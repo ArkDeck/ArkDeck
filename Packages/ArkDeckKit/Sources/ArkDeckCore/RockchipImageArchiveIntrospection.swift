@@ -24,7 +24,6 @@
 // Nothing here executes anything from inside the archive. Reading bytes is the
 // whole capability: no mount, no loop device, no interpreter.
 
-import ArkDeckCore
 import CryptoKit
 import Foundation
 

@@ -9,7 +9,7 @@
 //
 // No device is touched: every test reads bytes from a fixture directory.
 
-import ArkDeckCore
+@testable import ArkDeckCore
 import Foundation
 import XCTest
 
@@ -68,6 +68,27 @@ final class RockchipImageArchiveIntrospectionContractTests: XCTestCase {
     // Board facts survive untouched.
     XCTAssertEqual(derived.mappedPartitions, board.mappedPartitions)
     XCTAssertEqual(derived.catalogReference, board.catalogReference)
+  }
+
+  func testSharedArchiveConformanceFailureRetainsProviderErrorBoundary() {
+    let board = RockchipFlashProfile.dayu200
+    let incomplete = RockchipImageBuildDescriptor(
+      archiveSizeBytes: 1, archiveSHA256: String(repeating: "a", count: 64),
+      members: [], declaredPartitions: [], runtimeBuildVersion: "")
+    var readOnlyReason: String?
+    do {
+      _ = try board.withArchiveBuild(incomplete)
+      XCTFail("incomplete archive cannot become a review profile")
+    } catch RockchipFlashProfileError.archiveDoesNotConform(let reason) {
+      readOnlyReason = reason
+    } catch { XCTFail("unexpected read-only error: \(error)") }
+    do {
+      _ = try board.forBuild(incomplete)
+      XCTFail("Provider adapter must preserve the rejection")
+    } catch DeviceProviderError.unsupportedAction(let reason) {
+      XCTAssertNotNil(readOnlyReason)
+      XCTAssertEqual(reason, readOnlyReason)
+    } catch { XCTFail("Provider error contract changed: \(error)") }
   }
 
   /// The rule replaces a table that a person wrote by hand, twice. If it does

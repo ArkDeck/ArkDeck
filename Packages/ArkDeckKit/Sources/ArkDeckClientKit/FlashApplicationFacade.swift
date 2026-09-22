@@ -1,14 +1,12 @@
-import ArkDeckClientKit
 // App-facing Flash planning and typed execution over Runtime's XPC door.
 //
 // The production provider reads operation availability and adopted target
-// facts from the daemon, materializes an exact Rockchip plan in-process from a
-// user-selected archive, imports that archive, and submits the published
+// facts from the daemon, inspects a user-selected archive for presentation,
+// imports that archive, and asks Runtime to materialize the published
 // `flash.full-restore@1` typed operation. Runtime owns capability creation and all
 // target/plan/artifact admission; the App cannot supply or administer one.
 
 import ArkDeckCore
-import ArkDeckRuntime
 import Foundation
 import os
 
@@ -35,15 +33,14 @@ public struct FlashTargetPresentation: Sendable, Equatable, Identifiable {
 public struct FlashWorkspacePresentation: Sendable, Equatable {
   public let availability: FlashOperationAvailability
   public let targets: [FlashTargetPresentation]
-  public let bootloaderStatus: RockchipBootloaderStatus
+  /// Nil means Runtime did not provide a valid observation; it is not absence.
+  public let bootloaderStatus: RockchipBootloaderStatus?
   public let targetLoadFailure: String?
 
   public init(
     availability: FlashOperationAvailability,
     targets: [FlashTargetPresentation],
-    bootloaderStatus: RockchipBootloaderStatus = RockchipBootloaderStatus(
-      disposition: .absent, observationCount: 0, mode: nil,
-      targetID: nil, bindingRevision: nil),
+    bootloaderStatus: RockchipBootloaderStatus? = nil,
     targetLoadFailure: String? = nil
   ) {
     self.availability = availability
@@ -312,14 +309,14 @@ public struct FlashSubmissionPresentation: Sendable, Equatable {
   public let state: String
   public let outcomeUnknown: Bool
   public let timeline: [String]
-  public let processProgress: RuntimeJobProcessProgress?
+  public let processProgress: FlashProcessProgressPresentation?
 
   public init(
     jobID: String,
     state: String,
     outcomeUnknown: Bool,
     timeline: [String],
-    processProgress: RuntimeJobProcessProgress? = nil
+    processProgress: FlashProcessProgressPresentation? = nil
   ) {
     self.jobID = jobID
     self.state = state
@@ -454,7 +451,7 @@ public enum FlashLiveProgressProjector {
   }
 
   private static func writeFraction(
-    progress: RuntimeJobProcessProgress,
+    progress: FlashProcessProgressPresentation,
     partitions: [FlashPartitionPresentation]
   ) -> Double {
     let currentFraction = Double(progress.currentUnitPercent ?? 0) / 100
@@ -496,7 +493,7 @@ enum FlashJobStatusResponseDecoding {
       let timeline = fields["timeline"] as? [String]
     else { return nil }
 
-    let processProgress: RuntimeJobProcessProgress?
+    let processProgress: FlashProcessProgressPresentation?
     if let rawProgress = fields["processProgress"], !(rawProgress is NSNull) {
       guard let progressFields = rawProgress as? [String: Any],
         let decoded = decodeProcessProgress(progressFields)
@@ -519,10 +516,10 @@ enum FlashJobStatusResponseDecoding {
 
   private static func decodeProcessProgress(
     _ fields: [String: Any]
-  ) -> RuntimeJobProcessProgress? {
+  ) -> FlashProcessProgressPresentation? {
     guard let stepID = fields["stepId"] as? String, !stepID.isEmpty,
       let phaseValue = fields["phase"] as? String,
-      let phase = RuntimeProcessProgressPhase(rawValue: phaseValue),
+      let phase = FlashProcessProgressPresentation.Phase(rawValue: phaseValue),
       let completed = fields["completedUnitCount"] as? Int,
       let total = fields["totalUnitCount"] as? Int,
       total > 0, (0...total).contains(completed)
@@ -534,7 +531,7 @@ enum FlashJobStatusResponseDecoding {
       percent.map({ (0...100).contains($0) }) ?? true
     else { return nil }
 
-    return RuntimeJobProcessProgress(
+    return FlashProcessProgressPresentation(
       stepID: stepID,
       phase: phase,
       unitName: unitName,
@@ -636,7 +633,7 @@ public enum FlashApplicationFacade {
   }
 }
 
-private struct FlashImportedArtifact: Sendable, Equatable {
+struct FlashImportedArtifact: Sendable, Equatable {
   let lease: String
   let targetID: String
   let bindingRevision: Int
@@ -650,17 +647,31 @@ private struct FlashImportedArtifactKey: Sendable, Hashable {
   let archiveSizeBytes: Int64
 }
 
-private struct FlashRuntimePlanPreview: Sendable, Equatable {
+struct FlashRuntimePlanPreview: Sendable, Equatable {
   let materializedPlanDigest: String
 }
 
-private actor FlashProductionApplicationProvider: FlashApplicationProviding {
+actor FlashProductionApplicationProvider: FlashApplicationProviding {
+  typealias Send = @Sendable (String, [String: JSONValue]?) async -> Result<Data, FlashXPCReadFailure>
+  private let send: Send
+  private var requestedRuns: Set<String> = []
+
+  init() {
+    send = { await FlashXPCTransport.request(method: $0, params: $1) }
+  }
+
+  init(send: @escaping Send) { self.send = send }
+
+  private func request(method: String, params: [String: JSONValue]? = nil) async -> Result<Data, FlashXPCReadFailure> {
+    await send(method, params)
+  }
+
   private var importedArtifacts: [FlashImportedArtifactKey: FlashImportedArtifact] = [:]
 
   func refreshWorkspace() async -> FlashWorkspacePresentation {
-    async let operations = FlashXPCTransport.request(method: "operation.list")
-    async let targets = FlashXPCTransport.request(method: "target.list")
-    async let bootloader = FlashXPCTransport.request(method: "flash.bootloader-status")
+    async let operations = self.request(method: "operation.list")
+    async let targets = self.request(method: "target.list")
+    async let bootloader = self.request(method: "flash.bootloader-status")
     return FlashWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
@@ -687,7 +698,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     guard mode == .execute, let target, case .ready(let plan) = local else {
       return local
     }
-    let response = await FlashXPCTransport.request(
+    let response = await self.request(
       method: "flash.prerequisites",
       params: [
         "targetId": .string(target.id),
@@ -725,7 +736,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     profileReference: String,
     archiveSHA256: String
   ) async -> FlashLanePlanPreviewPresentation {
-    let response = await FlashXPCTransport.request(
+    let response = await self.request(
       method: "flash.lanePlanPreview",
       params: [
         "targetId": .string(target.id),
@@ -788,7 +799,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
         plan: plan, artifact: artifact, target: target,
         reviewedPlanDigest: expectedPlanDigest)
       let submitted = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
+        await self.request(
           method: "job.submit",
           params: ["requestJson": .string(requestJSON)]))
       guard let jobID = submitted["jobId"] as? String else {
@@ -819,7 +830,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       bindingRevision: target.bindingRevision, name: "images.tar.gz",
       byteCount: Int(plan.archiveSizeBytes), sha256: plan.archiveSHA256,
       send: { method, params in
-        try await FlashXPCTransport.request(method: method, params: params).get()
+        try await self.request(method: method, params: params).get()
       })
     guard case .string(let lease)? = receipt["lease"] else {
       throw FlashResponseFailure(message: "Runtime returned no Flash Import lease")
@@ -880,7 +891,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     return requestJSON
   }
 
-  private func runtimePlanPreview(
+  func runtimePlanPreview(
     plan: FlashExactPlanPresentation,
     artifact: FlashImportedArtifact,
     target: FlashTargetPresentation
@@ -888,55 +899,70 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
     let requestJSON = try runtimeRequestJSON(
       plan: plan, artifact: artifact, target: target)
     let result = try await FlashXPCResponseDecoding.resultObject(
-      await FlashXPCTransport.request(
+      await self.request(
         method: "job.plan", params: ["requestJson": .string(requestJSON)]))
     if let blocker = result["providerAdmissionBlocker"] as? String, !blocker.isEmpty {
       throw FlashResponseFailure(message: blocker)
     }
-    guard result["executionMode"] as? String == "planOnly",
-      result["operationReference"] as? String == ArkForgeFlashOperation.canonicalReference,
-      result["targetID"] as? String == target.id,
-      result["bindingRevision"] as? Int == target.bindingRevision,
-      result["providerID"] as? String == "arkforge",
-      result["effectiveEffect"] as? String == WorkflowEffect.destructive.rawValue,
-      result["authorizationPolicy"] as? String
-        == RuntimeOperationAuthorizationPolicy.runtimeCapability.rawValue,
-      result["jobAdmitted"] as? Bool == false,
-      result["dispatchDisposition"] as? String == "notDispatched",
-      (result["providerAdmissionBlocker"] == nil
-        || result["providerAdmissionBlocker"] is NSNull),
-      let materializedPlanDigest = result["materializedPlanDigest"] as? String,
-      SHA256Hex.isLowercaseSHA256(materializedPlanDigest),
-      let inputs = result["inputs"] as? [String: Any],
-      inputs["artifactLease"] as? String == artifact.lease,
-      inputs["deviceProfileRef"] as? String == plan.profileReference,
-      inputs["intent"] as? String == "fullRestore",
-      inputs["verification"] as? String == "full",
-      let rows = result["steps"] as? [[String: Any]]
+    guard let review = FlashCatalogReview.decode(Data(FlashReviewCatalogGenerated.json.utf8)),
+      let bytes = try? JSONSerialization.data(withJSONObject: result),
+      let preview = try? JSONDecoder().decode(FlashRuntimePlanResponse.self, from: bytes),
+      preview.schemaVersion == "arkdeck.job-plan/1",
+      preview.executionMode == "planOnly",
+      preview.operation == ArkForgeFlashOperation.canonicalReference,
+      preview.catalogDigest == RuntimeOperationCatalog.catalogDigest,
+      review.stepSetDigestSHA256 == plan.stepSetDigestSHA256,
+      // The additive field may be absent in an older valid response. Present
+      // null, wrong types and mismatches are never treated as absence.
+      (!result.keys.contains("stepSetDigestSHA256")
+        || result["stepSetDigestSHA256"] as? String == review.stepSetDigestSHA256),
+      preview.targetId == target.id,
+      preview.bindingRevision == target.bindingRevision,
+      preview.providerId == "arkforge",
+      preview.effectiveEffect == WorkflowEffect.destructive.rawValue,
+      preview.authorizationPolicy == RuntimeOperationAuthorizationPolicy.runtimeCapability.rawValue,
+      !preview.jobAdmitted, preview.dispatchDisposition == "notDispatched",
+      result.keys.contains("providerAdmissionBlocker"),
+      preview.providerAdmissionBlocker == nil,
+      SHA256Hex.isLowercaseSHA256(preview.materializedPlanDigest),
+      preview.inputs == [
+        "artifactLease": .string(artifact.lease), "deviceProfileRef": .string(plan.profileReference),
+        "intent": .string("fullRestore"), "verification": .string("full"),
+      ]
     else {
       throw FlashResponseFailure(
         message: "Runtime plan-only facts no longer match the reviewed Flash plan")
     }
-    let stepIDs = rows.compactMap { row in row["stepID"] as? String }
-    let stepKinds = rows.compactMap { row in row["kind"] as? String }
-    let stepEffects = rows.compactMap { row in row["effect"] as? String }
-    guard stepIDs == plan.steps.map(\.id),
-      stepKinds == plan.steps.map(\.kind),
-      stepEffects == plan.steps.map({ $0.effect.rawValue })
+    guard preview.steps.count == plan.steps.count,
+      preview.steps.count == review.steps.count,
+      zip(preview.steps, review.steps).allSatisfy({ actual, expected in
+        actual.stepId == expected.stepId && actual.kind == expected.kind
+          && actual.effect == expected.effect && actual.cancellation == expected.cancellation
+          && actual.binding == expected.binding && actual.optional == expected.optional
+      }),
+      preview.steps.map(\.stepId) == plan.steps.map(\.id),
+      preview.steps.map(\.kind) == plan.steps.map(\.kind),
+      preview.steps.map(\.effect) == plan.steps.map({ $0.effect.rawValue }),
+      preview.steps.map(\.cancellation) == plan.steps.map({ $0.cancellation.rawValue })
     else {
       throw FlashResponseFailure(
         message: "Runtime plan-only steps no longer match the reviewed Flash plan")
     }
-    return FlashRuntimePlanPreview(materializedPlanDigest: materializedPlanDigest)
+    return FlashRuntimePlanPreview(materializedPlanDigest: preview.materializedPlanDigest)
   }
 
   func run(jobID: String) async -> FlashRunResult {
+    // Consume the local dispatch handle before suspension. A missing response
+    // is not permission to repeat an effectful run; status remains readable.
+    guard requestedRuns.insert(jobID).inserted else {
+      return .failed("Flash run was already requested; inspect its current Runtime status")
+    }
     do {
       _ = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
+        await self.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
       let terminal = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
-        try await FlashXPCTransport.request(method: method, params: params).get()
+        try await self.request(method: method, params: params).get()
       }
       guard
         let presentation = FlashJobStatusResponseDecoding.presentation(
@@ -955,7 +981,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   func status(jobID: String) async -> FlashJobStatusResult {
     do {
       let current = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
-        try await FlashXPCTransport.request(method: method, params: params).get()
+        try await self.request(method: method, params: params).get()
       }
       guard
         let presentation = FlashJobStatusResponseDecoding.presentation(
@@ -974,7 +1000,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   func cancel(jobID: String) async -> Bool {
     guard
       let result = try? await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
+        await self.request(
           method: "job.cancel", params: ["jobId": .string(jobID)]))
     else { return false }
     return result["cancelRequested"] as? Bool == true
@@ -985,7 +1011,7 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
   ) async -> FlashLoaderBindingResult {
     do {
       let result = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
+        await self.request(
           method: "flash.bind-current-loader",
           params: [
             "targetId": .string(target.id),
@@ -1106,7 +1132,7 @@ private actor FlashFixtureApplicationProvider: FlashApplicationProviding {
           "verified rebind-loader-identity []",
           "intent flash-partitions",
         ],
-        processProgress: RuntimeJobProcessProgress(
+        processProgress: FlashProcessProgressPresentation(
           stepID: "flash-partitions",
           phase: .writing,
           unitName: "system",
@@ -1191,27 +1217,38 @@ enum FlashWorkspaceResponseDecoding {
     }
   }
 
+  private struct BootloaderEnvelope: Decodable {
+    struct Payload: Decodable {
+      let disposition: String
+      let observationCount: Int
+      let mode: String?
+      let targetId: String?
+      let bindingRevision: Int?
+    }
+    let ok: Bool
+    let result: Payload?
+  }
+
   private static func decodeBootloaderStatus(
     _ response: Result<Data, FlashXPCReadFailure>
-  ) -> RockchipBootloaderStatus {
+  ) -> RockchipBootloaderStatus? {
     guard case .success(let data) = response,
-      let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      envelope["ok"] as? Bool == true,
-      let result = envelope["result"] as? [String: Any],
-      let dispositionText = result["disposition"] as? String,
-      let disposition = RockchipBootloaderBindingDisposition(rawValue: dispositionText),
-      let count = result["observationCount"] as? Int
-    else {
-      return RockchipBootloaderStatus(
-        disposition: .absent, observationCount: 0, mode: nil,
-        targetID: nil, bindingRevision: nil)
+      let envelope = try? JSONDecoder().decode(BootloaderEnvelope.self, from: data),
+      envelope.ok, let result = envelope.result,
+      let disposition = RockchipBootloaderBindingDisposition(rawValue: result.disposition),
+      result.observationCount >= 0,
+      (disposition == .absent ? result.observationCount == 0 : result.observationCount > 0),
+      result.mode.map({ ["loader", "hdcNormal"].contains($0) }) ?? true,
+      result.bindingRevision.map({ $0 > 0 }) ?? true
+    else { return nil }
+    if disposition == .exactBoundTarget || disposition == .targetBindingUnprepared {
+      guard result.observationCount == 1,
+        result.targetId?.isEmpty == false, result.bindingRevision != nil
+      else { return nil }
     }
     return RockchipBootloaderStatus(
-      disposition: disposition,
-      observationCount: count,
-      mode: result["mode"] as? String,
-      targetID: result["targetId"] as? String,
-      bindingRevision: result["bindingRevision"] as? Int)
+      disposition: disposition, observationCount: result.observationCount,
+      mode: result.mode, targetID: result.targetId, bindingRevision: result.bindingRevision)
   }
 
   private static func decodeAvailability(
@@ -1365,7 +1402,7 @@ enum FlashPlanPresentationBuilder {
       return .failed(code: .unsupportedBundle, detail: profileReference)
     }
     do {
-      let profile = try board.forArchive(at: archiveURL)
+      let profile = try board.reviewingArchive(at: archiveURL)
       let observation = RockchipImagesArchiveObservation(
         archiveSizeBytes: profile.archiveSizeBytes,
         archiveSHA256: profile.archiveSHA256,
@@ -1377,6 +1414,9 @@ enum FlashPlanPresentationBuilder {
         return .failed(
           code: .planMaterializationFailed,
           detail: "archive observation failed profile validation")
+      }
+      guard reviewSteps(mode: mode) != nil else {
+        return .failed(code: .planMaterializationFailed, detail: "Flash catalog review is unavailable")
       }
       return .ready(
         presentation(
@@ -1406,16 +1446,12 @@ enum FlashPlanPresentationBuilder {
     "verification": .string("full")
   ]
 
-  /// The catalog steps the engine will select for the default request, with
-  /// their real execution disposition. Same descriptor, same selection rule,
-  /// same digest algorithm as `RuntimeJobEngine` — presentation and
-  /// authorization cannot disagree (CHG-2026-066).
+  /// Rust supplies the default selected steps and digest as a generated,
+  /// target-independent projection. Offline presentation grants no admission.
   static func reviewSteps(
     mode: RockchipFlashExecutionMode
   ) -> (steps: [FlashPlanStepPresentation], stepSetDigestSHA256: String)? {
-    guard
-      let descriptor = RuntimeOperationCatalog.descriptor(
-        reference: ArkForgeFlashOperation.canonicalReference)
+    guard let review = FlashCatalogReview.decode(Data(FlashReviewCatalogGenerated.json.utf8))
     else { return nil }
     let disposition: FlashPlanStepDisposition
     switch mode {
@@ -1423,29 +1459,18 @@ enum FlashPlanPresentationBuilder {
     case .planOnly: disposition = .planned
     case .simulated: disposition = .simulatedPreview
     }
-    let laneOwned = RuntimeJobEngine.arkForgeOwnedModeSteps
-      .union(RuntimeJobEngine.arkForgeDispatchedSteps)
-    let steps = descriptor.steps
-      .filter {
-        RuntimeJobEngine.stepIsRequested(
-          $0, descriptor: descriptor, inputs: reviewSelectionInputs)
-      }
-      .map { step in
-        FlashPlanStepPresentation(
-          id: step.stepID,
-          kind: step.kind.rawValue,
-          argumentSummary: laneOwned.contains(step.stepID)
-            ? "ArkForge lane (delegated)" : "engine host step",
-          effect: FlashPlanEffect(rawValue: step.effect.rawValue) ?? .hostOnly,
-          cancellation: FlashPlanCancellation(rawValue: step.cancellation.rawValue)
-            ?? .immediate,
-          disposition: disposition)
-      }
-    return (
-      steps,
-      RuntimeJobEngine.stepSetDigest(
-        descriptor: descriptor, inputs: reviewSelectionInputs)
-    )
+    var steps: [FlashPlanStepPresentation] = []
+    for step in review.steps {
+      guard let effect = FlashPlanEffect(rawValue: step.effect),
+        let cancellation = FlashPlanCancellation(rawValue: step.cancellation)
+      else { return nil }
+      steps.append(FlashPlanStepPresentation(
+        id: step.stepId, kind: step.kind,
+        argumentSummary: step.executionOwner == "arkforgeLane"
+          ? "ArkForge lane (delegated)" : "engine host step",
+        effect: effect, cancellation: cancellation, disposition: disposition))
+    }
+    return (steps, review.stepSetDigestSHA256)
   }
 
   static func presentation(
@@ -1517,4 +1542,33 @@ private enum FlashXPCTransport {
     await RuntimeXPCRequestTransport.request(method: method, params: params)
       .mapError { FlashXPCReadFailure.transport($0.message) }
   }
+}
+
+/// Decodable preserves the wire distinction between numbers, booleans and
+/// strings. Foundation dictionary bridging must not turn 0 into false or a
+/// boolean into a binding revision at this review boundary.
+private struct FlashRuntimePlanResponse: Decodable {
+  struct Step: Decodable {
+    let stepId: String
+    let kind: String
+    let effect: String
+    let cancellation: String
+    let binding: String
+    let optional: Bool
+  }
+  let schemaVersion: String
+  let executionMode: String
+  let operation: String
+  let targetId: String
+  let bindingRevision: Int
+  let providerId: String
+  let effectiveEffect: String
+  let authorizationPolicy: String
+  let jobAdmitted: Bool
+  let dispatchDisposition: String
+  let providerAdmissionBlocker: String?
+  let materializedPlanDigest: String
+  let catalogDigest: String
+  let inputs: [String: JSONValue]
+  let steps: [Step]
 }

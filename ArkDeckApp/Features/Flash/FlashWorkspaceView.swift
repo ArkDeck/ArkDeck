@@ -1,7 +1,6 @@
 import ArkDeckClientKit
 import AppKit
 import ArkDeckCore
-import ArkDeckWorkflows
 import Observation
 import SwiftUI
 import UniformTypeIdentifiers
@@ -1051,9 +1050,9 @@ struct FlashWorkspaceView: View {
         .disabled(model.isRefreshingDeviceAccess)
         .accessibilityIdentifier("flash.deviceAccess.reprobe")
       }
-      if model.workspace.bootloaderStatus.disposition == .unbound
-        || model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
-        model.workspace.bootloaderStatus.mode == "loader"
+      if model.workspace.bootloaderStatus?.disposition == .unbound
+        || model.workspace.bootloaderStatus?.disposition == .targetBindingUnprepared,
+        model.workspace.bootloaderStatus?.mode == "loader"
       {
         Divider()
         Label(
@@ -1064,15 +1063,15 @@ struct FlashWorkspaceView: View {
         .foregroundStyle(.orange)
         Text(
           flashText(
-            model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared
+            model.workspace.bootloaderStatus?.disposition == .targetBindingUnprepared
               ? "flash.bootloader.unprepared.detail"
               : "flash.bootloader.unbound.detail")
         )
         .font(.callout)
         .foregroundStyle(.secondary)
         .fixedSize(horizontal: false, vertical: true)
-      } else if model.workspace.bootloaderStatus.disposition == .exactBoundTarget,
-        model.workspace.bootloaderStatus.mode == "loader"
+      } else if model.workspace.bootloaderStatus?.disposition == .exactBoundTarget,
+        model.workspace.bootloaderStatus?.mode == "loader"
       {
         Label(
           flashText("flash.bootloader.bound"),
@@ -1080,8 +1079,8 @@ struct FlashWorkspaceView: View {
         )
         .foregroundStyle(.green)
         .accessibilityIdentifier("flash.bootloader.bound")
-      } else if model.workspace.bootloaderStatus.disposition == .targetBindingUnprepared,
-        model.workspace.bootloaderStatus.mode == "hdcNormal"
+      } else if model.workspace.bootloaderStatus?.disposition == .targetBindingUnprepared,
+        model.workspace.bootloaderStatus?.mode == "hdcNormal"
       {
         Label(
           flashText("flash.binding.unprepared.hdc.title"),
@@ -1516,8 +1515,7 @@ final class FlashWorkspaceViewModel {
 
   var willActivateCurrentTargetOnSubmit: Bool {
     guard mode == .execute, let selectedTarget else { return false }
-    let status = workspace.bootloaderStatus
-    guard status.observationCount == 1,
+    guard let status = workspace.bootloaderStatus, status.observationCount == 1,
       status.mode == "loader" || status.mode == "hdcNormal"
     else { return false }
     switch status.disposition {
@@ -1854,7 +1852,7 @@ final class FlashWorkspaceViewModel {
   }
 
   private func applyBoundLoader(_ rebound: FlashTargetPresentation) {
-    let observedMode = workspace.bootloaderStatus.mode
+    let observedMode = workspace.bootloaderStatus?.mode
     workspace = FlashWorkspacePresentation(
       availability: workspace.availability,
       targets: workspace.targets.map { $0.id == rebound.id ? rebound : $0 },
