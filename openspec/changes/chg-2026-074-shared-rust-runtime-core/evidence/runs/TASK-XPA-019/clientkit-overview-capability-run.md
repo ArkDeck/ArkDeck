@@ -184,3 +184,39 @@ The commit that records this section changes only this file.
   build-for-testing lane compiles the App and its UI runner, and the fixture those suites launch
   is unchanged.
 - Signed standalone Rust App acceptance, installed activation, a device.
+
+## Follow-up: HDC presentation boundary audit (2026-09-22)
+
+On protected main `5d176172b`, slow UI run `35534480398` failed only
+`HDCStatusUITests.testOBSAPP4_AppSourceKeepsPresentationOnlyPackageBoundary`:
+its expected import set still named Workflows alone, while this extraction
+already added ClientKit to `HDCStatusView.swift`. The view consumes
+`OverviewCapabilityMatrixPresentation` from ClientKit and still consumes
+`HDCDiagnosticsPresentation` through Workflows' HDC facade. This follow-up
+updates the **exact** expected set to those two modules. All forbidden
+execution/domain symbols, fixture-value bans and presentation-field assertions
+remain intact. No App source, package dependency, runtime behavior or acceptance
+requirement changes. HDC facade extraction and signed standalone Rust App
+acceptance remain outstanding.
+
+### Local targeted checks
+
+- `ARKDECK_UI_TEST_DERIVED_DATA=/private/tmp/arkdeck-1330-ui-derived sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/HDCStatusUITests/testOBSAPP4_AppSourceKeepsPresentationOnlyPackageBoundary`:
+  App and test runner compiled and signed; exit 65 before any assertion because
+  automation-mode initialization timed out. Log:
+  `/private/tmp/arkdeck-1330-ui-boundary.log`.
+- The same wrapper/selection with `--no-build`, the one bootstrap retry allowed
+  by the acceptance guide: exit 65 for the same initialization timeout. Log:
+  `/private/tmp/arkdeck-1330-ui-boundary-retry.log`. Neither run is a UI PASS.
+- Static replay of the source audit's exact import set, all forbidden
+  symbols/values and five presentation-field checks: exit 0. Log:
+  `/private/tmp/arkdeck-1330-ui-source-audit.log`. This does not replace XCTest.
+- `sh scripts/check-sdd.sh`: exit 0, zero errors/warnings. Log:
+  `/private/tmp/arkdeck-1330-ui-sdd.log`. `git diff --check`: exit 0.
+
+The original XCTest remains unverified locally until the host can initialize
+UI automation. No full local gate, hardware or signed Runtime acceptance ran.
+
+### CI
+
+Pending the implementation PR; no skipped job is counted as a pass.
