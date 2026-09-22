@@ -4,7 +4,7 @@ use arkdeck_cli::{
 use arkdeck_client::Client;
 use arkdeck_platform::{LocalEndpoint, ServerIdentity, default_user_endpoint, random_bytes};
 use serde_json::{Map, Value, json};
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -653,17 +653,31 @@ fn run_agent(
         error
     };
     let mut answer =
-        request(invocation.method, params).map_err(|error| attach(error, &execution))?;
-    if invocation.command == "human-action.resume"
-        && (answer["schemaVersion"] == "arkdeck.impact-approval-challenge/1"
-            || answer["owner"]["kind"] == "controlAction")
-    {
-        let mut error = CliError::new(
-            "humanActionRequired",
-            "impact approval requires its supported foreground interactive console",
-        );
-        error.details.insert("humanAction".into(), answer);
-        return Err(error);
+        request(invocation.method, params.clone()).map_err(|error| attach(error, &execution))?;
+    if invocation.command == "human-action.resume" {
+        let challenge = answer["schemaVersion"] == "arkdeck.impact-approval-challenge/1";
+        if cfg!(target_os = "macos") && challenge {
+            let stdin = io::stdin();
+            let response = arkdeck_cli::read_console_challenge(
+                &answer,
+                stdin.is_terminal(),
+                &mut stdin.lock(),
+                &mut io::stderr().lock(),
+            )?;
+            let mut resumed = params;
+            resumed.insert("challengeResponse".into(), json!(response));
+            let result = request(invocation.method, resumed)?;
+            arkdeck_cli::validate_control_action_result(&result)?;
+            return Ok(result);
+        }
+        if challenge || answer["owner"]["kind"] == "controlAction" {
+            let mut error = CliError::new(
+                "humanActionRequired",
+                "impact approval requires the same foreground interactive console",
+            );
+            error.details.insert("humanAction".into(), answer);
+            return Err(error);
+        }
     }
     let mut interval = 100;
     loop {
