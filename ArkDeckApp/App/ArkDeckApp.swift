@@ -148,7 +148,9 @@ private final class ArkDeckAppModelStore {
     // read while SwiftUI builds the window instead of waiting for `.task`
     // after first appearance. The task inherits the main actor only for
     // publication; the provider actor owns the Runtime/XPC wait.
-    deviceList.refreshForStartup()
+    if !ProcessInfo.processInfo.arguments.contains("--runtime-readonly-smoke") {
+      deviceList.refreshForStartup()
+    }
   }
 
   func requestTraceWorkspace() {
@@ -168,20 +170,25 @@ struct ArkDeckApp: App {
 
   var body: some Scene {
     WindowGroup(id: ArkDeckWindow.main) {
-      AppShellView(models: models)
-        .onOpenURL(perform: openTrace)
-        .overlay(alignment: .bottomTrailing) {
-          if ProcessInfo.processInfo.arguments.contains("--ui-test-window-geometry") {
-            WindowGeometryEvidence()
-              .frame(width: 1, height: 1)
+      if ProcessInfo.processInfo.arguments.contains("--runtime-readonly-smoke") {
+        Text("Runtime connection check")
+          .task { await RuntimeReadonlySmoke.run() }
+      } else {
+        AppShellView(models: models)
+          .onOpenURL(perform: openTrace)
+          .overlay(alignment: .bottomTrailing) {
+            if ProcessInfo.processInfo.arguments.contains("--ui-test-window-geometry") {
+              WindowGeometryEvidence()
+                .frame(width: 1, height: 1)
+            }
           }
-        }
-        .overlay(alignment: .bottomTrailing) {
-          if let size = WindowFrameEstablisher.requestedSize {
-            WindowFrameEstablisher(size: size)
-              .frame(width: 1, height: 1)
+          .overlay(alignment: .bottomTrailing) {
+            if let size = WindowFrameEstablisher.requestedSize {
+              WindowFrameEstablisher(size: size)
+                .frame(width: 1, height: 1)
+            }
           }
-        }
+      }
     }
     .defaultSize(width: 1180, height: 760)
     .commands {
@@ -1735,5 +1742,41 @@ private final class OverviewCapabilityViewModel {
       from: providerPresentation,
       devices: deviceObservation,
       preferredTargetID: selectedTargetID)
+  }
+}
+
+/// Opt-in host integration entry point. Uses the production ClientKit providers
+/// under the real App identity/sandbox; accepts only a refresh signal on stdin.
+/// It never selects a transport, changes authority, or dispatches a device job.
+@MainActor
+private enum RuntimeReadonlySmoke {
+  static var started = false
+
+  static func run() async {
+    guard !started else { return }
+    started = true
+    let history = RuntimeHistoryApplicationFacade.make(arguments: [])
+    let filters = RuntimeHistoryFilterApplicationFacade.make(arguments: [])
+    while let line = await Task.detached(operation: { readLine() }).value {
+      guard line == "refresh" else { exit(64) }
+      let snapshot = await history.refreshHistory()
+      let filter = await filters.loadHistoryFilter()
+      let historyReady = snapshot.availability == .available && snapshot.olderJobsLoadFailure == nil
+      let filterReady: Bool
+      if case .loaded = filter { filterReady = true } else { filterReady = false }
+      let report: [String: Any] = [
+        "schemaVersion": "arkdeck.app-readonly-smoke/1",
+        "connected": historyReady && filterReady,
+        "historyAvailable": historyReady,
+        "filterAvailable": filterReady,
+        "jobCount": snapshot.jobs.count,
+        "hardwareAcceptance": false,
+      ]
+      guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]),
+        let text = String(data: data, encoding: .utf8)
+      else { exit(70) }
+      FileHandle.standardOutput.write(Data("ARKDECK_IPC_SMOKE \(text)\n".utf8))
+    }
+    exit(0)
   }
 }
