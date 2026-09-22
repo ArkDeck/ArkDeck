@@ -211,11 +211,13 @@ impl HdcLifecycleDriver for ManagedHdc {
         self.revalidate_ownership(&ownership).map_err(drift)?;
         audit.append("launchWindowEntered", &audit_id, Value::Object(marker))?;
         *ownership = DispatchOwnership::Pending;
+        let expected_exit = self.expect_confirmed_exit();
         drop(ownership);
         let mut window = LaunchWindow {
             managed: self,
             completed: false,
         };
+        expected_exit.map_err(drift)?;
         let receipt = prepared.launch(&LifecycleBudget::default());
         let mut replacement = None;
         let mut outcome = match receipt.outcome {

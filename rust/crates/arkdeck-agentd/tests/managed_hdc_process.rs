@@ -276,6 +276,53 @@ fn frame(method: &str, params: Value) -> Vec<u8> {
 }
 
 #[test]
+fn unexpected_foreground_exit_ends_the_daemon_and_a_successor_rebuilds_the_provider() {
+    use arkdeck_platform::{LoopbackServerLease, VerifiedTool};
+    let mut runtime = Runtime::new();
+    runtime.start();
+    let tool = VerifiedTool::open(
+        runtime.hdc(),
+        &sha256_hex(&fs::read(runtime.hdc()).unwrap()),
+    )
+    .unwrap();
+    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, runtime.port);
+    let before = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+    // This is the exact retained fake child's PID, never a real HDC target.
+    assert!(
+        Command::new("/bin/kill")
+            .args(["-KILL", &before.identity().pid.to_string()])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let mut child = runtime.child.take().unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let status = loop {
+        if let Some(status) = child.try_wait().unwrap() {
+            break status;
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            panic!("daemon kept serving after its foreground HDC died");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert_eq!(status.code(), Some(70));
+    assert!(UnixStream::connect(runtime.socket()).is_err());
+    assert!(before.revalidate().is_err());
+    // Emulate launchd starting the same binary/root; no installed service is
+    // changed. Startup must recover the stale control socket and store locks.
+    runtime.start();
+    let after = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+    assert_ne!(before.identity(), after.identity());
+    assert_eq!(runtime.call("runtime.hdc.status", json!({}))["ok"], true);
+    let (status, _) = runtime.terminate(Duration::from_secs(10));
+    assert_eq!(status.code(), Some(0));
+    assert!(after.revalidate().is_err());
+}
+
+#[test]
 fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon() {
     let mut runtime = Runtime::new();
     let digest = sha256_hex(&fs::read(runtime.hdc()).unwrap());

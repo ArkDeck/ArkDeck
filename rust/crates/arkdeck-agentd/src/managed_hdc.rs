@@ -12,6 +12,9 @@
 //! child. Neither an unrelated process on the endpoint nor an unproved
 //! replacement may receive an HDC plan. The shared Supervisor supplies the
 //! same ownership fallback to status and impact observations as Swift does.
+//! The process owner exits 70 on an unexpected foreground-child exit so
+//! launchd can rebuild the provider graph. Confirmed execution has Swift's
+//! bounded expected-exit window; no uncertain replacement is adopted here.
 use arkdeck_control::ManagedToolFacts;
 use arkdeck_platform::{LoopbackServerLease, ServerStop, VerifiedTool};
 use arkdeck_provider_hdc::{
@@ -23,6 +26,19 @@ use arkdeck_provider_hdc::{
 use serde_json::Value;
 use std::io;
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+#[derive(Default)]
+struct ForegroundLifecycle {
+    stopping: bool,
+    expected_until: Option<Instant>,
+}
+
+impl ForegroundLifecycle {
+    fn unexpected(&self, now: Instant) -> bool {
+        !self.stopping && self.expected_until.is_none_or(|deadline| now > deadline)
+    }
+}
 
 #[path = "managed_hdc_lifecycle.rs"]
 mod lifecycle;
@@ -36,6 +52,7 @@ pub(crate) struct ManagedHdc {
     tool: VerifiedTool,
     supervisor: Mutex<Option<SupervisedServer>>,
     ownership: Mutex<DispatchOwnership>,
+    foreground: Mutex<ForegroundLifecycle>,
 }
 
 /// A replacement is owned only after an audited restart and a fresh kernel
@@ -98,6 +115,7 @@ impl ManagedHdc {
             tool: retained,
             supervisor: Mutex::new(Some(supervised)),
             ownership: Mutex::new(DispatchOwnership::Original),
+            foreground: Mutex::default(),
         })
     }
 
@@ -109,6 +127,60 @@ impl ManagedHdc {
     /// The endpoint the server was started on, as its selection spells it.
     pub(crate) fn endpoint(&self) -> &str {
         &self.startup.endpoint
+    }
+
+    /// Only the process composition arms this crash boundary. An in-process
+    /// test owning a server must not terminate its own runner.
+    pub(crate) fn monitor_foreground_exit(self: &Arc<Self>) -> io::Result<()> {
+        let managed = Arc::downgrade(self);
+        std::thread::Builder::new()
+            .name("hdc-foreground-exit".into())
+            .spawn(move || loop {
+                let Some(managed) = managed.upgrade() else { return };
+                match managed.foreground_exit() {
+                    Some(true) => {
+                        eprintln!("arkdeck-agentd: foreground HDC exited unexpectedly; Runtime restart required");
+                        std::process::exit(70);
+                    }
+                    Some(false) => return,
+                    None => {}
+                }
+                drop(managed);
+                std::thread::sleep(Duration::from_millis(50));
+            })?;
+        Ok(())
+    }
+
+    /// None while running; once ended, whether the original child's exit is
+    /// unexpected. Replacement processes are not children observed by this
+    /// monitor, matching the accepted Swift lifecycle.
+    fn foreground_exit(&self) -> Option<bool> {
+        let Ok(lifecycle) = self.foreground.lock() else {
+            return Some(true);
+        };
+        if lifecycle.stopping {
+            return Some(false);
+        }
+        let Ok(mut server) = self.server.lock() else {
+            return Some(true);
+        };
+        let Some(server) = server.as_mut() else {
+            return Some(false);
+        };
+        server
+            .exited()
+            .then(|| lifecycle.unexpected(Instant::now()))
+    }
+
+    /// Called after the durable launch marker, with the launch lease held.
+    /// Swift allows the original foreground child's exit for twenty seconds.
+    fn expect_confirmed_exit(&self) -> Result<(), String> {
+        let mut lifecycle = self
+            .foreground
+            .lock()
+            .map_err(|_| "HDC foreground lifecycle is unavailable")?;
+        lifecycle.expected_until = Instant::now().checked_add(Duration::from_secs(20));
+        Ok(())
     }
 
     /// Swift `activeLaunch()`: the spawn record while the server runs and is
@@ -198,6 +270,7 @@ impl ManagedHdc {
     /// Swift `HeadlessHDCServerHost.stop`: TERM to the server's process
     /// group, KILL after its grace, and what it wrote. Once only.
     pub(crate) fn stop(&self) -> Option<io::Result<ServerStop>> {
+        self.foreground.lock().ok()?.stopping = true;
         *self.ownership.lock().ok()? = DispatchOwnership::Stopped;
         *self.supervisor.lock().ok()? = None;
         let server = self.server.lock().ok()?.take()?;
@@ -278,6 +351,19 @@ mod tests {
     use std::time::{Duration, Instant};
 
     const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
+
+    #[test]
+    fn foreground_exit_window_is_bounded_and_stop_is_expected() {
+        let now = Instant::now();
+        let mut lifecycle = ForegroundLifecycle::default();
+        assert!(lifecycle.unexpected(now));
+        lifecycle.expected_until = Some(now + Duration::from_secs(20));
+        assert!(!lifecycle.unexpected(now));
+        assert!(!lifecycle.unexpected(now + Duration::from_secs(20)));
+        assert!(lifecycle.unexpected(now + Duration::from_secs(20) + Duration::from_nanos(1)));
+        lifecycle.stopping = true;
+        assert!(!lifecycle.unexpected(now + Duration::from_secs(30)));
+    }
 
     struct Fake(PathBuf);
     impl Drop for Fake {
@@ -392,11 +478,13 @@ mod tests {
             reason,
             "dispatch refused: foreground HDC server exited after signal 9"
         );
+        assert_eq!(managed.foreground_exit(), Some(true));
         assert!(!hdc.mutation_identity_current());
         let status = managed.status(&|| "2026-09-19T00:00:00Z".to_owned());
         assert_eq!(status["executableSHA256"], tool.sha256());
         assert!(managed.stop().is_some());
         assert!(managed.stop().is_none());
+        assert_eq!(managed.foreground_exit(), Some(false));
         let Err(DispatchFailure::Refused(reason)) = hdc.dispatch(&plan()) else {
             panic!("a plan was dispatched past the managed server's stop");
         };
@@ -768,6 +856,7 @@ mod tests {
                     assert!(!managed.state(managed.endpoint()).unwrap().healthy);
                 } else {
                     assert!(managed.active_launch().is_none());
+                    assert_eq!(managed.foreground_exit(), Some(false));
                     assert!(hdc.mutation_identity_current());
                     assert!(
                         managed.state(managed.endpoint()).unwrap().generation > before.generation

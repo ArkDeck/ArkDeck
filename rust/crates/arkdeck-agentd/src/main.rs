@@ -385,6 +385,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 dispatch,
                 managed: Some(managed),
             }) => {
+                managed.monitor_foreground_exit()?;
                 managed_hdc = Some(Arc::clone(&managed));
                 host.with_managed_development_hdc(dispatch, managed)
             }
