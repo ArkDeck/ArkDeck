@@ -21,6 +21,13 @@ import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[2]
+REVIEW_PROJECTION = "Packages/ArkDeckKit/Sources/ArkDeckCore/FlashReviewCatalogGenerated.swift"
+
+
+def review_projection() -> bytes:
+    # This is a checkout implementation companion, not a published protocol input.
+    # Both views compile the current Rust implementation and its drift assertion.
+    return (ROOT / REVIEW_PROJECTION).read_bytes()
 
 
 def load_module(name: str, path: Path, contents: bytes | None = None):
@@ -65,13 +72,17 @@ def rust_digest(source: Path) -> str:
 
 
 def materialize(destination: Path, inputs, info: dict, published_info: dict,
-                rust_source: Path | None = None, catalog_source: str | None = None) -> None:
+                rust_source: Path | None = None, catalog_source: str | None = None,
+                review_source: bytes | None = None) -> None:
     """All fixture readers and include_str! consumers see the same input view."""
     copy_rust(rust_source or ROOT / "rust", destination / "rust")
     for path, contents in inputs.files.items():
         target = destination / path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(contents)
+    companion = destination / REVIEW_PROJECTION
+    companion.parent.mkdir(parents=True, exist_ok=True)
+    companion.write_bytes(review_projection() if review_source is None else review_source)
     write_json(destination / "spec/baselines/swift-single-v1.json", published_info)
     if info["kind"] == "candidate":
         write_json(destination / "spec/baselines/swift-candidate-inputs.json", info)
@@ -210,6 +221,7 @@ def check(output_root: Path) -> Path:
     output.mkdir(parents=True, exist_ok=False)
     failures = []
     source_digest = rust_digest(ROOT / "rust")
+    review_source = review_projection()
     # When the working inputs are byte-identical to the published base (the
     # merge-base with origin/main), the published view would be the checkout
     # this lane already linted and tested at top level. Building the same
@@ -241,7 +253,7 @@ def check(output_root: Path) -> Path:
         for name, inputs, info in views:
             view = Path(directory) / name
             try:
-                materialize(view, inputs, info, published_info, rust_source, catalogs[name])
+                materialize(view, inputs, info, published_info, rust_source, catalogs[name], review_source)
                 run_view(view, output / name, info, published_info)
             except (OSError, ValueError, subprocess.CalledProcessError) as error:
                 failures.append({"view": name, "error": str(error)})
@@ -251,6 +263,8 @@ def check(output_root: Path) -> Path:
         failures.append({"view": "candidate", "error": "source inputs changed during validation"})
     if rust_digest(ROOT / "rust") != source_digest:
         failures.append({"view": "source", "error": "Rust sources changed during validation"})
+    if review_projection() != review_source:
+        failures.append({"view": "source", "error": "App review projection changed during validation"})
     if catalog_path.read_bytes() != catalog_bytes:
         failures.append({"view": "source", "error": "Catalog generator changed during validation"})
     contract.verify_checkout()
@@ -258,6 +272,7 @@ def check(output_root: Path) -> Path:
         "schemaVersion": "arkdeck.rust-dual-contract-check/1", "kind": "host-test",
         "deviceAcceptance": False, "publishedBaselineCommit": published_info["commit"],
         "sourceRustDigest": source_digest,
+        "appReviewProjectionSHA256": contract.sha(review_source),
         "catalogGeneratorSHA256": contract.sha(catalog_bytes),
         "candidateInputDigest": current_info["inputDigest"],
         "publishedView": "covered-by-candidate" if published_covered else "run",

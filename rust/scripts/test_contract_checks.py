@@ -97,6 +97,7 @@ class ContractChecksTests(unittest.TestCase):
             replacement = patch.object(module, key, value)
             replacement.start()
             self.addCleanup(replacement.stop)
+        self.write(runner.REVIEW_PROJECTION, b"// current App projection\n")
         methods = ["device.observations", "doctor", "health", "operation.list"]
         registry = {"currentVersion": "1.0.0", "maximumRequestFrameBytes": 1000,
                     "maximumResponseFrameBytes": 2000, "methods": methods}
@@ -387,10 +388,14 @@ class ContractChecksTests(unittest.TestCase):
     def test_input_views_keep_the_published_pin_and_consume_distinct_schema_bytes(self):
         current, candidate = self.change_candidate()
         before = contract.BASELINE.read_bytes()
+        snapshot = runner.review_projection()
+        self.write(runner.REVIEW_PROJECTION, b"// later checkout contents\n")
         for name, inputs, info in [("published", self.published, self.published_info),
                                    ("candidate", current, candidate)]:
             view = self.root / name
-            runner.materialize(view, inputs, info, self.published_info)
+            runner.materialize(view, inputs, info, self.published_info, review_source=snapshot)
+            self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), snapshot)
+            self.assertNotEqual((view / runner.REVIEW_PROJECTION).read_bytes(), runner.review_projection())
             pin = view / "spec/baselines/swift-single-v1.json"
             self.assertEqual(json.loads(pin.read_bytes()), self.published_info)
             self.assertEqual(json.loads(pin.read_bytes())["commit"], self.commit)
@@ -498,18 +503,21 @@ class ContractChecksTests(unittest.TestCase):
         calls = []
         source = self.root / "rust/scripts/check-readonly.py"
         original = source.read_bytes()
+        projection = runner.review_projection()
 
         def check_view(view, output, info, published_info):
             calls.append(info["kind"])
             self.assertEqual((view / "rust/scripts/check-readonly.py").read_bytes(), original)
+            self.assertEqual((view / runner.REVIEW_PROJECTION).read_bytes(), projection)
             self.assertEqual((view / "rust/crates/arkdeck-contract/src/catalog_generated.rs").read_bytes(),
                              b"// test catalog\n")
             if info["kind"] == "development":
                 source.write_bytes(b"# concurrently edited Rust checker\n")
+                self.write(runner.REVIEW_PROJECTION, b"// concurrent projection edit\n")
                 self.write("scripts/catalog_gen/generate.py", b"raise RuntimeError('changed generator')\n")
 
         with patch.object(runner, "run_view", check_view):
-            with self.assertRaisesRegex(ValueError, "Rust sources changed.*Catalog generator changed"):
+            with self.assertRaisesRegex(ValueError, "Rust sources changed.*App review projection changed.*Catalog generator changed"):
                 runner.check(self.root / "outputs")
         self.assertEqual(calls, ["development", "candidate"])
 

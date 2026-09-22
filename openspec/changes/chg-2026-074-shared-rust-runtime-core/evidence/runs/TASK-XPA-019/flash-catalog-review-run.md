@@ -128,3 +128,39 @@ physical-device acceptance, REAL_DEVICE_PASS or G5 completion.
 
 The agent branch opens the implementation PR. CI and maintainer review remain
 required; skipped lanes do not count as passes. No full unified gate runs locally.
+
+### CI contract-view repair
+
+CI run `35718238175` on `8b1d18957f7c5e4aba09a4479e1a84332047af7d`
+failed: the published schema correctly rejected the additive plan field, while
+both macOS contract views omitted the Swift generated projection required by
+`include_str!`. The CLI and legacy oracle helper now assert the selected schema's
+acceptance/rejection explicitly, validate the entire legacy projection, and
+retain strict digest validation and all existing field comparisons. The view
+materializer snapshots the current App projection together with the Rust source,
+copies the same bytes into both views, records its SHA-256 in the summary and
+rejects concurrent source changes. The Runtime/generated-literal equality test
+remains active in both views; no schema, fixture or production guard was relaxed.
+
+Local targeted checks for this repair (isolated target
+`/private/tmp/arkdeck-2121-repair-target`, `CARGO_BUILD_JOBS=2`):
+
+- `test_contract_checks.py`: exit 0, 42 tests; follow-up concurrent projection
+  edit regression: exit 0, 1 test. Logs
+  `/private/tmp/arkdeck-2121-view-python.log` and
+  `/private/tmp/arkdeck-2121-view-drift.log`.
+- Materialized actual published and candidate inputs with `check-contracts.py`'s
+  materializer; ran only `arkdeck-cli --test job_plan`, `arkdeck-hoststore --lib
+  catalog_review::tests` and `arkdeck-hoststore --test debug_hap_plan` in each view:
+  exit 0, 18 total tests, no ignored tests. Logs
+  `/private/tmp/arkdeck-2121-{published,candidate}-{cli,catalog,legacy}.log`.
+- `cargo fmt --all --check` and `generate-contract.py --check`: exit 0;
+  `/private/tmp/arkdeck-2121-repair-{fmt,contract}.log`.
+
+CI: the failed run is not a pass. The repair requires a fresh PR-head run and
+maintainer review. No full local unified lane or physical-device check was run.
+
+- Repair targeted clippy (`hoststore --lib --test debug_hap_plan`, CLI
+  `--test job_plan`, both `-D warnings`) and SDD: exit 0;
+  `/private/tmp/arkdeck-2121-repair-clippy-{hoststore,cli}.log`,
+  `/private/tmp/arkdeck-2121-repair-sdd.log`.

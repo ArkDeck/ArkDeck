@@ -441,7 +441,24 @@ pub fn assert_leftovers_with(
 /// analyzer and Debug HAP tests; no other response property is removed here.
 pub fn legacy_plan_answer(mut answer: Value) -> Value {
     if answer["ok"] == true && answer["result"]["schemaVersion"] == "arkdeck.job-plan/1" {
-        arkdeck_contract::validate_method_value("job.plan", "result", &answer["result"]).unwrap();
+        let schema: Value = serde_json::from_str(
+            arkdeck_contract::METHOD_SCHEMAS
+                .iter()
+                .find(|(name, _)| *name == "job.plan")
+                .unwrap()
+                .1,
+        )
+        .unwrap();
+        let supports_review = schema["$defs"]["result"]["properties"]
+            .get("stepSetDigestSHA256")
+            .is_some();
+        let checked =
+            arkdeck_contract::validate_method_value("job.plan", "result", &answer["result"]);
+        assert_eq!(
+            checked.is_ok(),
+            supports_review,
+            "the selected contract view must enforce its own closed fields"
+        );
         let digest = answer["result"]
             .as_object_mut()
             .unwrap()
@@ -453,6 +470,7 @@ pub fn legacy_plan_answer(mut answer: Value) -> Value {
             text.bytes()
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
         );
+        arkdeck_contract::validate_method_value("job.plan", "result", &answer["result"]).unwrap();
     }
     answer
 }
