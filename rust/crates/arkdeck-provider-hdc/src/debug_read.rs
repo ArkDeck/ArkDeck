@@ -13,13 +13,22 @@ pub enum DebugReadTemplate {
 }
 impl DebugReadTemplate {
     pub fn parse(value: &str) -> Option<Self> {
-        Some(match value {
-            "device.packageInventory" => Self::PackageInventory,
-            "device.debugParameterRead" => Self::DebugParameter,
-            "device.windowInventory" => Self::WindowInventory,
-            "device.uptime" => Self::Uptime,
-            _ => return None,
-        })
+        [
+            Self::PackageInventory,
+            Self::DebugParameter,
+            Self::WindowInventory,
+            Self::Uptime,
+        ]
+        .into_iter()
+        .find(|template| template.definition().id == value)
+    }
+    fn definition(self) -> &'static arkdeck_contract::DebugTemplateDefinition {
+        &arkdeck_contract::DEBUG_TEMPLATES[match self {
+            Self::PackageInventory => 0,
+            Self::DebugParameter => 1,
+            Self::WindowInventory => 2,
+            Self::Uptime => 3,
+        }]
     }
     pub fn raw(self) -> &'static str {
         match self {
@@ -78,26 +87,12 @@ impl DebugReadTemplate {
     }
 
     pub fn plan(self, connect_key: &str) -> ProcessPlan {
-        let (command, capture_bytes): (&[&str], usize) = match self {
-            Self::PackageInventory => (&["shell", "bm", "dump", "-a"], 2 * 1024 * 1024),
-            Self::DebugParameter => (
-                &["shell", "param", "get", "persist.ace.debug.enabled"],
-                4096,
-            ),
-            Self::WindowInventory => (
-                &[
-                    "shell",
-                    "hidumper",
-                    "-s",
-                    "WindowManagerService",
-                    "-a",
-                    "-a",
-                ],
-                8 * 1024 * 1024,
-            ),
-            Self::Uptime => (&["shell", "uptime"], 16 * 1024),
-        };
-        plan(connect_key, command, capture_bytes)
+        let definition = self.definition();
+        plan(
+            connect_key,
+            definition.command,
+            definition.output_byte_budget,
+        )
     }
 }
 fn plan(key: &str, command: &[&str], capture_bytes: usize) -> ProcessPlan {

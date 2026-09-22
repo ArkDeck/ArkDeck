@@ -1,6 +1,8 @@
 //! Pure current-contract types and encodings. No I/O or Runtime authority.
 
 mod canonical;
+mod debug_templates;
+pub use debug_templates::{DEBUG_TEMPLATES, DebugTemplateDefinition};
 mod catalog_generated;
 mod cbor;
 mod control_generated;

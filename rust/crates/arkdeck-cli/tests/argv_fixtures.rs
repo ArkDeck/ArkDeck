@@ -290,10 +290,20 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         .unwrap();
     assert!(debug.status.success());
     assert!(String::from_utf8(debug.stdout).unwrap().contains("probe"));
+    let templates = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args(["debug", "template", "--help"])
+        .output()
+        .unwrap();
+    assert!(templates.status.success());
+    assert!(
+        String::from_utf8(templates.stdout)
+            .unwrap()
+            .contains("list")
+    );
     // A node of the registry this CLI serves nothing under is still refused,
     // and so is a node's help in a machine mode.
     for argv in [
-        vec!["debug", "template", "--help"],
+        vec!["debug", "template", "run", "--help"],
         vec!["nope", "--help"],
         vec!["runtime", "--help", "--output", "json"],
     ] {

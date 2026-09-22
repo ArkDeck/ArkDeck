@@ -11,6 +11,8 @@ pub use artifact_resources::{
 pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod debug_probe;
+mod debug_templates;
+pub use debug_templates::debug_template_list;
 mod device_wait;
 pub use debug_probe::validate_debug_probe;
 mod operation_validation;
@@ -724,6 +726,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["debug", "probe"] => "debug.probe",
+        ["debug", "template", "list"] => "debug.template.list",
         ["job", "watch"] => "job.watch",
         ["job", "plan"] => "job.plan",
         ["job", "submit"] => "job.submit",
