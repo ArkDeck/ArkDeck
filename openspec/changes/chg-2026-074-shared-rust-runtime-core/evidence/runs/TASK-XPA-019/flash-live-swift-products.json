@@ -1,0 +1,14 @@
+{
+  "arkdeck": {
+    "source": "/private/tmp/arkdeck-e190-swift/build/out/Products/Debug/arkdeck",
+    "sha256": "5b0a5f66bdbf589ea8140c23f142f5de0b1cd0b6baa3bd702483231f8faea090",
+    "bytes": 70744288,
+    "mtimeNs": 1790075757336483921
+  },
+  "arkdeck-agentd": {
+    "source": "/private/tmp/arkdeck-e190-swift/build/out/Products/Debug/arkdeck-agentd",
+    "sha256": "220ee8d23dd4c74306e49ae9fb3b5c681e07b235d672528b7649c4043988679d",
+    "bytes": 81875584,
+    "mtimeNs": 1790075763401663154
+  }
+}

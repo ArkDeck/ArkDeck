@@ -1,0 +1,21 @@
+{
+  "analyzer": "/usr/bin/true",
+  "analyzerSHA256": "511602b8cf083bdff74d43242b71c27484bd63121c07f3b59575d35676e1f6cb",
+  "cases": 67,
+  "checks": 141,
+  "deviceDispatchCount": 0,
+  "identicalAnswers": 67,
+  "kind": "isolated-host-test",
+  "plannedAnswers": 4,
+  "plannedDigest": "4282118668b73630a202e442be6c18254bf5f8213afc3b8310c8d4b06269fd2f",
+  "recordedDeadlinesMovedDays": 9,
+  "result": "PASS",
+  "rustCliSHA256": "06fb3d60e83b9bbe02b680b02a20330938864a2fc1d8496d0c7b1812772f7297",
+  "rustDaemonSHA256": "ad06a3e8dc172edb70932f5b6612052bc6fca003d433ec6bdfe7c8e8eea72ff2",
+  "rustPlanningSideEffects": [],
+  "swiftCliSHA256": "5b0a5f66bdbf589ea8140c23f142f5de0b1cd0b6baa3bd702483231f8faea090",
+  "swiftDaemonSHA256": "220ee8d23dd4c74306e49ae9fb3b5c681e07b235d672528b7649c4043988679d",
+  "swiftPlanningSideEffects": [
+    "job-oracle-absent"
+  ]
+}

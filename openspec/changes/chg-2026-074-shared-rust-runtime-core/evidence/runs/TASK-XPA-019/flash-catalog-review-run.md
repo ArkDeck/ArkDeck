@@ -119,8 +119,9 @@ Cargo uses `CARGO_BUILD_JOBS=2`,
 The retained Swift Job-plan oracle checks the new analyzer step digest against an
 exact fixed value and compares all existing fields unchanged. The live parity script
 also expects that exact additive field instead of ignoring arbitrary extra output.
-The live Swift/Rust Job-plan parity script was syntax-checked but not executed locally
-because this worktree has no built Swift daemon/CLI products; CI owns that lane.
+The initial implementation only syntax-checked the live Swift/Rust Job-plan
+script. The previous statement that CI owned this lane was incorrect: no CI
+workflow invokes it. The targeted live follow-up below supplies that evidence.
 Full App behavior is B's consumer work; this change does not claim signed IPC,
 physical-device acceptance, REAL_DEVICE_PASS or G5 completion.
 
@@ -164,3 +165,55 @@ maintainer review. No full local unified lane or physical-device check was run.
   `--test job_plan`, both `-D warnings`) and SDD: exit 0;
   `/private/tmp/arkdeck-2121-repair-clippy-{hoststore,cli}.log`,
   `/private/tmp/arkdeck-2121-repair-sdd.log`.
+
+
+### Live Swift/Rust plan follow-up
+
+Code under test: exact PR #2121 commit
+`3a68678d1a702b2ee075054df23cf29cea58448b`, clean source worktree
+`/private/tmp/arkdeck-2121-repair`. No product source changed for this follow-up.
+
+Local targeted checks:
+
+- Built `arkdeck-agentd` and `arkdeck-cli` with `CARGO_BUILD_JOBS=2` into a new,
+  exclusive `/private/tmp/arkdeck-2121-live-target`: exit 0;
+  `/private/tmp/arkdeck-2121-live-build-clean.log`.
+- Reused Swift executable products from
+  `/private/tmp/arkdeck-e190-swift/build/out/Products/Debug`, copied byte-for-byte
+  with their runtime resource bundles to `/private/tmp/arkdeck-2121-swift-products`.
+  They were produced at 2026-09-22 19:15:57 / 19:16:03 +08:00; the App task's
+  existing `/private/tmp/arkdeck-e190-flash-final-tests.log` records their product
+  builds. No new Swift build ran. The reused products do not carry an embedded
+  source commit, so the current App worktree SHA is not asserted as their binary
+  provenance. Exact source paths, sizes, timestamps and hashes are retained in
+  `flash-live-swift-products.json`; authenticated CLI connections also verify the
+  current control contract identity against the running daemons.
+- `python3 rust/scripts/check-job-plan.py --bin-dir
+  /private/tmp/arkdeck-2121-live-target/debug --swift-bin-dir
+  /private/tmp/arkdeck-2121-swift-products --record
+  /private/tmp/arkdeck-2121-live-plan-clean.json`: exit 0; 67 requests, 67 compared
+  answers, 4 planned answers, 141 checks. Raw summary:
+  `flash-live-plan-result.json`; log `/private/tmp/arkdeck-2121-live-plan-clean.log`.
+  Rust planning wrote no new Artifact entries. Swift created its existing
+  `job-oracle-absent` entry. The analyzer was `/usr/bin/true`, never dispatched;
+  device dispatch count was zero. Each daemon ran sequentially over fresh
+  copies at the same disposable path with an isolated home, never installed
+  Runtime state or a real device.
+- The first run used a target previously shared with temporary contract views
+  and failed with Rust `job.plan` response `internalError` (exit 1);
+  `/private/tmp/arkdeck-2121-live-plan.log`. It is not a pass or valid exact-source
+  artifact. The fresh target run above passed with unchanged source, establishing
+  the usable binary evidence without weakening validation. Contract-view
+  rechecks now use a different target for each view as well.
+
+CI: this live script is a local targeted check, not a hidden/skipped CI lane.
+The PR still requires current-head CI and maintainer review. This follow-up is
+host parity evidence, not pure Rust hardware acceptance or G5 completion.
+
+- Follow-up view checks: exit 0, the same 18 tests, with separate
+  `/private/tmp/arkdeck-2121-published-target` and
+  `/private/tmp/arkdeck-2121-candidate-target`. Logs
+  `/private/tmp/arkdeck-2121-{published,candidate}-{catalog,legacy,cli}-isolated.log`;
+  orchestration `/private/tmp/arkdeck-2121-isolated-views.log`. These independent
+  build artifacts supersede the earlier shared-target view run as reproducible
+  view evidence. SDD exit 0: `/private/tmp/arkdeck-2121-live-sdd.log`.
