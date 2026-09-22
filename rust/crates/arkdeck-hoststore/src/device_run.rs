@@ -1484,7 +1484,7 @@ impl JobRunner<'_> {
             };
             let product = owner.product(&step.step_id, declaration, window.clone());
             // A received product is the received bytes or nothing.
-            if device_steps::FILE_BACKED.contains(&name) {
+            if device_steps::FILE_BACKED.contains(&name) || name == "ui-tree.json" {
                 self.publish_received(run, &product, declaration, receipt)?;
                 continue;
             }

@@ -1,4 +1,4 @@
-//! `capture.screen-sequence@1` materialization for `job.plan`, `job.submit`
+//! File-backed diagnostics and `capture.screen-sequence@1` materialization for `job.plan`, `job.submit`
 //! and each mutation of its run, as Swift
 //! `materializeTypedPlanBeforeAuthorization` materializes it: every step under
 //! the authorization envelope, the file legs as the HDC provider names and
@@ -16,7 +16,7 @@ use arkdeck_provider_hdc::{FileAction, FilePlan};
 const AUTHORIZATION_JOB: &str = "job-authorization-envelope";
 
 impl<'a> JobPlanner<'a> {
-    pub(super) fn materialize_screen_sequence(
+    pub(super) fn materialize_file_capture(
         &self,
         request: &OperationRequest,
         descriptor: &CatalogOperation,
