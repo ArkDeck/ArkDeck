@@ -73,6 +73,29 @@ not a missing certificate. The user has been asked once for an existing
 environment. Positive connection/reconnect evidence is explicitly outstanding.
 No performance, device, UI presentation or REAL_DEVICE_PASS claim is made here.
 
+## Production signed App preparation
+
+Release build from #2115 head `fc0605ca` (subsequently merged):
+`ARKDECK_XCODE_CACHE_ROOT=/private/tmp/arkdeck-e190-xcode ARKDECK_XCODE_JOBS=2 sh
+scripts/ci/run-xcodebuild.sh --release`, exit 0, BUILD SUCCEEDED;
+`/private/tmp/arkdeck-e190-signed-app-build.log`.
+
+Actual `inspect_app` verification found a harness invocation defect:
+`codesign -R` treats text without an `=` prefix as a filename. Both App and
+isolated-daemon verification now pass the same requirement with the required
+inline prefix. No identity predicate, signature or sandbox check is weakened.
+
+Rechecking the actual signed Release App passes deep/strict signature,
+team/identifier, production sandbox and exact Mach-exception validation:
+`/private/tmp/arkdeck-e190-signed-app-inspection.log`, exit 0. The signer is
+Developer ID Application: Hanfeng Fu (8AQTYW5FKR), version 0.1.0 build 1.
+App binary SHA-256:
+`522faf58e6ccadae95f6d424d882eb83c91704b5fbb66018d4dbb5b37f01e27c`.
+Artifact: `/private/tmp/arkdeck-e190-xcode/DerivedData/Build/Products/Release/ArkDeck.app`.
+This preparation starts no Runtime and is not positive Rust Mach acceptance.
+The four harness safety tests still pass; no App rebuild was needed for this
+Python argument fix. The independent login/VM condition remains outstanding.
+
 ## CI
 
 Pending this independent PR. Required guard/swift checks and maintainer review

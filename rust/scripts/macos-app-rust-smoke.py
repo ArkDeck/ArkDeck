@@ -56,7 +56,7 @@ def require_free_domain():
 
 
 def inspect_app(app):
-    command("/usr/bin/codesign", "--verify", "--deep", "--strict", "-R", APP_REQUIREMENT, str(app))
+    command("/usr/bin/codesign", "--verify", "--deep", "--strict", "-R", "=" + APP_REQUIREMENT, str(app))
     info = plistlib.loads((app / "Contents/Info.plist").read_bytes())
     entitlements = plistlib.loads(command(
         "/usr/bin/codesign", "-d", "--entitlements", ":-", str(app)).stdout)
@@ -121,7 +121,7 @@ def execute(args, domain, info, executable):
     (bundle / "Contents/Info.plist").write_bytes(plistlib.dumps(metadata))
     command("/usr/bin/codesign", "--force", "--options", "runtime", "--sign", args.sign_identity, str(bundle))
     requirement = APP_REQUIREMENT.replace("com.arkdeck.desktop", SERVICE)
-    command("/usr/bin/codesign", "--verify", "--strict", "-R", requirement, str(bundle))
+    command("/usr/bin/codesign", "--verify", "--strict", "-R", "=" + requirement, str(bundle))
     label = "com.arkdeck.ipc-smoke." + str(uuid.uuid4())
     plist = output / (label + ".plist")
     plist.write_bytes(plistlib.dumps({
