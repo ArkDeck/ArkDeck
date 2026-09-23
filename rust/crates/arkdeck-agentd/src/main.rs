@@ -27,6 +27,8 @@ mod host;
 mod managed_hdc;
 #[cfg(all(test, target_os = "macos"))]
 mod operation_availability_control;
+#[cfg(target_os = "macos")]
+mod production;
 #[cfg(all(test, target_os = "macos"))]
 mod target_observation_control;
 #[cfg(all(test, target_os = "macos"))]
@@ -143,6 +145,21 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
+    // The production composition is asked for explicitly, and refuses every
+    // other composition's input before one is read (`production.rs`).
+    #[cfg(target_os = "macos")]
+    let production = production::requested(std::env::var_os(production::COMPOSITION).as_deref())?;
+    #[cfg(target_os = "macos")]
+    if production {
+        production::refuse_other_compositions(
+            &|name| std::env::var_os(name).is_some(),
+            facade::swift_executable().is_some(),
+        )?;
+    }
+    #[cfg(not(target_os = "macos"))]
+    if std::env::var_os("ARKDECK_RUNTIME_COMPOSITION").is_some() {
+        return Err("the production composition is composed only on macOS".into());
+    }
     #[cfg(target_os = "macos")]
     let app_ingress = app_ingress::Configuration::from_environment(development.as_deref())?;
     #[cfg(target_os = "macos")]
@@ -430,15 +447,57 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         host
     };
+    // The production composition over the account's own state root
+    // (`production.rs`): its claim holds Swift's instance lock and the
+    // installed socket before any store is created or probed, and both stay
+    // held until this process exits.
+    #[cfg(target_os = "macos")]
+    let (host, app_ingress, _instance_lock, production_socket) = if production {
+        let layout = production::Layout::account()?;
+        let inputs = production::Inputs::from_environment()?;
+        let now = host::utc_now();
+        let authority = match production::claim(&layout, &now)? {
+            production::Claim::Owned(authority) => authority,
+            // As Swift's second instance: the Runtime serving keeps serving.
+            production::Claim::AlreadyRunning(instance) => {
+                production::report(&instance.running());
+                return Ok(());
+            }
+        };
+        development_listener = Some(authority.listener);
+        production::report(&format!(
+            "arkdeck-agentd production composition over {}",
+            layout.state.display()
+        ));
+        let composition = production::compose(&layout, &inputs, host, &now)?;
+        for omitted in &composition.omitted {
+            production::report(&format!("arkdeck-agentd composes no {omitted}"));
+        }
+        production::report(&format!(
+            "arkdeck-agentd owners: {}",
+            composition.host.owner_census().join(", ")
+        ));
+        if let Some(managed) = composition.managed {
+            managed_hdc = Some(managed);
+        }
+        (
+            composition.host,
+            composition.ingress,
+            Some(authority.instance),
+            Some(layout.socket),
+        )
+    } else {
+        (host, app_ingress, None, None)
+    };
     #[cfg(not(target_os = "macos"))]
     if development.is_some() {
         return Err("development host-store owner is not yet supported on this platform".into());
     }
-    // Swift `recoverActiveJobs()` before the daemon serves: the isolated owner
-    // reopens its active Jobs, parks every unresolved intent and dispatches
-    // nothing. A Job it cannot read, or whose recovery needs state it does not
-    // hold, is named here and left as it is; a recovery that fails stops the
-    // start, as Swift's does.
+    // Swift `recoverActiveJobs()` before the daemon serves: the isolated or
+    // the production owner reopens its active Jobs, parks every unresolved
+    // intent and dispatches nothing. A Job it cannot read, or whose recovery
+    // needs state it does not hold, is named here and left as it is; a
+    // recovery that fails stops the start, as Swift's does.
     #[cfg(target_os = "macos")]
     if let Some(recovered) = host.recover_active_jobs()? {
         if !recovered.statuses.is_empty() {
@@ -494,9 +553,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let mut listener = LocalListener::bind(&endpoint)?;
     #[cfg(target_os = "macos")]
     if let Some(configuration) = app_ingress {
-        // This explicit isolated composition owns no Swift process. Both local
-        // transports use the very same Control and durable History owner.
+        // The isolated or the production composition, which owns no Swift
+        // process. Both local transports use the very same Control and owners.
         configuration.listen(Arc::clone(&control))?;
+        if production_socket.is_some() {
+            production::report("arkdeck-agentd App ingress: com.arkdeck.agentd");
+        }
+    }
+    // As Swift's server announces it, once recovery is done and serving
+    // starts.
+    #[cfg(target_os = "macos")]
+    if let Some(socket) = &production_socket {
+        production::report(&format!("arkdeck-agentd listening on {}", socket.display()));
     }
     let active = Arc::new(AtomicUsize::new(0));
     #[cfg(unix)]

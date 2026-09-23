@@ -128,6 +128,16 @@ impl JobStore {
         Self::open_with(path, JobRepository::open_owner)
     }
 
+    /// The Rust Job owner's store at the Runtime's state root, where Swift's
+    /// daemon keeps its Job index, Job directories and `cli-job-snapshots`
+    /// beside every other owner's entry: the production composition's layout,
+    /// whose root a device mutation proves its state continuity against. It
+    /// differs from [`Self::open_owner`] only in creating a first index beside
+    /// those entries (`JobRepository::open_state_root_owner`).
+    pub fn open_state_root_owner(path: &Path) -> io::Result<Self> {
+        Self::open_with(path, JobRepository::open_state_root_owner)
+    }
+
     fn open_with(
         path: &Path,
         repository: impl FnOnce(&Path) -> io::Result<JobRepository>,

@@ -134,6 +134,10 @@ lease is also unavailable in this phase, so both paths refuse HDC dispatch.
 Registering Windows requires actual Windows tool/output provenance and a
 separately scoped integration change; see the
 [delivery record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/xpa-002-readonly-foundation.md).
+On macOS, `ARKDECK_RUNTIME_COMPOSITION=production` selects the
+[production composition](#macos-production-composition-task-xpa-017-not-activated)
+instead, which refuses `ARKDECK_ENDPOINT` and `ARKDECK_HDC_SHA256`; nothing sets
+it before the M5 cutover.
 
 ## Isolated macOS History owner
 
@@ -2114,6 +2118,66 @@ process ends with status 0. After SIGKILL the paired Swift daemon unlinks its
 socket and removes the directory when the pairing pipe closes. The harness's
 fixture authority does the same, so the facade tests leave nothing under
 `/private/tmp`.
+
+## macOS production composition (TASK-XPA-017, not activated)
+
+The third mode of `arkdeck-agentd` — neither an isolated development root nor
+a facade — is the one M5's cutover points the LaunchAgent at. Without
+`ARKDECK_RUNTIME_COMPOSITION` it stays the read-only foundation described
+above; with `ARKDECK_RUNTIME_COMPOSITION=production` (its one value) the daemon
+composes every owner over the account's own state, as Swift's daemon lays it
+out. Nothing sets that variable before the cutover: no LaunchAgent, plist,
+receipt or installed service changes here (`src/production.rs`).
+
+Every root comes from one account home, the one Swift's Foundation resolves
+(`CFFIXED_USER_HOME`, else the account's), so a caller cannot split them:
+
+| Root | Owner |
+| --- | --- |
+| `~/Library/Application Support/ArkDeck/Agentd` | Swift's state directory: the Job owner (`runtime-jobs.sqlite3`, `jobs/`, `cli-job-snapshots/`, recovery epochs), Session storage, History, planning, `instance.lock`, `instance.json`, `agentd.sock` |
+| `…/Agentd/{capabilities,targets,artifacts,agent-executions,human-action-snapshots,control-action-snapshots,workspace-projects}` | the owner of the same name; `hdc-control-actions` only beside a managed HDC server |
+| `…/ArkDeck/Sessions`, `…/ArkDeck/Bootstrap/v1` | the default Session root; the tool, bundle and DevEco registries |
+| `~/Library/Containers/com.arkdeck.desktop/Data/Library/Caches/ArkDeck/Trace/traces` | the Trace cache, read only where the App created it |
+
+The Job owner opens Swift's index in place (`JobStore::open_state_root_owner`):
+a first index is created beside the other owners' entries, as Swift's
+`RuntimeJobRepository` creates one, and still never replaces lost history. The
+device-mutation continuity proof is anchored at the same `Agentd` root.
+
+One authority: before any store is created or probed, the daemon takes Swift's
+single-instance lock (`Agentd/instance.lock`, `LOCK_EX|LOCK_NB`), then the
+facade's lock on the `Agentd` directory with the installed socket
+(`LocalListener::bind_facade`, which reclaims only a socket nobody answers on),
+and writes Swift's `instance.json` naming itself. Swift's daemon holds only the
+first lock and the facade only the second; holding both excludes each, and each
+refuses to start beside it. When the instance lock is held and its document
+names the holder, the daemon prints Swift's `arkdeck-agentd already running:
+pid <p>, socket <s>, protocol <v>` and exits 0 having composed nothing; a lock
+held without that document, the facade's lock or a live listener on the socket
+ends the start with exit 69. It never stands by.
+
+With `ARKDECK_HDC_PATH` (Swift's only HDC input) the account's bootstrap
+registry adopts that file while it holds no selection, and its startup
+selection is started as the managed server on Swift's endpoint
+(`OHOS_HDC_SERVER_PORT`, else 127.0.0.1:8710), with the HDC control actions,
+Trace and Debug probes and the exit-70 boundary of the isolated owner. An
+unpublished HDC, a pending tool selection or an occupied endpoint ends the
+start; without the variable, dispatch stays refused as Swift's does.
+`ARKDECK_ANALYZER_PATH` names the analyzer. The composition prints what it
+composed (`arkdeck-agentd owners: …`) and one line per owner it composes
+without and why: no HDC, a Trace cache the App has not created, no reader of
+trusted USB relations yet (adoption stays refused), no App ingress over an
+overridden home, and every input Swift's LaunchAgent sets for an owner not
+ported yet. Over the account's own home the App ingress is served on
+`com.arkdeck.agentd` with Swift's code-signing requirement and the owner's
+effective UID (`app_ingress::Configuration::production`). Startup recovery and
+the Artifact sweep run as they do for the isolated owner; then it prints
+`arkdeck-agentd listening on <socket>`.
+
+`cargo test -p arkdeck-agentd --test production_composition` runs the real
+daemon in this mode under temporary homes only (environment cleared,
+`CFFIXED_USER_HOME` below `/private/tmp`, so no Mach service is registered);
+see [the run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-017/production-composition-run.md).
 
 ## macOS owner lifecycle soak
 
