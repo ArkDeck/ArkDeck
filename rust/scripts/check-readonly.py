@@ -60,7 +60,9 @@ def assert_boundaries() -> None:
         # The Job engine lowers device steps through the HDC provider's typed
         # actions (the design's crate graph: RUNTIME --> PHDC).
         "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc"},
-        "arkdeck-provider-hdc": {"arkdeck-platform"},
+        # Debug template lowering reads the closed template definitions from the
+        # pure contract crate, their single source, which the CLI also discloses.
+        "arkdeck-provider-hdc": {"arkdeck-contract", "arkdeck-platform"},
         # Workspace signing and credentials (SPK-10): measured files, the
         # Keychain and the signer's terminal all come from the platform crate.
         "arkdeck-provider-workspace": {"arkdeck-platform"},

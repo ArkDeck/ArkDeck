@@ -117,6 +117,7 @@ dependencies = [
 name = "arkdeck-provider-hdc"
 version = "0.1.0"
 dependencies = [
+ "arkdeck-contract",
  "arkdeck-platform",
  "hmac",
  "serde_json",
