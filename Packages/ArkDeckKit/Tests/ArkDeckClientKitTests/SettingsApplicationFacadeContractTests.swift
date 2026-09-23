@@ -5,8 +5,7 @@ import XCTest
 @testable import ArkDeckCore
 
 /// The Settings facade in ClientKit: its Runtime storage reads, and the two
-/// seams the App composes from ArkDeckWorkflows — the support-bundle exporter
-/// and, for a UI-automation launch, the storage fixture.
+/// composed support-bundle exporter and in-memory UI presentation fixture.
 final class SettingsApplicationFacadeContractTests: XCTestCase {
   /// Stands in for the support-bundle exporter the App composes: one fixed
   /// preview, and a record of every scope an export was approved for.
@@ -153,6 +152,204 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     }
   }
 
+  func testInvalidSuccessAndMeasurementFlagsNeverPublishStorageFacts() async throws {
+    let original = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(StorageFixture.status.utf8)) as? [String: Any])
+    for value: Any in [false, 1, "true", NSNull()] {
+      var response = original
+      response["ok"] = value
+      let bytes = try JSONSerialization.data(withJSONObject: response)
+      let provider = SettingsApplicationFacade.make(diagnosticBundles: DiagnosticBundles()) {
+        _, _ in bytes
+      }
+      do {
+        _ = try await provider.refresh()
+        XCTFail("invalid success flag must not publish a valid-looking result")
+      } catch SettingsApplicationError.runtimeStorageResponseInvalid {}
+    }
+    for value: Any in [0, 1, "false", NSNull()] {
+      var response = original
+      var result = try XCTUnwrap(response["result"] as? [String: Any])
+      var session = try XCTUnwrap(result["sessionDomain"] as? [String: Any])
+      var usage = try XCTUnwrap(session["usage"] as? [String: Any])
+      usage["measurementIncomplete"] = value
+      session["usage"] = usage
+      result["sessionDomain"] = session
+      response["result"] = result
+      let bytes = try JSONSerialization.data(withJSONObject: response)
+      let provider = SettingsApplicationFacade.make(diagnosticBundles: DiagnosticBundles()) {
+        _, _ in bytes
+      }
+      do {
+        _ = try await provider.refresh()
+        XCTFail("malformed measurement state must not be rendered")
+      } catch SettingsApplicationError.runtimeStorageResponseInvalid {}
+    }
+  }
+
+  private actor ScriptedStorage {
+    private var replies: [Data?]
+    private(set) var calls: [(String, [String: JSONValue]?)] = []
+    init(_ replies: [Data?]) { self.replies = replies }
+    func reply(_ method: String, _ params: [String: JSONValue]?) -> Data? {
+      calls.append((method, params))
+      return replies.isEmpty ? nil : replies.removeFirst()
+    }
+  }
+
+  /// The three generation-bound mutations, each with the one closed request
+  /// shape the Runtime's App ingress admits, bound to the fixture status's
+  /// generation 4. The selected root is not under a symlinked system
+  /// directory, so the request path cannot depend on what exists on the host.
+  private enum Mutation: CaseIterable {
+    case policy, selectRoot, resetRoot
+
+    var method: String {
+      self == .policy ? "runtime.storage.policy" : "runtime.storage.root"
+    }
+
+    var params: [String: JSONValue] {
+      switch self {
+      case .policy:
+        return [
+          "expectedGeneration": .string("4"), "totalQuotaBytes": .string("20000"),
+          "safetyMarginBytes": .string("1000"), "retentionDays": .string("30"),
+        ]
+      case .selectRoot:
+        return [
+          "expectedGeneration": .string("4"), "rootPath": .string("/fixture/selected-sessions"),
+        ]
+      case .resetRoot:
+        return ["expectedGeneration": .string("4"), "resetToDefault": .bool(true)]
+      }
+    }
+
+    func run(_ provider: any SettingsApplicationProviding) async throws
+      -> SettingsStoragePresentation
+    {
+      switch self {
+      case .policy:
+        return try await provider.updateStoragePolicy(
+          totalQuotaBytes: 20_000, safetyMarginBytes: 1_000, retentionDays: 30
+        ).storage
+      case .selectRoot:
+        return try await provider.selectStorageRoot(
+          URL(filePath: "/fixture/selected-sessions")
+        ).storage
+      case .resetRoot:
+        return try await provider.resetStorageRoot().storage
+      }
+    }
+  }
+
+  /// A mutation that lost its generation race publishes the winner's state by
+  /// reading it back. The mutation itself is sent exactly once.
+  func testAConflictedStorageMutationReadsBackWithoutRepeatingIt() async throws {
+    let refreshed = StorageFixture.status.replacingOccurrences(
+      of: #""generation":"4""#, with: #""generation":"5""#)
+    for mutation in Mutation.allCases {
+      let script = ScriptedStorage([
+        Data(StorageFixture.status.utf8),
+        Data(#"{"ok":false,"error":{"code":"resourceConflict","message":"m"}}"#.utf8),
+        Data(refreshed.utf8),
+      ])
+      let provider = SettingsApplicationFacade.make(diagnosticBundles: DiagnosticBundles()) {
+        await script.reply($0, $1)
+      }
+      let storage = try await mutation.run(provider)
+      XCTAssertEqual(storage.generation, 5, "\(mutation)")
+      let calls = await script.calls
+      XCTAssertEqual(
+        calls.map(\.0),
+        ["runtime.storage.status", mutation.method, "runtime.storage.status"], "\(mutation)")
+      XCTAssertEqual(calls[1].1, mutation.params, "\(mutation)")
+      XCTAssertNil(calls[2].1, "\(mutation)")
+    }
+  }
+
+  /// Only a conflict is reconciled. A lost reply or one the reader cannot
+  /// account for leaves the outcome unknown — the Runtime may have committed —
+  /// and a refusal is final, so each is reported after exactly one send: never
+  /// retried, never read back, never shown as a success.
+  func testALostUnreadableOrRefusedStorageMutationIsSentOnceAndNeverRetried() async throws {
+    let outcomes: [(reply: Data?, error: SettingsApplicationError)] = [
+      (nil, .runtimeStorageUnavailable),
+      (
+        Data(#"{"ok":true,"result":{"schemaVersion":"arkdeck.runtime-storage/1"}}"#.utf8),
+        .runtimeStorageResponseInvalid
+      ),
+      (
+        Data(#"{"ok":false,"error":{"code":"invalidInput","message":"m"}}"#.utf8),
+        .runtimeStorageRejected("invalidInput")
+      ),
+    ]
+    for mutation in Mutation.allCases {
+      for outcome in outcomes {
+        let script = ScriptedStorage([Data(StorageFixture.status.utf8), outcome.reply])
+        let provider = SettingsApplicationFacade.make(diagnosticBundles: DiagnosticBundles()) {
+          await script.reply($0, $1)
+        }
+        do {
+          _ = try await mutation.run(provider)
+          XCTFail("\(mutation): an unconfirmed mutation must not publish a presentation")
+        } catch let error as SettingsApplicationError {
+          XCTAssertEqual(error, outcome.error, "\(mutation)")
+        }
+        let calls = await script.calls
+        XCTAssertEqual(
+          calls.map(\.0), ["runtime.storage.status", mutation.method], "\(mutation)")
+        XCTAssertEqual(calls[1].1, mutation.params, "\(mutation)")
+      }
+    }
+  }
+
+  func testPresentationFixtureRequiresExplicitLaunchAndNeverCreatesStorage() async throws {
+    XCTAssertNil(SettingsStoragePresentationFixture.make(arguments: ["ArkDeck"]))
+    let fixture = try XCTUnwrap(
+      SettingsStoragePresentationFixture.make(
+        arguments: ["ArkDeck", "--ui-test-runtime-history"]))
+    let provider = SettingsApplicationFacade.make(
+      diagnosticBundles: DiagnosticBundles(), storageFixture: fixture)
+    let initial = try await provider.refresh().storage
+    XCTAssertEqual(initial.generation, 2)
+    XCTAssertEqual(initial.totalQuotaBytes, 12_884_901_888)
+    let selected = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: selected.path))
+    let updated = try await provider.updateStoragePolicy(
+      totalQuotaBytes: 9_663_676_416, safetyMarginBytes: 1_073_741_824, retentionDays: 30
+    ).storage
+    XCTAssertEqual(updated.generation, 3)
+    XCTAssertEqual(updated.retentionDays, 30)
+    let custom = try await provider.selectStorageRoot(selected).storage
+    XCTAssertTrue(custom.usesCustomRoot)
+    XCTAssertEqual(custom.rootPath, selected.standardizedFileURL.path)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: selected.path))
+    let reset = try await provider.resetStorageRoot().storage
+    XCTAssertFalse(reset.usesCustomRoot)
+    XCTAssertEqual(reset.rootPath, initial.rootPath)
+    XCTAssertEqual(reset.generation, 5)
+  }
+
+  func testPresentationFixtureCanLoseAndRecoverItsReplyWithoutAStorageOwner() async throws {
+    let state = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: state) }
+    try "--ui-test-runtime-history-unreachable".write(to: state, atomically: true, encoding: .utf8)
+    let fixture = try XCTUnwrap(
+      SettingsStoragePresentationFixture.make(arguments: [
+        "ArkDeck", "--ui-test-runtime-history", "--ui-test-fixture-state", state.path,
+      ]))
+    let provider = SettingsApplicationFacade.make(
+      diagnosticBundles: DiagnosticBundles(), storageFixture: fixture)
+    do {
+      _ = try await provider.refresh()
+      XCTFail("unreachable presentation must not publish storage values")
+    } catch SettingsApplicationError.runtimeStorageUnavailable {}
+    try "".write(to: state, atomically: true, encoding: .utf8)
+    let recovered = try await provider.refresh().storage
+    XCTAssertEqual(recovered.generation, 2)
+    XCTAssertFalse(try XCTUnwrap(recovered.sessionRoot).measurementIncomplete)
+  }
+
   /// The production figure must keep coming from the Runtime. Recomputing it in
   /// process is the defect, not an optimisation: the App Sandbox places the
   /// daemon's state directory outside this container.
@@ -168,8 +365,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     XCTAssertTrue(view.contains("sessionRoot.measuredBytes"))
     XCTAssertTrue(view.contains("settings.storage.runtimeUnavailable"))
     XCTAssertTrue(view.contains("settings.storage.sessionUsage"))
-    // ClientKit reads and maps; the exporter and the fixture owner it is
-    // composed with stay in ArkDeckWorkflows.
+    // ClientKit reads and maps without importing the Runtime storage owner.
     for forbiddenImport in ["ArkDeckWorkflows", "ArkDeckStorage", "ArkDeckRuntime"] {
       XCTAssertFalse(facade.contains("import \(forbiddenImport)"), forbiddenImport)
     }

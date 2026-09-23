@@ -55,7 +55,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
       app.contains(
         "SettingsApplicationFacade.make(\n"
           + "      diagnosticBundles: RuntimeSupportBundleSettingsExporter(),\n"
-          + "      storageFixture: SettingsStorageUIFixture.runtimeStorage()))"))
+          + "      storageFixture: SettingsStoragePresentationFixture.make()))"))
     XCTAssertTrue(viewModel.contains("func settingsText(_ key: String) -> String"))
     XCTAssertTrue(viewModel.contains("tableName: \"SettingsLocalizable\""))
     for key in [
