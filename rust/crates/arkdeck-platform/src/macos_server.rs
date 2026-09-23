@@ -87,6 +87,88 @@ impl LoopbackServerLease {
     }
 }
 
+/// How [`end_proved_process`] left the process a receipt names.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProvedProcessEnd {
+    /// The kernel no longer reported its birth: nothing was signalled.
+    AlreadyEnded,
+    /// SIGTERM ended it within the grace.
+    Terminated,
+    /// It outlived the grace, and SIGKILL ended it.
+    Killed,
+}
+
+/// How often an ending process is looked for (Swift's group drain probe).
+const END_PROBE: std::time::Duration = std::time::Duration::from_millis(10);
+
+/// Ends the one process an identity receipt names, as a daemon's own stop
+/// ends its server: SIGTERM, then SIGKILL once `grace` has passed, returning
+/// when the kernel no longer reports the receipt's birth for the PID (an
+/// exited process has none, reaped or not). The birth, and that the calling
+/// user runs it, are read again immediately before each signal, and nothing
+/// is signalled once they differ: no descriptor pins a process that is not
+/// this one's child, so this is how a PID recycled since the receipt is never
+/// signalled (the kernel hands PIDs out in turn). Only that PID is signalled,
+/// never a group. Whether the process is the caller's to end is the caller's
+/// proof; this never decides it.
+pub fn end_proved_process(
+    receipt: &ServerIdentityReceipt,
+    grace: std::time::Duration,
+    kill_grace: std::time::Duration,
+) -> io::Result<ProvedProcessEnd> {
+    // kill(2) reads 0 as this process group and -1 as every process.
+    if receipt.pid <= 0 {
+        return Err(invalid("a proved process has a positive PID"));
+    }
+    let alive = || {
+        process_birth(receipt.pid).is_some_and(|birth| {
+            birth.uid == effective_uid()
+                && (birth.start_seconds, birth.start_microseconds)
+                    == (receipt.start_seconds, receipt.start_microseconds)
+        })
+    };
+    let gone_within = |within: std::time::Duration| {
+        let deadline = std::time::Instant::now() + within;
+        while std::time::Instant::now() < deadline {
+            if !alive() {
+                return true;
+            }
+            std::thread::sleep(END_PROBE);
+        }
+        !alive()
+    };
+    // Signals the PID only while it still has the receipt's birth; true once
+    // the signal was delivered.
+    let signal = |number: libc::c_int| -> io::Result<bool> {
+        if !alive() {
+            return Ok(false);
+        }
+        // SAFETY: kill takes a positive PID checked just now to still be the
+        // receipt's process, and a valid signal number; it touches no memory.
+        if unsafe { libc::kill(receipt.pid, number) } == 0 {
+            return Ok(true);
+        }
+        let error = io::Error::last_os_error();
+        if alive() { Err(error) } else { Ok(false) }
+    };
+    if !signal(libc::SIGTERM)? {
+        return Ok(ProvedProcessEnd::AlreadyEnded);
+    }
+    if gone_within(grace) {
+        return Ok(ProvedProcessEnd::Terminated);
+    }
+    if !signal(libc::SIGKILL)? {
+        return Ok(ProvedProcessEnd::Terminated);
+    }
+    if gone_within(kill_grace) {
+        return Ok(ProvedProcessEnd::Killed);
+    }
+    Err(io::Error::new(
+        io::ErrorKind::TimedOut,
+        "the proved process outlived SIGKILL",
+    ))
+}
+
 /// Swift `scan`: every process running the verified executable is examined;
 /// exactly one must own exactly one registered listener on the endpoint.
 fn scan(tool: &VerifiedTool, endpoint: SocketAddrV4) -> io::Result<ServerIdentityReceipt> {

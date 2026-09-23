@@ -603,10 +603,29 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // Swift stops its HDC host next. Unlike Swift, which lets go of its
         // instance lock at the end of the drain, the transport directory and
         // every store stay owned until the process ends, so a successor never
-        // meets this server on the endpoint.
+        // meets this server on the endpoint. Unlike Swift's, the stop also
+        // ends the replacement a confirmed restart proved (`ManagedHdc::stop`).
         #[cfg(target_os = "macos")]
-        if let Some(managed) = managed_hdc {
-            let _ = managed.stop();
+        if let Some(managed) = managed_hdc
+            && let Some(stopped) = managed.stop()
+        {
+            use managed_hdc::ReplacementStop;
+            if let Err(error) = &stopped.server {
+                eprintln!("arkdeck-agentd: the managed HDC server's stop failed: {error}");
+            }
+            match stopped.replacement {
+                ReplacementStop::None => {}
+                ReplacementStop::Ended => eprintln!(
+                    "arkdeck-agentd: ended the replacement HDC server a confirmed restart proved"
+                ),
+                ReplacementStop::Uncertain => eprintln!(
+                    "arkdeck-agentd: an HDC restart's outcome is uncertain; whatever it left on \
+                     the endpoint was not stopped"
+                ),
+                ReplacementStop::Unproved(reason) | ReplacementStop::Survived(reason) => {
+                    eprintln!("arkdeck-agentd: {reason}")
+                }
+            }
         }
         println!("arkdeck-agentd stopped");
         let _ = io::stdout().flush();

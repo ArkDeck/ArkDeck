@@ -80,6 +80,10 @@ impl Default for StartBudget {
 /// refusal before it.
 #[derive(Debug)]
 pub enum StartFailure {
+    /// Something already listens on the endpoint: nothing was launched, and
+    /// what listens there is named, never adopted or stopped (Swift's
+    /// "managed HDC endpoint was not absent before the foreground launch").
+    Occupied(String),
     /// The launch itself was refused: nothing ran.
     Refused(io::Error),
     /// The server ended before it was ready (Swift `foregroundExitReason`).
@@ -99,18 +103,34 @@ pub struct ManagedHdcServer {
 }
 
 impl ManagedHdcServer {
-    /// Swift `HeadlessHDCServerHost.start`: launch, then the loopback listener
-    /// must become reachable (never `checkserver` first — an HDC client
-    /// bootstraps a competing server when no listener exists), then
-    /// `checkserver` must exit 0 with nothing on stderr and agreeing versions,
-    /// then the listener's owner must be the launched process. The server
-    /// ending at any point before that is its own failure; a launch that
-    /// fails to be ready is stopped before this returns.
+    /// Swift `HeadlessHDCServerHost.start`: the endpoint must be absent,
+    /// then launch, then the loopback listener must become reachable (never
+    /// `checkserver` first — an HDC client bootstraps a competing server when
+    /// no listener exists), then `checkserver` must exit 0 with nothing on
+    /// stderr and agreeing versions, then the listener's owner must be the
+    /// launched process. The server ending at any point before that is its
+    /// own failure; a launch that fails to be ready is stopped before this
+    /// returns.
+    ///
+    /// Swift's absence gate (`authorizeManagedStart`) asks only its
+    /// Supervisor's memory, which every daemon start begins empty, so Swift
+    /// launches a second server beside whatever already holds the endpoint
+    /// — a server a restart left, one a killed daemon orphaned, another
+    /// client's — and fails only in readiness. Here the endpoint itself is
+    /// asked first, by the connect alone that Swift's readiness uses (no HDC
+    /// client runs): if anything answers, nothing is launched, and what
+    /// holds the endpoint is named by the commandless proof and is never
+    /// adopted or stopped (AC-HDC-003-02: managed only on an endpoint that had
+    /// no server before the start; REQ-HDC-003). The proof after the launch
+    /// still decides whatever a listener appearing in between could change.
     pub fn start(
         tool: &VerifiedTool,
         endpoint: SocketAddrV4,
         budget: StartBudget,
     ) -> Result<Self, StartFailure> {
+        if reachable(endpoint) {
+            return Err(StartFailure::Occupied(occupant(tool, endpoint)));
+        }
         let spelled = endpoint.to_string();
         let environment = [(
             OsString::from(SERVER_PORT_VARIABLE),
@@ -259,6 +279,28 @@ fn launch_matches(launch: &ServerLaunch, identity: &ServerIdentityReceipt) -> bo
 /// what it is.
 fn reachable(endpoint: SocketAddrV4) -> bool {
     TcpStream::connect_timeout(&SocketAddr::V4(endpoint), REACHABILITY_PROBE).is_ok()
+}
+
+/// What holds an endpoint a managed launch found occupied, as the
+/// commandless proof can say it: a process of the configured executable that
+/// this launch did not start (by its PID and generation), a listener of any
+/// other executable, or one whose owner cannot be proved. Only read: nothing
+/// is adopted, signalled or connected to beyond the reachability probe.
+fn occupant(tool: &VerifiedTool, endpoint: SocketAddrV4) -> String {
+    let holder = match LoopbackServerLease::acquire(tool, endpoint) {
+        Ok(lease) => format!(
+            "a server of the configured HDC executable that this launch did not start \
+             listens there (pid {}, generation {})",
+            lease.identity().pid,
+            crate::lifecycle::generation(lease.identity())
+                .map_or_else(|| "unknown".to_owned(), |generation| generation.to_string())
+        ),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            "a listener that is not the configured HDC executable holds it".to_owned()
+        }
+        Err(error) => format!("the owner of its listener cannot be proved ({error})"),
+    };
+    format!("managed HDC endpoint was not absent before the foreground launch: {holder}")
 }
 
 /// Swift `foregroundExitReason`.

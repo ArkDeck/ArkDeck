@@ -44,6 +44,11 @@ impl FakeHdc {
         let binary = directory.join("hdc");
         let mut command = Command::new("cc");
         command.arg("-O0").arg("-o").arg(&binary).arg(&source);
+        // Every invocation of the fake is recorded, one line each.
+        command.arg(format!(
+            "-DRECORD_CALLS=\"{}\"",
+            directory.join("calls").display()
+        ));
         for define in defines {
             command.arg(format!("-D{define}"));
         }
@@ -59,6 +64,15 @@ impl FakeHdc {
         let digest = format!("{:x}", Sha256::digest(fs::read(&binary).unwrap()));
         let tool = VerifiedTool::open(&binary, &digest).unwrap();
         Self { directory, tool }
+    }
+
+    /// How many times the fake ran as a `-m` server.
+    fn launches(&self) -> usize {
+        fs::read_to_string(self.directory.join("calls"))
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| line.ends_with(" -m"))
+            .count()
     }
 }
 
@@ -169,9 +183,45 @@ fn a_server_whose_versions_disagree_is_never_ready_and_is_stopped() {
     assert!(unreachable_within(endpoint, Duration::from_secs(5)));
 }
 
+/// A listener that appears only after the launch — here once the fake has
+/// run as the server, which never binds — answers the endpoint, but it is
+/// not the launched process: the launch is never bound to it.
 #[test]
 fn a_listener_of_another_process_never_binds_the_launch() {
     let fake = FakeHdc::compile("foreign", &["NEVER_BIND=1"]);
+    let endpoint = free_endpoint();
+    let calls = fake.directory.join("calls");
+    let foreign = std::thread::spawn(move || {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !fs::read_to_string(&calls)
+            .unwrap_or_default()
+            .lines()
+            .any(|line| line.ends_with(" -m"))
+        {
+            assert!(Instant::now() < deadline, "the server was never launched");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        std::net::TcpListener::bind(endpoint).unwrap()
+    });
+    let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(10)))
+        .err()
+        .expect("another process's listener is not this launch");
+    let _foreign = foreign.join().unwrap();
+    let StartFailure::Unbound(reason) = error else {
+        panic!("expected the identity refusal, got {error:?}");
+    };
+    assert_eq!(
+        reason,
+        "managed HDC launch could not be bound to its live process identity"
+    );
+}
+
+/// A listener already on the endpoint when the start begins: nothing is
+/// launched beside it (Swift launches and fails in readiness), and it is
+/// named, never adopted.
+#[test]
+fn a_listener_already_on_the_endpoint_is_named_and_nothing_is_launched() {
+    let fake = FakeHdc::compile("occupied-foreign", &[]);
     // The foreign listener keeps the port it was handed: releasing it and
     // binding again would open a window for another test's server.
     let foreign = loopback_ports::issued_listener();
@@ -180,15 +230,52 @@ fn a_listener_of_another_process_never_binds_the_launch() {
     };
     let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(10)))
         .err()
-        .expect("another process's listener is not this launch");
-    let StartFailure::Unbound(reason) = error else {
-        panic!("expected the identity refusal, got {error:?}");
+        .expect("an occupied endpoint is not started on");
+    let StartFailure::Occupied(reason) = error else {
+        panic!("expected the occupied endpoint, got {error:?}");
     };
     assert_eq!(
         reason,
-        "managed HDC launch could not be bound to its live process identity"
+        "managed HDC endpoint was not absent before the foreground launch: a listener that is \
+         not the configured HDC executable holds it"
+    );
+    assert!(
+        !fake.directory.join("calls").exists(),
+        "the fake was run beside the listener"
     );
     drop(foreign);
+}
+
+/// A server of the very executable already on the endpoint — one a restart
+/// or a killed daemon left — is named by its PID and generation, neither
+/// adopted nor disturbed, and no second server is launched beside it.
+#[test]
+fn a_server_of_the_executable_already_on_the_endpoint_is_named_and_left_alone() {
+    let fake = FakeHdc::compile("occupied-server", &[]);
+    let endpoint = free_endpoint();
+    let mut first =
+        ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(15))).unwrap();
+    assert_eq!(fake.launches(), 1);
+    let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(10)))
+        .err()
+        .expect("an occupied endpoint is not started on");
+    let StartFailure::Occupied(reason) = error else {
+        panic!("expected the occupied endpoint, got {error:?}");
+    };
+    assert_eq!(
+        reason,
+        format!(
+            "managed HDC endpoint was not absent before the foreground launch: a server of the \
+             configured HDC executable that this launch did not start listens there (pid {}, \
+             generation {})",
+            first.identity().pid,
+            arkdeck_provider_hdc::generation(first.identity()).unwrap()
+        )
+    );
+    assert_eq!(fake.launches(), 1, "a second server was launched");
+    first.revalidate().unwrap();
+    first.stop().unwrap();
+    assert!(unreachable_within(endpoint, Duration::from_secs(5)));
 }
 
 #[test]

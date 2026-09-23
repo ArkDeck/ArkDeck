@@ -65,8 +65,8 @@ pub use stop_signal::{Latch, StopSignal};
 mod macos_server;
 #[cfg(target_os = "macos")]
 pub use macos_server::{
-    LoopbackServerLease, ServerIdentityReceipt, process_argument_record, process_arguments,
-    verifies_managed_process,
+    LoopbackServerLease, ProvedProcessEnd, ServerIdentityReceipt, end_proved_process,
+    process_argument_record, process_arguments, verifies_managed_process,
 };
 #[cfg(windows)]
 pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};

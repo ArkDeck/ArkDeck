@@ -15,8 +15,19 @@
 //! The process owner exits 70 on an unexpected foreground-child exit so
 //! launchd can rebuild the provider graph. Confirmed execution has Swift's
 //! bounded expected-exit window; no uncertain replacement is adopted here.
+//!
+//! The replacement a confirmed restart proved outlives this Runtime unless
+//! it is ended: `kill -r` starts it in a session of its own, as HDC does, so
+//! it is no child here or in Swift. The daemon's stop ends it as it ends the
+//! original child (TASK-XPA-014), only while a fresh proof still names that
+//! very process, so a normal stop leaves the endpoint as a stop without a
+//! restart does. An uncertain outcome's server, and whatever else holds the
+//! endpoint, is never signalled. A start never adopts a server it finds on
+//! the endpoint: it refuses before launching anything (`StartFailure::
+//! Occupied`), so a replacement a crashed Runtime left keeps the next start
+//! refused until that server ends.
 use arkdeck_control::ManagedToolFacts;
-use arkdeck_platform::{LoopbackServerLease, ServerStop, VerifiedTool};
+use arkdeck_platform::{LoopbackServerLease, ServerStop, VerifiedTool, end_proved_process};
 use arkdeck_provider_hdc::{
     CommandlessIdentity, DispatchFailure, EndpointSelection, HdcDispatch, HdcStatusObserver,
     ManagedHdcServer, ManagedLaunch, NativeSignature, ProcessDispatch, ProcessPlan, Receipt,
@@ -80,6 +91,10 @@ impl ManagedHdc {
         let retained = VerifiedTool::open(tool.path(), tool.sha256()).map_err(|e| e.to_string())?;
         let server = ManagedHdcServer::start(tool, selection.endpoint, StartBudget::default())
             .map_err(|failure| match failure {
+                StartFailure::Occupied(reason) => format!(
+                    "the managed HDC server did not start: {reason}; nothing was launched, and \
+                     that server is neither adopted nor stopped"
+                ),
                 StartFailure::Refused(error) => {
                     format!("the managed HDC server launch was refused: {error}")
                 }
@@ -269,13 +284,101 @@ impl ManagedHdc {
 
     /// Swift `HeadlessHDCServerHost.stop`: TERM to the server's process
     /// group, KILL after its grace, and what it wrote. Once only.
-    pub(crate) fn stop(&self) -> Option<io::Result<ServerStop>> {
+    ///
+    /// Beyond Swift, it also ends the replacement a confirmed restart proved:
+    /// Swift's stop reaches only its original child, so after a restart it
+    /// left the listener its own contract says a stop drains
+    /// (`testColdStartReturnsOnlyAfterTheForegroundListenerIsReachable`), and
+    /// the next start could not launch beside it.
+    pub(crate) fn stop(&self) -> Option<Stop> {
         self.foreground.lock().ok()?.stopping = true;
-        *self.ownership.lock().ok()? = DispatchOwnership::Stopped;
+        let ownership = std::mem::replace(
+            &mut *self.ownership.lock().ok()?,
+            DispatchOwnership::Stopped,
+        );
         *self.supervisor.lock().ok()? = None;
         let server = self.server.lock().ok()?.take()?;
-        Some(server.stop())
+        let server = server.stop();
+        let replacement = match ownership {
+            DispatchOwnership::Replacement(lease) => self.end_replacement(&lease),
+            DispatchOwnership::Pending | DispatchOwnership::Unknown => ReplacementStop::Uncertain,
+            DispatchOwnership::Original | DispatchOwnership::Stopped => ReplacementStop::None,
+        };
+        Some(Stop {
+            server,
+            replacement,
+        })
     }
+
+    /// The replacement a confirmed restart proved is this Runtime's managed
+    /// server, as its original child was (REQ-HDC-003 forbids an automatic
+    /// stop only of an external or unknown server), so it is ended as that
+    /// child is — SIGTERM, then SIGKILL after the same grace — but only while
+    /// the tool still verifies, the retained proof still holds, and a fresh
+    /// two-scan proof names exactly that process as the endpoint's owner.
+    /// Anything else there is left as it is.
+    fn end_replacement(&self, lease: &LoopbackServerLease) -> ReplacementStop {
+        let proved = || -> Result<(), String> {
+            let endpoint = self
+                .endpoint()
+                .parse()
+                .map_err(|_| "the selected endpoint is unavailable".to_owned())?;
+            self.tool.revalidate().map_err(|error| error.to_string())?;
+            lease.revalidate().map_err(|error| error.to_string())?;
+            let fresh =
+                LoopbackServerLease::acquire(&self.tool, endpoint).map_err(|e| e.to_string())?;
+            if fresh.identity() != lease.identity() {
+                return Err("another process now owns the endpoint".into());
+            }
+            Ok(())
+        };
+        let pid = lease.identity().pid;
+        if let Err(reason) = proved() {
+            return ReplacementStop::Unproved(format!(
+                "the replacement HDC server a confirmed restart proved (pid {pid}) is no longer \
+                 proved ({reason}); nothing was signalled"
+            ));
+        }
+        // Ended politely, killed, or gone on its own since the proof.
+        match end_proved_process(lease.identity(), TERMINATION_GRACE, KILL_GRACE) {
+            Ok(_) => ReplacementStop::Ended,
+            Err(error) => ReplacementStop::Survived(format!(
+                "the replacement HDC server a confirmed restart proved (pid {pid}) did not end: \
+                 {error}"
+            )),
+        }
+    }
+}
+
+/// Swift's process-group drain: the grace SIGTERM has before SIGKILL, and
+/// how long the end after SIGKILL is waited for.
+const TERMINATION_GRACE: Duration = Duration::from_millis(250);
+const KILL_GRACE: Duration = Duration::from_secs(1);
+
+/// What the daemon's stop ended.
+#[derive(Debug)]
+pub(crate) struct Stop {
+    /// The original foreground child, as its stop collected it.
+    pub(crate) server: io::Result<ServerStop>,
+    /// What became of a server a confirmed restart started.
+    pub(crate) replacement: ReplacementStop,
+}
+
+/// What the daemon's stop did about a server a confirmed restart started.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum ReplacementStop {
+    /// No confirmed restart transferred ownership in this Runtime.
+    None,
+    /// The proved replacement has ended.
+    Ended,
+    /// A restart's outcome was uncertain: whatever it left is unknown and
+    /// was not signalled (REQ-HDC-003).
+    Uncertain,
+    /// The endpoint no longer holds the proved replacement, or the proof
+    /// could not be read again: nothing was signalled.
+    Unproved(String),
+    /// Signalled, it did not end.
+    Survived(String),
 }
 
 impl SupervisorState for ManagedHdc {
@@ -430,6 +533,151 @@ mod tests {
             timeout: Duration::from_secs(10),
             capture_bytes: 4096,
         }
+    }
+
+    /// Whether anything listens on the endpoint.
+    fn reachable(endpoint: SocketAddrV4) -> bool {
+        std::net::TcpStream::connect_timeout(&endpoint.into(), Duration::from_millis(100)).is_ok()
+    }
+
+    /// How many `-m` servers of a recording fake ever ran: those a start
+    /// launched and those its `kill -r` started.
+    fn launches(fake: &Fake) -> usize {
+        std::fs::read_to_string(fake.0.join("calls"))
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| line.ends_with(" -m"))
+            .count()
+    }
+
+    /// The servers the fake's `kill -r` started, by PID.
+    fn recorded_servers(fake: &Fake) -> Vec<i32> {
+        std::fs::read_to_string(fake.0.join("servers"))
+            .unwrap_or_default()
+            .lines()
+            .map(|line| line.parse().unwrap())
+            .collect()
+    }
+
+    /// Ends whatever server of this build listens on the endpoint, as an
+    /// operator's `hdc -s <endpoint> kill` would (the fake's `stop` marker),
+    /// then clears the marker so that the next server of this build runs.
+    fn hdc_kill(fake: &Fake, endpoint: SocketAddrV4) {
+        let status = std::process::Command::new(fake.0.join("hdc"))
+            .args(["-s", &endpoint.to_string(), "kill"])
+            .status()
+            .unwrap();
+        assert!(status.success());
+        std::fs::remove_file(fake.0.join("stop")).unwrap();
+        assert!(!reachable(endpoint), "the server did not end");
+    }
+
+    /// The managed server a daemon start composes on `endpoint`.
+    fn daemon_start(tool: &VerifiedTool, endpoint: SocketAddrV4) -> Result<ManagedHdc, String> {
+        ManagedHdc::start(
+            tool,
+            &tool.path().to_string_lossy(),
+            EndpointSelection {
+                endpoint,
+                source: "inheritedEnvironment",
+            },
+        )
+    }
+
+    /// A synthetic trusted impact of the managed server as it now is. The
+    /// fake's digest proves no registered HDC, so no production source
+    /// observes it; only this test binary composes one.
+    struct Impacts(arkdeck_hoststore::ImpactReading);
+    impl arkdeck_hoststore::ImpactSource for Impacts {
+        fn endpoint_reference(&self) -> String {
+            self.0.impact.value()["serverEndpointRef"]
+                .as_str()
+                .unwrap()
+                .into()
+        }
+        fn read_impact(&self) -> Result<arkdeck_hoststore::ImpactReading, String> {
+            Ok(self.0.clone())
+        }
+    }
+
+    /// The durable control-action and Job owners a restart needs.
+    type Owners = (
+        arkdeck_hoststore::HdcControlActions,
+        arkdeck_hoststore::JobStore,
+    );
+
+    /// The owners, in the fake's directory.
+    fn owners(fake: &Fake) -> Owners {
+        let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
+        root.private_child("actions").unwrap();
+        root.private_child("jobs").unwrap();
+        (
+            arkdeck_hoststore::HdcControlActions::open(
+                &fake.0.join("actions"),
+                arkdeck_hoststore::OwnerContext::production().unwrap(),
+            )
+            .unwrap(),
+            arkdeck_hoststore::JobStore::open_owner(&fake.0.join("jobs")).unwrap(),
+        )
+    }
+
+    /// One restart of the managed server, confirmed as a foreground console
+    /// confirms it, through the real durable owner, lifecycle driver and
+    /// verified runner: its terminal projection.
+    fn confirmed_restart(
+        managed: &ManagedHdc,
+        tool: &VerifiedTool,
+        (owner, jobs): &Owners,
+        request: &str,
+    ) -> Value {
+        use serde_json::json;
+        let before = managed.state(managed.endpoint()).unwrap();
+        let endpoint_ref = arkdeck_provider_hdc::server_endpoint_ref(managed.endpoint());
+        let source = Impacts(arkdeck_hoststore::ImpactReading {
+            impact: arkdeck_hoststore::Impact::new(json!({
+                "serverEndpointRef":endpoint_ref,"endpoint":managed.endpoint(),"serverOwnership":"arkDeckManaged",
+                "serverGeneration":before.generation.to_string(),"serverHealth":"healthy","serverVersion":"3.2.0d",
+                "tool":{"reference":null,"executablePath":tool.path(),"source":"runtimeConfiguration","sha256":tool.sha256(),"signature":null,"version":"3.2.0d","trust":"unverified"},
+                "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],"otherClientsMayExist":true,"affectedDeviceObservations":[],
+                "criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},
+                "interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},"recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+            }).as_object().unwrap().clone()).unwrap(),
+            relations: vec![],
+            blocker: None,
+        });
+        let preview = owner
+            .preview(
+                json!({"action":"restart","actionRequestId":request,"serverEndpointRef":endpoint_ref,
+                    "expectedServerGeneration":before.generation.to_string()})
+                .as_object()
+                .unwrap(),
+                &source,
+            )
+            .unwrap();
+        let id = preview["controlActionId"].as_str().unwrap();
+        let waiting = owner
+            .restart(
+                id,
+                preview["preview"]["previewId"].as_str().unwrap(),
+                preview["preview"]["previewDigest"].as_str().unwrap(),
+                &source,
+            )
+            .unwrap();
+        let human = &waiting["humanAction"];
+        let reference = human["resumeReference"].as_str().unwrap();
+        let challenge = owner
+            .issue_interactive_challenge(human["actionId"].as_str().unwrap(), reference)
+            .unwrap();
+        owner
+            .consume_interactive_challenge(
+                id,
+                reference,
+                challenge["challenge"].as_str().unwrap(),
+                jobs,
+                &source,
+                managed,
+            )
+            .unwrap()
     }
 
     /// Dispatch addresses the managed server only while it is the one
@@ -689,7 +937,26 @@ mod tests {
                         .count(),
                     1
                 );
-                managed.stop();
+                // The server this uncertain restart left is unknown: the stop
+                // signals nothing but the original child, and a new start
+                // neither launches beside that server nor adopts it.
+                let left = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+                assert_eq!(recorded_servers(&fake), [left.identity().pid]);
+                assert_eq!(
+                    managed.stop().unwrap().replacement,
+                    ReplacementStop::Uncertain
+                );
+                left.revalidate().unwrap();
+                let launched = launches(&fake);
+                let refused = daemon_start(&tool, endpoint)
+                    .err()
+                    .expect("a start beside the server an uncertain restart left");
+                assert!(
+                    refused.contains(&format!("(pid {}, generation", left.identity().pid)),
+                    "{refused}"
+                );
+                assert_eq!(launches(&fake), launched);
+                left.revalidate().unwrap();
             }
         }
     }
@@ -883,5 +1150,165 @@ mod tests {
             }
             managed.stop();
         }
+    }
+
+    /// restart -> the daemon's stop (SIGTERM or SIGINT drains the daemon,
+    /// then stops its server) -> the next start on the same endpoint. The
+    /// stop ends the replacement the confirmed restart proved, exactly that
+    /// process, so the endpoint has no server again and the next start
+    /// launches and proves its own; the restart's durable outcome, read by a
+    /// new Runtime epoch, is unchanged and nothing reruns it. Isolated fake
+    /// processes and a synthetic impact source: not registered-HDC or device
+    /// evidence.
+    #[test]
+    fn a_stop_ends_the_proved_replacement_and_the_next_start_launches_its_own() {
+        let (fake, tool) = fake_options(true, false);
+        let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+        let managed = daemon_start(&tool, endpoint).unwrap();
+        let original = managed.active_launch().unwrap().pid;
+        let owners = owners(&fake);
+        let result = confirmed_restart(&managed, &tool, &owners, "restart-then-stop");
+        assert_eq!(result["state"], "succeeded", "{result}");
+        let replacement = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        assert_ne!(replacement.identity().pid, original);
+        assert_eq!(recorded_servers(&fake), [replacement.identity().pid]);
+
+        let stopped = managed.stop().unwrap();
+        assert_eq!(stopped.replacement, ReplacementStop::Ended);
+        assert!(stopped.server.is_ok());
+        assert!(
+            replacement.revalidate().is_err(),
+            "the replacement still runs"
+        );
+        assert!(!reachable(endpoint), "a server is left on the endpoint");
+        assert!(managed.stop().is_none());
+
+        let launched = launches(&fake);
+        let next = daemon_start(&tool, endpoint).unwrap();
+        assert_eq!(launches(&fake), launched + 1);
+        let own = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        assert_eq!(own.identity().pid, next.active_launch().unwrap().pid);
+        assert!(generation(own.identity()) > generation(replacement.identity()));
+        let epoch = arkdeck_hoststore::HdcControlActions::open(
+            &fake.0.join("actions"),
+            arkdeck_hoststore::OwnerContext::production().unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            epoch
+                .show(result["controlActionId"].as_str().unwrap())
+                .unwrap(),
+            result
+        );
+        let calls = std::fs::read_to_string(fake.0.join("calls")).unwrap();
+        assert_eq!(
+            calls
+                .lines()
+                .filter(|line| line.ends_with(" kill -r"))
+                .count(),
+            1
+        );
+        assert_eq!(next.stop().unwrap().replacement, ReplacementStop::None);
+        assert!(!reachable(endpoint));
+    }
+
+    /// restart -> the daemon ends without its stop (SIGKILL, or exit 70:
+    /// no drain runs) -> the next start. The replacement the ended Runtime
+    /// left was not launched by the start that finds it: it is named and
+    /// refused before anything is launched, neither adopted nor stopped
+    /// (AC-HDC-003-02, REQ-HDC-003), and every start is refused so until that
+    /// server ends; then the next start launches its own. Whether a start
+    /// should instead serve beside it or claim it by a durable proof is the
+    /// maintainer's to decide (hdc-replacement-lifetime-rust-run.md).
+    #[test]
+    fn a_crash_after_a_restart_leaves_its_replacement_and_starts_refuse_it_until_it_ends() {
+        let (fake, tool) = fake_options(true, false);
+        let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+        let managed = daemon_start(&tool, endpoint).unwrap();
+        let owners = owners(&fake);
+        let result = confirmed_restart(&managed, &tool, &owners, "restart-then-crash");
+        assert_eq!(result["state"], "succeeded", "{result}");
+        let replacement = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        // A crash runs no stop: the Runtime's handles go as its process does.
+        drop(managed);
+        replacement.revalidate().unwrap();
+
+        let launched = launches(&fake);
+        for _ in 0..2 {
+            let refused = daemon_start(&tool, endpoint)
+                .err()
+                .expect("a start beside the replacement");
+            assert_eq!(
+                refused,
+                format!(
+                    "the managed HDC server did not start: managed HDC endpoint was not absent \
+                     before the foreground launch: a server of the configured HDC executable \
+                     that this launch did not start listens there (pid {}, generation {}); \
+                     nothing was launched, and that server is neither adopted nor stopped",
+                    replacement.identity().pid,
+                    generation(replacement.identity()).unwrap()
+                )
+            );
+            assert_eq!(launches(&fake), launched, "a server was launched beside it");
+            replacement.revalidate().unwrap();
+        }
+        hdc_kill(&fake, endpoint);
+        assert!(replacement.revalidate().is_err());
+        let next = daemon_start(&tool, endpoint).unwrap();
+        assert_eq!(launches(&fake), launched + 1);
+        assert_eq!(next.stop().unwrap().replacement, ReplacementStop::None);
+    }
+
+    /// restart -> the replacement ends and an unrelated server of the very
+    /// same executable, newer and with the same argv, takes the endpoint ->
+    /// the daemon's stop, then the next start. That server is not the
+    /// process the restart proved: the stop signals nothing but the original
+    /// child, and the next start neither launches beside it nor inherits it.
+    #[test]
+    fn an_unrelated_server_in_the_replacements_place_is_neither_stopped_nor_inherited() {
+        let (fake, tool) = fake_options(true, false);
+        let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+        let managed = daemon_start(&tool, endpoint).unwrap();
+        let owners = owners(&fake);
+        let result = confirmed_restart(&managed, &tool, &owners, "restart-then-unrelated");
+        assert_eq!(result["state"], "succeeded", "{result}");
+        let replacement = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        hdc_kill(&fake, endpoint);
+        assert!(replacement.revalidate().is_err());
+        let unrelated = ManagedHdcServer::start(&tool, endpoint, StartBudget::default()).unwrap();
+        let identity = unrelated.identity().clone();
+        assert_ne!(identity.pid, replacement.identity().pid);
+
+        let ReplacementStop::Unproved(reason) = managed.stop().unwrap().replacement else {
+            panic!("the stop signalled a server the restart did not prove");
+        };
+        assert!(
+            reason.contains(&format!("(pid {})", replacement.identity().pid))
+                && reason.ends_with("nothing was signalled"),
+            "{reason}"
+        );
+        assert_eq!(
+            LoopbackServerLease::acquire(&tool, endpoint)
+                .unwrap()
+                .identity(),
+            &identity,
+            "the unrelated server was signalled"
+        );
+        let launched = launches(&fake);
+        let refused = daemon_start(&tool, endpoint)
+            .err()
+            .expect("a start beside an unrelated server");
+        assert!(
+            refused.contains(&format!("(pid {}, generation", identity.pid)),
+            "{refused}"
+        );
+        assert_eq!(launches(&fake), launched);
+        assert_eq!(
+            LoopbackServerLease::acquire(&tool, endpoint)
+                .unwrap()
+                .identity(),
+            &identity
+        );
+        unrelated.stop().unwrap();
     }
 }
