@@ -1,7 +1,9 @@
 # TASK-XPA-016 — the Runtime's own trusted USB relations on Rust (M1, GJ-1)
 
-Base: protected main `afde8a42ac753d199f4078e91aca56b788533589` (#2134). Branch:
-`agent/xpa-016-trusted-usb-relations`. CHG-2026-074, M1 (GJ-1), G5 queue slice 5.
+Base: protected main `51f8009dfb86821a773baa942cc82a4340fe2a02` (#2136). The slice was first
+written and pushed on `afde8a42a` (#2134, head `426870a00`), then rebased onto #2136 without conflict
+for the second commit (see "The macOS 26 CI finding"). Branch: `agent/xpa-016-trusted-usb-relations`.
+CHG-2026-074, M1 (GJ-1), G5 queue slice 5.
 
 This is a host-only change. No device was attached, no HDC was run against a device, and the
 installed Runtime (its `hdc` server and `com.arkdeck.agentd`) was not touched. Nothing here is
@@ -197,11 +199,24 @@ passes that entry over.
   counts):
   - the USB device census answers on this host;
   - the census reads string, number and boolean properties from the host's USB host controllers;
-  - two measured batches of 2,000 censuses each, after an unmeasured warm-up batch on a fresh thread,
-    keep neither heap blocks nor Mach port names, for both censuses.
+  - what repeated censuses leave behind on a fresh thread without an autorelease pool. After three
+    unmeasured warm-up batches, it counts heap blocks (and bytes) and Mach port names over six
+    measured batches of 2,000 censuses each. It measures the production census, the controller census
+    with every read, and each kind of read alone: enumeration only, a string, a number, a boolean, an
+    absent key, and the registry entry ID. So any growth names the read that causes it. A control
+    that churns the heap from Rust alone is measured and reported, not judged.
 
-  The test does not require a DAYU200. Without one it reports the skip and never fails for its
-  absence.
+  The rules follow from one fact: a census takes the same path over the same registry on every call,
+  so anything it kept it would keep on every call, which is at least 2,000 per batch in every batch.
+
+  - (a) No measured batch keeps 1,000 (`CALLS / 2`) or more. That is twice the margin below
+    per-call retention.
+  - (b) Some measured batch keeps fewer than 20 (`CALLS / 100`). A leak grows in every batch at its
+    rate; a first-use fill stops, and an allocator's bookkeeping moves both ways.
+
+  Every run writes its per-batch figures to the job's log, passing or not: they go to the standard
+  error stream itself, which libtest does not capture. The test does not require a DAYU200; without
+  one it reports the skip and never fails for its absence.
 - **`arkdeck-provider-hdc` unit tests.**
   - `only_the_hdc_normal_dayu200_with_an_attachment_is_a_registered_relation` covers name trimming,
     exact comparison, Loader, vendor, attachment, and census order without deduplication.
@@ -233,10 +248,17 @@ passes that entry over.
 - **`development_usb`**: `the_registry_is_read_beside_the_managed_registered_hdc_unless_a_file_is_named`
   covers seven compositions. No process test can reach the registered ones, since a test HDC never
   has a registered digest.
-- **Mutations**, each caught and then restored by checksum:
-  - a census that never releases I/O Kit references keeps 2,000 port names per batch;
-  - never releasing the property key keeps 8,000 heap blocks per batch;
-  - never releasing the property value keeps 4,000 heap blocks per batch;
+- **Mutations**, each caught and then restored by checksum. The first three were run again against
+  the measurement above. Each fails both rules in exactly the variants whose reads it breaks:
+  - a census that never releases I/O Kit references keeps 2,000 port names in all six batches of
+    every controller variant (its iterator). The production census on this host has no iterator,
+    since it lists no device.
+  - never releasing the property key keeps 8,000 heap blocks per batch for every read, and 4,000 for
+    the boolean and the absent key alone. Their keys are long enough to be heap strings; the short
+    `IOClass` and `locationID` keys are not.
+  - never releasing the property value keeps 4,000 heap blocks per batch for every read and for the
+    string alone. A small number and a boolean are not heap objects, and an absent key has no value.
+
   - dropping the product-name check fails both agentd tests and the provider unit test;
   - reading an unavailable census as no devices fails the agentd uncertainty test and the provider
     unit test.
@@ -248,13 +270,40 @@ passes that entry over.
   DAYU200**, so both DAYU200 checks reported their skip.
 - The controller census read 2 `AppleUSBHostController` entries, with their class string, location
   number and sleep boolean.
-- The leak batches kept 0 then 0 heap blocks and 0 then 0 port names per 2,000 censuses, for both
-  censuses.
+- Here (macOS 27), every measured variant and the control kept 0 heap blocks, 0 bytes and 0 port
+  names in each of the six batches of 2,000 censuses.
 - The smoke found one thing before commit. With no entry of the class, the kernel answers
   `KERN_SUCCESS` and a null iterator. The first version asked that iterator's validity and answered
   `Invalidated`. It is now an empty census, as Swift's loop reads it.
 
 This smoke is a host-only read of this Mac's registry. It is not device acceptance.
+
+## The macOS 26 CI finding and how it was discriminated
+
+The first head (`426870a00`) went red on `macos-26` only, in job 107373735747 of Swift CI
+35917773897, in the host smoke's leak check. That job's VM listed one USB host controller and no USB
+device. After one warm-up batch:
+
+- `usb_host_devices` kept 1,365 and then 0 heap blocks;
+- the controller census kept 341 and then 512;
+- both kept 0 and 0 port names.
+
+The bound was then 20 (`CALLS / 100`). The same checks were 0 throughout on macOS 27.
+
+None of these numbers is per-call retention. Anything a census keeps it keeps on every call, which is
+at least 2,000 per batch in every batch: the mutants kept 2,000, 4,000 and 8,000 in every batch. The
+production census's 1,365 then 0 is a fill that stopped. But the controller census grew in both
+batches it had, so a single-batch bound could not tell a first-use fill, allocator bookkeeping and a
+slow leak apart.
+
+The measurement was therefore rebuilt, with a longer warm-up, six measured batches, each kind of read
+alone, a control, and the two rules above. A slow leak in one kind of property read on macOS 26 would
+fail rule (b) in that read's variant alone, with every figure on the job's log.
+
+The production reader reads only `IOUSBHostDevice` properties: numbers (`idVendor`, `idProduct`,
+`locationID`), strings (the serials, the product name) and the registry entry ID. No CI VM lists a
+USB device, so the controller variants for the number and string reads stand in for them there. The
+boolean read is not one production makes. No production code changed.
 
 ## Real-device acceptance still pending
 
@@ -269,7 +318,10 @@ This smoke is a host-only read of this Mac's registry. It is not device acceptan
     the registry read does not need the interface.
   - Record: `gj1-rust-trusted-usb-development-root-<date>.md`. It is still development-root
     evidence.
-- **Queue slice 6** must compose `UsbRegistryRelations::system()` beside its managed registered HDC.
+- **The production composition.** Queue slice 6 (#2136) composes no reader yet, says so at startup
+  ("no trusted USB reader until #2135"), and its adoption stays refused. Once this PR merges, it
+  should compose `UsbRegistryRelations::system()` beside its managed registered HDC. That is a
+  follow-up; this PR, rebased onto #2136, does not touch `production.rs`.
 - **A possible maintainer decision:** once the reader has run on the device, retire #2023's
   acknowledged relation file beside a registered HDC. This slice leaves it unchanged, as instructed.
 
@@ -294,6 +346,19 @@ every log below. The target directory was `/private/tmp/arkdeck-1330-rust-target
 
 After every run, no fake `hdc` process and no test root was left behind. The installed `hdc`
 server kept running untouched.
+
+The table above is the first head (`426870a00`, on `afde8a42a`). The second commit changes only
+`tests/usb_registry.rs` and this record, and was checked on the tree rebased onto `51f8009df`. Logs
+are `/private/tmp/arkdeck-s12b-*.log`.
+
+| Command | Exit | Log SHA-256 |
+| --- | --- | --- |
+| `cargo fmt --all --check` | 0 | `e3b0c442…` (empty) |
+| `cargo clippy --locked --all-targets -- -D warnings` for the same eight crates | 0 | `b9369d72…` |
+| `cargo test -p arkdeck-platform --test usb_registry`: every variant and the control at 0 heap blocks, 0 bytes and 0 port names in all six batches; 2 controllers, 0 USB devices | 0 | `35325145…` |
+| the three ownership mutants against the new test: each fails rules (a) and (b) in exactly the variants whose reads it breaks (see Tests), then restored by checksum | 101 each | — |
+| `cargo build -p arkdeck-cli`, then `cargo test --locked --no-fail-fast -p arkdeck-platform -p arkdeck-provider-hdc -p arkdeck-agentd` (agentd because #2136 also changed `main.rs` and `host.rs`): 46 targets, 461 passed, 0 failed, 4 ignored (pre-existing), including #2136's `production_composition` | 0 | `b71ac876…` |
+| `sh scripts/check-sdd.sh`: 0 errors, 0 warnings | 0 | `77c17376…` |
 
 ## CI
 
