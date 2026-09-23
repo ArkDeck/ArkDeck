@@ -1,0 +1,22 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-b011936bbd9b59d8cfc2dbf524d8c47d",
+  "markers" : [
+    {
+      "detail" : "failed cleanup-ui-tree-temp: cleanupDebt: remote cleanup failed for /data/local/tmp/arkdeck-job-b011936bbd9b59d8cfc2dbf524d8c47d-capture-ui-tree-owned.json",
+      "kind" : "auto",
+      "trigger" : "stepFailed"
+    }
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

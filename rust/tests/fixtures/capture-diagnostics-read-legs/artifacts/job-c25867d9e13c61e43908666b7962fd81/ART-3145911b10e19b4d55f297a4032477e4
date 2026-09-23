@@ -1,0 +1,58 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "application-liveness.json" : {
+      "artifactId" : "ART-d71fa1e6d0fc35f96407bbf77678068e",
+      "byteCount" : 632,
+      "required" : false,
+      "sha256" : "60326ba01c7861d0134e30e58074322809c03c9dd005c2607dd0daf1c4a76b27",
+      "status" : "published"
+    },
+    "crash-index.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-log.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "hilog.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "detail" : "upstream capture-trace did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-dump.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "jobId" : "job-c25867d9e13c61e43908666b7962fd81",
+  "operation" : "capture.diagnostics@1"
+}

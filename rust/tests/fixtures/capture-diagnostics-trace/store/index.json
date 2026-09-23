@@ -1,0 +1,164 @@
+{
+  "journalMode" : "wal",
+  "rows" : [
+    {
+      "admissionSequence" : 1,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-blocking",
+      "jobId" : "job-1c209bf5f7b1537cbd2406f5640e0ab8",
+      "recordSHA256" : "7623fbad961a350aabf2bf8f7a2f9fc3e2fca15a9524d797648b6a9831f2cc79",
+      "requestHash" : "ece74f8e4e3bee436c0d4cf1f8958b6d7a13490f329a3c5b3c1c8fb47abc2048",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 17
+    },
+    {
+      "admissionSequence" : 2,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-ring",
+      "jobId" : "job-55c4a0176fed6e2b546d97a9cae80f52",
+      "recordSHA256" : "d4eb65e8bbafcba089a1e5a1fd095394de6f2d25c0ececf1e8aa32c25706ab8d",
+      "requestHash" : "b6ef9f4a493ff728617dd647ba357e4978e52e387553f8b5ce2c16e2231d7b19",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 17
+    },
+    {
+      "admissionSequence" : 3,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-ringNotHeld",
+      "jobId" : "job-6c545eb6042a9ea99e700467bbb77d06",
+      "recordSHA256" : "e58bb4e4a4fc25c9f5964a6e416d5a687a0c8a26de0076102adc22da11c1f6d2",
+      "requestHash" : "13b83cbc23e57b56be02e182c710a6bc9a6d28177c6afdd7f809f9a3d1d56cac",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 17
+    },
+    {
+      "admissionSequence" : 4,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-everyLeg",
+      "jobId" : "job-2ba1bd5a231273e388689a61f209280c",
+      "recordSHA256" : "537eefeb1ca1f906e37f445d863b103832bc207f0483c731aae3447b8852919a",
+      "requestHash" : "c520e1ddd36e4fffe1c0d52443a90033fd92aa612a61a33584728963f31f17b3",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 29
+    },
+    {
+      "admissionSequence" : 5,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-emptyTrace",
+      "jobId" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "recordSHA256" : "35809af3a44fdd24a1bb4172857596e069a9808f597a43cb69a424f9203cfb1c",
+      "requestHash" : "601edc5bde20547ba820a4eafb31df25f78855df4bd0d430e4853579eb9443a0",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 15
+    },
+    {
+      "admissionSequence" : 6,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-cleanupRefused",
+      "jobId" : "job-70b257b0b8e9b3362a71a9854c94eba9",
+      "recordSHA256" : "39f374bc482dd0eb384b5626cdc00bfab3ec2544b87d3ec7ea8bf07a2b852832",
+      "requestHash" : "6071321c0241fd8222682f2f860a17b10bc94459c90419307919bde20f47942e",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 18
+    },
+    {
+      "admissionSequence" : 7,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-tagNotOffered",
+      "jobId" : "job-473d9008e66c524e94aae1515254c0d1",
+      "recordSHA256" : "689f70108029943d467dfb1452c383c3924ad338a90c11eaa83b12d30d547446",
+      "requestHash" : "05cded550847648fd69137e07d6d758db8bfd2cd06ba41b3f8135130d034f1c0",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 8,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-tagListLost",
+      "jobId" : "job-e771b1c2ef5bf497f77974a579186be4",
+      "recordSHA256" : "9370736df0ed8b9ce4dd69e08ffd0ccfec2ee37e6b64f7cc1126b1f28017bbd0",
+      "requestHash" : "82deb22b8788369a08a5f9fa979f66edadfc34b76c5a4725fddf7001194db4e2",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 9,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-afterTagListLost",
+      "jobId" : "job-a9f338c9e94f35bc2fc9245c48197bf5",
+      "recordSHA256" : "9f9db3ba9adba2cf69f1edcf15715924a77a13ed22e922f91ffa1962cd95027d",
+      "requestHash" : "65b573c843b743dbae54c3e2044a692852147ed2e7f5dd19a77366fa10e76029",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 17
+    },
+    {
+      "admissionSequence" : 10,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-capture-traceMissing",
+      "jobId" : "job-4e749be864dd656a3ec13548f001bca7",
+      "recordSHA256" : "a07e0aa7da10f50e2b8b5b1fea2be9c3f9fafb300a15ff87df7ec9deaea1f9c1",
+      "requestHash" : "8833ded238c55ad0783cf0e4726068b198776044a9422e0cc3fcad31ecf226fc",
+      "state" : "waitingForRecovery",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 14
+    }
+  ],
+  "schema" : [
+    {
+      "name" : "runtime_job",
+      "sql" : "CREATE TABLE runtime_job(\n  job_id TEXT PRIMARY KEY,\n  idempotency_key TEXT NOT NULL UNIQUE,\n  request_hash TEXT NOT NULL,\n  state TEXT NOT NULL,\n  admission_sequence INTEGER NOT NULL,\n  created_at_utc TEXT NOT NULL,\n  created_at_order_key TEXT NOT NULL,\n  updated_at_utc TEXT NOT NULL,\n  version INTEGER NOT NULL CHECK(version >= 1),\n  initial_record_json BLOB\n)",
+      "tableName" : "runtime_job",
+      "type" : "table"
+    },
+    {
+      "name" : "runtime_job_admission_sequence_idx",
+      "sql" : "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_created_idx",
+      "sql" : "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_updated_idx",
+      "sql" : "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_1",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_2",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    }
+  ],
+  "userVersion" : 1
+}

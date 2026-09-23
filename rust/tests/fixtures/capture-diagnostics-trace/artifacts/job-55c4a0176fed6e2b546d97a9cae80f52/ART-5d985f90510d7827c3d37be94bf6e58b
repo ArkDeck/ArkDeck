@@ -1,0 +1,185 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "application-liveness.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-index.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-log.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "hilog.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "artifactId" : "ART-bdf60435f9451fd45c8bdc00f4b9205d",
+      "byteCount" : 120,
+      "required" : false,
+      "sha256" : "65e811629e5b5040ad7c909e4ae5887903d2bddb221f51cc7a0d5a0d96e63446",
+      "status" : "published"
+    },
+    "ui-dump.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "jobId" : "job-55c4a0176fed6e2b546d97a9cae80f52",
+  "operation" : "capture.diagnostics@1",
+  "trace" : {
+    "adapterFamily" : "hitrace.dayu200-oh7.text",
+    "bufferKB" : 16384,
+    "durationSeconds" : 5,
+    "parameters" : [
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.syntax.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.layout.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.build.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.measure.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.sync.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "desired" : "1",
+        "name" : "persist.ace.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.performance.monitor.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "1",
+        "name" : "persist.sys.graphic.openDebugTrace",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "1",
+        "name" : "persist.rosen.animationtrace.enabled",
+        "restored" : null
+      }
+    ],
+    "rawArtifactId" : "ART-bdf60435f9451fd45c8bdc00f4b9205d",
+    "rawByteCount" : 120,
+    "rawSha256" : "65e811629e5b5040ad7c909e4ae5887903d2bddb221f51cc7a0d5a0d96e63446",
+    "tags" : [
+      "ace"
+    ],
+    "toolIdentity" : "hitrace"
+  }
+}

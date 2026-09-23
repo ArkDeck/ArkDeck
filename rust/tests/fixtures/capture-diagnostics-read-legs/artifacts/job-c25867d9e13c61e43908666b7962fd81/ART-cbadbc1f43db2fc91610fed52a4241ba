@@ -1,0 +1,37 @@
+jobCreated
+queued->preflight
+preflight->running
+reason: steps-start
+host-step preflight-host-storage
+intent confirm-evidence-target
+verified confirm-evidence-target ["deviceIdentitySHA256", "state", "transport"]
+evidence-preflight confirm-evidence-target
+intent read-evidence-model
+verified read-evidence-model ["value"]
+evidence-preflight read-evidence-model
+intent read-evidence-firmware
+verified read-evidence-firmware ["value"]
+evidence-preflight read-evidence-firmware
+intent preflight-device-storage
+verified preflight-device-storage ["availableBytes"]
+intent observe-application-liveness
+verified observe-application-liveness ["abilityState", "applicationRef", "observedAtUtc", "pidObserved", "processState", "reasonCode", "state"]
+artifact application-liveness.json -> ART-d71fa1e6d0fc35f96407bbf77678068e
+skipped capture-hilog: step not selected by the request inputs
+skipped capture-ui-dump: step not selected by the request inputs
+skipped capture-advanced-ui-dump: step not selected by the request inputs
+skipped capture-crash-index: step not selected by the request inputs
+skipped capture-crash-log: step not selected by the request inputs
+skipped capture-ui-tree: step not selected by the request inputs
+skipped receive-ui-tree: upstream capture-ui-tree did not run: step not selected by the request inputs
+skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: step not selected by the request inputs
+skipped capture-screenshot: step not selected by the request inputs
+skipped receive-screenshot: upstream capture-screenshot did not run: step not selected by the request inputs
+skipped cleanup-screenshot-temp: upstream capture-screenshot did not run: step not selected by the request inputs
+skipped capture-trace: step not selected by the request inputs
+skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs
+skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs
+host-step postprocess-index
+host-step finalize-session
+running->finalizing
+reason: steps-complete

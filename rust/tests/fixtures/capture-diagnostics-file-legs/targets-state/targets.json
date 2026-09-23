@@ -1,0 +1,37 @@
+{
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-09-14T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "stablePhysicalIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+      "targetID" : "TGT-3ba3f5f43b92",
+      "toolVersion" : "3.2.0d"
+    },
+    {
+      "adoptedAtUTC" : "2026-09-14T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "stablePhysicalIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+      "targetID" : "TGT-bdb339768bc5",
+      "toolVersion" : "3.2.0d"
+    },
+    {
+      "adoptedAtUTC" : "2026-09-14T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "cccccccccccccccccccccccccccccccc",
+      "stablePhysicalIdentitySHA256" : "cd93782b7fb95559de14f738b65988af85d41dc1565f7c7d1ed2d035665b519c",
+      "targetID" : "TGT-cd93782b7fb9",
+      "toolVersion" : "3.2.0d"
+    },
+    {
+      "adoptedAtUTC" : "2026-09-14T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "dddddddddddddddddddddddddddddddd",
+      "stablePhysicalIdentitySHA256" : "fbbbb6de2aa74c3c9570d2d8db1de31eadb66113c96034a7adb21243754d7683",
+      "targetID" : "TGT-fbbbb6de2aa7",
+      "toolVersion" : "3.2.0d"
+    }
+  ]
+}

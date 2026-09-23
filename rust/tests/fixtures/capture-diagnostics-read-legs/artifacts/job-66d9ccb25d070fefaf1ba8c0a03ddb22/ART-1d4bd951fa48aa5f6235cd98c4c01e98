@@ -1,0 +1,18 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-66d9ccb25d070fefaf1ba8c0a03ddb22",
+  "markers" : [
+
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -1,0 +1,224 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "captureRemoteFile"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "b6a4291ea16515424b78479f3da66a02785ea590bf7dd593178a4bf26268d446",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-AA94DFA9070693484A315D758BA6C332F441D48F-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "99d2a0529adb71242810f4bb546546a302c54f4abf332627d718481c01a91adc",
+      "reservationID" : "idem-capture-emptyTree",
+      "stepSetDigestSHA256" : "8e98a64f389c6752985191550a6a1f706a77bbdc7190313d1b8b80f523855080",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-511874c7e0add285f44d9d862d991086",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "99d2a0529adb71242810f4bb546546a302c54f4abf332627d718481c01a91adc",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-emptyTree",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiComponentTree" : true,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-emptyTree",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-AA94DFA9070693484A315D758BA6C332F441D48F-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-emptyTree",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiComponentTree" : true,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-emptyTree",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "contractViolation",
+      "detail" : "composed Manifest was refused by the current contract: invalidManifest(\"succeeded status contains failed Step\")"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-511874c7e0add285f44d9d862d991086"
+  },
+  "skipReasons" : {
+    "capture-advanced-ui-dump" : "step not selected by the request inputs",
+    "capture-crash-index" : "step not selected by the request inputs",
+    "capture-crash-log" : "step not selected by the request inputs",
+    "capture-hilog" : "step not selected by the request inputs",
+    "capture-screenshot" : "step not selected by the request inputs",
+    "capture-trace" : "step not selected by the request inputs",
+    "capture-ui-dump" : "step not selected by the request inputs",
+    "capture-ui-tree" : "failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")",
+    "cleanup-remote-temp" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "cleanup-screenshot-temp" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+    "cleanup-ui-tree-temp" : "upstream capture-ui-tree did not run: failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")",
+    "observe-application-liveness" : "step not selected by the request inputs",
+    "receive-screenshot" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+    "receive-trace-artifact" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "receive-ui-tree" : "upstream capture-ui-tree did not run: failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")"
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "skipped observe-application-liveness: step not selected by the request inputs",
+    "skipped capture-hilog: step not selected by the request inputs",
+    "skipped capture-ui-dump: step not selected by the request inputs",
+    "skipped capture-advanced-ui-dump: step not selected by the request inputs",
+    "skipped capture-crash-index: step not selected by the request inputs",
+    "skipped capture-crash-log: step not selected by the request inputs",
+    "capability consumed before first mutation",
+    "intent capture-ui-tree",
+    "failed capture-ui-tree: emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json",
+    "skipped capture-ui-tree: failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")",
+    "skipped receive-ui-tree: upstream capture-ui-tree did not run: failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")",
+    "skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: failed(\"emptyComponentTree: uitest left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-511874c7e0add285f44d9d862d991086-capture-ui-tree-owned.json\")",
+    "skipped capture-screenshot: step not selected by the request inputs",
+    "skipped receive-screenshot: upstream capture-screenshot did not run: step not selected by the request inputs",
+    "skipped cleanup-screenshot-temp: upstream capture-screenshot did not run: step not selected by the request inputs",
+    "skipped capture-trace: step not selected by the request inputs",
+    "skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs",
+    "skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs",
+    "host-step postprocess-index",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

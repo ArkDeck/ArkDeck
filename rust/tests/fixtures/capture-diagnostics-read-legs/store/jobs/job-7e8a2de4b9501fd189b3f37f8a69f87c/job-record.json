@@ -1,0 +1,225 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "captureRemoteStdout"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-7e8a2de4b9501fd189b3f37f8a69f87c",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "bccb7b0ef5d25e89a87d97a8201bfa6740202aa0d43a3f6d367bf24fcc99f52a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "storage",
+    "code" : "artifactPublicationFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "notAutomatic",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-overBudget",
+    "inputs" : {
+      "captureHilog" : false,
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "totalArtifactByteBudget" : 1048576,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-overBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-overBudget",
+    "inputs" : {
+      "captureHilog" : false,
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "totalArtifactByteBudget" : 1048576,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-overBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "8483",
+      "lastSequence" : 14,
+      "sha256" : "9d969b4822b3a690464c8b1fd31077b561252dfbe66848a0444bf1987afd9d22"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-7e8a2de4b9501fd189b3f37f8a69f87c",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "74019",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "8866",
+      "lastSequence" : 15,
+      "sha256" : "bb67f8be49bf208cd3cfd5e87363be4ca3c92f19cffab6948a0644e40d467bcd"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "4880",
+      "manifestSHA256" : "b039b290837ac44c104fcb0a67fa2dc1a3c162e74dd13f37af9f3632663a8205",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "4",
+      "manifestSHA256" : "b039b290837ac44c104fcb0a67fa2dc1a3c162e74dd13f37af9f3632663a8205",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-7e8a2de4b9501fd189b3f37f8a69f87c",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-7e8a2de4b9501fd189b3f37f8a69f87c",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+    "capture-advanced-ui-dump" : "step not selected by the request inputs",
+    "capture-hilog" : "step not selected by the request inputs",
+    "capture-ui-dump" : "step not selected by the request inputs",
+    "observe-application-liveness" : "step not selected by the request inputs"
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "skipped observe-application-liveness: step not selected by the request inputs",
+    "skipped capture-hilog: step not selected by the request inputs",
+    "skipped capture-ui-dump: step not selected by the request inputs",
+    "skipped capture-advanced-ui-dump: step not selected by the request inputs",
+    "intent capture-crash-index",
+    "verified capture-crash-index [\"byteCount\", \"entryCount\"]",
+    "running->finalizing",
+    "reason: artifact publication failed: job byte budget 1048576 exceeded while publishing crash-index.txt",
+    "finalizing->failed",
+    "reason: artifact publication failed: job byte budget 1048576 exceeded while publishing crash-index.txt"
+  ]
+}

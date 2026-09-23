@@ -1,0 +1,42 @@
+jobCreated
+queued->preflight
+preflight->running
+reason: steps-start
+trace parameters snapshotted before capture
+host-step preflight-host-storage
+intent confirm-evidence-target
+verified confirm-evidence-target ["deviceIdentitySHA256", "state", "transport"]
+evidence-preflight confirm-evidence-target
+intent read-evidence-model
+verified read-evidence-model ["value"]
+evidence-preflight read-evidence-model
+intent read-evidence-firmware
+verified read-evidence-firmware ["value"]
+evidence-preflight read-evidence-firmware
+intent preflight-device-storage
+verified preflight-device-storage ["availableBytes"]
+skipped observe-application-liveness: step not selected by the request inputs
+skipped capture-hilog: step not selected by the request inputs
+skipped capture-ui-dump: step not selected by the request inputs
+skipped capture-advanced-ui-dump: step not selected by the request inputs
+skipped capture-crash-index: step not selected by the request inputs
+skipped capture-crash-log: step not selected by the request inputs
+skipped capture-ui-tree: step not selected by the request inputs
+skipped receive-ui-tree: upstream capture-ui-tree did not run: step not selected by the request inputs
+skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: step not selected by the request inputs
+skipped capture-screenshot: step not selected by the request inputs
+skipped receive-screenshot: upstream capture-screenshot did not run: step not selected by the request inputs
+skipped cleanup-screenshot-temp: upstream capture-screenshot did not run: step not selected by the request inputs
+capability consumed before first mutation
+intent capture-trace
+verified capture-trace ["coverageAnchor", "remoteByteCount", "ringHeldCoverageAnchor"]
+intent receive-trace-artifact
+verified receive-trace-artifact ["byteCount", "localArtifact", "sha256"]
+artifact trace.htrace -> ART-e618655e59c2e05ded82590512588d25
+intent cleanup-remote-temp
+verified cleanup-remote-temp ["cleaned"]
+host-step postprocess-index
+host-step finalize-session
+trace parameters snapshotted after capture
+running->finalizing
+reason: steps-complete

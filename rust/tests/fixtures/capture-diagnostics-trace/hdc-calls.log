@@ -1,0 +1,300 @@
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-1c209bf5f7b1537cbd2406f5640e0ab8-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-1c209bf5f7b1537cbd2406f5640e0ab8-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -t 5 -b 8192 ability ace graphic -o /data/local/tmp/arkdeck-job-1c209bf5f7b1537cbd2406f5640e0ab8-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-1c209bf5f7b1537cbd2406f5640e0ab8-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-1c209bf5f7b1537cbd2406f5640e0ab8-capture-trace-owned.htrace
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-55c4a0176fed6e2b546d97a9cae80f52-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-55c4a0176fed6e2b546d97a9cae80f52-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell echo ARKDECKANCHORa0176fed6e2b546d97a9cae80f52capturetrace > /sys/kernel/tracing/trace_marker
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell grep -c ARKDECKANCHORa0176fed6e2b546d97a9cae80f52capturetrace /sys/kernel/tracing/trace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_begin -b 16384 ace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_dump -o /data/local/tmp/arkdeck-job-55c4a0176fed6e2b546d97a9cae80f52-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_finish_nodump
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-55c4a0176fed6e2b546d97a9cae80f52-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-55c4a0176fed6e2b546d97a9cae80f52-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell sleep 5
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-6c545eb6042a9ea99e700467bbb77d06-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-6c545eb6042a9ea99e700467bbb77d06-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell echo ARKDECKANCHOR5eb6042a9ea99e700467bbb77d06capturetrace > /sys/kernel/tracing/trace_marker
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell grep -c ARKDECKANCHOR5eb6042a9ea99e700467bbb77d06capturetrace /sys/kernel/tracing/trace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_begin -b 16384 ace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_dump -o /data/local/tmp/arkdeck-job-6c545eb6042a9ea99e700467bbb77d06-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --trace_finish_nodump
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-6c545eb6042a9ea99e700467bbb77d06-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-6c545eb6042a9ea99e700467bbb77d06-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell sleep 5
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-screenshot-owned.png /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-screenshot-owned.png
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-ui-tree-owned.json /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-ui-tree-owned.json
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hidumper -s 1201 -a -p Faultlogger -f cppcrash-com.example.demo-20010039-20260914000000
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hidumper -s 1201 -a -p Faultlogger -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hidumper -s WindowManagerService -a -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hidumper -s WindowManagerService -a -w 7 -element -lastpage 42
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hilog -x
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -t 5 -b 8192 ace graphic -o /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-screenshot-owned.png
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-ui-tree-owned.json
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell pidof com.example.demo
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-screenshot-owned.png
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-ui-tree-owned.json
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell snapshot_display -t png -f /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-screenshot-owned.png
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell uitest dumpLayout -p /data/local/tmp/arkdeck-job-2ba1bd5a231273e388689a61f209280c-capture-ui-tree-owned.json
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -t 5 -b 8192 ace -o /data/local/tmp/arkdeck-job-d87e93b62a5439c408b76112d61e5f7b-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-d87e93b62a5439c408b76112d61e5f7b-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -t 5 -b 8192 ace -o /data/local/tmp/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace
+list targets -v
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa file recv /data/local/tmp/arkdeck-job-a9f338c9e94f35bc2fc9245c48197bf5-capture-trace-owned.htrace /private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-a9f338c9e94f35bc2fc9245c48197bf5-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell df -k /data/local/tmp
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -t 5 -b 8192 ace -o /data/local/tmp/arkdeck-job-a9f338c9e94f35bc2fc9245c48197bf5-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell ls -l /data/local/tmp/arkdeck-job-a9f338c9e94f35bc2fc9245c48197bf5-capture-trace-owned.htrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.ohos.fullname
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get const.product.name
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell rm -f /data/local/tmp/arkdeck-job-a9f338c9e94f35bc2fc9245c48197bf5-capture-trace-owned.htrace
+list targets -v
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell bytrace --help
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell bytrace --help
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell df -k /data/local/tmp
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell hitrace --help
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell hitrace --help
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell hitrace -l
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell hitrace -l
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell hitrace -t 5 -b 8192 ace -o /data/local/tmp/arkdeck-job-4e749be864dd656a3ec13548f001bca7-capture-trace-owned.htrace
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell ls -l /data/local/tmp/arkdeck-job-4e749be864dd656a3ec13548f001bca7-capture-trace-owned.htrace
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get const.ohos.fullname
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get const.product.name
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.performance.monitor.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.performance.monitor.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.build.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.build.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.layout.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.layout.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.measure.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.measure.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.sync.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.sync.debug.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.syntax.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.ace.trace.syntax.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.rosen.animationtrace.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.rosen.animationtrace.enabled
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.sys.graphic.openDebugTrace
+-t bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb shell param get persist.sys.graphic.openDebugTrace
+list targets -v

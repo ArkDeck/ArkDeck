@@ -1,0 +1,185 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-MISSING-ae109001b5058657456378680249f32b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "application\/json",
+      "name" : "application-liveness.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "observe-application-liveness"
+    },
+    {
+      "artifactID" : "ART-MISSING-aa618089ee52da645b5bd0d7e839121b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "text\/plain",
+      "name" : "hilog.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-hilog"
+    },
+    {
+      "artifactID" : "ART-MISSING-cdd1ffbd714fe8b3b55acfe715e107e6",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "application\/json",
+      "name" : "ui-dump.json",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-ui-dump"
+    },
+    {
+      "artifactID" : "ART-MISSING-9107e999958fb6d2ab56e79727388981",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "text\/plain",
+      "name" : "advanced-dump.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-advanced-ui-dump"
+    },
+    {
+      "artifactID" : "ART-MISSING-1371c253a199bb5ca2c0baba6da76e9c",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "text\/plain",
+      "name" : "crash-index.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-crash-index"
+    },
+    {
+      "artifactID" : "ART-MISSING-762dad49e1c9cb0b8263f8fbcbfe314d",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+        "targetID" : "TGT-bdb339768bc5"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -1,0 +1,226 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "verifyRemoteState",
+    "captureRemoteStdout"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-30d281cdf15c3e65fa33c975f0f31b06",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "92836a9640380fd134fb805db3d4e515eb3b39dea9fcc1c99e7b2e8c83b3e9f3",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-degraded",
+    "inputs" : {
+      "advancedDump" : true,
+      "bundleName" : "com.example.demo",
+      "captureHilog" : false,
+      "componentId" : "42",
+      "crashLogName" : "jscrash-com.example.demo-20010039-20260913235959",
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "uiDump" : false,
+      "windowId" : "7"
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-degraded",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-degraded",
+    "inputs" : {
+      "advancedDump" : true,
+      "bundleName" : "com.example.demo",
+      "captureHilog" : false,
+      "componentId" : "42",
+      "crashLogName" : "jscrash-com.example.demo-20010039-20260913235959",
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "uiDump" : false,
+      "windowId" : "7"
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-degraded",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "contractViolation",
+      "detail" : "composed Manifest was refused by the current contract: invalidManifest(\"succeeded status contains failed Step\")"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-30d281cdf15c3e65fa33c975f0f31b06"
+  },
+  "skipReasons" : {
+    "capture-advanced-ui-dump" : "failed(\"invalidEncoding: UI dump is not UTF-8\")",
+    "capture-crash-log" : "failed(\"faultLogNotFound: device has no entry named jscrash-com.example.demo-20010039-20260913235959\")",
+    "capture-hilog" : "step not selected by the request inputs",
+    "capture-screenshot" : "step not selected by the request inputs",
+    "capture-trace" : "step not selected by the request inputs",
+    "capture-ui-dump" : "step not selected by the request inputs",
+    "capture-ui-tree" : "step not selected by the request inputs",
+    "cleanup-remote-temp" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "cleanup-screenshot-temp" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+    "cleanup-ui-tree-temp" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "receive-screenshot" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+    "receive-trace-artifact" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "receive-ui-tree" : "upstream capture-ui-tree did not run: step not selected by the request inputs"
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "intent observe-application-liveness",
+    "verified observe-application-liveness [\"abilityState\", \"applicationRef\", \"observedAtUtc\", \"pidObserved\", \"processState\", \"reasonCode\", \"state\"]",
+    "artifact application-liveness.json -> ART-b4e5e49536d0e7b7962bef32b07674cc",
+    "skipped capture-hilog: step not selected by the request inputs",
+    "skipped capture-ui-dump: step not selected by the request inputs",
+    "intent capture-advanced-ui-dump",
+    "failed capture-advanced-ui-dump: invalidEncoding: UI dump is not UTF-8",
+    "skipped capture-advanced-ui-dump: failed(\"invalidEncoding: UI dump is not UTF-8\")",
+    "intent capture-crash-index",
+    "verified capture-crash-index [\"byteCount\", \"entryCount\"]",
+    "artifact crash-index.txt -> ART-71621d8ae9b87cbcf18de8712c14a687",
+    "intent capture-crash-log",
+    "failed capture-crash-log: faultLogNotFound: device has no entry named jscrash-com.example.demo-20010039-20260913235959",
+    "skipped capture-crash-log: failed(\"faultLogNotFound: device has no entry named jscrash-com.example.demo-20010039-20260913235959\")",
+    "skipped capture-ui-tree: step not selected by the request inputs",
+    "skipped receive-ui-tree: upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "skipped capture-screenshot: step not selected by the request inputs",
+    "skipped receive-screenshot: upstream capture-screenshot did not run: step not selected by the request inputs",
+    "skipped cleanup-screenshot-temp: upstream capture-screenshot did not run: step not selected by the request inputs",
+    "skipped capture-trace: step not selected by the request inputs",
+    "skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs",
+    "skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs",
+    "host-step postprocess-index",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

@@ -1,0 +1,37 @@
+jobCreated
+queued->preflight
+preflight->running
+reason: steps-start
+host-step preflight-host-storage
+intent confirm-evidence-target
+verified confirm-evidence-target ["deviceIdentitySHA256", "state", "transport"]
+evidence-preflight confirm-evidence-target
+evidence-preflight read-evidence-model carried from session readback at 2026-09-14T00:00:00Z
+evidence-preflight read-evidence-firmware carried from session readback at 2026-09-14T00:00:00Z
+evidence-preflight complete
+intent preflight-device-storage
+verified preflight-device-storage ["availableBytes"]
+skipped observe-application-liveness: step not selected by the request inputs
+skipped capture-hilog: step not selected by the request inputs
+skipped capture-ui-dump: step not selected by the request inputs
+skipped capture-advanced-ui-dump: step not selected by the request inputs
+skipped capture-crash-index: step not selected by the request inputs
+skipped capture-crash-log: step not selected by the request inputs
+skipped capture-ui-tree: step not selected by the request inputs
+skipped receive-ui-tree: upstream capture-ui-tree did not run: step not selected by the request inputs
+skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: step not selected by the request inputs
+capability consumed before first mutation
+intent capture-screenshot
+verified capture-screenshot ["remoteByteCount"]
+intent receive-screenshot
+failed receive-screenshot: unexpectedFormat: received bytes do not begin with the pinned magic
+skipped receive-screenshot: failed("unexpectedFormat: received bytes do not begin with the pinned magic")
+intent cleanup-screenshot-temp
+verified cleanup-screenshot-temp ["cleaned"]
+skipped capture-trace: step not selected by the request inputs
+skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs
+skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs
+host-step postprocess-index
+host-step finalize-session
+running->finalizing
+reason: steps-complete

@@ -1,0 +1,18 @@
+[
+  {
+    "jobID" : "job-70b257b0b8e9b3362a71a9854c94eba9",
+    "persistedAction" : {
+      "arguments" : {
+        "jobId" : "job-70b257b0b8e9b3362a71a9854c94eba9",
+        "nonce" : "owned",
+        "remotePath" : "\/data\/local\/tmp\/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace",
+        "stepId" : "capture-trace"
+      },
+      "kind" : "hdc.cleanupOwnedRemotePath"
+    },
+    "reason" : "failed(\"cleanupDebt: remote cleanup failed for \/data\/local\/tmp\/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace\")",
+    "recordedAtUTC" : "2026-09-14T00:00:00Z",
+    "remotePath" : "\/data\/local\/tmp\/arkdeck-job-70b257b0b8e9b3362a71a9854c94eba9-capture-trace-owned.htrace",
+    "stepID" : "cleanup-remote-temp"
+  }
+]

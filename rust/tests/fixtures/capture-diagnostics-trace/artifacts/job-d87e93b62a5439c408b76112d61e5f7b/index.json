@@ -1,0 +1,425 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-MISSING-c02cde93aace66945802f5550206e99f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "application-liveness.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "observe-application-liveness"
+    },
+    {
+      "artifactID" : "ART-MISSING-3b008e366e7d8721cac0030095c1b790",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "text\/plain",
+      "name" : "hilog.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-hilog"
+    },
+    {
+      "artifactID" : "ART-MISSING-d9ddf0305a97f73a86e59ce10477d35d",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "ui-dump.json",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-ui-dump"
+    },
+    {
+      "artifactID" : "ART-MISSING-8d8b76deaf6f15bbe26f323d5103700a",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "text\/plain",
+      "name" : "advanced-dump.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-advanced-ui-dump"
+    },
+    {
+      "artifactID" : "ART-MISSING-a92854cc40a11f6c65e63eadeb189ea5",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "text\/plain",
+      "name" : "crash-index.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-crash-index"
+    },
+    {
+      "artifactID" : "ART-MISSING-7be621e0ffbab66b58603365f131307b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-crash-log"
+    },
+    {
+      "artifactID" : "ART-MISSING-95356c9f82eb6c1d8a7aadf178484e67",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "ui-tree.json",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "upstream capture-ui-tree did not run: step not selected by the request inputs"
+        }
+      },
+      "stepID" : "receive-ui-tree"
+    },
+    {
+      "artifactID" : "ART-MISSING-4783f7ef71a371300ca07c05df9b599b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "image\/png",
+      "name" : "screenshot.png",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "upstream capture-screenshot did not run: step not selected by the request inputs"
+        }
+      },
+      "stepID" : "receive-screenshot"
+    },
+    {
+      "artifactID" : "ART-MISSING-b3ca26d605e7673a99fdef40f81fc7c2",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "image\/jpeg",
+      "name" : "screenshot.jpeg",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "upstream capture-screenshot did not run: step not selected by the request inputs"
+        }
+      },
+      "stepID" : "receive-screenshot"
+    },
+    {
+      "artifactID" : "ART-MISSING-4903e18e23ca2842f4f8ebcbba84f0b7",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace.htrace",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "missing" : {
+          "reason" : "upstream capture-trace did not run: failed(\"emptyTrace: hitrace left a zero-byte file at \/data\/local\/tmp\/arkdeck-job-d87e93b62a5439c408b76112d61e5f7b-capture-trace-owned.htrace\")"
+        }
+      },
+      "stepID" : "receive-trace-artifact"
+    },
+    {
+      "artifactID" : "ART-4d487313669689a3f9f88138b2b9f0d9",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 2530,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "text\/plain",
+      "name" : "capture.log",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "6e467a2700f903e18c8dfea00a75c445603893a25926cfc603158ca0a5cee55d",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    },
+    {
+      "artifactID" : "ART-f81218cefe234e93d2ea2bfb28962a7c",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 724,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "markers.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "723f414c633a75145362d722361dfa02b9ade237ad05c806585df28ed244a2b7",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    },
+    {
+      "artifactID" : "ART-032e543945478c8b2aebc27f7f914551",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 4600,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "artifact-index.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "abae2d92972319d4505e65b3231e85455a1e6e8ccbd1f33bb9ea2b5f72986d9f",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    },
+    {
+      "artifactID" : "ART-bc69cf87f42ddd5e0c4c21beef3aa52e",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 4661,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-d87e93b62a5439c408b76112d61e5f7b",
+      "mediaType" : "application\/json",
+      "name" : "capture-summary.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-d87e93b62a5439c408b76112d61e5f7b",
+      "sha256" : "53747891bd430b47ee792f405f559e0620f70409cc0c3ec8df317d62940980a5",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

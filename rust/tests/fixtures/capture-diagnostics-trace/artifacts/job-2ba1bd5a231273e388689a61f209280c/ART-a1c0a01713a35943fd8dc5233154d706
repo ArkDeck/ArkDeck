@@ -1,0 +1,205 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "artifactId" : "ART-a0b30c895451d178ef58d11739cc815a",
+      "byteCount" : 55,
+      "required" : false,
+      "sha256" : "a66a3004df7a817c44e994da94a3e72624e57e6b29bba5b6f605a22fd5497d50",
+      "status" : "published"
+    },
+    "application-liveness.json" : {
+      "artifactId" : "ART-c71d30dd16dca30740c7a87e14e63b04",
+      "byteCount" : 627,
+      "required" : false,
+      "sha256" : "e3cbe4242ed91e4e67c31a0ba2e8c5b7a6eec0ffb8954d32eb99cca9357eff3d",
+      "status" : "published"
+    },
+    "crash-index.txt" : {
+      "artifactId" : "ART-ffbef77e88c0c768b7ea36f66ecb32ed",
+      "byteCount" : 80,
+      "required" : false,
+      "sha256" : "917977cebe4a60292bcd7fdcb3278824b131dbfe4e14fe0fd8233a24a9864f88",
+      "status" : "published"
+    },
+    "crash-log.txt" : {
+      "artifactId" : "ART-73d2026af1fc7b05cb242f8eae08aec7",
+      "byteCount" : 98,
+      "required" : false,
+      "sha256" : "c69c6280c4dff7b873ed303d5e2fb738f256a7b9888b2e2ab5def98d0cc9de87",
+      "status" : "published"
+    },
+    "hilog.txt" : {
+      "artifactId" : "ART-203640240eeba2eaad312b86022cfa91",
+      "byteCount" : 28,
+      "required" : false,
+      "sha256" : "8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182",
+      "status" : "published"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "no step produced this declared artifact",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "artifactId" : "ART-b6dff35c0b9d247604407cec8d6dc3e0",
+      "byteCount" : 18,
+      "required" : false,
+      "sha256" : "9ae7bc0c3c70450cbf913b7752a04d3bd70f88ca5e48d790f7ba2cea6066f667",
+      "status" : "published"
+    },
+    "trace.htrace" : {
+      "artifactId" : "ART-fb7690fdfec56703960304b41e3de298",
+      "byteCount" : 80,
+      "required" : false,
+      "sha256" : "bcfd7fc0aa7e8e27ff8a266f7b19f773ef1aaa69648f806878e38103c095bbb1",
+      "status" : "published"
+    },
+    "ui-dump.json" : {
+      "artifactId" : "ART-3ca4e0e2f4ad229aab5bba5c5f93c8b2",
+      "byteCount" : 15,
+      "required" : false,
+      "sha256" : "829e9704ae2d587d34d8c8c69cbb8e3b90467019eceead92d6a930853c2c790c",
+      "status" : "published"
+    },
+    "ui-tree.json" : {
+      "artifactId" : "ART-53afd439d1b42b7b4046f399aa705524",
+      "byteCount" : 48,
+      "required" : false,
+      "sha256" : "5cde607242ea642054e05d4623a7ebecb2d315f6cd8ab18d22b485452777f53e",
+      "status" : "published"
+    }
+  },
+  "completeness" : "complete",
+  "jobId" : "job-2ba1bd5a231273e388689a61f209280c",
+  "missingRequired" : [
+
+  ],
+  "operation" : "capture.diagnostics@1",
+  "trace" : {
+    "adapterFamily" : "hitrace.dayu200-oh7.text",
+    "durationSeconds" : 5,
+    "parameters" : [
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.syntax.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.layout.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.build.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.measure.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.sync.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "desired" : "1",
+        "name" : "persist.ace.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.performance.monitor.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "1",
+        "name" : "persist.sys.graphic.openDebugTrace",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "1",
+        "name" : "persist.rosen.animationtrace.enabled",
+        "restored" : null
+      }
+    ],
+    "rawArtifactId" : "ART-fb7690fdfec56703960304b41e3de298",
+    "rawByteCount" : 80,
+    "rawSha256" : "bcfd7fc0aa7e8e27ff8a266f7b19f773ef1aaa69648f806878e38103c095bbb1",
+    "tags" : [
+      "ace",
+      "graphic"
+    ],
+    "toolIdentity" : "hitrace"
+  }
+}

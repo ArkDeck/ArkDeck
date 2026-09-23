@@ -1,0 +1,138 @@
+{
+  "actualEffect" : "deviceMutation",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-e771b1c2ef5bf497f77974a579186be4",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "7a94ea3ca8f5d293c55e7cc559071f83493dfda65d4091da1655ca043b69cafc",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-tagListLost",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "traceCategories" : [
+        "ace"
+      ],
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-tagListLost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-46E1B63DD85B611BF257242B3E9959DCF4275F84-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-tagListLost",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "traceCategories" : [
+        "ace"
+      ],
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-tagListLost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1763",
+      "lastSequence" : 4,
+      "sha256" : "6d9c31953f59912d0f60c446862cf20ef62f59eda8aa8a255c7a64ae4d94ce61"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-e771b1c2ef5bf497f77974a579186be4",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67299",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2145",
+      "lastSequence" : 5,
+      "sha256" : "ea0d6f502d03510ce09ff2d37c013e7503733839195dd8231eceb7c11636faeb"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1124",
+      "manifestSHA256" : "326c6a9f9813dca1c50d4df326c9514eef524d4d2d5352c472f089abc8fd4177",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "6",
+      "manifestSHA256" : "326c6a9f9813dca1c50d4df326c9514eef524d4d2d5352c472f089abc8fd4177",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-e771b1c2ef5bf497f77974a579186be4",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-e771b1c2ef5bf497f77974a579186be4",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "running->finalizing",
+    "reason: Trace before snapshot failed: read-only HDC probe failed: HDC reported an explicit failure",
+    "finalizing->failed",
+    "reason: Trace before snapshot failed: read-only HDC probe failed: HDC reported an explicit failure"
+  ]
+}

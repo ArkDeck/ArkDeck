@@ -1,0 +1,199 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "captureRemoteFile"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "e46536b7fc02fd5d7193c70e20d464599eda9a511582146861aa5402ccc411cc",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-105AF92E62D924A8A6F15CEC9FFADAE1201352FC-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "ea611830f73078068b8b0fbcc037db41a4ecb2852bba8820a1766cc4cf669d77",
+      "reservationID" : "idem-capture-treeMissing",
+      "stepSetDigestSHA256" : "8e98a64f389c6752985191550a6a1f706a77bbdc7190313d1b8b80f523855080",
+      "targetBindingDigestSHA256" : "91ede385c2339e44ea8e608449a73aa55cd1a2ca3715a12d4ac587590e63129a",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+    "targetID" : "TGT-bdb339768bc5",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-bdb339768bc5",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "ea611830f73078068b8b0fbcc037db41a4ecb2852bba8820a1766cc4cf669d77",
+  "materializedStableTargetIdentitySHA256" : "bdb339768bc5e4fecbe55a442056919b2b325907d49bcbf3bf8de13781996a83",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-treeMissing",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiComponentTree" : true,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-treeMissing",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-bdb339768bc5"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "hdc",
+  "recoveryAction" : {
+    "arguments" : {
+      "jobId" : "job-c5bbf49c33ed649f6b4f2a1f9db6cf02",
+      "nonce" : "owned",
+      "remotePath" : "\/data\/local\/tmp\/arkdeck-job-c5bbf49c33ed649f6b4f2a1f9db6cf02-capture-ui-tree-owned.json",
+      "stepId" : "capture-ui-tree"
+    },
+    "kind" : "hdc.captureComponentTree"
+  },
+  "recoveryIntentEventID" : "intent-capture-ui-tree",
+  "recoveryStepID" : "capture-ui-tree",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-105AF92E62D924A8A6F15CEC9FFADAE1201352FC-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-treeMissing",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiComponentTree" : true,
+      "uiDump" : false
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-treeMissing",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-bdb339768bc5"
+    }
+  },
+  "skipReasons" : {
+    "capture-advanced-ui-dump" : "step not selected by the request inputs",
+    "capture-crash-index" : "step not selected by the request inputs",
+    "capture-crash-log" : "step not selected by the request inputs",
+    "capture-hilog" : "step not selected by the request inputs",
+    "capture-ui-dump" : "step not selected by the request inputs",
+    "observe-application-liveness" : "step not selected by the request inputs"
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "skipped observe-application-liveness: step not selected by the request inputs",
+    "skipped capture-hilog: step not selected by the request inputs",
+    "skipped capture-ui-dump: step not selected by the request inputs",
+    "skipped capture-advanced-ui-dump: step not selected by the request inputs",
+    "skipped capture-crash-index: step not selected by the request inputs",
+    "skipped capture-crash-log: step not selected by the request inputs",
+    "capability consumed before first mutation",
+    "intent capture-ui-tree",
+    "outcomeUnknown capture-ui-tree; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: tree readback did not describe \/data\/local\/tmp\/arkdeck-job-c5bbf49c33ed649f6b4f2a1f9db6cf02-capture-ui-tree-owned.json as a regular file"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-d87e93b62a5439c408b76112d61e5f7b",
+  "markers" : [
+    {
+      "detail" : "failed capture-trace: emptyTrace: hitrace left a zero-byte file at /data/local/tmp/arkdeck-job-d87e93b62a5439c408b76112d61e5f7b-capture-trace-owned.htrace",
+      "kind" : "auto",
+      "trigger" : "stepFailed"
+    }
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

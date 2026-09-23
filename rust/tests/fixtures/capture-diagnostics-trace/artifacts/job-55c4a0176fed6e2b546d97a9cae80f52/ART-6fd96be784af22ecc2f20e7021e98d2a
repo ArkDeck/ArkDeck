@@ -1,0 +1,26 @@
+{
+  "coverage" : {
+    "anchor" : "ARKDECKANCHORa0176fed6e2b546d97a9cae80f52capturetrace",
+    "checkAgainst" : "trace.htrace",
+    "how" : "the anchor marks where this snapshot reaches back to; finding it in the trace is a string search, no decoder needed",
+    "ringHeldAnchor" : true,
+    "traceStatus" : "published",
+    "writtenIntoTheDeviceRingAt" : "capture-trace"
+  },
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-55c4a0176fed6e2b546d97a9cae80f52",
+  "markers" : [
+
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

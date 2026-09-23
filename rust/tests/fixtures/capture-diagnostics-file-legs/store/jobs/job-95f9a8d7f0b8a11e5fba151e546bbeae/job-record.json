@@ -1,0 +1,226 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "preflightDeviceStorage",
+    "captureRemoteFile",
+    "receiveFile",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "57595ce16d5f2b5ebb9b76a89c2576b19a27b4f71aac3a03049e035a935c2b73",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-B0EE6E3C13C1C7B0E84949734B42569BDCC2C336-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "f0a21a952961f68053fd36d10a1b4bd2c39e9246cdf74294446e1439ae86c6fe",
+      "reservationID" : "idem-capture-notPNG",
+      "stepSetDigestSHA256" : "a87710c4722357cba9c9163396ab2729cd70ab773c4f7b4288bad4f862933f4e",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 3
+    },
+    "validUntilUTC" : "2026-09-14T01:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadbackSessionCarried",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "carriedFromUTC" : "2026-09-14T00:00:00Z",
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "carriedFromUTC" : "2026-09-14T00:00:00Z",
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "carriedFromUTC" : "2026-09-14T00:00:00Z",
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "carriedFromUTC" : "2026-09-14T00:00:00Z",
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-95f9a8d7f0b8a11e5fba151e546bbeae",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "f0a21a952961f68053fd36d10a1b4bd2c39e9246cdf74294446e1439ae86c6fe",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-notPNG",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiDump" : false,
+      "uiScreenshot" : true
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-notPNG",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-B0EE6E3C13C1C7B0E84949734B42569BDCC2C336-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-notPNG",
+    "inputs" : {
+      "captureHilog" : false,
+      "durationSeconds" : 5,
+      "uiDump" : false,
+      "uiScreenshot" : true
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-notPNG",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "sourceIntegrityFailed",
+      "detail" : "device Session: missing or inconsistent job-local target\/tool observation"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-95f9a8d7f0b8a11e5fba151e546bbeae"
+  },
+  "skipReasons" : {
+    "capture-advanced-ui-dump" : "step not selected by the request inputs",
+    "capture-crash-index" : "step not selected by the request inputs",
+    "capture-crash-log" : "step not selected by the request inputs",
+    "capture-hilog" : "step not selected by the request inputs",
+    "capture-trace" : "step not selected by the request inputs",
+    "capture-ui-dump" : "step not selected by the request inputs",
+    "capture-ui-tree" : "step not selected by the request inputs",
+    "cleanup-remote-temp" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "cleanup-ui-tree-temp" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "observe-application-liveness" : "step not selected by the request inputs",
+    "receive-screenshot" : "failed(\"unexpectedFormat: received bytes do not begin with the pinned magic\")",
+    "receive-trace-artifact" : "upstream capture-trace did not run: step not selected by the request inputs",
+    "receive-ui-tree" : "upstream capture-ui-tree did not run: step not selected by the request inputs"
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "evidence-preflight read-evidence-model carried from session readback at 2026-09-14T00:00:00Z",
+    "evidence-preflight read-evidence-firmware carried from session readback at 2026-09-14T00:00:00Z",
+    "evidence-preflight complete",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "skipped observe-application-liveness: step not selected by the request inputs",
+    "skipped capture-hilog: step not selected by the request inputs",
+    "skipped capture-ui-dump: step not selected by the request inputs",
+    "skipped capture-advanced-ui-dump: step not selected by the request inputs",
+    "skipped capture-crash-index: step not selected by the request inputs",
+    "skipped capture-crash-log: step not selected by the request inputs",
+    "skipped capture-ui-tree: step not selected by the request inputs",
+    "skipped receive-ui-tree: upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "skipped cleanup-ui-tree-temp: upstream capture-ui-tree did not run: step not selected by the request inputs",
+    "capability consumed before first mutation",
+    "intent capture-screenshot",
+    "verified capture-screenshot [\"remoteByteCount\"]",
+    "intent receive-screenshot",
+    "failed receive-screenshot: unexpectedFormat: received bytes do not begin with the pinned magic",
+    "skipped receive-screenshot: failed(\"unexpectedFormat: received bytes do not begin with the pinned magic\")",
+    "intent cleanup-screenshot-temp",
+    "verified cleanup-screenshot-temp [\"cleaned\"]",
+    "skipped capture-trace: step not selected by the request inputs",
+    "skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs",
+    "skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs",
+    "host-step postprocess-index",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

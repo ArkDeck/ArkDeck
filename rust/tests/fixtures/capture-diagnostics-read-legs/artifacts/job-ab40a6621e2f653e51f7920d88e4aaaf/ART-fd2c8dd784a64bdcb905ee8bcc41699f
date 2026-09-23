@@ -1,0 +1,72 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "artifactId" : "ART-1420828956bcc568a37f7ffd13259ea6",
+      "byteCount" : 55,
+      "required" : false,
+      "sha256" : "a66a3004df7a817c44e994da94a3e72624e57e6b29bba5b6f605a22fd5497d50",
+      "status" : "published"
+    },
+    "application-liveness.json" : {
+      "artifactId" : "ART-14bd8bbdc0384a6919bfe7d9dd8c56f6",
+      "byteCount" : 724,
+      "required" : false,
+      "sha256" : "daf11b9e3452bee038296ec2ed383f67a72000bd613085805b22a8e683ddf267",
+      "status" : "published"
+    },
+    "crash-index.txt" : {
+      "artifactId" : "ART-4eb3c7b6e8e5e3ecdd99a62f726cde77",
+      "byteCount" : 203,
+      "required" : false,
+      "sha256" : "b7f2eb503eacba05baf41ccfbf09a50100d7f91cac80f35730c4e42267f04bf6",
+      "status" : "published"
+    },
+    "crash-log.txt" : {
+      "artifactId" : "ART-b292faf8982b93b3f4cb8b96377a11e4",
+      "byteCount" : 220,
+      "required" : false,
+      "sha256" : "5b9ed44cf15842e42a6bf3523994b11c0f605abe4a23a4afb51cf5ba62f96049",
+      "status" : "published"
+    },
+    "hilog.txt" : {
+      "artifactId" : "ART-5fa70b2f84005fad2772bbc261a70f2b",
+      "byteCount" : 28,
+      "required" : false,
+      "sha256" : "8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182",
+      "status" : "published"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "detail" : "upstream capture-trace did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-dump.json" : {
+      "artifactId" : "ART-ffb2548c90a9838152cd3b86f5a9e4f8",
+      "byteCount" : 15,
+      "required" : false,
+      "sha256" : "829e9704ae2d587d34d8c8c69cbb8e3b90467019eceead92d6a930853c2c790c",
+      "status" : "published"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "completeness" : "complete",
+  "jobId" : "job-ab40a6621e2f653e51f7920d88e4aaaf",
+  "missingRequired" : [
+
+  ],
+  "operation" : "capture.diagnostics@1"
+}
