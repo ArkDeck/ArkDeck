@@ -1122,6 +1122,7 @@ python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-lifecycle
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/trace-probe
 ```
 
 ## Diagnostic capture (TASK-XPA-014, M1)
@@ -1748,6 +1749,27 @@ observation identities and generations over a reading, following a
 reference, and the adoption itself are the Target owner's.
 `tests/target_observation.rs` reads the observe fixture's shared fake with
 injected relations and checks the argv the driver logged.
+
+## Trace Runtime probe (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::trace_probe` is Swift's `FoundationTraceRuntimeProbe`
+on an adopted route, and `evaluate_help`/`evaluate_tag_list` its
+`TraceProbeAdapter`: only the registered `OPENHARMONY-TRACE-PROBES@1.0.0`
+help and tag-list bytes (their SHA-256 after the leading capture time) select
+`hitrace` for capture, `bytrace` stays probe-only, and a tool's name, exit
+status or a familiar marker never selects anything. The help reads and the
+nine catalog `param get` reads run together (15 s each, 64 KiB or 4 KiB kept);
+the tag list follows only a registered hitrace help, and failing it fails the
+probe. A help read that cannot complete is `probeFailed`, a parameter read
+`unreadable` with Swift's reason — never a value or an answer. The Host serves
+it as `trace.probe` beside the Debug reads, and the standalone App ingress
+admits it with `targetId` alone. `tests/trace_probe.rs` covers the adapter on
+the registered resources and the reads over scripted dispatch;
+`arkdeck-agentd`'s `trace_probe_control` replays the Swift oracle
+(`tests/fixtures/trace-probe`, recorded by `TraceProbeOracleContractTests`,
+re-recorded with `ARKDECK_RUST_TRACE_PROBE_RECORD=/private/tmp/<new>`) through
+the production Host, answer by answer and call by call.
+
 ## Debug HAP provider (TASK-XPA-016, M2)
 
 `arkdeck_provider_hdc::HapAction` is Swift's HDC provider for `debug.hap@1`

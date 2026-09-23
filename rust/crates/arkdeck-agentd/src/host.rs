@@ -2013,6 +2013,18 @@ impl HostServices for Host {
             })?
             .debug_read(target_id, template_id)
     }
+    /// Swift's daemon composes its Trace Runtime probe beside the Debug one,
+    /// over the same selected HDC executable and Target owner.
+    #[cfg(target_os = "macos")]
+    fn trace_probe(&self, target_id: &str) -> Result<serde_json::Value, WireError> {
+        self.hdc()
+            .ok_or_else(|| WireError {
+                code: "internalError".into(),
+                message: "Trace Runtime probing is not configured".into(),
+                details: None,
+            })?
+            .trace_probe(target_id)
+    }
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when
     /// the isolated owner started a managed server.

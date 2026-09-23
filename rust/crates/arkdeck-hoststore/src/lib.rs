@@ -53,6 +53,8 @@ mod debug_read;
 #[cfg(target_os = "macos")]
 mod device_facts;
 #[cfg(target_os = "macos")]
+mod trace_probe;
+#[cfg(target_os = "macos")]
 pub use device_facts::HdcComposition;
 #[cfg(target_os = "macos")]
 mod capture_documents;

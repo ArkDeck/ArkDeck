@@ -38,14 +38,20 @@
           "type": "integer"
         },
         "family": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "parameters": {
           "items": {
             "additionalProperties": false,
             "properties": {
               "detail": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "name": {
                 "type": "string"
@@ -54,7 +60,10 @@
                 "type": "string"
               },
               "value": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "required": [
@@ -68,10 +77,16 @@
           "type": "array"
         },
         "rawHelp": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "rawHelpSha256": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "supportedTags": {
           "items": {
@@ -83,9 +98,49 @@
           "type": "string"
         },
         "tool": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "tools": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "detail": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "disposition": {
+                "type": "string"
+              },
+              "family": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "rawHelpSha256": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "tool": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "detail",
+              "disposition",
+              "family",
+              "rawHelpSha256",
+              "tool"
+            ],
+            "type": "object"
+          },
           "type": "array"
         }
       },
@@ -112,8 +167,8 @@
   "x-arkdeck-method": "trace.probe",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 9,
+    "request": 24,
+    "result": 15
   }
 }

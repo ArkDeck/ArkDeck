@@ -185,6 +185,7 @@ impl<H: HostServices> AppIngress<H> {
                     | "trace.cache.status"
                     | "trace.cache.purge"
                     | "debug.probe"
+                    | "trace.probe"
             )
         {
             return refusal(
@@ -322,7 +323,7 @@ fn closed_parameters(request: &Request) -> bool {
         | "artifact.quota"
         | "trace.cache.status"
         | "trace.cache.purge" => &[],
-        "debug.probe" => &["targetId"],
+        "debug.probe" | "trace.probe" => &["targetId"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",
