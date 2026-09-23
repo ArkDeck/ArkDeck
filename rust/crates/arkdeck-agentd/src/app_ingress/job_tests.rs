@@ -17,6 +17,59 @@ fn submit(document: &Value) -> Vec<u8> {
 fn capture() -> Value {
     document("ArkDeckApp.DebugWorkspace.Logs", "capture.diagnostics")
 }
+/// The published contract view runs these tests against the merge base's
+/// inputs, which name their commit; the checkout and candidate views do not.
+fn published_view() -> bool {
+    let inputs =
+        arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+/// A plan as the control layer answers it under this build's `job.plan`
+/// schema. The checkout and candidate views publish the additive step-set
+/// review digest every Rust plan carries. The published view compiles the
+/// merge base's closed result schema, which predates it, so the control layer
+/// answers `internalError` in place of a result that schema cannot publish.
+fn plan_answer(reply: &[u8]) -> Option<Value> {
+    let schema: Value = serde_json::from_str(
+        arkdeck_contract::METHOD_SCHEMAS
+            .iter()
+            .find(|(method, _)| *method == "job.plan")
+            .unwrap()
+            .1,
+    )
+    .unwrap();
+    let publishes_digest = schema["$defs"]["result"]["properties"]
+        .get("stepSetDigestSHA256")
+        .is_some();
+    assert!(
+        publishes_digest || published_view(),
+        "only the merge base's schema may predate the step-set review digest"
+    );
+    let outcome = decode_response(reply.trim_ascii_end(), "request-1", "job.plan")
+        .unwrap()
+        .outcome;
+    if !publishes_digest {
+        let error = outcome.expect_err("a plan field the schema does not publish");
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "internalError",
+                "the result does not conform to the current contract"
+            )
+        );
+        return None;
+    }
+    let plan = outcome.unwrap_or_else(|error| panic!("job.plan: {error:?}"));
+    let digest = plan["stepSetDigestSHA256"].as_str().unwrap_or_default();
+    assert!(
+        digest.len() == 64
+            && digest
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+        "{plan}"
+    );
+    Some(plan)
+}
 struct Owner {
     calls: Arc<Mutex<Vec<String>>>,
     entered: Arc<Barrier>,
@@ -481,14 +534,13 @@ esac
         );
         assert!(!root.0.join("calls").exists());
     }
-    let plan = result(
-        &ingress.handle(
-            &frame("job.plan", json!({"requestJson":doc.to_string()})),
-            root.peer(),
-        ),
-        "job.plan",
+    let planned = ingress.handle(
+        &frame("job.plan", json!({"requestJson":doc.to_string()})),
+        root.peer(),
     );
-    assert_eq!(plan["dispatchDisposition"], "notDispatched");
+    if let Some(plan) = plan_answer(&planned) {
+        assert_eq!(plan["dispatchDisposition"], "notDispatched");
+    }
     assert!(!root.0.join("calls").exists());
     let accepted = result(&ingress.handle(&submit(&doc), root.peer()), "job.submit");
     let id = accepted["jobId"].as_str().unwrap();

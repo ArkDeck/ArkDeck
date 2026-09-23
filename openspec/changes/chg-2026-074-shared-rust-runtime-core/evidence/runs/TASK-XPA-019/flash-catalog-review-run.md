@@ -217,3 +217,64 @@ host parity evidence, not pure Rust hardware acceptance or G5 completion.
   orchestration `/private/tmp/arkdeck-2121-isolated-views.log`. These independent
   build artifacts supersede the earlier shared-target view run as reproducible
   view evidence. SDD exit 0: `/private/tmp/arkdeck-2121-live-sdd.log`.
+
+### CI published-view journey repair
+
+CI run `35721800680` (job `106726399564`, macos-26 Rust workspace) on
+`42ff80cd47cdd8bdf3f8a7ee6516d784d12b24d4` failed only in `check-contracts.py`'s
+published view, which compiles this checkout's Rust against the merge base's
+(`e5d8b691`) contract inputs. That closed `job.plan` result schema predates
+`stepSetDigestSHA256`, so the control layer correctly answered every successful
+Rust plan with `internalError` ("the result does not conform to the current
+contract"). Four agentd App-ingress journeys that plan before submitting
+(`production_uidump`) stopped there. `cargo test --workspace` stops at the first
+failing binary; a local `--no-fail-fast` run of the materialized published view
+found one more: `import_publication_process` plans through the real CLI and
+daemon. The checkout and candidate view were green.
+
+Both now derive the expected answer from the compiled `job.plan` schema, as the
+CLI and legacy oracle helpers above already do. Where it publishes the digest
+(checkout and candidate views), the plan must succeed, carry a lowercase
+64-hex `stepSetDigestSHA256` and dispatch nothing. Where it does not, the inputs
+must be the published view's (they name their merge-base commit) and the answer
+must be exactly that `internalError`; the journeys then submit and run as before.
+No schema, producer or checkout/candidate assertion was relaxed.
+
+Local targeted checks (`CARGO_BUILD_JOBS=2`; checkout target
+`/private/tmp/arkdeck-2121-repair-target`, published view materialized with
+`check-contracts.py`'s materializer at `/private/tmp/arkdeck-2121-published-view`
+with its own target `/private/tmp/arkdeck-2121-published-view-target`):
+
+- Published view before the repair, `cargo test --workspace --locked
+  --no-fail-fast`: exit 101, 1195 passed, 5 failed, 18 ignored; failed targets
+  exactly `arkdeck-agentd --bin arkdeck-agentd` (the four CI failures) and
+  `--test import_publication_process`;
+  `/private/tmp/arkdeck-2121-published-test-before.log`.
+- Published view after the repair, those two targets: exit 0, 61 + 1 passed;
+  `/private/tmp/arkdeck-2121-published-agentd-after.log`. Its remaining steps,
+  never reached in CI: `windows_spk3 process-selftest` and `cargo build
+  --workspace --bins --locked` exit 0
+  (`/private/tmp/arkdeck-2121-published-rest.log`); `check-readonly.py` exit 0,
+  PASS (`/private/tmp/arkdeck-2121-published-readonly.log`).
+- The repair target still held an `arkdeck-contract` built from a materialized
+  published view before this repair: same relative-path metadata hash, newer
+  than the checkout's sources, its rlib embedding the merge-base baseline with
+  `commit` and no digest. A first checkout run therefore linked it and silently
+  took the published branch; it is not evidence. After `cargo clean -p
+  arkdeck-contract` in that target the rebuilt rlibs embed the checkout
+  baseline and digest schema; every checkout result below is from that rebuild.
+- Checkout: `cargo fmt --all --check` exit 0
+  (`/private/tmp/arkdeck-2121-fix-fmt.log`); `cargo build -p arkdeck-cli --bins`
+  then `cargo test -p arkdeck-agentd`: exit 0, 76 passed
+  (`/private/tmp/arkdeck-2121-fix-agentd-test.log`); `cargo clippy -p
+  arkdeck-agentd --all-targets -- -D warnings`: exit 0
+  (`/private/tmp/arkdeck-2121-fix-clippy-agentd.log`); `sh scripts/check-sdd.sh`:
+  exit 0 (`/private/tmp/arkdeck-2121-fix-sdd.log`).
+- Mutation, discarded afterwards: without `stepSetDigestSHA256` in
+  `JobPlanner::plan`, the checkout journey fails at the digest assertion
+  (`/private/tmp/arkdeck-2121-mutation-no-digest.log`) and the published view's
+  fails at the refusal expectation, because that plan then conforms
+  (`/private/tmp/arkdeck-2121-published-mutation-no-digest.log`). The view was
+  restored byte-identical to the checkout and its two targets re-ran green.
+
+CI: pending for the new PR head; the failed run is not a pass.
