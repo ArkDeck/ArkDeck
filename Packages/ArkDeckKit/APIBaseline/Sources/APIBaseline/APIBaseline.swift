@@ -10,6 +10,7 @@
 
 import ArkDeckAgentClient
 import ArkDeckAgentDaemon
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckOpenHarmony
@@ -109,9 +110,13 @@ private enum OpenHarmonySurface {
   static let subserver: HDCSubserverCapability.Type = HDCSubserverCapability.self
 }
 
-// MARK: - ArkDeckWorkflows: discovery vocabulary
+// MARK: - ArkDeckClientKit: discovery vocabulary
+//
+// The App-facing RockUSB access advice moved here from ArkDeckWorkflows
+// (CHG-2026-074). Workflows' public RockchipDeviceAccessObserving still
+// returns this type, so an external importer names it through ClientKit.
 
-private enum WorkflowsSurface {
+private enum ClientKitSurface {
   static let rockUSBMode = RockchipDeviceMode.loader
 }
 

@@ -96,6 +96,46 @@ Runtime-owner work. The exact method/field/client-identity list has been sent to
 the Runtime owner and monitor; unsupported responses stay unavailable. Support
 Bundle and Settings production assembly still retain Workflows dependencies.
 
+## Rebase onto main and the external-consumer API baseline
+
+#2121 was squash-merged as `48d180ef8` and #2123 as `a5e9b6189`. Only the
+consumer commit was replayed onto main `544a86c23`, with
+`git rebase --onto origin/main 3a68678d1`. After #2127 merged, the consumer
+commit and this fix were rebased onto main `86cb81c1c`. Neither rebase had
+conflicts, and `git range-diff` reports every replayed patch as identical. The
+macos-26 Rust failures on the previous head came from #2121 and were fixed there.
+
+The previous head also failed swift-tests (run 35720963765, job 106723585205) in
+`APIBaselineGateContractTests.testExternalConsumerBaselineBuildsAgainstThePublishedPublicAPI`.
+The failure reproduces locally as
+`APIBaseline.swift:115:28: error: cannot find 'RockchipDeviceMode' in scope`.
+This slice moved `RockchipDeviceMode`, with the rest of the App-facing RockUSB
+access advice, from ArkDeckWorkflows to ArkDeckClientKit. The baseline imported
+only Workflows. The type is still public in the published ArkDeckClientKit
+library, and Workflows' public `RockchipDeviceAccessObserving` still returns it.
+The baseline now depends on and imports ArkDeckClientKit and asserts the same
+`RockchipDeviceMode.loader` there. The gate logic is unchanged and no assertion
+was removed. Workflows gets no forwarding alias, because ClientKit is the single
+owner of App-facing types under CHG-2026-074.
+
+Local targeted checks used the cache root `/private/tmp/arkdeck-e190-swift`:
+
+- Before the fix, `--filter APIBaselineGateContractTests` exited 1 with the
+  error above. Log: `/private/tmp/arkdeck-e190-flash-s3-apibaseline-repro.log`.
+- After the fix, a run over the API baseline, architecture boundary, the Flash
+  and Rockchip classes above, `FlashArtifactContractTests`,
+  `RockchipFlashReviewContractTests`, `Dayu20070035RuntimePlanOnlyContractTests`
+  and the daemon device-access test exited 0. It executed 94 tests, skipped 3
+  existing real-archive tests and had no failures. It passed on both bases.
+  Logs: `/private/tmp/arkdeck-e190-flash-s3-tests.log` on `544a86c23` and
+  `/private/tmp/arkdeck-e190-flash-s3-tests-86cb81c1c.log` on `86cb81c1c`.
+- App `build-for-testing` exited 0 with TEST BUILD SUCCEEDED on both bases.
+  Logs: `/private/tmp/arkdeck-e190-flash-s3-app-build.log` and
+  `/private/tmp/arkdeck-e190-flash-s3-app-build-86cb81c1c.log`.
+- `sh scripts/check-sdd.sh` exited 0. Log: `/private/tmp/arkdeck-e190-flash-s3-sdd.log`.
+
+This fix changes no App source, so the UI tests were not rerun.
+
 ## CI
 
 Pending the consumer PR, required guard/swift checks and maintainer review.
