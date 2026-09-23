@@ -215,4 +215,11 @@ Rust uses `CARGO_BUILD_JOBS=2` and `CARGO_TARGET_DIR=/private/tmp/arkdeck-1330-r
 
 ## CI
 
-Pending this PR.
+PR #2131, head `67ca7f682`; merged as `20abb8553`.
+
+- SDD Guard `35884169583` passed (`guard`, `ds-tokens`); Agent PR `35884169769`
+  passed.
+- Swift CI `35884169894` passed: `plan`, Rust host-independent checks, the Rust
+  workspace on ubuntu-latest, macos-26 (job `107260033191`) and windows-latest,
+  and the `swift` aggregate. `swift-tests`, `app-build` and `ds-interactions`
+  were skipped by the plan; a skipped job is not a pass.

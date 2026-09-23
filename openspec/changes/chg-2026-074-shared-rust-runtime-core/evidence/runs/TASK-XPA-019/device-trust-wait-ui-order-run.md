@@ -83,6 +83,16 @@ The console was locked (`CGSSessionScreenIsLocked=1`), so no UI test ran locally
 
 ## CI
 
-Pending. Pull-request CI only builds the UI tests. Running them needs a
-dispatch: `gh workflow run swift-slow-lanes.yml --ref
-agent/xpa-019-device-wait-ui-regression -f job=ui-tests`.
+PR #2130, head `bc7599e84`; merged as `0f4daa971`.
+
+- SDD Guard `35876049817` passed (`guard`, `ds-tokens`); Agent PR `35876050258`
+  passed.
+- Swift CI `35876050364` passed: `plan`, `swift-tests`, `app-build`,
+  `ds-interactions` and the `swift` aggregate. `rust-checks` was skipped by the
+  plan. Pull-request CI only builds the UI tests.
+- The UI tests ran on a dispatch on the same head, `gh workflow run
+  swift-slow-lanes.yml --ref agent/xpa-019-device-wait-ui-regression -f
+  job=ui-tests`: Swift slow lanes `35877056524`, job `ui-tests` `107235599340`,
+  success (14:50–15:24Z). `AppShellUITests.testEnglishSweepOfEveryWorkspace`
+  passed (117.880 s); the run executed 63 tests, 14 skipped, 0 failures.
+  `slow-lanes` and `host-store-shadow` were not selected by the dispatch.

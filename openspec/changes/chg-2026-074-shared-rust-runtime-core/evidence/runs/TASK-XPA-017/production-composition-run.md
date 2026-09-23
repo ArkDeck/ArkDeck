@@ -246,4 +246,15 @@ logs `/private/tmp/arkdeck-s13-*.log`.
 
 ## CI
 
-Pending.
+PR #2136, head `7e7584974`; merged as `51f8009df`.
+
+- SDD Guard `35924284852` passed (`guard`, `ds-tokens`); Agent PR `35924284094`
+  passed.
+- Swift CI `35924284502` passed: `plan`, Rust host-independent checks, the Rust
+  workspace on ubuntu-latest, macos-26 (job `107395584495`) and windows-latest,
+  and the `swift` aggregate. `swift-tests`, `app-build` and `ds-interactions`
+  were skipped by the plan; a skipped job is not a pass.
+- In the macos-26 job, `tests/production_composition.rs` (8), `production::tests`
+  (7), `app_ingress::tests::production_tests` (2) and hoststore's
+  `the_state_root_owner_creates_its_index_beside_the_runtimes_other_owners` ran
+  and passed.
