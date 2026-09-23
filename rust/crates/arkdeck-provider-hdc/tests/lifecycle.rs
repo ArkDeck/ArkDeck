@@ -3,9 +3,11 @@
 //! records, one launch per preparation, and the post-dispatch re-observation
 //! that alone decides the outcome, judged as Swift's
 //! `HDCProcessLifecycleExecutor` judges it. The tool is a fake `hdc` compiled
-//! here from C: its `-m` server polls a marker file and ends when it appears;
-//! its `kill -r` client writes the marker, waits for the port to free, and
-//! starts a new server of the same executable in its own session; its
+//! here from C: its `-m` server names its PID and port in a file once it
+//! listens, polls a marker file and ends when it appears (or when this test
+//! process is gone); its `kill -r` client writes the marker, waits for the
+//! port to free, starts a new server of the same executable in its own
+//! session and records that server's PID for the fake's guard to end; its
 //! behaviour on `kill` is fixed at compile time. No real HDC is launched.
 //! Spawning children, these tests keep a binary of their own.
 #![cfg(target_os = "macos")]
@@ -31,6 +33,7 @@ const FAKE_HDC: &str = r#"
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -40,6 +43,20 @@ const FAKE_HDC: &str = r#"
 #ifndef KILL_MODE
 #define KILL_MODE 0
 #endif
+/* `listening-<pid>` names this server's PID and port once it listens; it is
+ * written whole under another name first. */
+static int say_listening(int port) {
+    char path[1024], partial[1040], line[48];
+    int pid = (int)getpid();
+    snprintf(path, sizeof path, "%s/listening-%d", MARKER_DIR, pid);
+    snprintf(partial, sizeof partial, "%s.partial", path);
+    int length = snprintf(line, sizeof line, "%d %d\n", pid, port);
+    int fd = open(partial, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd < 0) return -1;
+    int written = write(fd, line, (size_t)length) == length;
+    close(fd);
+    return written && rename(partial, path) == 0 ? 0 : -1;
+}
 static int endpoint_port(const char *endpoint) {
     const char *colon = strrchr(endpoint, ':');
     return colon == NULL ? -1 : atoi(colon + 1);
@@ -69,6 +86,7 @@ static int serve(int port) {
     address.sin_port = htons((unsigned short)port);
     address.sin_addr.s_addr = inet_addr("127.0.0.1");
     if (bind(fd, (struct sockaddr *)&address, sizeof address) != 0 || listen(fd, 4) != 0) return 67;
+    if (say_listening(port) != 0) return 72;
     for (;;) {
         struct pollfd waiting = { fd, POLLIN, 0 };
         if (poll(&waiting, 1, 50) > 0) {
@@ -76,6 +94,8 @@ static int serve(int port) {
             if (client >= 0) close(client);
         }
         if (access(MARKER_DIR "/stop", F_OK) == 0) return 0;
+        /* A test killed before its guard ran cannot end this server. */
+        if (kill(OWNER_PID, 0) != 0 && errno == ESRCH) return 0;
     }
 }
 int main(int argc, char **argv) {
@@ -100,6 +120,10 @@ int main(int argc, char **argv) {
     close(marker);
     for (int i = 0; i < 200 && listener_reachable(port); i++) usleep(20000);
     if (!restart) return 0;
+    /* The new server is nobody's child: its PID is recorded before this
+     * command returns, for the fake's guard to end it. */
+    int servers = open(MARKER_DIR "/servers", O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
+    if (servers < 0) return 70;
     unlink(MARKER_DIR "/stop");
     pid_t child = fork();
     if (child < 0) return 68;
@@ -110,6 +134,14 @@ int main(int argc, char **argv) {
         char *server_argv[] = { (char *)SELF_PATH, "-s", (char *)endpoint, "-m", NULL };
         execv(SELF_PATH, server_argv);
         _exit(69);
+    }
+    char line[24];
+    int length = snprintf(line, sizeof line, "%d\n", (int)child);
+    int recorded = write(servers, line, (size_t)length) == length;
+    close(servers);
+    if (!recorded) {
+        kill(child, SIGKILL);
+        return 71;
     }
     return 0;
 }
@@ -142,6 +174,7 @@ impl FakeHdc {
             .arg(format!("-DKILL_MODE={kill_mode}"))
             .arg(format!("-DMARKER_DIR=\"{}\"", directory.display()))
             .arg(format!("-DSELF_PATH=\"{}\"", binary.display()))
+            .arg(format!("-DOWNER_PID={}", std::process::id()))
             .output()
             .expect("cc from the developer tools compiles the fake");
         assert!(
@@ -160,30 +193,66 @@ impl FakeHdc {
     }
 
     /// A server of the fake at the endpoint, started by the test as the
-    /// daemon would have started it, and its confirmed generation.
+    /// daemon would have started it, and its confirmed generation. Something
+    /// accepting on the port proves nothing: the server names its PID and
+    /// port once it listens, the endpoint's proved owner must be that very
+    /// child, and a child that ends first fails with its exit status.
     fn server(&self, endpoint: SocketAddrV4) -> (Server, u64) {
-        let child = Command::new(&self.binary)
-            .args(["-s", &endpoint.to_string(), "-m"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .unwrap();
-        let deadline = Instant::now() + Duration::from_secs(10);
-        while !reachable(endpoint) {
-            assert!(Instant::now() < deadline, "the fake server never listened");
-            std::thread::sleep(Duration::from_millis(20));
+        let mut server = Server(
+            Command::new(&self.binary)
+                .args(["-s", &endpoint.to_string(), "-m"])
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .unwrap(),
+        );
+        let pid = server.0.id();
+        let listening = self.directory.join(format!("listening-{pid}"));
+        // Only keeps the test from hanging on a child that neither listens
+        // nor ends.
+        let deadline = Instant::now() + Duration::from_secs(60);
+        loop {
+            match fs::read_to_string(&listening) {
+                Ok(said) => {
+                    assert_eq!(said, format!("{pid} {}\n", endpoint.port()));
+                    break;
+                }
+                Err(error) if error.kind() == ErrorKind::NotFound => {}
+                Err(error) => panic!("the fake server's readiness is unreadable: {error}"),
+            }
+            if let Some(status) = server.0.try_wait().unwrap() {
+                panic!("the fake server ended before it listened on {endpoint}: {status}");
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the fake server never listened on {endpoint}"
+            );
+            std::thread::sleep(Duration::from_millis(10));
         }
-        let lease = LoopbackServerLease::acquire(&self.tool, endpoint).unwrap();
+        let lease = LoopbackServerLease::acquire(&self.tool, endpoint)
+            .unwrap_or_else(|error| panic!("{endpoint} has no proved owner: {error}"));
+        assert_eq!(
+            u32::try_from(lease.identity().pid).ok(),
+            Some(pid),
+            "{endpoint} is owned by another process than the server this test started"
+        );
         let expected = generation(lease.identity()).unwrap();
-        (Server(child), expected)
+        (server, expected)
     }
 }
 
+/// Dropped, the fake ends the servers its `kill -r` started -- nobody's
+/// children, each ended by its recorded PID while that PID still runs as
+/// this fake -- then removes its directory, on a panic as well.
 impl Drop for FakeHdc {
     fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.directory);
+        fake_hdc_servers::tear_down(&self.directory, &self.binary);
     }
+}
+
+mod fake_hdc_servers {
+    include!("../../../tests/support/fake_hdc_servers.rs");
 }
 
 struct Server(Child);
@@ -192,16 +261,6 @@ impl Drop for Server {
     fn drop(&mut self) {
         let _ = self.0.kill();
         let _ = self.0.wait();
-    }
-}
-
-/// The server a restart started is nobody's child; it is ended by the PID
-/// the lease proved a moment ago to be a listener of this test's own fake.
-fn end_server(tool: &VerifiedTool, endpoint: SocketAddrV4) {
-    if let Ok(lease) = LoopbackServerLease::acquire(tool, endpoint) {
-        let _ = Command::new("/bin/kill")
-            .args(["-9", &lease.identity().pid.to_string()])
-            .status();
     }
 }
 
@@ -293,8 +352,12 @@ fn a_confirmed_restart_succeeds_only_with_a_strictly_newer_generation() {
     assert!(receipt.stdout.is_empty() && receipt.stderr.is_empty());
     let lease = LoopbackServerLease::acquire(&fake.tool, endpoint).unwrap();
     assert_ne!(u32::try_from(lease.identity().pid).unwrap(), old_pid);
+    // The replacement is nobody's child; the fake recorded it for its drop.
+    assert_eq!(
+        fs::read_to_string(fake.directory.join("servers")).unwrap(),
+        format!("{}\n", lease.identity().pid)
+    );
     drop(server);
-    end_server(&fake.tool, endpoint);
 }
 
 #[test]

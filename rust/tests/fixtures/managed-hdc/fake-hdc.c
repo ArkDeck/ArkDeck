@@ -6,12 +6,21 @@
  * it alive without a listener, PRINT_PORT reports the server port variable
  * it was given. LIST_EMPTY answers `list targets -v` with no target, and
  * RECORD_CALLS names a file every invocation appends its arguments to, one
- * line each, before it does anything else (TASK-XPA-014). No real HDC,
- * server or device is involved. */
+ * line each, before it does anything else (TASK-XPA-014). RESTART_DIR makes
+ * `-s <endpoint> kill` write the `stop` marker there, which ends a server of
+ * this build, and wait for the port to free; `kill -r` then starts a server of
+ * SELF_PATH in a session of its own, as HDC does, and appends its PID to
+ * `servers` there before it returns, since that server is nobody's child
+ * (rust/tests/support/fake_hdc_servers.rs ends it). FAIL_RESTART answers
+ * `kill` with unregistered stderr instead. A server of this build also ends
+ * once OWNER_PID, the test process, is gone. No real HDC, server or device is
+ * involved. */
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -94,6 +103,8 @@ int main(int argc, char **argv) {
             usleep(20000);
         }
         if (!restart) return 0;
+        int servers = open(RESTART_DIR "/servers", O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
+        if (servers < 0) return 70;
         unlink(RESTART_DIR "/stop");
         pid_t child = fork();
         if (child < 0) return 68;
@@ -104,6 +115,14 @@ int main(int argc, char **argv) {
             char *args[] = { (char *)SELF_PATH, "-s", (char *)endpoint, "-m", NULL };
             execv(SELF_PATH, args);
             _exit(69);
+        }
+        char line[24];
+        int length = snprintf(line, sizeof line, "%d\n", (int)child);
+        int recorded = write(servers, line, (size_t)length) == length;
+        close(servers);
+        if (!recorded) {
+            kill(child, SIGKILL);
+            return 71;
         }
         return 0;
     }
@@ -144,6 +163,10 @@ int main(int argc, char **argv) {
     for (;;) {
 #ifdef RESTART_DIR
         if (access(RESTART_DIR "/stop", F_OK) == 0) return 0;
+#ifdef OWNER_PID
+        /* A test killed before its guard ran cannot end this server. */
+        if (kill(OWNER_PID, 0) != 0 && errno == ESRCH) return 0;
+#endif
         struct pollfd waiting = { fd, POLLIN, 0 };
         if (poll(&waiting, 1, 20) <= 0) continue;
 #endif
