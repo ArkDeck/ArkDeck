@@ -418,7 +418,32 @@ The third commit calibrates the heap rule by the control, again changing only
 
 ## CI
 
-Pending.
+PR #2135, final head `de377796d` (three commits after the rebase onto `51f8009df`, #2136); merged as
+`d5f9f6f22`.
+
+| Head | SDD Guard | Agent PR | Swift CI | Conclusion |
+| --- | --- | --- | --- | --- |
+| `426870a00` (first) | `35917773721` passed | `35917773713` passed | `35917773897` failed | macos-26 job `107373735747` red in `tests/usb_registry.rs`'s single-batch bound (the macOS 26 finding above); the `swift` aggregate failed |
+| `13d7f065b` | `35926948373` passed | `35926948425` passed | `35926948886` failed | macos-26 job `107404247720` red on rule (a) (the table above); the `swift` aggregate failed |
+| `de377796d` (final) | `35928199898` passed | `35928199916` passed | `35928200205` passed | every lane the plan selected passed |
+
+On `de377796d`, Swift CI `35928200205` passed `plan`, `ds-interactions`, Rust host-independent
+checks, the Rust workspace on ubuntu-latest, macos-26 (job `107408319686`) and windows-latest, and
+the `swift` aggregate; `swift-tests` and `app-build` were skipped by the plan, and a skipped job is
+not a pass. In the macos-26 job (one USB host controller, no USB device, so the smoke's board check
+skipped):
+
+- The control stepped `[0, 1920, 0, 0, 0, 85]` heap blocks again, so heap blocks were judged by
+  rule (b) alone and port names by rules (a) and (b), as calibrated.
+- `usb_host_devices` kept `[0, 512, 0, 0, 0, 2730]` heap blocks. Every controller variant kept the
+  same figures as in job `107404247720`, stepping in the same two batches and 0 in the other four.
+  Port names were 0 in every batch of every variant.
+- The other new tests ran on macOS 26 for the first time and passed: the platform's `usb_registry`
+  units, the provider's reader unit and `tests/target_observation.rs` (the shared fake bracketed by
+  the reader, and `system()` on that host), agentd's
+  `the_registry_reader_adopts_the_swift_fake_device_as_the_oracle_s_relations_do` and
+  `an_uncertain_registry_fails_closed_through_the_control_layer`, and `development_usb`'s decision
+  table.
 
 ## Not run
 

@@ -33,7 +33,7 @@ binary M5 switches to could carry no Golden Journey.
 | Single instance: `Agentd/instance.lock` + `instance.json`, taken last (`AgentDaemon.swift:3844-3910`, `main.swift:1561`) | none | both locks taken first (below) |
 | UDS `Agentd/agentd.sock` | `$TMPDIR/arkdeck-rust-<uid>/control.sock` | `Agentd/agentd.sock` |
 | HDC: `ARKDECK_HDC_PATH` → `BootstrapToolRegistry` adoption → startup selection → `HeadlessHDCServerHost` (`main.swift:462-584`) | read-only provider from `ARKDECK_HDC_PATH`+`ARKDECK_HDC_SHA256` | registry adoption and startup selection → `ManagedHdc` (#2131 semantics) |
-| USB: `TargetUSBRelation.registeredDAYU200()` (`main.swift:1246-1248`) | none | none yet (#2135 open); adoption refused, stated at start |
+| USB: `TargetUSBRelation.registeredDAYU200()` (`main.swift:1246-1248`) | none | none in this slice (#2135 open; adoption refused, stated at start); since the follow-up, `UsbRegistryRelations::system()` beside the managed registered HDC ([production-trusted-usb-run.md](production-trusted-usb-run.md)) |
 | Code-sign helper `HDCNativeCodeSignHelperArtifact.bundled()` | bundled | bundled |
 | `recoverActiveJobs`, Artifact GC (`main.swift:1289,1326`) | none (no Job owner) | the shared startup recovery and sweep |
 | App Mach service `com.arkdeck.agentd`, `appCodeRequirement`, euid (`AgentXPCListener.swift:20-40`) | refused (isolated root only) | served over the account's own home |
@@ -148,7 +148,7 @@ binary M5 switches to could carry no Golden Journey.
 | a store unreadable, a Job index that would hide lost history | exit 69 |
 | startup recovery fails | exit 69, as Swift's start fails |
 | no `ARKDECK_HDC_PATH` | serves; dispatch refused, `device.observations` refused, `runtime.hdc.status` unconfigured |
-| no USB relation reader (beside a managed HDC) | serves; every observation stays generation-scoped, so the Target observation owner refuses adoption |
+| no USB relation reader (beside a managed HDC; this slice only, until the follow-up composed #2135's) | serves; every observation stays generation-scoped, so the Target observation owner refuses adoption |
 | no App Trace cache | serves; `trace.cache.status` and `.purge` refused (`rejected`, not configured, zero dispatch) |
 | overridden home | serves; no Mach service |
 
@@ -173,9 +173,12 @@ binary M5 switches to could carry no Golden Journey.
 
 ## Not composed, and why
 
-- **Trusted USB relations**: `UsbRegistryRelations::system()` is #2135 (open at this
-  base). Until it merges, target adoption stays refused and the start says so;
-  the follow-up is one line beside the managed registered HDC.
+- **Trusted USB relations**: composed since the follow-up
+  ([production-trusted-usb-run.md](production-trusted-usb-run.md)): with #2135
+  merged, `UsbRegistryRelations::system()` is read beside the managed registered
+  HDC, by the isolated owner's rule, and the start names `usbRegistryRelations`
+  among its owners instead of saying none is composed. At this slice's base
+  #2135 was open, so adoption stayed refused and the start said so.
 - **Tool-selection control actions** (`runtime.tool.select`): no Rust owner in any
   mode; a pending selection refuses the start.
 - **ArkForge lane, `flash.*`, Rockchip binding lineage and post-flash alias
@@ -246,4 +249,15 @@ logs `/private/tmp/arkdeck-s13-*.log`.
 
 ## CI
 
-Pending.
+PR #2136, head `7e7584974`; merged as `51f8009df`.
+
+- SDD Guard `35924284852` passed (`guard`, `ds-tokens`); Agent PR `35924284094`
+  passed.
+- Swift CI `35924284502` passed: `plan`, Rust host-independent checks, the Rust
+  workspace on ubuntu-latest, macos-26 (job `107395584495`) and windows-latest,
+  and the `swift` aggregate. `swift-tests`, `app-build` and `ds-interactions`
+  were skipped by the plan; a skipped job is not a pass.
+- In the macos-26 job, `tests/production_composition.rs` (8), `production::tests`
+  (7), `app_ingress::tests::production_tests` (2) and hoststore's
+  `the_state_root_owner_creates_its_index_beside_the_runtimes_other_owners` ran
+  and passed.

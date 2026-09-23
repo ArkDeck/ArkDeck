@@ -262,3 +262,18 @@ This uses the default 300 s interval, which is the weekly lane's definition.
     maintainer with those numbers. The bound is not raised for it.
 - The coordinating session dispatched the four-hour soak on `bcbef6936`: run `35873673934`. The
   follow-up commit touches only this test and this record, so the soak binary is unchanged.
+- On `04295eb90`, the final head (the batch-form test and this record):
+  - SDD Guard `35877685742` passed (`guard`, `ds-tokens`); Agent PR `35877685750` passed.
+  - Swift CI `35877685921` passed: Rust host-independent checks, the Rust workspace on
+    ubuntu-latest, macos-26 (job `107237852331`) and windows-latest, and the `swift` aggregate.
+    `swift-tests`, `app-build` and `ds-interactions` were skipped by the plan; a skipped job is not
+    a pass.
+  - In the macos-26 job, `calendar_calls_drain_what_they_autorelease` passed. Its figures are
+    captured when it passes, so the log shows that each function's second measured batch kept fewer
+    than 100 blocks there (`CALLS / 100`), not how many.
+- The four-hour soak `35873673934` (Performance lanes, `workflow_dispatch` on `bcbef6936`; job
+  `soak` `107224030697`, 14:22–18:24Z) succeeded: 48 cycles and 480 Jobs, all terminal, 432 with
+  verified Artifacts. The last cycle's RSS growth was 11,780,096 bytes (11.78 MB) against the
+  32 MiB gate (33,554,432 bytes), and the descriptor count was 19 in every cycle.
+- The maintainer merged #2129 by hand at 2026-09-23T16:03:58Z, on `04295eb90` and before the soak
+  concluded: `7d6382c9e` on main.

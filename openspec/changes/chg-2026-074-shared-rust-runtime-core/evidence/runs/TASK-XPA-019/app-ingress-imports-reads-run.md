@@ -191,5 +191,11 @@ was accessed.
 
 ## CI
 
-Pending the agent-branch PR and current-head CI. Full unified checks run in CI;
-pending or skipped jobs are not passes. Maintainer review remains required.
+PR #2132, head `7426044a2`; merged as `f06f83d05`.
+
+- SDD Guard `35889503178` passed (`guard`, `ds-tokens`); Agent PR `35889503175`
+  passed.
+- Swift CI `35889503787` passed: `plan`, Rust host-independent checks, the Rust
+  workspace on ubuntu-latest, macos-26 (job `107278175571`) and windows-latest,
+  and the `swift` aggregate. `swift-tests`, `app-build` and `ds-interactions`
+  were skipped by the plan; a skipped job is not a pass.

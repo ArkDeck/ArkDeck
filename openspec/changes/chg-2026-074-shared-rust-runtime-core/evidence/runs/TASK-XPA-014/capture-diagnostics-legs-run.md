@@ -166,7 +166,12 @@ device.
 
 ## CI
 
-Pending.
+PR #2134, two commits, head `f61d1adc1`; merged as `afde8a42a`.
+
+- SDD Guard `35909441429` passed (`guard`, `ds-tokens`); Agent PR `35909441510` passed.
+- Swift CI `35909441828` passed: `plan`, `swift-tests`, `ds-interactions`, Rust host-independent
+  checks, the Rust workspace on ubuntu-latest, macos-26 (job `107345349091`) and windows-latest,
+  and the `swift` aggregate. `app-build` was skipped by the plan; a skipped job is not a pass.
 
 ## Declared differences from Swift
 

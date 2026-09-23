@@ -1,14 +1,20 @@
 //! The production composition's pieces, in process and over temporary homes
 //! only: every root resolves below the home it is given, the claim takes
 //! Swift's lock and the facade's before anything else, the registry selects
-//! the HDC as Swift's does, and `compose` opens every owner in Swift's
-//! layout. The daemon's own start, single instance and serving are
-//! `tests/production_composition.rs`'s. No real account root, Mach service,
-//! LaunchAgent or HDC is touched.
+//! the HDC as Swift's does, `compose` opens every owner in Swift's layout,
+//! and the Runtime's own USB relations are read only beside the managed
+//! registered HDC, over a census the test hands it. The daemon's own start,
+//! single instance and serving are `tests/production_composition.rs`'s. No
+//! real account root, Mach service, LaunchAgent, HDC or USB device is
+//! touched.
 use super::*;
+use arkdeck_provider_hdc::{
+    DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations, ROCKUSB_VENDOR_ID, UsbRelation,
+};
 use serde_json::{Value, json};
 use std::fs;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// A temporary home: physical, owner-only, short enough that the installed
 /// socket's path fits `sun_path`, and removed afterwards.
@@ -354,6 +360,8 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
     let composition = compose(&layout, &Inputs::default(), Host::from_environment(), "now")
         .map_err(|error| error.to_string())
         .unwrap();
+    // Without an HDC there is no managed server, so no USB relation reader
+    // either (`usbRegistryRelations` is not among them).
     assert_eq!(
         composition.host.owner_census(),
         [
@@ -390,6 +398,7 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             composition.omitted
         );
     }
+    assert_eq!(composition.omitted.len(), 3, "{:?}", composition.omitted);
     // Swift's Job index is at the state root, beside the other owners.
     assert!(layout.state.join("runtime-jobs.sqlite3").is_file());
     // Everything created is below the home and owner-only; the App's
@@ -433,4 +442,71 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             .iter()
             .any(|line| line.starts_with("App ingress"))
     );
+}
+
+/// A DAYU200 in HDC-normal mode as the I/O Registry lists it.
+fn board(attachment: u64) -> UsbHostDevice {
+    UsbHostDevice {
+        serial: "0123456789ABCDEF".into(),
+        vendor_id: ROCKUSB_VENDOR_ID,
+        product_id: DAYU200_NORMAL_PRODUCT_ID,
+        topology: "337641472".into(),
+        product_name: Some("\"HDC Device\"".into()),
+        registry_entry_id: Some(attachment),
+    }
+}
+
+/// The Runtime's own reader over a census the test hands it in place of the
+/// host's I/O Registry, so that nothing here depends on this host's USB
+/// devices: the board, and another vendor's device the reader passes over.
+/// The census counts its reads.
+fn registry(
+    reads: Arc<AtomicUsize>,
+) -> UsbRegistryRelations<impl Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>> {
+    UsbRegistryRelations::new(move || {
+        reads.fetch_add(1, Ordering::SeqCst);
+        Ok(vec![
+            board(17),
+            UsbHostDevice {
+                vendor_id: 0x05ac,
+                ..board(18)
+            },
+        ])
+    })
+}
+
+#[test]
+fn the_runtimes_own_usb_relations_are_read_only_beside_the_managed_registered_hdc() {
+    // Beside the registered HDC the composition started as its managed
+    // server: the Runtime's own reader, which the owner census names.
+    // Composing it reads nothing; every read takes a census of its own.
+    let reads = Arc::new(AtomicUsize::new(0));
+    let beside = with_trusted_usb(Host::from_environment(), true, registry(reads.clone()));
+    assert!(beside.owner_census().contains(&"usbRegistryRelations"));
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+    let proved = UsbRelation {
+        serial: "0123456789ABCDEF".into(),
+        location: "337641472".into(),
+        attachment_id: 17,
+        vendor_id: ROCKUSB_VENDOR_ID,
+        product_id: DAYU200_NORMAL_PRODUCT_ID,
+    };
+    assert_eq!(beside.usb_relations().relations(), Ok(vec![proved.clone()]));
+    assert_eq!(beside.usb_relations().relations(), Ok(vec![proved]));
+    assert_eq!(reads.load(Ordering::SeqCst), 2);
+    // Another source put in its place is not named as the Runtime's own.
+    assert!(
+        !beside
+            .with_usb_relations(Arc::new(NoUsbRelations))
+            .owner_census()
+            .contains(&"usbRegistryRelations")
+    );
+
+    // Without that server nothing is composed or read: no observation is
+    // proved, so adoption stays refused.
+    let reads = Arc::new(AtomicUsize::new(0));
+    let without = with_trusted_usb(Host::from_environment(), false, registry(reads.clone()));
+    assert!(!without.owner_census().contains(&"usbRegistryRelations"));
+    assert_eq!(without.usb_relations().relations(), Ok(Vec::new()));
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

@@ -36,13 +36,20 @@
 //! bootstrap registry cannot select, a pending tool selection it has no owner
 //! to settle, an endpoint another server holds, a recovery that fails — each
 //! ends the start with its reason, as Swift's does (exit 69 here, 1 there).
-//! What it composes without is named on stdout: no HDC configured (dispatch
-//! refused, as Swift's `RefusingDispatcher`), no Trace cache the App has
-//! created, no reader of trusted USB relations yet (adoption refused), no App
-//! ingress over an overridden home, and each input Swift's LaunchAgent sets
-//! for an owner not ported yet.
+//! Beside the registered HDC it starts as its managed server it reads the
+//! Runtime's own trusted USB relations, as Swift's daemon reads
+//! `registeredDAYU200()` ([`with_trusted_usb`]). What it composes without is
+//! named on stdout: no HDC configured (dispatch refused, as Swift's
+//! `RefusingDispatcher`; nothing is observed, so no USB relation is read and
+//! nothing is adopted), no Trace cache the App has created, no App ingress
+//! over an overridden home, and each input Swift's LaunchAgent sets for an
+//! owner not ported yet.
+use crate::development_usb::{self, RelationSource};
 use crate::host::Host;
-use arkdeck_platform::{HostDirectory, HostReadLock, LocalEndpoint, LocalListener};
+use arkdeck_platform::{
+    HostDirectory, HostReadLock, LocalEndpoint, LocalListener, RegistryUnavailable, UsbHostDevice,
+};
+use arkdeck_provider_hdc::UsbRegistryRelations;
 use std::ffi::OsStr;
 use std::io::{self, Read, Write};
 use std::os::unix::fs::DirBuilderExt;
@@ -392,6 +399,31 @@ pub(crate) fn registered_hdc(
     Ok(selection)
 }
 
+/// The USB relations the Target observations read, by the isolated owner's
+/// rule (`development_usb::relation_source`): beside the registered HDC this
+/// composition started as its managed server (`managed`; its registry selects
+/// only a published HDC, so a managed one is a registered one) the Runtime's
+/// own reader, `registry`, as Swift's daemon reads
+/// `TargetUSBRelation.registeredDAYU200()` beside its `HeadlessHDCServerHost`
+/// (the maintainer's decision Q1=B of 2026-09-24). Without one nothing is
+/// read: no observation is proved and adoption stays refused. No development
+/// relation file is ever read here; `main.rs` refuses one without a
+/// development root. Composing reads nothing; each observation takes its own
+/// census.
+pub(crate) fn with_trusted_usb<C>(
+    host: Host,
+    managed: bool,
+    registry: UsbRegistryRelations<C>,
+) -> Host
+where
+    C: Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync + 'static,
+{
+    match development_usb::relation_source(managed, managed, false) {
+        RelationSource::Registry => host.with_usb_registry_relations(registry),
+        RelationSource::File | RelationSource::Nothing => host,
+    }
+}
+
 /// What [`compose`] composed.
 pub(crate) struct Composition {
     pub(crate) host: Host,
@@ -537,13 +569,6 @@ pub(crate) fn compose(
             )?);
             let dispatch =
                 arkdeck_provider_hdc::ProcessDispatch::new(tool()?, inputs.server_port.as_deref());
-            // No reader of the host's USB relations is composed yet: no
-            // observation is proved, and adoption stays refused.
-            omitted.push(
-                "trusted USB relations: no reader is composed; every observation stays \
-                 generation-scoped and target adoption is refused"
-                    .into(),
-            );
             (
                 host.with_control_actions(controls)
                     .with_managed_development_hdc(dispatch, Arc::clone(&managed)),
@@ -551,6 +576,9 @@ pub(crate) fn compose(
             )
         }
     };
+    // The host's I/O Registry beside the managed server started above; no
+    // reader without one.
+    let host = with_trusted_usb(host, managed.is_some(), UsbRegistryRelations::system());
     for (name, owner) in &inputs.unread {
         omitted.push(format!(
             "{owner}: {name} is set, but this Runtime has not ported that owner yet"
