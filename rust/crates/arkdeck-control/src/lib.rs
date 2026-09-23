@@ -44,6 +44,24 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    /// The Import methods of a frame the authenticated App transport accepted
+    /// (`Control::handle_app_frame`), never of a local control client: an
+    /// Import the App begins is App-owned, and it can operate on no other.
+    /// A host without that owner refuses with zero dispatch.
+    fn app_import_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "App Import owner services are unavailable".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("importOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
 
     fn target_resource(
         &self,
@@ -550,6 +568,16 @@ pub struct Control<H> {
     providers: Vec<String>,
 }
 
+/// The transport that accepted a frame, as that transport authenticated its
+/// connection. A frame can name neither.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Origin {
+    /// The local control socket, with or without a foreground console.
+    Local { foreground_console: bool },
+    /// The authenticated App transport.
+    App,
+}
+
 impl<H: HostServices> Control<H> {
     pub fn new(host: H) -> Result<Self, ContractError> {
         if sha256_hex(CATALOG_CANONICAL_JSON.as_bytes()) != CATALOG_DIGEST {
@@ -632,6 +660,22 @@ impl<H: HostServices> Control<H> {
     /// `foreground_console` comes from the kernel-authenticated connection,
     /// never from the request or the App transport.
     pub fn handle_frame_with_console(&self, bytes: &[u8], foreground_console: bool) -> Vec<u8> {
+        self.handle_frame_from(bytes, Origin::Local { foreground_console })
+    }
+
+    /// A frame the authenticated App transport accepted. That transport, not
+    /// the frame, supplies this origin, and it never holds a foreground
+    /// console. Only its Import methods answer differently from a local
+    /// client's: they reach `HostServices::app_import_resource`.
+    pub fn handle_app_frame(&self, bytes: &[u8]) -> Vec<u8> {
+        self.handle_frame_from(bytes, Origin::App)
+    }
+
+    fn handle_frame_from(&self, bytes: &[u8], origin: Origin) -> Vec<u8> {
+        let foreground_console = origin
+            == Origin::Local {
+                foreground_console: true,
+            };
         let request = match decode_request(bytes) {
             Ok(request) => request,
             Err(error) => {
@@ -1113,7 +1157,10 @@ impl<H: HostServices> Control<H> {
             | "artifact.import.commit"
             | "artifact.import.release" => Response {
                 id: request.id.clone(),
-                outcome: self.host.import_resource(&request.method, &params),
+                outcome: match origin {
+                    Origin::App => self.host.app_import_resource(&request.method, &params),
+                    Origin::Local { .. } => self.host.import_resource(&request.method, &params),
+                },
             },
             "session.list"
             | "session.show"

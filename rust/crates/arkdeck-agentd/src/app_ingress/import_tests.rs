@@ -1,0 +1,661 @@
+//! Real Import, Target, Artifact, storage, Trace cache and Debug owners behind
+//! the App boundary, with a synthetic kernel-origin peer. No signed XPC peer,
+//! device or installed Runtime is represented, and no HDC server is started.
+use super::*;
+use arkdeck_contract::{WireError, encode_import_chunk, sha256_hex};
+use arkdeck_hoststore::{
+    ArtifactReadStore, ArtifactUsage, ImportUploadFault, ImportUploadStore, JobStore, SessionStore,
+    TargetStore, TraceCacheStore,
+};
+use std::{
+    collections::BTreeMap,
+    os::unix::fs::PermissionsExt,
+    sync::{Arc, Mutex},
+};
+
+/// A ZIP-headed HAP, the content the Import owner's HAP validator accepts.
+const HAP: &[u8] = b"PK\x03\x04app-owned upload through the App ingress";
+/// The adopted Target of the checked-in Import fixture.
+const TARGET: &str = "TGT-dddddddddddd";
+
+fn directory(path: &Path) {
+    fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+}
+/// The isolated root's Target, Artifact and Job directories, the Target
+/// adopted at revision 1 with a direct HDC route.
+fn uploads() -> Root {
+    let root = Root::new();
+    for name in ["targets", "artifacts", "jobs"] {
+        directory(&root.0.join(name));
+    }
+    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/import-target-current/direct");
+    for name in ["targets.json", "target-display-names.json"] {
+        let path = root.0.join("targets").join(name);
+        fs::copy(source.join(name), &path).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    root
+}
+type Reached = Arc<Mutex<Vec<ImportUploadFault>>>;
+/// The production Host's Import, Target, Artifact and Job owners over `root`. Every
+/// write step the Import owner reaches is recorded; `fail` loses that step's
+/// answer after its durable effect, as a crash or lost reply would.
+fn compose(
+    root: &Root,
+    fail: Option<ImportUploadFault>,
+) -> (Arc<Control<crate::host::Host>>, Reached) {
+    let reached = Reached::default();
+    let seen = reached.clone();
+    let imports = ImportUploadStore::open_with_fault(
+        &root.0.join("artifacts"),
+        Arc::new(move |point| {
+            seen.lock().unwrap().push(point);
+            if Some(point) == fail {
+                Err(std::io::Error::other("the answer after this step is lost"))
+            } else {
+                Ok(())
+            }
+        }),
+    )
+    .unwrap();
+    let host = crate::host::Host::from_environment()
+        .with_targets(TargetStore::open(&root.0.join("targets")).unwrap())
+        .with_imports(imports)
+        .with_artifacts(ArtifactReadStore::open(&root.0.join("artifacts")).unwrap())
+        .with_jobs(JobStore::open_owner(&root.0.join("jobs")).unwrap());
+    (Arc::new(Control::new(host).unwrap()), reached)
+}
+/// What ClientKit `RuntimeAppArtifactUpload` sends to begin an upload.
+fn begin(request: &str, kind: &str) -> Value {
+    let (name, profile, bytes) = match kind {
+        "native-library" => ("libfixture.so", Value::Null, [b'a'; 64].to_vec()),
+        "flash-bundle" => ("images.tar.gz", json!("dayu200"), HAP.to_vec()),
+        "workspace-patch" => ("fixture.patch", Value::Null, HAP.to_vec()),
+        _ => ("fixture.hap", Value::Null, HAP.to_vec()),
+    };
+    json!({"schemaVersion":"arkdeck.import-intent/1","importRequestId":request,"kind":kind,
+        "targetId":TARGET,"bindingRevision":"1","deviceProfile":profile,"name":name,
+        "byteCount":bytes.len().to_string(),"sha256":sha256_hex(&bytes)})
+}
+fn append(id: &str) -> Value {
+    json!({"importId":id,"generation":"1","offset":"0","byteCount":HAP.len().to_string(),
+        "sha256":sha256_hex(HAP),"base64":encode_import_chunk(HAP).unwrap()})
+}
+fn selector(id: &str) -> Value {
+    json!({"importId":id,"generation":"1"})
+}
+fn record(root: &Root, request: &str) -> Value {
+    let path = root
+        .0
+        .join("artifacts/.imports-v1/records")
+        .join(format!("{}.json", sha256_hex(request.as_bytes())));
+    serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
+}
+/// Every directory and file under `path`, with the bytes of each file.
+fn tree(path: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
+    let mut entries = BTreeMap::new();
+    let mut pending = vec![path.to_owned()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).unwrap() {
+            let entry = entry.unwrap();
+            if entry.file_type().unwrap().is_dir() {
+                pending.push(entry.path());
+                entries.insert(entry.path(), Vec::new());
+            } else {
+                entries.insert(entry.path(), fs::read(entry.path()).unwrap());
+            }
+        }
+    }
+    entries
+}
+fn refusal(bytes: &[u8], method: &str) -> WireError {
+    decode_response(bytes.trim_ascii_end(), "request-1", method)
+        .unwrap()
+        .outcome
+        .unwrap_err()
+}
+
+#[test]
+fn app_uploads_publish_once_as_app_owned_and_keep_their_owner_across_restart() {
+    let root = uploads();
+    let (control, reached) = compose(&root, None);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    let call = |method, params| ingress.handle(&frame(method, params), root.peer());
+    let began = result(
+        &call("artifact.import.begin", begin("app-upload", "hap")),
+        "artifact.import.begin",
+    );
+    assert_eq!(
+        (&began["state"], &began["generation"], &began["nextOffset"]),
+        (&json!("inProgress"), &json!("1"), &json!("0"))
+    );
+    let id = began["importId"].as_str().unwrap().to_owned();
+    // Provenance is the owner's own durable record, written with the Import.
+    assert_eq!(record(&root, "app-upload")["appOwned"], true);
+    let appended = result(
+        &call("artifact.import.append", append(&id)),
+        "artifact.import.append",
+    );
+    assert_eq!(appended["nextOffset"], HAP.len().to_string());
+    let committed = result(
+        &call("artifact.import.commit", selector(&id)),
+        "artifact.import.commit",
+    );
+    assert_eq!(
+        (&committed["state"], &committed["generation"]),
+        (&json!("committed"), &json!("2"))
+    );
+    let receipt = &committed["receipt"];
+    let artifact = receipt["artifactId"].as_str().unwrap();
+    assert_eq!(receipt["lease"], format!("lease-v1:{id}:{artifact}"));
+    assert_eq!(
+        receipt["validation"],
+        json!({"kind":"hap","container":"zip"})
+    );
+    assert_eq!(
+        fs::read(root.0.join("artifacts").join(&id).join(artifact)).unwrap(),
+        HAP
+    );
+    // Three requests, three owner calls, one publication.
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 3);
+    assert_eq!(
+        reached
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|point| **point == ImportUploadFault::AfterPublication)
+            .count(),
+        1
+    );
+    // A local client reads the same Import; the App cannot (not admitted).
+    let inspect = frame("artifact.import.inspect", json!({"importId":id}));
+    assert_eq!(
+        result(&control.handle_frame(&inspect), "artifact.import.inspect")["state"],
+        "committed"
+    );
+    assert_eq!(code(&ingress.handle(&inspect, root.peer())), "rejected");
+    // A native library upload left in progress stays the App's across a restart.
+    let native = result(
+        &call(
+            "artifact.import.begin",
+            begin("app-native", "native-library"),
+        ),
+        "artifact.import.begin",
+    );
+    assert_eq!(native["state"], "inProgress");
+    assert_eq!(record(&root, "app-native")["appOwned"], true);
+    drop(ingress);
+    drop(control);
+    let (control, _) = compose(&root, None);
+    let reopened = AppIngress::new(control, root.peer().euid);
+    let aborted = result(
+        &reopened.handle(
+            &frame(
+                "artifact.import.abort",
+                json!({"importRequestId":"app-native","generation":"1"}),
+            ),
+            root.peer(),
+        ),
+        "artifact.import.abort",
+    );
+    assert_eq!(
+        (&aborted["state"], &aborted["importId"]),
+        (&json!("aborted"), &native["importId"])
+    );
+    assert_eq!(reopened.dispatches.load(Ordering::Relaxed), 1);
+}
+
+#[test]
+fn the_app_operates_no_import_it_did_not_begin_and_writes_nothing_trying() {
+    let root = uploads();
+    let (control, reached) = compose(&root, None);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    // The CLI's path: the same Control over the local control socket.
+    let local = |method, params| control.handle_frame(&frame(method, params));
+    let began = result(
+        &local("artifact.import.begin", begin("cli-upload", "hap")),
+        "artifact.import.begin",
+    );
+    let id = began["importId"].as_str().unwrap().to_owned();
+    assert_eq!(record(&root, "cli-upload")["appOwned"], false);
+    result(
+        &local("artifact.import.append", append(&id)),
+        "artifact.import.append",
+    );
+    let before = tree(&root.0);
+    let steps = reached.lock().unwrap().len();
+    for (method, params) in [
+        // Replaying the CLI's request identity adopts nothing.
+        ("artifact.import.begin", begin("cli-upload", "hap")),
+        ("artifact.import.append", append(&id)),
+        (
+            "artifact.import.abort",
+            json!({"importRequestId":"cli-upload","generation":"1"}),
+        ),
+        ("artifact.import.commit", selector(&id)),
+    ] {
+        let error = refusal(&ingress.handle(&frame(method, params), root.peer()), method);
+        assert_eq!(error.code, "admissionDenied", "{method}");
+        assert_eq!(
+            error.details,
+            json!({"phase":"importOwner","newDispatchCount":0})
+                .as_object()
+                .cloned(),
+            "{method}"
+        );
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 4);
+    // The owner refused on its record, before any write step.
+    assert_eq!(reached.lock().unwrap().len(), steps);
+    assert_eq!(tree(&root.0), before);
+    // The CLI's upload is intact and still its own to finish.
+    assert_eq!(
+        result(
+            &local("artifact.import.commit", selector(&id)),
+            "artifact.import.commit"
+        )["state"],
+        "committed"
+    );
+}
+
+#[test]
+fn a_lost_commit_answer_reaches_the_owner_once_and_is_never_rewritten() {
+    let root = uploads();
+    let (control, reached) = compose(&root, Some(ImportUploadFault::AfterReceiptCheckpoint));
+    let ingress = AppIngress::new(control, root.peer().euid);
+    let call = |method, params| ingress.handle(&frame(method, params), root.peer());
+    let began = result(
+        &call("artifact.import.begin", begin("app-lost-answer", "hap")),
+        "artifact.import.begin",
+    );
+    let id = began["importId"].as_str().unwrap().to_owned();
+    result(
+        &call("artifact.import.append", append(&id)),
+        "artifact.import.append",
+    );
+    let error = refusal(
+        &call("artifact.import.commit", selector(&id)),
+        "artifact.import.commit",
+    );
+    // The receipt is durable but its answer was lost inside the owner. The
+    // App gets the owner's own uncertainty: not success, not pre-admission.
+    assert_eq!(error.code, "recordUnreadable");
+    assert_eq!(error.details.unwrap()["phase"], "importOwner");
+    let durable = record(&root, "app-lost-answer");
+    assert_eq!(durable["state"], "committed");
+    assert!(durable["receipt"].is_object());
+    // One commit, one publication, one receipt: nothing was retried.
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 3);
+    let reached = reached.lock().unwrap();
+    for point in [
+        ImportUploadFault::AfterCommitIntent,
+        ImportUploadFault::AfterPublication,
+        ImportUploadFault::AfterReceiptCheckpoint,
+    ] {
+        assert_eq!(
+            reached.iter().filter(|seen| **seen == point).count(),
+            1,
+            "{point:?}"
+        );
+    }
+    let published = fs::read_dir(root.0.join("artifacts").join(&id))
+        .unwrap()
+        .filter(|entry| {
+            entry
+                .as_ref()
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with("ART-")
+        })
+        .count();
+    assert_eq!(published, 1);
+}
+
+#[test]
+fn malformed_uploads_other_kinds_and_foreign_peers_never_enter_the_owner() {
+    let root = uploads();
+    let (control, reached) = compose(&root, None);
+    let ingress = AppIngress::new(control, root.peer().euid);
+    let before = tree(&root.0);
+    let valid = [
+        ("artifact.import.begin", begin("app-closed", "hap")),
+        (
+            "artifact.import.append",
+            append("imp-00000000-0000-4000-8000-000000000000"),
+        ),
+        (
+            "artifact.import.abort",
+            json!({"importRequestId":"app-closed","generation":"1"}),
+        ),
+        (
+            "artifact.import.commit",
+            selector("imp-00000000-0000-4000-8000-000000000000"),
+        ),
+    ];
+    let mut malformed = Vec::new();
+    for (method, params) in &valid {
+        for key in params.as_object().unwrap().keys() {
+            let mut missing = params.clone();
+            missing.as_object_mut().unwrap().remove(key);
+            malformed.push((*method, missing));
+            let mut typed = params.clone();
+            typed[key] = json!(7);
+            malformed.push((*method, typed));
+        }
+        // The recorded schema admits owner/artifactId; the App never sends them.
+        for (key, value) in [
+            ("owner", json!({"kind":"import","id":"imp-x"})),
+            ("artifactId", json!("ART-1")),
+            ("appOwned", json!(true)),
+            ("peerEUID", json!(root.peer().euid)),
+        ] {
+            let mut extra = params.clone();
+            extra[key] = value;
+            malformed.push((*method, extra));
+        }
+    }
+    for (method, key) in [
+        ("artifact.import.begin", "bindingRevision"),
+        ("artifact.import.begin", "byteCount"),
+        ("artifact.import.append", "generation"),
+        ("artifact.import.append", "offset"),
+        ("artifact.import.append", "byteCount"),
+        ("artifact.import.abort", "generation"),
+        ("artifact.import.commit", "generation"),
+    ] {
+        let params = &valid.iter().find(|(name, _)| *name == method).unwrap().1;
+        let zero = if key == "offset" { vec![] } else { vec!["0"] };
+        for bad in ["01", "+1", "-1", "1.0", " 1", "9223372036854775808"]
+            .into_iter()
+            .chain(zero)
+        {
+            let mut noncanonical = params.clone();
+            noncanonical[key] = json!(bad);
+            malformed.push((method, noncanonical));
+        }
+    }
+    let mut profile = begin("app-closed", "hap");
+    profile["deviceProfile"] = json!(true);
+    malformed.push(("artifact.import.begin", profile));
+    for (method, params) in malformed {
+        let reply = ingress.handle(&frame(method, params.clone()), root.peer());
+        assert_eq!(code(&reply), "invalidParams", "{method} {params}");
+    }
+    // Swift's App transport refuses other kinds before the owner; the Flash
+    // bundle upload is not admitted by this ingress yet.
+    for kind in ["flash-bundle", "workspace-patch", "fixture"] {
+        let method = "artifact.import.begin";
+        let error = refusal(
+            &ingress.handle(&frame(method, begin("app-kind", kind)), root.peer()),
+            method,
+        );
+        assert_eq!(error.code, "admissionDenied", "{kind}");
+        assert_eq!(
+            error.details,
+            json!({"phase":"preAdmission","newDispatchCount":0})
+                .as_object()
+                .cloned()
+        );
+    }
+    for peer in [
+        PeerOrigin {
+            euid: root.peer().euid.wrapping_add(1),
+            ..root.peer()
+        },
+        PeerOrigin {
+            pid: 1,
+            ..root.peer()
+        },
+        PeerOrigin {
+            foreground_console: true,
+            ..root.peer()
+        },
+    ] {
+        for (method, params) in &valid {
+            assert_eq!(
+                code(&ingress.handle(&frame(method, params.clone()), peer)),
+                "rejected"
+            );
+        }
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+    assert!(reached.lock().unwrap().is_empty());
+    assert_eq!(tree(&root.0), before);
+}
+
+#[test]
+fn every_admitted_request_reaches_its_one_owner_exactly_once() {
+    type Calls = Arc<Mutex<Vec<(String, Value)>>>;
+    struct Owners(Calls);
+    impl Owners {
+        fn called(&self, method: &str, params: Value) {
+            self.0.lock().unwrap().push((method.into(), params));
+        }
+    }
+    fn uncertain(code: &str, phase: &str) -> WireError {
+        let mut details = serde_json::Map::from_iter([
+            ("phase".into(), json!(phase)),
+            ("newDispatchCount".into(), json!(0)),
+        ]);
+        if phase == "traceCacheOwner" {
+            details.insert("purgeScope".into(), json!("inactiveDerivedDatabases"));
+        }
+        WireError {
+            code: code.into(),
+            message: "the owner's own uncertain answer".into(),
+            details: Some(details),
+        }
+    }
+    impl HostServices for Owners {
+        fn observed_at(&self) -> String {
+            "2026-09-24T00:00:00Z".into()
+        }
+        fn hdc_status(&self, deep: bool) -> arkdeck_control::HdcStatus {
+            arkdeck_control::HdcStatus::unavailable(deep, "fixture")
+        }
+        fn observations(&self) -> Result<arkdeck_contract::DeviceObservationsResult, WireError> {
+            panic!("an App upload or read observed devices")
+        }
+        fn import_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            panic!("the App frame {method} reached the local Import owner")
+        }
+        fn app_import_resource(
+            &self,
+            method: &str,
+            params: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.called(method, Value::Object(params.clone()));
+            Err(uncertain("recordUnreadable", "importOwner"))
+        }
+        fn artifact_quota(&self) -> Result<Value, WireError> {
+            self.called("artifact.quota", json!({}));
+            Ok(json!({"totalBytes":10,"usedBytes":4,"remainingBytes":6}))
+        }
+        fn trace_cache_status(&self) -> Result<Value, WireError> {
+            self.called("trace.cache.status", json!({}));
+            Ok(
+                json!({"schemaVersion":"arkdeck.trace-cache-status/1","entryCount":0,"totalByteCount":"0",
+                "activeEntryCount":0,"inactiveEntryCount":0,"purgeScope":"inactiveDerivedDatabases"}),
+            )
+        }
+        fn trace_cache_purge(&self) -> Result<Value, WireError> {
+            self.called("trace.cache.purge", json!({}));
+            Err(uncertain("outcomeUnknown", "traceCacheOwner"))
+        }
+        fn debug_read(&self, target: &str, template: Option<&str>) -> Result<Value, WireError> {
+            self.called(
+                "debug.probe",
+                json!({"targetId":target,"templateId":template}),
+            );
+            Ok(
+                json!({"schemaVersion":"arkdeck.debug-probe/1","targetId":target,"bindingRevision":1,
+                "packages":[],"portRules":[],"warnings":[]}),
+            )
+        }
+    }
+    let root = Root::new();
+    let calls = Calls::default();
+    let ingress = AppIngress::new(
+        Arc::new(Control::new(Owners(calls.clone())).unwrap()),
+        root.peer().euid,
+    );
+    let id = "imp-00000000-0000-4000-8000-000000000000";
+    let requests = [
+        ("artifact.quota", json!({})),
+        ("trace.cache.status", json!({})),
+        ("trace.cache.purge", json!({})),
+        ("debug.probe", json!({"targetId":TARGET})),
+        ("artifact.import.begin", begin("app-once", "native-library")),
+        ("artifact.import.append", append(id)),
+        (
+            "artifact.import.abort",
+            json!({"importRequestId":"app-once","generation":"1"}),
+        ),
+        ("artifact.import.commit", selector(id)),
+    ];
+    for (index, (method, params)) in requests.iter().enumerate() {
+        let reply = ingress.handle(&frame(method, params.clone()), root.peer());
+        let decoded = decode_response(reply.trim_ascii_end(), "request-1", method).unwrap();
+        // An uncertain owner answer crosses unchanged: never success, never
+        // a pre-admission claim, never a second call.
+        if let Err(error) = decoded.outcome {
+            assert_eq!(
+                error.message, "the owner's own uncertain answer",
+                "{method}"
+            );
+            assert_ne!(error.details.unwrap()["phase"], "preAdmission");
+        }
+        let calls = calls.lock().unwrap();
+        assert_eq!(calls.len(), index + 1, "{method}");
+        let expected = if *method == "debug.probe" {
+            json!({"targetId":TARGET,"templateId":null})
+        } else {
+            params.clone()
+        };
+        assert_eq!(calls[index], ((*method).to_owned(), expected));
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), requests.len());
+}
+
+#[test]
+fn app_reads_and_trace_maintenance_answer_from_the_production_owners() {
+    let root = uploads();
+    for name in ["state", "sessions", "trace-cache"] {
+        directory(&root.0.join(name));
+    }
+    directory(&root.0.join("trace-cache/traces"));
+    // An inert local HDC that logs what it runs and answers only the probe's
+    // three fixed reads of the fixture Target's route.
+    let script = r#"#!/bin/sh
+printf '%s\n' "$*" >> 'ROOT/hdc-calls'
+case "$*" in
+'-t display-name-device shell bm dump -a') printf 'com.example.z\ncom.example.a\n';;
+'-t display-name-device fport ls') printf 'tcp:9000 tcp:8000\n';;
+'-t display-name-device rport ls') printf '[Fail] offline\n' >&2;;
+*) exit 93;;
+esac
+"#
+    .replace("ROOT", root.0.to_str().unwrap());
+    fs::write(root.0.join("hdc"), &script).unwrap();
+    fs::set_permissions(root.0.join("hdc"), fs::Permissions::from_mode(0o700)).unwrap();
+    let artifacts = root.0.join("artifacts");
+    let control = Arc::new(
+        Control::new(
+            crate::host::Host::from_environment()
+                .with_targets(TargetStore::open(&root.0.join("targets")).unwrap())
+                .with_artifacts(ArtifactReadStore::open(&artifacts).unwrap())
+                .with_jobs(JobStore::open_owner(&root.0.join("jobs")).unwrap())
+                .with_trace_cache(
+                    TraceCacheStore::open(&root.0.join("trace-cache/traces")).unwrap(),
+                )
+                .with_storage(
+                    SessionStore::open(&root.0.join("state"), &root.0.join("sessions")).unwrap(),
+                    ArtifactUsage::open(&artifacts, 1024 * 1024).unwrap(),
+                )
+                .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(
+                    arkdeck_platform::VerifiedTool::open(
+                        root.0.join("hdc"),
+                        &sha256_hex(script.as_bytes()),
+                    )
+                    .unwrap(),
+                    None,
+                ))),
+        )
+        .unwrap(),
+    );
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    // Reads answer exactly as the local socket's Control answers them.
+    for method in ["artifact.quota", "trace.cache.status"] {
+        let request = frame(method, json!({}));
+        let reply = ingress.handle(&request, root.peer());
+        assert_eq!(reply, control.handle_frame(&request), "{method}");
+        result(&reply, method);
+    }
+    let quota = result(
+        &ingress.handle(&frame("artifact.quota", json!({})), root.peer()),
+        "artifact.quota",
+    );
+    assert_eq!(quota["totalBytes"], 1024 * 1024);
+    let purged = result(
+        &ingress.handle(&frame("trace.cache.purge", json!({})), root.peer()),
+        "trace.cache.purge",
+    );
+    assert_eq!(purged["removedEntryCount"], 0);
+    // The owner's root replaced under it: its purge outcome is unknown, and
+    // that answer crosses once, unchanged, without touching the replacement.
+    fs::rename(
+        root.0.join("trace-cache/traces"),
+        root.0.join("trace-cache/moved"),
+    )
+    .unwrap();
+    directory(&root.0.join("trace-cache/traces"));
+    let error = refusal(
+        &ingress.handle(&frame("trace.cache.purge", json!({})), root.peer()),
+        "trace.cache.purge",
+    );
+    assert_eq!(error.code, "outcomeUnknown");
+    assert_eq!(error.details.unwrap()["phase"], "traceCacheOwner");
+    assert_eq!(
+        fs::read_dir(root.0.join("trace-cache/traces"))
+            .unwrap()
+            .count(),
+        0
+    );
+    let probe = result(
+        &ingress.handle(
+            &frame("debug.probe", json!({"targetId":TARGET})),
+            root.peer(),
+        ),
+        "debug.probe",
+    );
+    assert_eq!(
+        (&probe["targetId"], &probe["bindingRevision"]),
+        (&json!(TARGET), &json!(1))
+    );
+    assert_eq!(probe["packages"], json!(["com.example.a", "com.example.z"]));
+    assert_eq!(
+        probe["portRules"],
+        json!([{"direction":"forward","localPort":9000,"remotePort":8000}])
+    );
+    let mut calls: Vec<_> = fs::read_to_string(root.0.join("hdc-calls"))
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    calls.sort();
+    assert_eq!(
+        calls,
+        [
+            "-t display-name-device fport ls",
+            "-t display-name-device rport ls",
+            "-t display-name-device shell bm dump -a",
+        ]
+    );
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 6);
+}

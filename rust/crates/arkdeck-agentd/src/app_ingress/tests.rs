@@ -173,6 +173,14 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "job.evidence",
             "artifact.list",
             "artifact.read",
+            "artifact.quota",
+            "artifact.import.begin",
+            "artifact.import.append",
+            "artifact.import.abort",
+            "artifact.import.commit",
+            "trace.cache.status",
+            "trace.cache.purge",
+            "debug.probe",
         ]
         .contains(method)
         {
@@ -226,6 +234,16 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "artifact.read",
             json!({"artifactId":"ART-1","allowSensitive":"true"}),
         ),
+        ("artifact.quota", json!({"path":"/tmp/foreign"})),
+        ("trace.cache.status", json!({"peerEUID":root.peer().euid})),
+        ("trace.cache.purge", json!({"path":"/tmp/cache"})),
+        ("debug.probe", json!({})),
+        ("debug.probe", json!({"targetId":5})),
+        (
+            "debug.probe",
+            json!({"targetId":"TGT-1","rawCommand":"shell id"}),
+        ),
+        ("artifact.import.commit", json!({"importId":"imp-1"})),
     ] {
         let reply = ingress.handle(&frame(method, params), root.peer());
         assert_eq!(
@@ -432,3 +450,6 @@ mod job_tests;
 
 #[path = "storage_tests.rs"]
 mod storage_tests;
+
+#[path = "import_tests.rs"]
+mod import_tests;
