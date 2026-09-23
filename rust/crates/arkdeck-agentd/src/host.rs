@@ -145,6 +145,10 @@ pub struct Host {
     /// `TargetUSBRelation.registeredDAYU200()`.
     #[cfg(target_os = "macos")]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    /// Whether `usb` is that reader of the Runtime's own, which the owner
+    /// census names.
+    #[cfg(target_os = "macos")]
+    usb_registry: bool,
     /// The bundled OpenHarmony code-sign helper this composition verified;
     /// without one a native deployment stays unavailable.
     #[cfg(target_os = "macos")]
@@ -272,17 +276,45 @@ impl Host {
     fn managed_hdc(&self) -> Option<&crate::managed_hdc::ManagedHdc> {
         self.hdc.as_ref().and_then(|hdc| hdc.managed())
     }
-    /// The USB relations the Target observation owner reads: a test's, the
-    /// development source the isolated owner names, or the Runtime's own
-    /// registry reader beside the registered HDC it started as its managed
-    /// server (`development_usb::relation_source`).
+    /// The USB relations the Target observation owner reads: a test's, or
+    /// the development source the isolated owner names
+    /// (`development_usb::relation_source`).
     #[cfg(target_os = "macos")]
     pub fn with_usb_relations(
         mut self,
         usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
     ) -> Self {
         self.usb = usb;
+        self.usb_registry = false;
         self
+    }
+    /// The Runtime's own USB relations, which a composition reads beside the
+    /// registered HDC it started as its managed server
+    /// (`development_usb::relation_source`): Swift's `registeredDAYU200()`
+    /// over `registry`'s census, taken afresh on every read —
+    /// `UsbRegistryRelations::system()`, the host's I/O Registry, or a test's
+    /// census. The owner census names it.
+    #[cfg(target_os = "macos")]
+    pub fn with_usb_registry_relations<C>(
+        mut self,
+        registry: arkdeck_provider_hdc::UsbRegistryRelations<C>,
+    ) -> Self
+    where
+        C: Fn() -> Result<
+                Vec<arkdeck_platform::UsbHostDevice>,
+                arkdeck_platform::RegistryUnavailable,
+            > + Send
+            + Sync
+            + 'static,
+    {
+        self.usb = std::sync::Arc::new(registry);
+        self.usb_registry = true;
+        self
+    }
+    /// The USB relations the Target observation owner reads.
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn usb_relations(&self) -> &dyn arkdeck_provider_hdc::UsbRelations {
+        &*self.usb
     }
     /// Runs `run` over the Target observation owner's sources — the
     /// development HDC, the USB relations, the Target store and the clock —
@@ -635,6 +667,7 @@ impl Host {
             ("traceCache", self.trace_cache.is_some()),
             ("hdc", self.hdc.is_some()),
             ("managedHdc", self.managed_hdc().is_some()),
+            ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -711,6 +744,8 @@ impl Host {
             target_observations: Default::default(),
             #[cfg(target_os = "macos")]
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
+            #[cfg(target_os = "macos")]
+            usb_registry: false,
             #[cfg(target_os = "macos")]
             code_sign_helper: None,
             #[cfg(target_os = "macos")]

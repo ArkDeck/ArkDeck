@@ -1806,7 +1806,10 @@ which fails the observation (`internalError`) and breaks its continuity; it is
 never read as no devices. The isolated owner composes it only beside the
 registered HDC it starts as its managed server and without a relation file
 (`development_usb::relation_source`); beside a fixture it reads none, so the
-host's devices never prove a fixture's candidates.
+host's devices never prove a fixture's candidates. The production composition
+composes it by the same rule beside the registered HDC it starts as its
+managed server, and reads no relation file ("macOS production composition"
+below). A host with it names `usbRegistryRelations` in its owner census.
 
 Tests: `usb_registry` unit tests (the per-entry rule over synthetic entries);
 `tests/usb_registry.rs` (the host's census answers with or without a board, the
@@ -2208,16 +2211,19 @@ With `ARKDECK_HDC_PATH` (Swift's only HDC input) the account's bootstrap
 registry adopts that file while it holds no selection, and its startup
 selection is started as the managed server on Swift's endpoint
 (`OHOS_HDC_SERVER_PORT`, else 127.0.0.1:8710), with the HDC control actions,
-Trace and Debug probes and the exit-70 boundary of the isolated owner. An
-unpublished HDC, a pending tool selection or an occupied endpoint ends the
-start; without the variable, dispatch stays refused as Swift's does.
-`ARKDECK_ANALYZER_PATH` names the analyzer. The composition prints what it
-composed (`arkdeck-agentd owners: …`) and one line per owner it composes
-without and why: no HDC, a Trace cache the App has not created, no reader of
-trusted USB relations yet (adoption stays refused), no App ingress over an
-overridden home, and every input Swift's LaunchAgent sets for an owner not
-ported yet. Over the account's own home the App ingress is served on
-`com.arkdeck.agentd` with Swift's code-signing requirement and the owner's
+Trace and Debug probes and the exit-70 boundary of the isolated owner. Beside
+that managed server its Target observations read the Runtime's own trusted USB
+relations (`UsbRegistryRelations::system()`, "Trusted USB relations" above),
+as Swift's daemon reads `registeredDAYU200()`. An unpublished HDC, a pending
+tool selection or an occupied endpoint ends the start; without the variable,
+dispatch stays refused as Swift's does, nothing is observed and nothing is
+adopted. `ARKDECK_ANALYZER_PATH` names the analyzer. The composition prints
+what it composed (`arkdeck-agentd owners: …`, with `hdc, managedHdc,
+usbRegistryRelations` beside a managed server) and one line per owner it
+composes without and why: no HDC, a Trace cache the App has not created, no App
+ingress over an overridden home, and every input Swift's LaunchAgent sets for
+an owner not ported yet. Over the account's own home the App ingress is served
+on `com.arkdeck.agentd` with Swift's code-signing requirement and the owner's
 effective UID (`app_ingress::Configuration::production`). Startup recovery and
 the Artifact sweep run as they do for the isolated owner; then it prints
 `arkdeck-agentd listening on <socket>`.

@@ -14,6 +14,12 @@
 //! refused before its launch). Swift's daemon and the facade are represented
 //! by the very locks they take (`instance.lock` with its document, and the
 //! transport directory's lock with its socket).
+//!
+//! So no daemon here reads the host's USB relations: the Runtime's own reader
+//! is composed only beside the registered HDC the composition starts as its
+//! managed server, which needs a published HDC executable no test starts.
+//! That the reader is composed there, and only there, is
+//! `production::tests`'s, over a census the test hands it.
 #![cfg(target_os = "macos")]
 
 use arkdeck_hoststore::{
@@ -323,6 +329,14 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
         "{:?}",
         daemon.stdout
     );
+    // Without an HDC no USB relation reader is composed (none is named among
+    // the owners above), and nothing claims one is missing: nothing is
+    // observed at all.
+    assert!(
+        !daemon.stdout.iter().any(|line| line.contains("USB")),
+        "{:?}",
+        daemon.stdout
+    );
     // Swift's instance document names this daemon.
     let instance: Value =
         serde_json::from_slice(&fs::read(home.state().join("instance.json")).unwrap()).unwrap();
@@ -359,9 +373,19 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
         )),
         "{storage}"
     );
-    // Without an HDC nothing is observed, as Swift's refusing dispatcher.
+    // Without an HDC nothing is observed, as Swift's refusing dispatcher, and
+    // nothing is adopted.
     assert_eq!(
         request(&home, "device.observations", json!({}))["error"]["code"],
+        "rejected"
+    );
+    assert_eq!(
+        request(
+            &home,
+            "target.adopt",
+            json!({"candidate": "0123456789ABCDEF", "observationGeneration": "1",
+                "observationId": "obs-00000000-0000-4000-8000-000000000000"})
+        )["error"]["code"],
         "rejected"
     );
     assert_eq!(

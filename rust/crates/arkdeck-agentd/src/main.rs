@@ -432,9 +432,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             development_usb::RelationSource::File => host.with_usb_relations(Arc::new(
                 file.ok_or("development USB relations are unavailable")?,
             )),
-            development_usb::RelationSource::Registry => host.with_usb_relations(Arc::new(
-                arkdeck_provider_hdc::UsbRegistryRelations::system(),
-            )),
+            development_usb::RelationSource::Registry => host
+                .with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::system()),
             development_usb::RelationSource::Nothing => host,
         };
         // Acknowledged, and with the development HDC started as the managed
