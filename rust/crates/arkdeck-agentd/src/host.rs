@@ -138,9 +138,11 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     target_observations: arkdeck_hoststore::TargetObservations,
     /// Who reads the live USB relations that prove an observation's
-    /// physical identity. By default nothing is read, until the ArkForge
-    /// lane's reader lands, so no observation is proved and nothing can be
-    /// adopted.
+    /// physical identity. By default nothing is read, so no observation is
+    /// proved and nothing can be adopted; a composition that addresses a real
+    /// device through a registered HDC it proved reads the Runtime's own
+    /// (`UsbRegistryRelations`), as Swift's daemon composes
+    /// `TargetUSBRelation.registeredDAYU200()`.
     #[cfg(target_os = "macos")]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
     /// The bundled OpenHarmony code-sign helper this composition verified;
@@ -270,8 +272,10 @@ impl Host {
     fn managed_hdc(&self) -> Option<&crate::managed_hdc::ManagedHdc> {
         self.hdc.as_ref().and_then(|hdc| hdc.managed())
     }
-    /// The USB relations the Target observation owner reads: a test's, or
-    /// the development source the isolated owner names.
+    /// The USB relations the Target observation owner reads: a test's, the
+    /// development source the isolated owner names, or the Runtime's own
+    /// registry reader beside the registered HDC it started as its managed
+    /// server (`development_usb::relation_source`).
     #[cfg(target_os = "macos")]
     pub fn with_usb_relations(
         mut self,

@@ -1,5 +1,6 @@
-//! The isolated owner's development USB relations: what the Target
-//! observation owner reads in place of the ArkForge lane's reader, named by
+//! The isolated owner's USB relations: which source its Target observation
+//! owner reads ([`relation_source`]), and the development file a harness
+//! names in place of the Runtime's own reader,
 //! `ARKDECK_DEVELOPMENT_USB_RELATIONS`. A harness rewrites the file for each
 //! exchange: `{"relations": [...]}`, or with
 //! `"after": {"reads": n, "relations": [...]}` the relations it changes to
@@ -14,6 +15,14 @@
 //! the maintainer's decision of 2026-09-19 (option A of the GJ-1 preflight's
 //! second and third blockers): what the owner then proves about the real
 //! device is development-root evidence, never `REAL_DEVICE_PASS`.
+//!
+//! Without a file, beside the registered HDC it starts as its managed server,
+//! the owner reads the Runtime's own relations, Swift's source: a census of
+//! the host's I/O Registry (`arkdeck_provider_hdc::UsbRegistryRelations`,
+//! the maintainer's decision Q1=B of 2026-09-24). Beside a fixture it reads
+//! none, so that a fixture's candidates are never proved by the host's
+//! devices. Neither changes what the owner's evidence is: development-root
+//! evidence, never `REAL_DEVICE_PASS`.
 use arkdeck_provider_hdc::{UsbRelation, UsbRelations};
 use serde_json::Value;
 use std::ffi::OsStr;
@@ -69,6 +78,33 @@ pub(crate) fn admit(
         return Err(FIXTURE_ONLY);
     }
     Ok(())
+}
+
+/// The USB relations the isolated owner's Target observations read.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum RelationSource {
+    /// The development file the caller names, as `admit` allowed it.
+    File,
+    /// The Runtime's own reader, Swift's `registeredDAYU200()` census.
+    Registry,
+    /// None: no candidate is ever proved.
+    Nothing,
+}
+
+/// Which relations the isolated owner reads once `admit` has accepted its
+/// composition: a named file stands in for any reader, as before; without
+/// one, the Runtime's own reader beside a registered HDC the owner started as
+/// its managed server, the one composition in which it addresses a real
+/// device through a server it proved; and none otherwise — beside a fixture,
+/// or with no development HDC.
+pub(crate) fn relation_source(registered: bool, managed: bool, relations: bool) -> RelationSource {
+    if relations {
+        RelationSource::File
+    } else if registered && managed {
+        RelationSource::Registry
+    } else {
+        RelationSource::Nothing
+    }
 }
 
 pub(crate) struct DevelopmentUsbRelations {
@@ -210,6 +246,32 @@ mod tests {
             let (registered, managed, relations, acknowledged) = composition;
             assert_eq!(
                 admit(registered, managed, relations, acknowledged),
+                expected,
+                "{composition:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_registry_is_read_beside_the_managed_registered_hdc_unless_a_file_is_named() {
+        // (registered, managed, relations) and the source read.
+        for (composition, expected) in [
+            // Beside the registered HDC the owner started: the Runtime's own.
+            ((true, true, false), RelationSource::Registry),
+            // A named file stands in for it, where `admit` allows one.
+            ((true, true, true), RelationSource::File),
+            ((false, false, true), RelationSource::File),
+            ((false, true, true), RelationSource::File),
+            // A fixture, started as a managed server or not, reads none.
+            ((false, false, false), RelationSource::Nothing),
+            ((false, true, false), RelationSource::Nothing),
+            // A registered HDC the owner did not start (refused at startup)
+            // reads none.
+            ((true, false, false), RelationSource::Nothing),
+        ] {
+            let (registered, managed, relations) = composition;
+            assert_eq!(
+                relation_source(registered, managed, relations),
                 expected,
                 "{composition:?}"
             );
