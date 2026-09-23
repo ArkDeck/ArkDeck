@@ -61,3 +61,73 @@ After the base update, only the intersecting paths were rerun: Provider's
 `closed_templates_preserve_commands_and_capture_budgets`, CLI `--test
 debug_templates`, and hoststore `--test debug_template_run`: exit 0, three tests;
 `/private/tmp/arkdeck-template-disclosure-rebase-{provider,cli,job}.log`.
+
+## CI crate-boundary repair
+
+CI run `35721863071` on `f4053f94314e0e6c87dfce71e7e0d7857da82b54` failed the
+three Rust workspace lanes (macos-26, ubuntu and windows) in the same step.
+This slice changes no contract input, so `check-contracts.py` recorded the
+published view as covered and ran only the candidate view. Its
+`check-readonly.py` stopped in `assert_boundaries`, which pins every internal
+crate edge: `unexpected dependency edge: arkdeck-provider-hdc`. The HDC
+provider's new dependency on `arkdeck-contract` was missing from that
+allow-list, and the local checks above had not run the black-box check. The
+ubuntu artifact upload 403 came after that failure.
+
+The coordinating session accepted the edge. `arkdeck-contract` has no internal
+dependency, performs no I/O and holds no Runtime authority. The design keeps
+platform and I/O dependencies out of the contract crate and forbids
+provider-to-provider edges; a provider reading pure contract data breaks
+neither rule, and the crate graph stays acyclic. One template definition read
+by both the provider and the CLI is preferred over a data copy in the CLI.
+`check-readonly.py` now allows `arkdeck-contract` for `arkdeck-provider-hdc`
+with that reason, and the boundary paragraph of `rust/README.md` states the
+edge. No other file pins the Rust crate edges: the Python and CI scripts,
+workflows, Swift boundary tests, `design.md` and the cross-platform
+architecture's dependency rules were checked, and `deny.toml` lists crate
+versions rather than edges.
+
+The branch was rebased onto main `86cb81c1c3cc81787ff5114105f1731558c38e74`
+(#2127, after #2126, #2121 and #2116) without conflict. None of this slice's
+files changed on main, and `git range-diff` shows the feature commit unchanged.
+The checks below ran on that base. Before the push, #2124 merged as
+`7cf20b7b289c8d125fcb8ddfc994d7cb8d34a213`; it changes no file under `rust/`
+and no contract input, so the branch was rebased onto it without rerunning them.
+
+Local targeted checks used `CARGO_BUILD_JOBS=2` and the target
+`/private/tmp/arkdeck-1330-rust-target`. `cargo clean -p arkdeck-contract` ran
+first, so no contract build from a materialized published view could be reused.
+
+- `assert_boundaries` alone: the previous allow-list reproduces the CI
+  `AssertionError` on this manifest; the new one passes.
+- `cargo fmt --all --check`: exit 0.
+- `cargo test --no-fail-fast` for contract, provider-hdc, cli, control and
+  client: exit 0, 452 passed, 0 ignored;
+  `/private/tmp/arkdeck-s4-2125-test-core-r2.log`.
+- hoststore `--test debug_template_run --test job_plan`, the agentd
+  `debug_read`/`debug_template` unit tests, and soak: exit 0, 4 + 3 + 4 passed;
+  `/private/tmp/arkdeck-s4-2125-test-dependents.log`.
+- `cargo clippy --all-targets -- -D warnings` for those eight crates: exit 0;
+  `/private/tmp/arkdeck-s4-2125-clippy.log`.
+- `generate-contract.py --check`: exit 0. The copied argv file is byte-identical
+  to its Swift source.
+- `check-contracts.py` (the failed CI step), with its own output directory:
+  exit 0. As in CI, the published view is covered by the candidate because
+  the contract inputs equal the merge base's. All 17 candidate commands exited
+  0, including `check-readonly.py` (PASS on macOS, 288 recorded files) and the
+  owner harnesses after it; `/private/tmp/arkdeck-s4-2125-check-contracts.log`.
+- `test_contract_checks.py`: exit 0, 42 tests.
+- `cargo deny --locked check` and `cargo vet --locked --no-registry-suggestions`
+  come after it in the lane and never ran on the failed head: exit 0.
+- `scripts/check-sdd.sh`: exit 0.
+
+The first test run, without `--no-fail-fast`, stopped at the unchanged
+provider-hdc `tests/lifecycle.rs`.
+`a_confirmed_restart_succeeds_only_with_a_strictly_newer_generation` panicked
+at line 177: just after its reachability probe connected, the lease found no
+process of the test's own fake owning the endpoint (`NotFound`). The fake
+server is spawned without a readiness proof, so a listener of another process
+on that port cannot be told from the started server. That binary then passed
+in four of four runs on its own, and the complete run above passed. The
+failure is outside this diff (lifecycle executor and platform lease), so that
+first run was recorded as invalid, not as a result of this change.

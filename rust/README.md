@@ -390,7 +390,9 @@ executions and capability uses. Neither has a caller yet. `arkdeck-control` has 
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
 boundary and holds the HDC typed actions of the device operations, which the
-Job engine in `arkdeck-hoststore` lowers its device steps through.
+Job engine in `arkdeck-hoststore` lowers its device steps through. Its closed
+Debug template lowering reads the template definitions from `arkdeck-contract`,
+their single source, which `arkdeck debug template list` also discloses.
 `arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 `arkdeck-provider-workspace` is the workspace provider's signing and credential
