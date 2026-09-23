@@ -1111,6 +1111,156 @@ fn import_upload_methods_use_only_the_typed_import_owner() {
 }
 
 #[test]
+fn only_app_frames_reach_the_app_import_owner_and_never_a_console() {
+    type Calls = Arc<std::sync::Mutex<Vec<(&'static str, String)>>>;
+    struct Imports(Calls);
+    fn owner(message: &str) -> WireError {
+        WireError {
+            code: "operationUnavailable".into(),
+            message: message.into(),
+            details: json!({"phase":"importOwner","newDispatchCount":0})
+                .as_object()
+                .cloned(),
+        }
+    }
+    impl HostServices for Imports {
+        fn observed_at(&self) -> String {
+            panic!("Import read the unrelated clock")
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("Import touched HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("Import touched device observations")
+        }
+        fn import_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.0.lock().unwrap().push(("local", method.into()));
+            Err(owner("local Import owner"))
+        }
+        fn app_import_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.0.lock().unwrap().push(("app", method.into()));
+            Err(owner("App Import owner"))
+        }
+        fn agent_execution(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.0.lock().unwrap().push(("execution", method.into()));
+            Err(WireError {
+                code: "resourceNotFound".into(),
+                message: "human action does not exist".into(),
+                details: None,
+            })
+        }
+        fn interactive_human_action_resume(
+            &self,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.0
+                .lock()
+                .unwrap()
+                .push(("console", "human-action.resume".into()));
+            Err(WireError {
+                code: "resourceNotFound".into(),
+                message: "human action does not exist".into(),
+                details: None,
+            })
+        }
+    }
+    fn frame(method: &str, params: Value) -> Vec<u8> {
+        let request = Request::new("test", method, params.as_object().cloned());
+        let mut frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+        frame.pop();
+        frame
+    }
+    let calls = Calls::default();
+    let control = Control::new(Imports(calls.clone())).unwrap();
+    let methods = [
+        "artifact.import.list",
+        "artifact.import.begin",
+        "artifact.import.append",
+        "artifact.import.abort",
+        "artifact.import.inspect",
+        "artifact.import.inspection",
+        "artifact.import.commit",
+        "artifact.import.release",
+    ];
+    let mut expected = Vec::new();
+    for method in methods {
+        let request = frame(method, json!({"importRequestId":"stable-request"}));
+        control.handle_frame(&request);
+        control.handle_frame_with_console(&request, true);
+        let reply = control.handle_app_frame(&request);
+        expected.extend([("local", method), ("local", method), ("app", method)]);
+        // Where the vocabulary publishes the owner's refusal, the answer is
+        // the App owner's own, never the local one.
+        if validate_method_value(method, "errorCode", &json!("operationUnavailable")).is_ok() {
+            let error = decode_response(&reply[..reply.len() - 1], "test", method)
+                .unwrap()
+                .outcome
+                .unwrap_err();
+            assert_eq!(error.message, "App Import owner", "{method}");
+        }
+    }
+    // An App frame never carries a foreground console.
+    let resume = frame(
+        "human-action.resume",
+        json!({"resumeReference":"resume-missing","humanAction":"har-missing"}),
+    );
+    control.handle_app_frame(&resume);
+    control.handle_frame_with_console(&resume, true);
+    expected.extend([
+        ("execution", "human-action.resume"),
+        ("console", "human-action.resume"),
+    ]);
+    assert_eq!(
+        *calls.lock().unwrap(),
+        expected
+            .into_iter()
+            .map(|(origin, method)| (origin, method.to_owned()))
+            .collect::<Vec<_>>()
+    );
+    // Any other method answers an App frame exactly as a local one.
+    let health = frame("health", json!({}));
+    assert_eq!(
+        control.handle_app_frame(&health),
+        control.handle_frame(&health)
+    );
+    // A host without an App Import owner refuses, with zero dispatch.
+    let (plain, reads) = setup();
+    for method in [
+        "artifact.import.begin",
+        "artifact.import.append",
+        "artifact.import.abort",
+        "artifact.import.commit",
+    ] {
+        let reply = plain.handle_app_frame(&frame(method, json!({"importId":"imp-1"})));
+        let error = decode_response(&reply[..reply.len() - 1], "test", method)
+            .unwrap()
+            .outcome
+            .unwrap_err();
+        assert_eq!(error.code, "operationUnavailable", "{method}");
+        assert_eq!(
+            error.details,
+            json!({"phase":"importOwner","newDispatchCount":0})
+                .as_object()
+                .cloned(),
+            "{method}"
+        );
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn physical_resume_routes_reach_the_same_execution_owner() {
     struct ResumeHost(Arc<AtomicUsize>, &'static str);
     impl HostServices for ResumeHost {

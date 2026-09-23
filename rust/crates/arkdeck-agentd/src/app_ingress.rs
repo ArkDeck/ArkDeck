@@ -1,4 +1,5 @@
-//! Standalone App composition: discovery, History, artifacts and owned typed Jobs.
+//! Standalone App composition: discovery, History, artifacts, App-owned Import
+//! uploads, Trace cache, Debug probe and owned typed Jobs.
 //! This is deliberately opt-in on the isolated development owner. It neither
 //! activates a LaunchAgent nor changes the installed service. The transport
 //! authenticates the actual XPC connection, never an identity in request JSON.
@@ -11,6 +12,7 @@ use arkdeck_platform::{HostDirectory, PeerOrigin, listen_mach};
 use serde_json::Value;
 use std::{ffi::OsStr, io, os::unix::fs::MetadataExt, path::Path, sync::Arc};
 
+mod imports;
 mod jobs;
 
 const SERVICE: &str = "com.arkdeck.agentd";
@@ -175,6 +177,14 @@ impl<H: HostServices> AppIngress<H> {
                     | "job.evidence"
                     | "artifact.list"
                     | "artifact.read"
+                    | "artifact.quota"
+                    | "artifact.import.begin"
+                    | "artifact.import.append"
+                    | "artifact.import.abort"
+                    | "artifact.import.commit"
+                    | "trace.cache.status"
+                    | "trace.cache.purge"
+                    | "debug.probe"
             )
         {
             return refusal(
@@ -189,6 +199,9 @@ impl<H: HostServices> AppIngress<H> {
                 "invalidParams",
                 "App request requires its complete closed parameters",
             );
+        }
+        if let Some(refusal) = imports::out_of_scope(&request) {
+            return refusal;
         }
         // Retain the one-shot claim across the synchronous owner call, but
         // never hold the gate mutex while executing; a parallel cancel must enter.
@@ -216,8 +229,12 @@ impl<H: HostServices> AppIngress<H> {
         self.dispatches
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // Exactly once, without a retry, response cache or Swift fallback. The
-        // owner keeps CAS, query validation and outcomeUnknown semantics.
-        let reply = self.control.handle_frame(frame);
+        // owner keeps CAS, query validation and outcomeUnknown semantics. The
+        // App origin is this authenticated transport's, never the frame's: an
+        // Import it begins is App-owned in the owner's own record, so an
+        // Import reply (a lost commit receipt included) is returned as the
+        // owner wrote it, never recorded, repeated or rewritten here.
+        let reply = self.control.handle_app_frame(frame);
         if let Some(jobs::Action::Submit(kind)) = job
             && !self.jobs.record_reply(&reply, &request.id, kind)
         {
@@ -240,12 +257,7 @@ fn closed_parameters(request: &Request) -> bool {
         request.method.as_str(),
         "runtime.storage.policy" | "runtime.storage.root"
     ) {
-        let positive = |key: &str| {
-            params.get(key).and_then(Value::as_str).is_some_and(|text| {
-                text.parse::<i64>()
-                    .is_ok_and(|value| value > 0 && value.to_string() == text)
-            })
-        };
+        let positive = |key: &str| canonical_decimal(params.get(key), 1);
         let shape = if request.method == "runtime.storage.policy" {
             params.len() == 4
                 && [
@@ -293,13 +305,24 @@ fn closed_parameters(request: &Request) -> bool {
     ) {
         return validate_method_value(&request.method, "request", &Value::Object(params)).is_ok();
     }
+    // Uploads name only the App's own Import request and generation; the
+    // owner resolves binding, bounds and App ownership.
+    if imports::METHODS.contains(&request.method.as_str()) {
+        return imports::closed(&request.method, &params);
+    }
     let keys: &[&str] = match request.method.as_str() {
+        // The Trace cache root and the Artifact root are fixed at composition;
+        // the App cannot name a path, and the probe cannot carry a command.
         "health"
         | "history.filter.list"
         | "operation.list"
         | "target.list"
         | "runtime.hdc.status"
-        | "runtime.storage.status" => &[],
+        | "runtime.storage.status"
+        | "artifact.quota"
+        | "trace.cache.status"
+        | "trace.cache.purge" => &[],
+        "debug.probe" => &["targetId"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",
@@ -316,6 +339,14 @@ fn closed_parameters(request: &Request) -> bool {
     params.len() == keys.len()
         && keys.iter().all(|key| params.contains_key(*key))
         && validate_method_value(&request.method, "request", &Value::Object(params)).is_ok()
+}
+/// A canonical decimal string of at least `minimum` within Int64, as the
+/// Runtime spells generations and counts: no sign, no leading zero.
+fn canonical_decimal(value: Option<&Value>, minimum: i64) -> bool {
+    value.and_then(Value::as_str).is_some_and(|text| {
+        text.parse::<i64>()
+            .is_ok_and(|number| number >= minimum && number.to_string() == text)
+    })
 }
 fn refusal(id: &str, code: &str, message: &str) -> Vec<u8> {
     let response = Response::failure(id, code, message).value();

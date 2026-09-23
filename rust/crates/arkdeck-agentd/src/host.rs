@@ -726,65 +726,36 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let unavailable = || WireError {
-            code: "operationUnavailable".into(),
-            message: "Import requires the Runtime Target owner and publication services".into(),
-            details: Some(serde_json::Map::from_iter([
-                ("phase".into(), serde_json::json!("importOwner")),
-                ("newDispatchCount".into(), serde_json::json!(0)),
-            ])),
-        };
-        if [
-            "artifact.import.release",
-            "artifact.import.inspection",
-            "artifact.import.inspect",
+        // Local control clients never inherit the App's trusted transport provenance.
+        self.imports_for(method, params, false)
+    }
+    /// Swift's `RuntimeImportControlGateway` for the App transport: the
+    /// owner records an Import the App begins as App-owned, atomically with
+    /// it, so a restart keeps that ownership; it refuses to append to, abort
+    /// or commit any other before it writes anything. Discovery, inspection
+    /// and release stay local.
+    #[cfg(target_os = "macos")]
+    fn app_import_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        if ![
+            "artifact.import.begin",
+            "artifact.import.append",
+            "artifact.import.abort",
+            "artifact.import.commit",
         ]
         .contains(&method)
         {
-            return self
-                .imports
-                .as_ref()
-                .ok_or_else(unavailable)?
-                .lifecycle_resource(
-                    self.artifacts.as_ref().ok_or_else(unavailable)?,
-                    self.jobs.as_ref().ok_or_else(unavailable)?,
-                    method,
-                    params,
-                    &utc_now(),
-                );
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "Import discovery, inspection and release are not available to the App"
+                    .into(),
+                details: None,
+            });
         }
-        if method == "artifact.import.list" {
-            return self
-                .imports
-                .as_ref()
-                .ok_or_else(unavailable)?
-                .list_with_artifacts(params, self.artifacts.as_ref().ok_or_else(unavailable)?);
-        }
-        if method == "artifact.import.commit" {
-            return self.imports.as_ref().ok_or_else(unavailable)?.commit(
-                params,
-                &utc_now(),
-                false,
-                self.artifacts.as_ref().ok_or_else(unavailable)?,
-                ARTIFACT_QUOTA,
-                |intent| {
-                    self.targets
-                        .as_ref()
-                        .ok_or_else(unavailable)?
-                        .resolve_import_binding(intent)
-                },
-            );
-        }
-        // Local control clients never inherit the App's trusted transport provenance.
-        self.imports
-            .as_ref()
-            .ok_or_else(unavailable)?
-            .handle_resource(method, params, &utc_now(), false, |intent| {
-                self.targets
-                    .as_ref()
-                    .ok_or_else(unavailable)?
-                    .resolve_import_binding(intent)
-            })
+        self.imports_for(method, params, true)
     }
 
     #[cfg(target_os = "macos")]
@@ -2324,6 +2295,77 @@ impl HostServices for Host {
         };
         state.snapshot = Some(snapshot.clone());
         Ok(snapshot)
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl Host {
+    /// The Import owner's answer with the transport provenance the caller's
+    /// entry point proved: `app_owned` only for the authenticated App.
+    fn imports_for(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+        app_owned: bool,
+    ) -> Result<serde_json::Value, WireError> {
+        let unavailable = || WireError {
+            code: "operationUnavailable".into(),
+            message: "Import requires the Runtime Target owner and publication services".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("importOwner")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        };
+        if [
+            "artifact.import.release",
+            "artifact.import.inspection",
+            "artifact.import.inspect",
+        ]
+        .contains(&method)
+        {
+            return self
+                .imports
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .lifecycle_resource(
+                    self.artifacts.as_ref().ok_or_else(unavailable)?,
+                    self.jobs.as_ref().ok_or_else(unavailable)?,
+                    method,
+                    params,
+                    &utc_now(),
+                );
+        }
+        if method == "artifact.import.list" {
+            return self
+                .imports
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .list_with_artifacts(params, self.artifacts.as_ref().ok_or_else(unavailable)?);
+        }
+        if method == "artifact.import.commit" {
+            return self.imports.as_ref().ok_or_else(unavailable)?.commit(
+                params,
+                &utc_now(),
+                app_owned,
+                self.artifacts.as_ref().ok_or_else(unavailable)?,
+                ARTIFACT_QUOTA,
+                |intent| {
+                    self.targets
+                        .as_ref()
+                        .ok_or_else(unavailable)?
+                        .resolve_import_binding(intent)
+                },
+            );
+        }
+        self.imports
+            .as_ref()
+            .ok_or_else(unavailable)?
+            .handle_resource(method, params, &utc_now(), app_owned, |intent| {
+                self.targets
+                    .as_ref()
+                    .ok_or_else(unavailable)?
+                    .resolve_import_binding(intent)
+            })
     }
 }
 
