@@ -195,10 +195,11 @@ public protocol SettingsDiagnosticBundleExporting: Sendable {
 /// Answers the three `runtime.storage.*` requests in place of the Runtime for
 /// a UI-automation launch.
 ///
-/// The one the App composes stays in ArkDeckWorkflows: it answers from the
-/// daemon's own storage owner, so a fixture launch still exercises this
-/// facade's request framing, exact-shape validation, generation-bound
-/// mutation and presentation mapping. An ordinary launch composes none.
+/// The one the App composes is `SettingsStoragePresentationFixture`: framed
+/// in-memory replies, so a fixture launch still exercises this facade's
+/// request framing, exact-shape validation, generation-bound mutation and
+/// presentation mapping without composing a storage owner or touching the
+/// host's disk. An ordinary launch composes none.
 public protocol SettingsRuntimeStorageFixture: Sendable {
   /// The framed reply, or `nil` while the Runtime it stands in for does not
   /// answer.
@@ -256,7 +257,7 @@ public enum SettingsApplicationFacade {
 private actor ProductionSettingsApplicationProvider: SettingsApplicationProviding {
   /// One Runtime storage request: the method and its closed parameters in, the
   /// daemon's framed reply out. Production sends it over XPC; the UI fixture
-  /// answers it in process from the same owner type the daemon composes.
+  /// supplies in-memory presentation replies without composing a storage owner.
   typealias RuntimeRequest = @Sendable (
     _ method: String, _ params: [String: JSONValue]?
   ) async -> RuntimeXPCRequestTransport.ResultValue
@@ -359,7 +360,15 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     {
       throw SettingsApplicationError.runtimeStorageRejected(code)
     }
-    guard let result = envelope["result"] as? [String: Any],
+    // Preserve JSON boolean identity: NSNumber bridging can otherwise turn
+    // numeric success/incompleteness flags into trusted presentation facts.
+    guard let typed = try? JSONDecoder().decode([String: JSONValue].self, from: data),
+      typed["ok"] == .bool(true),
+      case .object(let typedResult)? = typed["result"],
+      case .object(let typedSessions)? = typedResult["sessionDomain"],
+      case .object(let typedUsage)? = typedSessions["usage"],
+      case .bool(let incomplete)? = typedUsage["measurementIncomplete"],
+      let result = envelope["result"] as? [String: Any],
       Self.hasExactKeys(result, ["schemaVersion", "sessionDomain", "artifactDomain"]),
       result["schemaVersion"] as? String == "arkdeck.runtime-storage/1",
       let sessions = result["sessionDomain"] as? [String: Any],
@@ -396,7 +405,6 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
       let pinnedCount = Self.count(usage["pinnedSessionCount"]),
       pinnedCount <= sessionCount,
       let unaccounted = Self.count(usage["unaccountedSessionCount"]),
-      let incomplete = usage["measurementIncomplete"] as? Bool,
       Self.isOptionalDecimal(sessions["catalogGeneration"]),
       let artifacts = result["artifactDomain"] as? [String: Any],
       Self.hasExactKeys(

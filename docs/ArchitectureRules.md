@@ -107,10 +107,11 @@ Trace cache 维护的 App 侧模型、XPC provider 与应答解码也在 ClientK
 Overview 能力矩阵的展示模型、在线目标投影、读请求与应答解码也在 ClientKit；证明 hidumper 行的只读
 `debug.template@1` 窗口清单 Job 仍由 Workflows 的 `DebugWindowInventoryJobRunner` 按 Debug 工作区的 typed 请求提交，
 ClientKit 只声明 `OverviewWindowInventoryJobRunning`，由 App 组合，不新增依赖边。
-Settings 的展示模型、provider 协议、facade 与 `runtime.storage.*` 请求及精确形状校验也在 ClientKit；本地诊断包导出
-（经 Storage 读本机文件，CLI 共用）与 `--ui-test-runtime-history` 启动时代替 daemon 应答的存储 owner 仍在 Workflows，
-ClientKit 只声明 `SettingsDiagnosticBundleExporting` 与 `SettingsRuntimeStorageFixture`，由 App 组合
-`RuntimeSupportBundleSettingsExporter` 与 `SettingsStorageUIFixture.runtimeStorage()`，不新增依赖边。
+Settings 的展示模型、provider 协议、facade 与 `runtime.storage.*` 请求及精确形状校验也在 ClientKit；
+`--ui-test-runtime-history` 启动时代替 daemon 应答的 `SettingsStoragePresentationFixture` 也在 ClientKit，只给内存应答，
+不组合存储 owner、不校验主机路径、不写盘。本地诊断包导出（经 Storage 读本机文件，CLI 共用）仍在 Workflows，
+ClientKit 只声明 `SettingsDiagnosticBundleExporting`，由 App 组合 `RuntimeSupportBundleSettingsExporter`，不新增依赖边；
+Workflows 的 `SettingsStorageUIFixture`（Swift 存储 owner）只供契约测试核对该 owner 的应答，App 不再组合它。
 App 侧 SSH 远程构建源（`RemoteBuildSourceApplicationFacade`：Keychain 凭据、SFTP 只读浏览与有界拉取）整体在 ClientKit，
 Citadel/NIOSSH/NIOCore/swift-crypto/swift-log 随之由 ClientKit 而非 Workflows 链接（外部包，不是 ArkDeck 依赖边）；
 Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。远程构建源用到的 `DebugTypedValueValidator`

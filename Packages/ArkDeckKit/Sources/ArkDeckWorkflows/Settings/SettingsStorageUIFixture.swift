@@ -2,25 +2,22 @@ import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
-/// A Runtime storage owner for UI automation, standing in for the daemon's
-/// `runtime.storage.*` replies and nothing else.
+/// A Swift Runtime storage owner standing in for the daemon's
+/// `runtime.storage.*` replies and nothing else, for contract tests.
 ///
 /// Like `ViewerUIFixture` this supplies a *domain* object — the protocol-2
 /// reply the daemon frames — and never a presentation. The reply is composed
-/// by the same `RuntimeSessionStorageStore` the daemon owns, against a
-/// throwaway root under this process's temporary directory, so a launch driven
-/// by it still exercises the App's real request framing, exact-shape
-/// validation, generation-bound mutation and presentation mapping instead of a
-/// second copy of them that could drift. Nothing here reaches XPC, and a
-/// launch without the selecting argument never reaches any of it.
+/// by the same `RuntimeSessionStorageStore` the Swift daemon owns, against a
+/// throwaway root under this process's temporary directory, so the contract
+/// tests hold that owner's replies to the ClientKit facade's real request
+/// framing, exact-shape validation, generation-bound mutation and presentation
+/// mapping instead of a second copy of them that could drift. Nothing here
+/// reaches XPC, and arguments without the selecting one never reach any of it.
 ///
-/// Why it exists: once the Settings facade moved to the Runtime-owned storage
-/// owner, the Storage pane rendered nothing until `runtime.storage.status`
-/// answered. Every developer machine runs the daemon, so the UI sweep passed
-/// locally while the nightly runner — which has none — showed an empty pane.
-/// The selecting argument is the one that already makes the Runtime a fixture
-/// for History, continuation and job control: a launch that fakes the Runtime
-/// fakes its storage owner too.
+/// The App no longer composes it. A `--ui-test-runtime-history` launch answers
+/// Settings from ClientKit's `SettingsStoragePresentationFixture`, which holds
+/// in-memory replies only, so the App's UI automation neither composes this
+/// storage owner nor writes its root to disk.
 public enum SettingsStorageUIFixture {
   public static let selectingArgument = "--ui-test-runtime-history"
 
@@ -39,11 +36,9 @@ public enum SettingsStorageUIFixture {
 
   /// The policy the owner publishes at creation, chosen so that no product
   /// default can be mistaken for it: an untouched daemon owner reports
-  /// 20 GiB / 2 GiB / 90 days. The UI sweep asserts the pane's editable
-  /// fields carry these figures, so a launch that silently reached the host's
-  /// real daemon fails loudly instead of passing on a machine that happens to
-  /// run one. The root path would be the natural witness, but a selectable
-  /// fact row's text is not readable by UI automation on macOS.
+  /// 20 GiB / 2 GiB / 90 days, so a test cannot pass on an owner that
+  /// silently kept its defaults. ClientKit's `SettingsStoragePresentationFixture`
+  /// publishes the same figures for the App's UI sweep, for the same reason.
   public static let publishedPolicy = RuntimeSessionStoragePolicy(
     totalQuotaBytes: 12 * 1_024 * 1_024 * 1_024,
     safetyMarginBytes: 3 * 1_024 * 1_024 * 1_024,
@@ -62,9 +57,9 @@ public enum SettingsStorageUIFixture {
     arguments.contains(selectingArgument)
   }
 
-  /// The owner to install, or `nil` for every ordinary launch. The App has
-  /// one owner per process at the fixed location; a test passes its own root
-  /// so that test processes running in parallel never share one owner.
+  /// The owner to install, or `nil` for arguments without the selecting one.
+  /// Without a root it uses the one fixed location; a test passes its own
+  /// root so that test processes running in parallel never share one owner.
   package static func owner(arguments: [String], root: URL? = nil) -> Owner? {
     guard isSelected(arguments: arguments) else { return nil }
     let stateFileURL: URL?
@@ -80,15 +75,6 @@ public enum SettingsStorageUIFixture {
         ?? FileManager.default.temporaryDirectory.appending(
           path: directoryName, directoryHint: .isDirectory),
       launchArguments: arguments, stateFileURL: stateFileURL)
-  }
-
-  /// The storage fixture the App composes into the ClientKit Settings facade:
-  /// the owner for a launch that selects the Runtime fixture, `nil` for every
-  /// ordinary launch, which then reaches the Runtime over XPC.
-  public static func runtimeStorage(
-    arguments: [String] = ProcessInfo.processInfo.arguments
-  ) -> (any SettingsRuntimeStorageFixture)? {
-    owner(arguments: arguments)
   }
 
   /// The in-process stand-in for the daemon's storage resource handler: the

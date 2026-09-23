@@ -117,13 +117,13 @@ private final class ArkDeckAppModelStore {
   @ObservationIgnored lazy var traceWorkspace = TraceWorkspaceViewModel(
     provider: TraceApplicationFacade.make(),
     documentController: traceDocument)
-  // Settings reads Runtime storage through ClientKit; its diagnostic bundle
-  // exporter and the storage owner a `--ui-test-runtime-history` launch
-  // answers from are still ArkDeckWorkflows'.
+  // Settings reads Runtime storage through ClientKit. UI automation supplies
+  // only in-memory replies; Settings' remaining Workflows dependency is the
+  // local support-bundle exporter until its Runtime resource interface exists.
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make(
       diagnosticBundles: RuntimeSupportBundleSettingsExporter(),
-      storageFixture: SettingsStorageUIFixture.runtimeStorage()))
+      storageFixture: SettingsStoragePresentationFixture.make()))
   @ObservationIgnored lazy var deviceWorkspace = DeviceWorkspaceViewModel(
     provider: DeviceControlFacade.make())
   // A launch without `--ui-test-device-recording=` never reaches the fixture.

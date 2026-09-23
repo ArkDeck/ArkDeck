@@ -3,36 +3,31 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import XCTest
 
-/// The Storage pane renders nothing until the Runtime-owned storage owner has
-/// answered. Developer machines run the daemon and hosted runners do not, so
-/// without a fixture the UI sweep was green locally and red nightly. These
-/// tests hold the fixture to the daemon's own contract and to the rule that
-/// nothing reaches it without the launch argument.
+/// The Swift storage owner's replies, held to the daemon's own contract through
+/// the ClientKit facade, and to the rule that nothing reaches the owner without
+/// the selecting argument. The App's UI automation answers from ClientKit's
+/// in-memory `SettingsStoragePresentationFixture` instead; this owner is
+/// composed only by these contract tests.
 final class SettingsStorageUIFixtureContractTests: XCTestCase {
   func testOrdinaryLaunchNeverReachesTheFixture() {
     XCTAssertFalse(SettingsStorageUIFixture.isSelected(arguments: ["/Applications/ArkDeck.app"]))
     XCTAssertFalse(
       SettingsStorageUIFixture.isSelected(arguments: ["--ui-test-devices", "--ui-test-flash"]))
     XCTAssertNil(SettingsStorageUIFixture.owner(arguments: ["--ui-test-viewer"]))
-    // What the App composes into the ClientKit facade: nothing, so the
-    // ordinary launch reaches the Runtime over XPC.
-    XCTAssertNil(SettingsStorageUIFixture.runtimeStorage(arguments: ["/Applications/ArkDeck.app"]))
+    XCTAssertNil(SettingsStorageUIFixture.owner(arguments: ["/Applications/ArkDeck.app"]))
 
     XCTAssertTrue(SettingsStorageUIFixture.isSelected(arguments: ["--ui-test-runtime-history"]))
     XCTAssertNotNil(
       SettingsStorageUIFixture.owner(
         arguments: ["/Applications/ArkDeck.app", "--ui-test-runtime-history"]))
-    XCTAssertNotNil(
-      SettingsStorageUIFixture.runtimeStorage(
-        arguments: ["/Applications/ArkDeck.app", "--ui-test-runtime-history"]))
   }
 
-  /// The fixture launch goes through the production facade: the same request
+  /// The owner's replies go through the production facade: the same request
   /// framing, the same exact-shape validation, the same presentation mapping.
   /// Only the transport is the fixture, and no daemon is needed for any of it.
   func testFixtureLaunchAnswersTheOwnerContractThroughTheProductionFacade() async throws {
     // Each test roots its own owner: the suite runs its methods in parallel
-    // processes, and two owners on the App's one fixed path would race.
+    // processes, and two owners on the one fixed path would race.
     let root = uniqueRoot("facade")
     defer { try? FileManager.default.removeItem(at: root) }
     let provider = SettingsApplicationFacade.composed(
@@ -145,8 +140,8 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
   }
 
   /// The History fixture's unreachable switch reaches this owner too, at launch
-  /// or through the shared state file, so the App can be walked from an
-  /// unavailable Storage pane to a recovered one without a relaunch.
+  /// or through the shared state file, so one provider can be walked from an
+  /// unavailable Storage pane to a recovered one.
   func testUnreachableSwitchFailsEveryRequestUntilItIsCleared() async throws {
     let root = uniqueRoot("unreachable")
     let stateFile = FileManager.default.temporaryDirectory.appending(
@@ -209,11 +204,10 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
 }
 
 extension SettingsApplicationFacade {
-  /// What the App composes for a launch with these arguments — the support
-  /// bundle exporter and, when the arguments select it, the storage fixture —
-  /// with the fixture's owner rooted where the test says: the suite runs its
-  /// methods in parallel processes, and two owners on the App's one fixed path
-  /// would race.
+  /// The App's support bundle exporter and, when the arguments select it, the
+  /// Swift storage owner rooted where the test says: the suite runs its
+  /// methods in parallel processes, and two owners on the one fixed path would
+  /// race.
   static func composed(
     arguments: [String], fixtureRoot: URL
   ) -> any SettingsApplicationProviding {
