@@ -457,3 +457,6 @@ mod import_tests;
 
 #[path = "trace_probe_tests.rs"]
 mod trace_probe_tests;
+
+#[path = "production_tests.rs"]
+mod production_tests;

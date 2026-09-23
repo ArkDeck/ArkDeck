@@ -1,8 +1,10 @@
 //! Standalone App composition: discovery, History, artifacts, App-owned Import
 //! uploads, Trace cache, Debug probe and owned typed Jobs.
-//! This is deliberately opt-in on the isolated development owner. It neither
-//! activates a LaunchAgent nor changes the installed service. The transport
-//! authenticates the actual XPC connection, never an identity in request JSON.
+//! On the isolated development owner it is an explicit opt-in over an
+//! isolated root; the production composition (`production.rs`) composes it
+//! over the account's own state root. Neither activates a LaunchAgent nor
+//! changes the installed service. The transport authenticates the actual XPC
+//! connection, never an identity in request JSON.
 use arkdeck_contract::{
     ContractError, MAX_RESPONSE_BYTES, Request, Response, decode_request, encode_frame,
     strict_json, validate_method_value,
@@ -71,21 +73,47 @@ impl Configuration {
         })
     }
 
+    /// The production composition's App ingress over the account's own
+    /// state root: the fixed service Swift's LaunchAgent vends, Swift's
+    /// code-signing requirement and the owner's effective UID, exactly as the
+    /// isolated ingress has them. Only the isolated-root rule is gone, since
+    /// this root is the installed Runtime's; it must still be the owner's
+    /// private physical directory.
+    pub(crate) fn production(state: &Path) -> io::Result<Self> {
+        let directory = HostDirectory::open(state)?;
+        directory.validate_path(state)?;
+        Ok(Self {
+            owner_uid: std::fs::metadata(state)?.uid(),
+        })
+    }
+
     pub(crate) fn listen<H: HostServices + 'static>(
         self,
         control: Arc<Control<H>>,
+    ) -> io::Result<()> {
+        self.listen_with(control, listen_mach)
+    }
+
+    /// What `listen` registers through `listen`: the fixed service, the fixed
+    /// requirement, and the handler libxpc's authenticated callback enters.
+    fn listen_with<H: HostServices + 'static>(
+        self,
+        control: Arc<Control<H>>,
+        listen: impl FnOnce(&str, &str, Handler) -> io::Result<()>,
     ) -> io::Result<()> {
         let ingress = AppIngress::new(control, self.owner_uid);
         // libxpc installs the fixed code-signing requirement before activating
         // peers and checks their kernel euid. Only its authenticated callback
         // can enter here; PeerOrigin is never decoded from a request.
-        listen_mach(
+        listen(
             SERVICE,
             APP_REQUIREMENT,
             Box::new(move |frame, peer| ingress.handle(frame, peer)),
         )
     }
 }
+/// The authenticated callback `listen_mach` enters for each frame.
+type Handler = Box<dyn Fn(&[u8], PeerOrigin) -> Vec<u8> + Send + Sync>;
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }

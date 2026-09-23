@@ -523,6 +523,74 @@ fn unsupported_layout_and_missing_index_are_preserved() {
     );
 }
 
+/// The production composition keeps the Job index at the Runtime's state root,
+/// where Swift's daemon keeps it, beside every other owner's entry: a first
+/// index is created there as Swift's `RuntimeJobRepository` creates one, while
+/// a directory of the owner's own still refuses anything else before it. Lost
+/// history is never replaced there: an initialized owner, a Job directory, a
+/// log or journal of a lost index, or Swift's retired ledger each refuse a
+/// fresh index and leave the directory as it was.
+#[test]
+fn the_state_root_owner_creates_its_index_beside_the_runtimes_other_owners() {
+    use std::os::unix::fs::DirBuilderExt;
+    let private_file = |path: PathBuf, bytes: &[u8]| {
+        fs::write(&path, bytes).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    };
+    let state_root = || {
+        let root = Root::new();
+        for name in ["capabilities", "targets", "artifacts", "agent-executions"] {
+            fs::DirBuilder::new()
+                .mode(0o700)
+                .create(root.0.join(name))
+                .unwrap();
+        }
+        for name in ["instance.lock", "instance.json", "session-storage.json"] {
+            private_file(root.0.join(name), b"");
+        }
+        root
+    };
+    let root = state_root();
+    assert!(JobStore::open_owner(&root.0).is_err());
+    assert!(!root.0.join("runtime-jobs.sqlite3").exists());
+    let store = JobStore::open_state_root_owner(&root.0).unwrap();
+    assert!(store.current_jobs().unwrap().is_empty());
+    drop(store);
+    assert!(root.0.join("runtime-jobs.sqlite3").is_file());
+    // An existing index opens in either placement.
+    drop(JobStore::open_state_root_owner(&root.0).unwrap());
+    drop(JobStore::open_owner(&root.0).unwrap());
+    fs::remove_file(root.0.join("runtime-jobs.sqlite3")).unwrap();
+    assert!(
+        JobStore::open_state_root_owner(&root.0).is_err(),
+        "a lost initialized index must not become empty history"
+    );
+    assert!(!root.0.join("runtime-jobs.sqlite3").exists());
+
+    let root = state_root();
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(root.0.join("jobs/job-unindexed"))
+        .unwrap();
+    assert!(JobStore::open_state_root_owner(&root.0).is_err());
+    assert!(!root.0.join("runtime-jobs.sqlite3").exists());
+    assert!(root.0.join("jobs/job-unindexed").is_dir());
+
+    for left in [
+        "runtime-jobs.sqlite3-wal",
+        "runtime-jobs.sqlite3-shm",
+        "runtime-jobs.sqlite3-journal",
+        "idempotency.json",
+    ] {
+        let root = state_root();
+        private_file(root.0.join(left), b"retained");
+        assert!(JobStore::open_state_root_owner(&root.0).is_err(), "{left}");
+        assert!(!root.0.join("runtime-jobs.sqlite3").exists(), "{left}");
+        assert_eq!(fs::read(root.0.join(left)).unwrap(), b"retained");
+    }
+}
+
 #[test]
 fn active_session_census_retains_unknown_outcomes_and_refuses_unreadable_rows() {
     let root = Root::initialized();

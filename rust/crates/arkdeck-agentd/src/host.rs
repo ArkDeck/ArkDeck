@@ -423,6 +423,18 @@ impl Host {
         self.default_mutation_root = Some(root);
         self
     }
+    /// The installed Runtime's own state root, which a device mutation
+    /// proves its continuity against: the production composition names it
+    /// from the same account home as every other root it composes.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn with_mutation_root(mut self, root: std::path::PathBuf) -> Self {
+        self.default_mutation_root = Some(root);
+        self
+    }
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) fn mutation_root(&self) -> Option<&std::path::Path> {
+        self.default_mutation_root.as_deref()
+    }
     /// What a device mutation is authorized from: the capability store and
     /// this daemon's device sessions. Without a store no mutation is admitted.
     #[cfg(target_os = "macos")]
@@ -589,6 +601,42 @@ impl Host {
     pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
         self.history = Some(history);
         self
+    }
+
+    /// The owners this composition holds, by name, in a fixed order: what the
+    /// production composition reports at its start and its tests compare.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn owner_census(&self) -> Vec<&'static str> {
+        [
+            ("jobs", self.jobs.is_some()),
+            ("capabilities", self.capabilities.is_some()),
+            ("mutationAuthority", self.authority().is_some()),
+            ("targets", self.targets.is_some()),
+            ("artifacts", self.artifacts.is_some()),
+            ("imports", self.imports.is_some()),
+            ("storage", self.storage.is_some()),
+            ("history", self.history.is_some()),
+            ("workspaceProjects", self.workspace_projects.is_some()),
+            ("bootstrap", self.bootstrap.is_some()),
+            ("planning", self.planning.is_some()),
+            (
+                "analyzer",
+                self.planning
+                    .as_ref()
+                    .is_some_and(|(_, analyzer)| analyzer.is_some()),
+            ),
+            ("agentExecutions", self.agents.is_some()),
+            ("humanActions", self.human_actions.is_some()),
+            ("controlActions", self.control_actions.is_some()),
+            ("traceCache", self.trace_cache.is_some()),
+            ("hdc", self.hdc.is_some()),
+            ("managedHdc", self.managed_hdc().is_some()),
+            ("codeSignHelper", self.code_sign_helper.is_some()),
+            ("readOnlyHdcProvider", self.provider.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(name, composed)| composed.then_some(name))
+        .collect()
     }
 
     pub fn from_environment() -> Self {

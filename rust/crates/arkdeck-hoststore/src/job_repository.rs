@@ -270,9 +270,19 @@ fn describes(
     Ok(())
 }
 
+/// Where a Job index lives: in a directory of its own, as the isolated
+/// development owner keeps it, or at the Runtime's state root, which it shares
+/// with the Runtime's other owners as Swift's
+/// `RuntimeJobRepository(stateDirectory:)` does.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Placement {
+    Dedicated,
+    StateRoot,
+}
+
 impl JobRepository {
     pub fn open(path: &Path) -> io::Result<Self> {
-        Self::open_mode(path, false)
+        Self::open_mode(path, false, Placement::Dedicated)
     }
 
     /// The Runtime Job owner's writable index. As Swift RuntimeJobRepository,
@@ -281,10 +291,21 @@ impl JobRepository {
     /// connection then rechecks under a write lock and uses WAL with FULL
     /// synchronization.
     pub fn open_owner(path: &Path) -> io::Result<Self> {
-        Self::open_mode(path, true)
+        Self::open_mode(path, true, Placement::Dedicated)
     }
 
-    fn open_mode(path: &Path, writable: bool) -> io::Result<Self> {
+    /// The owner's writable index at the Runtime's state root, where Swift's
+    /// daemon keeps `runtime-jobs.sqlite3` and `jobs/` beside every other
+    /// owner's entry. An existing index opens as [`Self::open_owner`] opens
+    /// one. A first index is created where Swift creates one — no Job history
+    /// in `jobs/` — and, beyond Swift, only while this owner's lock is unmarked
+    /// and no log or journal of a lost index remains; the other owners'
+    /// entries beside it are expected, not orphaned history.
+    pub fn open_state_root_owner(path: &Path) -> io::Result<Self> {
+        Self::open_mode(path, true, Placement::StateRoot)
+    }
+
+    fn open_mode(path: &Path, writable: bool, placement: Placement) -> io::Result<Self> {
         let root = HostDirectory::open(path)?;
         let lock = root.lock_document(LOCK)?;
         match root.owned_kind_and_size("idempotency.json") {
@@ -298,12 +319,33 @@ impl JobRepository {
                 if !root.read(LOCK, 1)?.is_empty() {
                     return Err(corrupt());
                 }
-                if root
-                    .names(3)?
-                    .iter()
-                    .any(|name| ![LOCK, "jobs"].contains(&name.as_str()))
-                {
-                    return Err(corrupt());
+                match placement {
+                    // A directory of its own holds nothing else before its
+                    // first index.
+                    Placement::Dedicated => {
+                        if root
+                            .names(3)?
+                            .iter()
+                            .any(|name| ![LOCK, "jobs"].contains(&name.as_str()))
+                        {
+                            return Err(corrupt());
+                        }
+                    }
+                    // The state root holds the other owners' entries; what
+                    // this index alone leaves behind — a log, its index or a
+                    // rollback journal — is history a fresh one would hide.
+                    Placement::StateRoot => {
+                        for companion in [
+                            "runtime-jobs.sqlite3-wal",
+                            "runtime-jobs.sqlite3-shm",
+                            "runtime-jobs.sqlite3-journal",
+                        ] {
+                            match root.owned_kind_and_size(companion) {
+                                Err(e) if e.kind() == io::ErrorKind::NotFound => (),
+                                _ => return Err(corrupt()),
+                            }
+                        }
+                    }
                 }
                 match root.child("jobs") {
                     Ok(jobs) if jobs.names(1)?.is_empty() => (),
