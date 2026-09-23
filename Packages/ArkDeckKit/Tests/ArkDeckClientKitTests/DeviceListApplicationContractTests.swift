@@ -104,6 +104,13 @@ final class DeviceListApplicationContractTests: XCTestCase {
       })?.state, "Unauthorized")
 
     try Data("--ui-test-device-authorized".utf8).write(to: state)
+    // The flip is not reserved for the wait: every candidate read answers from
+    // the same state file, including the refresh the App's live observation
+    // makes on its own timer. The App UI sweep therefore flips it only while
+    // a retried wait is already polling.
+    let live = await provider.refreshCandidates()
+    XCTAssertEqual(
+      live.candidates.first(where: { $0.connectKey == "7f2c091a445e21" })?.state, "Connected")
     let ready = await provider.waitForAuthorization(connectKey: "7f2c091a445e21")
     XCTAssertEqual(ready.authorization, .ready)
     XCTAssertTrue(

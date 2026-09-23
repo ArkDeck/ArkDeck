@@ -2012,13 +2012,46 @@ final class AppShellUITests: XCTestCase {
       "the closed window offers the Overview recovery path, not a restart here",
       file: file, line: line)
     XCTAssertTrue(beginWait.isEnabled, file: file, line: line)
-    writeFixtureState("--ui-test-device-authorized", in: app, file: file, line: line)
+    // The fixture answers every candidate read from its state file, and the
+    // App re-reads the candidates on its own every ten seconds (its one live
+    // device observation). A flip written before the retry let such a tick
+    // publish Connected first, and a Connected device has no retry to click.
+    // So the retry starts on the Unauthorized device, and the device flips
+    // only while the retried wait is polling.
     beginWait.click()
+    XCTAssertTrue(
+      element("device.wait.polling", in: app).waitForExistenceFast(timeout: 5),
+      "retrying must restart the countdown", file: file, line: line)
+    XCTAssertFalse(
+      element("device.wait.timedOut", in: app).exists,
+      "the retried wait replaces the closed window's verdict", file: file, line: line)
+    writeFixtureState("--ui-test-device-authorized", in: app, file: file, line: line)
     XCTAssertTrue(
       element("device.trust.ready", in: app).waitForExistenceFast(timeout: 10),
       "an authorized device ends the wait as ready", file: file, line: line)
-    XCTAssertFalse(element("device.wait.timedOut", in: app).exists, file: file, line: line)
+    // A Connected device shows neither the countdown nor a verdict, and a
+    // live tick can publish Connected before the wait's own probe does, so
+    // the verdict is read back on an Unauthorized device. Re-check stays
+    // disabled while the wait polls, so enabled means the wait has returned;
+    // resetting the fixture and re-checking then shows what that wait left
+    // behind. A ready ending leaves no countdown and no timed-out banner.
+    XCTAssertTrue(
+      waitUntil(timeout: 10) { recheck.exists && recheck.isEnabled },
+      "the retried wait must return once the device is authorized", file: file, line: line)
     writeFixtureState("", in: app, file: file, line: line)
+    recheck.click()
+    // Fifteen seconds spans one live tick: a tick that read the file just
+    // before the reset can publish Connected once more, and the next one
+    // reads Unauthorized.
+    assertDisplayed(
+      element("device.fact.state", in: app), equals: "Unauthorized", timeout: 15,
+      file: file, line: line)
+    XCTAssertFalse(
+      element("device.wait.timedOut", in: app).exists,
+      "the retried wait ended ready, so no timed-out verdict remains", file: file, line: line)
+    XCTAssertFalse(element("device.wait.polling", in: app).exists, file: file, line: line)
+    XCTAssertFalse(element("device.wait.unavailable", in: app).exists, file: file, line: line)
+    XCTAssertTrue(beginWait.isEnabled, file: file, line: line)
     select("app.navigation.overview", in: app)
     XCTAssertTrue(
       app.staticTexts["overview.status.server.value"].waitForExistenceFast(timeout: 10),
