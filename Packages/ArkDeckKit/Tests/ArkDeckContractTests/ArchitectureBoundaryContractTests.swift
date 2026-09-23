@@ -561,7 +561,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
     let flashFacade = try String(
       contentsOf: sourceRoot.appending(
-        path: "ArkDeckWorkflows/FlashApplicationFacade.swift"),
+        path: "ArkDeckClientKit/FlashApplicationFacade.swift"),
       encoding: .utf8)
     XCTAssertTrue(flashFacade.contains("ArkForgeFlashOperation.canonicalReference"))
     XCTAssertFalse(flashFacade.contains("flash.dayu200"))

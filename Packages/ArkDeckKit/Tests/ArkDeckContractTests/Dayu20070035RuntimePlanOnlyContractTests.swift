@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import CryptoKit
 import Foundation
 import XCTest

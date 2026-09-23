@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
@@ -89,7 +90,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
         timeline: [
           "intent flash-partitions"
         ],
-        processProgress: RuntimeJobProcessProgress(
+        processProgress: FlashProcessProgressPresentation(
           stepID: "flash-partitions", phase: .staging,
           completedUnitCount: 0, totalUnitCount: 9)),
       partitions: plan.partitions)
@@ -101,7 +102,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
         timeline: [
           "intent flash-partitions"
         ],
-        processProgress: RuntimeJobProcessProgress(
+        processProgress: FlashProcessProgressPresentation(
           stepID: "flash-partitions", phase: .writing, unitName: "system",
           completedUnitCount: 4, totalUnitCount: 9, currentUnitPercent: 35)),
       partitions: plan.partitions)
@@ -169,7 +170,7 @@ final class FlashApplicationFacadeContractTests: XCTestCase {
       FlashJobStatusResponseDecoding.presentation(fields, expectedJobID: "job-live"))
     XCTAssertEqual(
       decoded.processProgress,
-      RuntimeJobProcessProgress(
+      FlashProcessProgressPresentation(
         stepID: "flash-partitions", phase: .writing, unitName: "system",
         completedUnitCount: 4, totalUnitCount: 9, currentUnitPercent: 35))
 

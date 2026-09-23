@@ -1,4 +1,3 @@
-import ArkDeckCore
 import Compression
 import CryptoKit
 import Foundation
@@ -22,6 +21,12 @@ package struct GzipTarMemberSummary: Equatable, Sendable {
   public let name: String
   package let sizeBytes: Int64
   public let sha256: String
+
+  package init(name: String, sizeBytes: Int64, sha256: String) {
+    self.name = name
+    self.sizeBytes = sizeBytes
+    self.sha256 = sha256
+  }
 }
 
 package struct GzipTarArchiveSummary: Equatable, Sendable {

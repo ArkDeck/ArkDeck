@@ -23,6 +23,7 @@ let package = Package(
     .target(
       name: "APIBaseline",
       dependencies: [
+        .product(name: "ArkDeckClientKit", package: "ArkDeckKit"),
         .product(name: "ArkDeckCore", package: "ArkDeckKit"),
         .product(name: "ArkDeckProcess", package: "ArkDeckKit"),
         .product(name: "ArkDeckRuntime", package: "ArkDeckKit"),
