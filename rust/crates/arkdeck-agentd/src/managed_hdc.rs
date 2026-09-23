@@ -346,6 +346,9 @@ mod tests {
     mod loopback_ports {
         include!("../../../tests/support/loopback_ports.rs");
     }
+    mod fake_hdc_servers {
+        include!("../../../tests/support/fake_hdc_servers.rs");
+    }
     use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
@@ -365,10 +368,13 @@ mod tests {
         assert!(!lifecycle.unexpected(now + Duration::from_secs(30)));
     }
 
+    /// The fake's own directory. Dropped, even on a panic, it ends every
+    /// server the fake's `kill -r` started -- nobody's child, which would
+    /// otherwise listen on after the directory is gone -- then removes it.
     struct Fake(PathBuf);
     impl Drop for Fake {
         fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.0);
+            fake_hdc_servers::tear_down(&self.0, &self.0.join("hdc"));
         }
     }
 
@@ -390,6 +396,8 @@ mod tests {
             .mode(0o700)
             .create(&directory)
             .unwrap();
+        let fake = Fake(directory);
+        let directory = &fake.0;
         let source = directory.join("fake-hdc.c");
         std::fs::write(&source, FAKE_HDC).unwrap();
         let binary = directory.join("hdc");
@@ -399,7 +407,8 @@ mod tests {
             compiler
                 .arg(format!("-DRESTART_DIR=\"{}\"", directory.display()))
                 .arg(format!("-DSELF_PATH=\"{}\"", binary.display()))
-                .arg(format!("-DRECORD_CALLS=\"{}/calls\"", directory.display()));
+                .arg(format!("-DRECORD_CALLS=\"{}/calls\"", directory.display()))
+                .arg(format!("-DOWNER_PID={}", std::process::id()));
         }
         if fail {
             compiler.arg("-DFAIL_RESTART");
@@ -412,7 +421,7 @@ mod tests {
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700)).unwrap();
         let digest = arkdeck_contract::sha256_hex(&std::fs::read(&binary).unwrap());
         let tool = VerifiedTool::open(&binary, &digest).unwrap();
-        (Fake(directory), tool)
+        (fake, tool)
     }
 
     fn plan() -> ProcessPlan {
@@ -645,8 +654,8 @@ mod tests {
                 assert_eq!(challenge["ok"], true, "{challenge}");
                 params["challengeResponse"] = challenge["result"]["challenge"].clone();
                 let failed = send("human-action.resume", params.clone());
-                // Stop the isolated replacement even if an assertion fails.
-                std::fs::write(fake.0.join("stop"), []).unwrap();
+                // The isolated replacement is ended by `fake`'s drop, even if
+                // an assertion fails.
                 assert!(injected.load(Ordering::SeqCst), "{failed}");
                 if recovery_fails {
                     assert_eq!(failed["error"]["code"], "recordUnreadable", "{failed}");
@@ -706,23 +715,8 @@ mod tests {
                 Ok(self.0.clone())
             }
         }
-        struct Cleanup {
-            root: PathBuf,
-            tool: VerifiedTool,
-            endpoint: SocketAddrV4,
-        }
-        impl Drop for Cleanup {
-            fn drop(&mut self) {
-                let _ = std::fs::write(self.root.join("stop"), []);
-                let deadline = Instant::now() + Duration::from_secs(3);
-                while LoopbackServerLease::acquire(&self.tool, self.endpoint).is_ok()
-                    && Instant::now() < deadline
-                {
-                    std::thread::sleep(Duration::from_millis(20));
-                }
-            }
-        }
         for failed in [false, true] {
+            // `fake`, dropped last, ends every replacement this turn starts.
             let (fake, tool) = fake_options(true, failed);
             let port = loopback_ports::free_port();
             let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
@@ -737,11 +731,6 @@ mod tests {
                 )
                 .unwrap(),
             );
-            let _cleanup = Cleanup {
-                root: fake.0.clone(),
-                tool: VerifiedTool::open(tool.path(), tool.sha256()).unwrap(),
-                endpoint,
-            };
             let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
             root.private_child("actions").unwrap();
             root.private_child("jobs").unwrap();
