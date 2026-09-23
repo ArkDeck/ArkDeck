@@ -1344,12 +1344,14 @@ refresh or restart. A lost or invalid name-write reply is `outcomeUnknown`; the
 CLI never replays it.
 
 With the development HDC, the daemon answers `device.observations` (following a
-reference too) and `target.adopt` through the owner below. Its USB relations are
-the production stand-in, which reads none until the ArkForge lane's reader lands,
-so the daemon proves and adopts nothing yet, unless the isolated development
-owner names a development source: `ARKDECK_DEVELOPMENT_USB_RELATIONS`, an absolute
-path beside the development HDC's fixture (beside a registered one, only as the
-HDC runtime status section below says), read on every call
+reference too) and `target.adopt` through the owner below. Beside the registered
+HDC the isolated owner starts as its managed server, its USB relations are the
+Runtime's own (`UsbRegistryRelations`, "Trusted USB relations" below); beside a
+fixture it reads none, so a fixture's candidates are proved and adopted only
+when the isolated development owner names a development source:
+`ARKDECK_DEVELOPMENT_USB_RELATIONS`, an absolute path beside the development
+HDC's fixture (beside a registered one, in place of the Runtime's own and only
+as the HDC runtime status section below says), read on every call
 (`{"relations": [...]}`, with `"after": {"reads": n, "relations": [...]}` for a
 replug the oracle times by its reads). A host composed with relations
 (`Host::with_usb_relations`) proves and adopts as Swift does. Candidate display
@@ -1592,7 +1594,10 @@ accepted, and development USB relations beside it only with
 `ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC=acknowledged` (the
 maintainer's option A of 2026-09-19: what the owner proves about the real device
 is development-root evidence, never `REAL_DEVICE_PASS`), which startup refuses in
-any other composition and outside an isolated root.
+any other composition and outside an isolated root. Without such a file the owner
+reads the Runtime's own USB relations beside that server ("Trusted USB
+relations"), so `target adopt` needs no relation file there; what it proves is
+development-root evidence all the same.
 Beside that server, `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY=acknowledged` lets
 the isolated owner prove a device mutation's state continuity against its own
 Job state instead of the installed Runtime's root, which it can never be, so
@@ -1751,11 +1756,10 @@ observation as Swift's `TargetObservationCoordinator` proves it. `UsbRelation`
 is Swift's `TargetUSBRelation` (the serial that is the connect key, the
 decimal location, one IOKit attachment identity, the vendor and product) with
 its `is_usable` rule and the JSON shape the oracles record; `UsbRelations` is
-the port that reads them, implemented by any closure for tests and by
-`NoUsbRelations` in production until the ArkForge lane's `arkforged
-discoverDevices` client reads the registry (r11 keeps IOKit out of this
-crate) — it answers no relations, so no candidate is proved and no adoption
-can pass, while the device list stays readable. `Reading::take` is Swift's
+the port that reads them, implemented by any closure for tests, by
+`NoUsbRelations` — no relations, so no candidate is proved and no adoption can
+pass, while the device list stays readable — and by the Runtime's own
+`UsbRegistryRelations` (next section). `Reading::take` is Swift's
 bracketed read over any `HdcDispatch`: the relations, `list targets -v`
 (parsed with the highest registered version, as Swift's bootstrap port
 parses it), the relations again; `Reading::rows` is the stamp's rule — a
@@ -1770,6 +1774,50 @@ observation identities and generations over a reading, following a
 reference, and the adoption itself are the Target owner's.
 `tests/target_observation.rs` reads the observe fixture's shared fake with
 injected relations and checks the argv the driver logged.
+
+## Trusted USB relations (TASK-XPA-016, M1)
+
+The Runtime reads the USB relations that prove a target observation from the
+host's I/O Registry itself, as Swift's daemon does (the maintainer's decision
+Q1=B of 2026-09-24; r11's design table had the ArkForge lane's `arkforged
+discoverDevices` serve them, which is re-evaluated after M4). The census is
+`arkdeck_platform::usb_host_devices`, Swift's
+`RockchipProductUSBProbe.systemIdentities()`: every `IOUSBHostDevice` entry with
+a numeric `idVendor`, `idProduct` and `locationID` and a string
+`USB Serial Number` (else `kUSBSerialNumberString`), read as `NSNumber` reads
+them (the low sixteen bits; the location's bits in decimal), with its optional
+`USB Product Name` and its registry entry ID (none when the registry answers
+none or zero), in registry order and never deduplicated. It only matches and
+reads properties: it opens no device or interface and sends no USB request,
+releases every object it obtains, and drains its own autorelease pool. With no
+entry of the class the kernel answers no iterator, an empty census; a census it
+cannot take, or whose iterator did not stay valid (a check Swift never makes),
+is unavailable (`RegistryUnavailable`). `registry_census` is the same read for
+any class.
+
+`arkdeck_provider_hdc::UsbRegistryRelations` is Swift's
+`TargetUSBRelation.registeredDAYU200()` over that census on every read: the
+HDC-normal DAYU200 (`is_dayu200_hdc_normal`: vendor `0x2207`, product `0x5000`,
+a product name that is `HDC Device` once quotes and spaces are trimmed) with an
+attachment, as relations (`registered_dayu200_relations`); whether one is usable,
+unique and unchanged stays the reading's rule. A census that cannot be taken
+fails the read with Swift's `admissionRejected("USB registry unavailable")`,
+which fails the observation (`internalError`) and breaks its continuity; it is
+never read as no devices. The isolated owner composes it only beside the
+registered HDC it starts as its managed server and without a relation file
+(`development_usb::relation_source`); beside a fixture it reads none, so the
+host's devices never prove a fixture's candidates.
+
+Tests: `usb_registry` unit tests (the per-entry rule over synthetic entries);
+`tests/usb_registry.rs` (the host's census answers with or without a board, the
+census reads strings, numbers and booleans from the host's USB controllers, and
+batches of censuses keep no heap block or port name); the provider's reader
+units and `tests/target_observation.rs` (the shared fake bracketed by the reader
+over a census, and this host's registry through `system()`, which skips without
+a board); in agentd, the Target adoption oracle replayed through `Control` with
+the reader over a census listing each relation's board among entries it must
+pass over, and an uncertain census failing closed. None of it is device
+evidence.
 
 ## Trace Runtime probe (TASK-XPA-016, M1)
 

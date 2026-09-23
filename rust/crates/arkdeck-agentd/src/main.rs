@@ -57,6 +57,9 @@ const CONNECTION_IDLE: Duration = Duration::from_secs(20);
 struct DevelopmentHdc {
     dispatch: arkdeck_provider_hdc::ProcessDispatch,
     managed: Option<Arc<managed_hdc::ManagedHdc>>,
+    /// Whether its digest is a registered HDC's, which it then is only as
+    /// the managed server this owner started.
+    registered: bool,
 }
 
 /// The isolated owner's development HDC, named by
@@ -75,7 +78,9 @@ struct DevelopmentHdc {
 ///
 /// Development USB relations are read beside a fixture; beside a registered
 /// HDC only when the owner starts it as its managed server and the caller
-/// acknowledges them (`development_usb::admit`).
+/// acknowledges them (`development_usb::admit`). Without them, the owner reads
+/// the Runtime's own USB relations beside that registered HDC and none beside
+/// a fixture (`development_usb::relation_source`).
 #[cfg(target_os = "macos")]
 fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error>> {
     let managed = match std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER") {
@@ -112,7 +117,7 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
                 .into(),
         );
     }
-    // A harness's relations stand in for the ArkForge lane's reader beside a
+    // A harness's relations stand in for the Runtime's own reader beside a
     // fixture. For a registered HDC they would be a trusted fact about a real
     // device that no physical relation proved, so they are refused there
     // unless the owner starts that HDC as its managed server and the caller
@@ -140,6 +145,7 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
             arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
         ),
         managed,
+        registered,
     }))
 }
 
@@ -397,10 +403,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                     })
                     .transpose()?,
             );
-        let host = match development_hdc()? {
+        let development_hdc = development_hdc()?;
+        let (registered, managed) = development_hdc.as_ref().map_or((false, false), |hdc| {
+            (hdc.registered, hdc.managed.is_some())
+        });
+        let host = match development_hdc {
             Some(DevelopmentHdc {
                 dispatch,
                 managed: Some(managed),
+                ..
             }) => {
                 managed.monitor_foreground_exit()?;
                 managed_hdc = Some(Arc::clone(&managed));
@@ -409,12 +420,22 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             Some(DevelopmentHdc { dispatch, .. }) => host.with_development_hdc(Some(dispatch)),
             None => host.with_development_hdc(None),
         };
-        // Beside the development HDC's fixture, or acknowledged beside the
-        // registered HDC it started as its managed server (`development_hdc`):
-        // the relations the file names stand in for the ArkForge lane's reader.
-        let host = match development_usb::DevelopmentUsbRelations::from_environment()? {
-            Some(usb) => host.with_usb_relations(std::sync::Arc::new(usb)),
-            None => host,
+        // The USB relations the Target observations read
+        // (`development_usb::relation_source`): the file the caller names,
+        // beside the fixture or acknowledged beside the registered HDC
+        // (`development_hdc`); without one, beside the registered HDC this
+        // owner started as its managed server, the Runtime's own census of the
+        // host's I/O Registry, Swift's source (the maintainer's decision Q1=B
+        // of 2026-09-24); otherwise none.
+        let file = development_usb::DevelopmentUsbRelations::from_environment()?;
+        let host = match development_usb::relation_source(registered, managed, file.is_some()) {
+            development_usb::RelationSource::File => host.with_usb_relations(Arc::new(
+                file.ok_or("development USB relations are unavailable")?,
+            )),
+            development_usb::RelationSource::Registry => host.with_usb_relations(Arc::new(
+                arkdeck_provider_hdc::UsbRegistryRelations::system(),
+            )),
+            development_usb::RelationSource::Nothing => host,
         };
         // Acknowledged, and with the development HDC started as the managed
         // server, this owner proves a device mutation's state continuity

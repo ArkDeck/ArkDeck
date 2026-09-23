@@ -234,3 +234,11 @@ pub use self_resources::{SelfResources, self_resources};
 mod continuous_clock;
 #[cfg(target_os = "macos")]
 pub use continuous_clock::ContinuousInstant;
+
+#[cfg(target_os = "macos")]
+mod autorelease_pool;
+
+mod usb_registry;
+pub use usb_registry::{RegistryEntry, RegistryUnavailable, RegistryValue, UsbHostDevice};
+#[cfg(target_os = "macos")]
+pub use usb_registry::{registry_census, usb_host_devices};

@@ -13,15 +13,20 @@
 //! `-v` and the exact-row confirmation, judged by the observation parsers, so
 //! that the fixture's shell fake can drive them (the registered-digest gate of
 //! [`crate::HdcReadOnlyProvider`] stays for production tools). Who reads the
-//! relations is a [`UsbRelations`] port: the daemon's production reader is the
-//! ArkForge lane's `arkforged discoverDevices` (r11 keeps IOKit out of this
-//! crate), and until it lands [`NoUsbRelations`] answers no relations at all —
-//! fail closed, every candidate unproved. Stamping observation identities and
-//! generations over a reading is the Target owner's.
+//! relations is a [`UsbRelations`] port. The Runtime's own reader is
+//! [`UsbRegistryRelations`], Swift's `TargetUSBRelation.registeredDAYU200()`
+//! over `arkdeck-platform`'s read-only I/O Registry census, the source Swift's
+//! daemon reads (the maintainer's decision Q1=B of 2026-09-24; r11's design
+//! table had the ArkForge lane's `arkforged discoverDevices` serve it, which is
+//! re-evaluated after M4). [`NoUsbRelations`] answers no relations at all
+//! wherever no registered HDC is composed — fail closed, every candidate
+//! unproved. Stamping observation identities and generations over a reading
+//! is the Target owner's.
 use crate::{
     Action, DeviceCandidate, DispatchFailure, Expected, HdcDispatch, Outcome, ParseError,
     ProcessPlan, parse_target_list,
 };
+use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -110,15 +115,96 @@ impl<F: Fn() -> Result<Vec<UsbRelation>, String>> UsbRelations for F {
     }
 }
 
-/// The production stand-in until the ArkForge lane's `arkforged
-/// discoverDevices` client reads the registry: no relation is ever observed,
-/// so no candidate is ever proved and no adoption can pass. It never fails
-/// the observation itself — the device list stays readable.
+/// No relation reader: beside a fixture HDC, and wherever no registered HDC
+/// is composed. No relation is ever observed, so no candidate is ever proved
+/// and no adoption can pass. It never fails the observation itself — the
+/// device list stays readable.
 pub struct NoUsbRelations;
 
 impl UsbRelations for NoUsbRelations {
     fn relations(&self) -> Result<Vec<UsbRelation>, String> {
         Ok(Vec::new())
+    }
+}
+
+/// Swift `RockchipProductUSBIdentity.isHDCNormal`'s product name, which the
+/// board reports between quotes.
+const HDC_NORMAL_PRODUCT_NAME: &str = "HDC Device";
+
+/// Swift's answer when its registry census throws: the reading fails, and
+/// the daemon's catch-all describes the error it caught,
+/// `RockchipFlashExecutionError.admissionRejected("USB registry unavailable")`.
+const REGISTRY_UNAVAILABLE: &str = "admissionRejected(\"USB registry unavailable\")";
+
+/// Swift `RockchipProductUSBIdentity.isHDCNormal`: the registered vendor, the
+/// DAYU200's normal-mode product, and a product name that is exactly
+/// `HDC Device` once quotes and spaces are trimmed from both ends. The Loader
+/// personality and every other device are not.
+pub fn is_dayu200_hdc_normal(device: &UsbHostDevice) -> bool {
+    device.vendor_id == ROCKUSB_VENDOR_ID
+        && device.product_id == DAYU200_NORMAL_PRODUCT_ID
+        && device
+            .product_name
+            .as_deref()
+            .is_some_and(|name| name.trim_matches(['"', ' ']) == HDC_NORMAL_PRODUCT_NAME)
+}
+
+/// Swift `TargetUSBRelation.registeredDAYU200()` over one census: every
+/// HDC-normal DAYU200 with a registry entry ID, in census order and without
+/// deduplication, as a relation whose location is its topology and whose
+/// attachment is that ID. Nothing else is judged here: whether a relation is
+/// usable, unique and unchanged is the reading's rule ([`Reading::rows`]).
+pub fn registered_dayu200_relations(devices: &[UsbHostDevice]) -> Vec<UsbRelation> {
+    devices
+        .iter()
+        .filter(|device| is_dayu200_hdc_normal(device))
+        .filter_map(|device| {
+            Some(UsbRelation {
+                serial: device.serial.clone(),
+                location: device.topology.clone(),
+                attachment_id: device.registry_entry_id?,
+                vendor_id: device.vendor_id,
+                product_id: device.product_id,
+            })
+        })
+        .collect()
+}
+
+/// The Runtime's own USB relations: Swift's daemon composes its coordinator
+/// with `TargetUSBRelation.registeredDAYU200()`, a fresh census of the host's
+/// I/O Registry on every read, and so does this with its census —
+/// [`UsbRegistryRelations::system`] reads the host's, a test hands it one. A
+/// census that cannot be taken fails the read with Swift's words, which fails
+/// the observation and breaks its continuity: it is never read as no devices.
+pub struct UsbRegistryRelations<C> {
+    census: C,
+}
+
+impl<C> UsbRegistryRelations<C>
+where
+    C: Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>,
+{
+    pub fn new(census: C) -> Self {
+        Self { census }
+    }
+}
+
+#[cfg(target_os = "macos")]
+impl UsbRegistryRelations<fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>> {
+    /// The host's I/O Registry (`arkdeck_platform::usb_host_devices`).
+    pub fn system() -> Self {
+        Self::new(arkdeck_platform::usb_host_devices)
+    }
+}
+
+impl<C> UsbRelations for UsbRegistryRelations<C>
+where
+    C: Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable>,
+{
+    fn relations(&self) -> Result<Vec<UsbRelation>, String> {
+        (self.census)()
+            .map(|devices| registered_dayu200_relations(&devices))
+            .map_err(|_| REGISTRY_UNAVAILABLE.to_owned())
     }
 }
 
@@ -695,5 +781,178 @@ mod tests {
             list_candidates(&garbage).unwrap_err().0,
             "invalidEncoding: stdout is not valid UTF-8"
         );
+    }
+
+    /// A census entry as the platform reads one: the DAYU200 in its
+    /// HDC-normal personality, with the product name it reports.
+    fn board(serial: &str, entry: u64) -> UsbHostDevice {
+        UsbHostDevice {
+            serial: serial.into(),
+            vendor_id: ROCKUSB_VENDOR_ID,
+            product_id: DAYU200_NORMAL_PRODUCT_ID,
+            topology: "100".into(),
+            product_name: Some("\"HDC Device\"".into()),
+            registry_entry_id: Some(entry),
+        }
+    }
+
+    #[test]
+    fn only_the_hdc_normal_dayu200_with_an_attachment_is_a_registered_relation() {
+        let named = |name: Option<&str>| UsbHostDevice {
+            product_name: name.map(str::to_owned),
+            ..board(KEY, 17)
+        };
+        for name in [
+            "\"HDC Device\"",
+            "HDC Device",
+            " \"HDC Device\" ",
+            "\"\" HDC Device \"\"",
+        ] {
+            assert!(is_dayu200_hdc_normal(&named(Some(name))), "{name:?}");
+        }
+        // Swift trims only quotes and spaces, and compares exactly.
+        for name in [
+            None,
+            Some(""),
+            Some("hdc device"),
+            Some("HDC Device2"),
+            Some("HDC  Device"),
+            Some("'HDC Device'"),
+            Some("\tHDC Device"),
+        ] {
+            assert!(!is_dayu200_hdc_normal(&named(name)), "{name:?}");
+        }
+        let loader = UsbHostDevice {
+            product_id: 0x350a,
+            ..board(KEY, 20)
+        };
+        let other = UsbHostDevice {
+            vendor_id: 0x18d1,
+            ..board(KEY, 21)
+        };
+        let detached = UsbHostDevice {
+            registry_entry_id: None,
+            ..board(KEY, 22)
+        };
+        assert!(!is_dayu200_hdc_normal(&loader));
+        assert!(!is_dayu200_hdc_normal(&other));
+        let foreign = UsbRelation {
+            serial: "bbbb".into(),
+            ..relation(18, "100")
+        };
+        assert_eq!(
+            registered_dayu200_relations(&[
+                loader,
+                board("bbbb", 18),
+                other,
+                detached,
+                named(None),
+                board(KEY, 17),
+                board(KEY, 17),
+            ]),
+            vec![foreign, relation(17, "100"), relation(17, "100")],
+            "in census order; nothing is deduplicated or judged usable here"
+        );
+        assert_eq!(registered_dayu200_relations(&[]), Vec::<UsbRelation>::new());
+    }
+
+    /// The registry reader through the reading's bracket: what one census
+    /// holds unchanged in both reads proves the candidate; a replug, a second
+    /// board with the serial, a board gone or never usable proves nothing;
+    /// and a census that cannot be taken fails the reading in Swift's words.
+    #[test]
+    fn the_registry_reader_proves_only_an_unchanged_unique_board_and_fails_closed() {
+        use std::cell::Cell;
+        let dispatch = Scripted {
+            version: "3.2.0f",
+            list: format!("{KEY}\t\tUSB\tConnected\tlocalhost\n").into_bytes(),
+            calls: RefCell::new(Vec::new()),
+        };
+        let proved = |census: &dyn UsbRelations| {
+            Reading::take(&dispatch, census).unwrap().rows()[0]
+                .relation
+                .clone()
+        };
+        assert_eq!(
+            proved(&UsbRegistryRelations::new(|| Ok(vec![board(KEY, 17)]))),
+            Some(relation(17, "100"))
+        );
+        let reads = Cell::new(0_u64);
+        let read = || {
+            reads.set(reads.get() + 1);
+            reads.get()
+        };
+        assert_eq!(
+            proved(&UsbRegistryRelations::new(|| Ok(vec![board(
+                KEY,
+                16 + read()
+            )]))),
+            None,
+            "a new attachment between the reads"
+        );
+        reads.set(0);
+        assert_eq!(
+            proved(&UsbRegistryRelations::new(|| {
+                Ok(if read() == 1 {
+                    vec![board(KEY, 17)]
+                } else {
+                    Vec::new()
+                })
+            })),
+            None,
+            "gone before the second read"
+        );
+        for census in [
+            vec![board(KEY, 17), board(KEY, 18)],
+            vec![UsbHostDevice {
+                registry_entry_id: None,
+                ..board(KEY, 17)
+            }],
+            vec![UsbHostDevice {
+                product_id: 0x350a,
+                ..board(KEY, 17)
+            }],
+            vec![UsbHostDevice {
+                topology: "0100".into(),
+                ..board(KEY, 17)
+            }],
+            vec![board("bbbb", 17)],
+            Vec::new(),
+        ] {
+            let reader = UsbRegistryRelations::new(|| Ok(census.clone()));
+            assert_eq!(proved(&reader), None, "{census:?}");
+        }
+        for cause in [
+            RegistryUnavailable::Matching,
+            RegistryUnavailable::Services(-536_870_212),
+            RegistryUnavailable::Invalidated,
+        ] {
+            let failing = UsbRegistryRelations::new(move || Err(cause));
+            assert_eq!(
+                Reading::take(&dispatch, &failing).unwrap_err().0,
+                "admissionRejected(\"USB registry unavailable\")",
+                "{cause:?}"
+            );
+            reads.set(0);
+            let second = UsbRegistryRelations::new(|| {
+                if read() == 1 {
+                    Ok(vec![board(KEY, 17)])
+                } else {
+                    Err(cause)
+                }
+            });
+            assert_eq!(
+                Reading::take(&dispatch, &second).unwrap_err().0,
+                "admissionRejected(\"USB registry unavailable\")",
+                "the second read of {cause:?}"
+            );
+        }
+        // The adoption's final check reads the same census.
+        let live = UsbRegistryRelations::new(|| Ok(vec![board(KEY, 17)]))
+            .relations()
+            .unwrap();
+        let readback = BTreeMap::from([("serial".to_owned(), KEY.to_owned())]);
+        assert!(adoption_holds(&relation(17, "100"), &live, &readback));
+        assert!(!adoption_holds(&relation(18, "100"), &live, &readback));
     }
 }
