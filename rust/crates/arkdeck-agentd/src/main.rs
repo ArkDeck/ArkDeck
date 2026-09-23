@@ -644,3 +644,5 @@ fn main() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod debug_read_control;
+#[cfg(all(test, target_os = "macos"))]
+mod trace_probe_control;

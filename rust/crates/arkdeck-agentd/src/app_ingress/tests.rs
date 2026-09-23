@@ -181,6 +181,7 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "trace.cache.status",
             "trace.cache.purge",
             "debug.probe",
+            "trace.probe",
         ]
         .contains(method)
         {
@@ -453,3 +454,6 @@ mod storage_tests;
 
 #[path = "import_tests.rs"]
 mod import_tests;
+
+#[path = "trace_probe_tests.rs"]
+mod trace_probe_tests;

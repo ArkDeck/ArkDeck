@@ -330,8 +330,9 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    # Debug reads validate required typed parameters before asking for a provider.
-                    if method in {"debug.probe", "debug.template.run"}:
+                    # Debug and Trace reads validate required typed parameters before asking
+                    # for a provider.
+                    if method in {"debug.probe", "debug.template.run", "trace.probe"}:
                         expected = "invalidParams"
                     if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
                         expected = "invalidParams"
@@ -380,6 +381,8 @@ def main() -> None:
                     ("debug-template-missing-owner", "debug.template.run", {"targetId": "target-fixture", "templateId": "device.uptime"}, "internalError"),
                     ("debug-probe-extra", "debug.probe", {"targetId": "target-fixture", "rawCommand": "shell uptime"}, "invalidParams"),
                     ("debug-template-unknown", "debug.template.run", {"targetId": "target-fixture", "templateId": "shell uptime"}, "invalidParams"),
+                    ("trace-probe-missing-owner", "trace.probe", {"targetId": "target-fixture"}, "internalError"),
+                    ("trace-probe-bad-type", "trace.probe", {"targetId": 1}, "invalidParams"),
                     ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),

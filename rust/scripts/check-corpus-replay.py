@@ -31,6 +31,12 @@ Job state an accepted run read, that state must not be terminal. A request
 naming `<nextCursor of X>` sends the cursor exchange X's page minted. The
 fake must receive the oracle's calls, in order.
 
+A probe oracle (`trace.probe`) has no Jobs either, but adopted its Target
+before its exchanges, as a Job oracle did. Its reads run concurrently, so it
+records each exchange's calls sorted, in `hdc-calls.log` (its answers append
+one line per call), and the replay compares those in place of the driver's
+log; its answers may read the `resources/` it recorded beside them.
+
 An adoption oracle has no Jobs: its daemon starts with no Target and adopts
 the device itself. An exchange that plugs USB relations names them
 (`usbRelations`, with `usbRelationsAfter` for a replug the oracle times by its
@@ -83,7 +89,7 @@ TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
 SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
           'agent.run', 'agent.status', 'agent.list', 'agent.abandon', 'device.observations',
-          'target.adopt'}
+          'target.adopt', 'trace.probe'}
 # The identities an owner mints at random, which an oracle labels by kind in
 # order of first appearance.
 MINTED = re.compile(r'\b(har|resume|candidate|obs)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-'
@@ -136,13 +142,18 @@ def wait_for(condition, seconds: float, failure: str) -> None:
 
 
 def install_fake(fixture: Path) -> None:
-    """`HDCOracleFake.install`: the driver, the oracle's answers, no calls."""
+    """`HDCOracleFake.install`: the driver, the oracle's answers, no calls; and
+    the resources those answers read, where an oracle recorded them."""
     shutil.rmtree(HDC_ROOT, ignore_errors=True)
     HDC_ROOT.mkdir(mode=0o700)
     shutil.copyfile(fixture / 'hdc', HDC_ROOT / 'hdc')
     (HDC_ROOT / 'hdc').chmod(0o700)
     shutil.copyfile(fixture / 'hdc-answers.sh', HDC_ROOT / 'hdc-answers.sh')
     (HDC_ROOT / 'hdc-invocations.log').write_bytes(b'')
+    if (fixture / 'resources').is_dir():
+        (HDC_ROOT / 'resources').mkdir(mode=0o700)
+        for resource in sorted((fixture / 'resources').iterdir()):
+            shutil.copyfile(resource, HDC_ROOT / 'resources' / resource.name)
 
 
 def main() -> None:
@@ -222,9 +233,11 @@ def main() -> None:
             state = base / 'state'
             state.mkdir(mode=0o700)
             (state / 'targets-state').mkdir(mode=0o700)
-            # A Job oracle adopted its Target before its runs; an adoption
-            # oracle starts with none and adopts it itself.
-            if oracle.get('jobs'):
+            # A Job or probe oracle adopted its Target before its exchanges;
+            # an adoption oracle starts with none and adopts it itself.
+            seeded = bool(oracle.get('jobs')) or not any(
+                item['method'] == 'target.adopt' for item in oracle['exchanges'])
+            if seeded:
                 shutil.copyfile(fixture / 'targets-state/targets.json',
                                 state / 'targets-state/targets.json')
                 # Owner-only, as the Target owner requires and Swift wrote it.
@@ -259,6 +272,11 @@ def main() -> None:
                 return json.loads(text)
 
             calls = HDC_ROOT / 'hdc-invocations.log'
+            # A probe's reads run concurrently, so its oracle records each
+            # exchange's calls sorted, from the answers' own one-append log.
+            concurrent = (fixture / 'hdc-calls.log').is_file()
+            exchange_calls = HDC_ROOT / 'hdc-calls.log'
+            sorted_calls = b''
             daemon_process = start(env, endpoint)
             replayed, answers, held_from = 0, {}, 0
             # The first page of the listing each page belongs to, and each
@@ -329,10 +347,20 @@ def main() -> None:
                               ours)
                 else:
                     compare(f'{name}: T1 answer', answer, item['answer'])
+                if concurrent:
+                    lines = exchange_calls.read_bytes().splitlines(keepends=True) \
+                        if exchange_calls.exists() else []
+                    exchange_calls.write_bytes(b'')
+                    sorted_calls += b''.join(sorted(lines))
                 replayed += 1
-            recorded, received = (fixture / 'hdc-invocations.log').read_bytes(), calls.read_bytes()
-            check('the fake received the oracle\'s calls in order', received == recorded)
-            if not oracle.get('jobs'):
+            dispatched = calls.read_bytes()
+            if concurrent:
+                recorded, received = (fixture / 'hdc-calls.log').read_bytes(), sorted_calls
+                check('the fake received each exchange\'s calls', received == recorded)
+            else:
+                recorded, received = (fixture / 'hdc-invocations.log').read_bytes(), dispatched
+                check('the fake received the oracle\'s calls in order', received == recorded)
+            if not seeded:
                 # The oracle adopted its device: the Target document and the
                 # candidate names are Swift's, their times read alike.
                 for document in ('targets.json', 'target-display-names.json'):
@@ -364,7 +392,7 @@ def main() -> None:
                         entries.append(note)
                 check(f'{run}: {method} after restart', after == expected,
                       {'expected': expected, 'after': after})
-            check('restart does not redispatch the fake HDC', calls.read_bytes() == received)
+            check('restart does not redispatch the fake HDC', calls.read_bytes() == dispatched)
             first = next(iter(oracle['exchanges']))['name'].split('.')[0]
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(endpoint), ARKDECK_DAEMON_PATH=str(daemon))
             for command, method in (('result', 'job.result'), ('evidence', 'job.evidence')) if jobs else ():

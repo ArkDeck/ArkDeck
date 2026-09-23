@@ -109,6 +109,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
         if [
             "debug.probe",
             "debug.template.run",
+            "trace.probe",
             "workspace.project.register",
             "workspace.project.list",
             "workspace.project.show",
@@ -1355,4 +1356,91 @@ fn debug_reads_validate_before_unconfigured_owner() {
         assert_eq!(error.message, "Debug Runtime probing is not configured");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+/// Swift's `trace.probe` handler reads a string `targetId`, and nothing
+/// else, before it asks for its probe; without one it answers as Swift's
+/// daemon without a probe.
+#[test]
+fn trace_probe_reads_a_string_target_before_its_unconfigured_owner() {
+    let (control, reads) = setup();
+    for params in [
+        json!({}),
+        json!({"targetId": 5}),
+        json!({"targetId": null}),
+        json!({"target": "TGT-example"}),
+    ] {
+        let error = call(&control, "trace.probe", params).outcome.unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            ("invalidParams", "targetId is required")
+        );
+    }
+    for params in [
+        json!({"targetId": "TGT-example"}),
+        json!({"targetId": "TGT-example", "rawCommand": "shell id"}),
+    ] {
+        let error = call(&control, "trace.probe", params).outcome.unwrap_err();
+        assert_eq!(error.code, "internalError");
+        assert_eq!(error.message, "Trace Runtime probing is not configured");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+/// The probe's owner receives the target as sent, once; its portrait is
+/// answered only as the current contract publishes it.
+#[test]
+fn trace_probe_answers_its_owner_s_portrait_within_the_contract() {
+    type Targets = Arc<std::sync::Mutex<Vec<String>>>;
+    struct Probe {
+        targets: Targets,
+        portrait: Value,
+    }
+    impl HostServices for Probe {
+        fn observed_at(&self) -> String {
+            "2026-09-01T00:00:00Z".into()
+        }
+        fn hdc_status(&self, deep: bool) -> HdcStatus {
+            HdcStatus::unavailable(deep, "hdc.notConfigured")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            unreachable!("trace.probe observes no candidates")
+        }
+        fn trace_probe(&self, target_id: &str) -> Result<Value, WireError> {
+            self.targets.lock().unwrap().push(target_id.to_owned());
+            Ok(self.portrait.clone())
+        }
+    }
+    let corpus = include_str!(
+        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/trace.probe.jsonl"
+    );
+    let recorded = corpus
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|record| record["ok"] == true)
+        .unwrap()["result"]
+        .clone();
+    let targets = Targets::default();
+    let control = Control::new(Probe {
+        targets: Arc::clone(&targets),
+        portrait: recorded.clone(),
+    })
+    .unwrap();
+    let answer = call(&control, "trace.probe", json!({"targetId": "TGT-example"}));
+    assert_eq!(answer.outcome.unwrap(), recorded);
+    let mut foreign = recorded;
+    foreign["rawCommand"] = json!("shell id");
+    let control = Control::new(Probe {
+        targets: Arc::clone(&targets),
+        portrait: foreign,
+    })
+    .unwrap();
+    let error = call(&control, "trace.probe", json!({"targetId": "TGT-other"}))
+        .outcome
+        .unwrap_err();
+    assert_eq!(error.code, "internalError");
+    assert_eq!(
+        targets.lock().unwrap().as_slice(),
+        ["TGT-example", "TGT-other"]
+    );
 }

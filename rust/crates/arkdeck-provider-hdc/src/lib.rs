@@ -32,6 +32,7 @@ mod semantic;
 #[cfg(target_os = "macos")]
 mod status;
 mod target_observation;
+mod trace_probe;
 
 pub use capture_files::{
     DirectoryPurpose, FaultLogName, FileAction, FileActionError, FilePlan, FileReceipt,
@@ -113,4 +114,9 @@ pub use target_observation::{
     ROCKUSB_VENDOR_ID, Reading, UsbRelation, UsbRelations, adoption_holds, list_candidates,
     observe_device_identity, observe_tool_version, stable_identity_sha256_for_serial,
     usable_relations,
+};
+pub use trace_probe::{
+    BYTRACE_HELP_FAMILY, HITRACE_HELP_FAMILY, TRACE_PARAMETERS, TraceParameterObservation,
+    TraceProbe, TraceSelection, TraceTool, TraceToolObservation, evaluate_help, evaluate_tag_list,
+    trace_probe,
 };

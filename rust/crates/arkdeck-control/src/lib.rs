@@ -355,6 +355,16 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `trace.probe`: the fixed Trace Runtime probe of an adopted Target. The
+    /// router reads its `targetId` before reaching an owner; a host without
+    /// one answers as Swift's daemon without its probe does.
+    fn trace_probe(&self, _target_id: &str) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Trace Runtime probing is not configured".into(),
+            details: None,
+        })
+    }
     /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
     /// without it keeps the foundation's refusal.
     fn runtime_hdc_status(&self) -> Result<Value, WireError> {
@@ -1263,6 +1273,15 @@ impl<H: HostServices> Control<H> {
                     },
                 }
             }
+            // As Swift's handler: a string `targetId` is required, and it is
+            // all the handler reads; the probe's commands are fixed.
+            "trace.probe" => match params.get("targetId").and_then(Value::as_str) {
+                Some(target) => Response {
+                    id: request.id.clone(),
+                    outcome: self.host.trace_probe(target),
+                },
+                None => Response::failure(&request.id, "invalidParams", "targetId is required"),
+            },
             // As Swift's handler: a caller's facts are refused before any observation.
             "runtime.hdc.status" if params.is_empty() => Response {
                 id: request.id.clone(),
