@@ -1,5 +1,6 @@
 //! Gregorian calendar primitives for the macOS Session store's frozen dates.
 //! Each call owns its calendar and UTC zone; no shared mutable formatter state.
+//! Each call also drains the Foundation objects it autoreleases.
 use std::ffi::c_void;
 
 #[repr(C)]
@@ -48,11 +49,42 @@ unsafe extern "C" {
     fn CFRelease(object: *const c_void);
 }
 
+#[link(name = "objc")]
+unsafe extern "C" {
+    fn objc_autoreleasePoolPush() -> *mut c_void;
+    fn objc_autoreleasePoolPop(pool: *mut c_void);
+}
+
 struct Owned(*const c_void);
 impl Drop for Owned {
     fn drop(&mut self) {
         // SAFETY: nonnull create-rule object, exclusively owned by this guard.
         unsafe { CFRelease(self.0) };
+    }
+}
+
+/// One call's autorelease pool. Foundation answers
+/// `CFCalendarDecomposeAbsoluteTime` through an autoreleased date-components
+/// object: two malloc blocks, 216 bytes, per call on macOS 27. A Rust thread
+/// has no pool of its own, so without this scope every such object waits for
+/// the thread to exit, and on a thread that lives as long as the process —
+/// a Runtime owner's, the soak's — that is a leak of one object per call.
+/// The Session census adds days to every catalogued Session on each
+/// publication, so the leak grew with the square of the Session count.
+/// Declare the guard before any other local so that it drops last.
+struct AutoreleasePool(*mut c_void);
+impl AutoreleasePool {
+    fn push() -> Self {
+        // SAFETY: opens a pool boundary on this thread's pool stack. The raw
+        // pointer keeps the guard on this thread, and it pops in LIFO order.
+        Self(unsafe { objc_autoreleasePoolPush() })
+    }
+}
+impl Drop for AutoreleasePool {
+    fn drop(&mut self) {
+        // SAFETY: the token of this thread's matching push; pools pushed
+        // after it have already been popped by their own guards.
+        unsafe { objc_autoreleasePoolPop(self.0) };
     }
 }
 
@@ -68,6 +100,7 @@ pub fn host_gregorian_timestamp(at: f64) -> Option<String> {
         whole += 1.0;
         nanos = 0;
     }
+    let _pool = AutoreleasePool::push();
     // SAFETY: create-rule objects are owned locally; the six output pointers
     // match the y/M/d/H/m/s C-int descriptors and live through the call.
     unsafe {
@@ -115,6 +148,7 @@ pub fn host_gregorian_seconds(
     minute: i32,
     second: i32,
 ) -> Option<f64> {
+    let _pool = AutoreleasePool::push();
     // SAFETY: the calendar and zone follow create-rule ownership. All variadic
     // arguments match the documented y/M/d/H/m/s C-int component descriptors;
     // output pointers reference live initialized f64 values for each call.
@@ -179,6 +213,7 @@ pub fn host_gregorian_add_days(at: f64, days: i32) -> Option<f64> {
     if !at.is_finite() || days <= 0 {
         return None;
     }
+    let _pool = AutoreleasePool::push();
     // SAFETY: create-rule objects are guarded; C varargs match d (int) and
     // y (int*) descriptors. No pointer escapes this function.
     unsafe {
