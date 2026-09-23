@@ -212,18 +212,20 @@ impl Owners {
     }
 }
 
-fn rows(jobs: &JobStore) -> Result<Vec<Value>> {
+/// Every Job's identity and state: all the soak reads from Job history. A page
+/// is dropped once these are copied out, so the soak itself does not hold
+/// every history row while the owner serves the next page.
+fn rows(jobs: &JobStore) -> Result<Vec<(String, String)>> {
     let mut rows = Vec::new();
     let mut params = Map::from_iter([("pageSize".into(), json!(250))]);
     loop {
         let page = jobs.handle_resource("job.list", &params).map_err(error)?;
-        rows.extend(
-            page["items"]
-                .as_array()
-                .ok_or("invalid Job list")?
-                .iter()
-                .cloned(),
-        );
+        for row in page["items"].as_array().ok_or("invalid Job list")? {
+            rows.push((
+                field(row, "jobId")?.to_owned(),
+                field(row, "state")?.to_owned(),
+            ));
+        }
         match page["nextCursor"].as_str() {
             Some(cursor) => {
                 params.insert("cursor".into(), json!(cursor));
@@ -279,9 +281,8 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         hdc: Some(&hdc),
     };
     let mut recovered = 0;
-    for row in rows(&owners.jobs)? {
-        let state = field(&row, "state")?;
-        if terminal(state) {
+    for (id, state) in rows(&owners.jobs)? {
+        if terminal(&state) {
             continue;
         }
         // This is the Swift fixture's clean preflight restart leg, never a
@@ -289,9 +290,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         if state != "preflight" {
             return Err(format!("unsupported restart state {state}"));
         }
-        let result = runner
-            .handle(&job_params(field(&row, "jobId")?))
-            .map_err(error)?;
+        let result = runner.handle(&job_params(&id)).map_err(error)?;
         if result["state"] != "succeeded" {
             return Err("reopened Job did not succeed".into());
         }
@@ -461,19 +460,17 @@ fn verify_owned_state(root: &Path) -> Result<u64> {
         return Err("empty state is not a soak workload".into());
     }
     let mut verified = 0;
-    for row in all_rows {
-        let state = field(&row, "state")?;
-        if !matches!(state, "succeeded" | "cancelled") {
+    for (id, state) in all_rows {
+        if !matches!(state.as_str(), "succeeded" | "cancelled") {
             return Err(format!("unexpected final state {state}"));
         }
-        let id = field(&row, "jobId")?;
-        let journal = inspect_journal(&root.join("jobs-state/jobs").join(id)).map_err(error)?;
-        if !journal.finalized || journal.current_state.as_deref() != Some(state) {
+        let journal = inspect_journal(&root.join("jobs-state/jobs").join(&id)).map_err(error)?;
+        if !journal.finalized || journal.current_state.as_deref() != Some(state.as_str()) {
             return Err("terminal Job and journal disagree".into());
         }
         if state == "succeeded" {
             let evidence = reader
-                .handle("job.evidence", &job_params(field(&row, "jobId")?))
+                .handle("job.evidence", &job_params(&id))
                 .map_err(error)?;
             let artifacts = evidence["artifacts"]
                 .as_array()
@@ -518,8 +515,8 @@ fn collect(
         artifacts: &owners.artifacts,
     };
     let mut states = BTreeMap::new();
-    for row in rows(&owners.jobs)? {
-        *states.entry(field(&row, "state")?.to_owned()).or_insert(0) += 1;
+    for (_, state) in rows(&owners.jobs)? {
+        *states.entry(state).or_insert(0) += 1;
     }
     let active = states
         .iter()
