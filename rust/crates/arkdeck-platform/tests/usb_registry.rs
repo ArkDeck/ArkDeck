@@ -20,8 +20,21 @@
 //!   margin below per-call retention;
 //! - (b) the growth stops: some measured batch keeps fewer than `CALLS / 100`.
 //!   A leak grows in every batch at its rate, whereas what the system fills
-//!   on first use stops growing, and an allocator's own bookkeeping moves both
-//!   ways.
+//!   on first use stops growing, and an allocator that accounts in whole
+//!   chunks steps in some batches and not in others.
+//!
+//! Port names are exact counts, so both rules always apply to them. The heap
+//! counter is exact only where the allocator accounts block by block. The
+//! control finds out which kind this host has: it frees everything it
+//! allocates, so an exact counter reads 0 for it in every batch.
+//!
+//! On macOS 26 (CI job 107404247720) the control stepped by 1,920 blocks
+//! (64 KiB) in one batch, and every census variant stepped in the same
+//! batches as the control and nowhere else. No per-batch heap bound can be
+//! tighter than one such chunk. Where the control steps, the heap is
+//! therefore judged by rule (b) alone. A leak smaller than a chunk per batch
+//! can hide in those steps; an exact host sees it, and port names show it
+//! everywhere.
 //!
 //! The per-batch figures go to the job's log on every run, passing or not, so
 //! each host's numbers are on record: libtest captures only the print macros.
@@ -152,6 +165,47 @@ fn controller_census(read: impl Fn(&dyn RegistryEntry)) -> usize {
     .len()
 }
 
+/// Rules (a) and (b) over one variant's measured batches. Rule (a) applies
+/// to the heap only when `exact_heap` says this host's heap counter resolves
+/// single blocks.
+fn judge(name: &str, kept: &[Kept], exact_heap: bool) -> Vec<String> {
+    let heap: Vec<i64> = kept.iter().map(|batch| batch.blocks).collect();
+    let ports: Vec<i64> = kept.iter().map(|batch| batch.ports).collect();
+    let mut failures = Vec::new();
+    for (counter, counts, per_batch) in [
+        ("heap blocks", &heap, exact_heap),
+        ("port names", &ports, true),
+    ] {
+        // (a) Per-call retention keeps at least CALLS in every batch.
+        if per_batch && counts.iter().any(|count| *count >= CALLS / 2) {
+            failures.push(format!(
+                "(a) {name} kept {counts:?} {counter}: a batch reached half of one per census"
+            ));
+        }
+        // (b) A leak keeps growing in every batch; a fill or a chunk step
+        // does not.
+        if counts.iter().all(|count| *count >= CALLS / 100) {
+            failures.push(format!(
+                "(b) {name} kept {counts:?} {counter}: it grew in every batch, as a leak does"
+            ));
+        }
+    }
+    failures
+}
+
+/// Batches of the given heap blocks and port names, for the rules' checks.
+fn recorded(blocks: [i64; MEASURED], ports: [i64; MEASURED]) -> Vec<Kept> {
+    blocks
+        .into_iter()
+        .zip(ports)
+        .map(|(blocks, ports)| Kept {
+            blocks,
+            bytes: 0,
+            ports,
+        })
+        .collect()
+}
+
 /// Everything the census reads from each USB host controller: a string, a
 /// number and a boolean the controllers carry, a device's serial they do not
 /// carry, and the registry entry ID.
@@ -167,6 +221,24 @@ fn controller_reads(entry: &dyn RegistryEntry) {
 
 #[test]
 fn the_host_registry_is_read_without_holding_anything() {
+    // The rules against the figures they were chosen from. On macOS 26 (CI
+    // job 107404247720) the heap counter steps in chunks, and a variant with
+    // no leak steps there. Every ownership mutant keeps 2,000 to 8,000 in
+    // every batch, as does a per-call leak on any host.
+    let stepped = recorded([0, 1536, 0, 0, 0, 3242], [0; MEASURED]);
+    assert!(judge("macOS 26, every read", &stepped, false).is_empty());
+    assert!(!judge("the same on an exact counter", &stepped, true).is_empty());
+    for exact_heap in [false, true] {
+        for per_call in [2_000, 4_000, 8_000] {
+            let heap = recorded([per_call; MEASURED], [0; MEASURED]);
+            assert!(!judge("a heap leak", &heap, exact_heap).is_empty());
+        }
+        let ports = recorded([0; MEASURED], [2_000; MEASURED]);
+        assert!(!judge("a reference leak", &ports, exact_heap).is_empty());
+        let slow = recorded([400; MEASURED], [0; MEASURED]);
+        assert!(!judge("a slow leak", &slow, exact_heap).is_empty());
+    }
+
     // The USB device census answers on any host; what it lists is this
     // host's, never a fixture and never acceptance.
     let devices = usb_host_devices().expect("the USB device census answers");
@@ -306,35 +378,19 @@ fn the_host_registry_is_read_without_holding_anything() {
         std::hint::black_box(blocks);
     });
     report(&describe("control, Rust heap churn only", &control));
+    let exact_heap = control.iter().all(|batch| batch.blocks.abs() < CALLS / 100);
+    report(if exact_heap {
+        "the heap counter resolves single blocks here (the control kept nothing): rules (a) and \
+         (b) apply to heap blocks and port names"
+    } else {
+        "the heap counter steps in allocator chunks here (the control, which reads no registry, \
+         stepped): rule (b) applies to heap blocks, (a) and (b) to port names"
+    });
     let mut failures = Vec::new();
     for (name, census) in &judged {
         let kept = batches(census.as_ref());
         report(&describe(name, &kept));
-        for (counter, counts) in [
-            (
-                "heap blocks",
-                kept.iter().map(|batch| batch.blocks).collect::<Vec<_>>(),
-            ),
-            (
-                "port names",
-                kept.iter().map(|batch| batch.ports).collect::<Vec<_>>(),
-            ),
-        ] {
-            // (a) Per-call retention keeps at least CALLS in every batch.
-            if counts.iter().any(|count| *count >= CALLS / 2) {
-                failures.push(format!(
-                    "(a) {name} kept {counts:?} {counter}: a batch reached half of one per \
-                     census"
-                ));
-            }
-            // (b) A leak keeps growing in every batch; a first-use fill stops.
-            if counts.iter().all(|count| *count >= CALLS / 100) {
-                failures.push(format!(
-                    "(b) {name} kept {counts:?} {counter}: it grew in every batch, as a \
-                     leak does"
-                ));
-            }
-        }
+        failures.extend(judge(name, &kept, exact_heap));
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

@@ -212,7 +212,21 @@ passes that entry over.
   - (a) No measured batch keeps 1,000 (`CALLS / 2`) or more. That is twice the margin below
     per-call retention.
   - (b) Some measured batch keeps fewer than 20 (`CALLS / 100`). A leak grows in every batch at its
-    rate; a first-use fill stops, and an allocator's bookkeeping moves both ways.
+    rate; a first-use fill stops, and an allocator that accounts in whole chunks steps in some
+    batches and not in others.
+
+  Port names are exact counts, so both rules always apply to them. For heap blocks, the control
+  calibrates the counter. The control frees all it allocates, so an exact counter reads 0 for it in
+  every batch.
+  - Where the control reads 0 (macOS 27 here), both rules apply to heap blocks.
+  - Where it steps (the macOS 26 CI VM), no per-batch heap bound can be tighter than one allocator
+    chunk, so heap blocks are judged by rule (b) alone. A leak smaller than a chunk per batch can hide
+    in those steps; an exact host sees it, and port names show it everywhere.
+
+  The test first checks the rules against the figures they were chosen from:
+  - macOS 26's stepped batches pass on a chunk-counting host and fail on an exact one;
+  - per-call leaks of 2,000, 4,000 and 8,000 per batch, a slow leak of 400 per batch, and a
+    reference leak fail on both kinds of host.
 
   Every run writes its per-batch figures to the job's log, passing or not: they go to the standard
   error stream itself, which libtest does not capture. The test does not require a DAYU200; without
@@ -249,7 +263,8 @@ passes that entry over.
   covers seven compositions. No process test can reach the registered ones, since a test HDC never
   has a registered digest.
 - **Mutations**, each caught and then restored by checksum. The first three were run again against
-  the measurement above. Each fails both rules in exactly the variants whose reads it breaks:
+  the measurement above, including its final calibrated form. On this exact host each fails both
+  rules in exactly the variants whose reads it breaks:
   - a census that never releases I/O Kit references keeps 2,000 port names in all six batches of
     every controller variant (its iterator). The production census on this host has no iterator,
     since it lists no device.
@@ -258,7 +273,6 @@ passes that entry over.
     `IOClass` and `locationID` keys are not.
   - never releasing the property value keeps 4,000 heap blocks per batch for every read and for the
     string alone. A small number and a boolean are not heap objects, and an absent key has no value.
-
   - dropping the product-name check fails both agentd tests and the provider unit test;
   - reading an unavailable census as no devices fails the agentd uncertainty test and the provider
     unit test.
@@ -300,10 +314,41 @@ The measurement was therefore rebuilt, with a longer warm-up, six measured batch
 alone, a control, and the two rules above. A slow leak in one kind of property read on macOS 26 would
 fail rule (b) in that read's variant alone, with every figure on the job's log.
 
-The production reader reads only `IOUSBHostDevice` properties: numbers (`idVendor`, `idProduct`,
-`locationID`), strings (the serials, the product name) and the registry entry ID. No CI VM lists a
-USB device, so the controller variants for the number and string reads stand in for them there. The
-boolean read is not one production makes. No production code changed.
+The rebuilt measurement ran on `macos-26` at head `13d7f065b`, in job 107404247720 of Swift CI
+35926948886. Again the VM had one controller and no USB device. Heap blocks per 2,000 censuses, six
+batches after three warm-up batches:
+
+| Variant | Heap blocks | Heap bytes in the stepped batches |
+| --- | --- | --- |
+| control, Rust heap churn only (no registry) | `[0, 1920, 0, 0, 0, 85]` | 65,536; 16,320 |
+| `usb_host_devices` | `[0, 512, 0, 0, 0, 0]` | 16,384 |
+| controllers, every read | `[0, 1536, 0, 0, 0, 3242]` | 32,768; 114,656 |
+| controllers, enumeration only | `[0, 512, 0, 0, 0, 3071]` | 16,384; 114,640 |
+| controllers, string `IOClass` | `[0, 1877, 0, 0, 0, 3242]` | 49,136; 114,656 |
+| controllers, number `locationID` | `[0, 512, 0, 0, 0, 3071]` | 16,384; 114,640 |
+| controllers, boolean `kUSBSleepSupported` | `[0, 853, 0, 0, 0, 2730]` | 32,752; 98,272 |
+| controllers, absent `USB Serial Number` | `[0, 853, 0, 0, 0, 2730]` | 32,752; 98,272 |
+| controllers, registry entry ID | `[0, 512, 0, 0, 0, 3071]` | 16,384; 114,640 |
+
+Port names were 0 in every batch of every variant.
+
+- **Not a leak, and in no property read.** Rule (b) held everywhere: four of six batches are exactly
+  0 in every variant. A leak cannot leave a batch at 0.
+- **Allocator chunks.** The steps fall in the same two batches as the control's, and the control
+  touches no registry. They come in whole chunks: 512 blocks are 16 KiB of 32-byte blocks, and the
+  control's step is 64 KiB. The variant that reads nothing (enumeration only) steps like the number
+  and registry-ID reads.
+- **What failed.** Rule (a), a per-batch heap bound. On this allocator one chunk alone exceeds it, as
+  the control proves. The calibration above is the fix; the rules and the port-name checks are
+  otherwise unchanged.
+- **Production is not affected.** The production reader reads only `IOUSBHostDevice` properties:
+  numbers (`idVendor`, `idProduct`, `locationID`), strings (the serials, the product name) and the
+  registry entry ID. Their stand-ins on a CI VM without USB devices, the number, string and registry
+  ID variants, show only the allocator's steps. The production census itself stepped once and then
+  stayed at 0. The boolean read is not one production makes. No production code changed.
+
+That job also stopped at this target. So the next head's macOS 26 run is still the first run of the
+other new tests (provider-hdc, agentd) there.
 
 ## Real-device acceptance still pending
 
@@ -358,6 +403,17 @@ are `/private/tmp/arkdeck-s12b-*.log`.
 | `cargo test -p arkdeck-platform --test usb_registry`: every variant and the control at 0 heap blocks, 0 bytes and 0 port names in all six batches; 2 controllers, 0 USB devices | 0 | `35325145…` |
 | the three ownership mutants against the new test: each fails rules (a) and (b) in exactly the variants whose reads it breaks (see Tests), then restored by checksum | 101 each | — |
 | `cargo build -p arkdeck-cli`, then `cargo test --locked --no-fail-fast -p arkdeck-platform -p arkdeck-provider-hdc -p arkdeck-agentd` (agentd because #2136 also changed `main.rs` and `host.rs`): 46 targets, 461 passed, 0 failed, 4 ignored (pre-existing), including #2136's `production_composition` | 0 | `b71ac876…` |
+| `sh scripts/check-sdd.sh`: 0 errors, 0 warnings | 0 | `77c17376…` |
+
+The third commit calibrates the heap rule by the control, again changing only
+`tests/usb_registry.rs` and this record. Logs are `/private/tmp/arkdeck-s12c-*.log`.
+
+| Command | Exit | Log SHA-256 |
+| --- | --- | --- |
+| `cargo fmt --all --check` | 0 | `e3b0c442…` (empty) |
+| `cargo clippy --locked -p arkdeck-platform --all-targets -- -D warnings` | 0 | `02264d92…` |
+| `cargo test -p arkdeck-platform --test usb_registry`: the rules' check against macOS 26's figures and the leak shapes passes; this host's counter is exact (the control kept 0), and every variant is 0 in all six batches | 0 | `f4abc29b…` |
+| the three ownership mutants against it: 14, 6 and 4 rule violations, each in the variants whose reads it breaks; restored by checksum | 101 each | — |
 | `sh scripts/check-sdd.sh`: 0 errors, 0 warnings | 0 | `77c17376…` |
 
 ## CI
