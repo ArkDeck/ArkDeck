@@ -1,0 +1,222 @@
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bytrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace --help
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hitrace -l
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.performance.monitor.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.build.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.layout.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.measure.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.sync.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.trace.syntax.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.rosen.animationtrace.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.sys.graphic.openDebugTrace

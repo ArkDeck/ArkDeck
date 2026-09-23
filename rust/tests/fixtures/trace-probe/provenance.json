@@ -1,0 +1,20 @@
+{
+  "files" : {
+    "cases.json" : "af6147d392e416b22edce3943a6bfcc363e2d279c7e0acbe9b6918f2697260d5",
+    "hdc" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "hdc-answers.sh" : "8af28392e44086c97b8ab7b9a210f731331245d2176bef3c0e830192bf8f75f7",
+    "hdc-calls.log" : "fa79991a6a8dc3a0577b7823d92d8854a83c1d77bdc18c8138854629e757b70d",
+    "resources/bytrace-help.stdout.bin" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+    "resources/bytrace-tags.stdout.bin" : "c37e017549ff634b5ffd03339fc7cbe50fd627a1140e84496eb6b68a56694810",
+    "resources/hitrace-help.stdout.bin" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+    "resources/hitrace-tags.stdout.bin" : "ade3fdc4dd8231dc57e2a8e4ec9d38151a376d245b822f75687c207ead467e96",
+    "targets-state/targets.json" : "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "home" : "/private/tmp/arkdeck-hdc-oracle/home",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "TraceProbeOracleContractTests.testSwiftProbesTheSharedFakeTraceRuntime",
+  "resourcePack" : "openspec/integrations/openharmony/trace-probes/1.0.0/fixtures",
+  "root" : "/private/tmp/arkdeck-hdc-oracle",
+  "targetId" : "TGT-3ba3f5f43b92"
+}

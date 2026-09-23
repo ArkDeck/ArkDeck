@@ -1,0 +1,46 @@
+2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP
+usage: hitrace [options] [categories...]
+options include:
+  -b N                   Set the size of the buffer (KB) for storing and reading traces.
+                         The default buffer size is 18432 KB.
+  --buffer_size N        Like "-b N".
+  -l                     List available hitrace categories.
+  --list_categories      Like "-l".
+  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on
+                         the time required for analysis.
+  --time N               Like "-t N".
+  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be
+                         boot (default), global, mono, uptime, or perf.
+  --trace_begin          Start capturing traces.
+  --trace_dump           Dump traces to a specified path (stdout by default).
+  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).
+  --trace_finish_nodump  Stop capturing traces and not dumps traces.
+  --record               Enable or disable long-term trace collection tasks in conjunction with
+                         "--trace_begin" and "--trace_finish".
+  --overwrite            Set the action to take when the buffer is full. If this option is used,
+                         the latest traces are discarded; if this option is not used (default setting),
+                         the earliest traces are discarded.
+  -o filename            Specifies the name of the target file (stdout by default).
+  --output filename      Like "-o filename".
+  -z                     Compresses a captured trace.
+  --text                 Specify the output format of trace as text.
+  --raw                  Specify the output format of trace as raw trace, the default format is text.
+  --start_bgsrv          Enable trace_service in snapshot mode.
+  --dump_bgsrv           Trigger the dump trace task of the trace_service.
+  --stop_bgsrv           Disable trace_service in snapshot mode.
+  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.
+                         Only effective in raw trace mode
+  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.
+                         Only effective in raw trace mode.
+  --trace_level level    Set the system parameter "persist.hitrace.level.threshold", which can control
+                         the level threshold of tracing. Valid values for "level" include
+                         D or Debug, I or Info, C or Critical, M or Commercial.
+  --get_level            Query the system parameter "persist.hitrace.level.threshold",
+                         which can control the level threshold of tracing.
+  --boot_trace           Configure boot trace capture for next boot. Use "off" to disable.
+                         It supports concrete categories with -b/--buffer_size, -t/--time,
+                         --file_prefix, --repeat and --increment.
+  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.
+  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.
+  --increment            Append an incrementing index to boot trace output names. Only supports
+                         --boot_trace.

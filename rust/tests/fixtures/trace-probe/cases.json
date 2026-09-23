@@ -1,0 +1,1860 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "captureEligible",
+          "bindingRevision" : 1,
+          "family" : "hitrace.dayu200-oh7.text",
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+            "ability",
+            "accesscontrol",
+            "accessibility",
+            "account",
+            "ace",
+            "animation",
+            "app",
+            "ark",
+            "binder",
+            "bluetooth",
+            "cloud",
+            "commercial",
+            "commonlibrary",
+            "daudio",
+            "dcamera",
+            "deviceauth",
+            "devicemanager",
+            "deviceprofile",
+            "dhfwk",
+            "dinput",
+            "disk",
+            "distributeddatamgr",
+            "dlpcre",
+            "drm",
+            "dsched",
+            "dscreen",
+            "dslm",
+            "dsoftbus",
+            "erofs",
+            "ffrt",
+            "filemanagement",
+            "freq",
+            "graphic",
+            "gresource",
+            "hdcd",
+            "hdf",
+            "hmfs",
+            "huks",
+            "i2c",
+            "idle",
+            "interconn",
+            "ipa",
+            "irq",
+            "irqoff",
+            "load",
+            "mdfs",
+            "membus",
+            "memory",
+            "memreclaim",
+            "misc",
+            "mmc",
+            "msdp",
+            "multimodalinput",
+            "musl",
+            "net",
+            "notification",
+            "nweb",
+            "ohos",
+            "pagecache",
+            "power",
+            "preemptoff",
+            "push",
+            "regulators",
+            "rpc",
+            "samgr",
+            "sched",
+            "schedlt",
+            "security",
+            "sensors",
+            "sync",
+            "ufs",
+            "usb",
+            "useriam",
+            "virse",
+            "window",
+            "workq",
+            "zaudio",
+            "zbinder",
+            "zcamera",
+            "zimage",
+            "zmedia"
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : "hitrace",
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "normal",
+      "name" : "probe.captureEligible",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "captureEligible",
+          "bindingRevision" : 1,
+          "family" : "hitrace.dayu200-oh7.text",
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2026/09/14 08:30:00 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "49f198ca7b032fd8398338faab919815832b43395ca7678baf3f9fe862b202c1",
+          "supportedTags" : [
+            "ability",
+            "accesscontrol",
+            "accessibility",
+            "account",
+            "ace",
+            "animation",
+            "app",
+            "ark",
+            "binder",
+            "bluetooth",
+            "cloud",
+            "commercial",
+            "commonlibrary",
+            "daudio",
+            "dcamera",
+            "deviceauth",
+            "devicemanager",
+            "deviceprofile",
+            "dhfwk",
+            "dinput",
+            "disk",
+            "distributeddatamgr",
+            "dlpcre",
+            "drm",
+            "dsched",
+            "dscreen",
+            "dslm",
+            "dsoftbus",
+            "erofs",
+            "ffrt",
+            "filemanagement",
+            "freq",
+            "graphic",
+            "gresource",
+            "hdcd",
+            "hdf",
+            "hmfs",
+            "huks",
+            "i2c",
+            "idle",
+            "interconn",
+            "ipa",
+            "irq",
+            "irqoff",
+            "load",
+            "mdfs",
+            "membus",
+            "memory",
+            "memreclaim",
+            "misc",
+            "mmc",
+            "msdp",
+            "multimodalinput",
+            "musl",
+            "net",
+            "notification",
+            "nweb",
+            "ohos",
+            "pagecache",
+            "power",
+            "preemptoff",
+            "push",
+            "regulators",
+            "rpc",
+            "samgr",
+            "sched",
+            "schedlt",
+            "security",
+            "sensors",
+            "sync",
+            "ufs",
+            "usb",
+            "useriam",
+            "virse",
+            "window",
+            "workq",
+            "zaudio",
+            "zbinder",
+            "zcamera",
+            "zimage",
+            "zmedia"
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : "hitrace",
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "49f198ca7b032fd8398338faab919815832b43395ca7678baf3f9fe862b202c1",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "b9a92856f367fba99f0080f05e2b27b640d2b4c2e766ec6ce2f583342f6cf27e",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "restamped",
+      "name" : "probe.restamped",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "captureEligible",
+          "bindingRevision" : 1,
+          "family" : "hitrace.dayu200-oh7.text",
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+            "ability",
+            "accesscontrol",
+            "accessibility",
+            "account",
+            "ace",
+            "animation",
+            "app",
+            "ark",
+            "binder",
+            "bluetooth",
+            "cloud",
+            "commercial",
+            "commonlibrary",
+            "daudio",
+            "dcamera",
+            "deviceauth",
+            "devicemanager",
+            "deviceprofile",
+            "dhfwk",
+            "dinput",
+            "disk",
+            "distributeddatamgr",
+            "dlpcre",
+            "drm",
+            "dsched",
+            "dscreen",
+            "dslm",
+            "dsoftbus",
+            "erofs",
+            "ffrt",
+            "filemanagement",
+            "freq",
+            "graphic",
+            "gresource",
+            "hdcd",
+            "hdf",
+            "hmfs",
+            "huks",
+            "i2c",
+            "idle",
+            "interconn",
+            "ipa",
+            "irq",
+            "irqoff",
+            "load",
+            "mdfs",
+            "membus",
+            "memory",
+            "memreclaim",
+            "misc",
+            "mmc",
+            "msdp",
+            "multimodalinput",
+            "musl",
+            "net",
+            "notification",
+            "nweb",
+            "ohos",
+            "pagecache",
+            "power",
+            "preemptoff",
+            "push",
+            "regulators",
+            "rpc",
+            "samgr",
+            "sched",
+            "schedlt",
+            "security",
+            "sensors",
+            "sync",
+            "ufs",
+            "usb",
+            "useriam",
+            "virse",
+            "window",
+            "workq",
+            "zaudio",
+            "zbinder",
+            "zcamera",
+            "zimage",
+            "zmedia"
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : "hitrace",
+          "tools" : [
+            {
+              "detail" : "probe exited non-zero",
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : "probe exited non-zero",
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpExitNonZero",
+      "name" : "probe.helpExitNonZero",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the BUFFER (KB) for storing and reading traces.\n                         The default BUFFER size is 18432 KB.\n  --BUFFER_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the BUFFER is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--BUFFER_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "8dddfc4814e3e692608ce24e694aaf2efa38434b139aeb3236930e0f38d37e9c",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "8dddfc4814e3e692608ce24e694aaf2efa38434b139aeb3236930e0f38d37e9c",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : "probe exited non-zero",
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "11c96eb1427e0061d582f972e25283b90febddaac08442bfaa71415503b48fdd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpUnregistered",
+      "name" : "probe.helpUnregistered",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2026/13/14 08:30:00 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "4edf6b491a02a52c31a9a31bb536fbbfb434400adaf44461cbcf39d57b830f65",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "4edf6b491a02a52c31a9a31bb536fbbfb434400adaf44461cbcf39d57b830f65",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpBadTimestamp",
+      "name" : "probe.helpBadTimestamp",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpStderr",
+      "name" : "probe.helpStderr",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 bytrace enter, running_state is SHOW_HELP\nusage: bytrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpSwapped",
+      "name" : "probe.helpSwapped",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : null,
+          "rawHelpSha256" : null,
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : "read-only probe could not complete",
+              "disposition" : "probeFailed",
+              "family" : null,
+              "rawHelpSha256" : null,
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : "read-only probe could not complete",
+              "disposition" : "probeFailed",
+              "family" : null,
+              "rawHelpSha256" : null,
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpUnobservable",
+      "name" : "probe.helpUnobservable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : null,
+          "rawHelpSha256" : "c74fe0615830d6601ede6bdef8618720fa0b121af81b75f6c901dfe18b582676",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "unrecognized",
+              "family" : null,
+              "rawHelpSha256" : "c74fe0615830d6601ede6bdef8618720fa0b121af81b75f6c901dfe18b582676",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "helpNotUTF8",
+      "name" : "probe.helpNotUTF8",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsUnregistered",
+      "name" : "probe.tagsUnregistered",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsStderr",
+      "name" : "probe.tagsStderr",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "unsupported",
+          "bindingRevision" : 1,
+          "family" : null,
+          "parameters" : [
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "value",
+              "value" : "false"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "0"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "value",
+              "value" : "1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "value",
+              "value" : "false"
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : null,
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsSwapped",
+      "name" : "probe.tagsSwapped",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: read-only HDC probe exited 1"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsExitNonZero",
+      "name" : "probe.tagsExitNonZero",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: read-only HDC probe failed: HDC reported an explicit failure"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsFailMarker",
+      "name" : "probe.tagsFailMarker",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: outcomeUnknown(\"process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for a same-second entry named after the executable).\")"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsUnobservable",
+      "name" : "probe.tagsUnobservable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: read-only HDC probe output was truncated"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsTruncated",
+      "name" : "probe.tagsTruncated",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: outcomeUnknown(\"process timed out before completion\")"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "tagsTimeout",
+      "name" : "probe.tagsTimeout",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "captureEligible",
+          "bindingRevision" : 1,
+          "family" : "hitrace.dayu200-oh7.text",
+          "parameters" : [
+            {
+              "detail" : "read-only HDC probe failed: HDC reported an explicit failure",
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe failed: HDC reported an explicit failure",
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe failed: HDC reported an explicit failure",
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe failed: HDC reported an explicit failure",
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "parameter output is not UTF-8",
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "parameter value is oversized",
+              "name" : "persist.ace.debug.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe output was truncated",
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe exited 1",
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "read-only HDC probe failed: target is offline",
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "unreadable",
+              "value" : null
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+            "ability",
+            "accesscontrol",
+            "accessibility",
+            "account",
+            "ace",
+            "animation",
+            "app",
+            "ark",
+            "binder",
+            "bluetooth",
+            "cloud",
+            "commercial",
+            "commonlibrary",
+            "daudio",
+            "dcamera",
+            "deviceauth",
+            "devicemanager",
+            "deviceprofile",
+            "dhfwk",
+            "dinput",
+            "disk",
+            "distributeddatamgr",
+            "dlpcre",
+            "drm",
+            "dsched",
+            "dscreen",
+            "dslm",
+            "dsoftbus",
+            "erofs",
+            "ffrt",
+            "filemanagement",
+            "freq",
+            "graphic",
+            "gresource",
+            "hdcd",
+            "hdf",
+            "hmfs",
+            "huks",
+            "i2c",
+            "idle",
+            "interconn",
+            "ipa",
+            "irq",
+            "irqoff",
+            "load",
+            "mdfs",
+            "membus",
+            "memory",
+            "memreclaim",
+            "misc",
+            "mmc",
+            "msdp",
+            "multimodalinput",
+            "musl",
+            "net",
+            "notification",
+            "nweb",
+            "ohos",
+            "pagecache",
+            "power",
+            "preemptoff",
+            "push",
+            "regulators",
+            "rpc",
+            "samgr",
+            "sched",
+            "schedlt",
+            "security",
+            "sensors",
+            "sync",
+            "ufs",
+            "usb",
+            "useriam",
+            "virse",
+            "window",
+            "workq",
+            "zaudio",
+            "zbinder",
+            "zcamera",
+            "zimage",
+            "zmedia"
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : "hitrace",
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "parametersUnreadable",
+      "name" : "probe.parametersUnreadable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "adapterDisposition" : "captureEligible",
+          "bindingRevision" : 1,
+          "family" : "hitrace.dayu200-oh7.text",
+          "parameters" : [
+            {
+              "detail" : "read-only HDC probe failed: target authorization is unavailable",
+              "name" : "persist.ace.trace.syntax.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : "outcomeUnknown(\"process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for a same-second entry named after the executable).\")",
+              "name" : "persist.ace.trace.layout.enabled",
+              "state" : "unreadable",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.build.enabled",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.measure.debug.enabled",
+              "state" : "value",
+              "value" : "other.key = 1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.trace.sync.debug.enabled",
+              "state" : "value",
+              "value" : "persist.ace.trace.sync.debug.enabled.extra = 1"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.debug.enabled",
+              "state" : "value",
+              "value" : "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.ace.performance.monitor.enabled",
+              "state" : "value",
+              "value" : "true"
+            },
+            {
+              "detail" : null,
+              "name" : "persist.sys.graphic.openDebugTrace",
+              "state" : "missing",
+              "value" : null
+            },
+            {
+              "detail" : null,
+              "name" : "persist.rosen.animationtrace.enabled",
+              "state" : "missing",
+              "value" : null
+            }
+          ],
+          "rawHelp" : "2021/01/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b/--buffer_size, -t/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+          "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+          "supportedTags" : [
+            "ability",
+            "accesscontrol",
+            "accessibility",
+            "account",
+            "ace",
+            "animation",
+            "app",
+            "ark",
+            "binder",
+            "bluetooth",
+            "cloud",
+            "commercial",
+            "commonlibrary",
+            "daudio",
+            "dcamera",
+            "deviceauth",
+            "devicemanager",
+            "deviceprofile",
+            "dhfwk",
+            "dinput",
+            "disk",
+            "distributeddatamgr",
+            "dlpcre",
+            "drm",
+            "dsched",
+            "dscreen",
+            "dslm",
+            "dsoftbus",
+            "erofs",
+            "ffrt",
+            "filemanagement",
+            "freq",
+            "graphic",
+            "gresource",
+            "hdcd",
+            "hdf",
+            "hmfs",
+            "huks",
+            "i2c",
+            "idle",
+            "interconn",
+            "ipa",
+            "irq",
+            "irqoff",
+            "load",
+            "mdfs",
+            "membus",
+            "memory",
+            "memreclaim",
+            "misc",
+            "mmc",
+            "msdp",
+            "multimodalinput",
+            "musl",
+            "net",
+            "notification",
+            "nweb",
+            "ohos",
+            "pagecache",
+            "power",
+            "preemptoff",
+            "push",
+            "regulators",
+            "rpc",
+            "samgr",
+            "sched",
+            "schedlt",
+            "security",
+            "sensors",
+            "sync",
+            "ufs",
+            "usb",
+            "useriam",
+            "virse",
+            "window",
+            "workq",
+            "zaudio",
+            "zbinder",
+            "zcamera",
+            "zimage",
+            "zmedia"
+          ],
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : "hitrace",
+          "tools" : [
+            {
+              "detail" : null,
+              "disposition" : "captureEligible",
+              "family" : "hitrace.dayu200-oh7.text",
+              "rawHelpSha256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+              "tool" : "hitrace"
+            },
+            {
+              "detail" : null,
+              "disposition" : "probeOnly",
+              "family" : "bytrace.dayu200-oh7.text",
+              "rawHelpSha256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+              "tool" : "bytrace"
+            }
+          ]
+        }
+      },
+      "method" : "trace.probe",
+      "mode" : "parametersEdge",
+      "name" : "probe.parametersEdge",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: target TGT-000000000000 has not been adopted"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "normal",
+      "name" : "probe.unadopted",
+      "params" : {
+        "targetId" : "TGT-000000000000"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Trace Runtime probe failed: target  has not been adopted"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "mode" : "normal",
+      "name" : "probe.emptyTarget",
+      "params" : {
+        "targetId" : ""
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId is required"
+        },
+        "ok" : false
+      },
+      "method" : "trace.probe",
+      "name" : "probe.noParameters",
+      "params" : {
+
+      }
+    }
+  ],
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  },
+  "unadoptedTarget" : "TGT-000000000000"
+}
