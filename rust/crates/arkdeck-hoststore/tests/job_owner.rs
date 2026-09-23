@@ -482,11 +482,15 @@ fn corrupt_identity_and_unknown_fields_fail_the_complete_list() {
             )
             .unwrap();
         let store = JobStore::open(&root.0).unwrap();
-        assert_eq!(
-            handle(&store, "job.list", json!({})).unwrap_err().code,
-            "recordUnreadable",
-            "{alteration}"
-        );
+        for options in [json!({}), json!({"state":"queued", "pageSize":1})] {
+            // A projected or filtered-out row still belongs to the complete
+            // source census: it cannot hide a malformed record.
+            assert_eq!(
+                handle(&store, "job.list", options).unwrap_err().code,
+                "recordUnreadable",
+                "{alteration}"
+            );
+        }
     }
 }
 

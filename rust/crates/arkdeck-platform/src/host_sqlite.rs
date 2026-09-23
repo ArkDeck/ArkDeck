@@ -147,6 +147,19 @@ impl HostSqlite {
         values: &[SqliteValue],
         maximum_bytes: usize,
     ) -> io::Result<Vec<Vec<SqliteValue>>> {
+        self.query_map(sql, values, maximum_bytes, Ok)
+    }
+
+    /// Project each owned row before stepping to the next. The cumulative byte
+    /// budget still covers every source column, including discarded payloads.
+    /// An error drops all projected results and finalizes the statement.
+    pub fn query_map<T>(
+        &mut self,
+        sql: &str,
+        values: &[SqliteValue],
+        maximum_bytes: usize,
+        mut project: impl FnMut(Vec<SqliteValue>) -> io::Result<T>,
+    ) -> io::Result<Vec<T>> {
         let sql = CString::new(sql).map_err(|_| super::invalid("invalid SQLite statement"))?;
         let mut raw = ptr::null_mut();
         let mut tail = ptr::null();
@@ -248,7 +261,7 @@ impl HostSqlite {
                 };
                 row.push(value);
             }
-            rows.push(row);
+            rows.push(project(row)?);
         }
         Ok(rows)
     }
@@ -259,5 +272,55 @@ impl HostSqlite {
         }
         // SAFETY: the connection is live and this observes its last statement.
         usize::try_from(unsafe { sqlite3_changes(self.0) }).map_err(|_| error(20))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::DirBuilderExt;
+
+    #[test]
+    fn projection_preserves_source_budget_and_finalizes_on_failure() {
+        let nonce = u128::from_ne_bytes(crate::random_bytes::<16>().unwrap());
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("sqlite-projection-{nonce:x}"));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root)
+            .unwrap();
+        let mut db = HostSqlite::open(&root.join("store.sqlite"), false, true).unwrap();
+        db.execute("CREATE TABLE rows (id INTEGER, payload BLOB)", &[])
+            .unwrap();
+        for id in 0..3 {
+            db.execute(
+                "INSERT INTO rows VALUES (?, ?)",
+                &[SqliteValue::Integer(id), SqliteValue::Blob(vec![42; 1024])],
+            )
+            .unwrap();
+        }
+        let sql = "SELECT id, payload FROM rows ORDER BY id";
+        let projected = db
+            .query_map(sql, &[], 3096, |row| Ok(row[0].integer().unwrap()))
+            .unwrap();
+        assert_eq!(projected, [0, 1, 2]);
+        // Dropping every payload does not bypass the original aggregate limit.
+        assert!(db.query_map(sql, &[], 3095, |_| Ok(())).is_err());
+        let error = db
+            .query_map(sql, &[], 3096, |row| {
+                if row[0].integer() == Some(1) {
+                    Err(io::Error::other("projection failed"))
+                } else {
+                    Ok(())
+                }
+            })
+            .unwrap_err();
+        assert_eq!(error.to_string(), "projection failed");
+        // Both failure paths finalize their statement and release its read lock.
+        db.execute("DROP TABLE rows", &[]).unwrap();
+        drop(db);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

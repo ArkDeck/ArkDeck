@@ -185,9 +185,11 @@ impl JobStore {
         self.root.validate_path(&self.path)?;
         Ok(self
             .repository
-            .rows(None)?
+            .map_rows(None, |row| {
+                Ok((!crate::job_record::terminal(&row.state)).then_some(row))
+            })?
             .into_iter()
-            .filter(|row| !crate::job_record::terminal(&row.state))
+            .flatten()
             .collect())
     }
 
@@ -667,26 +669,38 @@ impl JobStore {
         SnapshotPager::open(&self.path.join("cli-job-snapshots"))
             .map_err(unreadable)?
             .page_filtered("job.list", &filters, order, size, cursor, || {
-                let mut rows = Vec::new();
-                for row in self.repository.rows(None).map_err(unreadable)? {
-                    let record = JobRecord::from_row(&row)?;
-                    let value = record.history(timeline);
-                    if [
-                        ("state", "state"),
-                        ("operation", "operation"),
-                        ("target", "targetId"),
-                        ("thread", "threadId"),
-                    ]
-                    .iter()
-                    .any(|(filter, field)| {
-                        filters
-                            .get(*filter)
-                            .is_some_and(|expected| expected != &value[*field])
-                    }) {
-                        continue;
-                    }
-                    rows.push((row.order_key, row.id, value));
-                }
+                let projected = self
+                    .repository
+                    .map_rows(None, |row| {
+                        // Preserve the typed record error while the repository still
+                        // validates every source row in its complete snapshot.
+                        Ok((|| -> Result<_, WireError> {
+                            let record = JobRecord::from_row(&row)?;
+                            let value = record.history(timeline);
+                            if [
+                                ("state", "state"),
+                                ("operation", "operation"),
+                                ("target", "targetId"),
+                                ("thread", "threadId"),
+                            ]
+                            .iter()
+                            .any(|(filter, field)| {
+                                filters
+                                    .get(*filter)
+                                    .is_some_and(|expected| expected != &value[*field])
+                            }) {
+                                return Ok(None);
+                            }
+                            Ok(Some((row.order_key, row.id, value)))
+                        })())
+                    })
+                    .map_err(unreadable)?;
+                let mut rows = projected
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
                 rows.sort_by(|a, b| {
                     (if order == "createdAtDescJobIdAsc" {
                         b.0.cmp(&a.0)
