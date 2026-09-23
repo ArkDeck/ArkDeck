@@ -27,6 +27,8 @@ use std::time::{Duration, Instant};
 const LISTENER_HOST: &str = "ARKDECK_LEASE_LISTENER_HOST";
 const LISTENER_PORT: &str = "ARKDECK_LEASE_LISTENER_PORT";
 const LISTENER_READY: &str = "ARKDECK_LEASE_LISTENER_READY";
+/// Set, the listener ignores SIGTERM, as a server that will not end politely.
+const LISTENER_IGNORES_TERM: &str = "ARKDECK_LEASE_LISTENER_IGNORES_TERM";
 
 /// A scanning test's turn, held for as long as the test has children so that
 /// the running processes of the verified executable are only ever its own.
@@ -44,6 +46,11 @@ fn listener_process() {
     let (Ok(host), Ok(port)) = (std::env::var(LISTENER_HOST), std::env::var(LISTENER_PORT)) else {
         return;
     };
+    if std::env::var_os(LISTENER_IGNORES_TERM).is_some() {
+        // SAFETY: SIG_IGN is a valid disposition for SIGTERM; nothing of this
+        // process handles the signal otherwise.
+        unsafe { libc::signal(libc::SIGTERM, libc::SIG_IGN) };
+    }
     // The address is parsed, never looked up: binding must not wait on a
     // name service that a loaded host can keep waiting.
     let address = SocketAddrV4::new(host.parse().unwrap(), port.parse().unwrap());
@@ -97,9 +104,15 @@ impl Executable {
     /// listening by the time it is returned; no connection is ever made to
     /// it.
     fn listener(&self, host: &str, port: u16) -> Listener {
+        self.listener_with(host, port, &[])
+    }
+
+    /// The same, with more of the listener's environment.
+    fn listener_with(&self, host: &str, port: u16, environment: &[(&str, &str)]) -> Listener {
         let report = self.reports.0.join(format!("listening-{port}"));
         let child = Command::new(&self.path)
             .args(["--exact", "listener_process", "--test-threads", "1"])
+            .envs(environment.iter().copied())
             .env(LISTENER_HOST, host)
             .env(LISTENER_PORT, port.to_string())
             .env(LISTENER_READY, &report)
@@ -300,6 +313,83 @@ fn the_endpoint_must_be_the_exact_ipv4_loopback() {
         SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0),
     ] {
         let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidInput);
+    }
+}
+
+/// What a daemon may do with a proof (TASK-XPA-014): end the one server
+/// process it names and nothing else. SIGTERM ends a server that heeds it,
+/// SIGKILL after the grace one that ignores it; a receipt whose birth the
+/// kernel does not report for its PID — a recycled PID's, here one
+/// microsecond off — signals nothing, and neither does a receipt of a
+/// process that has already ended. A PID kill(2) would read as a group or as
+/// every process is refused outright.
+#[test]
+fn only_the_proved_process_is_ended_and_one_that_ignores_sigterm_is_killed() {
+    use arkdeck_platform::{ProvedProcessEnd, ServerIdentityReceipt, end_proved_process};
+    use std::os::unix::process::ExitStatusExt;
+    let (grace, kill_grace) = (Duration::from_millis(250), Duration::from_secs(1));
+    let _alone = alone();
+    let this = Executable::new();
+    for (environment, expected, signal) in [
+        (&[][..], ProvedProcessEnd::Terminated, libc::SIGTERM),
+        (
+            &[(LISTENER_IGNORES_TERM, "1")][..],
+            ProvedProcessEnd::Killed,
+            libc::SIGKILL,
+        ),
+    ] {
+        let port = free_port();
+        let mut listener = this.listener_with("127.0.0.1", port, environment);
+        let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+        let lease = acquire_within(&this.tool, endpoint, Duration::from_secs(5)).unwrap();
+        let recycled = ServerIdentityReceipt {
+            start_microseconds: (lease.identity().start_microseconds + 1) % 1_000_000,
+            ..lease.identity().clone()
+        };
+        assert_eq!(
+            end_proved_process(&recycled, grace, kill_grace).unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        assert!(
+            matches!(listener.0.try_wait(), Ok(None)),
+            "a process of another birth was signalled"
+        );
+        lease.revalidate().unwrap();
+        assert_eq!(
+            end_proved_process(lease.identity(), grace, kill_grace).unwrap(),
+            expected
+        );
+        // This test's own child: ended (a zombie has no birth), reaped here.
+        assert_eq!(listener.0.wait().unwrap().signal(), Some(signal));
+        assert!(lease.revalidate().is_err());
+        assert_eq!(
+            end_proved_process(lease.identity(), grace, kill_grace).unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        assert!(
+            TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok(),
+            "the ended server's endpoint is free"
+        );
+    }
+    let this_process = ServerIdentityReceipt {
+        pid: i32::try_from(std::process::id()).unwrap(),
+        start_seconds: 1,
+        start_microseconds: 0,
+        executable_path: this.path.clone(),
+        executable_sha256: this.tool.sha256().to_owned(),
+        endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710),
+    };
+    for pid in [0, -1] {
+        let error = end_proved_process(
+            &ServerIdentityReceipt {
+                pid,
+                ..this_process.clone()
+            },
+            grace,
+            kill_grace,
+        )
+        .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidInput);
     }
 }

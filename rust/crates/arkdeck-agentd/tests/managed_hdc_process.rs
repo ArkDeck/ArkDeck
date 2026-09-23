@@ -3,10 +3,14 @@
 //! development HDC as `hdc -s <endpoint> -m` before the daemon serves,
 //! `runtime.hdc.status` and `target.availability` answer from it, and SIGTERM
 //! drains the daemon, stops the server and ends the daemon with status 0,
-//! leaving nothing on the endpoint. Host-only: the HDC is a fake compiled
-//! here from C (a shell script cannot own a TCP listener); the Target is the
-//! adoption fixture's, copied. No real HDC, device, installed state or Swift
-//! daemon is used. Spawning children, these tests keep a binary of their own.
+//! leaving nothing on the endpoint. A daemon that ends without its stop
+//! (SIGKILL, or exit 70 after another client's `kill -r`) leaves a server
+//! the next start did not launch: every start refuses it before launching
+//! anything, neither adopting nor stopping it, until it ends (TASK-XPA-014).
+//! Host-only: the HDC is a fake compiled here from C (a shell script cannot
+//! own a TCP listener); the Target is the adoption fixture's, copied. No real
+//! HDC, device, installed state or Swift daemon is used. Spawning children,
+//! these tests keep a binary of their own.
 #![cfg(target_os = "macos")]
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION, sha256_hex, validate_method_value};
 use serde_json::{Value, json};
@@ -26,6 +30,9 @@ mod loopback_ports {
     include!("../../../tests/support/loopback_ports.rs");
 }
 use loopback_ports::{free_port, issued_listener};
+mod fake_hdc_servers {
+    include!("../../../tests/support/fake_hdc_servers.rs");
+}
 
 fn reachable(port: u16) -> bool {
     TcpStream::connect_timeout(
@@ -73,8 +80,21 @@ impl Runtime {
         fs::set_permissions(&targets, fs::Permissions::from_mode(0o600)).unwrap();
         let source = root.join("tools/fake-hdc.c");
         fs::write(&source, FAKE_HDC).unwrap();
+        // Every invocation is recorded in `tools/calls`; `kill` stops a
+        // server of this build through the `tools/stop` marker and `kill -r`
+        // then starts one in a session of its own, recorded in
+        // `tools/servers`; a server of this build ends once this test
+        // process is gone.
+        let tools = root.join("tools");
         let output = Command::new("cc")
             .arg("-O0")
+            .arg(format!("-DRESTART_DIR=\"{}\"", tools.display()))
+            .arg(format!("-DSELF_PATH=\"{}\"", tools.join("hdc").display()))
+            .arg(format!(
+                "-DRECORD_CALLS=\"{}\"",
+                tools.join("calls").display()
+            ))
+            .arg(format!("-DOWNER_PID={}", std::process::id()))
             .arg("-o")
             .arg(root.join("tools/hdc"))
             .arg(&source)
@@ -95,6 +115,115 @@ impl Runtime {
 
     fn hdc(&self) -> PathBuf {
         self.root.join("tools/hdc")
+    }
+
+    /// The fake, verified as the daemon verifies its development HDC.
+    fn tool(&self) -> arkdeck_platform::VerifiedTool {
+        arkdeck_platform::VerifiedTool::open(
+            self.hdc(),
+            &sha256_hex(&fs::read(self.hdc()).unwrap()),
+        )
+        .unwrap()
+    }
+
+    fn endpoint(&self) -> SocketAddrV4 {
+        SocketAddrV4::new(Ipv4Addr::LOCALHOST, self.port)
+    }
+
+    /// The fake run as any other client of the endpoint would run `hdc`:
+    /// `kill` ends the server there and waits for the endpoint to free,
+    /// `kill -r` then starts a server in a session of its own.
+    fn hdc_client(&self, arguments: &[&str]) -> std::process::ExitStatus {
+        Command::new(self.hdc())
+            .arg("-s")
+            .arg(self.endpoint().to_string())
+            .args(arguments)
+            .env("OHOS_HDC_SERVER_PORT", self.port.to_string())
+            .status()
+            .unwrap()
+    }
+
+    /// An operator's `hdc -s <endpoint> kill`: whatever server of this build
+    /// listens there ends, and the marker that ended it is cleared so that
+    /// the next server of this build runs.
+    fn operator_kill(&self) {
+        assert!(self.hdc_client(&["kill"]).success());
+        fs::remove_file(self.root.join("tools/stop")).unwrap();
+        assert!(!reachable(self.port), "the server did not end");
+    }
+
+    /// How many `-m` servers of this fake ever ran: those a daemon launched
+    /// and those a `kill -r` started.
+    fn launches(&self) -> usize {
+        fs::read_to_string(self.root.join("tools/calls"))
+            .unwrap_or_default()
+            .lines()
+            .filter(|line| line.ends_with(" -m"))
+            .count()
+    }
+
+    /// The servers a `kill -r` of this fake started, by PID.
+    fn recorded_servers(&self) -> Vec<i32> {
+        fs::read_to_string(self.root.join("tools/servers"))
+            .unwrap_or_default()
+            .lines()
+            .map(|line| line.parse().unwrap())
+            .collect()
+    }
+
+    /// The running daemon's own end, within `within`: its status.
+    fn exit_within(&mut self, within: Duration) -> std::process::ExitStatus {
+        let mut child = self.child.take().unwrap();
+        let deadline = Instant::now() + within;
+        loop {
+            if let Some(status) = child.try_wait().unwrap() {
+                return status;
+            }
+            if Instant::now() >= deadline {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("the daemon did not end within {within:?}");
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// SIGKILL to the daemon alone: no drain, no stop.
+    fn kill(&mut self) {
+        let mut child = self.child.take().unwrap();
+        child.kill().unwrap();
+        let status = child.wait().unwrap();
+        assert_eq!(
+            std::os::unix::process::ExitStatusExt::signal(&status),
+            Some(9)
+        );
+    }
+
+    /// Every start while a server this daemon did not launch holds the
+    /// endpoint: refused before anything is launched, naming that server,
+    /// which it neither adopts nor stops.
+    fn refused_beside(&self, pid: i32, generation: u64) {
+        let port = self.port.to_string();
+        let launched = self.launches();
+        for _ in 0..2 {
+            let output = self.refused(&[
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", &port),
+            ]);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains(&format!(
+                    "arkdeck-agentd: the managed HDC server did not start: managed HDC endpoint \
+                     was not absent before the foreground launch: a server of the configured \
+                     HDC executable that this launch did not start listens there (pid {pid}, \
+                     generation {generation}); nothing was launched, and that server is neither \
+                     adopted nor stopped\n"
+                )),
+                "{stderr}"
+            );
+            assert!(output.stdout.is_empty());
+            assert_eq!(self.launches(), launched, "a server was launched beside it");
+        }
     }
 
     /// Whether any process still runs this test's own fake: the managed
@@ -261,8 +390,35 @@ impl Drop for Runtime {
         let _ = Command::new("/usr/bin/pkill")
             .args(["-KILL", "-f", &self.hdc().to_string_lossy()])
             .status();
+        // A `kill -r` server is nobody's child: ended by its recorded PID.
+        fake_hdc_servers::tear_down(&self.root.join("tools"), &self.hdc());
         let _ = fs::remove_dir_all(&self.root);
     }
+}
+
+/// The commandless proof of the server on `endpoint`, once one listens there
+/// within `budget`.
+fn proved_within(
+    tool: &arkdeck_platform::VerifiedTool,
+    endpoint: SocketAddrV4,
+    budget: Duration,
+) -> arkdeck_platform::LoopbackServerLease {
+    let deadline = Instant::now() + budget;
+    loop {
+        match arkdeck_platform::LoopbackServerLease::acquire(tool, endpoint) {
+            Ok(lease) => return lease,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                assert!(Instant::now() < deadline, "no server listens: {error}");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(error) => panic!("the endpoint's server is not proved: {error}"),
+        }
+    }
+}
+
+/// Swift `stableGeneration`: a server's birth in microseconds.
+fn generation(lease: &arkdeck_platform::LoopbackServerLease) -> u64 {
+    lease.identity().start_seconds * 1_000_000 + lease.identity().start_microseconds
 }
 
 fn frame(method: &str, params: Value) -> Vec<u8> {
@@ -465,8 +621,8 @@ fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon(
 fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
     let mut runtime = Runtime::new();
     // Another process's listener on the selected endpoint, held from the
-    // moment its port is found: the fake's own `-m` cannot bind, and the
-    // listener answering is not its launch.
+    // moment its port is found: no managed server is launched beside it,
+    // and the listener answering is never taken for one.
     let foreign = issued_listener();
     runtime.port = foreign.local_addr().unwrap().port();
     let port = runtime.port.to_string();
@@ -476,12 +632,84 @@ fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
     ]);
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("the managed HDC server did not start"),
+        stderr.contains(
+            "the managed HDC server did not start: managed HDC endpoint was not absent before \
+             the foreground launch: a listener that is not the configured HDC executable holds \
+             it; nothing was launched, and that server is neither adopted nor stopped"
+        ),
         "{stderr}"
     );
     assert!(output.stdout.is_empty());
+    assert_eq!(runtime.launches(), 0, "a server was launched beside it");
     drop(foreign);
     assert!(!runtime.fake_running(), "no managed server was left behind");
+}
+
+/// Another client's restart (`hdc -s <endpoint> kill -r`, which this daemon
+/// neither ran nor approved) ends the daemon's foreground server, so the
+/// daemon exits 70 for launchd to rebuild it, and the replacement that
+/// restart started is a server no later start launched. Every start refuses
+/// before launching anything, naming that server, which it neither adopts
+/// nor stops; once an operator's `hdc kill` has ended it, the next start
+/// serves with a server of its own and its stop leaves nothing behind.
+#[test]
+fn an_external_restart_leaves_a_server_every_start_refuses_until_it_ends() {
+    let mut runtime = Runtime::new();
+    runtime.start();
+    let tool = runtime.tool();
+    let original = proved_within(&tool, runtime.endpoint(), Duration::from_secs(5));
+    assert!(runtime.hdc_client(&["kill", "-r"]).success());
+    assert_eq!(
+        runtime.exit_within(Duration::from_secs(10)).code(),
+        Some(70)
+    );
+    let replacement = proved_within(&tool, runtime.endpoint(), Duration::from_secs(10));
+    assert_ne!(replacement.identity().pid, original.identity().pid);
+    assert_eq!(runtime.recorded_servers(), [replacement.identity().pid]);
+
+    runtime.refused_beside(replacement.identity().pid, generation(&replacement));
+    replacement.revalidate().unwrap();
+
+    runtime.operator_kill();
+    assert!(replacement.revalidate().is_err());
+    let launched = runtime.launches();
+    runtime.start();
+    assert_eq!(runtime.launches(), launched + 1);
+    let own = proved_within(&tool, runtime.endpoint(), Duration::from_secs(5));
+    assert_ne!(own.identity().pid, replacement.identity().pid);
+    assert_eq!(runtime.call("runtime.hdc.status", json!({}))["ok"], true);
+    let (status, stdout) = runtime.terminate(Duration::from_secs(15));
+    assert_eq!(status.code(), Some(0));
+    assert_eq!(stdout, "arkdeck-agentd stopped\n");
+    assert!(own.revalidate().is_err());
+    assert!(!runtime.fake_running(), "no server is left");
+}
+
+/// A daemon killed outright (SIGKILL: no drain and no stop) leaves the
+/// server it launched listening as nobody's child. The next start did not
+/// launch it: every start refuses before launching anything, naming it,
+/// neither adopting nor stopping it, until it ends; then the next start
+/// serves with a server of its own.
+#[test]
+fn a_killed_daemon_leaves_its_server_and_every_start_refuses_it_until_it_ends() {
+    let mut runtime = Runtime::new();
+    runtime.start();
+    let tool = runtime.tool();
+    let orphan = proved_within(&tool, runtime.endpoint(), Duration::from_secs(5));
+    runtime.kill();
+    orphan.revalidate().unwrap();
+
+    runtime.refused_beside(orphan.identity().pid, generation(&orphan));
+    orphan.revalidate().unwrap();
+
+    runtime.operator_kill();
+    assert!(orphan.revalidate().is_err());
+    runtime.start();
+    let own = proved_within(&tool, runtime.endpoint(), Duration::from_secs(5));
+    assert_ne!(own.identity().pid, orphan.identity().pid);
+    let (status, _) = runtime.terminate(Duration::from_secs(15));
+    assert_eq!(status.code(), Some(0));
+    assert!(!runtime.fake_running(), "no server is left");
 }
 
 #[test]
