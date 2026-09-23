@@ -1,0 +1,57 @@
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-sWindowManagerService-a-a
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-sWindowManagerService-a-w 7 -element -lastpage 42
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -l
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -f cppcrash-com.example.demo-20010039-20260914000000
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-sWindowManagerService-a-w 7 -element -lastpage 42
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -l
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -f jscrash-com.example.demo-20010039-20260913235959
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo:render
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -l
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -l
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-s1201-a-p Faultlogger -f cppcrash-com.example.demo-1
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhidumper-sWindowManagerService-a-w 7 -element -lastpage 42
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo

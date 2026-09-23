@@ -1,0 +1,64 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "detail" : "failed(\"invalidEncoding: UI dump is not UTF-8\")",
+      "required" : false,
+      "status" : "missing"
+    },
+    "application-liveness.json" : {
+      "artifactId" : "ART-b4e5e49536d0e7b7962bef32b07674cc",
+      "byteCount" : 633,
+      "required" : false,
+      "sha256" : "465bb59917fcf6bf1eaa144442b1a06f66dda556a9507f2ac727df96b2bbdd56",
+      "status" : "published"
+    },
+    "crash-index.txt" : {
+      "artifactId" : "ART-71621d8ae9b87cbcf18de8712c14a687",
+      "byteCount" : 51,
+      "required" : false,
+      "sha256" : "83a4d325c7b6c0c1f4c0158937a82ea46af388c5324e7a455c14440763c8702d",
+      "status" : "published"
+    },
+    "crash-log.txt" : {
+      "detail" : "failed(\"faultLogNotFound: device has no entry named jscrash-com.example.demo-20010039-20260913235959\")",
+      "required" : false,
+      "status" : "missing"
+    },
+    "hilog.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "detail" : "upstream capture-trace did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-dump.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "completeness" : "complete",
+  "jobId" : "job-30d281cdf15c3e65fa33c975f0f31b06",
+  "missingRequired" : [
+
+  ],
+  "operation" : "capture.diagnostics@1"
+}

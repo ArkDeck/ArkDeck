@@ -1,0 +1,9 @@
+#!/bin/sh
+# ArkDeck HDC oracle driver. Each call is recorded, then answered by the
+# oracle's hdc-answers.sh in the mode hdc-mode names.
+root=/private/tmp/arkdeck-hdc-oracle
+mode=normal
+if [ -r "$root/hdc-mode" ]; then IFS= read -r mode < "$root/hdc-mode"; fi
+printf '%s\037' "$@" >> "$root/hdc-invocations.log"
+printf '\n' >> "$root/hdc-invocations.log"
+. "$root/hdc-answers.sh"

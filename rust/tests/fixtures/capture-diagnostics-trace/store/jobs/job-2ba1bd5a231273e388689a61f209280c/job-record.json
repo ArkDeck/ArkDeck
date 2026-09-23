@@ -1,0 +1,593 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "verifyRemoteState",
+    "captureRemoteStdout",
+    "captureRemoteFile",
+    "receiveFile",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "3ddcac70534b1055d189e4536910c0fb7597f8478330b1846d17e6e842f9f132",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-C76F79B337B16FFBF58E433BD54D3A1E2A58A21E-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "9d31adef1111840d58eb21ca55c71c80da462dceeed5278e8ae2e0f5c992f08e",
+      "reservationID" : "idem-capture-everyLeg",
+      "stepSetDigestSHA256" : "53a123401bef95209ac5aa1d35dad1e4c014bc61a1db2b03ae36327104c9b49a",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-2ba1bd5a231273e388689a61f209280c",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9d31adef1111840d58eb21ca55c71c80da462dceeed5278e8ae2e0f5c992f08e",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "capture.diagnostics@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-everyLeg",
+    "inputs" : {
+      "advancedDump" : true,
+      "bundleName" : "com.example.demo",
+      "componentId" : "42",
+      "crashLogName" : "cppcrash-com.example.demo-20010039-20260914000000",
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "markers" : [
+        "2026-09-14T00:00:01Z#every leg"
+      ],
+      "traceCategories" : [
+        "ace",
+        "graphic"
+      ],
+      "uiComponentTree" : true,
+      "uiScreenshot" : true,
+      "windowId" : "7"
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-everyLeg",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-C76F79B337B16FFBF58E433BD54D3A1E2A58A21E-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-capture-everyLeg",
+    "inputs" : {
+      "advancedDump" : true,
+      "bundleName" : "com.example.demo",
+      "componentId" : "42",
+      "crashLogName" : "cppcrash-com.example.demo-20010039-20260914000000",
+      "crashLogs" : true,
+      "durationSeconds" : 5,
+      "markers" : [
+        "2026-09-14T00:00:01Z#every leg"
+      ],
+      "traceCategories" : [
+        "ace",
+        "graphic"
+      ],
+      "uiComponentTree" : true,
+      "uiScreenshot" : true,
+      "windowId" : "7"
+    },
+    "operation" : {
+      "id" : "capture.diagnostics",
+      "version" : 1
+    },
+    "requestId" : "req-capture-everyLeg",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "28141",
+      "lastSequence" : 42,
+      "sha256" : "c6acd86e0bc4a412cc656b9c2d5c12099bcf0a763ac456aa98b6b8e38c0046d3"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-2ba1bd5a231273e388689a61f209280c",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "93677",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "28527",
+      "lastSequence" : 43,
+      "sha256" : "b56b74bfbb63a1fefeed57cd1b1dad971da6d0fb22d6c7a2e0b619293d8e1882"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "13596",
+      "manifestSHA256" : "6dd5a4d0d0d1b28336ade0af3f24717df13e41c0f75273d55745d7f3dadb93b8",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "4",
+      "manifestSHA256" : "6dd5a4d0d0d1b28336ade0af3f24717df13e41c0f75273d55745d7f3dadb93b8",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-2ba1bd5a231273e388689a61f209280c",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-2ba1bd5a231273e388689a61f209280c",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "trace parameters snapshotted before capture",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "intent observe-application-liveness",
+    "verified observe-application-liveness [\"abilityState\", \"applicationRef\", \"observedAtUtc\", \"pidObserved\", \"processState\", \"reasonCode\", \"state\"]",
+    "artifact application-liveness.json -> ART-c71d30dd16dca30740c7a87e14e63b04",
+    "intent capture-hilog",
+    "verified capture-hilog [\"byteCount\"]",
+    "artifact hilog.txt -> ART-203640240eeba2eaad312b86022cfa91",
+    "intent capture-ui-dump",
+    "verified capture-ui-dump [\"byteCount\"]",
+    "artifact ui-dump.json -> ART-3ca4e0e2f4ad229aab5bba5c5f93c8b2",
+    "intent capture-advanced-ui-dump",
+    "verified capture-advanced-ui-dump [\"byteCount\"]",
+    "artifact advanced-dump.txt -> ART-a0b30c895451d178ef58d11739cc815a",
+    "intent capture-crash-index",
+    "verified capture-crash-index [\"byteCount\", \"entryCount\"]",
+    "artifact crash-index.txt -> ART-ffbef77e88c0c768b7ea36f66ecb32ed",
+    "intent capture-crash-log",
+    "verified capture-crash-log [\"byteCount\", \"faultLogName\"]",
+    "artifact crash-log.txt -> ART-73d2026af1fc7b05cb242f8eae08aec7",
+    "capability consumed before first mutation",
+    "intent capture-ui-tree",
+    "verified capture-ui-tree [\"remoteByteCount\"]",
+    "intent receive-ui-tree",
+    "verified receive-ui-tree [\"byteCount\", \"localArtifact\", \"sha256\"]",
+    "artifact ui-tree.json -> ART-53afd439d1b42b7b4046f399aa705524",
+    "intent cleanup-ui-tree-temp",
+    "verified cleanup-ui-tree-temp [\"cleaned\"]",
+    "intent capture-screenshot",
+    "verified capture-screenshot [\"remoteByteCount\"]",
+    "intent receive-screenshot",
+    "verified receive-screenshot [\"byteCount\", \"localArtifact\", \"sha256\"]",
+    "artifact screenshot.png -> ART-b6dff35c0b9d247604407cec8d6dc3e0",
+    "intent cleanup-screenshot-temp",
+    "verified cleanup-screenshot-temp [\"cleaned\"]",
+    "intent capture-trace",
+    "verified capture-trace [\"remoteByteCount\"]",
+    "intent receive-trace-artifact",
+    "verified receive-trace-artifact [\"byteCount\", \"localArtifact\", \"sha256\"]",
+    "artifact trace.htrace -> ART-fb7690fdfec56703960304b41e3de298",
+    "intent cleanup-remote-temp",
+    "verified cleanup-remote-temp [\"cleaned\"]",
+    "host-step postprocess-index",
+    "host-step finalize-session",
+    "trace parameters snapshotted after capture",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ],
+  "traceProbeAfter" : {
+    "adapterDisposition" : "captureEligible",
+    "bindingRevision" : 1,
+    "family" : "hitrace.dayu200-oh7.text",
+    "parameters" : [
+      {
+        "name" : "persist.ace.trace.syntax.enabled",
+        "state" : "value",
+        "value" : "false"
+      },
+      {
+        "name" : "persist.ace.trace.layout.enabled",
+        "state" : "value",
+        "value" : "true"
+      },
+      {
+        "name" : "persist.ace.trace.build.enabled",
+        "state" : "missing"
+      },
+      {
+        "name" : "persist.ace.trace.measure.debug.enabled",
+        "state" : "value",
+        "value" : "1"
+      },
+      {
+        "name" : "persist.ace.trace.sync.debug.enabled",
+        "state" : "missing"
+      },
+      {
+        "name" : "persist.ace.debug.enabled",
+        "state" : "value",
+        "value" : "0"
+      },
+      {
+        "name" : "persist.ace.performance.monitor.enabled",
+        "state" : "value",
+        "value" : "true"
+      },
+      {
+        "name" : "persist.sys.graphic.openDebugTrace",
+        "state" : "value",
+        "value" : "1"
+      },
+      {
+        "name" : "persist.rosen.animationtrace.enabled",
+        "state" : "value",
+        "value" : "false"
+      }
+    ],
+    "rawHelp" : "2021\/01\/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b\/--buffer_size, -t\/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+    "rawHelpSHA256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+    "supportedTags" : [
+      "ability",
+      "accesscontrol",
+      "accessibility",
+      "account",
+      "ace",
+      "animation",
+      "app",
+      "ark",
+      "binder",
+      "bluetooth",
+      "cloud",
+      "commercial",
+      "commonlibrary",
+      "daudio",
+      "dcamera",
+      "deviceauth",
+      "devicemanager",
+      "deviceprofile",
+      "dhfwk",
+      "dinput",
+      "disk",
+      "distributeddatamgr",
+      "dlpcre",
+      "drm",
+      "dsched",
+      "dscreen",
+      "dslm",
+      "dsoftbus",
+      "erofs",
+      "ffrt",
+      "filemanagement",
+      "freq",
+      "graphic",
+      "gresource",
+      "hdcd",
+      "hdf",
+      "hmfs",
+      "huks",
+      "i2c",
+      "idle",
+      "interconn",
+      "ipa",
+      "irq",
+      "irqoff",
+      "load",
+      "mdfs",
+      "membus",
+      "memory",
+      "memreclaim",
+      "misc",
+      "mmc",
+      "msdp",
+      "multimodalinput",
+      "musl",
+      "net",
+      "notification",
+      "nweb",
+      "ohos",
+      "pagecache",
+      "power",
+      "preemptoff",
+      "push",
+      "regulators",
+      "rpc",
+      "samgr",
+      "sched",
+      "schedlt",
+      "security",
+      "sensors",
+      "sync",
+      "ufs",
+      "usb",
+      "useriam",
+      "virse",
+      "window",
+      "workq",
+      "zaudio",
+      "zbinder",
+      "zcamera",
+      "zimage",
+      "zmedia"
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "tool" : "hitrace",
+    "tools" : [
+      {
+        "disposition" : "captureEligible",
+        "family" : "hitrace.dayu200-oh7.text",
+        "rawHelpSHA256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+        "tool" : "hitrace"
+      },
+      {
+        "disposition" : "probeOnly",
+        "family" : "bytrace.dayu200-oh7.text",
+        "rawHelpSHA256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+        "tool" : "bytrace"
+      }
+    ]
+  },
+  "traceProbeBefore" : {
+    "adapterDisposition" : "captureEligible",
+    "bindingRevision" : 1,
+    "family" : "hitrace.dayu200-oh7.text",
+    "parameters" : [
+      {
+        "name" : "persist.ace.trace.syntax.enabled",
+        "state" : "value",
+        "value" : "false"
+      },
+      {
+        "name" : "persist.ace.trace.layout.enabled",
+        "state" : "value",
+        "value" : "true"
+      },
+      {
+        "name" : "persist.ace.trace.build.enabled",
+        "state" : "missing"
+      },
+      {
+        "name" : "persist.ace.trace.measure.debug.enabled",
+        "state" : "value",
+        "value" : "1"
+      },
+      {
+        "name" : "persist.ace.trace.sync.debug.enabled",
+        "state" : "missing"
+      },
+      {
+        "name" : "persist.ace.debug.enabled",
+        "state" : "value",
+        "value" : "0"
+      },
+      {
+        "name" : "persist.ace.performance.monitor.enabled",
+        "state" : "value",
+        "value" : "true"
+      },
+      {
+        "name" : "persist.sys.graphic.openDebugTrace",
+        "state" : "value",
+        "value" : "1"
+      },
+      {
+        "name" : "persist.rosen.animationtrace.enabled",
+        "state" : "value",
+        "value" : "false"
+      }
+    ],
+    "rawHelp" : "2021\/01\/02 14:35:18 hitrace enter, running_state is SHOW_HELP\nusage: hitrace [options] [categories...]\noptions include:\n  -b N                   Set the size of the buffer (KB) for storing and reading traces.\n                         The default buffer size is 18432 KB.\n  --buffer_size N        Like \"-b N\".\n  -l                     List available hitrace categories.\n  --list_categories      Like \"-l\".\n  -t N                   Set the hitrace running duration in seconds (5s by default), which depends on\n                         the time required for analysis.\n  --time N               Like \"-t N\".\n  --trace_clock clock    Sets the type of the clock for adding a timestamp to a trace, which can be\n                         boot (default), global, mono, uptime, or perf.\n  --trace_begin          Start capturing traces.\n  --trace_dump           Dump traces to a specified path (stdout by default).\n  --trace_finish         Stop capturing traces and dumps traces to a specified path (stdout by default).\n  --trace_finish_nodump  Stop capturing traces and not dumps traces.\n  --record               Enable or disable long-term trace collection tasks in conjunction with\n                         \"--trace_begin\" and \"--trace_finish\".\n  --overwrite            Set the action to take when the buffer is full. If this option is used,\n                         the latest traces are discarded; if this option is not used (default setting),\n                         the earliest traces are discarded.\n  -o filename            Specifies the name of the target file (stdout by default).\n  --output filename      Like \"-o filename\".\n  -z                     Compresses a captured trace.\n  --text                 Specify the output format of trace as text.\n  --raw                  Specify the output format of trace as raw trace, the default format is text.\n  --start_bgsrv          Enable trace_service in snapshot mode.\n  --dump_bgsrv           Trigger the dump trace task of the trace_service.\n  --stop_bgsrv           Disable trace_service in snapshot mode.\n  --file_size            Sets the size of the raw trace (KB). The default file size is 102400 KB.\n                         Only effective in raw trace mode\n  --total_size           Sets the total size of all traces (KB). The default total size is 2048*1024 KB.\n                         Only effective in raw trace mode.\n  --trace_level level    Set the system parameter \"persist.hitrace.level.threshold\", which can control\n                         the level threshold of tracing. Valid values for \"level\" include\n                         D or Debug, I or Info, C or Critical, M or Commercial.\n  --get_level            Query the system parameter \"persist.hitrace.level.threshold\",\n                         which can control the level threshold of tracing.\n  --boot_trace           Configure boot trace capture for next boot. Use \"off\" to disable.\n                         It supports concrete categories with -b\/--buffer_size, -t\/--time,\n                         --file_prefix, --repeat and --increment.\n  --file_prefix prefix   Set the boot trace output file prefix. Only supports --boot_trace.\n  --repeat N             Set boot trace capture count, from 1 to 100. Only supports --boot_trace.\n  --increment            Append an incrementing index to boot trace output names. Only supports\n                         --boot_trace.\n",
+    "rawHelpSHA256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+    "supportedTags" : [
+      "ability",
+      "accesscontrol",
+      "accessibility",
+      "account",
+      "ace",
+      "animation",
+      "app",
+      "ark",
+      "binder",
+      "bluetooth",
+      "cloud",
+      "commercial",
+      "commonlibrary",
+      "daudio",
+      "dcamera",
+      "deviceauth",
+      "devicemanager",
+      "deviceprofile",
+      "dhfwk",
+      "dinput",
+      "disk",
+      "distributeddatamgr",
+      "dlpcre",
+      "drm",
+      "dsched",
+      "dscreen",
+      "dslm",
+      "dsoftbus",
+      "erofs",
+      "ffrt",
+      "filemanagement",
+      "freq",
+      "graphic",
+      "gresource",
+      "hdcd",
+      "hdf",
+      "hmfs",
+      "huks",
+      "i2c",
+      "idle",
+      "interconn",
+      "ipa",
+      "irq",
+      "irqoff",
+      "load",
+      "mdfs",
+      "membus",
+      "memory",
+      "memreclaim",
+      "misc",
+      "mmc",
+      "msdp",
+      "multimodalinput",
+      "musl",
+      "net",
+      "notification",
+      "nweb",
+      "ohos",
+      "pagecache",
+      "power",
+      "preemptoff",
+      "push",
+      "regulators",
+      "rpc",
+      "samgr",
+      "sched",
+      "schedlt",
+      "security",
+      "sensors",
+      "sync",
+      "ufs",
+      "usb",
+      "useriam",
+      "virse",
+      "window",
+      "workq",
+      "zaudio",
+      "zbinder",
+      "zcamera",
+      "zimage",
+      "zmedia"
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "tool" : "hitrace",
+    "tools" : [
+      {
+        "disposition" : "captureEligible",
+        "family" : "hitrace.dayu200-oh7.text",
+        "rawHelpSHA256" : "9ab0718d7da1d5beb459c74548f89cc69775a931be7931686637d6e584d70e39",
+        "tool" : "hitrace"
+      },
+      {
+        "disposition" : "probeOnly",
+        "family" : "bytrace.dayu200-oh7.text",
+        "rawHelpSHA256" : "690ca26bbe14d6edd8ad163cce18c1f1a494e4984e8d86f1866f32b7f8bb94fd",
+        "tool" : "bytrace"
+      }
+    ]
+  }
+}

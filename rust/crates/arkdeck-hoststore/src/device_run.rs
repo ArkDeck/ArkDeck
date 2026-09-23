@@ -71,6 +71,8 @@ mod hap_failure;
 mod native;
 #[path = "device_screen_sequence.rs"]
 mod screen_sequence;
+#[path = "device_trace.rs"]
+mod trace;
 
 const OBSERVE: &str = "observe.device@1";
 const CAPTURE: &str = "capture.diagnostics@1";
@@ -327,7 +329,7 @@ impl JobRunner<'_> {
             return Err(uncertain());
         };
         let hap = descriptor.reference() == HAP;
-        match self.steps(run, hdc, descriptor) {
+        match self.traced_steps(run, hdc, descriptor) {
             Ok(()) => {}
             // A debug HAP first compensates what its succeeded steps did.
             Err(Stop::Failed(reason)) if hap => {
@@ -1043,7 +1045,14 @@ impl JobRunner<'_> {
                     fact_names(&summary)
                 ));
                 // The timeline names the facts a step verified, not their
-                // values; what a run of stills measured is kept on the record.
+                // values: whether a trace ring held its coverage anchor and
+                // what a run of stills measured are kept on the record.
+                if let (Some(anchor), Some(held)) = (
+                    summary.get("coverageAnchor"),
+                    summary.get("ringHeldCoverageAnchor"),
+                ) {
+                    run.record.set_ring_coverage(anchor, held == "true");
+                }
                 if let Some(measured) = screen_sequence::measured(&summary) {
                     run.record.set_screen_sequence(measured);
                 }
@@ -1669,8 +1678,8 @@ fn binding_snapshot(record: &JobRecord) -> Value {
 }
 
 /// Swift `RuntimeArtifactService.artifactContents` for a step's product: a
-/// capture's bytes as the provider received them from its one process, or a
-/// facts product.
+/// capture's bytes as the provider received them from its one process, the
+/// liveness document derived from its readback's facts, or a facts product.
 fn contents(
     name: &str,
     record: &JobRecord,
@@ -1689,8 +1698,52 @@ fn contents(
             .first()
             .map(|process| process.stdout.clone())
             .unwrap_or_default(),
+        "application-liveness.json" => liveness(record, summary),
         _ => facts(name, record, summary),
     }
+}
+
+/// Swift's `application-liveness.json`: what the readback observed, bound to
+/// the application it names, the Job and operation that observed it, the
+/// binding revision the request expected and the deployed digest the caller
+/// supplied, over a window of the one observation instant. A fact the
+/// readback did not name reads as not observed, never as healthy.
+fn liveness(record: &JobRecord, summary: &BTreeMap<String, String>) -> Vec<u8> {
+    let fact = |key: &str, absent: &str| json!(summary.get(key).map_or(absent, String::as_str));
+    let observed = fact("observedAtUtc", "");
+    let mut fields = Map::from_iter([
+        (
+            "documentType".to_owned(),
+            json!("arkdeck-application-liveness"),
+        ),
+        ("schemaVersion".to_owned(), json!("1.0.0")),
+        ("applicationRef".to_owned(), fact("applicationRef", "")),
+        ("state".to_owned(), fact("state", "UNKNOWN")),
+        (
+            "reasonCode".to_owned(),
+            fact("reasonCode", "processReadbackUnavailable"),
+        ),
+        ("abilityState".to_owned(), fact("abilityState", "UNKNOWN")),
+        ("processState".to_owned(), fact("processState", "UNKNOWN")),
+        (
+            "pidObserved".to_owned(),
+            json!(summary.get("pidObserved").map(String::as_str) == Some("true")),
+        ),
+        ("sourceRuntimeJobId".to_owned(), json!(record.job_id)),
+        ("sourceOperationRef".to_owned(), json!(record.operation())),
+        ("observedAtUtc".to_owned(), observed.clone()),
+    ]);
+    if let Some(revision) = record.request["target"]["expectedBindingRevision"].as_i64() {
+        fields.insert("targetBindingRevision".into(), json!(revision));
+    }
+    if let Some(digest) = summary.get("deployedArtifactDigest") {
+        fields.insert("deployedArtifactDigest".into(), json!(digest));
+    }
+    fields.insert(
+        "observationWindow".into(),
+        json!({"startedAtUtc": observed, "endedAtUtc": observed}),
+    );
+    session_json::encode_canonical_pretty(&Value::Object(fields)).unwrap_or_else(|_| b"{}".to_vec())
 }
 
 /// A facts product: the product, the operation and the Job, the

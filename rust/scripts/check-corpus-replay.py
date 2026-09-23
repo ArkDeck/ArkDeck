@@ -31,6 +31,15 @@ Job state an accepted run read, that state must not be terminal. A request
 naming `<nextCursor of X>` sends the cursor exchange X's page minted. The
 fake must receive the oracle's calls, in order.
 
+The oracle ran on a fixed clock and the daemon runs on the host's. A time in
+an answer reads as <time>; a product whose bytes carry the oracle's own clock
+reading (an application liveness document's observation instant), and every
+product that names such a product's identity or digest (a capture's log,
+index and summary), is minted differently on another clock, so where the
+oracle recorded its identity, digest or reference the answer is compared with
+<clock-bearing> in its place, on both sides, and a listing's items are
+compared as a multiset.
+
 A probe oracle (`trace.probe`) has no Jobs either, but adopted its Target
 before its exchanges, as a Job oracle did. Its reads run concurrently, so it
 records each exchange's calls sorted, in `hdc-calls.log` (its answers append
@@ -133,6 +142,47 @@ def counted(page: dict) -> dict:
     return comparable(dict(page, result=dict(page['result'], items=len(page['result']['items']))))
 
 
+def clock_bearing(fixture: Path, provenance: dict) -> set[str]:
+    """The identities and digests of the products the oracle published whose
+    bytes carry its own clock reading, and of every product that names one of
+    those, transitively: what a daemon on another clock mints differently."""
+    clock = [reading for reading in (provenance.get('nowUTC'), provenance.get('nowPreciseUTC'))
+             if reading]
+    published = {}
+    for index in sorted((fixture / 'artifacts').glob('*/index.json')):
+        for row in json.loads(index.read_text()).get('artifacts', []):
+            payload = index.parent / row['artifactID']
+            if 'published' in row.get('status', {}) and payload.is_file():
+                published[row['artifactID']] = (row['sha256'], payload.read_bytes().decode(errors='replace'))
+    bearing: set[str] = set()
+    grown = True
+    while grown:
+        grown = False
+        for artifact, (digest, text) in published.items():
+            if artifact not in bearing and any(token in text for token in [*clock, *bearing]):
+                bearing |= {artifact, digest}
+                grown = True
+    return bearing
+
+
+def masked(recorded, answer, bearing: set[str]):
+    """Both values with <clock-bearing> wherever the recorded one names a
+    clock-bearing identity or digest."""
+    if isinstance(recorded, str) and isinstance(answer, str):
+        if any(token in recorded for token in bearing):
+            return '<clock-bearing>', '<clock-bearing>'
+        return recorded, answer
+    if isinstance(recorded, dict) and isinstance(answer, dict):
+        pairs = {key: masked(recorded[key], answer[key], bearing)
+                 for key in recorded.keys() & answer.keys()}
+        return ({key: pairs[key][0] if key in pairs else value for key, value in recorded.items()},
+                {key: pairs[key][1] if key in pairs else value for key, value in answer.items()})
+    if isinstance(recorded, list) and isinstance(answer, list) and len(recorded) == len(answer):
+        pairs = [masked(left, right, bearing) for left, right in zip(recorded, answer)]
+        return [left for left, _ in pairs], [right for _, right in pairs]
+    return recorded, answer
+
+
 def wait_for(condition, seconds: float, failure: str) -> None:
     deadline = time.monotonic() + seconds
     while not condition():
@@ -169,6 +219,7 @@ def main() -> None:
     identity = hashlib.sha256(
         json.dumps(registry, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
     oracle = json.loads((fixture / 'cases.json').read_text())
+    bearing = clock_bearing(fixture, json.loads((fixture / 'provenance.json').read_text()))
     checks: list[str] = []
     children: list[subprocess.Popen] = []
 
@@ -178,6 +229,7 @@ def main() -> None:
         checks.append(name)
 
     def compare(name: str, answer: dict, recorded: dict, shape=comparable) -> None:
+        recorded, answer = masked(recorded, answer, bearing)
         check(name, shape(answer) == shape(recorded),
               f"\n  swift {json.dumps(shape(recorded), sort_keys=True)}"
               f"\n  rust  {json.dumps(shape(answer), sort_keys=True)}")
@@ -339,8 +391,25 @@ def main() -> None:
                     if answer['result']['nextCursor'] is None:
                         def by_id(entry: dict) -> str:
                             return entry[identity_key]
-                        check(f'{opened}: T1 listing', sorted(map(comparable, ours), key=by_id)
-                              == sorted(map(comparable, swift), key=by_id), (ours, swift))
+
+                        def canonical(entry: dict) -> str:
+                            return json.dumps(comparable(entry), sort_keys=True)
+                        # An item pairs with Swift's of the same name, which a
+                        # clock-bearing identity cannot pair it with.
+                        named = {entry['name']: entry for entry in swift
+                                 if isinstance(entry.get('name'), str)}
+                        theirs = [entry for entry in swift if not isinstance(entry.get('name'), str)]
+                        mine = []
+                        for entry in ours:
+                            recorded = (named.pop(entry['name'], None)
+                                        if isinstance(entry.get('name'), str) else None)
+                            if recorded is not None:
+                                recorded, entry = masked(recorded, entry, bearing)
+                                theirs.append(recorded)
+                            mine.append(entry)
+                        theirs += named.values()
+                        check(f'{opened}: T1 listing', sorted(map(canonical, mine))
+                              == sorted(map(canonical, theirs)), (ours, swift))
                         check(f'{opened}: listing order ({order})',
                               ours == sorted(sorted(ours, key=by_id),
                                              key=lambda entry: entry[created_key], reverse=True),
@@ -381,11 +450,11 @@ def main() -> None:
                 after = exchange(endpoint, method, params)
                 expected = json.loads(json.dumps(before[(run, method)]))
                 job = (expected.get('result') or {}).get('job') or {}
-                if (method == 'job.show' and job.get('operation') == 'observe.device@1'
-                        and job.get('outcomeUnknown') is True
+                if (method == 'job.show' and job.get('outcomeUnknown') is True
                         and job.get('state') == 'waitingForRecovery'):
-                    # Existing job_recovery::recover records its no-redispatch decision.
-                    # Require the exact audit addition, not arbitrary timeline drift.
+                    # Startup recovery (job_recovery::recover) records its
+                    # no-redispatch decision on every parked Job. Require the
+                    # exact audit addition, not arbitrary timeline drift.
                     entries = expected['result']['timeline']['entries']
                     note = 'recovered: outstanding intents or unknown outcomes; no redispatch'
                     if note not in entries:

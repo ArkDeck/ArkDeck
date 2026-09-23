@@ -3,12 +3,14 @@
 //! timeline as the run finalizes; its markers are the host's own marks and
 //! what the run already knows, with what it could not derive said so; its
 //! index and summary state every other declared product's final status, so a
-//! partial capture can never read as a whole one. A screen sequence's
+//! partial capture can never read as a whole one, and for a Trace capture
+//! what its two snapshots read of the trace parameters. A screen sequence's
 //! `sequence.json` is what its run of stills measured. Built from the record
 //! and the Artifact index alone: no product's bytes are opened.
 use crate::job_record::JobRecord;
 use crate::operation_catalog::CatalogOperation;
 use crate::session_json;
+use arkdeck_provider_hdc::TraceRequest;
 use serde_json::{Map, Value, json};
 
 const CAPTURE: &str = "capture.diagnostics@1";
@@ -96,16 +98,85 @@ pub(crate) fn contents(
         });
         payload["missingRequired"] = json!(missing_required);
     }
-    let requested_trace = record.request["inputs"]["traceCategories"]
-        .as_array()
-        .is_some_and(|tags| !tags.is_empty());
-    if reference == CAPTURE && requested_trace {
-        // Swift adds the Trace capture's parameters here; a capture with
-        // Trace legs is not planned by this Runtime.
-        return Err("a Trace capture's summary is not composed by the Rust Runtime yet".into());
+    if reference == CAPTURE
+        && let Some(tags) = record.request["inputs"]["traceCategories"]
+            .as_array()
+            .filter(|tags| !tags.is_empty())
+    {
+        payload["trace"] = trace(record, recorded, tags);
     }
     session_json::encode_canonical_pretty(&payload)
         .map_err(|_| "the document cannot be encoded".into())
+}
+
+/// Swift `TraceDebugParameterCatalog.definitions`: each Trace parameter in
+/// catalog order, with the value the debug profile wants it to hold.
+const TRACE_PROFILE: [(&str, &str); 9] = [
+    ("persist.ace.trace.syntax.enabled", "true"),
+    ("persist.ace.trace.layout.enabled", "true"),
+    ("persist.ace.trace.build.enabled", "true"),
+    ("persist.ace.trace.measure.debug.enabled", "true"),
+    ("persist.ace.trace.sync.debug.enabled", "true"),
+    ("persist.ace.debug.enabled", "1"),
+    ("persist.ace.performance.monitor.enabled", "true"),
+    ("persist.sys.graphic.openDebugTrace", "1"),
+    ("persist.rosen.animationtrace.enabled", "1"),
+];
+
+/// What a Trace capture's index and summary say of it: the tool and family
+/// its first snapshot read, the tags the request named, each parameter's
+/// wanted value and what the two snapshots read of it (never restored), the
+/// window and buffer the request set, and the published trace's identity.
+fn trace(record: &JobRecord, recorded: &[Value], tags: &[Value]) -> Value {
+    let before = record.trace_probe(true);
+    let after = record.trace_probe(false);
+    // Swift `traceParameterJSON`: the reading, or that none was taken.
+    let reading = |snapshot: Option<&Value>, name: &str| {
+        let Some(observation) = snapshot
+            .and_then(|snapshot| snapshot["parameters"].as_array())
+            .and_then(|readings| readings.iter().find(|reading| reading["name"] == name))
+        else {
+            return json!({"state": "unobserved"});
+        };
+        let mut fields = Map::from_iter([("state".to_owned(), observation["state"].clone())]);
+        for key in ["value", "detail"] {
+            if let Some(value) = observation.get(key) {
+                fields.insert(key.to_owned(), value.clone());
+            }
+        }
+        Value::Object(fields)
+    };
+    let parameters: Vec<Value> = TRACE_PROFILE
+        .iter()
+        .map(|(name, desired)| {
+            json!({"name": name, "desired": desired, "before": reading(before, name),
+                "after": reading(after, name), "restored": null})
+        })
+        .collect();
+    let member = |key: &str| {
+        before
+            .and_then(|snapshot| snapshot.get(key))
+            .cloned()
+            .unwrap_or(Value::Null)
+    };
+    let mut trace = json!({"toolIdentity": member("tool"), "adapterFamily": member("family"),
+        "tags": tags, "parameters": parameters});
+    let inputs = &record.request["inputs"];
+    if let Some(duration) = inputs["durationSeconds"].as_i64() {
+        trace["durationSeconds"] = json!(duration);
+    }
+    if let Some(buffer) = inputs["traceBufferKB"].as_i64() {
+        trace["bufferKB"] = json!(buffer);
+    }
+    if let Some(raw) = recorded
+        .iter()
+        .find(|row| row["name"] == "trace.htrace" && published(row))
+    {
+        trace["rawArtifactId"] = raw["artifactID"].clone();
+        trace["rawSha256"] = raw["sha256"].clone();
+        trace["rawByteCount"] = raw["byteCount"].clone();
+    }
+    trace
 }
 
 /// Swift `markersDocument`: the host's marks, a crash log that arrived with
@@ -142,14 +213,7 @@ fn markers(record: &JobRecord, recorded: &[Value]) -> Result<Vec<u8>, String> {
     {
         marks.push(json!({"kind": "auto", "trigger": "stepFailed", "detail": entry}));
     }
-    if inputs["ringBuffered"] == true {
-        // Swift names the ring's coverage anchor here; a ring-buffered
-        // capture is not planned by this Runtime.
-        return Err(
-            "a ring-buffered capture's markers are not composed by the Rust Runtime yet".into(),
-        );
-    }
-    let document = json!({
+    let mut document = json!({
         "documentType": "arkdeck-diagnostic-markers",
         "schemaVersion": "1.0.0",
         "jobId": record.job_id,
@@ -162,6 +226,29 @@ fn markers(record: &JobRecord, recorded: &[Value]) -> Result<Vec<u8>, String> {
                 finalization does not open"},
         ],
     });
+    // The ring's coverage anchor, when this capture armed one: what to look
+    // for and where, not a claim that the search succeeded, since the run
+    // never opened the trace. Whether the ring held it is the capture's own
+    // readback, or said not to be established where no readback reported.
+    if inputs["ringBuffered"] == true {
+        let ring = record.ring_coverage();
+        let anchor = ring.and_then(|ring| ring["anchor"].as_str()).map_or_else(
+            || TraceRequest::anchor(&record.job_id, "capture-trace"),
+            str::to_owned,
+        );
+        let trace = row(recorded, "trace.htrace").is_some_and(published);
+        document["coverage"] = json!({
+            "anchor": anchor,
+            "writtenIntoTheDeviceRingAt": "capture-trace",
+            "checkAgainst": "trace.htrace",
+            "traceStatus": if trace { "published" } else { "absent" },
+            "how": "the anchor marks where this snapshot reaches back to; finding it in the \
+                trace is a string search, no decoder needed",
+            "ringHeldAnchor": ring
+                .and_then(|ring| ring["ringHeldAnchor"].as_bool())
+                .map_or_else(|| json!("notEstablished"), |held| json!(held)),
+        });
+    }
     session_json::encode_canonical_pretty(&document)
         .map_err(|_| "the document cannot be encoded".into())
 }

@@ -1,0 +1,62 @@
+jobCreated
+queued->preflight
+preflight->running
+reason: steps-start
+trace parameters snapshotted before capture
+host-step preflight-host-storage
+intent confirm-evidence-target
+verified confirm-evidence-target ["deviceIdentitySHA256", "state", "transport"]
+evidence-preflight confirm-evidence-target
+intent read-evidence-model
+verified read-evidence-model ["value"]
+evidence-preflight read-evidence-model
+intent read-evidence-firmware
+verified read-evidence-firmware ["value"]
+evidence-preflight read-evidence-firmware
+intent preflight-device-storage
+verified preflight-device-storage ["availableBytes"]
+intent observe-application-liveness
+verified observe-application-liveness ["abilityState", "applicationRef", "observedAtUtc", "pidObserved", "processState", "reasonCode", "state"]
+artifact application-liveness.json -> ART-c71d30dd16dca30740c7a87e14e63b04
+intent capture-hilog
+verified capture-hilog ["byteCount"]
+artifact hilog.txt -> ART-203640240eeba2eaad312b86022cfa91
+intent capture-ui-dump
+verified capture-ui-dump ["byteCount"]
+artifact ui-dump.json -> ART-3ca4e0e2f4ad229aab5bba5c5f93c8b2
+intent capture-advanced-ui-dump
+verified capture-advanced-ui-dump ["byteCount"]
+artifact advanced-dump.txt -> ART-a0b30c895451d178ef58d11739cc815a
+intent capture-crash-index
+verified capture-crash-index ["byteCount", "entryCount"]
+artifact crash-index.txt -> ART-ffbef77e88c0c768b7ea36f66ecb32ed
+intent capture-crash-log
+verified capture-crash-log ["byteCount", "faultLogName"]
+artifact crash-log.txt -> ART-73d2026af1fc7b05cb242f8eae08aec7
+capability consumed before first mutation
+intent capture-ui-tree
+verified capture-ui-tree ["remoteByteCount"]
+intent receive-ui-tree
+verified receive-ui-tree ["byteCount", "localArtifact", "sha256"]
+artifact ui-tree.json -> ART-53afd439d1b42b7b4046f399aa705524
+intent cleanup-ui-tree-temp
+verified cleanup-ui-tree-temp ["cleaned"]
+intent capture-screenshot
+verified capture-screenshot ["remoteByteCount"]
+intent receive-screenshot
+verified receive-screenshot ["byteCount", "localArtifact", "sha256"]
+artifact screenshot.png -> ART-b6dff35c0b9d247604407cec8d6dc3e0
+intent cleanup-screenshot-temp
+verified cleanup-screenshot-temp ["cleaned"]
+intent capture-trace
+verified capture-trace ["remoteByteCount"]
+intent receive-trace-artifact
+verified receive-trace-artifact ["byteCount", "localArtifact", "sha256"]
+artifact trace.htrace -> ART-fb7690fdfec56703960304b41e3de298
+intent cleanup-remote-temp
+verified cleanup-remote-temp ["cleaned"]
+host-step postprocess-index
+host-step finalize-session
+trace parameters snapshotted after capture
+running->finalizing
+reason: steps-complete

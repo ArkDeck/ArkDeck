@@ -1,0 +1,183 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "application-liveness.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-index.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-log.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "hilog.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "detail" : "upstream capture-trace did not run: failed(\"emptyTrace: hitrace left a zero-byte file at /data/local/tmp/arkdeck-job-d87e93b62a5439c408b76112d61e5f7b-capture-trace-owned.htrace\")",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-dump.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "completeness" : "complete",
+  "jobId" : "job-d87e93b62a5439c408b76112d61e5f7b",
+  "missingRequired" : [
+
+  ],
+  "operation" : "capture.diagnostics@1",
+  "trace" : {
+    "adapterFamily" : "hitrace.dayu200-oh7.text",
+    "durationSeconds" : 5,
+    "parameters" : [
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.syntax.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.layout.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.build.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.measure.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "missing"
+        },
+        "before" : {
+          "state" : "missing"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.trace.sync.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "0"
+        },
+        "desired" : "1",
+        "name" : "persist.ace.debug.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "true"
+        },
+        "desired" : "true",
+        "name" : "persist.ace.performance.monitor.enabled",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "1"
+        },
+        "desired" : "1",
+        "name" : "persist.sys.graphic.openDebugTrace",
+        "restored" : null
+      },
+      {
+        "after" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "before" : {
+          "state" : "value",
+          "value" : "false"
+        },
+        "desired" : "1",
+        "name" : "persist.rosen.animationtrace.enabled",
+        "restored" : null
+      }
+    ],
+    "tags" : [
+      "ace"
+    ],
+    "toolIdentity" : "hitrace"
+  }
+}

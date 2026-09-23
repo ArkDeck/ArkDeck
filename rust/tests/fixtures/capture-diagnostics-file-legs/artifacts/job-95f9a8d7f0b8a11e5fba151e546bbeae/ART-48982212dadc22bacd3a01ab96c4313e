@@ -1,0 +1,22 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-95f9a8d7f0b8a11e5fba151e546bbeae",
+  "markers" : [
+    {
+      "detail" : "failed receive-screenshot: unexpectedFormat: received bytes do not begin with the pinned magic",
+      "kind" : "auto",
+      "trigger" : "stepFailed"
+    }
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

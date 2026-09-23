@@ -1,0 +1,18 @@
+{
+  "abilityState" : "UNKNOWN",
+  "applicationRef" : "288a665f09da36e575f6898244feb014a63b642a8556de9ebd5c1353eac3ea76",
+  "documentType" : "arkdeck-application-liveness",
+  "observationWindow" : {
+    "endedAtUtc" : "2026-09-14T00:00:00Z",
+    "startedAtUtc" : "2026-09-14T00:00:00Z"
+  },
+  "observedAtUtc" : "2026-09-14T00:00:00Z",
+  "pidObserved" : false,
+  "processState" : "UNKNOWN",
+  "reasonCode" : "processReadbackAmbiguous",
+  "schemaVersion" : "1.0.0",
+  "sourceOperationRef" : "capture.diagnostics@1",
+  "sourceRuntimeJobId" : "job-c25867d9e13c61e43908666b7962fd81",
+  "state" : "UNKNOWN",
+  "targetBindingRevision" : 1
+}

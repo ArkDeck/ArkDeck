@@ -455,7 +455,29 @@
           "type": "object"
         },
         "ringCoverage": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "anchor": {
+                  "type": "string"
+                },
+                "ringHeldAnchor": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "anchor",
+                "ringHeldAnchor"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "schemaVersion": {
           "type": "string"
@@ -516,7 +538,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 23,
-    "result": 21
+    "request": 24,
+    "result": 22
   }
 }

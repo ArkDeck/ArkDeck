@@ -151,6 +151,31 @@ pub struct JobRecord {
     residues: Option<i64>,
 }
 
+/// Swift `AgentDaemon.encodeTraceRuntimeProbe`: a Trace snapshot's route,
+/// verdict, tool, family, tags and help digest and each parameter's reading,
+/// an absent member null; no snapshot is null.
+fn trace_projection(snapshot: Option<&Value>) -> Value {
+    let Some(snapshot) = snapshot else {
+        return Value::Null;
+    };
+    let member = |value: &Value, key: &str| value.get(key).cloned().unwrap_or(Value::Null);
+    let parameters: Vec<Value> = snapshot["parameters"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|reading| {
+            json!({"name": reading["name"], "state": reading["state"],
+                "value": member(reading, "value"), "detail": member(reading, "detail")})
+        })
+        .collect();
+    json!({
+        "targetId": snapshot["targetID"], "bindingRevision": snapshot["bindingRevision"],
+        "adapterDisposition": snapshot["adapterDisposition"], "tool": member(snapshot, "tool"),
+        "family": member(snapshot, "family"), "supportedTags": snapshot["supportedTags"],
+        "rawHelpSha256": member(snapshot, "rawHelpSHA256"), "parameters": parameters,
+    })
+}
+
 pub(super) fn closed<'a>(
     value: &'a Value,
     required: &[&str],
@@ -528,10 +553,22 @@ impl JobRecord {
     pub(super) fn admission(&self) -> Option<&Value> {
         self.admission.as_ref()
     }
-    /// Whether the record carries a Trace probe, which this Runtime does not
-    /// project yet.
-    pub(super) fn carries_trace_probe(&self) -> bool {
-        self.trace_before.is_some() || self.trace_after.is_some()
+    /// Swift `RuntimeJobRecord.traceProbeBefore` (or `traceProbeAfter`): the
+    /// Trace snapshot a capture took before (or after) its steps, as the
+    /// record keeps it.
+    pub(crate) fn trace_probe(&self, before: bool) -> Option<&Value> {
+        if before {
+            self.trace_before.as_ref()
+        } else {
+            self.trace_after.as_ref()
+        }
+    }
+    pub(super) fn set_trace_probe(&mut self, before: bool, snapshot: Option<Value>) {
+        if before {
+            self.trace_before = snapshot;
+        } else {
+            self.trace_after = snapshot;
+        }
     }
     pub(super) fn set_evidence_preflight(&mut self, preflight: Value) {
         self.evidence_preflight = Some(preflight);
@@ -663,11 +700,11 @@ impl JobRecord {
         })
     }
     /// Swift `RuntimeControlPlaneHandler.encodeEvidence` over the facts
-    /// `RuntimeJobEngine.evidenceSnapshot` reads from a record with no device
-    /// observation, Trace probe or recovery epoch (the caller checks), before
-    /// artifacts and blockers are added: the admission evidence as the
-    /// authority, the request's inputs as the parameters, and the typed steps
-    /// that ran (none recorded reads as none ran).
+    /// `RuntimeJobEngine.evidenceSnapshot` reads from a record with no
+    /// recovery epoch (the caller checks), before artifacts and blockers are
+    /// added: the admission evidence as the authority, the request's inputs as
+    /// the parameters, the Trace snapshots, and the typed steps that ran (none
+    /// recorded reads as none ran).
     pub(super) fn evidence_fields(&self) -> Map<String, Value> {
         let authority = self.admission.as_ref().map_or(Value::Null, |admission| {
             let optional = |key: &str| admission.get(key).cloned().unwrap_or(Value::Null);
@@ -737,8 +774,14 @@ impl JobRecord {
             ("firstEvidenceStepAtUtc".into(), json!(self.first_evidence)),
             ("finishedAtUtc".into(), json!(self.finished)),
             ("recoveryEpoch".into(), Value::Null),
-            ("traceProbeBefore".into(), Value::Null),
-            ("traceProbeAfter".into(), Value::Null),
+            (
+                "traceProbeBefore".into(),
+                trace_projection(self.trace_before.as_ref()),
+            ),
+            (
+                "traceProbeAfter".into(),
+                trace_projection(self.trace_after.as_ref()),
+            ),
             ("parameters".into(), self.request["inputs"].clone()),
         ])
     }
@@ -813,6 +856,15 @@ impl JobRecord {
     }
     pub(super) fn set_screen_sequence(&mut self, measured: Value) {
         self.screen = Some(measured);
+    }
+    /// Swift `RuntimeJobRecord.ringCoverage`: the anchor a ring-buffered
+    /// trace wrote into the device's ring, and whether the ring answered that
+    /// it held it when the capture armed it.
+    pub(crate) fn ring_coverage(&self) -> Option<&Value> {
+        self.ring.as_ref()
+    }
+    pub(super) fn set_ring_coverage(&mut self, anchor: &str, held: bool) {
+        self.ring = Some(json!({"anchor": anchor, "ringHeldAnchor": held}));
     }
     /// The step kinds the record kept, in the order they first ran.
     pub(super) fn step_kinds(&self) -> Option<&[String]> {

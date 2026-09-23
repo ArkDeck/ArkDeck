@@ -518,10 +518,168 @@
               "type": "string"
             },
             "traceProbeAfter": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "adapterDisposition": {
+                      "type": "string"
+                    },
+                    "bindingRevision": {
+                      "type": "integer"
+                    },
+                    "family": {
+                      "type": "string"
+                    },
+                    "parameters": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "detail": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "detail",
+                          "name",
+                          "state",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "rawHelpSha256": {
+                      "type": "string"
+                    },
+                    "supportedTags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "adapterDisposition",
+                    "bindingRevision",
+                    "family",
+                    "parameters",
+                    "rawHelpSha256",
+                    "supportedTags",
+                    "targetId",
+                    "tool"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
             },
             "traceProbeBefore": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "adapterDisposition": {
+                      "type": "string"
+                    },
+                    "bindingRevision": {
+                      "type": "integer"
+                    },
+                    "family": {
+                      "type": "string"
+                    },
+                    "parameters": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "detail": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "detail",
+                          "name",
+                          "state",
+                          "value"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "rawHelpSha256": {
+                      "type": "string"
+                    },
+                    "supportedTags": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "tool": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "adapterDisposition",
+                    "bindingRevision",
+                    "family",
+                    "parameters",
+                    "rawHelpSha256",
+                    "supportedTags",
+                    "targetId",
+                    "tool"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
             }
           },
           "required": [
@@ -866,7 +1024,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 5,
-    "request": 34,
-    "result": 29
+    "request": 31,
+    "result": 26
   }
 }

@@ -1,0 +1,27 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-30d281cdf15c3e65fa33c975f0f31b06",
+  "markers" : [
+    {
+      "detail" : "failed capture-advanced-ui-dump: invalidEncoding: UI dump is not UTF-8",
+      "kind" : "auto",
+      "trigger" : "stepFailed"
+    },
+    {
+      "detail" : "failed capture-crash-log: faultLogNotFound: device has no entry named jscrash-com.example.demo-20010039-20260913235959",
+      "kind" : "auto",
+      "trigger" : "stepFailed"
+    }
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

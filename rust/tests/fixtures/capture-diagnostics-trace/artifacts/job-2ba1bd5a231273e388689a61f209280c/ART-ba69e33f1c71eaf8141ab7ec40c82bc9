@@ -1,0 +1,28 @@
+{
+  "documentType" : "arkdeck-diagnostic-markers",
+  "jobId" : "job-2ba1bd5a231273e388689a61f209280c",
+  "markers" : [
+    {
+      "atHostUTC" : "2026-09-14T00:00:01Z",
+      "kind" : "manual",
+      "label" : "every leg"
+    },
+    {
+      "evidenceArtifact" : "crash-log.txt",
+      "evidenceByteCount" : 98,
+      "kind" : "auto",
+      "trigger" : "crashLogCaptured"
+    }
+  ],
+  "notDerived" : [
+    {
+      "kind" : "frameDeadline",
+      "reason" : "deriving it means reading the trace, and finalization holds artifact metadata rather than artifact bytes"
+    },
+    {
+      "kind" : "logKeyword",
+      "reason" : "deriving it means reading the captured log, which finalization does not open"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

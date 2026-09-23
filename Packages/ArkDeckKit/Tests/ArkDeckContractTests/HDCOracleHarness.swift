@@ -153,7 +153,8 @@ enum HDCOracleHarness {
   /// the Debug Runtime probe the daemon composes beside a started HDC server
   /// host, which answers `debug.probe` and `debug.template.run` outside the
   /// engine; with `traceRuntimeProbe`, likewise the Trace Runtime probe that
-  /// answers `trace.probe`. With `testHooks`, the engine calls the
+  /// answers `trace.probe`, which the daemon also gives its engine to bracket
+  /// a Trace capture with parameter snapshots. With `testHooks`, the engine calls the
   /// package-only hooks of `RuntimeJobEngine.Configuration.TestHooks` (none
   /// unless an oracle names them). None of these is applied unless an oracle
   /// names it.
@@ -211,6 +212,7 @@ enum HDCOracleHarness {
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilities, artifactStore: store,
+      traceRuntimeProbe: traceRuntimeProbe,
       nowUTC: { settings.nowUTC }, nowPreciseUTC: { settings.nowPreciseUTC })
     var executions: (owner: RuntimeAgentExecutionCoordinator, directory: URL)?
     var observations: TargetObservationCoordinator?
@@ -316,11 +318,16 @@ enum HDCOracleHarness {
   /// below the Job directories, the capability store, the Sessions root, the
   /// storage owner and the agent execution directory when composed (dot
   /// entries included, each Job record's machine facts as labels), every such
-  /// entry's kind and mode, and the provenance of all of them.
+  /// entry's kind and mode, and the provenance of all of them. An oracle whose
+  /// calls run concurrently names `calls`: each exchange's calls sorted, from
+  /// its answers' own one-append log, recorded as `hdc-calls.log` in place of
+  /// the driver's log, whose two appends per call concurrent calls interleave.
+  /// `resources` are what its answers read beside them, recorded under their
+  /// paths.
   static func files(
     _ composition: Composition, target: RuntimeTargetRecord, cases: JSONValue,
     answers: String, producer: String, settings: Settings,
-    identities: RandomIdentities? = nil
+    identities: RandomIdentities? = nil, calls: Data? = nil, resources: [String: Data] = [:]
   ) throws -> [String: Data] {
     let manager = FileManager.default
     let encoder = JSONEncoder()
@@ -328,13 +335,18 @@ enum HDCOracleHarness {
     var files: [String: Data] = [
       "hdc": HDCOracleFake.driver,
       "hdc-answers.sh": Data(answers.utf8),
-      "hdc-invocations.log": try HDCOracleFake.invocations(),
       "targets-state/targets.json": try Data(
         contentsOf: composition.targets.appending(path: "targets.json")),
       "cases.json": try encoder.encode(cases) + Data("\n".utf8),
       "store/index.json":
         try encoder.encode(try index(of: composition.jobsState)) + Data("\n".utf8),
     ]
+    if let calls {
+      files["hdc-calls.log"] = calls
+    } else {
+      files["hdc-invocations.log"] = try HDCOracleFake.invocations()
+    }
+    files.merge(resources) { _, resource in resource }
     for entry in try manager.contentsOfDirectory(atPath: composition.artifacts.path).sorted()
     where !entry.hasPrefix(".") {
       let url = composition.artifacts.appending(path: entry)

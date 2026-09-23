@@ -34,6 +34,9 @@ pub(crate) const NATIVE: &str = "deploy.native-library.app-owned@1";
 const NATIVE_ABILITY: &str = "EntryAbility";
 /// The bounded run of stills, whose capture, receive and cleanup are file legs.
 pub(crate) const SCREEN_SEQUENCE: &str = "capture.screen-sequence@1";
+/// The diagnostic capture, whose legs beyond its default are file legs or
+/// reads [`FileAction`] names.
+pub(crate) const CAPTURE: &str = "capture.diagnostics@1";
 
 /// The device-bound operations this Runtime plans and runs.
 pub(crate) const DEVICE_OPERATIONS: [&str; 11] = [
@@ -296,15 +299,14 @@ impl StepAction {
                 context.library.map(|library| library.byte_count),
                 context.helper,
             ),
-            Self::File { .. } => Err(format!(
-                "{step_id} lowers only within a composition that names its host receive root"
-            )),
+            // Only a receive's argv names a host path.
+            Self::File { action, .. } => action.lower_in(step_id, connect_key, None),
         }
     }
 
-    /// [`Self::plan`] within an HDC composition: a file leg lowers with the
-    /// composition's host receive root (Swift `hostReceiveRoot`), where a
-    /// received file lands; a composition without one runs no file leg.
+    /// [`Self::plan`] within an HDC composition: a receive lowers with the
+    /// composition's host receive root (Swift `hostReceiveRoot`), where the
+    /// received file lands; a composition without one receives nothing.
     pub(crate) fn plan_in(
         &self,
         step_id: &str,
@@ -312,10 +314,20 @@ impl StepAction {
         context: &StepContext<'_>,
         receive_root: Option<&Path>,
     ) -> Result<FilePlan, String> {
-        match (self, receive_root) {
-            (Self::File { action, .. }, Some(root)) => action.lower(step_id, connect_key, root),
+        match self {
+            Self::File { action, .. } => action.lower_in(step_id, connect_key, receive_root),
             _ => self.plan(step_id, connect_key, context),
         }
+    }
+}
+
+/// Swift's interpolation of a provider's refusal of a request: a
+/// `DeviceProviderError` describes itself by its detail alone, a bound the
+/// request breaks as `HDCE0RequestError` spells it.
+pub(crate) fn refusal_detail(error: FileActionError) -> String {
+    match error {
+        FileActionError::Unsupported(detail) => detail,
+        FileActionError::Request(error) => error.to_string(),
     }
 }
 
@@ -438,7 +450,7 @@ pub(crate) fn action_in(
     }
     // A screen sequence's capture, receive and cleanup are its file legs,
     // each naming the Job's own frame directory and archive.
-    if matches!(reference, SCREEN_SEQUENCE | "capture.diagnostics@1") {
+    if matches!(reference, SCREEN_SEQUENCE | CAPTURE) {
         let named = FileAction::for_step(
             &step.step_id,
             &step.kind,
@@ -771,8 +783,9 @@ pub(crate) fn compensation_declarations(
 }
 
 /// Swift `cleanupResidue(for:)`: what a cleanup was to remove, a debug HAP's
-/// staged path or installed bundle, or a native deployment's staging. No
-/// other action owes a residue here.
+/// staged path or installed bundle, a native deployment's staging, or a
+/// capture's owned temporary file. A screen sequence's cleanup owes none: its
+/// residue is a verdict of its own (`sequenceCleanupResidue`).
 pub(crate) fn cleanup_residue(action: &StepAction) -> Option<Residue> {
     match action {
         StepAction::Native(native) => match native.as_ref() {
@@ -790,6 +803,11 @@ pub(crate) fn cleanup_residue(action: &StepAction) -> Option<Residue> {
         StepAction::Hap(HapAction::UninstallPackage(bundle)) => {
             Some(Residue::InstalledBundle(bundle.bundle_name().to_owned()))
         }
+        // A capture's provider-owned temporary file, whichever leg wrote it.
+        StepAction::File {
+            action: FileAction::CleanupOwnedRemotePath { path },
+            ..
+        } => Some(Residue::RemotePath(path.remote_path.clone())),
         _ => None,
     }
 }
@@ -1106,46 +1124,52 @@ pub(crate) const FILE_BACKED: [&str; 6] = [
     "unsigned.hap",
 ];
 
-/// Swift `journalStep(for:)` arguments of a screen sequence's file legs, for
-/// the Job `job_id` (before admission, the authorization envelope): the
-/// capture's frames, type, directory and archive; the archive a receive takes
-/// and where it lands among the Job's raw products; and the two owned paths
-/// a cleanup removes. None of them declares a compensation.
+/// Swift `journalStep(for:)` arguments of the legs [`FileAction`] names, for
+/// the Job `job_id` (before admission, the authorization envelope): a stdout
+/// leg's catalog action with its parameters; the liveness readback's probe; a
+/// capture's parameters and the owned path it writes (a screen sequence's also
+/// its frame directory); the file a receive takes and where it lands among
+/// the Job's raw products; and the owned paths a cleanup removes. None of them
+/// declares a compensation.
 pub(crate) fn file_journal_arguments(
     action: &FileAction,
     step: &CatalogStep,
     job_id: &str,
 ) -> Option<Value> {
+    let artifact_id = format!("artifact-{}", step.step_id);
+    // A stdout leg names the catalog's own action, never one guessed from the
+    // step (CHG-2026-050), with the parameters Swift journals for it.
+    let stdout = |parameters: Value| -> Option<Value> {
+        let (catalog, action_id) = step.action.as_ref()?;
+        Some(
+            json!({"catalogId": catalog, "actionId": action_id, "parameters": parameters,
+            "artifactId": artifact_id}),
+        )
+    };
     Some(match action {
-        FileAction::CaptureScreenshot { path, .. } | FileAction::CaptureComponentTree { path } => {
-            json!({
-                "catalogId":"trace-presets", "actionId":"custom", "parameters":{},
-                "artifactId":format!("artifact-{}",step.step_id), "ownedRemotePath":path.remote_path,
-            })
-        }
-        FileAction::CaptureTrace { request, path } => json!({
-            "catalogId":"trace-presets", "actionId":"custom",
-            "parameters":{"durationSeconds":request.duration_seconds,"categories":request.categories,"bufferKB":request.buffer_kb},
-            "artifactId":format!("artifact-{}",step.step_id), "ownedRemotePath":path.remote_path,
-        }),
-        FileAction::CleanupOwnedRemotePath { path } => json!({
-            "remotePath":path.remote_path,"ownershipEvidenceId":format!("owned-{job_id}"),
-        }),
         FileAction::CaptureComponentDetail {
             window_id,
             component_id,
-        } => json!({
-            "catalogId":step.action.as_ref()?.0,"actionId":"componentDetail",
-            "parameters":{"windowId":window_id,"componentId":component_id,"byteBudget":8*1024*1024},
-            "artifactId":format!("artifact-{}",step.step_id),
-        }),
-        FileAction::CaptureCrashIndex { byte_budget } => json!({
-            "catalogId":step.action.as_ref()?.0,"actionId":"crashIndex",
-            "parameters":{"byteBudget":byte_budget},"artifactId":format!("artifact-{}",step.step_id),
-        }),
-        FileAction::CaptureCrashLog { name, byte_budget } => json!({
-            "catalogId":step.action.as_ref()?.0,"actionId":"crashLog",
-            "parameters":{"faultLogName":name.value(),"byteBudget":byte_budget},"artifactId":format!("artifact-{}",step.step_id),
+        } => stdout(json!({"windowId": window_id, "componentId": component_id,
+            "byteBudget": STDOUT_BUDGET}))?,
+        FileAction::CaptureCrashIndex { .. } => stdout(json!({"byteBudget": STDOUT_BUDGET}))?,
+        FileAction::CaptureCrashLog { name, .. } => {
+            stdout(json!({"byteBudget": STDOUT_BUDGET, "faultLogName": name.value()}))?
+        }
+        // Swift journals every readback that is not a port rule's, a package
+        // process's or a native library's as the generic process probe.
+        FileAction::ObserveApplicationLiveness(_) => {
+            json!({"probeId": "process-state", "expectedState": "running"})
+        }
+        FileAction::CaptureScreenshot { path, .. } | FileAction::CaptureComponentTree { path } => {
+            json!({"catalogId": "trace-presets", "actionId": "custom", "parameters": {},
+                "artifactId": artifact_id, "ownedRemotePath": path.remote_path})
+        }
+        FileAction::CaptureTrace { request, path } => json!({
+            "catalogId": "trace-presets", "actionId": "custom",
+            "parameters": {"durationSeconds": request.duration_seconds,
+                "categories": request.categories, "bufferKB": request.buffer_kb},
+            "artifactId": artifact_id, "ownedRemotePath": path.remote_path,
         }),
         FileAction::CaptureScreenSequence {
             request,
@@ -1155,35 +1179,38 @@ pub(crate) fn file_journal_arguments(
             "catalogId": "trace-presets", "actionId": "custom",
             "parameters": {"frameCount": request.frame_count,
                 "imageType": request.image_type.raw(), "framesDirectory": frames.remote_path},
-            "artifactId": format!("artifact-{}", step.step_id),
-            "ownedRemotePath": archive.remote_path,
+            "artifactId": artifact_id, "ownedRemotePath": archive.remote_path,
         }),
         FileAction::ReceiveOwnedArtifact(artifact) => {
+            // The landing name carries a still's encoding; every receive
+            // that is not the tree's, a still's or a sequence's is the
+            // trace's.
             let name = match step.step_id.as_str() {
-                "receive-screen-sequence" => "frames.tar",
                 "receive-ui-tree" => "ui-tree.json",
                 "receive-screenshot" if artifact.path.remote_path.ends_with(".jpeg") => {
                     "screenshot.jpeg"
                 }
                 "receive-screenshot" => "screenshot.png",
-                "receive-trace" => "trace.htrace",
-                _ => return None,
+                "receive-screen-sequence" => "frames.tar",
+                _ => "trace.htrace",
             };
             let mut arguments = json!({"remotePath": artifact.path.remote_path,
-                "artifactId": format!("artifact-{}", step.step_id),
-                "localRelativePath": format!("artifacts/raw/{name}")});
+                "artifactId": artifact_id, "localRelativePath": format!("artifacts/raw/{name}")});
             if let Some(expected) = &artifact.expected_sha256 {
                 arguments["expectedSha256"] = json!(expected);
             }
             arguments
         }
+        FileAction::CleanupOwnedRemotePath { path } => json!({
+            "remotePath": path.remote_path, "ownershipEvidenceId": format!("owned-{job_id}"),
+        }),
+        // Two owned things, not one: the archive and the frame directory.
         FileAction::CleanupScreenSequence {
             frames, archive, ..
         } => json!({
             "remotePath": archive.remote_path, "framesDirectory": frames.remote_path,
             "ownershipEvidenceId": format!("owned-{job_id}"),
         }),
-        _ => return None,
     })
 }
 

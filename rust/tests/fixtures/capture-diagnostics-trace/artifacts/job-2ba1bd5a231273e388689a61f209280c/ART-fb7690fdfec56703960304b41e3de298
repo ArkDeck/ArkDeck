@@ -1,0 +1,2 @@
+# tracer: nop
+  hitrace-1 [000] ....  1.000000: tracing_mark_write: B|1|capture
