@@ -104,6 +104,7 @@ fn rust_plans_the_swift_pointer_gestures() {
             }}),
         };
         plans += 1;
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",

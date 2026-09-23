@@ -206,6 +206,7 @@ fn rust_observes_the_swift_fake_device() {
             }
             other => panic!("{name}: the oracle sent {other}"),
         };
+        let actual = support::legacy_plan_answer(actual);
         let recorded = &exchange["answer"];
         if semantic(&actual) != semantic(recorded) {
             differences.push(format!("{name}:\n  swift {recorded}\n  rust  {actual}"));

@@ -327,6 +327,7 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         if method.starts_with("cleanupDebt.") {
             assert_conforms(method, &actual);
         }
+        let actual = super::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{name}:\n  swift {}\n  rust  {actual}",

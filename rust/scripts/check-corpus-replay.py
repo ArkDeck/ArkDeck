@@ -301,6 +301,16 @@ def main() -> None:
                 answer = with_labels(exchange(endpoint, method, params))
                 answers[name] = answer
                 answer = labelled(answer, item['answer'])
+                if method == 'job.plan' and answer.get('ok'):
+                    # One documented Rust projection addition; retain exact comparison
+                    # of every recorded Swift field. Semantic digest vectors live in
+                    # hoststore's Flash/analyzer/Debug HAP tests.
+                    digest = answer['result'].get('stepSetDigestSHA256')
+                    check(f'{name}: bounded review digest',
+                          isinstance(digest, str) and re.fullmatch(r'[a-f0-9]{64}', digest) is not None,
+                          digest)
+                    answer = dict(answer, result={key: value for key, value in answer['result'].items()
+                                                 if key != 'stepSetDigestSHA256'})
                 if method in LISTINGS and answer.get('ok') and item['answer'].get('ok'):
                     identity_key, created_key, order = LISTINGS[method]
                     listings[name] = opened
@@ -340,8 +350,21 @@ def main() -> None:
 
             daemon_process = start(env, endpoint)
             for run, method, params in reads:
-                check(f'{run}: {method} after restart',
-                      exchange(endpoint, method, params) == before[(run, method)])
+                after = exchange(endpoint, method, params)
+                expected = json.loads(json.dumps(before[(run, method)]))
+                job = (expected.get('result') or {}).get('job') or {}
+                if (method == 'job.show' and job.get('operation') == 'observe.device@1'
+                        and job.get('outcomeUnknown') is True
+                        and job.get('state') == 'waitingForRecovery'):
+                    # Existing job_recovery::recover records its no-redispatch decision.
+                    # Require the exact audit addition, not arbitrary timeline drift.
+                    entries = expected['result']['timeline']['entries']
+                    note = 'recovered: outstanding intents or unknown outcomes; no redispatch'
+                    if note not in entries:
+                        entries.append(note)
+                check(f'{run}: {method} after restart', after == expected,
+                      {'expected': expected, 'after': after})
+            check('restart does not redispatch the fake HDC', calls.read_bytes() == received)
             first = next(iter(oracle['exchanges']))['name'].split('.')[0]
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(endpoint), ARKDECK_DAEMON_PATH=str(daemon))
             for command, method in (('result', 'job.result'), ('evidence', 'job.evidence')) if jobs else ():

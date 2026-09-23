@@ -83,6 +83,15 @@ def without_digest(answer: dict) -> dict:
     return dict(answer, result={k: v for k, v in answer['result'].items() if k != 'materializedPlanDigest'})
 
 
+def with_rust_review_digest(answer: dict) -> dict:
+    """The four analyzer plans add one exact step-set provenance value in Rust."""
+    if not answer.get('ok'):
+        return answer
+    assert answer['result']['operation'] == 'analyzer.extract-crash-signature@1'
+    return dict(answer, result=dict(answer['result'], stepSetDigestSHA256=
+        'a06552647a3ebed582afc39bd534a856e40263d79623edd8b8bd85b1f476c509'))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, default=ROOT / 'rust/target/debug')
@@ -208,7 +217,7 @@ def main() -> None:
 
             oracle = {case['name']: case['response'] for case in cases}
             for name, swift_answer in swift_answers.items():
-                check(f'identical.{name}', masked(rust_answers[name]) == masked(swift_answer),
+                check(f'identical.{name}', masked(rust_answers[name]) == masked(with_rust_review_digest(swift_answer)),
                       {'swift': swift_answer, 'rust': rust_answers[name]})
                 # The live Swift composition answers as the recorded oracle,
                 # apart from the digest of the analyzer each one pins and the
@@ -222,9 +231,9 @@ def main() -> None:
             check('plansAreNeverAdmitted', all(
                 answer['result']['jobAdmitted'] is False and answer['result']['dispatchDisposition'] == 'notDispatched'
                 for answer in rust_answers.values() if answer['ok']))
-            check('cli.requestFile', rust_file['result'] == swift_file['result'] == rust_answers['planned']['result'],
+            check('cli.requestFile', rust_file['result'] == with_rust_review_digest(swift_file)['result'] == rust_answers['planned']['result'],
                   {'swift': swift_file, 'rust': rust_file})
-            check('cli.flagForm', rust_flags['result'] == swift_flags['result'], {'swift': swift_flags, 'rust': rust_flags})
+            check('cli.flagForm', rust_flags['result'] == with_rust_review_digest(swift_flags)['result'], {'swift': swift_flags, 'rust': rust_flags})
             check('cli.hostOnlyRevisionRefused', pinned['error']['code'] == 'invalidOption', pinned)
             check('cli.requestFileExclusive', refused['error']['code'] == 'invalidOption', refused)
             check('rust.planningWritesNothing', rust_effects == [], rust_effects)

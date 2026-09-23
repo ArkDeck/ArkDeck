@@ -218,6 +218,7 @@ fn only_a_complete_unadmitted_plan_projection_is_accepted() {
         ("jobAdmitted", json!(true)),
         ("dispatchDisposition", json!("dispatched")),
         ("materializedPlanDigest", json!("ABC")),
+        ("stepSetDigestSHA256", json!("ABC")),
         ("bindingRevision", json!(0)),
         ("authorizationPolicy", json!("anything")),
         ("providerAdmissionBlocker", json!("")),
@@ -230,6 +231,28 @@ fn only_a_complete_unadmitted_plan_projection_is_accepted() {
             "{field}"
         );
     }
+    let mut with_review = planned.clone();
+    with_review["stepSetDigestSHA256"] =
+        json!("a06552647a3ebed582afc39bd534a856e40263d79623edd8b8bd85b1f476c509");
+    validate_plan(&with_review).unwrap();
+    let schema: Value = serde_json::from_str(
+        arkdeck_contract::METHOD_SCHEMAS
+            .iter()
+            .find(|(name, _)| *name == "job.plan")
+            .unwrap()
+            .1,
+    )
+    .unwrap();
+    let supports_review = schema["$defs"]["result"]["properties"]
+        .get("stepSetDigestSHA256")
+        .is_some();
+    let checked = arkdeck_contract::validate_method_value("job.plan", "result", &with_review);
+    assert_eq!(
+        checked.is_ok(),
+        supports_review,
+        "the selected contract view must enforce its own closed fields"
+    );
+    arkdeck_contract::validate_method_value("job.plan", "result", &planned).unwrap();
     let mut unknown = planned.clone();
     unknown["extra"] = json!(1);
     assert!(validate_plan(&unknown).is_err());

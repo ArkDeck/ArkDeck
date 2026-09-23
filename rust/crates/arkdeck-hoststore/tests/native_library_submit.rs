@@ -79,6 +79,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
             }
             _ => continue,
         };
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",

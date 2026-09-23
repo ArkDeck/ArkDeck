@@ -54,6 +54,7 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
                 "details": {"newDispatchCount": 0, "phase": "preAdmission"}}})
             }
         };
+        let actual = support::legacy_plan_answer(actual);
         assert_eq!(actual, exchange["answer"], "{}", exchange["name"]);
     }
     let valid = cases["exchanges"]

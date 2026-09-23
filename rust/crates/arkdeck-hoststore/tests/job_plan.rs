@@ -180,7 +180,7 @@ fn rust_plans_reproduce_the_swift_oracle() {
         .handle(&params);
         restore();
         let expected = &case["response"];
-        let actual = match outcome {
+        let mut actual = match outcome {
             Ok(result) => {
                 planned += 1;
                 json!({"ok": true, "result": result})
@@ -188,6 +188,19 @@ fn rust_plans_reproduce_the_swift_oracle() {
             Err(refusal) => json!({"ok": false, "error": {"code": refusal.code,
                 "message": refusal.message}}),
         };
+        if let Some(result) = actual.get_mut("result") {
+            // New presentation provenance is not in the retained Swift wire oracle.
+            // The same Runtime helper is separately checked against frozen Swift step digests.
+            let digest = result
+                .as_object_mut()
+                .unwrap()
+                .remove("stepSetDigestSHA256")
+                .unwrap();
+            assert_eq!(
+                digest,
+                "a06552647a3ebed582afc39bd534a856e40263d79623edd8b8bd85b1f476c509"
+            );
+        }
         let mut recorded = expected.clone();
         if let Some(error) = recorded.get_mut("error").and_then(Value::as_object_mut) {
             // Zero-dispatch details are the control layer's; the agentd

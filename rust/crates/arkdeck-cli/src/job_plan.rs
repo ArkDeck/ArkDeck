@@ -409,7 +409,15 @@ pub fn validate_plan(value: &Value) -> Result<(), CliError> {
     let named = |value: &Value| value.as_str().is_some_and(|text| !text.is_empty());
     let effect = |value: &Value| value.as_str().is_some_and(|text| EFFECTS.contains(&text));
     let target = value["targetId"].as_str().is_some_and(valid_identifier);
-    if !keys(value, &PLAN_KEYS)
+    let shape_valid = if value.get("stepSetDigestSHA256").is_some() {
+        let mut keys_with_digest = PLAN_KEYS.to_vec();
+        keys_with_digest.push("stepSetDigestSHA256");
+        keys(value, &keys_with_digest) && digest(&value["stepSetDigestSHA256"])
+    } else {
+        // The still-published Swift daemon lacks this additive projection.
+        keys(value, &PLAN_KEYS)
+    };
+    if !shape_valid
         || value["schemaVersion"] != "arkdeck.job-plan/1"
         || value["executionMode"] != "planOnly"
         || value["jobAdmitted"] != false

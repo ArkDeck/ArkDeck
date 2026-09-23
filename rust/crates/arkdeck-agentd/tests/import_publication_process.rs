@@ -357,7 +357,7 @@ fn real_cli_daemon_three_kinds_restart_and_lost_commit_reply() {
     ];
     let mut plan = vec!["job", "plan"];
     plan.extend(args);
-    assert!(runtime.cli(&plan)["materializedPlanDigest"].is_string());
+    assert_plan(&runtime, &plan);
     let mut submit = vec!["job", "submit"];
     submit.extend(args);
     let accepted = runtime.cli(&submit);
@@ -425,6 +425,58 @@ fn real_cli_daemon_three_kinds_restart_and_lost_commit_reply() {
         }
         assert!(runtime.cli(&args)["base64"].is_string());
     }
+}
+
+/// `job plan` as the daemon's control layer answers it under this build's
+/// `job.plan` schema. The checkout and candidate views publish the additive
+/// step-set review digest every Rust plan carries. The published view compiles
+/// the merge base's closed result schema, which predates it, so the daemon
+/// answers `internalError` in place of a result that schema cannot publish.
+fn assert_plan(runtime: &Runtime, plan: &[&str]) {
+    let schema: Value = serde_json::from_str(
+        arkdeck_contract::METHOD_SCHEMAS
+            .iter()
+            .find(|(method, _)| *method == "job.plan")
+            .unwrap()
+            .1,
+    )
+    .unwrap();
+    if schema["$defs"]["result"]["properties"]
+        .get("stepSetDigestSHA256")
+        .is_some()
+    {
+        let planned = runtime.cli(plan);
+        assert!(planned["materializedPlanDigest"].is_string());
+        let digest = planned["stepSetDigestSHA256"].as_str().unwrap_or_default();
+        assert!(
+            digest.len() == 64
+                && digest
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+            "{planned}"
+        );
+        return;
+    }
+    // Only the published view's inputs name their merge-base commit.
+    let inputs =
+        arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+    assert!(
+        inputs["kind"] == "development" && inputs.get("commit").is_some(),
+        "only the merge base's schema may predate the step-set review digest"
+    );
+    let refused = runtime.cli_at(
+        plan,
+        &runtime.socket(),
+        Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")),
+    );
+    assert!(!refused.status.success());
+    let failure: Value = serde_json::from_slice(&refused.stdout).unwrap();
+    assert_eq!(failure["error"]["code"], "internalError", "{failure}");
+    assert_eq!(
+        failure["error"]["message"],
+        "the result does not conform to the current contract"
+    );
+    assert_eq!(failure["error"]["details"]["wireCode"], "internalError");
 }
 
 /// A real process path under the exact old published contract. Its supported
