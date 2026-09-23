@@ -22,19 +22,26 @@ fn blocks_in_use() -> i64 {
     i64::from(statistics.blocks_in_use)
 }
 
-/// Heap blocks still allocated after `CALLS` calls on a fresh thread, counted
-/// before that thread exits, since its exit would drain an implicit pool.
-fn retained_blocks(call: impl Fn() + Send) -> i64 {
+/// Heap blocks left allocated by each of two consecutive batches of `CALLS`
+/// calls on a fresh thread, counted before that thread exits (its exit would
+/// drain an implicit pool). One batch runs first, unmeasured: it absorbs the
+/// caches the system fills on first use, such as calendar and time-zone data.
+/// Those do not recur, while anything a call keeps grows with every batch.
+fn blocks_per_batch(call: impl Fn() + Send) -> [i64; 2] {
     std::thread::scope(|scope| {
         scope
             .spawn(move || {
-                // The first call fills one-time caches, such as calendar data.
-                call();
-                let before = blocks_in_use();
-                for _ in 0..CALLS {
-                    call();
-                }
-                blocks_in_use() - before
+                let batch = || {
+                    for _ in 0..CALLS {
+                        call();
+                    }
+                };
+                batch();
+                let start = blocks_in_use();
+                batch();
+                let middle = blocks_in_use();
+                batch();
+                [middle - start, blocks_in_use() - middle]
             })
             .join()
             .unwrap()
@@ -44,31 +51,33 @@ fn retained_blocks(call: impl Fn() + Send) -> i64 {
 #[test]
 fn calendar_calls_drain_what_they_autorelease() {
     let at = host_gregorian_seconds(2026, 7, 17, 8, 0, 0).unwrap();
-    for (name, retained) in [
+    for (name, [first, second]) in [
         (
             "host_gregorian_add_days",
-            retained_blocks(|| {
+            blocks_per_batch(|| {
                 host_gregorian_add_days(at, 30).unwrap();
             }),
         ),
         (
             "host_gregorian_timestamp",
-            retained_blocks(|| {
+            blocks_per_batch(|| {
                 host_gregorian_timestamp(at).unwrap();
             }),
         ),
         (
             "host_gregorian_seconds",
-            retained_blocks(|| {
+            blocks_per_batch(|| {
                 host_gregorian_seconds(2026, 7, 17, 8, 0, 0).unwrap();
             }),
         ),
     ] {
-        // An undrained call keeps two blocks: 20,000 here. The allowance
-        // absorbs only one-time allocations, never one block per call.
+        eprintln!("{name}: {first} then {second} heap blocks per {CALLS} calls");
+        // An undrained call keeps two blocks, 20,000 per batch, in every
+        // batch. The bound admits less than one block per hundred calls in
+        // the later batch, after the warm-up and the first measured batch.
         assert!(
-            retained < CALLS / 10,
-            "{name} kept {retained} heap blocks after {CALLS} calls"
+            second < CALLS / 100,
+            "{name} kept {first} and then {second} heap blocks per {CALLS} calls"
         );
     }
 }

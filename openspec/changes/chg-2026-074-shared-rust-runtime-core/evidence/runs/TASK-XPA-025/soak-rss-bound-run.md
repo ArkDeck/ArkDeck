@@ -96,9 +96,18 @@ fragmented: 9.9 MB allocated, 21.5 MB dirty.
    the owner served the next page. The calls, their order and every check are unchanged. The only
    stricter rule is that every row must now carry both fields. The final verification already
    required that.
-3. Regression test `rust/crates/arkdeck-platform/tests/host_calendar_autorelease.rs`: 10,000 calls
-   of each helper on a fresh thread must keep fewer than 1,000 heap blocks. Before the fix, the
-   leaking helpers kept 20,000. The file holds one test, so no other test allocates while it counts.
+3. Regression test `rust/crates/arkdeck-platform/tests/host_calendar_autorelease.rs`. Each helper
+   runs on a fresh thread: first an unmeasured warm-up batch of 10,000 calls, then two measured
+   batches of 10,000 calls each. The second measured batch must keep fewer than 100 heap blocks,
+   below one block per hundred calls.
+   - A cache filled on first use does not come back in a later batch.
+   - Anything a call keeps grows again with every batch. Before the fix, the leaking helpers kept
+     20,020 blocks in each batch.
+   - The failure message reports both batches, so a failing run shows which case it is.
+   - The file holds one test, so no other test allocates while it counts.
+
+   The first commit measured a single batch after one warm-up call, with a bound of 1,000 blocks.
+   On macOS 26 CI that shape failed (§9).
 
 ## 6. After
 
@@ -185,10 +194,26 @@ they need their own tests and review.
 
 - Before the fix, the probe showed `host_gregorian_add_days` and `host_gregorian_timestamp` each
   keeping +20,020 blocks per 10,000 calls. Log: `/private/tmp/arkdeck-s6-probe-autorelease.log`.
-- `cargo test -p arkdeck-platform --test host_calendar_autorelease`: exit 0. Two mutants each
-  failed with exit 101 and the message "kept 20020 heap blocks after 10000 calls": one without the
-  add-days pool and one without the timestamp pool. The source was restored by checksum. Logs:
-  `/private/tmp/arkdeck-s6-calendar-test.log` and `-calendar-mutant-{adddays,timestamp}.log`.
+- `cargo test -p arkdeck-platform --test host_calendar_autorelease`, single-batch form of the first
+  commit: exit 0. Two mutants each failed with exit 101 and the message "kept 20020 heap blocks
+  after 10000 calls": one without the add-days pool and one without the timestamp pool. The source
+  was restored by checksum. Logs: `/private/tmp/arkdeck-s6-calendar-test.log` and
+  `-calendar-mutant-{adddays,timestamp}.log`.
+- Batch form of the follow-up commit, on macOS 27 (26A428):
+  - Five local runs with `--nocapture`, exit 0 each. Every helper reported "0 then 0 heap blocks
+    per 10000 calls" in all five runs. Logs: `/private/tmp/arkdeck-s6b-calendar-run{1..5}.log`.
+  - Pool-removal mutants. The source was restored by checksum after each one. Logs:
+    `/private/tmp/arkdeck-s6b-calendar-mutant-{adddays,timestamp,seconds}.log`.
+    - Add-days pool removed: exit 101, "kept 20020 and then 20020 heap blocks per 10000 calls".
+    - Timestamp pool removed: exit 101, with the same numbers.
+    - Seconds pool removed: exit 0, 0 then 0 blocks. `CFCalendarComposeAbsoluteTime` autoreleases
+      nothing on this OS, as the probe showed. That pool is defensive, and this test cannot prove
+      it here.
+  - `cargo fmt --all --check`: exit 0.
+  - `cargo clippy -p arkdeck-platform --all-targets -- -D warnings`: exit 0.
+  - `cargo test -p arkdeck-platform --no-fail-fast`: exit 0, with 18 targets, 161 passed and
+    4 ignored.
+  - Logs: `/private/tmp/arkdeck-s6b-{fmt,clippy,platform-tests}.log`.
 - `cargo fmt --all --check`: exit 0. Log: `/private/tmp/arkdeck-s6-fmt.log`.
 - `cargo clippy -p arkdeck-platform -p arkdeck-hoststore -p arkdeck-provider-hdc
   -p arkdeck-provider-workspace -p arkdeck-client -p arkdeck-cli -p arkdeck-agentd -p arkdeck-soak
@@ -215,11 +240,25 @@ Not run:
 
 ## 9. CI
 
-Pending PR CI. The soak lane runs only on dispatch or the Sunday 03:00Z cron. A skipped soak job
-is not a pass. Dispatch it on this branch:
+PR #2129. The soak lane runs only on dispatch or the Sunday 03:00Z cron. A skipped soak job is not
+a pass. The dispatch for this branch:
 
 ```
 gh workflow run rust-perf.yml --ref agent/xpa-025-soak-rss-bound -f soak-hours=4
 ```
 
 This uses the default 300 s interval, which is the weekly lane's definition.
+
+- On `bcbef6936`, the first commit:
+  - SDD Guard `35873441568` passed.
+  - In Swift CI `35873441947`, the host-independent Rust job and the ubuntu and windows workspace
+    jobs passed. The macOS 26 workspace job (`107223255607`, image `macos-26-arm64`) failed in this
+    test: "host_gregorian_add_days kept 1109 heap blocks after 10000 calls" against the bound of
+    1,000. Cargo stops at the first failing target, so later targets did not run in that job.
+  - An undrained call would have kept 20,020 blocks, so the pool works on macOS 26 as well.
+  - A single batch cannot tell a cache filled on first use from a small per-call leak. That is
+    why the follow-up commit changes only the test, to the batch form of §5.3. If macOS 26 also
+    keeps blocks in the second measured batch, that is a per-call leak there, and it goes to the
+    maintainer with those numbers. The bound is not raised for it.
+- The coordinating session dispatched the four-hour soak on `bcbef6936`: run `35873673934`. The
+  follow-up commit touches only this test and this record, so the soak binary is unchanged.
