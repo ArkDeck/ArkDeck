@@ -1120,6 +1120,7 @@ daemon and reads every Job again, and reads through the Rust CLI:
 cargo build -p arkdeck-agentd -p arkdeck-cli
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics-read-legs
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-lifecycle
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/trace-probe
@@ -1144,17 +1145,33 @@ Finalization publishes `capture.log` (the timeline), `markers.json`,
 `artifact-index.json` and `capture-summary.json`, which states every declared
 product's status, so a partial capture never reads as a whole one.
 `job.result` and `job.evidence` accept as missing only the products the request
-left out. A request for a leg this Runtime does not run yet (the advanced dump,
-the crash ledger, the liveness readback, the tree, screenshot and Trace file
-legs, a ring-buffered capture) is refused at planning, before anything is
-admitted.
+left out.
+
+Every other leg runs too, with the provider's `FileAction` (below): the
+component detail dump, the Faultlogger index and one entry of it, and the
+application liveness readback, whose facts become `application-liveness.json`;
+the component tree and the screenshot, each written to an owned path, read back,
+received under the composition's host receive root and removed, a refused
+removal owing a cleanup debt; and the Trace legs, blocking or as an armed ring
+whose held coverage anchor the record keeps (`ringCoverage`) and `markers.json`
+reports. A Trace capture's steps are bracketed by two snapshots of the trace
+tool and its parameters (`device_trace.rs` over `trace_probe`): the first must
+name the Target, a capture-eligible `hitrace` offering every requested tag and
+the whole parameter catalog before any step runs, the second is taken whatever
+the steps ended with, and the index and summary report what both read. A
+composition without a receive root plans every leg but a receive.
 
 `rust/tests/fixtures/capture-diagnostics/` is Swift
 `CaptureDiagnosticsOracleContractTests`' oracle over the shared fake: a capture
 that succeeds, one the device's free space refuses, one on another device and
-one whose HiLog drain comes back empty. `tests/capture_diagnostics.rs` replays
-it in-process and compares every answer and every file the Jobs leave; the
-harness above replays it against the real daemon.
+one whose HiLog drain comes back empty. `capture-diagnostics-read-legs/`,
+`capture-diagnostics-file-legs/` and `capture-diagnostics-trace/` are the
+`CaptureDiagnostics{ReadLegs,FileLegs,Trace}OracleContractTests` oracles of the
+other legs, with their failures, unknown outcomes and refusals.
+`tests/capture_diagnostics.rs` replays all four in-process and compares every
+answer and every file the Jobs leave; the harness above replays the default and
+read-leg oracles against the real daemon (a file leg needs the development
+mutation authority and names the daemon's own receive root).
 
 ## Agent executions and Artifact lists (TASK-XPA-014, M1)
 

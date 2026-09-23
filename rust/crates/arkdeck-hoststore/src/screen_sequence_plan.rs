@@ -1,13 +1,16 @@
-//! File-backed diagnostics and `capture.screen-sequence@1` materialization for `job.plan`, `job.submit`
+//! File-backed and read-leg `capture.diagnostics@1` and
+//! `capture.screen-sequence@1` materialization for `job.plan`, `job.submit`
 //! and each mutation of its run, as Swift
 //! `materializeTypedPlanBeforeAuthorization` materializes it: every step under
-//! the authorization envelope, the file legs as the HDC provider names and
-//! lowers them — the capture's `mkdir`, one still per frame, `tar` and
-//! readback, the receive landing under the composition's host receive root,
-//! and the cleanup's exact removals and readback — and the other device steps
-//! as every device-bound plan lowers them. The receive argv names the landing
-//! path, so the plan digest, and with it the automatic capability, follows the
-//! host receive root. Nothing is dispatched, issued or consumed.
+//! the authorization envelope, the legs [`FileAction`] names as the HDC
+//! provider names and lowers them — a capture's process or process sequence
+//! and its readback, the receive landing under the composition's host receive
+//! root, the cleanup's exact removals and readback, the stdout reads and the
+//! liveness readback — and the other device steps as every device-bound plan
+//! lowers them. A receive's argv names the landing path, so the plan digest,
+//! and with it the automatic capability, follows the host receive root; a
+//! plan that selects no receive does not depend on one. Nothing is
+//! dispatched, issued or consumed.
 use super::*;
 use crate::device_facts::DeviceFacts;
 use crate::operation_catalog::CatalogStep;
@@ -24,17 +27,6 @@ impl<'a> JobPlanner<'a> {
     ) -> Result<Materialized<'a>, PlanRefusal> {
         self.refuse_debug_permit(request)?;
         let hdc = self.hdc.ok_or_else(internal_failure)?;
-        // A composition that names no host receive root cannot say where the
-        // archive would land.
-        let Some(receive_root) = hdc.receive_root else {
-            return Err(refusal(
-                "rejected",
-                format!(
-                    "{} is not materialized by the Rust Runtime without a host receive root",
-                    descriptor.reference()
-                ),
-            ));
-        };
         let now = (hdc.now)().ok_or_else(internal_failure)?;
         let mut steps = Vec::new();
         for step in descriptor
@@ -47,7 +39,7 @@ impl<'a> JobPlanner<'a> {
                 &descriptor.reference(),
                 request,
                 facts,
-                receive_root,
+                hdc.receive_root,
                 &now,
             )?);
         }
@@ -66,13 +58,15 @@ impl<'a> JobPlanner<'a> {
 }
 
 /// One step of the materialized plan document: an engine step, or a device
-/// step with its journal arguments and its process or process sequence.
+/// step with its journal arguments and its process or process sequence. A
+/// receive needs the composition's host receive root: a composition that
+/// names none cannot say where the file would land.
 fn materialize_step(
     step: &CatalogStep,
     reference: &str,
     request: &OperationRequest,
     facts: &DeviceFacts,
-    receive_root: &Path,
+    receive_root: Option<&Path>,
     now: &str,
 ) -> Result<Value, PlanRefusal> {
     let mut document = json!({"stepID": step.step_id, "kind": step.kind, "effect": step.effect,
@@ -95,16 +89,25 @@ fn materialize_step(
         &request.inputs,
         AUTHORIZATION_JOB,
     )
-    .map_err(|error| preflight(error.to_string()))?;
+    .map_err(|error| preflight(device_steps::refusal_detail(error)))?;
     let (plan, arguments) = if let Some(action) = named {
         if action.effect() != step.effect {
             return Err(internal_failure());
+        }
+        if action.receives() && receive_root.is_none() {
+            return Err(refusal(
+                "rejected",
+                format!(
+                    "{reference} is not materialized by the Rust Runtime without a host receive \
+                     root"
+                ),
+            ));
         }
         let arguments = device_steps::file_journal_arguments(&action, step, AUTHORIZATION_JOB)
             .ok_or_else(internal_failure)?;
         (
             action
-                .lower(&step.step_id, Some(&facts.connect_key), receive_root)
+                .lower_in(&step.step_id, Some(&facts.connect_key), receive_root)
                 .map_err(preflight)?,
             arguments,
         )

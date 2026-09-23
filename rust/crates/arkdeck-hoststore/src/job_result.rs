@@ -6,10 +6,9 @@
 //! Job's empty Artifact directory, reseal a payload or refresh its
 //! verification cache while it reads.
 //!
-//! Only Jobs of the operations this Runtime runs are read. A Job carrying a
-//! Trace probe is refused until its owner joins. An unreadable recovery-epoch
-//! store, or an epoch naming the Job as the Job that recovered (a
-//! `recoveryEpoch` the published schema still pins to null), degrades the
+//! Only Jobs of the operations this Runtime runs are read. An unreadable
+//! recovery-epoch store, or an epoch naming the Job as the Job that recovered
+//! (a `recoveryEpoch` the published schema still pins to null), degrades the
 //! evidence. A product the request chose not to take may stay missing; any
 //! other missing product fails the evidence.
 use crate::artifact_read_owner::ArtifactReadStore;
@@ -145,7 +144,7 @@ impl JobResultReader<'_> {
             }
         };
         let record = self.snapshot(id)?;
-        if !READABLE.contains(&record.operation()) || record.carries_trace_probe() {
+        if !READABLE.contains(&record.operation()) {
             return Err(proven(
                 "rejected",
                 format!(

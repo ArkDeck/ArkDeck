@@ -389,6 +389,10 @@ pub fn assert_leftovers_with(
     if root.join("agent-executions").exists() {
         bases.push((root.join("agent-executions"), "agent-executions"));
     }
+    // What the Jobs left where received files land, when an oracle fixed it.
+    if root.join("receive").exists() {
+        bases.push((root.join("receive"), "receive"));
+    }
     for (base, prefix) in bases {
         walk(&base, prefix, &mut files, &mut tree);
     }
@@ -413,6 +417,7 @@ pub fn assert_leftovers_with(
             "session-owner/",
             "artifacts/",
             "agent-executions/",
+            "receive/",
         ]
         .iter()
         .any(|prefix| path.starts_with(prefix))

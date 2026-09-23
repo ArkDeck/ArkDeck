@@ -391,25 +391,13 @@ impl<'a> JobPlanner<'a> {
         if reference == device_steps::NATIVE {
             return self.materialize_native(request, descriptor, &facts);
         }
-        // A screen sequence's file legs are named for the authorization
-        // envelope and lowered against the composition's host receive root.
-        if reference == device_steps::SCREEN_SEQUENCE {
+        // A screen sequence's and a capture's legs are named for the
+        // authorization envelope; a receive among them lowers against the
+        // composition's host receive root.
+        if [device_steps::SCREEN_SEQUENCE, device_steps::CAPTURE].contains(&reference.as_str()) {
             return self.materialize_file_capture(request, descriptor, &facts);
         }
         self.refuse_debug_permit(request)?;
-        // Swift names a ring-buffered capture's coverage anchor in its
-        // markers; this Runtime does not compose it yet.
-        if request.inputs.get("ringBuffered") == Some(&Value::Bool(true)) {
-            return Err(refusal(
-                "rejected",
-                format!("a ring-buffered {reference} is not materialized by the Rust Runtime yet"),
-            ));
-        }
-        // Diagnostics uses the same owned-file lowering as screen sequences.
-        // No receive root means file steps remain unavailable, as before.
-        if reference == "capture.diagnostics@1" && hdc.receive_root.is_some() {
-            return self.materialize_file_capture(request, descriptor, &facts);
-        }
         // The provider context's clock, which a pointer gesture's frame is
         // judged against.
         let now = (hdc.now)().ok_or_else(internal_failure)?;

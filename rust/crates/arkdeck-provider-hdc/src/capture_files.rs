@@ -967,6 +967,24 @@ impl FileAction {
         connect_key: Option<&str>,
         host_receive_root: &Path,
     ) -> Result<FilePlan, String> {
+        self.lower_in(step_id, connect_key, Some(host_receive_root))
+    }
+
+    /// Whether the leg lands a file on the host, and so lowers only where a
+    /// host receive root names the landing.
+    pub fn receives(&self) -> bool {
+        matches!(self, Self::ReceiveOwnedArtifact(_))
+    }
+
+    /// [`Self::lower`] where the composition may name no host receive root:
+    /// every leg but a receive lowers without one, since only a receive's
+    /// argv names a host path.
+    pub fn lower_in(
+        &self,
+        step_id: &str,
+        connect_key: Option<&str>,
+        host_receive_root: Option<&Path>,
+    ) -> Result<FilePlan, String> {
         let Some(key) = connect_key.filter(|key| !key.is_empty()) else {
             return Err(format!(
                 "factsUnavailable(\"{step_id} has no descriptor-bound target connect key\")"
@@ -1226,6 +1244,12 @@ impl FileAction {
             // basename so that both landing forms hdc builds use land on the
             // same path instead of on a guess.
             Self::ReceiveOwnedArtifact(artifact) => {
+                let Some(host_receive_root) = host_receive_root else {
+                    return Err(format!(
+                        "{step_id} lowers only within a composition that names its host receive \
+                         root"
+                    ));
+                };
                 let destination = host_landing(host_receive_root, &artifact.path);
                 FilePlan::Receive {
                     process: ProcessPlan {
