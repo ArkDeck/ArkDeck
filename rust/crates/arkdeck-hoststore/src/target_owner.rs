@@ -53,12 +53,13 @@ pub struct TargetStore {
     /// over this owner shares (`device_lane.rs`).
     lanes: crate::device_lane::DeviceMutationLanes,
 }
-/// The Target a binding lineage advance left.
+/// The Target a binding lineage advance left, and whether it moved.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AdvancedTarget {
     pub(crate) target_id: String,
     pub(crate) identity_sha256: String,
     pub(crate) binding_revision: u64,
+    pub(crate) updated: bool,
 }
 /// Swift `routeObservationFreshnessSeconds`.
 const ROUTE_OBSERVATION_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(5);
@@ -796,6 +797,7 @@ impl TargetStore {
                 target_id: record.target_id,
                 identity_sha256: record.identity,
                 binding_revision: record.binding_revision,
+                updated,
             });
             Ok((Value::Null, publications))
         })
@@ -817,6 +819,81 @@ impl TargetStore {
             ),
         })?;
         advanced.ok_or_else(|| "storeFailure(\"invalid target binding lineage advance\")".into())
+    }
+
+    /// The durable alias relation `ProductRockchipTargetAliasReconciler`
+    /// reuses: the one whose identity-bearing members all match `draft`.
+    pub(crate) fn matching_alias_resolution(
+        &self,
+        draft: &crate::target_document::AliasResolutionDraft,
+    ) -> Result<Option<crate::target_document::AliasResolutionName>, String> {
+        let mut found = None;
+        self.transaction("", |targets, _| {
+            found = targets.matching_alias_resolution(draft);
+            Ok((Value::Null, false))
+        })
+        .map_err(|error| {
+            format!(
+                "storeFailure({})",
+                crate::strict_json::swift_quoted(&format!(
+                    "undecodable target store: {}",
+                    error.message
+                ))
+            )
+        })?;
+        Ok(found)
+    }
+
+    /// Swift `RuntimeTargetStore.appendAliasResolution(_:)`: the proven
+    /// relation appended to the binding document under both locks, published
+    /// only when it was not already there. A refusal is Swift's rendered
+    /// `storeFailure`.
+    pub(crate) fn append_alias_resolution(
+        &self,
+        draft: &crate::target_document::AliasResolutionDraft,
+    ) -> Result<crate::target_document::AliasResolutionName, String> {
+        let mut appended = None;
+        self.publishing("", |targets, _| {
+            let (name, changed) =
+                targets
+                    .append_alias_resolution(draft)
+                    .map_err(|refusal| WireError {
+                        code: "storeFailure".into(),
+                        message: refusal,
+                        details: None,
+                    })?;
+            appended = Some(name);
+            let publications = if changed {
+                vec![Publication::Targets(
+                    targets.encode().map_err(|_| unreadable(""))?,
+                )]
+            } else {
+                Vec::new()
+            };
+            Ok((Value::Null, publications))
+        })
+        .map_err(|error| match error.code.as_str() {
+            "storeFailure" => error.message,
+            "recordUnreadable" => format!(
+                "storeFailure({})",
+                crate::strict_json::swift_quoted(&format!(
+                    "undecodable target store: {}",
+                    error.message
+                ))
+            ),
+            _ => format!(
+                "storeFailure({})",
+                crate::strict_json::swift_quoted(&format!(
+                    "cannot persist target store: {}",
+                    error.message
+                ))
+            ),
+        })?;
+        appended.ok_or_else(|| {
+            "storeFailure(\"target alias resolution lacks exact identity, history or postflight \
+             proof\")"
+                .into()
+        })
     }
 
     /// Presentation lookup from provider-observed addresses. This does not select

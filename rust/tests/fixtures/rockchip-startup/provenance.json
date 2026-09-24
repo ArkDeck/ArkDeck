@@ -1,0 +1,9 @@
+{
+  "base" : "/private/tmp/arkdeck-rockchip-startup-oracle",
+  "producer" : "RockchipStartupReconcileOracleContractTests",
+  "steps" : [
+    "RuntimeTargetStore.advanceBindingLineage",
+    "RockchipProductBindingSnapshot.loaderBindingRecoveryProof",
+    "ProductRockchipTargetAliasReconciler.reconcileIfProven"
+  ]
+}

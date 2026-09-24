@@ -1,0 +1,90 @@
+{
+  "actualEffect" : "destructive",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-08-08T00:02:00Z",
+  "jobID" : "job-22222222222222222222222222222222",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9999999999999999999999999999999999999999999999999999999999999999",
+  "materializedStableTargetIdentitySHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+  "operationReference" : "flash.dayu200",
+  "originalSubmissionRequest" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-ALIAS-FIXTURE"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-job-22222222222222222222222222222222",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:alias-fixture:ART-0123456789abcdef0123456789abcdef",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "request-job-22222222222222222222222222222222",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-815c2c2e87c5"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "rockchip",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-ALIAS-FIXTURE"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-job-22222222222222222222222222222222",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:alias-fixture:ART-0123456789abcdef0123456789abcdef",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "request-job-22222222222222222222222222222222",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-815c2c2e87c5"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-08-08T00:02:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+
+  ]
+}

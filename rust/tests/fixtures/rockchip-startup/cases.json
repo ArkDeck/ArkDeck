@@ -1,0 +1,1154 @@
+{
+  "scenarios" : [
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        }
+      ],
+      "name" : "lineage.noBinding",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.noBinding/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "lineage.revisionOne",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.revisionOne/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "lineage.advanced",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "advanced runtime target TGT-8b3d0a34cf32 to Rockchip binding revision 2"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/lineage.advanced/run-1/targets.json"
+        },
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/lineage.advanced/run-2/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "state/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "state/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "state/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "name" : "lineage.customStateDirectory",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.customStateDirectory/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "state"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "lineage.invalid",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip binding requires Runtime Loader onboarding: productionConfigurationUnavailable(\"durable binding previous identity lineage is invalid or ambiguous\")"
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.invalid/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "lineage.collides",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip binding requires Runtime Loader onboarding: storeFailure(\"target binding lineage collides with a durable record\")"
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.collides/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "644",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "lineage.bindingShared",
+      "runs" : [
+        {
+          "failure" : "productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")",
+          "lines" : [
+
+          ],
+          "recovery" : null,
+          "targets" : "outputs/lineage.bindingShared/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.complete",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "resolved historical target alias TGT-815c2c2e87c5 to TGT-8b3d0a34cf32 via target-alias-resolution-7883c4998b17ac3d935d966afaa971b0"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.complete/run-1/targets.json"
+        },
+        {
+          "failure" : null,
+          "lines" : [
+            "resolved historical target alias TGT-815c2c2e87c5 to TGT-8b3d0a34cf32 via target-alias-resolution-7883c4998b17ac3d935d966afaa971b0"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.complete/run-2/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ],
+      "name" : "alias.noRoute",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.noRoute/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.noAlias",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.noAlias/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.destructiveUnknown",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"target alias carries an effect not covered by later normal-mode postflight\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.destructiveUnknown/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-33333333333333333333333333333333/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.unreadableJob",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"target alias history contains an unreadable Job record\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.unreadableJob/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.flashFactsMismatched",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"post-flash HDC alias establishing Flash has mismatched operation or target facts\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.flashFactsMismatched/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.noCapability",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"post-flash HDC alias establishing Flash lacks immutable capability facts\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.noCapability/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.unfinishedJournal",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"post-flash HDC alias establishing Flash lacks clean terminal journal proof\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.unfinishedJournal/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.noReadback",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"post-flash HDC alias establishing Flash lacks write/readback/postflight proof\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.noReadback/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.chronologyReversed",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "Rockchip target alias remains fail-closed: storeFailure(\"post-flash HDC alias chronology is missing or reversed\")"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.chronologyReversed/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    },
+    {
+      "inputs" : [
+        {
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-11111111111111111111111111111111/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/.manifest.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/job-record.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/jobs/job-22222222222222222222222222222222/journal.jsonl"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.target-display-names.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/.targets.lock"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/target-display-names.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "Agentd/targets/targets.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "name" : "alias.republishedRoute",
+      "runs" : [
+        {
+          "failure" : null,
+          "lines" : [
+            "resolved historical target alias TGT-815c2c2e87c5 to TGT-8b3d0a34cf32 via target-alias-resolution-7883c4998b17ac3d935d966afaa971b0"
+          ],
+          "recovery" : {
+            "currentRevision" : 2,
+            "previousRevision" : 1,
+            "selectionEvidenceSha256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "targetId" : "TGT-8b3d0a34cf32"
+          },
+          "targets" : "outputs/alias.republishedRoute/run-1/targets.json"
+        }
+      ],
+      "stateDirectory" : "Agentd"
+    }
+  ]
+}

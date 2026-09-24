@@ -1,5 +1,8 @@
-//! Read-only validation of Swift's Target binding and alias history document.
-//! This decoder never creates a binding, observation proof, or alias resolution.
+//! Swift's Target binding and alias history document: its validation, and
+//! the changes Swift's Runtime makes to it — an adoption, a binding lineage
+//! advance, and an alias resolution appended only from a draft proven by
+//! terminal Flash history. Nothing here creates a binding or an observation
+//! proof.
 use crate::{DecodeError, display_names::target_identifier, format_time::valid_format_timestamp};
 use arkdeck_contract::{sha256_hex, strict_json};
 use serde::{Deserialize, Serialize};
@@ -87,6 +90,75 @@ fn resolution_digest(resolution: &Resolution) -> String {
         members.remove("resolutionSHA256");
     }
     sha256_hex(&serde_json::to_vec(&material).expect("a value always encodes"))
+}
+/// Swift `RuntimeTargetAliasResolutionDraft`: every member of a proven alias
+/// relation but its identity, chain link and digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AliasResolutionDraft {
+    pub(crate) alias: String,
+    pub(crate) alias_identity: String,
+    pub(crate) alias_revision: u64,
+    pub(crate) canonical: String,
+    pub(crate) canonical_identity: String,
+    pub(crate) canonical_revision: u64,
+    pub(crate) routed_identity: String,
+    pub(crate) topology: String,
+    pub(crate) job: String,
+    pub(crate) plan: String,
+    pub(crate) steps: Vec<String>,
+    /// Each covered unknown intent: its Job, intent event, step and effect.
+    pub(crate) intents: Vec<(String, String, String, String)>,
+    pub(crate) established_at: String,
+}
+/// What a start-up line names of an alias relation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AliasResolutionName {
+    pub(crate) resolution_id: String,
+    pub(crate) alias: String,
+    pub(crate) canonical: String,
+}
+impl Resolution {
+    fn draft(&self) -> AliasResolutionDraft {
+        AliasResolutionDraft {
+            alias: self.alias.clone(),
+            alias_identity: self.alias_identity.clone(),
+            alias_revision: self.alias_revision,
+            canonical: self.canonical.clone(),
+            canonical_identity: self.canonical_identity.clone(),
+            canonical_revision: self.canonical_revision,
+            routed_identity: self.routed_identity.clone(),
+            topology: self.topology.clone(),
+            job: self.job.clone(),
+            plan: self.plan.clone(),
+            steps: self.steps.clone(),
+            intents: self
+                .intents
+                .iter()
+                .map(|i| {
+                    (
+                        i.job.clone(),
+                        i.event.clone(),
+                        i.step.clone(),
+                        i.effect.clone(),
+                    )
+                })
+                .collect(),
+            established_at: self.established_at.clone(),
+        }
+    }
+    fn name(&self) -> AliasResolutionName {
+        AliasResolutionName {
+            resolution_id: self.id.clone(),
+            alias: self.alias.clone(),
+            canonical: self.canonical.clone(),
+        }
+    }
+}
+/// Swift `resolutionID(for:)`: derived from the two Targets and the Flash
+/// that established the relation.
+fn resolution_id(alias: &str, canonical: &str, job: &str) -> String {
+    let seed = sha256_hex(format!("{alias}\n{canonical}\n{job}").as_bytes());
+    format!("target-alias-resolution-{}", &seed[..32])
 }
 pub(super) fn sha(value: &str) -> bool {
     value.len() == 64
@@ -395,18 +467,165 @@ impl TargetDocument {
                 resolution.canonical_identity = identity.into();
                 resolution.canonical_revision = revision;
             }
-            let seed = sha256_hex(
-                format!(
-                    "{}\n{}\n{}",
-                    resolution.alias, resolution.canonical, resolution.job
-                )
-                .as_bytes(),
-            );
-            resolution.id = format!("target-alias-resolution-{}", &seed[..32]);
+            resolution.id =
+                resolution_id(&resolution.alias, &resolution.canonical, &resolution.job);
             resolution.previous = chain.take();
             resolution.digest = resolution_digest(resolution);
             chain = Some(resolution.digest.clone());
         }
+    }
+    /// The relation `ProductRockchipTargetAliasReconciler` reuses: one whose
+    /// every identity-bearing member still matches, whichever Flash later
+    /// republished the route.
+    pub(crate) fn matching_alias_resolution(
+        &self,
+        draft: &AliasResolutionDraft,
+    ) -> Option<AliasResolutionName> {
+        self.resolutions
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .find(|r| {
+                r.alias == draft.alias
+                    && r.alias_identity == draft.alias_identity
+                    && r.alias_revision == draft.alias_revision
+                    && r.canonical == draft.canonical
+                    && r.canonical_identity == draft.canonical_identity
+                    && r.canonical_revision == draft.canonical_revision
+                    && r.routed_identity == draft.routed_identity
+                    && r.topology == draft.topology
+            })
+            .map(Resolution::name)
+    }
+    /// Swift `RuntimeTargetStore.appendAliasResolution(_:)` over this
+    /// document: the proven relation appended to the chain, digested as the
+    /// store digests it; the exact same relation already there is answered
+    /// as it is; a different one, a chain or a reused proof refuses with
+    /// Swift's `storeFailure`. Whether the document changed.
+    pub(crate) fn append_alias_resolution(
+        &mut self,
+        draft: &AliasResolutionDraft,
+    ) -> Result<(AliasResolutionName, bool), String> {
+        let failure = |detail: &str| format!("storeFailure(\"{detail}\")");
+        if !self.proves(draft) {
+            return Err(failure(
+                "target alias resolution lacks exact identity, history or postflight proof",
+            ));
+        }
+        let existing = self.resolutions.as_deref().unwrap_or_default();
+        if let Some(resolution) = existing
+            .iter()
+            .find(|r| r.alias == draft.alias || r.canonical == draft.alias)
+        {
+            if resolution.draft() != *draft {
+                return Err(failure(
+                    "target alias already has a different durable resolution",
+                ));
+            }
+            return Ok((resolution.name(), false));
+        }
+        if existing.iter().any(|r| r.alias == draft.canonical) {
+            return Err(failure("target alias resolution chains are forbidden"));
+        }
+        let key = |job: &str, event: &str| format!("{job}\n{event}");
+        let used: BTreeSet<String> = existing
+            .iter()
+            .flat_map(|r| r.intents.iter().map(|i| key(&i.job, &i.event)))
+            .collect();
+        if draft
+            .intents
+            .iter()
+            .any(|(job, event, _, _)| used.contains(&key(job, event)))
+            || existing.iter().any(|r| r.job == draft.job)
+        {
+            return Err(failure(
+                "target alias resolution reuses durable Flash or intent proof",
+            ));
+        }
+        let mut resolution = Resolution {
+            id: resolution_id(&draft.alias, &draft.canonical, &draft.job),
+            alias: draft.alias.clone(),
+            alias_identity: draft.alias_identity.clone(),
+            alias_revision: draft.alias_revision,
+            canonical: draft.canonical.clone(),
+            canonical_identity: draft.canonical_identity.clone(),
+            canonical_revision: draft.canonical_revision,
+            routed_identity: draft.routed_identity.clone(),
+            topology: draft.topology.clone(),
+            job: draft.job.clone(),
+            plan: draft.plan.clone(),
+            steps: draft.steps.clone(),
+            intents: draft
+                .intents
+                .iter()
+                .map(|(job, event, step, effect)| Intent {
+                    job: job.clone(),
+                    event: event.clone(),
+                    step: step.clone(),
+                    effect: effect.clone(),
+                })
+                .collect(),
+            established_at: draft.established_at.clone(),
+            previous: existing.last().map(|r| r.digest.clone()),
+            digest: String::new(),
+        };
+        resolution.digest = resolution_digest(&resolution);
+        let name = resolution.name();
+        self.resolutions
+            .get_or_insert_with(Vec::new)
+            .push(resolution);
+        Ok((name, true))
+    }
+    /// Swift `validate(_ draft:targets:)`: the exact two Targets, the routed
+    /// identity the alias's own address, a complete postflight and only
+    /// enter-Loader intents covered.
+    fn proves(&self, draft: &AliasResolutionDraft) -> bool {
+        let one = |id: &str| {
+            let mut found = self.targets.iter().filter(|t| t.target_id == id);
+            match (found.next(), found.next()) {
+                (Some(target), None) => Some(target),
+                _ => None,
+            }
+        };
+        let (Some(alias), Some(canonical)) = (one(&draft.alias), one(&draft.canonical)) else {
+            return false;
+        };
+        let required = [
+            "enter-loader-mode",
+            "flash-partitions",
+            "verify-flash-readback",
+            "reboot-device",
+            "wait-for-hdc",
+            "rebind-and-verify-build",
+        ];
+        let steps: BTreeSet<&str> = draft.steps.iter().map(String::as_str).collect();
+        let intents: BTreeSet<(&str, &str)> = draft
+            .intents
+            .iter()
+            .map(|(job, event, _, _)| (job.as_str(), event.as_str()))
+            .collect();
+        draft.alias != draft.canonical
+            && alias.identity == draft.alias_identity
+            && alias.binding_revision == draft.alias_revision
+            && canonical.identity == draft.canonical_identity
+            && canonical.binding_revision == draft.canonical_revision
+            && draft.alias_identity == draft.routed_identity
+            && sha256_hex(alias.connect_key.as_bytes()) == draft.routed_identity
+            && sha(&draft.canonical_identity)
+            && sha(&draft.plan)
+            && !draft.job.is_empty()
+            && !draft.topology.is_empty()
+            && draft.topology.bytes().all(|b| b.is_ascii_digit())
+            && required.iter().all(|step| steps.contains(step))
+            && steps.len() == draft.steps.len()
+            && intents.len() == draft.intents.len()
+            && draft.intents.iter().all(|(job, event, step, effect)| {
+                !job.is_empty()
+                    && !event.is_empty()
+                    && step == "enter-loader-mode"
+                    && effect == "deviceMutation"
+            })
+            && valid_format_timestamp(&draft.established_at)
     }
     /// The document as Swift's `JSONEncoder` writes it: sorted keys, pretty
     /// printed, no trailing newline.

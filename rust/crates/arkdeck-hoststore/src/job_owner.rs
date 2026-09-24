@@ -527,10 +527,6 @@ impl JobStore {
         target_id: &str,
         expected_binding_revision: i64,
     ) -> Result<Vec<String>, WireError> {
-        // Swift `ArkForgeFlashOperation.containsDurableRecordReference`, of
-        // the typed request's operation.
-        const DAYU200_FLASH: [&str; 3] =
-            ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
         let rows = self.active_rows().map_err(unreadable)?;
         let mut jobs = Vec::new();
         for row in &rows {
@@ -538,14 +534,8 @@ impl JobStore {
                 .resident(&row.id)
                 .map(Ok)
                 .unwrap_or_else(|| JobRecord::from_row(row))?;
-            let operation = &record.request["operation"];
-            let reference = match (operation["id"].as_str(), operation["version"].as_i64()) {
-                (Some(id), Some(version)) => format!("{id}@{version}"),
-                (Some(id), None) => id.to_owned(),
-                _ => continue,
-            };
             let target = &record.request["target"];
-            if DAYU200_FLASH.contains(&reference.as_str())
+            if record.dayu200_flash()
                 && target["targetId"].as_str() == Some(target_id)
                 && target["expectedBindingRevision"].as_i64() == Some(expected_binding_revision)
                 && record.state == "waitingForRecovery"

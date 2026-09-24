@@ -325,6 +325,10 @@ mod loader_binding;
 #[cfg(target_os = "macos")]
 pub use loader_binding::LoaderBinding;
 #[cfg(target_os = "macos")]
+mod rockchip_startup;
+#[cfg(target_os = "macos")]
+pub use rockchip_startup::{RockchipStartup, reconcile_rockchip_startup};
+#[cfg(target_os = "macos")]
 mod flash_facts;
 #[cfg(target_os = "macos")]
 pub use flash_facts::{

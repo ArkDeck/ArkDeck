@@ -345,10 +345,20 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .chain(managed_server.then(|| root.join("hdc-control-actions")))
             .collect(),
         )?;
+        // Swift's start-up Rockchip reconciliation over this owner's Target
+        // store, its Job state standing for Swift's state directory: a custom
+        // state directory's, so no Loader binding lineage is followed and no
+        // recovery proof is kept, and only a post-flash alias proved from its
+        // own terminal Flash history is appended.
+        let targets = arkdeck_hoststore::TargetStore::open(&root.join("targets-state"))?;
+        for line in
+            arkdeck_hoststore::reconcile_rockchip_startup(&targets, &root.join("jobs-state"))?.lines
+        {
+            println!("{line}");
+        }
+        let _ = io::stdout().flush();
         let host = host
-            .with_targets(arkdeck_hoststore::TargetStore::open(
-                &root.join("targets-state"),
-            )?)
+            .with_targets(targets)
             .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
             // A preset's toolchain is pinned in this owner's own bootstrap
             // registry, as Swift pins it in its DevEco registry. An isolated
@@ -549,7 +559,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // installed socket before any store is created or probed, and both stay
     // held until this process exits.
     #[cfg(target_os = "macos")]
-    let (host, app_ingress, _instance_lock, production_socket) = if production {
+    let (host, app_ingress, _instance_lock, production_socket, rockchip) = if production {
         let layout = production::Layout::account()?;
         let inputs = production::Inputs::from_environment()?;
         let now = host::utc_now();
@@ -584,9 +594,16 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             composition.ingress,
             Some(authority.instance),
             Some(layout.socket),
+            composition.rockchip,
         )
     } else {
-        (host, app_ingress, None, None)
+        (
+            host,
+            app_ingress,
+            None,
+            None,
+            arkdeck_hoststore::RockchipStartup::default(),
+        )
     };
     #[cfg(not(target_os = "macos"))]
     if development.is_some() {
@@ -622,6 +639,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         for (job, reason) in &recovered.refused {
             eprintln!("arkdeck-agentd: job {job} was not recovered: {reason}");
         }
+    }
+    // As Swift's engine then does with the recovery proof of the binding its
+    // start carried the Target to (`main.swift` 1342–1356): the enter-Loader
+    // transition awaiting that binding, which this Runtime names and does not
+    // settle yet; two or more stop the start.
+    #[cfg(target_os = "macos")]
+    if let Some(line) = host.loader_transition_awaiting(&rockchip)? {
+        println!("{line}");
+        let _ = io::stdout().flush();
     }
     // As Swift's daemon, once, before serving and after its Job recovery
     // above: expired Artifacts are reclaimed; the sweep's census keeps every

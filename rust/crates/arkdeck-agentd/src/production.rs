@@ -462,6 +462,9 @@ pub(crate) struct Composition {
     pub(crate) ingress: Option<crate::app_ingress::Configuration>,
     /// What it composed without, and why.
     pub(crate) omitted: Vec<String>,
+    /// What the start-up Rockchip reconciliation left for after Job
+    /// recovery.
+    pub(crate) rockchip: arkdeck_hoststore::RockchipStartup,
 }
 
 /// Composes every owner over `layout` into `host`, as Swift's composition
@@ -499,8 +502,19 @@ pub(crate) fn compose(
             .create(root)?;
         HostDirectory::open(root)?.validate_path(root)?;
     }
+    // Swift's start-up Rockchip reconciliation over the Target store it has
+    // just opened, before any other owner reads a Target (`main.swift`
+    // 404–460): the Target carried along its Loader binding's lineage, the
+    // binding's recovery proof kept for after Job recovery, and a post-flash
+    // alias proved from terminal Flash history. A binding it cannot read ends
+    // the start, as Swift's does.
+    let targets = arkdeck_hoststore::TargetStore::open(&layout.targets)?;
+    let rockchip = arkdeck_hoststore::reconcile_rockchip_startup(&targets, &layout.state)?;
+    for line in &rockchip.lines {
+        report(line);
+    }
     let host = host
-        .with_targets(arkdeck_hoststore::TargetStore::open(&layout.targets)?)
+        .with_targets(targets)
         .with_history(arkdeck_hoststore::HistoryStore::open(&layout.state)?)
         // Swift pins a preset's DevEco toolchain in the bootstrap registry and
         // its signing credential in the account's signing owner, the secrets
@@ -704,6 +718,7 @@ pub(crate) fn compose(
         arkforge,
         ingress,
         omitted,
+        rockchip,
     })
 }
 

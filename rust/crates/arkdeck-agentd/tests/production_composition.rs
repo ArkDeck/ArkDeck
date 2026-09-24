@@ -944,3 +944,149 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
     // The analyzer never ran again.
     assert_eq!(fs::read(&dispatches).unwrap(), b"x");
 }
+
+/// One scenario of Swift's start-up oracle (`rust/tests/fixtures/
+/// rockchip-startup`), its `ArkDeck` root laid out as the home's Application
+/// Support with Swift's modes: what Swift's first start printed, and the
+/// Target document it left.
+fn rockchip_scenario(home: &Home, name: &str) -> (Value, PathBuf) {
+    let oracle = fixture("rockchip-startup");
+    let cases: Value =
+        serde_json::from_slice(&fs::read(oracle.join("cases.json")).unwrap()).unwrap();
+    let scenario = cases["scenarios"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|scenario| scenario["name"] == name)
+        .unwrap();
+    // Swift's engine indexes every Job it writes; the oracle wrote its Jobs'
+    // directories alone, which only the reconciler reads. So the index comes
+    // first, as a start creates it before any Job: Job history without one
+    // is refused rather than hidden behind a fresh index.
+    home.state_directory();
+    drop(JobStore::open_state_root_owner(&home.state()).unwrap());
+    for input in scenario["inputs"].as_array().unwrap() {
+        let path = input["path"].as_str().unwrap();
+        let file = home.support().join(path);
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(file.parent().unwrap())
+            .unwrap();
+        fs::copy(oracle.join("inputs").join(name).join(path), &file).unwrap();
+        let mode = u32::from_str_radix(input["mode"].as_str().unwrap(), 8).unwrap();
+        fs::set_permissions(&file, fs::Permissions::from_mode(mode)).unwrap();
+    }
+    let first = scenario["runs"][0].clone();
+    let targets = oracle.join(first["targets"].as_str().unwrap());
+    (first, targets)
+}
+
+#[test]
+fn the_start_carries_the_target_along_its_loader_binding_and_proves_the_post_flash_alias() {
+    let _turn = turn();
+    for name in ["lineage.advanced", "alias.complete"] {
+        let home = Home::new();
+        let (first, targets) = rockchip_scenario(&home, name);
+        let mut daemon = Daemon::start(&mut production(&home));
+        for line in first["lines"].as_array().unwrap() {
+            let line = line.as_str().unwrap();
+            assert_eq!(daemon.line(line), line, "{name}");
+        }
+        assert!(daemon.serving(&home).stop().success(), "{name}");
+        assert_eq!(
+            String::from_utf8(fs::read(home.state().join("targets/targets.json")).unwrap())
+                .unwrap(),
+            String::from_utf8(fs::read(targets).unwrap()).unwrap(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn a_rockchip_binding_the_start_cannot_read_refuses_the_start() {
+    let _turn = turn();
+    let home = Home::new();
+    let (first, _) = rockchip_scenario(&home, "lineage.bindingShared");
+    let output = finished(&mut production(&home));
+    assert_eq!(output.status.code(), Some(69), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(first["failure"].as_str().unwrap()),
+        "{output:?}"
+    );
+    assert!(!home.socket().exists());
+}
+
+/// A DAYU200 Flash Job for `target` at revision 1, parked in
+/// `waitingForRecovery` with its outcome unknown at its enter-Loader intent,
+/// admitted and recorded at the state root as the Rust runner records one.
+fn park_loader_transition(state: &Path, id: &str, target: &str) {
+    let jobs = JobStore::open_state_root_owner(state).unwrap();
+    let base = arkdeck_hoststore::JobRecord::decode(
+        &fs::read(fixture(
+            "job-reconcile-analyzer/before/jobs/job-082b8363fce0462b4571a62147751099/job-record.json",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut value = base.value().unwrap();
+    value["jobID"] = json!(id);
+    value["operationReference"] = json!("flash.full-restore@1");
+    value["request"]["operation"] = json!({"id": "flash.full-restore", "version": 1});
+    value["request"]["target"] = json!({"targetId": target, "expectedBindingRevision": 1});
+    value["request"]["idempotencyKey"] = json!(format!("idem-{id}"));
+    value["request"]["requestId"] = json!(format!("req-{id}"));
+    value["originalSubmissionRequest"] = value["request"].clone();
+    let admitted =
+        arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
+    jobs.admit(&admitted, &"a".repeat(64)).unwrap();
+    value["state"] = json!("waitingForRecovery");
+    value["outcomeUnknown"] = json!(true);
+    value["recoveryStepID"] = json!("enter-loader-mode");
+    value["recoveryIntentEventID"] = json!("intent-enter-loader-mode");
+    let parked =
+        arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
+    jobs.persist(&parked, "2026-09-25T00:00:00Z").unwrap();
+}
+
+#[test]
+fn an_enter_loader_transition_awaiting_the_binding_is_named_and_two_refuse_the_start() {
+    let _turn = turn();
+    let home = Home::new();
+    rockchip_scenario(&home, "lineage.advanced");
+    let target = "TGT-8b3d0a34cf32";
+    let first = "job-00000000000000000000000000000a01";
+    park_loader_transition(&home.state(), first, target);
+    let mut daemon = Daemon::start(&mut production(&home));
+    assert_eq!(
+        daemon.line("advanced runtime target "),
+        format!("advanced runtime target {target} to Rockchip binding revision 2")
+    );
+    assert_eq!(
+        daemon.line("Loader transition "),
+        format!(
+            "Loader transition {first} awaits settlement at Rockchip binding revision 2, which \
+             this Runtime does not settle yet; its outcome stays unknown"
+        )
+    );
+    let daemon = daemon.serving(&home);
+    // Named, never settled: the Job still waits with its outcome unknown.
+    let status = answered(&home, "job.status", json!({"jobId": first}));
+    assert_eq!(status["state"], "waitingForRecovery");
+    assert!(daemon.stop().success());
+
+    // Swift's engine refuses two as ambiguous, and so does this start.
+    park_loader_transition(
+        &home.state(),
+        "job-00000000000000000000000000000a02",
+        target,
+    );
+    let output = finished(&mut production(&home));
+    assert_eq!(output.status.code(), Some(69), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(&format!(
+            "jobNotRunnable(\"multiple unresolved Loader transitions cover target {target}\")"
+        )),
+        "{output:?}"
+    );
+}
