@@ -1,2 +1,5 @@
 {"method":"flash.bootloader-status","ok":true,"protocolVersion":"1.0.0","result":{"bindingRevision":null,"disposition":"unbound","mode":"loader","observationCount":1,"targetId":null}}
 {"error":{"code":"internalError","message":"Rockchip bootloader status observation is not configured"},"method":"flash.bootloader-status","ok":false,"params":{},"protocolVersion":"1.0.0"}
+{"method":"flash.bootloader-status","ok":true,"params":{},"protocolVersion":"1.0.0","result":{"bindingRevision":2,"disposition":"exactBoundTarget","mode":"loader","observationCount":1,"targetId":"TGT-HOST"}}
+{"method":"flash.bootloader-status","ok":true,"params":{},"protocolVersion":"1.0.0","result":{"bindingRevision":null,"disposition":"absent","mode":null,"observationCount":0,"targetId":null}}
+{"error":{"code":"rejected","message":"Rockchip bootloader status could not be observed: admissionRejected(\"USB registry unavailable\")"},"method":"flash.bootloader-status","ok":false,"params":{},"protocolVersion":"1.0.0"}

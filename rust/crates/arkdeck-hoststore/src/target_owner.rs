@@ -715,6 +715,38 @@ impl TargetStore {
             Ok((target_name(names,id),true))
         })
     }
+    /// Swift `RuntimeTargetStore.hasConflictingHDCAliasOwner(canonicalTargetID:
+    /// connectKey:identitySHA256:establishingFlashJobID:)`: whether another
+    /// adopted Target owns a verified post-flash alias's connect key or
+    /// identity, refused as Swift's `storeFailure` when the query or the
+    /// canonical Target is not exact.
+    pub fn has_conflicting_hdc_alias_owner(
+        &self,
+        canonical: &str,
+        connect_key: &str,
+        identity: &str,
+        establishing_job: &str,
+    ) -> Result<bool, String> {
+        let store_failure =
+            |detail: &str| format!("storeFailure({})", crate::strict_json::swift_quoted(detail));
+        if canonical.is_empty()
+            || connect_key.is_empty()
+            || !crate::target_document::sha(identity)
+            || arkdeck_contract::sha256_hex(connect_key.as_bytes()) != identity
+            || establishing_job.is_empty()
+        {
+            return Err(store_failure("invalid HDC alias ownership query"));
+        }
+        let mut answer = None;
+        self.transaction("", |targets, _| {
+            answer = targets.has_conflicting_hdc_alias_owner(canonical, connect_key, identity);
+            Ok((Value::Null, false))
+        })
+        .map_err(|error| store_failure(&format!("undecodable target store: {}", error.message)))?;
+        answer.ok_or_else(|| {
+            store_failure("canonical target for HDC alias ownership is missing or ambiguous")
+        })
+    }
     /// Swift `RuntimeTargetStore.list()`: every durable Target record,
     /// aliases included, in stored order, as its document spells it.
     pub fn records(&self) -> Result<Vec<Value>, WireError> {

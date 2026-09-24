@@ -292,7 +292,18 @@ the 256 feature entries as follows:
 | Published view | main's `debug.status` and list schemas compiled in and `published_view()` forced, the agentd replay and the CLI leaf tests run, the sources restored by digest | 3 and 4 passed (`fhr-pubsim.log`) |
 | Check scripts | `rust/scripts/test_contract_checks.py` | 42 tests OK |
 
-**CI.** Pending.
+**CI.** PR #2148 (recorded in the next slice, M4-1b):
+
+- head `5036b734`: Swift CI run 36033785541 was cancelled by the next push
+  after its Rust host-independent checks went red (`check-readonly.py`
+  expected the three routes' old answers); SDD Guard 36033784910 green;
+- head `71d37ded`: SDD Guard run 36035407500 `guard` success; Swift CI run
+  36035407790 success — the `swift` aggregate, `swift-tests`,
+  `ds-interactions`, the Rust host-independent checks and the Rust
+  workspace on ubuntu-latest, macos-26 and windows-latest; `app-build`
+  skipped by the plan;
+- squash-merged by the coordinating session as `main` `7f8e3d71`
+  (2026-09-24T18:06:02Z).
 
 No device, installed service, ArkForge daemon or App was used, and nothing
 here is device evidence.

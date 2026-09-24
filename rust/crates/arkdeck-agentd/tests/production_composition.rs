@@ -318,7 +318,8 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
         daemon.line("arkdeck-agentd owners: "),
         "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, \
          imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, \
-         agentExecutions, humanActions, controlActions, flashAliasReconciler, flashInvocations"
+         agentExecutions, humanActions, controlActions, flashAliasReconciler, flashInvocations, \
+         flashHostFacts"
     );
     let daemon = daemon.serving(&home);
     assert!(
@@ -540,11 +541,10 @@ fn the_trace_cache_the_app_created_is_composed_where_it_is() {
             .unwrap();
     }
     let mut daemon = Daemon::start(&mut production(&home));
-    assert!(
-        daemon
-            .line("arkdeck-agentd owners: ")
-            .ends_with(", controlActions, traceCache, flashAliasReconciler, flashInvocations")
-    );
+    assert!(daemon.line("arkdeck-agentd owners: ").ends_with(
+        ", controlActions, traceCache, flashAliasReconciler, flashInvocations, \
+                 flashHostFacts"
+    ));
     let daemon = daemon.serving(&home);
     answered(&home, "trace.cache.status", json!({}));
     assert!(daemon.stop().success());

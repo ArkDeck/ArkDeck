@@ -383,6 +383,7 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             "controlActions",
             "flashAliasReconciler",
             "flashInvocations",
+            "flashHostFacts",
         ]
     );
     // The Flash invocation owner's directories, created owner-only beside

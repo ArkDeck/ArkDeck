@@ -772,6 +772,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["debug", "probe"] => "debug.probe",
         ["debug", "status"] => "debug.status",
         ["flash", "reconcile-alias"] => "flash.reconcile-alias",
+        ["flash", "bootloader-status"] => "flash.bootloader-status",
+        ["flash", "prerequisites"] => "flash.prerequisites",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
         ["recovery", "flash-invocation", "status"] => "recovery.flash-invocation.status",
         ["debug", "template", "list"] => "debug.template.list",
@@ -942,6 +944,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let allowed: &[&str] = match command {
         "debug.probe" => &["targetId"],
         "flash.reconcile-alias" => &["targetId", "expectedBindingRevision"],
+        "flash.prerequisites" => &["targetId", "deviceProfile"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
         "artifact.import.hap"
@@ -1594,6 +1597,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "control-action.show"
                     | "control-action.reconcile"
                     | "flash.reconcile-alias"
+                    | "flash.prerequisites"
                     | "recovery.flash-invocation.list"
                     | "recovery.flash-invocation.status"
                     | "debug.status"

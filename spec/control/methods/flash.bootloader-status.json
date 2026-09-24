@@ -28,19 +28,28 @@
       "additionalProperties": false,
       "properties": {
         "bindingRevision": {
-          "type": "null"
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "disposition": {
           "type": "string"
         },
         "mode": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "observationCount": {
           "type": "integer"
         },
         "targetId": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         }
       },
       "required": [
@@ -62,7 +71,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 4,
-    "result": 2
+    "request": 5,
+    "result": 3
   }
 }

@@ -536,6 +536,14 @@ pub(crate) fn compose(
             &layout.application_support,
             arkdeck_platform::usb_host_devices,
             crate::host::utc_now,
+        ))
+        // Swift's bootloader status observer and Rockchip facts port over the
+        // same root and census. The ArkForge lane is not ported yet, so its
+        // native RockUSB identity answers that none is configured, as Swift's
+        // does without `ARKDECK_ARKFORGE_BUNDLE_PATH`.
+        .with_flash_host_facts(arkdeck_hoststore::FlashHostFacts::new(
+            &layout.application_support,
+            arkdeck_platform::usb_host_devices,
         ));
     // The App creates its Trace cache in its container; this Runtime reads it
     // where it is and never creates it.

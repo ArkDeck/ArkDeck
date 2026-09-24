@@ -214,6 +214,8 @@ impl<H: HostServices> AppIngress<H> {
                     | "trace.cache.purge"
                     | "debug.probe"
                     | "trace.probe"
+                    | "flash.bootloader-status"
+                    | "flash.prerequisites"
             )
         {
             return refusal(
@@ -350,8 +352,13 @@ fn closed_parameters(request: &Request) -> bool {
         | "runtime.storage.status"
         | "artifact.quota"
         | "trace.cache.status"
-        | "trace.cache.purge" => &[],
+        | "trace.cache.purge"
+        // The App's Flash workspace reads the attached board's disposition
+        // and one Target's prerequisites for a published profile; neither
+        // reaches the board or names a path.
+        | "flash.bootloader-status" => &[],
         "debug.probe" | "trace.probe" => &["targetId"],
+        "flash.prerequisites" => &["targetId", "profileReference"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",
