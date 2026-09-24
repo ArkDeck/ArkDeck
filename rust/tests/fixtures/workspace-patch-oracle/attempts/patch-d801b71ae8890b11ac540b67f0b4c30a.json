@@ -1,0 +1,27 @@
+{
+  "after" : [
+    {
+      "relativePath" : "Sources/App.txt",
+      "sha256" : "7aa7a5359173d05b63cfd682e3c38487f3cb4f7f1d60659fe59fab1505977d4c"
+    }
+  ],
+  "allowedFileGlobs" : [
+    "Sources/App.txt"
+  ],
+  "appliedAtUTC" : "2026-09-20T00:00:00Z",
+  "before" : [
+    {
+      "relativePath" : "Sources/App.txt",
+      "sha256" : "01d09d19c2139a46aebfb577780d123d7396e97201bc7ead210a2ebff8239dee"
+    }
+  ],
+  "patchArtifactID" : "ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+  "patchAttemptRef" : "patch-d801b71ae8890b11ac540b67f0b4c30a",
+  "patchFilePath" : "/private/tmp/arkdeck-workspace-patch-oracle/workspace-patch-attempts/patch-d801b71ae8890b11ac540b67f0b4c30a.patch",
+  "patchSHA256" : "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
+  "projectRef" : "evolution-ea4c148bc53412fee961",
+  "projectRoot" : "/tmp/arkdeck-workspace-patch-oracle/evolution-workspaces/evo-ea4c148bc53412fee961d1fb/workspace",
+  "revertedAtUTC" : "2026-09-20T00:00:00Z",
+  "workspaceRevisionAfter" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92",
+  "workspaceRevisionBefore" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172"
+}

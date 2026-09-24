@@ -233,4 +233,8 @@ failed: disk I/O error`). Reproduced locally with two workers and fixed in the
 test: each test names its own fixed root, which only that test empties and
 removes; the recording's root and frames are unchanged. No other test failed.
 
-Pending: the `guard` and `swift` aggregate on the fixed head.
+On the fixed head `f238ffd5` everything passed: Swift CI 35997529148 (`plan`,
+`ds-interactions`, `swift-tests`, the Rust host-independent checks and the Rust
+workspace on ubuntu-latest, windows-latest and macos-26, the `swift` aggregate),
+SDD Guard 35997528363 (`guard`) and Agent PR 35997528419. Merged as
+`642cac83`.

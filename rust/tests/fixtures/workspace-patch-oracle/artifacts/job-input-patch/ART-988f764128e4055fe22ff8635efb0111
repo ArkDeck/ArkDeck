@@ -1,0 +1,5 @@
+--- a/Sources/Other.txt
++++ b/Sources/Other.txt
+@@ -1 +1 @@
+-outside the narrowed scope
++changed

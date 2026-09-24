@@ -1,0 +1,26 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_PATCH_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspacePatchOracleContractTests",
+  "determinism": "the clock is fixed, the root is fixed and the requests are canonical JSON, so every Job, attempt, capability and Artifact identity repeats; patch.sh stands in for /usr/bin/patch with fixed bytes, so the plans and capabilities name the same executable on every host",
+  "durable": "attempts/ is the workspace-patch-attempts store, capabilities/ the capability store's checkpoint and ledger, tree.json the copy's regular files with their digests, adoption.json what a restarted isolation manager adopts after the apply, after the revert and at the end, parked-record.json the durable record of the Job whose receipt was lost after its child ran",
+  "files": {
+    "adoption.json": "61b24a2cc635ff5fdc331b337f19a5a240eda0d08539bb6ea66c052173662ef5",
+    "artifacts/job-input-patch/ART-43837c01d84f6d61f22bb58d4ab373aa": "86d1d32cca10b2e36ec80f71097042e2dfb67f969ca37d09b6741d62856758c0",
+    "artifacts/job-input-patch/ART-4ccb0a35050cacc5248ae8c1d2e9fb1c": "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
+    "artifacts/job-input-patch/ART-988f764128e4055fe22ff8635efb0111": "28adb6c4901cb222ffa70f384ad91b77371a8e2cd9ba7e92098ff8f8becfc0c6",
+    "artifacts/job-input-patch/index.json": "862886365c64bb7602c1a7a2395faca30548b10a8aef277dace9890da29825dd",
+    "attempts/patch-d801b71ae8890b11ac540b67f0b4c30a.json": "49de58a88c1d1ec58913e69c643383a9a8adb7d9bef16f699460d92b8954ac31",
+    "attempts/patch-d801b71ae8890b11ac540b67f0b4c30a.patch": "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
+    "capabilities/runtime-capabilities.json": "cc92c862cf7b16d4344baaee40820f570e26e0672b7439e6959f3cafde6ede97",
+    "capabilities/runtime-capabilities.ledger": "9a198e7bc0f75a3915bac5b64f90e2995ad400f7a6a7211f1a5ee37efc03e7cd",
+    "frames.jsonl": "50f47559cd122fdd07bd5d4ddb7b569d4d7da974d8b1d120677e1082937c8cbe",
+    "parked-record.json": "67bad93f3a6608b618508d6f922c1786710dfc72cef3080c09d158697a3e4567",
+    "patch.sh": "effe702f89bec06304df5d674f28d819c0832d78b42689989935a04c581206ce",
+    "tree.json": "9e4ec1bcbd20bdedb2626f7040da3d529e624c9725437ce1e7cb5e0fc8696993"
+  },
+  "frames": "job.submit and job.run of the Runtime-owned copy, then job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.apply-patch@1 and workspace.revert-patch@1 Job, in the order the control plane answered them",
+  "inputs": "artifacts/job-input-patch/ holds the three unified diffs the recording published before its first request, bound to the host target the patch Jobs name",
+  "recordedBy": "WorkspacePatchOracleContractTests.testTheControlPlaneAppliesAndRevertsPatchesAsRecorded",
+  "replayedBy": "the Rust port of workspace.apply-patch@1 and workspace.revert-patch@1 (TASK-XPA-015, M3)",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager and WorkspacePatchAttemptStore as its patch lineage, over a fabricated source tree under /private/tmp/arkdeck-workspace-patch-oracle; the patch dispatch loses its receipt only where the sequence says so",
+  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence"
+}

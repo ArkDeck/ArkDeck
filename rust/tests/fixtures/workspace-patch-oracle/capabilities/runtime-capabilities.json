@@ -1,0 +1,308 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-0CF4BD233FD88FCAC0F0920CFB76F04DB6D35020-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "allowedFileGlobs" : [
+            "Sources/App.txt"
+          ],
+          "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+          "patchArtifactRef" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+          "projectRef" : "evolution-ea4c148bc53412fee961"
+        },
+        "expiresAtUTC" : "2026-10-20T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172"
+          },
+          "patchArtifactRef" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-ea4c148bc53412fee961"
+          }
+        },
+        "issuedAtUTC" : "2026-09-20T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.apply-patch@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.apply-patch",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+          "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+          "kind" : "workspaceIdentity",
+          "sha256" : "88adb4e0ea256ecdfad583132e324ca32c7b79a8f72ffccf465583723c942146"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "974c31bdc211a92999bf9d65bb60e9090da7b10edbe4edde5bc5798e5a75754c",
+          "consumedAtUTC" : "2026-09-20T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-f772ced673f9f79d4352e2ba92f4ed38",
+          "materializedPlanDigest" : "23a3333f284c2ccd9372ce331e8678420e5578fb3dfeaf8bd483bd622dab5055",
+          "operationReference" : "workspace.apply-patch@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-f772ced673f9f79d4352e2ba92f4ed38",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "9a816cc1293685ec3328de49996a15953d85a380c3bc289142af05c0037586e6",
+              "recordSHA256" : "c604d894844c945c9d4ddf9c12410ff654e6c02abd656e977ef3498458ec8bbb",
+              "recordedAtUTC" : "2026-09-20T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "911cb8ef535a7886985c399aa4c1a1fafee9d3b54264e1362da9f19361d65df5",
+          "receiptSHA256" : "9a816cc1293685ec3328de49996a15953d85a380c3bc289142af05c0037586e6",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idempotency-apply"
+        },
+        {
+          "authorizationScopeFingerprintSHA256" : "974c31bdc211a92999bf9d65bb60e9090da7b10edbe4edde5bc5798e5a75754c",
+          "consumedAtUTC" : "2026-09-20T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-c6b5e06f27cbff132c89de780b7d5d2b",
+          "materializedPlanDigest" : "23a3333f284c2ccd9372ce331e8678420e5578fb3dfeaf8bd483bd622dab5055",
+          "operationReference" : "workspace.apply-patch@1",
+          "ordinal" : 2,
+          "outcomes" : [
+            {
+              "jobID" : "job-c6b5e06f27cbff132c89de780b7d5d2b",
+              "outcome" : "outcomeUnknown",
+              "previousRecordSHA256" : "70383758be7b6f853b125f2e7121ddc499d4073808e6b650909850a0cb84bb95",
+              "recordSHA256" : "a545ebc4d81b995472ca4775d715b1c01c69d1377d1765d56eb3b751a24e168a",
+              "recordedAtUTC" : "2026-09-20T00:00:00Z",
+              "terminalState" : "waitingForRecovery"
+            }
+          ],
+          "previousLineageSHA256" : "c604d894844c945c9d4ddf9c12410ff654e6c02abd656e977ef3498458ec8bbb",
+          "queryFingerprintSHA256" : "911cb8ef535a7886985c399aa4c1a1fafee9d3b54264e1362da9f19361d65df5",
+          "receiptSHA256" : "70383758be7b6f853b125f2e7121ddc499d4073808e6b650909850a0cb84bb95",
+          "remainingUsesAfter" : 9998,
+          "reservationID" : "idempotency-lost-before"
+        }
+      ],
+      "remainingUses" : 9998
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-1BF8DBC6CAD0CBA83ACCF6FDA5CC8C8B6BFAF293-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "allowedFileGlobs" : [
+            "Sources/App.txt"
+          ],
+          "expectedWorkspaceRevision" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92",
+          "patchArtifactRef" : "lease-v1:job-input-patch:ART-43837c01d84f6d61f22bb58d4ab373aa",
+          "projectRef" : "evolution-ea4c148bc53412fee961"
+        },
+        "expiresAtUTC" : "2026-10-20T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92"
+          },
+          "patchArtifactRef" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-patch:ART-43837c01d84f6d61f22bb58d4ab373aa"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-ea4c148bc53412fee961"
+          }
+        },
+        "issuedAtUTC" : "2026-09-20T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.apply-patch@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.apply-patch",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+          "expectedWorkspaceRevision" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92",
+          "kind" : "workspaceIdentity",
+          "sha256" : "88adb4e0ea256ecdfad583132e324ca32c7b79a8f72ffccf465583723c942146"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "f37ed645877939763043fb351799185b8903592728084ca59552c14b4b387476",
+          "consumedAtUTC" : "2026-09-20T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-4b04c7be3d0a9b23c8e0dbd1656e5bb5",
+          "materializedPlanDigest" : "b494a005925ca2c514c9570f8abeab0c031189f0a2837dca60a00ecd5a1211d7",
+          "operationReference" : "workspace.apply-patch@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-4b04c7be3d0a9b23c8e0dbd1656e5bb5",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "ec491a9380939979e602f14049e0ebb3c1284b66f69536290193db7b86ae8555",
+              "recordSHA256" : "8ff7c588e116bbbd69b96387f6e27f0a046072decbf2efe567d6344144f4c92b",
+              "recordedAtUTC" : "2026-09-20T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "7722b55b856f49223cfcf694946457aec4b4495268e182d67dd2cc27bacd6f27",
+          "receiptSHA256" : "ec491a9380939979e602f14049e0ebb3c1284b66f69536290193db7b86ae8555",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idempotency-conflict"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-16EF1EC6714586AD4E6EA22A6759EABE6A3B7287-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "expectedWorkspaceRevision" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92",
+          "patchAttemptRef" : "patch-d801b71ae8890b11ac540b67f0b4c30a",
+          "projectRef" : "evolution-ea4c148bc53412fee961"
+        },
+        "expiresAtUTC" : "2026-10-20T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92"
+          },
+          "patchAttemptRef" : {
+            "kind" : "exactString",
+            "value" : "patch-d801b71ae8890b11ac540b67f0b4c30a"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-ea4c148bc53412fee961"
+          }
+        },
+        "issuedAtUTC" : "2026-09-20T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.revert-patch@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.revert-patch",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+          "expectedWorkspaceRevision" : "65a32c1f169482de14016f894c3609260b63e110b36307929f131d287fc77d92",
+          "kind" : "workspaceIdentity",
+          "sha256" : "88adb4e0ea256ecdfad583132e324ca32c7b79a8f72ffccf465583723c942146"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "ca86d97d50e85394ab2673f222704add67838edbf30087fb7fe78f75c21553f4",
+          "consumedAtUTC" : "2026-09-20T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-ba86dc410c13fa4b0c4539585bf05b99",
+          "materializedPlanDigest" : "2dfd7c7a4012b591b9a500d867e16aeaa090a77c7b945db97b0df9c4fa6a74cc",
+          "operationReference" : "workspace.revert-patch@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-ba86dc410c13fa4b0c4539585bf05b99",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "6d4ab9f71fd0424133b2c3a230f02a0c42fd362401d6666d10a00bf9d1abd2f1",
+              "recordSHA256" : "661ad8319a14e3310b529e99996110306c89b63c73fd8bbe9b5c7a7c4508cb37",
+              "recordedAtUTC" : "2026-09-20T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "c0f3192b6fad247ff19e3b5b93523c40959f5aa82f6063bcd1fe608bac3f1bad",
+          "receiptSHA256" : "6d4ab9f71fd0424133b2c3a230f02a0c42fd362401d6666d10a00bf9d1abd2f1",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idempotency-revert"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-1259CE4F0B7DF2C2A8A64B88E1E5E072072A5810-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "allowedFileGlobs" : [
+            "Sources/**"
+          ],
+          "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+          "patchArtifactRef" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+          "projectRef" : "evolution-ea4c148bc53412fee961"
+        },
+        "expiresAtUTC" : "2026-10-20T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172"
+          },
+          "patchArtifactRef" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-ea4c148bc53412fee961"
+          }
+        },
+        "issuedAtUTC" : "2026-09-20T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.apply-patch@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.apply-patch",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+          "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+          "kind" : "workspaceIdentity",
+          "sha256" : "88adb4e0ea256ecdfad583132e324ca32c7b79a8f72ffccf465583723c942146"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

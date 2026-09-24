@@ -34,7 +34,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 13] = [
+const MATERIALIZED: [&str; 15] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "debug.template@1",
@@ -48,6 +48,8 @@ const MATERIALIZED: [&str; 13] = [
     device_steps::NATIVE,
     "capture.screen-sequence@1",
     "workspace.prepare-isolated-copy@1",
+    "workspace.apply-patch@1",
+    "workspace.revert-patch@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -323,16 +325,16 @@ impl<'a> JobPlanner<'a> {
             materialized._import_use = hold;
             return Ok(materialized);
         }
-        let digest = if descriptor.provider == "workspace" {
+        let (digest, artifact_facts) = if descriptor.provider == "workspace" {
             self.materialize_workspace(request, descriptor)?
         } else {
-            self.materialize(request, descriptor)?
+            (self.materialize(request, descriptor)?, BTreeMap::new())
         };
         Ok(Materialized {
             _import_use: hold,
             _workspace_use: workspace_use,
             digest,
-            artifact_facts: BTreeMap::new(),
+            artifact_facts,
             identity: None,
             binding_revision: None,
         })

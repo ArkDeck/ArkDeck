@@ -213,6 +213,181 @@ impl JobRunner<'_> {
         Ok(MutationConsumption::Consumed)
     }
 
+    /// Swift `consumeCapabilityBeforeMutation` for a workspace mutation: the
+    /// complete typed plan materialized again for the authorization envelope
+    /// and equal to the one admitted, the tree the request names measured
+    /// again — so a tree that moved since admission is refused here rather
+    /// than changed anyway — the capability's policy identity recomputed, and
+    /// the Job's one use consumed and made durable with its correlated
+    /// evidence before the step's write-ahead intent can exist.
+    pub(crate) fn consume_workspace_authority(
+        &self,
+        run: &mut Run,
+        descriptor: &CatalogOperation,
+        workspace: &crate::WorkspaceComposition,
+        leased: Option<&crate::workspace_composition::LeasedPatch>,
+    ) -> Result<MutationConsumption, String> {
+        let reject = |detail: String| format!("authorizationRequired: {detail}");
+        let owner = self
+            .mutation
+            .ok_or_else(|| reject("Runtime mutation owner is unavailable".into()))?;
+        let _reservation_guard = owner
+            .authority
+            .holds
+            .mutation_reservation_guard()
+            .map_err(&reject)?;
+        owner
+            .authority
+            .require_state(self.jobs)
+            .map_err(|e| reject(e.message))?;
+        // A workspace mutation consumes once, from its admitted boundary:
+        // evidence this run did not consume is never continued.
+        if let Some(evidence) = run.record.admission_evidence() {
+            if run.consumed.as_ref() == Some(evidence) {
+                return Ok(MutationConsumption::Held);
+            }
+            return Err(reject(
+                "persisted mutation evidence cannot be replayed".into(),
+            ));
+        }
+        let request = OperationRequest::decode(
+            &serde_json::to_vec(&run.record.request).map_err(|e| reject(e.to_string()))?,
+        )
+        .map_err(|_| reject("the persisted request is unreadable".into()))?;
+        let capability = request
+            .capability_id
+            .clone()
+            .ok_or_else(|| reject("mutation has no runtime capability reference".into()))?;
+        let Some(plan_digest) = run
+            .record
+            .materialized_plan()
+            .filter(|digest| {
+                digest.len() == 64
+                    && digest
+                        .bytes()
+                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            })
+            .map(str::to_owned)
+        else {
+            return Err(reject(
+                "materialized plan or verified target binding is absent or drifted".into(),
+            ));
+        };
+        let planner = JobPlanner {
+            imports: self.imports,
+            artifacts: Some(self.artifacts),
+            analyzer: self.analyzer,
+            state_root: owner.state_root,
+            hdc: None,
+            workspace: Some(workspace),
+        };
+        let fresh = planner
+            .materialized(&request, descriptor)
+            .map_err(|refusal| {
+                reject(format!(
+                    "fresh typed plan could not be materialized: {}",
+                    refusal.message
+                ))
+            })?;
+        if fresh.digest != plan_digest
+            || fresh.identity.as_deref() != run.record.materialized_identity()
+            || fresh.binding_revision != run.record.materialized_binding()
+        {
+            return Err(reject(
+                "fresh typed plan, target or binding drifted before dispatch".into(),
+            ));
+        }
+        drop(fresh);
+        let artifact_facts: std::collections::BTreeMap<String, String> = leased
+            .map(|leased| {
+                std::collections::BTreeMap::from([
+                    ("artifactId".to_owned(), leased.artifact_id.clone()),
+                    ("artifactSha256".to_owned(), leased.sha256.clone()),
+                    (
+                        "artifactByteCount".to_owned(),
+                        leased.byte_count.to_string(),
+                    ),
+                ])
+            })
+            .unwrap_or_default();
+        let facts = workspace
+            .authorization_facts(&request.inputs)
+            .map_err(|error| {
+                reject(format!(
+                    "no workspace subject to authorize this mutation against: {error}"
+                ))
+            })?;
+        let query = CapabilityQuery {
+            operation_id: descriptor.id().into(),
+            operation_version: descriptor.version(),
+            effect: Effect::DeviceMutation,
+            target_stable_identity_sha256: None,
+            target_binding_revision: None,
+            plan_digest: Some(plan_digest.clone()),
+            inputs: request.inputs.clone(),
+            artifact_facts: artifact_facts.clone(),
+            workspace_identity_sha256: Some(facts.identity_sha256),
+            workspace_revision: Some(facts.revision),
+            workspace_file_scopes_digest: Some(facts.file_scopes_digest),
+        };
+        let store = owner.authority.capabilities;
+        let status = store
+            .handle(
+                "capability.inspect",
+                json!({"capabilityId": capability}).as_object().unwrap(),
+            )
+            .map_err(|_| reject("capability status could not be read".into()))?;
+        if status["capability"]["issuer"]["kind"] == "runtimeDefaultPolicy" {
+            let fingerprint = capability_policy::policy_fingerprint(&query, false);
+            if !capability.starts_with(&format!("CAP-RT-POLICY-{}-G", &fingerprint[..40])) {
+                return Err("completeOverwriteRecovery.freshProofDrifted".into());
+            }
+        }
+        if self
+            .cancellation
+            .is_some_and(crate::job_cancel::RunCancellation::pending)
+        {
+            return Ok(MutationConsumption::Cancelled);
+        }
+        owner
+            .authority
+            .require_state(self.jobs)
+            .map_err(|e| reject(e.message))?;
+        let now = run
+            .clock()
+            .map_err(|_| reject("Runtime clock unavailable".into()))?;
+        let step_set_digest = crate::job_plan::step_set_digest(descriptor, &request.inputs)
+            .map_err(|_| reject("complete step set could not be materialized".into()))?;
+        let consumed = store
+            .consume(
+                &capability,
+                &request.idempotency_key,
+                Some(&run.record.job_id),
+                &query,
+                &now,
+            )
+            .map_err(|e| reject(format!("capability denied before mutation: {}", e.swift())))?;
+        let mut evidence = json!({"kind":"runtimeCapability", "reference":capability,
+            "admittedAtUTC":consumed.consumed_at_utc, "validUntilUTC":status["capability"]["expiresAtUTC"],
+            "consumptionFingerprintSHA256":consumed.query_fingerprint_sha256,
+            "runtimeCapabilityCorrelation":{"reservationID":consumed.reservation_id, "useOrdinal":consumed.ordinal,
+                "planDigestSHA256":plan_digest, "stepSetDigestSHA256":step_set_digest,
+                // A workspace subject names no device and no binding.
+                "targetBindingDigestSHA256":sha256_hex(b"-\n-")}});
+        if let Some(digest) = artifact_facts.get("artifactSha256") {
+            evidence["runtimeCapabilityCorrelation"]["artifactSHA256"] = json!(digest);
+        }
+        run.record.set_admission_evidence(evidence.clone());
+        run.record
+            .timeline
+            .push("capability consumed before first mutation".into());
+        if run.persist(self.jobs).is_err() {
+            return Ok(MutationConsumption::PersistenceUncertain);
+        }
+        run.consumed = Some(evidence);
+        Ok(MutationConsumption::Consumed)
+    }
+
     /// A resumed Job takes over the use its record says it consumed (Swift's
     /// resident Job owns it): the record's `runtimeCapability` evidence must
     /// name the capability the request names, and the capability store must

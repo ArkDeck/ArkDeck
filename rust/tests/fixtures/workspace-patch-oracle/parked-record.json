@@ -1,0 +1,117 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "applyWorkspacePatch"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-20T00:00:00Z",
+    "consumptionFingerprintSHA256" : "5fdda1cb9568a9d629ab42377d3719ffbc1f84d715e2c9e4c6c235a57bf4eb4b",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-1259CE4F0B7DF2C2A8A64B88E1E5E072072A5810-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
+      "planDigestSHA256" : "8e02cb50d40e75694e2675cd543f95b3d10f164ba6d8d91b9993b736a8066450",
+      "reservationID" : "idempotency-lost-after",
+      "stepSetDigestSHA256" : "6886b49a4248c695ee8a3d0ddfdd9ed6ed3e450cb818f3ff4cb9e1d90b97ff75",
+      "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-10-20T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-20T00:00:00Z",
+  "finishedAtUTC" : "2026-09-20T00:00:00Z",
+  "jobID" : "job-5a8adf973b71fb93cc2afc8f94076f41",
+  "materializedPlanDigest" : "8e02cb50d40e75694e2675cd543f95b3d10f164ba6d8d91b9993b736a8066450",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.apply-patch@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-lost-after",
+    "inputs" : {
+      "allowedFileGlobs" : [
+        "Sources\/**"
+      ],
+      "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+      "patchArtifactRef" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+      "projectRef" : "evolution-ea4c148bc53412fee961"
+    },
+    "operation" : {
+      "id" : "workspace.apply-patch",
+      "version" : 1
+    },
+    "requestId" : "request-lost-after",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJhcHBseVBhdGNoIjp7Il8wIjp7ImFsbG93ZWRGaWxlR2xvYnMiOlsiU291cmNlcy8qKiJdLCJiZWZvcmUiOlt7InJlbGF0aXZlUGF0aCI6IlNvdXJjZXMvQXBwLnR4dCIsInNoYTI1NiI6IjAxZDA5ZDE5YzIxMzlhNDZhZWJmYjU3Nzc4MGQxMjNkNzM5NmU5NzIwMWJjN2VhZDIxMGEyZWJmZjgyMzlkZWUifV0sImludm9jYXRpb24iOnsiYXJndW1lbnRzIjpbIi1mIiwiLXAxIiwiLWQiLCIvdG1wL2Fya2RlY2std29ya3NwYWNlLXBhdGNoLW9yYWNsZS9ldm9sdXRpb24td29ya3NwYWNlcy9ldm8tZWE0YzE0OGJjNTM0MTJmZWU5NjFkMWZiL3dvcmtzcGFjZSIsIi1pIiwiL3ByaXZhdGUvdG1wL2Fya2RlY2std29ya3NwYWNlLXBhdGNoLW9yYWNsZS9hcnRpZmFjdHMvam9iLWlucHV0LXBhdGNoL0FSVC00Y2NiMGEzNTA1MGNhY2M1MjQ4YWU4YzFkMmU5ZmIxYyJdLCJleGVjdXRhYmxlIjp7InBhdGgiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXBhdGNoLW9yYWNsZS90b29scy9wYXRjaCIsInNoYTI1NiI6ImVmZmU3MDJmODliZWMwNjMwNGRmNWQ2NzRmMjhkODE5YzA4MzJkNzhiNDI2ODk5ODk5MzVhMDRjNTgxMjA2Y2UifSwib3BlcmF0aW9uIjoid29ya3NwYWNlLmFwcGx5LXBhdGNoQDEiLCJwcmVzZXRJRCI6InBhdGNoIiwicHJvamVjdFJlZiI6ImV2b2x1dGlvbi1lYTRjMTQ4YmM1MzQxMmZlZTk2MSIsInByb2plY3RSb290IjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS1wYXRjaC1vcmFjbGUvZXZvbHV0aW9uLXdvcmtzcGFjZXMvZXZvLWVhNGMxNDhiYzUzNDEyZmVlOTYxZDFmYi93b3Jrc3BhY2UiLCJ0aW1lb3V0U2Vjb25kcyI6MTB9LCJwYXRjaEFydGlmYWN0SUQiOiJBUlQtNGNjYjBhMzUwNTBjYWNjNTI0OGFlOGMxZDJlOWZiMWMiLCJwYXRjaEF0dGVtcHRSZWYiOiJwYXRjaC1jMDY1OWY2ZGVkZTNiNmVlNTBmZmMxZDkyN2E0OTA3NyIsInBhdGNoRmlsZVBhdGgiOiIvcHJpdmF0ZS90bXAvYXJrZGVjay13b3Jrc3BhY2UtcGF0Y2gtb3JhY2xlL2FydGlmYWN0cy9qb2ItaW5wdXQtcGF0Y2gvQVJULTRjY2IwYTM1MDUwY2FjYzUyNDhhZThjMWQyZTlmYjFjIiwicGF0Y2hTSEEyNTYiOiJmMGE2MGZmOGFhNTFjYTViMzllOTUwYmY3YzU3ZGM4NzA3Y2NlYTcwN2M1ZDdjMWViNmFjNzI3OTc0MzhlZDRhIiwicHJldmlvdXNXb3Jrc3BhY2VSZXZpc2lvbiI6IjkzOTUwMWNjZWUzZTQzNjdhYmFjMTg1ZDJiYTNkMDM1N2JiMWQyOGJlM2M2YWJmN2RjNmI1Y2M3ZDRhMDkxNzIifX19"
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-apply-patch",
+  "recoveryStepID" : "apply-patch",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-1259CE4F0B7DF2C2A8A64B88E1E5E072072A5810-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-lost-after",
+    "inputs" : {
+      "allowedFileGlobs" : [
+        "Sources\/**"
+      ],
+      "expectedWorkspaceRevision" : "939501ccee3e4367abac185d2ba3d0357bb1d28be3c6abf7dc6b5cc7d4a09172",
+      "patchArtifactRef" : "lease-v1:job-input-patch:ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+      "projectRef" : "evolution-ea4c148bc53412fee961"
+    },
+    "operation" : {
+      "id" : "workspace.apply-patch",
+      "version" : 1
+    },
+    "requestId" : "request-lost-after",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-20T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "capability consumed before first mutation",
+    "intent apply-patch",
+    "outcomeUnknown apply-patch; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran",
+    "waitingForRecovery->reconciling",
+    "reason: begin exact typed provider reconciliation",
+    "reconcile started apply-patch",
+    "reconciling->waitingForRecovery",
+    "reason: persist exact typed reconcile decision: mutation has no dedicated readback; original not resent",
+    "reconcile inconclusive: mutation has no dedicated readback; original not resent"
+  ]
+}

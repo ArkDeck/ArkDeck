@@ -2142,7 +2142,7 @@ impl HostServices for Host {
                     .require_no_active_workspace_project_reference(project, &|reference| {
                         self.workspace
                             .as_ref()
-                            .and_then(|workspace| workspace.registration_project_ref(reference))
+                            .and_then(|workspace| workspace.census_registration(reference))
                     }),
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)

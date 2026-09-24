@@ -1,0 +1,86 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-4ccb0a35050cacc5248ae8c1d2e9fb1c",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 66,
+      "createdAtUTC" : "2026-09-20T00:00:00Z",
+      "jobID" : "job-input-patch",
+      "mediaType" : "text\/x-diff",
+      "name" : "good.patch",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-patch",
+      "sha256" : "f0a60ff8aa51ca5b39e950bf7c57dc8707ccea707c5d7c1eb6ac72797438ed4a",
+      "sourceOperation" : "artifact.import-workspace-patch",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-patch"
+    },
+    {
+      "artifactID" : "ART-43837c01d84f6d61f22bb58d4ab373aa",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 70,
+      "createdAtUTC" : "2026-09-20T00:00:00Z",
+      "jobID" : "job-input-patch",
+      "mediaType" : "text\/x-diff",
+      "name" : "conflict.patch",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-patch",
+      "sha256" : "86d1d32cca10b2e36ec80f71097042e2dfb67f969ca37d09b6741d62856758c0",
+      "sourceOperation" : "artifact.import-workspace-patch",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-patch"
+    },
+    {
+      "artifactID" : "ART-988f764128e4055fe22ff8635efb0111",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 97,
+      "createdAtUTC" : "2026-09-20T00:00:00Z",
+      "jobID" : "job-input-patch",
+      "mediaType" : "text\/x-diff",
+      "name" : "outside.patch",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-patch",
+      "sha256" : "28adb6c4901cb222ffa70f384ad91b77371a8e2cd9ba7e92098ff8f8becfc0c6",
+      "sourceOperation" : "artifact.import-workspace-patch",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-patch"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
