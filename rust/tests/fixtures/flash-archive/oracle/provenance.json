@@ -1,0 +1,10 @@
+{
+  "archives" : "rust/tests/fixtures/flash-archive/archives",
+  "producer" : "FlashBundleArchiveOracleContractTests",
+  "steps" : [
+    "GzipTarArchiveReader.summarize",
+    "RockchipImageArchiveIntrospection.describe",
+    "RockchipFlashProfile.forBuild",
+    "FlashBundleImportPolicy.production"
+  ]
+}

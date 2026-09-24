@@ -11,8 +11,11 @@ fn content_invalid() -> WireError {
         "Import content failed its registered format validator",
     )
 }
-fn validate_content(file: &HostUploadFile, kind: &str) -> Result<Map<String, Value>, WireError> {
-    let value = match kind {
+fn validate_content(
+    file: &HostUploadFile,
+    intent: &ImportIntent,
+) -> Result<Map<String, Value>, WireError> {
+    let value = match intent.kind.as_str() {
         "hap" => {
             if file.validator_bytes(4, true).map_err(unreadable)? != b"PK\x03\x04" {
                 return Err(content_invalid());
@@ -32,6 +35,27 @@ fn validate_content(file: &HostUploadFile, kind: &str) -> Result<Map<String, Val
                 .validator_bytes(512 * 1024, false)
                 .map_err(unreadable)?;
             json!({"kind":"workspace-patch","touchedFiles":patch_paths(&bytes)?})
+        }
+        // Swift's production policy registers the one DAYU200 profile and
+        // judges the archive by reading it.
+        "flash-bundle" => {
+            if intent.device_profile.as_deref() != Some("dayu200") {
+                return Err(failure(
+                    "invalidInput",
+                    "Import flash profile is not registered",
+                ));
+            }
+            let (byte_count, sha256) =
+                crate::flash_archive::import_validation(&mut file.validator_reader(), &intent.name)
+                    .map_err(|_| content_invalid())?;
+            if u64::try_from(byte_count).ok() != Some(intent.byte_count) || sha256 != intent.sha256
+            {
+                return Err(failure(
+                    "artifactIntegrityFailed",
+                    "validated archive does not match Import metadata",
+                ));
+            }
+            json!({"kind":"flash-bundle","deviceProfile":"dayu200"})
         }
         _ => {
             return Err(failure(
@@ -165,7 +189,7 @@ impl ImportUploadStore {
         }
         if !matches!(
             record.intent.kind.as_str(),
-            "hap" | "native-library" | "workspace-patch"
+            "hap" | "native-library" | "workspace-patch" | "flash-bundle"
         ) {
             return Err(failure(
                 "operationUnavailable",
@@ -191,7 +215,7 @@ impl ImportUploadStore {
             if resolve_binding(&record.intent)? != record.binding {
                 return Err(conflict());
             }
-            validate_content(&file, &record.intent.kind)?
+            validate_content(&file, &record.intent)?
         };
         if file.checkpoint_identity().map_err(unreadable)? != before {
             return Err(unreadable("validation raced"));

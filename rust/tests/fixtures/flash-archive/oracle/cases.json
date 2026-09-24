@@ -1,0 +1,4862 @@
+{
+  "cases" : [
+    {
+      "archive" : "bad-checksum-digit.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"invalid octal digit in checksum\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"invalid octal digit in checksum\")"
+      }
+    },
+    {
+      "archive" : "bad-checksum.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"header checksum mismatch\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"header checksum mismatch\")"
+      }
+    },
+    {
+      "archive" : "bad-octal-size.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"invalid octal digit in size\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"invalid octal digit in size\")"
+      }
+    },
+    {
+      "archive" : "base256-size.tar.gz",
+      "build" : {
+        "archiveSha256" : "02e0f99b2fbc660faeaa55d7a3af9d44bab9ba25b4b15505dd546dccf4a6b832",
+        "archiveSizeBytes" : 910,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 910,
+        "sha256" : "02e0f99b2fbc660faeaa55d7a3af9d44bab9ba25b4b15505dd546dccf4a6b832"
+      },
+      "profile" : {
+        "archiveSha256" : "02e0f99b2fbc660faeaa55d7a3af9d44bab9ba25b4b15505dd546dccf4a6b832",
+        "archiveSizeBytes" : 910,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "02e0f99b2fbc660faeaa55d7a3af9d44bab9ba25b4b15505dd546dccf4a6b832",
+        "archiveSizeBytes" : 910,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "complete.tar.gz",
+      "build" : {
+        "archiveSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "archiveSizeBytes" : 903,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 903,
+        "sha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d"
+      },
+      "profile" : {
+        "archiveSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "archiveSizeBytes" : 903,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "archiveSizeBytes" : 903,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "duplicate-member.tar.gz",
+      "build" : {
+        "archiveSha256" : "42619fc0551358201bbf9a278dff6c27d652b387d9c4000e9edb6a04f0d4a8fa",
+        "archiveSizeBytes" : 950,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: invalidProfileDefinition(\"duplicate archive member name\")"
+      },
+      "profile" : {
+        "error" : "invalidProfileDefinition(\"duplicate archive member name\")"
+      },
+      "summary" : {
+        "archiveSha256" : "42619fc0551358201bbf9a278dff6c27d652b387d9c4000e9edb6a04f0d4a8fa",
+        "archiveSizeBytes" : 950,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "9252a75c942da16f7b52cab752797dea4fca18474db9d7eff102842a459b25b3",
+            "sizeBytes" : 6
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "empty-name.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"empty member name\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"empty member name\")"
+      }
+    },
+    {
+      "archive" : "empty.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: unreadableFile(\"<archives>/empty.gz\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "unreadableFile(\"<archives>/empty.gz\")"
+      }
+    },
+    {
+      "archive" : "garbage-deflate.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: decompressionFailed"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "decompressionFailed"
+      }
+    },
+    {
+      "archive" : "gzip-name-over-64k.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptGzipHeader"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptGzipHeader"
+      }
+    },
+    {
+      "archive" : "gzip-optional-fields.tar.gz",
+      "build" : {
+        "archiveSha256" : "14c87e5f756f08f6bd9ba04519580b0993d046e9a4ffdf758463fb0630a77106",
+        "archiveSizeBytes" : 943,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 943,
+        "sha256" : "14c87e5f756f08f6bd9ba04519580b0993d046e9a4ffdf758463fb0630a77106"
+      },
+      "profile" : {
+        "archiveSha256" : "14c87e5f756f08f6bd9ba04519580b0993d046e9a4ffdf758463fb0630a77106",
+        "archiveSizeBytes" : 943,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "14c87e5f756f08f6bd9ba04519580b0993d046e9a4ffdf758463fb0630a77106",
+        "archiveSizeBytes" : 943,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "header-only.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptGzipHeader"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptGzipHeader"
+      }
+    },
+    {
+      "archive" : "huge-size.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"member size does not leave room for its 512-byte alignment\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"member size does not leave room for its 512-byte alignment\")"
+      }
+    },
+    {
+      "archive" : "long-noise-then-version.tar.gz",
+      "build" : {
+        "archiveSha256" : "014c4db088367eb2c8c3a1d0cbabd00c3b46e64f80f238cdb43da92a808e0c64",
+        "archiveSizeBytes" : 910,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.37"
+      },
+      "importPolicy" : {
+        "byteCount" : 910,
+        "sha256" : "014c4db088367eb2c8c3a1d0cbabd00c3b46e64f80f238cdb43da92a808e0c64"
+      },
+      "profile" : {
+        "archiveSha256" : "014c4db088367eb2c8c3a1d0cbabd00c3b46e64f80f238cdb43da92a808e0c64",
+        "archiveSizeBytes" : 910,
+        "firmwareVersion" : "OpenHarmony-7.0.0.37",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.37",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "014c4db088367eb2c8c3a1d0cbabd00c3b46e64f80f238cdb43da92a808e0c64",
+        "archiveSizeBytes" : 910,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "ebada1c763fba1dc90187152392736d56ed0443ba1d533cdee98a7ce3389e9d3",
+            "sizeBytes" : 1943
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.37"
+      }
+    },
+    {
+      "archive" : "method-7.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: unsupportedCompressionMethod"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "unsupportedCompressionMethod"
+      }
+    },
+    {
+      "archive" : "multi-member.tar.gz",
+      "build" : {
+        "archiveSha256" : "67537dc5c13a1546eea4d3834c6eb5e3b51fa82c179a7a290ff4b841410735b3",
+        "archiveSizeBytes" : 1011,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 1011,
+        "sha256" : "67537dc5c13a1546eea4d3834c6eb5e3b51fa82c179a7a290ff4b841410735b3"
+      },
+      "profile" : {
+        "archiveSha256" : "67537dc5c13a1546eea4d3834c6eb5e3b51fa82c179a7a290ff4b841410735b3",
+        "archiveSizeBytes" : 1011,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "67537dc5c13a1546eea4d3834c6eb5e3b51fa82c179a7a290ff4b841410735b3",
+        "archiveSizeBytes" : 1011,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "no-parameter.tar.gz",
+      "build" : {
+        "error" : "partitionTableMissing"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableMissing"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "3980f5b1ece32a4200c45dd629e878ff21df9ed625507e5c16da0976d95b34e2",
+        "archiveSizeBytes" : 562,
+        "captured" : {
+
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "no-system-image.tar.gz",
+      "build" : {
+        "error" : "systemImageMissing(\"system\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: systemImageMissing(\"system\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "470a10b9b737f0a47d8f48f963cb5a1fd889de2d059d7261ded323d768ef8964",
+        "archiveSizeBytes" : 824,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : null
+      }
+    },
+    {
+      "archive" : "no-version.tar.gz",
+      "build" : {
+        "error" : "runtimeBuildVersionUnreadable"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: runtimeBuildVersionUnreadable"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "09ad0d8fdd119d8075df85ce890c4c42e27b6e3483e113acc996736c15e46356",
+        "archiveSizeBytes" : 846,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "e5a00aa9991ac8a5ee3109844d84a55583bd20572ad3ffcd42792f3c36b183ad",
+            "sizeBytes" : 2048
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : null
+      }
+    },
+    {
+      "archive" : "nonconforming.tar.gz",
+      "build" : {
+        "archiveSha256" : "5061a8fea5a37508c6540823ee595d29dfcb047048223e995790a6fd43157efb",
+        "archiveSizeBytes" : 885,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "extra",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : 16
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5980160,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: flash bundle does not fit dayu200: mappedPartitionImageMissing:vendor; undeclaredPartitionInTable:extra; mappedPartitionAbsentFromTable:updater"
+      },
+      "profile" : {
+        "error" : "flash bundle does not fit dayu200: mappedPartitionImageMissing:vendor; undeclaredPartitionInTable:extra; mappedPartitionAbsentFromTable:updater"
+      },
+      "summary" : {
+        "archiveSha256" : "5061a8fea5a37508c6540823ee595d29dfcb047048223e995790a6fd43157efb",
+        "archiveSizeBytes" : 885,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 656,
+            "sha256" : "0e51a6c8a7d0fe103f02a9c64634ba484cd86bf8d32d583c0dddfc23ba266b96"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "0e51a6c8a7d0fe103f02a9c64634ba484cd86bf8d32d583c0dddfc23ba266b96",
+            "sizeBytes" : 656
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "oversized-parameter.tar.gz",
+      "build" : {
+        "error" : "partitionTableMissing"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableMissing"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "cb27ce40b451911dc7ea0cbc6e76db28cf0d68fd2a0239c2b564445ac6327260",
+        "archiveSizeBytes" : 2044,
+        "captured" : {
+
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "2bbfa8fd5556cc93e6a05ee5de0a46c40d6329684332c6f37c46e3fdeeb5e623",
+            "sizeBytes" : 1049240
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-bad-entry.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"0x00002000@0x00002000uboot\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"0x00002000@0x00002000uboot\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "7953a8245dcfa4adf8a30531eaf3c2230681bedbd159df1d9d9154ab54b53006",
+        "archiveSizeBytes" : 904,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 662,
+            "sha256" : "61924fc991c410aaf51aa21a247f6569290ad2648401c28567085aeb58e96751"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "61924fc991c410aaf51aa21a247f6569290ad2648401c28567085aeb58e96751",
+            "sizeBytes" : 662
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-bad-hex.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"0x00002000@0xZZ(uboot)\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"0x00002000@0xZZ(uboot)\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "24f2f6df91a8d86b20ba63b105b03f6c6f04964f24050e69efdc7fd8ed188405",
+        "archiveSizeBytes" : 909,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 658,
+            "sha256" : "fee72c7d0bd32dbae959fff54716a3056b896a76450a5cbc2b8861ad1649f874"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "fee72c7d0bd32dbae959fff54716a3056b896a76450a5cbc2b8861ad1649f874",
+            "sizeBytes" : 658
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-crlf-command-line-first.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"-@0x005b3000(userdata:grow)\\r\\nFIRMWARE_VER: 11.0\\r\\nMACHINE_MODEL: RK3568\\r\\nMACHINE_ID: 007\\r\\nMANUFACTURER: RK3568\\r\\nMAGIC: 0x5041524B\\r\\nTYPE: GPT\\r\\nuuid:system=614e0000-0000-4b53-8000-1d28000054a9\\r\\n\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"-@0x005b3000(userdata:grow)\\r\\nFIRMWARE_VER: 11.0\\r\\nMACHINE_MODEL: RK3568\\r\\nMACHINE_ID: 007\\r\\nMANUFACTURER: RK3568\\r\\nMAGIC: 0x5041524B\\r\\nTYPE: GPT\\r\\nuuid:system=614e0000-0000-4b53-8000-1d28000054a9\\r\\n\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "bb9b3dc4580e926b8e0a84d06ae1ae7f8a8b2ec3f84a8ba49572b9c3b49655b8",
+        "archiveSizeBytes" : 911,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 672,
+            "sha256" : "9b11764adb37c896d8be5f9eed837c22e827d4fe64b4f820ab946ddb7e5f1154"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "9b11764adb37c896d8be5f9eed837c22e827d4fe64b4f820ab946ddb7e5f1154",
+            "sizeBytes" : 672
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-crlf.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"no mtdparts\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"no mtdparts\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "b0c50d4c61fb02caa6caccfa4fa8d760bd8b353064a40008c1d09b180a864f40",
+        "archiveSizeBytes" : 910,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 672,
+            "sha256" : "d9d5cada1173d8dd5abe766d99a36229f60f810971e05fc9c610cdef4ef9dafb"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "d9d5cada1173d8dd5abe766d99a36229f60f810971e05fc9c610cdef4ef9dafb",
+            "sizeBytes" : 672
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-empty-list.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"empty list\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"empty list\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "6b3b7d186791639acde7304f2c8983e291a132ac8cba8d31e024448196533d92",
+        "archiveSizeBytes" : 616,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 32,
+            "sha256" : "ebe6ad91b3227e445b6c2d46cab53e87d5160b883d07c139d550f7788ba4be5d"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "ebe6ad91b3227e445b6c2d46cab53e87d5160b883d07c139d550f7788ba4be5d",
+            "sizeBytes" : 32
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-no-device-prefix.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"no device prefix\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"no device prefix\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "49bcbca0cc9a423d6a5308ab384839e8fff5bc59492ad993704ce2cc4b5dde9c",
+        "archiveSizeBytes" : 618,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 39,
+            "sha256" : "9337058468e0870117e94d280603cc403ecbbb3f7227a1bec9191e177865502a"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "9337058468e0870117e94d280603cc403ecbbb3f7227a1bec9191e177865502a",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-no-mtdparts.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"no mtdparts\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"no mtdparts\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "4a65e56dd13de9be7caf79b5a1fd67444ef809b208b7acd0e3e6e857dcd37aa1",
+        "archiveSizeBytes" : 628,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 44,
+            "sha256" : "74826b2413a3f70067ea3fc2ba069c8a50f4856c80d409b76df90ba937cf06eb"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "74826b2413a3f70067ea3fc2ba069c8a50f4856c80d409b76df90ba937cf06eb",
+            "sizeBytes" : 44
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-not-utf8.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"not UTF-8\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"not UTF-8\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "8c9d9d30aa332a21918489ebdc17afb78209f15f5ac0e77293a328ab13f7addd",
+        "archiveSizeBytes" : 906,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 667,
+            "sha256" : "39422f4d66dc6a57ae7e50c6698a0d98638e8fed59922c8c77eb941fbb50c0cd"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "39422f4d66dc6a57ae7e50c6698a0d98638e8fed59922c8c77eb941fbb50c0cd",
+            "sizeBytes" : 667
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "parameter-signed-hex.tar.gz",
+      "build" : {
+        "error" : "partitionTableUnparsable(\"+0x2000@-10(uboot)\")"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: partitionTableUnparsable(\"+0x2000@-10(uboot)\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "d2e1fce684f894f09bb8df1dc180e150c9a72d18a219b1ada3bd4ba870a97e72",
+        "archiveSizeBytes" : 910,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 654,
+            "sha256" : "cf13e04bbbe8c1724a2182381051e67ae8ba67eac6dbade776764dd0b0b8a6b9"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "cf13e04bbbe8c1724a2182381051e67ae8ba67eac6dbade776764dd0b0b8a6b9",
+            "sizeBytes" : 654
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "pax-directory.tar.gz",
+      "build" : {
+        "archiveSha256" : "51a641cf3043b000a91e07dd4bdf3587e0aa624810bfa5b1390377f14160b673",
+        "archiveSizeBytes" : 1020,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 1020,
+        "sha256" : "51a641cf3043b000a91e07dd4bdf3587e0aa624810bfa5b1390377f14160b673"
+      },
+      "profile" : {
+        "archiveSha256" : "51a641cf3043b000a91e07dd4bdf3587e0aa624810bfa5b1390377f14160b673",
+        "archiveSizeBytes" : 1020,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "51a641cf3043b000a91e07dd4bdf3587e0aa624810bfa5b1390377f14160b673",
+        "archiveSizeBytes" : 1020,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "sha256" : "1272a49868c41260330ce643f91dffd1114abc24bf149dfb4ebfb8833bbe5670",
+            "sizeBytes" : 10
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "plain.tar",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: notGzip"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "notGzip"
+      }
+    },
+    {
+      "archive" : "reserved-flag.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptGzipHeader"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptGzipHeader"
+      }
+    },
+    {
+      "archive" : "size-overflow.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: corruptTarHeader(\"numeric overflow in size\")"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "corruptTarHeader(\"numeric overflow in size\")"
+      }
+    },
+    {
+      "archive" : "symlink.tar.gz",
+      "build" : {
+        "archiveSha256" : "d02bec84add2e81d9d31067f31c545c043ae998e9b3870c23ad5293ce95c1e18",
+        "archiveSizeBytes" : 956,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 956,
+        "sha256" : "d02bec84add2e81d9d31067f31c545c043ae998e9b3870c23ad5293ce95c1e18"
+      },
+      "profile" : {
+        "archiveSha256" : "d02bec84add2e81d9d31067f31c545c043ae998e9b3870c23ad5293ce95c1e18",
+        "archiveSizeBytes" : 956,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "d02bec84add2e81d9d31067f31c545c043ae998e9b3870c23ad5293ce95c1e18",
+        "archiveSizeBytes" : 956,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "trailer-trimmed.tar.gz",
+      "build" : {
+        "archiveSha256" : "2d00c997dafbf13f82e79804430a17c6dc5df7605e44d90ba2cb10c3c5fa3c83",
+        "archiveSizeBytes" : 899,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 899,
+        "sha256" : "2d00c997dafbf13f82e79804430a17c6dc5df7605e44d90ba2cb10c3c5fa3c83"
+      },
+      "profile" : {
+        "archiveSha256" : "2d00c997dafbf13f82e79804430a17c6dc5df7605e44d90ba2cb10c3c5fa3c83",
+        "archiveSizeBytes" : 899,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "2d00c997dafbf13f82e79804430a17c6dc5df7605e44d90ba2cb10c3c5fa3c83",
+        "archiveSizeBytes" : 899,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "truncated-deflate.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: decompressionFailed"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "decompressionFailed"
+      }
+    },
+    {
+      "archive" : "truncated-tar.tar.gz",
+      "build" : null,
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: truncatedArchive"
+      },
+      "profile" : null,
+      "summary" : {
+        "error" : "truncatedArchive"
+      }
+    },
+    {
+      "archive" : "ustar-prefix.tar.gz",
+      "build" : {
+        "archiveSha256" : "7db3dca1ffdb996953cf9da552d1dae38962bc3110ac402932dfce56679c5c85",
+        "archiveSizeBytes" : 908,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/daily_build.log"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 908,
+        "sha256" : "7db3dca1ffdb996953cf9da552d1dae38962bc3110ac402932dfce56679c5c85"
+      },
+      "profile" : {
+        "archiveSha256" : "7db3dca1ffdb996953cf9da552d1dae38962bc3110ac402932dfce56679c5c85",
+        "archiveSizeBytes" : 908,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "7db3dca1ffdb996953cf9da552d1dae38962bc3110ac402932dfce56679c5c85",
+        "archiveSizeBytes" : 908,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "bc7220a909926e19190df6d5a5932355dd3b37c0257e7e89aa6df8076a014dbf",
+            "sizeBytes" : 1617
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd/daily_build.log",
+            "sha256" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+            "sizeBytes" : 4
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    },
+    {
+      "archive" : "version-at-member-end.tar.gz",
+      "build" : {
+        "error" : "runtimeBuildVersionUnreadable"
+      },
+      "importPolicy" : {
+        "error" : "flash bundle is not a usable DAYU200 images archive: runtimeBuildVersionUnreadable"
+      },
+      "profile" : null,
+      "summary" : {
+        "archiveSha256" : "920f894aa4a023f5eb48a16b5828cf52cb2fb09cc55b63123e84b7287dd2bcd4",
+        "archiveSizeBytes" : 876,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "system.img",
+            "sha256" : "cc7013b0b5bb5d0ef8e9035d7840ab4d2f8c3b4d858d4a3857caecf711d9170a",
+            "sizeBytes" : 104
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : null
+      }
+    },
+    {
+      "archive" : "version-straddles-window.tar.gz",
+      "build" : {
+        "archiveSha256" : "6d045c36a0272b7b3b39781cb264bec5e8226159eb994bf5939aac51b691d0bd",
+        "archiveSizeBytes" : 2494,
+        "declaredPartitions" : [
+          {
+            "name" : "uboot",
+            "offsetSectors" : 8192,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "misc",
+            "offsetSectors" : 16384,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "resource",
+            "offsetSectors" : 24576,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "boot_linux",
+            "offsetSectors" : 32768,
+            "sizeSectors" : 196608
+          },
+          {
+            "name" : "ramdisk",
+            "offsetSectors" : 229376,
+            "sizeSectors" : 8192
+          },
+          {
+            "name" : "system",
+            "offsetSectors" : 237568,
+            "sizeSectors" : 4194304
+          },
+          {
+            "name" : "vendor",
+            "offsetSectors" : 4431872,
+            "sizeSectors" : 1048576
+          },
+          {
+            "name" : "sys-prod",
+            "offsetSectors" : 5480448,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip-prod",
+            "offsetSectors" : 5578752,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "updater",
+            "offsetSectors" : 5677056,
+            "sizeSectors" : 98304
+          },
+          {
+            "name" : "chip_ckm",
+            "offsetSectors" : 5775360,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_system",
+            "offsetSectors" : 5840896,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "eng_chipset",
+            "offsetSectors" : 5906432,
+            "sizeSectors" : 65536
+          },
+          {
+            "name" : "bootctrl",
+            "offsetSectors" : 5971968,
+            "sizeSectors" : 4096
+          },
+          {
+            "name" : "userdata",
+            "offsetSectors" : 5976064,
+            "sizeSectors" : -1
+          }
+        ],
+        "members" : [
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "system.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "boot_linux.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "chip_ckm.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "chip_prod.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "config.cfg"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "daily_build.log"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "manifest_tag.xml"
+          },
+          {
+            "classification" : "loaderMaskromBranchOnly",
+            "name" : "MiniLoaderAll.bin"
+          },
+          {
+            "classification" : "partitionTable",
+            "name" : "parameter.txt"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "ramdisk.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "resource.img"
+          },
+          {
+            "classification" : "orphanImageWriteForbidden",
+            "name" : "sys_prod.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "uboot.img"
+          },
+          {
+            "classification" : "nonPartitionMetadata",
+            "name" : "updater_binary"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "updater.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "userdata.img"
+          },
+          {
+            "classification" : "mappedPartitionImage",
+            "name" : "vendor.img"
+          }
+        ],
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36"
+      },
+      "importPolicy" : {
+        "byteCount" : 2494,
+        "sha256" : "6d045c36a0272b7b3b39781cb264bec5e8226159eb994bf5939aac51b691d0bd"
+      },
+      "profile" : {
+        "archiveSha256" : "6d045c36a0272b7b3b39781cb264bec5e8226159eb994bf5939aac51b691d0bd",
+        "archiveSizeBytes" : 2494,
+        "firmwareVersion" : "OpenHarmony-7.0.0.36",
+        "runtimeBuildVersion" : "OpenHarmony-7.0.0.36",
+        "writeForbiddenMemberNames" : [
+          "chip_prod.img",
+          "sys_prod.img"
+        ]
+      },
+      "summary" : {
+        "archiveSha256" : "6d045c36a0272b7b3b39781cb264bec5e8226159eb994bf5939aac51b691d0bd",
+        "archiveSizeBytes" : 2494,
+        "captured" : {
+          "parameter.txt" : {
+            "byteCount" : 664,
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db"
+          }
+        },
+        "members" : [
+          {
+            "name" : "system.img",
+            "sha256" : "77a5f785f498dcf7f8c8f3c64fe657309258535e9695cf295b1abd06174233b6",
+            "sizeBytes" : 1572864
+          },
+          {
+            "name" : "boot_linux.img",
+            "sha256" : "e304c3a6c87eace3fc04ba80f896ba2fa73742ce8f26c06eaab4e9469131cc52",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "chip_ckm.img",
+            "sha256" : "62fd12eb39a04032618400526b39a539689d54d64b25539f1a8b21077f8d3db9",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "chip_prod.img",
+            "sha256" : "6efb66ec86936ffa40efd061083d8a67ef427f0e53227d57dcb3cd101548d91e",
+            "sizeBytes" : 42
+          },
+          {
+            "name" : "config.cfg",
+            "sha256" : "143212e219272da57f05df8f0bb170d3c081dbd429f5a48fdb7864e296c44132",
+            "sizeBytes" : 33
+          },
+          {
+            "name" : "daily_build.log",
+            "sha256" : "9628a704ed3f79e82224e3fc27d5b81ef2a9f889d2d834dcf3cd2967facb506a",
+            "sizeBytes" : 48
+          },
+          {
+            "name" : "manifest_tag.xml",
+            "sha256" : "e999564f79d7427a526ce59341584f41d8c2aecf1ab02ff43d2af42bdb5b74d1",
+            "sizeBytes" : 51
+          },
+          {
+            "name" : "MiniLoaderAll.bin",
+            "sha256" : "681b7155d822c95787c4dc5c6e192d072fa897efdc956bfd1be33a4b257b6e96",
+            "sizeBytes" : 54
+          },
+          {
+            "name" : "parameter.txt",
+            "sha256" : "639b8ddd0c909c80d5e162f84e44160d0e9cc421e5ee7f0497730feed095a5db",
+            "sizeBytes" : 664
+          },
+          {
+            "name" : "ramdisk.img",
+            "sha256" : "cbde71934b61754542ee36651e1b6be73b5e2c791f426ee9fd6202d032e3fda6",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "resource.img",
+            "sha256" : "648fb6321dfe5026427fc9c61593def696ceb2d506614afdda610fce0d354cda",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "sys_prod.img",
+            "sha256" : "f40b57280d0cc661a502833579a90df53bd12b1e3acd942d2b74cb45e9f9e461",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "uboot.img",
+            "sha256" : "7251f1603dc6be8c4677303e77c924316891c2ec4c0106cb71ba9074c0ff21a7",
+            "sizeBytes" : 30
+          },
+          {
+            "name" : "updater_binary",
+            "sha256" : "3c7cf69cf5aa3aeeeb03c4ad0a04f38d3637d968589e8463063b2c2bb8d973be",
+            "sizeBytes" : 45
+          },
+          {
+            "name" : "updater.img",
+            "sha256" : "d886efd61f35fd72efef51a766aea0c5c861302e7c15fbec89f644a19fd5fe07",
+            "sizeBytes" : 36
+          },
+          {
+            "name" : "userdata.img",
+            "sha256" : "8a448e9572497192a64b256ce37819ad1c9e3b8f56cc239738b5ad5ae3c1ce10",
+            "sizeBytes" : 39
+          },
+          {
+            "name" : "vendor.img",
+            "sha256" : "1136afcaa51f15b388b21dbba2cb83d219d6b03e990234ccf39fdea0aa8f5415",
+            "sizeBytes" : 33
+          }
+        ],
+        "scannedValue" : "OpenHarmony-7.0.0.36"
+      }
+    }
+  ]
+}
