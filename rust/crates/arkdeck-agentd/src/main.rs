@@ -351,16 +351,19 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             )?)
             .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
             // A preset's toolchain is pinned in this owner's own bootstrap
-            // registry, as Swift pins it in its DevEco registry. No signing
-            // credential owner is composed yet, so a preset that pins a
-            // credential is refused as Swift's store refuses it without one.
+            // registry, as Swift pins it in its DevEco registry. An isolated
+            // root composes no signing credential owner: Swift's private
+            // `--state-dir` daemon shares the account's signing material,
+            // which a development root must not read, pin or release. A
+            // preset that pins a credential is refused, as Swift's store
+            // refuses it without an owner, and nothing is signed.
             .with_workspace_projects(
                 arkdeck_hoststore::WorkspaceProjectStore::open(&root.join("workspace-projects"))?
                     .with_dependency_pinning(Some(host::toolchain_pinning(&bootstrap)?), None),
             )
             // Swift composes the registered projects over its state directory,
             // whose `evolution-workspaces` holds the Runtime-owned copies.
-            .with_workspace_operations(&root)?
+            .with_workspace_operations(&root, &bootstrap, None)?
             .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
             .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
             .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)

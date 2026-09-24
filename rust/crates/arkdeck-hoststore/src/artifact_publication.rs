@@ -65,6 +65,71 @@ fn io_failure(detail: &str) -> String {
     artifact_error("ioFailure", detail)
 }
 
+/// Swift `RuntimeArtifactStore.publishFile` for a binary product a step left
+/// on the host: an absolute, non-empty file of the declared digest, opened
+/// without following a link, still the declared regular file of the declared
+/// size, read whole and unchanged — the same inode, size and timestamps —
+/// once read. Those exact bytes are then published unredacted; text and JSON
+/// are refused, since this path skips redaction.
+pub(crate) fn publish_landed_file(
+    publisher: &ArtifactPublisher<'_>,
+    product: &Product<'_>,
+    path: &std::path::Path,
+    byte_count: u64,
+    sha256: &str,
+) -> Result<Value, String> {
+    use std::io::Read;
+    use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+    let errno = |error: &io::Error| error.raw_os_error().unwrap_or(0);
+    if !path.is_absolute()
+        || byte_count == 0
+        || byte_count > MAX_PAYLOAD as u64
+        || !crate::job_record::digest(sha256)
+        || product.media_type.starts_with("text/")
+        || product.media_type == "application/json"
+    {
+        return Err(io_failure(
+            "file-backed publication requires an absolute binary file with exact size and SHA-256",
+        ));
+    }
+    let file = std::fs::OpenOptions::new()
+        .read(true)
+        .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(path)
+        .map_err(|error| {
+            io_failure(&format!(
+                "cannot open file-backed Artifact source (errno {})",
+                errno(&error)
+            ))
+        })?;
+    let declared = || io_failure("file-backed Artifact source is not the declared regular file");
+    let before = file.metadata().map_err(|_| declared())?;
+    if !before.is_file() || before.len() != byte_count {
+        return Err(declared());
+    }
+    let mut bytes = Vec::new();
+    (&file)
+        .take(byte_count.saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| {
+            io_failure(&format!(
+                "cannot read file-backed Artifact source (errno {})",
+                errno(&error)
+            ))
+        })?;
+    let unchanged = file.metadata().is_ok_and(|after| {
+        (after.dev(), after.ino(), after.len()) == (before.dev(), before.ino(), before.len())
+            && (after.mtime(), after.mtime_nsec()) == (before.mtime(), before.mtime_nsec())
+            && (after.ctime(), after.ctime_nsec()) == (before.ctime(), before.ctime_nsec())
+    });
+    if bytes.len() as u64 != byte_count || sha256_hex(&bytes) != sha256 || !unchanged {
+        return Err(io_failure(
+            "file-backed Artifact source changed while being published",
+        ));
+    }
+    publisher.publish(product, &bytes)
+}
+
 impl ArtifactPublisher<'_> {
     /// Swift `publish`: the stored metadata, or Swift's refusal.
     pub(crate) fn publish(&self, product: &Product<'_>, contents: &[u8]) -> Result<Value, String> {

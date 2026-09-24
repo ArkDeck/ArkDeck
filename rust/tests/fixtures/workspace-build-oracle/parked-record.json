@@ -1,0 +1,110 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "buildWorkspaceOpenHarmony"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "32b8b8ee82fb1d1efe4265908c019a2fc80efc522a7df503463b0e0ed3d21096",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-2DC18C8E5975B65BF26A590D33418DDAB5BC8E63-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "8439605ff78155490c9617894751c7d76e2274e5aa42b4f68bcbee1156f5bb24",
+      "reservationID" : "idempotency-lost-after",
+      "stepSetDigestSHA256" : "bbc856fb281f21642645b7d0fa0b62486e1e0e5c540bcfacf1d868808fc5a3ad",
+      "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-25T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-a1f15a0413cc6c313aaba102f68875e3",
+  "materializedPlanDigest" : "8439605ff78155490c9617894751c7d76e2274e5aa42b4f68bcbee1156f5bb24",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.build-openharmony@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-lost-after",
+    "inputs" : {
+      "buildPresetRef" : "oracle-debug",
+      "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+      "projectRef" : "evolution-945bee85a8b91204bad1"
+    },
+    "operation" : {
+      "id" : "workspace.build-openharmony",
+      "version" : 1
+    },
+    "requestId" : "request-lost-after",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJidWlsZE9wZW5IYXJtb255Ijp7Il8wIjp7ImFyZ3VtZW50cyI6WyIvdG1wL2Fya2RlY2std29ya3NwYWNlLWJ1aWxkLW9yYWNsZS90b29scy9odmlnb3J3LmpzIiwiYXNzZW1ibGVIYXAiLCItLW1vZGUiLCJtb2R1bGUiLCItcCIsIm1vZHVsZT1lbnRyeUBkZWZhdWx0IiwiLXAiLCJwcm9kdWN0PWRlZmF1bHQiLCItcCIsImJ1aWxkTW9kZT1kZWJ1ZyIsIi0tYW5hbHl6ZT1ub3JtYWwiLCItLXBhcmFsbGVsIiwiLS1pbmNyZW1lbnRhbCIsIi0tbm8tZGFlbW9uIl0sImV4ZWN1dGFibGUiOnsicGF0aCI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2UtYnVpbGQtb3JhY2xlL3Rvb2xzL25vZGUiLCJzaGEyNTYiOiJlZTdkNjZlZWYyMzRmZjUwYTlkZDY2YjY1YzJiMjMyMTkwNThkYmFmNDU2MGU2MzY4ZDViY2Q4ZjZlNGJlN2M4In0sIm9wZXJhdGlvbiI6IndvcmtzcGFjZS5idWlsZC1vcGVuaGFybW9ueUAxIiwicHJlc2V0SUQiOiJvcmFjbGUtZGVidWciLCJwcm9qZWN0UmVmIjoiZXZvbHV0aW9uLTk0NWJlZTg1YThiOTEyMDRiYWQxIiwicHJvamVjdFJvb3QiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLWJ1aWxkLW9yYWNsZS9ldm9sdXRpb24td29ya3NwYWNlcy9ldm8tOTQ1YmVlODVhOGI5MTIwNGJhZDE0MTc0L3dvcmtzcGFjZSIsInRpbWVvdXRTZWNvbmRzIjo2MH19fQ=="
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-build-project",
+  "recoveryStepID" : "build-project",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-2DC18C8E5975B65BF26A590D33418DDAB5BC8E63-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-lost-after",
+    "inputs" : {
+      "buildPresetRef" : "oracle-debug",
+      "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+      "projectRef" : "evolution-945bee85a8b91204bad1"
+    },
+    "operation" : {
+      "id" : "workspace.build-openharmony",
+      "version" : 1
+    },
+    "requestId" : "request-lost-after",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "capability consumed before first mutation",
+    "intent build-project",
+    "outcomeUnknown build-project; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran",
+    "waitingForRecovery->reconciling",
+    "reason: begin exact typed provider reconciliation",
+    "reconcile started build-project",
+    "reconciling->waitingForRecovery",
+    "reason: persist exact typed reconcile decision: mutation has no dedicated readback; original not resent",
+    "reconcile inconclusive: mutation has no dedicated readback; original not resent"
+  ]
+}

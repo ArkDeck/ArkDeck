@@ -1,0 +1,37 @@
+{
+  "appCertificate" : {
+    "byteCount" : 19,
+    "path" : "\/tmp\/arkdeck-workspace-sign-oracle\/material\/release.cer",
+    "sha256" : "0715079bc5ab415bd765ded5e3c3acfde7d6f4cc82adfd050ac07d7674c9fbd6"
+  },
+  "installedAtUTC" : "2026-09-25T00:00:00Z",
+  "javaExecutable" : {
+    "byteCount" : 2677,
+    "path" : "\/tmp\/arkdeck-workspace-sign-oracle\/tools\/java",
+    "sha256" : "07d52f0431ea469f21b33ed39516ee4908e7860e01a4883809e278a5db1a56fe"
+  },
+  "keyAlias" : "oracle-key",
+  "keyPasswordAccount" : "openharmony-release@1|key",
+  "keychainAccessSchema" : "data-protection-access-group-v1",
+  "keystore" : {
+    "byteCount" : 16,
+    "path" : "\/tmp\/arkdeck-workspace-sign-oracle\/material\/release.p12",
+    "sha256" : "5fc22827d6ed6f3846c6fcc1cf35fa85f4907bd269c1126e95c883036606eb8f"
+  },
+  "keystorePasswordAccount" : "openharmony-release@1|keystore",
+  "presetID" : "openharmony-release@1",
+  "projectRef" : "SignOracleProject",
+  "schemaVersion" : "arkdeck-openharmony-signing\/v1",
+  "secretEnvelopeAccount" : "openharmony-release@1|secret-envelope-5d3c1f0e-7a2b-4c9d-8e6f-0a1b2c3d4e5f",
+  "signedProfile" : {
+    "byteCount" : 15,
+    "path" : "\/tmp\/arkdeck-workspace-sign-oracle\/material\/release.p7b",
+    "sha256" : "e94642a1e1247422487f7a976f20aead98a437f8f3437f908a0816134da772a4"
+  },
+  "signerJAR" : {
+    "byteCount" : 21,
+    "path" : "\/tmp\/arkdeck-workspace-sign-oracle\/material\/hap-sign-tool.jar",
+    "sha256" : "69f5fc25461a2b1d275805e582782566f69daf090088b8babb79342b121e9ec5"
+  },
+  "signingAlgorithm" : "SHA256withECDSA"
+}

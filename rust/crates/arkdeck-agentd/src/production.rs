@@ -147,6 +147,13 @@ pub(crate) struct Layout {
     pub(crate) sessions: PathBuf,
     /// `…/ArkDeck/Bootstrap/v1`: the tool, bundle and DevEco registries.
     pub(crate) bootstrap: PathBuf,
+    /// `…/ArkDeck/Signing/OpenHarmony`, Swift's
+    /// `OpenHarmonyLocalSigning.defaultRootURL()`: the installed signing
+    /// preset and its credential owner's ledger, outside the state directory.
+    pub(crate) signing: PathBuf,
+    /// Swift `defaultAgentDaemonURL()`: the installed daemon whose code
+    /// identity a signing receipt is bound to.
+    pub(crate) installed_daemon: PathBuf,
     /// `ArkDeck/Trace/traces` in the App's container caches, which the App
     /// creates and this Runtime never does.
     pub(crate) trace_cache: PathBuf,
@@ -175,6 +182,9 @@ impl Layout {
             workspace_projects: state.join("workspace-projects"),
             sessions: product.join("Sessions"),
             bootstrap: product.join("Bootstrap/v1"),
+            signing: product.join("Signing/OpenHarmony"),
+            installed_daemon: product
+                .join("Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd"),
             application_support: product,
             trace_cache: home
                 .join("Library/Containers")
@@ -492,19 +502,35 @@ pub(crate) fn compose(
     let host = host
         .with_targets(arkdeck_hoststore::TargetStore::open(&layout.targets)?)
         .with_history(arkdeck_hoststore::HistoryStore::open(&layout.state)?)
-        // Swift pins a preset's DevEco toolchain in the bootstrap registry.
-        // No signing credential owner is composed, so a preset pinning a
-        // credential is refused, as Swift's store refuses it without one.
+        // Swift pins a preset's DevEco toolchain in the bootstrap registry and
+        // its signing credential in the account's signing owner, the secrets
+        // read from the Data Protection Keychain bound to the installed
+        // daemon.
         .with_workspace_projects(
             arkdeck_hoststore::WorkspaceProjectStore::open(&layout.workspace_projects)?
                 .with_dependency_pinning(
                     Some(crate::host::toolchain_pinning(&layout.bootstrap)?),
-                    None,
+                    Some(arkdeck_hoststore::keychain_credential_pinning(
+                        layout.signing.clone(),
+                        layout.installed_daemon.clone(),
+                    )?),
                 ),
         )
         // Swift's registered projects over its state directory, whose
-        // `evolution-workspaces` holds the Runtime-owned copies.
-        .with_workspace_operations(&layout.state)?
+        // `evolution-workspaces` holds the Runtime-owned copies, and signing
+        // over the account's preset store. This composition owns the default
+        // state directory, so it releases the credential pins no preset
+        // record carries, as Swift's default daemon does.
+        .with_workspace_operations(
+            &layout.state,
+            &layout.bootstrap,
+            Some(arkdeck_hoststore::SigningSetup::keychain(
+                layout.signing.clone(),
+                layout.state.join("workspace-signing-attempts"),
+                layout.installed_daemon.clone(),
+                true,
+            )?),
+        )?
         .with_imports(arkdeck_hoststore::ImportUploadStore::open(
             &layout.artifacts,
         )?)

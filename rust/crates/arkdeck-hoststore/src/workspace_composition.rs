@@ -5,24 +5,35 @@
 //! materialized.
 //!
 //! At start-up every registered project whose root is still the directory
-//! its registration pinned resolves to the profile of its kind, the
-//! Runtime-owned copies a previous Runtime made are adopted again — the base
-//! revision vouching for an unpatched copy, the durable patch lineage for a
-//! patched one — and every registered generation is marked applied. A project
-//! registered or changed afterwards is refused until the Runtime restarts, as
-//! Swift refuses it.
+//! its registration pinned resolves to the profile of its kind — an
+//! OpenHarmony project with the Hvigor presets registered against it whose
+//! exact DevEco toolchain pin resolved — the Runtime-owned copies a previous
+//! Runtime made are adopted again — the base revision vouching for an
+//! unpatched copy, the durable patch lineage for a patched one — and every
+//! registered generation, project and preset, that composed is marked
+//! applied. A project or preset registered or changed afterwards is refused
+//! until the Runtime restarts, as Swift refuses it.
 use crate::operation_catalog::CatalogOperation;
+use crate::workspace_build::{BuildAction, BuildVerdict, Landed, Landing};
 use crate::workspace_isolation::{ISOLATION_DIRECTORY, IsolationIntent};
 use crate::workspace_patch::{
     self as patch, ATTEMPTS_DIRECTORY, AttemptStore, FileSnapshot, PatchAction, PatchAttempt,
     PatchIntent, RevertIntent, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
 };
 use crate::workspace_profile::{
-    ProfileKind, ProfileRegistry, WorkspaceAuthorizationFacts, WorkspaceProfile,
+    ProfileKind, ProfileRegistry, RegisteredBuildPreset, RegisteredKind, SigningPresetRef,
+    VerifiedResource, WorkspaceAuthorizationFacts, WorkspaceProfile,
 };
 use crate::workspace_project::{WorkspaceProjectStore, WorkspaceUse};
+use crate::workspace_signing::SigningSetup;
 use crate::workspace_support::{self as support, foundation_standardized, is_narrower};
 use arkdeck_contract::WireError;
+use arkdeck_provider_workspace::credential_owner::CredentialOwner;
+use arkdeck_provider_workspace::signer::{self, SignedHap, SigningFailure};
+use arkdeck_provider_workspace::signing_action::{SigningAction, SigningAttemptPaths};
+use arkdeck_provider_workspace::signing_preset::{
+    DEFAULT_PRESET_ID, SigningPresetStore, SigningSecrets, remeasure_for_dispatch,
+};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
@@ -59,18 +70,146 @@ pub struct WorkspaceComposition {
     /// profile resolved, beside the isolation manager's directory, which
     /// reads it as the copies' patch lineage.
     pub(crate) attempts: Option<AttemptStore>,
-    /// The dispatch a patch step runs its pinned tool through.
+    /// The dispatch a patch or build step runs its pinned tool through.
     pub(crate) tool: Box<dyn WorkspaceToolDispatch>,
+    /// Swift `WorkspaceActionExecutableResolver.resourcesByExecutable` over
+    /// the start-up profiles: what a dispatch of each pinned executable holds
+    /// open while its child runs.
+    resources: BTreeMap<(String, String), Vec<VerifiedResource>>,
+    /// Swift `childEnvironmentByExecutablePath`: what a child of each pinned
+    /// executable finds in its environment (a registered Hvigor preset's
+    /// `DEVECO_SDK_HOME`).
+    environment: BTreeMap<String, Vec<(String, String)>>,
     /// Swift `DeviceMutationLaneCoordinator` for the host target every
     /// workspace mutation names: a patch Job's steps hold it from its running
     /// transition to its last step, so one patch never overlaps another.
     pub(crate) lane: Mutex<()>,
+    /// The signing half of Swift's provider; without it nothing is signed.
+    pub(crate) signing: Option<Signing>,
 }
 
-/// A patch Artifact the engine resolved from its lease for this Job: the
-/// facts the lease names and the payload they describe.
+/// Swift's `signingPresetStore`, `signingCredentialOwner` and
+/// `signingAttemptStore`, and the Keychain the store reads its secrets from.
+pub(crate) struct Signing {
+    pub(crate) owner: CredentialOwner,
+    pub(crate) secrets: Box<dyn SigningSecrets + Send + Sync>,
+    /// Swift `OpenHarmonySigningAttemptStore`'s root, as it spells it.
+    pub(crate) attempts: String,
+}
+
+impl Signing {
+    /// The preset installed at `store_root` through its credential owner,
+    /// its passwords read from `secrets`, its attempts below `attempts_root`
+    /// — created owner-only, as Swift's attempt store creates it.
+    fn at(
+        store_root: &Path,
+        secrets: Box<dyn SigningSecrets + Send + Sync>,
+        attempts_root: &Path,
+    ) -> io::Result<Self> {
+        use std::os::unix::fs::PermissionsExt;
+        DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(attempts_root)?;
+        std::fs::set_permissions(attempts_root, std::fs::Permissions::from_mode(0o700))?;
+        let spelled = |path: &Path| foundation_standardized(&path.to_string_lossy());
+        Ok(Self {
+            owner: CredentialOwner::new(SigningPresetStore::new(spelled(store_root))),
+            secrets,
+            attempts: spelled(attempts_root),
+        })
+    }
+}
+
+/// What composing reports for the daemon to print, as Swift prints it at
+/// start-up.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CompositionNotes {
+    /// Swift `adoptRuntimeWorkspaces()`: the copies adoption could not vouch
+    /// for, which stay unresolvable.
+    pub unadopted: Vec<String>,
+    /// Swift `releaseOwners(absentFrom:)` at start-up: the presets whose
+    /// credential pins no store record carries any more, released — or why
+    /// the reconciliation was skipped. `None` where this Runtime does not own
+    /// the default state directory and so must not judge the pins.
+    pub released_credential_owners: Option<Result<Vec<String>, String>>,
+}
+
+/// The operation signing serves.
+pub(crate) const SIGN: &str = "workspace.sign-openharmony-hap@1";
+/// Swift's bound on an unsigned HAP.
+const MAXIMUM_UNSIGNED_HAP_BYTES: u64 = 64 * 1024 * 1024;
+
+/// How a signed product was judged: Swift's `.verified` summary or its
+/// `.failed` code and detail.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct LeasedPatch {
+pub(crate) enum SignVerdict {
+    Verified(BTreeMap<String, String>),
+    Failed(&'static str, String),
+}
+
+/// Swift `journalStep`'s arguments for `signWorkspaceOpenHarmonyHap`: the
+/// project, the selected preset and the input's identity.
+pub(crate) fn sign_journal_arguments(action: &SigningAction) -> Value {
+    serde_json::json!({
+        "projectRef": action.project_ref,
+        "signingPresetRef": action.selected_signing_preset_ref(),
+        "inputArtifactId": action.input_artifact_id,
+        "inputSha256": action.input_sha256,
+    })
+}
+
+/// Swift `ProviderReconcileOutcome` for a parked signing action.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SignReconcile {
+    NotExecuted,
+    Completed(BTreeMap<String, String>),
+    Unknown(String),
+}
+
+/// Swift `BootstrapDevEcoToolchainRegistry.ResolvedToolchain`, the part a
+/// registered Hvigor preset composes from: the Node launcher, the Hvigor
+/// script and SDK root the exact pin names, and every other file the record
+/// pins, each re-measured by the registry before it answered.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResolvedToolchain {
+    pub node_path: String,
+    pub hvigor_script_path: String,
+    pub sdk_root_path: String,
+    pub verified_resources: Vec<VerifiedResource>,
+}
+
+/// Swift `devecoToolchains.resolve(_:expectedGeneration:owner:)` as the
+/// composition root hands it over: (toolchain, generation, preset) to the
+/// toolchain that exact pin names, or why it cannot be.
+pub type ToolchainResolver<'a> = &'a dyn Fn(&str, u64, &str) -> Result<ResolvedToolchain, String>;
+
+/// How a lowered build step runs: the landing a copy's product needs, the
+/// environment its executable's children get and the files it holds open.
+pub(crate) struct BuildLowering {
+    pub(crate) landing: Option<Landing>,
+    pub(crate) environment: Vec<(String, String)>,
+    pub(crate) resources: Vec<VerifiedResource>,
+}
+
+/// The parts of Swift's child base a Hvigor build reads beyond this Runtime's
+/// clean one: the home it keeps its caches in and its temporary directory,
+/// as the daemon's own environment names them.
+fn inherited_base() -> Vec<(String, String)> {
+    ["HOME", "TMPDIR"]
+        .into_iter()
+        .filter_map(|key| {
+            let value = std::env::var(key).ok()?;
+            (!value.is_empty() && !value.contains('\0')).then(|| (key.to_owned(), value))
+        })
+        .collect()
+}
+
+/// An input Artifact the engine resolved from its lease for this Job — a
+/// patch, an unsigned HAP: the facts the lease names and the payload they
+/// describe.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LeasedInput {
     pub(crate) artifact_id: String,
     pub(crate) path: String,
     pub(crate) sha256: String,
@@ -126,18 +265,212 @@ fn registry(profiles: &[WorkspaceProfile]) -> io::Result<ProfileRegistry> {
     Ok(registry)
 }
 
+/// Swift's composition-root pass over the registered presets: each build or
+/// test preset's exact DevEco pin resolved to the toolchain it names, with
+/// the environment its Node children get; a symbol preset needs nothing to
+/// resolve. Answers the resolved Hvigor presets by project, the environment
+/// by executable path, the presets that composed and those that did not.
+struct RegisteredPresets {
+    by_project: BTreeMap<String, Vec<RegisteredBuildPreset>>,
+    /// The signing presets whose toolchain pin and credential resolved for
+    /// their own project.
+    signing: BTreeMap<String, Vec<SigningPresetRef>>,
+    environment: BTreeMap<String, Vec<(String, String)>>,
+    composed: BTreeMap<String, (String, u64)>,
+    failures: BTreeMap<String, String>,
+}
+
+/// Swift's `case "signing"` of the same pass: the toolchain pin and the
+/// credential both resolve for the preset — the credential pinned by this
+/// preset, its secrets present, bound to the preset's own project.
+fn resolve_signing(
+    preset: &crate::workspace_project::WorkspacePresetComposition,
+    toolchains: ToolchainResolver<'_>,
+    signing: &Signing,
+) -> Result<SigningPresetRef, String> {
+    let (Some(toolchain), Some(generation), Some(credential)) = (
+        preset.toolchain_ref.as_deref(),
+        preset.toolchain_generation,
+        preset.credential_ref.as_deref(),
+    ) else {
+        return Err(" registered signing preset has incomplete dependencies".into());
+    };
+    toolchains(toolchain, generation, &preset.preset_ref)?;
+    let receipt = signing
+        .owner
+        .resolve(
+            credential,
+            Some(&preset.preset_ref),
+            true,
+            &*signing.secrets,
+        )
+        .map_err(|error| error.to_string())?;
+    if receipt.project_ref != preset.project_ref {
+        return Err("resourceConflict: signing credential project binding changed".into());
+    }
+    SigningPresetRef::new(&preset.preset_ref, credential, preset.timeout_seconds)
+}
+
+fn resolve_registered(
+    presets: &[crate::workspace_project::WorkspacePresetComposition],
+    toolchains: ToolchainResolver<'_>,
+    signing: Option<&Signing>,
+) -> RegisteredPresets {
+    let mut resolved = RegisteredPresets {
+        by_project: BTreeMap::new(),
+        signing: BTreeMap::new(),
+        environment: BTreeMap::new(),
+        composed: BTreeMap::new(),
+        failures: BTreeMap::new(),
+    };
+    for preset in presets {
+        let kind = match preset.kind.as_str() {
+            "build" => RegisteredKind::Build,
+            "test" => RegisteredKind::Test,
+            "symbol" => {
+                resolved.composed.insert(
+                    preset.preset_ref.clone(),
+                    (preset.project_ref.clone(), preset.generation),
+                );
+                continue;
+            }
+            // A signing preset pins a credential: without the owner that
+            // holds it, it resolves to nothing.
+            "signing" => {
+                let outcome = match signing {
+                    Some(signing) => resolve_signing(preset, toolchains, signing),
+                    None => Err(" signing credential owner is unavailable".into()),
+                };
+                match outcome {
+                    Ok(reference) => {
+                        resolved
+                            .signing
+                            .entry(preset.project_ref.clone())
+                            .or_default()
+                            .push(reference);
+                        resolved.composed.insert(
+                            preset.preset_ref.clone(),
+                            (preset.project_ref.clone(), preset.generation),
+                        );
+                    }
+                    Err(error) => {
+                        resolved.failures.insert(
+                            preset.preset_ref.clone(),
+                            format!("workspace.presetResolutionFailed:{error}"),
+                        );
+                    }
+                }
+                continue;
+            }
+            _ => {
+                resolved.failures.insert(
+                    preset.preset_ref.clone(),
+                    "workspace.presetKindUnsupported".into(),
+                );
+                continue;
+            }
+        };
+        let (Some(toolchain), Some(generation), Some(module), Some(product), Some(mode)) = (
+            preset.toolchain_ref.as_deref(),
+            preset.toolchain_generation,
+            preset.module.as_ref(),
+            preset.product.as_ref(),
+            preset.build_mode.as_ref(),
+        ) else {
+            resolved.failures.insert(
+                preset.preset_ref.clone(),
+                "workspace.presetResolutionFailed: registered Hvigor preset has no toolchain pin"
+                    .into(),
+            );
+            continue;
+        };
+        match toolchains(toolchain, generation, &preset.preset_ref) {
+            Ok(toolchain) => {
+                resolved.environment.insert(
+                    crate::workspace_support::foundation_standardized(&toolchain.node_path),
+                    vec![(
+                        "DEVECO_SDK_HOME".to_owned(),
+                        toolchain.sdk_root_path.clone(),
+                    )],
+                );
+                resolved
+                    .by_project
+                    .entry(preset.project_ref.clone())
+                    .or_default()
+                    .push(RegisteredBuildPreset {
+                        kind,
+                        preset_ref: preset.preset_ref.clone(),
+                        module: module.clone(),
+                        product: product.clone(),
+                        build_mode: mode.clone(),
+                        timeout_seconds: preset.timeout_seconds,
+                        node_path: toolchain.node_path,
+                        hvigor_script_path: toolchain.hvigor_script_path,
+                        sdk_root_path: toolchain.sdk_root_path,
+                        verified_resources: toolchain.verified_resources,
+                    });
+                resolved.composed.insert(
+                    preset.preset_ref.clone(),
+                    (preset.project_ref.clone(), preset.generation),
+                );
+            }
+            Err(error) => {
+                resolved.failures.insert(
+                    preset.preset_ref.clone(),
+                    format!("workspace.presetResolutionFailed:{error}"),
+                );
+            }
+        }
+    }
+    resolved
+}
+
 impl WorkspaceComposition {
     /// Swift's composition root over the registered projects under
-    /// `state_root`: the profiles resolved, the isolation manager and its
-    /// adoption, and the applied generations. Returns what adoption could
-    /// not vouch for, which the daemon reports and leaves unresolvable.
+    /// `state_root`: the credential owner's pins reconciled with the preset
+    /// store where `signing` says this Runtime owns them, the registered
+    /// presets resolved through `toolchains` and — signing presets — the
+    /// credential owner, the profiles resolved, the isolation manager and its
+    /// adoption, and the applied generations. Returns what the daemon
+    /// reports: the reconciliation and what adoption could not vouch for,
+    /// which stays unresolvable. Without `signing` nothing is signed.
     pub fn compose(
         projects: Arc<WorkspaceProjectStore>,
         state_root: &Path,
         home: &str,
         now: fn() -> Option<String>,
-    ) -> Result<(Self, Vec<String>), String> {
+        toolchains: ToolchainResolver<'_>,
+        signing: Option<SigningSetup>,
+    ) -> Result<(Self, CompositionNotes), String> {
         let records = projects.startup_records().map_err(|error| error.message)?;
+        let preset_records = projects
+            .preset_composition_records()
+            .map_err(|error| error.message)?;
+        let mut notes = CompositionNotes::default();
+        let signing = match signing {
+            Some(setup) => {
+                if setup.releases_orphaned_owners {
+                    // The preset store is the authority on which presets
+                    // exist; the ledger beside the signing material keeps
+                    // pins for presets a retired state directory dropped.
+                    let registered = preset_records
+                        .iter()
+                        .map(|preset| preset.preset_ref.clone())
+                        .collect();
+                    notes.released_credential_owners = Some(
+                        CredentialOwner::new(SigningPresetStore::new(setup.store_root.clone()))
+                            .release_owners(&registered)
+                            .map_err(|error| error.to_string()),
+                    );
+                }
+                Some(
+                    Signing::at(&setup.store_root, setup.secrets, &setup.attempts_root)
+                        .map_err(|error| error.to_string())?,
+                )
+            }
+            None => None,
+        };
+        let presets = resolve_registered(&preset_records, toolchains, signing.as_ref());
         let mut failures: BTreeMap<String, String> = BTreeMap::new();
         let mut resolved = Vec::new();
         for record in &records {
@@ -153,7 +486,21 @@ impl WorkspaceComposition {
             };
             let profile = match record.kind.as_str() {
                 "arkdeck" => WorkspaceProfile::ark_deck(root, &record.project_ref),
-                "openharmony" => WorkspaceProfile::water_flow(root, &record.project_ref, home),
+                "openharmony" => WorkspaceProfile::water_flow_registered(
+                    root,
+                    &record.project_ref,
+                    home,
+                    presets
+                        .by_project
+                        .get(&record.project_ref)
+                        .map(Vec::as_slice)
+                        .unwrap_or_default(),
+                    presets
+                        .signing
+                        .get(&record.project_ref)
+                        .cloned()
+                        .unwrap_or_default(),
+                ),
                 _ => Err(format!(
                     "workspace.projectProfileUnavailable:{} is unsupported",
                     record.project_ref
@@ -172,6 +519,14 @@ impl WorkspaceComposition {
         let applied = records
             .iter()
             .map(|record| (record.project_ref.clone(), record.generation))
+            .collect();
+        // Swift marks a preset applied when its project composed and it
+        // resolved.
+        let applied_presets: BTreeMap<String, u64> = presets
+            .composed
+            .iter()
+            .filter(|(_, (project, _))| resolved.iter().any(|p| &p.project_ref == project))
+            .map(|(preset, (_, generation))| (preset.clone(), *generation))
             .collect();
         let composed = if resolved.is_empty() {
             let reason = if failures.is_empty() {
@@ -192,8 +547,11 @@ impl WorkspaceComposition {
                     attempts: None,
                     tool: Box::new(VerifiedToolDispatch),
                     lane: Mutex::new(()),
+                    resources: BTreeMap::new(),
+                    environment: BTreeMap::new(),
+                    signing,
                 },
-                Vec::new(),
+                notes,
             )
         } else {
             // Swift creates the attempt store first and hands it to the
@@ -214,11 +572,15 @@ impl WorkspaceComposition {
                 attempts: Some(attempts),
                 tool: Box::new(VerifiedToolDispatch),
                 lane: Mutex::new(()),
+                resources: WorkspaceProfile::resources_by_executable(&resolved),
+                environment: presets.environment.clone(),
+                signing,
             };
-            let unadopted = composition.adopt_runtime_workspaces();
-            (composition, unadopted)
+            notes.unadopted = composition.adopt_runtime_workspaces();
+            (composition, notes)
         };
         projects.mark_applied(applied);
+        projects.mark_applied_presets(applied_presets);
         Ok(composed)
     }
 
@@ -248,13 +610,45 @@ impl WorkspaceComposition {
             attempts,
             tool: Box::new(VerifiedToolDispatch),
             lane: Mutex::new(()),
+            resources: WorkspaceProfile::resources_by_executable(&profiles),
+            environment: BTreeMap::new(),
+            signing: None,
         })
     }
 
-    /// The same composition, its patch steps dispatched through `tool`.
+    /// The same composition, its patch and build steps dispatched through
+    /// `tool`.
     pub fn with_tool_dispatch(mut self, tool: Box<dyn WorkspaceToolDispatch>) -> Self {
         self.tool = tool;
         self
+    }
+
+    /// The same composition, the children of the executable at `path` given
+    /// `environment` (Swift `childEnvironmentByExecutablePath`, keyed by the
+    /// executable identity's own path).
+    pub fn with_child_environment(mut self, path: &str, environment: &[(&str, &str)]) -> Self {
+        self.environment.insert(
+            foundation_standardized(path),
+            environment
+                .iter()
+                .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+                .collect(),
+        );
+        self
+    }
+
+    /// The same composition, signing with the preset installed at
+    /// `store_root` through its credential owner, its passwords read from
+    /// `secrets`, its attempts below `attempts_root` (Swift's
+    /// `workspace-signing-attempts`, created owner-only).
+    pub fn with_signing(
+        mut self,
+        store_root: &Path,
+        secrets: Box<dyn SigningSecrets + Send + Sync>,
+        attempts_root: &Path,
+    ) -> io::Result<Self> {
+        self.signing = Some(Signing::at(store_root, secrets, attempts_root)?);
+        Ok(self)
     }
 
     /// Swift's registered provider's `runtimeAvailability(for:)`: available
@@ -270,10 +664,50 @@ impl WorkspaceComposition {
                 continue;
             };
             // A profile with no reason to refuse makes the operation available.
-            let reason = profile.unavailability(reference, self.isolation.is_some())?;
+            let reason = self.unavailability_of(&profile, reference)?;
             first.get_or_insert(reason);
         }
         Some(first.unwrap_or_else(|| "no_workspace_project_registered".into()))
+    }
+
+    /// Swift `runtimeAvailability(for:profile:)`, signing included: a
+    /// registered signing preset whose credential resolves for this project,
+    /// or — only where the profile may fall back — the installed receipt of
+    /// this project ready to sign.
+    fn unavailability_of(&self, profile: &WorkspaceProfile, reference: &str) -> Option<String> {
+        if reference != SIGN {
+            return profile.unavailability(reference, self.isolation.is_some());
+        }
+        let has_preset = if !profile.signing.is_empty() {
+            let Some(signing) = &self.signing else {
+                return Some("workspace.signingCredentialOwnerUnavailable".into());
+            };
+            profile.signing.values().any(|preset| {
+                signing
+                    .owner
+                    .resolve(
+                        &preset.credential_ref,
+                        Some(&preset.preset_id),
+                        true,
+                        &*signing.secrets,
+                    )
+                    .is_ok_and(|receipt| receipt.project_ref == profile.project_ref)
+            })
+        } else if profile.allows_legacy_signing {
+            let Some(signing) = &self.signing else {
+                return Some("workspace.signingPresetUnavailable".into());
+            };
+            // Swift `status()`: ready when the fixed preset validates with
+            // its secrets present.
+            signing
+                .owner
+                .store()
+                .load_validated(DEFAULT_PRESET_ID, true, &*signing.secrets)
+                .is_ok_and(|receipt| receipt.project_ref == profile.project_ref)
+        } else {
+            false
+        };
+        profile.preset_unavailability(has_preset)
     }
 
     /// Swift `workspaceRegistrationProjectRef(for:)`: a primary profile is its
@@ -363,7 +797,7 @@ impl WorkspaceComposition {
             .registry
             .profile(project_ref)
             .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?;
-        if let Some(reason) = profile.unavailability(reference, self.isolation.is_some()) {
+        if let Some(reason) = self.unavailability_of(&profile, reference) {
             return Err(reason);
         }
         if let Some(declared) = inputs
@@ -476,7 +910,7 @@ impl WorkspaceComposition {
         reference: &str,
         inputs: &Map<String, Value>,
         job_id: &str,
-        leased: Option<&LeasedPatch>,
+        leased: Option<&LeasedInput>,
     ) -> Result<PatchIntent, String> {
         let (project_ref, profile) = self.preamble(reference, inputs)?;
         let Some(leased) = leased else {
@@ -569,6 +1003,264 @@ impl WorkspaceComposition {
             invocation,
             attempt,
         })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.build-openharmony@1`: the preamble, then the build preset
+    /// the request names in that profile, resolved to its own invocation.
+    pub(crate) fn build_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+    ) -> Result<BuildAction, String> {
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let preset = inputs
+            .get("buildPresetRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input buildPresetRef is missing")?;
+        profile
+            .build_invocation(reference, preset)
+            .map(|invocation| BuildAction { invocation })
+            .ok_or_else(|| format!("workspace.buildPresetUnavailable:{preset}"))
+    }
+
+    fn build_profile(&self, action: &BuildAction) -> Result<WorkspaceProfile, String> {
+        let project_ref = &action.invocation.project_ref;
+        self.registry
+            .profile(project_ref)
+            .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))
+    }
+
+    /// Swift `WorkspaceOperationsProvider.lower` for a build: the executable
+    /// one the profile pinned; for a Runtime-owned copy whose preset declares
+    /// a product, the landing its dispatch prepares and reads back; and what
+    /// the dispatcher gives the executable's children and holds open for
+    /// them.
+    pub(crate) fn lower_build(&self, action: &BuildAction) -> Result<BuildLowering, String> {
+        let profile = self.build_profile(action)?;
+        let invocation = &action.invocation;
+        if !profile.owns_executable(&invocation.executable_path, &invocation.executable_sha256) {
+            return Err("workspace provider received a foreign action or executable".into());
+        }
+        let landing = match profile.kind {
+            ProfileKind::Evolution => {
+                profile
+                    .build_product(&invocation.preset_id)
+                    .map(|product| Landing {
+                        destination: format!(
+                            "{}/{product}",
+                            profile.project_root.trim_end_matches('/')
+                        ),
+                    })
+            }
+            ProfileKind::Primary => None,
+        };
+        let mut environment = inherited_base();
+        for (key, value) in self
+            .environment
+            .get(&invocation.executable_path)
+            .into_iter()
+            .flatten()
+        {
+            environment.retain(|(existing, _)| existing != key);
+            environment.push((key.clone(), value.clone()));
+        }
+        let resources = self
+            .resources
+            .get(&(
+                invocation.executable_path.clone(),
+                invocation.executable_sha256.clone(),
+            ))
+            .cloned()
+            .unwrap_or_default();
+        Ok(BuildLowering {
+            landing,
+            environment,
+            resources,
+        })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.verify` for a build: the receipt,
+    /// and for a copy whose preset declares a product, the product landed.
+    /// A profile that is gone leaves the verdict unreadable.
+    pub(crate) fn verify_build(
+        &self,
+        action: &BuildAction,
+        receipt: &ToolReceipt,
+        landed: Option<&Landed>,
+    ) -> Result<BuildVerdict, String> {
+        let profile = self.build_profile(action)?;
+        let declares_product = profile.kind == ProfileKind::Evolution
+            && profile
+                .build_product(&action.invocation.preset_id)
+                .is_some();
+        Ok(crate::workspace_build::verify(
+            receipt,
+            declares_product,
+            landed,
+        ))
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.sign-openharmony-hap@1`: the preamble, the unsigned HAP the
+    /// engine resolved from its lease, the receipt the named preset resolves
+    /// to — a registered preset through its pinned credential, or the
+    /// installed receipt itself where the profile may fall back — bound to the
+    /// request's project, the input a bounded ZIP container, and the attempt
+    /// paths owned by `job_id`.
+    pub(crate) fn sign_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+        job_id: &str,
+        leased: Option<&LeasedInput>,
+    ) -> Result<SigningAction, String> {
+        let (project_ref, profile) = self.preamble(reference, inputs)?;
+        let Some(leased) = leased else {
+            return Err(
+                "workspace unsigned HAP Artifact lease was not resolved before materialization"
+                    .into(),
+            );
+        };
+        let preset_id = inputs
+            .get("signingPresetRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input signingPresetRef is missing")?;
+        let Some(signing) = &self.signing else {
+            return Err("workspace.signingPresetUnavailable".into());
+        };
+        let receipt = if let Some(configured) = profile.signing.get(preset_id) {
+            signing
+                .owner
+                .resolve(
+                    &configured.credential_ref,
+                    Some(preset_id),
+                    true,
+                    &*signing.secrets,
+                )
+                .map_err(|error| format!("workspace.signingPresetUnavailable:{error}"))?
+        } else if profile.signing.is_empty() && profile.allows_legacy_signing {
+            signing
+                .owner
+                .store()
+                .load_validated(preset_id, true, &*signing.secrets)
+                .map_err(|error| format!("workspace.signingPresetUnavailable:{error}"))?
+        } else {
+            return Err(format!("workspace.signingPresetUnavailable:{preset_id}"));
+        };
+        if receipt.project_ref != project_ref {
+            return Err("workspace.signingPresetProjectMismatch".into());
+        }
+        let mut magic = [0u8; 4];
+        let zip = std::fs::File::open(&leased.path)
+            .and_then(|mut file| std::io::Read::read_exact(&mut file, &mut magic))
+            .is_ok()
+            && magic == [0x50, 0x4b, 0x03, 0x04];
+        if leased.byte_count == 0 || leased.byte_count > MAXIMUM_UNSIGNED_HAP_BYTES || !zip {
+            return Err("workspace unsigned HAP is not a bounded ZIP container".into());
+        }
+        Ok(SigningAction {
+            job_id: job_id.into(),
+            project_ref,
+            signing_preset_ref: Some(preset_id.into()),
+            preset: receipt,
+            input_artifact_id: leased.artifact_id.clone(),
+            input_file_path: leased.path.clone(),
+            input_sha256: leased.sha256.clone(),
+            input_byte_count: leased.byte_count,
+            output: SigningAttemptPaths::for_job(Path::new(&signing.attempts), job_id),
+        })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.lower` for a signing action, which
+    /// Swift's provider answers before routing by project: the action owned
+    /// by `job_id` and by the provider's own profile — the first registered
+    /// profile, as Swift composes its provider over it — then every pinned
+    /// signing file measured again.
+    pub(crate) fn lower_sign(&self, action: &SigningAction, job_id: &str) -> Result<(), String> {
+        let owned = self.signing.as_ref().is_some_and(|signing| {
+            action.output == SigningAttemptPaths::for_job(Path::new(&signing.attempts), job_id)
+        }) && action.job_id == job_id
+            && self.primaries.first() == Some(&action.project_ref);
+        if !owned {
+            return Err("workspace signing action is not owned by this Job/Profile".into());
+        }
+        remeasure_for_dispatch(&action.preset).map_err(|error| error.to_string())
+    }
+
+    /// Swift `OpenHarmonySigningWorkspaceDispatcher.dispatch` for a lowered
+    /// signing action: both passwords answered only on the signer's terminal.
+    pub(crate) fn sign(&self, action: &SigningAction) -> Result<SignedHap, SigningFailure> {
+        let Some(signing) = &self.signing else {
+            return Err(SigningFailure::Refused(
+                "signing preset unavailable before dispatch: no signing preset store".into(),
+            ));
+        };
+        signer::sign_hap(action, signing.owner.store(), &*signing.secrets, &|| false)
+    }
+
+    /// Swift `WorkspaceOperationsProvider.verify` for a signing receipt: the
+    /// recorded verification read back, equal to the receipt's summary and
+    /// naming exactly the product that landed.
+    pub(crate) fn verify_sign(action: &SigningAction, signed: &SignedHap) -> SignVerdict {
+        if signed.result_record != action.output.result_record {
+            return SignVerdict::Failed(
+                "workspace.signingPostflightMissing",
+                "signing receipt has no exact verified output".into(),
+            );
+        }
+        match signer::read_verified_result(action) {
+            Ok(durable)
+                if durable == signed.summary
+                    && durable.get("signedHapSha256") == Some(&signed.sha256)
+                    && durable.get("signedHapByteCount")
+                        == Some(&signed.byte_count.to_string()) =>
+            {
+                SignVerdict::Verified(durable)
+            }
+            Ok(_) => SignVerdict::Failed(
+                "workspace.signingPostflightDrift",
+                "signing result, output and process receipt disagree".into(),
+            ),
+            Err(error) => {
+                SignVerdict::Failed("workspace.signingPostflightInvalid", error.to_string())
+            }
+        }
+    }
+
+    /// Swift `WorkspaceOperationsProvider.reconcile` for a signing action:
+    /// nothing written is not executed; a record without its product is
+    /// unknown; a product is read back — its record, or `verify-app` once
+    /// more — and never signed again.
+    pub(crate) fn reconcile_sign(action: &SigningAction) -> SignReconcile {
+        let has_output = Path::new(&action.output.signed_hap).exists();
+        let has_result = Path::new(&action.output.result_record).exists();
+        if !has_output && !has_result {
+            return SignReconcile::NotExecuted;
+        }
+        if !has_output {
+            return SignReconcile::Unknown("signing result exists without its exact output".into());
+        }
+        let summary = if has_result {
+            signer::read_verified_result(action)
+        } else {
+            signer::verify_and_record(action)
+        };
+        match summary {
+            Ok(summary) => SignReconcile::Completed(summary),
+            Err(error) => {
+                SignReconcile::Unknown(format!("signing output cannot be verified: {error}"))
+            }
+        }
+    }
+
+    /// Swift `cleanupTerminalJob(jobID:)`: a known terminal Job's attempt
+    /// directory removed.
+    pub(crate) fn cleanup_sign(&self, job_id: &str) {
+        if let Some(signing) = &self.signing {
+            let paths = SigningAttemptPaths::for_job(Path::new(&signing.attempts), job_id);
+            let _ = std::fs::remove_dir_all(&paths.directory);
+        }
     }
 
     /// The profile a typed patch action names, as Swift's provider routes
@@ -762,4 +1454,35 @@ fn string_array(inputs: &Map<String, Value>, key: &str) -> Result<Vec<String>, S
                 .ok_or_else(|| format!("workspace input {key} contains a non-string"))
         })
         .collect()
+}
+
+/// Swift `PersistedTypedProviderAction` of a signing action: the workspace
+/// action `{"signOpenHarmonyHap": {"_0": action}}` as canonical JSON, base64.
+pub(crate) fn persisted_sign_action(
+    action: &arkdeck_provider_workspace::signing_action::SigningAction,
+) -> Result<Value, ()> {
+    let value = serde_json::json!({"signOpenHarmonyHap": {"_0": serde_json::to_value(action).map_err(|_| ())?}});
+    let bytes = crate::session_json::encode(&value).map_err(|_| ())?;
+    Ok(serde_json::json!({"kind": "workspace.action",
+        "arguments": {"payload": crate::agent_execution::base64(&bytes)}}))
+}
+
+/// Swift `PersistedTypedProviderAction.materialize()` for a signing action.
+pub(crate) fn materialize_sign_action(
+    persisted: &Value,
+) -> Result<arkdeck_provider_workspace::signing_action::SigningAction, String> {
+    let kind = persisted["kind"].as_str().unwrap_or_default();
+    if kind != "workspace.action" {
+        return Err(format!(
+            "persisted typed provider action kind {kind} is unknown"
+        ));
+    }
+    persisted["arguments"]["payload"]
+        .as_str()
+        .and_then(crate::agent_execution::unbase64)
+        .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+        .and_then(|payload| {
+            serde_json::from_value(payload.get("signOpenHarmonyHap")?.get("_0")?.clone()).ok()
+        })
+        .ok_or_else(|| "persisted workspace.action is not a signing action".to_owned())
 }

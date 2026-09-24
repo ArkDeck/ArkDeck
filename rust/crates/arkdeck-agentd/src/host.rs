@@ -687,7 +687,9 @@ impl Host {
         self
     }
     /// Swift's composition root over the registered workspace projects: each
-    /// resolved to its profile, the Runtime-owned copies under `state_root`
+    /// resolved to its profile — its registered Hvigor presets through the
+    /// DevEco registry at `bootstrap`, each preset's exact pin resolved to the
+    /// toolchain it names — the Runtime-owned copies under `state_root`
     /// adopted again, the registered generations marked applied. A copy that
     /// cannot be vouched for is reported, as Swift reports it, and stays
     /// unresolvable. Without the project owner nothing is composed.
@@ -695,21 +697,47 @@ impl Host {
     pub fn with_workspace_operations(
         mut self,
         state_root: &std::path::Path,
+        bootstrap: &std::path::Path,
+        signing: Option<arkdeck_hoststore::SigningSetup>,
     ) -> Result<Self, String> {
         let Some(projects) = self.workspace_projects.clone() else {
             return Ok(self);
         };
-        let (composition, unadopted) = arkdeck_hoststore::WorkspaceComposition::compose(
+        let registry = arkdeck_hoststore::DevEcoRegistryStore::open_existing(bootstrap)
+            .map_err(|error| error.to_string())?;
+        let resolve = |reference: &str, generation: u64, preset: &str| {
+            registry
+                .resolve(reference, generation, "workspacePreset", preset)
+                .map_err(|error| format!("{}: {}", error.code, error.message))
+        };
+        let (composition, notes) = arkdeck_hoststore::WorkspaceComposition::compose(
             projects,
             state_root,
             &self.home,
             arkdeck_hoststore::runtime_now,
+            &resolve,
+            signing,
         )?;
-        for failure in &unadopted {
+        use std::io::Write;
+        match &notes.released_credential_owners {
+            Some(Ok(released)) if !released.is_empty() => {
+                println!(
+                    "signing credential owner released presets no store record carries: {}",
+                    released.join(",")
+                );
+                let _ = std::io::stdout().flush();
+            }
+            // An unreadable owner is reported where it matters: every
+            // signing preset fails its resolution with the same cause.
+            Some(Err(error)) => {
+                eprintln!("signing credential owner reconciliation skipped: {error}");
+            }
+            _ => {}
+        }
+        for failure in &notes.unadopted {
             println!("runtime workspace not adopted for {failure}");
         }
-        if !unadopted.is_empty() {
-            use std::io::Write;
+        if !notes.unadopted.is_empty() {
             let _ = std::io::stdout().flush();
         }
         self.workspace = Some(std::sync::Arc::new(composition));

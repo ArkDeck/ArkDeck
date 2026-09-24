@@ -1,0 +1,29 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_SIGN_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspaceSignOracleContractTests",
+  "determinism": "the clock is fixed, the root is fixed, the requests are canonical JSON and the receipt, its Keychain account and every material file are written with fixed bytes, so every Job, Artifact, credential and attempt identity repeats; hap-signer.sh stands in for the preset's Java launcher with fixed bytes and reads its mode from the input HAP; both passwords are fixed fakes held in memory; two recordings were identical",
+  "durable": "preset-v1.json is the receipt the recording installed, credential-owner-v1.json the ledger the credential owner adopted and the workspace preset pinned, artifacts/job-input-hap/ the five unsigned inputs, artifacts/<job>/ART-* the signed HAP and signing report of the signed Job and of the Job recovered by readback, rejected-parked-record.json and verify-once-parked-record.json the durable records of the two Jobs parked on an unknown outcome, before their reconcile",
+  "files": {
+    "artifacts/job-2268f559559a94ce5fb1b00b4db9e87b/ART-51b682661e16750f9811113883577a52": "cf0576b2c10b39726a20653925e71699514c2e237d44e5f4e98e1e3d4d4ed10f",
+    "artifacts/job-2268f559559a94ce5fb1b00b4db9e87b/ART-d5babcc0bda05114aa323d46a1e093ac": "e88955b2b63a1485af242e5ae8d4bcc991714ccda48d1c1d43fcea8a736d1a8a",
+    "artifacts/job-ff9bd7e9f18fa64aeb97d76b9e4446e2/ART-2d3a843163c9c18d3a8844da5541efc5": "f55e5d5dbdb119b067216692d3f9031647efed9e244b84cfa38a3b7c4cfae4d3",
+    "artifacts/job-ff9bd7e9f18fa64aeb97d76b9e4446e2/ART-57f711ff89033d7276d189c5b6b7ade1": "03213152c4b6162c811c3a9ff798bb57e2135d2b928dc697055e9d1b8b3ea14f",
+    "artifacts/job-input-hap/ART-101d5417435801d173c0ddf4e9a8cda4": "f76dd91085c9985871a89ac228f122ea336ab6e25902fc15b68e87fcdce24bba",
+    "artifacts/job-input-hap/ART-81ae19b19ca7ea0d3ce99c554182c815": "f7fe2c7f8be923c206a434f59afba6f3bd35d6fa55f8d29bfa00f03ab0b5c8e0",
+    "artifacts/job-input-hap/ART-91e056cd71e7278acef6eb9fb563ee97": "0f8d97ddcca90371d065d511213c6ccc99071e99589911380b05e4147fbb9a72",
+    "artifacts/job-input-hap/ART-b9021b0a4cfdb6cf3a73558d0adb27e2": "c4eaf8e0914a787dea044962a793ea1468d7093540a8ddd993533db386d055da",
+    "artifacts/job-input-hap/ART-fe0e32028d5f7e03b71f80c25a947833": "6d9eaf7ca6c2e91c55a214cc95a051096ee73d9dbbf761b9308fad1b40aa131c",
+    "artifacts/job-input-hap/index.json": "e948935f8dba50a6cffecfd8ed2b0b2e538176e971a7c32cd84873cb51213922",
+    "credential-owner-v1.json": "a68f2efe6acdae4e4aa5e582a73b702fe2500d31606b07c80b62b144526cf639",
+    "frames.jsonl": "0c25652b9ed5db18b124d9f523012bbcb0525eacbb4edf3d9f32264623c3818d",
+    "hap-signer.sh": "07d52f0431ea469f21b33ed39516ee4908e7860e01a4883809e278a5db1a56fe",
+    "preset-v1.json": "7db1afdef603ecb21803178187012b0d539a07a77c7fed47cebc6db1f2d47a37",
+    "rejected-parked-record.json": "eb600fed070c49b7d6fa57734aaa3bac6889d5e7648f2a081f661370fcd8c4b2",
+    "verify-once-parked-record.json": "02c2b9c204b10b845e9242b662b7df1814b471d6e74a32c57382c1d72e512edc"
+  },
+  "frames": "job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.sign-openharmony-hap@1 Job, in the order the control plane answered them",
+  "recordedBy": "WorkspaceSignOracleContractTests.testTheControlPlaneSignsWithARegisteredPresetAsRecorded",
+  "replayedBy": "the Rust port of workspace.sign-openharmony-hap@1 (TASK-XPA-015, M3)",
+  "secrets": "the recording asserts neither fake password appears in any file below its root; no Keychain item, real credential or real signer is involved",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider with a registered signing preset resolved through OpenHarmonySigningCredentialOwner, and OpenHarmonySigningWorkspaceDispatcher over OpenHarmonySigningPresetStore, over a fixed root /private/tmp/arkdeck-workspace-sign-oracle",
+  "why": "the job.* corpora carry no frame of this operation and are deduplicated by shape, so they cannot be replayed as one sequence"
+}

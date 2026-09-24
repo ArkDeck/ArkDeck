@@ -77,6 +77,10 @@ const HAP: &str = "debug.hap@1";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const APPLY: &str = "workspace.apply-patch@1";
 const REVERT: &str = "workspace.revert-patch@1";
+const BUILD: &str = crate::workspace_build::BUILD;
+const SIGN: &str = crate::workspace_composition::SIGN;
+/// The workspace mutations: none has a dedicated readback.
+const WORKSPACE_MUTATIONS: [&str; 3] = [APPLY, REVERT, BUILD];
 /// Swift's engine answers a workspace mutation's reconcile from its provider's
 /// dedicated readback, which the workspace provider does not have.
 const NO_READBACK: &str = "mutation has no dedicated readback; original not resent";
@@ -441,7 +445,8 @@ pub struct JobReconciler<'a> {
 /// HAP, whose own lineage repair is not ported.
 fn reconciled(operation: &str, state: &str) -> bool {
     operation == ANALYZER
-        || [APPLY, REVERT].contains(&operation)
+        || operation == SIGN
+        || WORKSPACE_MUTATIONS.contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
 }
 
@@ -483,9 +488,19 @@ impl JobReconciler<'_> {
                 record.job_id
             ))
         };
+        // A signing Job's reconcile reads back its own product; a confirmed
+        // one is republished through the runner, before its step completes.
+        if operation == SIGN {
+            if self.runner.and_then(|runner| runner.workspace).is_none() {
+                return Ok(refusal(format!(
+                    "runs {operation}, and this owner holds no runner to republish its product"
+                )));
+            }
+            return Ok(None);
+        }
         // A workspace mutation's reconcile reads its own records only; it
         // needs no device facts, only the store its use is settled in.
-        if [APPLY, REVERT].contains(&operation) {
+        if WORKSPACE_MUTATIONS.contains(&operation) {
             if lineage::runtime_capability(record) && self.capabilities.is_none() {
                 return Ok(refusal(
                     "settles a runtime capability use, and this owner holds no capability store"
@@ -907,14 +922,25 @@ impl JobReconciler<'_> {
                 Decision::NotExecuted
             }
         });
-        if descriptor.binding() == "none" && [APPLY, REVERT].contains(&operation.as_str()) {
+        if operation == SIGN {
+            return self
+                .reconcile_signing(held, &events, &action, &intent, &step, &attempt, durable);
+        }
+        if descriptor.binding() == "none" && WORKSPACE_MUTATIONS.contains(&operation.as_str()) {
             // A workspace mutation: its input lease resolved again and its
             // persisted typed action materialized, then — as Swift's engine
             // has no dedicated readback for it — the intent stays unknown.
             // Nothing is read from the tree and nothing is resent.
             self.resolve_source(&held.run.record)?;
-            crate::workspace_patch::PatchAction::materialize(&action)
-                .map_err(|detail| unsupported(&detail))?;
+            if operation == BUILD {
+                crate::workspace_build::BuildAction::materialize(&action)
+                    .map(|_| ())
+                    .map_err(|detail| unsupported(&detail))?;
+            } else {
+                crate::workspace_patch::PatchAction::materialize(&action)
+                    .map(|_| ())
+                    .map_err(|detail| unsupported(&detail))?;
+            }
             exact(&events)?;
             let decision = durable.unwrap_or_else(|| Decision::Unknown(NO_READBACK.into()));
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
@@ -967,6 +993,70 @@ impl JobReconciler<'_> {
         )
     }
 
+    /// Swift's reconcile of a host-only signing intent: the unsigned HAP's
+    /// lease resolved again, the persisted action materialized, then the
+    /// provider's readback — nothing written is not executed, a record
+    /// without its product stays unknown, and a product is read back (its
+    /// record, or `verify-app` once more) and never signed again. A product
+    /// confirmed that way is republished with its source's binding before
+    /// the step is marked complete; a known terminal Job's attempt directory
+    /// is then removed.
+    #[allow(clippy::too_many_arguments)]
+    fn reconcile_signing(
+        &self,
+        held: &mut Held,
+        events: &[Value],
+        action: &Value,
+        intent: &str,
+        step: &str,
+        attempt: &str,
+        durable: Option<Decision>,
+    ) -> Result<Option<Value>, WireError> {
+        use crate::workspace_composition::{SignReconcile, WorkspaceComposition};
+        let (Some(runner), Some(workspace)) =
+            (self.runner, self.runner.and_then(|runner| runner.workspace))
+        else {
+            return Err(other(
+                "the Runtime runner is unavailable to republish a signed product",
+            ));
+        };
+        let (_, source_binding) = runner.sign_lease(&held.run).map_err(other)?;
+        let parked = crate::workspace_composition::materialize_sign_action(action)
+            .map_err(|detail| unsupported(&detail))?;
+        if !events.iter().any(|event| event["eventId"] == intent) {
+            return Err(engine(
+                "internalFailure",
+                "persisted reconciliation action has no matching intent",
+            ));
+        }
+        let decision = match durable {
+            Some(decision) => decision,
+            None => match WorkspaceComposition::reconcile_sign(&parked) {
+                SignReconcile::NotExecuted => Decision::NotExecuted,
+                SignReconcile::Unknown(reason) => Decision::Unknown(reason),
+                SignReconcile::Completed(_) => {
+                    let recovered = arkdeck_provider_workspace::signer::recovered_receipt(&parked)
+                        .map_err(|error| other(error.to_string()))?;
+                    runner
+                        .publish_signed(
+                            &mut held.run,
+                            &source_binding,
+                            &recovered.summary,
+                            &recovered,
+                            None,
+                        )
+                        .map_err(other)?;
+                    Decision::Completed(recovered.summary.keys().cloned().collect())
+                }
+            },
+        };
+        let answer = self.finish(held, events, intent, step, attempt, decision, None)?;
+        if terminal(&held.run.record.state) && !held.run.record.outcome_unknown() {
+            workspace.cleanup_sign(&held.run.record.job_id);
+        }
+        Ok(answer)
+    }
+
     /// Swift `resolvedInputArtifact(jobID:)`: the lease the operation's input
     /// names (an analyzer's source, a debug HAP's entry package, a native
     /// deployment's library) resolved again, then checked against the
@@ -977,6 +1067,7 @@ impl JobReconciler<'_> {
             HAP => "hapArtifactLease",
             NATIVE => "libraryArtifactLease",
             APPLY => "patchArtifactRef",
+            SIGN => "unsignedHapArtifactLease",
             _ => return Ok(None),
         };
         let Some(lease) = record.request["inputs"][input].as_str() else {

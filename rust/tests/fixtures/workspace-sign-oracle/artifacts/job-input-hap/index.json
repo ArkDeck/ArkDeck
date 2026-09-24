@@ -1,0 +1,140 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-81ae19b19ca7ea0d3ce99c554182c815",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 32,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/vnd.openharmony.hap",
+      "name" : "good.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "f7fe2c7f8be923c206a434f59afba6f3bd35d6fa55f8d29bfa00f03ab0b5c8e0",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-hap"
+    },
+    {
+      "artifactID" : "ART-fe0e32028d5f7e03b71f80c25a947833",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 37,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/vnd.openharmony.hap",
+      "name" : "rejected.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "6d9eaf7ca6c2e91c55a214cc95a051096ee73d9dbbf761b9308fad1b40aa131c",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-hap"
+    },
+    {
+      "artifactID" : "ART-91e056cd71e7278acef6eb9fb563ee97",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 36,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/vnd.openharmony.hap",
+      "name" : "echo.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "0f8d97ddcca90371d065d511213c6ccc99071e99589911380b05e4147fbb9a72",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-hap"
+    },
+    {
+      "artifactID" : "ART-b9021b0a4cfdb6cf3a73558d0adb27e2",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 90,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/vnd.openharmony.hap",
+      "name" : "verify-once.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "c4eaf8e0914a787dea044962a793ea1468d7093540a8ddd993533db386d055da",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-hap"
+    },
+    {
+      "artifactID" : "ART-101d5417435801d173c0ddf4e9a8cda4",
+      "bindingSnapshot" : {
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 23,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/vnd.openharmony.hap",
+      "name" : "not-zip.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "f76dd91085c9985871a89ac228f122ea336ab6e25902fc15b68e87fcdce24bba",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "import-hap"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

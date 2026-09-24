@@ -1,0 +1,4 @@
+PK
+mode=verify-once:/tmp/arkdeck-workspace-sign-oracle/verify-once.marker
+unsigned-body
+arkdeck-signed-fixture

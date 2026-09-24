@@ -19,6 +19,9 @@
 //!   and recorded as `signing-result.json` (`arkdeck-openharmony-signing-result/v1`).
 //! - `keychain_secrets` (macOS) is the production secret source over the Data
 //!   Protection Keychain and the installed daemon's code identity.
+//! - `credential_owner` (macOS) is the ledger of the workspace signing presets
+//!   that pin the installed credential by its content reference, and their
+//!   resolution to its receipt.
 //!
 //! No secret is ever placed in an argument, an environment, a receipt, a
 //! record, an error or a log; secrets live in [`arkdeck_platform::Secret`]
@@ -35,6 +38,8 @@ pub mod secret_envelope;
 pub mod signing_action;
 pub mod signing_preset;
 
+#[cfg(target_os = "macos")]
+pub mod credential_owner;
 #[cfg(target_os = "macos")]
 pub mod keychain_secrets;
 #[cfg(target_os = "macos")]
