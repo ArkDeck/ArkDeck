@@ -57,6 +57,12 @@ pub use job_events::{EventStream, event_line, terminal_line};
 pub use operation_validation::{
     bounded_input_document, input_findings, validation_attention, validation_document,
 };
+#[cfg(target_os = "macos")]
+mod arkforge_bundle;
+#[cfg(target_os = "macos")]
+pub mod runtime_service;
+#[cfg(target_os = "macos")]
+pub mod runtime_service_verify;
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
 pub const CLI_VERSION: &str = "0.1.0";
@@ -564,6 +570,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--owner-kind"
                 | "--owner"
                 | "--maximum-wait"
+                | "--maximum-wait-seconds"
                 | "--reviewed-plan-digest"
                 | "--timeout" => {
                     index += 1;
@@ -612,6 +619,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--selection-file" => "selectionFile",
                         "--owner-kind" => "ownerKind",
                         "--maximum-wait" => "maximumWait",
+                        "--maximum-wait-seconds" => "maximumWaitSeconds",
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
                         "--registration-request-id" => "registrationRequestId",
                         "--mutation-request-id" => "mutationRequestId",
@@ -760,6 +768,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "hdc", "status"] => "runtime.hdc.status",
         ["runtime", "hdc", "impact-preview"] => "runtime.hdc.impact-preview",
         ["runtime", "hdc", "restart"] => "runtime.hdc.restart",
+        ["runtime", "service", "status"] => "runtime.service.status",
+        ["runtime", "service", "verify"] => "runtime.service.verify",
+        ["runtime", "service", "restart"] => "runtime.service.restart",
         ["control-action", "list"] => "control-action.list",
         ["control-action", "show"] => "control-action.show",
         ["control-action", "reconcile"] => "control-action.reconcile",
@@ -801,11 +812,23 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
-    if legacy_json && (command != "debug.probe" || mode.is_some()) {
+    // The LaunchAgent leaves keep the legacy `--json` rendering (Swift's
+    // registry lists it beside `--output`, which it excludes), connect to no
+    // caller-named Runtime and take no correlation identity.
+    let service = command.starts_with("runtime.service.");
+    if legacy_json && (!(command == "debug.probe" || service) || mode.is_some()) {
         return Err(CliError::new(
             "invalidOption",
-            "--json belongs to debug probe and excludes --output",
+            "--json belongs to debug probe and the runtime service leaves and excludes --output",
         ));
+    }
+    if service && (id.is_some() || socket.is_some()) {
+        let mut error = CliError::new(
+            "invalidOption",
+            "the runtime service leaves take no --control-request-id or --socket",
+        );
+        error.command = Some(command);
+        return Err(error);
     }
     // Swift's parser refuses `--socket` on `runtime tool register` unless the
     // kind is DevEco, because its HDC registration runs in its own process.
@@ -1118,6 +1141,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
         "session.export.apply" | "session.cleanup.apply" => &["previewId", "previewDigest"],
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
+        "runtime.service.verify" => &["targetId", "maximumWaitSeconds", "executionId", "jobId"],
+        "runtime.service.restart" => &["maximumWaitSeconds"],
         _ => &[],
     };
     if method_options
@@ -1128,6 +1153,36 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "invalidOption",
             "the option does not belong to this command",
         ));
+    }
+    // The registry's grammar of the LaunchAgent leaves: `--maximum-wait-seconds`
+    // is a plain positive integer within 1…300, and `verify --job` excludes the
+    // three options of a fresh run.
+    if !help && service {
+        let refuse = |message: &str| {
+            let mut error = CliError::new("invalidOption", message);
+            error.command = Some(command);
+            error
+        };
+        if let Some(seconds) = method_options.get("maximumWaitSeconds") {
+            let text = seconds.as_str().expect("option text");
+            if text.starts_with('0')
+                || !text.bytes().all(|byte| byte.is_ascii_digit())
+                || !text
+                    .parse::<u64>()
+                    .is_ok_and(|seconds| (1..=300).contains(&seconds))
+            {
+                return Err(refuse("--maximum-wait-seconds must be between 1 and 300"));
+            }
+        }
+        if method_options.contains_key("jobId")
+            && ["targetId", "maximumWaitSeconds", "executionId"]
+                .iter()
+                .any(|key| method_options.contains_key(*key))
+        {
+            return Err(refuse(
+                "--job excludes --target, --maximum-wait-seconds and --execution-id",
+            ));
+        }
     }
     if !help
         && allowed.contains(&"expectedGeneration")
@@ -1405,6 +1460,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")
             || command.starts_with("human-action.")
+            || command.starts_with("runtime.service.")
             || matches!(
                 command,
                 "operation.describe"

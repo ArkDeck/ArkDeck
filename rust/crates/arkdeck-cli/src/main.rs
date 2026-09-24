@@ -706,6 +706,55 @@ fn write_document(value: &Value) -> io::Result<()> {
     io::stdout().lock().write_all(&bytes)
 }
 
+/// The LaunchAgent leaves answer as Swift's `runAgentDaemon` answers: the one
+/// document when there is one, then a plain failure's diagnostic on stderr
+/// and its exit status — never a failure envelope, so a refusal leaves stdout
+/// empty.
+fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    #[cfg(target_os = "macos")]
+    {
+        let answer = arkdeck_cli::runtime_service::run(invocation, id);
+        if let Some(document) = &answer.document {
+            let written = if invocation.legacy_json {
+                write_document(document)
+            } else if invocation.json {
+                write_document(&success_envelope(invocation.command, document.clone(), id))
+            } else {
+                writeln!(
+                    io::stdout().lock(),
+                    "{}",
+                    serde_json::to_string_pretty(document).expect("a JSON document")
+                )
+            };
+            if written.is_err() {
+                return 74.into();
+            }
+        }
+        match answer.failure {
+            Some(failure) => {
+                eprintln!("arkdeck {}: {}", invocation.command, failure.message);
+                failure.exit_code.into()
+            }
+            None => 0.into(),
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let error = CliError::new(
+            "unsupportedOnPlatform",
+            "the runtime service is the macOS user-domain LaunchAgent",
+        );
+        if invocation.json {
+            if write_document(&failure_envelope(invocation.command, &error, id, true)).is_err() {
+                return 74.into();
+            }
+        } else {
+            eprintln!("arkdeck: {}", error.message);
+        }
+        error.exit_code().into()
+    }
+}
+
 fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let fallback_id = correlation().unwrap_or_else(|_| "ctl-unavailable".into());
@@ -814,6 +863,9 @@ fn main() -> std::process::ExitCode {
             println!("{}", arkdeck_cli::command_registry_human(&registry));
         }
         return 0.into();
+    }
+    if invocation.command.starts_with("runtime.service.") {
+        return serve_runtime_service(&invocation, id);
     }
     match execute(&invocation, id) {
         Ok(result) => {

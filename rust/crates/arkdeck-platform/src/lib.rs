@@ -203,7 +203,22 @@ pub use bootstrap_tool_capture::{
 #[cfg(target_os = "macos")]
 mod host_bundle_signature;
 #[cfg(target_os = "macos")]
-pub use host_bundle_signature::{bootstrap_bundle_version, validate_production_daemon_bundle};
+pub use host_bundle_signature::{
+    bootstrap_bundle_version, validate_facade_signature, validate_production_daemon_bundle,
+};
+
+#[cfg(target_os = "macos")]
+pub mod launchd;
+
+#[cfg(target_os = "macos")]
+mod property_list;
+#[cfg(target_os = "macos")]
+pub use property_list::{MAX_PROPERTY_LIST_BYTES, PropertyListValue, read_property_list};
+
+#[cfg(target_os = "macos")]
+mod owner_file;
+#[cfg(target_os = "macos")]
+pub use owner_file::{OwnerFileRefusal, read_owner_controlled_file};
 
 #[cfg(target_os = "macos")]
 mod bootstrap_bundle_capture;
