@@ -483,7 +483,36 @@
           "type": "string"
         },
         "screenSequence": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "capturedFrameCount": {
+                  "type": "integer"
+                },
+                "frameDurationsSeconds": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "requestedFrameCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "capturedFrameCount",
+                "frameDurationsSeconds",
+                "requestedFrameCount"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "timeline": {
           "additionalProperties": false,
@@ -538,7 +567,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 24,
-    "result": 22
+    "request": 25,
+    "result": 23
   }
 }

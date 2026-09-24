@@ -554,6 +554,62 @@ fn job_request_inputs_accept_an_unrecorded_input_and_the_request_stays_closed() 
     );
 }
 
+/// A screen sequence Job's `job.show` carries what its run of stills measured
+/// (`screenSequence`), which the published schema pinned to `null` until the
+/// device mutation reconcile oracle recorded one: the recorded answer now
+/// conforms, so the control plane no longer rewrites it to `internalError`,
+/// and the measured record stays closed. The published view's schemas may
+/// predate it; they still refuse what the widened schema refuses.
+#[test]
+fn a_screen_sequence_job_show_carries_its_measured_run_and_the_record_stays_closed() {
+    let cases: Value = serde_json::from_slice(
+        &fs::read(
+            common::repo_root()
+                .join("rust/tests/fixtures/device-mutation-reconcile/screenSequence/cases.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let shown = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "receiveKilled.job.show")
+        .expect("the recorded job.show of a screen sequence Job");
+    let result = shown["answer"]["result"].clone();
+    assert_eq!(
+        result["screenSequence"],
+        json!({"capturedFrameCount": 3, "frameDurationsSeconds": [0.5, 0.5, 0.5],
+            "requestedFrameCount": 3})
+    );
+    assert!(
+        validate_method_value("job.show", "result", &result).is_ok() || published_view(),
+        "a screen sequence Job's measured run"
+    );
+    // Foundation writes a whole span without its fraction.
+    let mut whole = result.clone();
+    whole["screenSequence"]["frameDurationsSeconds"] = json!([1, 0.5]);
+    assert!(validate_method_value("job.show", "result", &whole).is_ok() || published_view());
+    let mut unmeasured = result.clone();
+    unmeasured["screenSequence"] = Value::Null;
+    assert!(validate_method_value("job.show", "result", &unmeasured).is_ok());
+    let mut extra = result.clone();
+    extra["screenSequence"]["unrecordedMember"] = json!(true);
+    assert!(
+        validate_method_value("job.show", "result", &extra).is_err(),
+        "an unknown member of the measured run"
+    );
+    let mut mistyped = result.clone();
+    mistyped["screenSequence"]["capturedFrameCount"] = json!("3");
+    assert!(validate_method_value("job.show", "result", &mistyped).is_err());
+    let mut partial = result;
+    partial["screenSequence"]
+        .as_object_mut()
+        .unwrap()
+        .remove("requestedFrameCount");
+    assert!(validate_method_value("job.show", "result", &partial).is_err());
+}
+
 #[test]
 fn source_schema_and_corpus_files_match_the_selected_input_manifest() {
     fn assert_git_object_id(value: &Value) {

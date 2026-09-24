@@ -1444,3 +1444,77 @@ fn trace_probe_answers_its_owner_s_portrait_within_the_contract() {
         ["TGT-example", "TGT-other"]
     );
 }
+
+/// A screen sequence Job's `job.show`, as its Job owner answers it, reaches
+/// the caller through the control plane unchanged: the measured run it
+/// carries (`screenSequence`) conforms now that the schema publishes it,
+/// where the control plane used to rewrite the answer to `internalError`.
+/// The published view compiles the merge base's schema, which may still pin
+/// the member to `null`; there the rewrite is what the caller gets. A
+/// measured run of a shape the schema does not publish is still rewritten.
+#[test]
+fn a_screen_sequence_job_show_passes_the_control_plane() {
+    struct ShowHost(Value);
+    impl HostServices for ShowHost {
+        fn observed_at(&self) -> String {
+            "2026-09-14T00:00:00Z".into()
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("a Job read entered HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("a Job read entered HDC")
+        }
+        fn job_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert_eq!(method, "job.show");
+            Ok(self.0.clone())
+        }
+    }
+    let cases: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/device-mutation-reconcile/screenSequence/cases.json"
+    ))
+    .unwrap();
+    let shown = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "receiveKilled.job.show")
+        .unwrap();
+    let result = shown["answer"]["result"].clone();
+    assert!(result["screenSequence"].is_object());
+    let inputs = strict_json(CONTRACT_INPUTS.as_bytes()).unwrap();
+    let published_view = inputs["kind"] == "development" && inputs.get("commit").is_some();
+    let answered = call(
+        &Control::new(ShowHost(result.clone())).unwrap(),
+        "job.show",
+        shown["params"].clone(),
+    )
+    .outcome;
+    match answered {
+        Ok(answer) => assert_eq!(answer, result),
+        Err(error) => {
+            assert!(published_view, "{error:?}");
+            assert_eq!(error.code, "internalError");
+        }
+    }
+    let mut foreign = result;
+    foreign["screenSequence"]["frameDurationsSeconds"] = json!("0.5,0.5,0.5");
+    let error = call(
+        &Control::new(ShowHost(foreign)).unwrap(),
+        "job.show",
+        shown["params"].clone(),
+    )
+    .outcome
+    .unwrap_err();
+    assert_eq!(
+        (error.code.as_str(), error.message.as_str()),
+        (
+            "internalError",
+            "the result does not conform to the current contract"
+        )
+    );
+}
