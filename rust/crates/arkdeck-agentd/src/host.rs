@@ -195,6 +195,11 @@ pub struct Host {
     /// in the lane's runtime directory, a fresh bounded session per read.
     #[cfg(target_os = "macos")]
     device_access: Option<arkdeck_provider_arkforge::DeviceAccessObserver>,
+    /// Swift `ProductRockchipLoaderBindingCoordinator`: the binding of the
+    /// Application Support root, the Runtime's records below it, the census
+    /// and ArkForge's Loader observation.
+    #[cfg(target_os = "macos")]
+    loader_binding: Option<arkdeck_hoststore::LoaderBinding>,
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
@@ -773,6 +778,14 @@ impl Host {
         self
     }
 
+    /// `flash.bind-current-loader` binds through this owner, against this
+    /// host's Target store and Jobs.
+    #[cfg(target_os = "macos")]
+    pub fn with_loader_binding(mut self, binding: arkdeck_hoststore::LoaderBinding) -> Self {
+        self.loader_binding = Some(binding);
+        self
+    }
+
     /// `flash.device-access` reads the flashing modes the ArkForge lane's
     /// daemon sees attached through this observer.
     #[cfg(target_os = "macos")]
@@ -819,6 +832,7 @@ impl Host {
             ("flashInvocations", self.flash_invocations.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
             ("deviceAccess", self.device_access.is_some()),
+            ("loaderBinding", self.loader_binding.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -912,6 +926,8 @@ impl Host {
             flash_facts: None,
             #[cfg(target_os = "macos")]
             device_access: None,
+            #[cfg(target_os = "macos")]
+            loader_binding: None,
             #[cfg(all(test, target_os = "macos"))]
             test_hdc_impact: None,
         }
@@ -2354,6 +2370,28 @@ impl HostServices for Host {
                 details: None,
             }),
         }
+    }
+    /// Swift's handler over its coordinator, with this host's Jobs consulted
+    /// first for an enter-Loader transition awaiting the binding.
+    #[cfg(target_os = "macos")]
+    fn flash_bind_current_loader(
+        &self,
+        target_id: &str,
+        expected_binding_revision: i64,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(binding), Some(targets)) = (&self.loader_binding, &self.targets) else {
+            return Err(WireError {
+                code: "internalError".into(),
+                message: "Rockchip Loader binding is not configured".into(),
+                details: None,
+            });
+        };
+        binding.bind(
+            targets,
+            self.jobs.as_deref(),
+            target_id,
+            expected_binding_revision,
+        )
     }
     #[cfg(target_os = "macos")]
     fn flash_bootloader_status(&self) -> Result<serde_json::Value, WireError> {

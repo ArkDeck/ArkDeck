@@ -668,6 +668,18 @@ pub(crate) fn compose(
         )
         .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
             &arkforge.runtime_directory,
+        ))
+        // Swift's Loader binding coordinator (`main.swift` 1549): the same
+        // root and census, ArkForge's half of the Loader observation through
+        // the lane's directory, and the Runtime's records in
+        // `…/Agentd/rockchip-runtime`.
+        .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
+            &layout.application_support,
+            arkdeck_platform::usb_host_devices,
+            arkdeck_hoststore::ArkForgeLoader::new(
+                arkdeck_platform::usb_host_devices,
+                &arkforge.runtime_directory,
+            ),
         ));
     for (name, owner) in &inputs.unread {
         omitted.push(format!(

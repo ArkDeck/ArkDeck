@@ -225,7 +225,9 @@ CI runs them.
     concurrent run: "a listener that is not the configured HDC executable
     holds" its endpoint. That is not this slice's code, and CI has not shown
     it; it is left as it is.
-- *Third push*: pending.
+- *Third push* (`3c1aa4d3`, run 36054888908): green on every lane, macos-26
+  included. Merged as `c588ccd7`; recorded with the next slice
+  (`loader-binding-run.md`).
 
 No device, installed service, real `arkforged` or App was used, and nothing
 here is device evidence.

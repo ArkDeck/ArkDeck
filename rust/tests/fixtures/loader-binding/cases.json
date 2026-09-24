@@ -1,0 +1,1448 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 1,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.noParameters",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 2,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.noRevision",
+      "params" : {
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 3,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.zeroRevision",
+      "params" : {
+        "expectedBindingRevision" : 0,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 4,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.noTarget",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 5,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.staleRevision",
+      "params" : {
+        "expectedBindingRevision" : 3,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a1.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 6,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.emptyTarget",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : ""
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"exactly one registered DAYU200 USB identity is required for binding\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 7,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.nothingAttached",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"exactly one registered DAYU200 USB identity is required for binding\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 8,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.twoBoards",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            },
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "19922944",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"USB registry unavailable\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 9,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.registryUnavailable",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : null
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"exactly one registered DAYU200 USB identity is required for binding\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 10,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.unrelatedOnly",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 4776,
+              "productName" : "iPhone",
+              "registryEntryId" : null,
+              "serial" : "unrelated-serial",
+              "topology" : "99",
+              "vendorId" : 1452
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"ArkForge dual-source Loader observation is required for binding: arkforged discoverDevices is unavailable: DAEMON_UNAVAILABLE: no lane\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 11,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.loaderUnobserved",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 4776,
+              "productName" : "iPhone",
+              "registryEntryId" : null,
+              "serial" : "unrelated-serial",
+              "topology" : "99",
+              "vendorId" : 1452
+            },
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "loader",
+          "refusal" : "arkforged discoverDevices is unavailable: DAEMON_UNAVAILABLE: no lane",
+          "script" : "refuse"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"ArkForge dual-source Loader observation is required for binding: IOKit Loader identity does not match the bound target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 12,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.loaderElsewhere",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "loader",
+          "script" : "port",
+          "topology" : "20000000"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: productionConfigurationUnavailable(\"durable Rockchip binding is not installed\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 13,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.bindingAbsent",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "loader",
+          "script" : "confirm"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 275,
+          "kind" : "file",
+          "mode" : "644",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 14,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.bindingSharedMode",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-installed.json",
+          "mode" : "644",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "previousBindingRevision" : 1,
+          "selectionEvidenceSha256" : "04d01e02a0c5f63023221ccc183420a4197ca117552994055e6e38da8720b3c5",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : true
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 369,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 15,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.firstCrossMode",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-installed.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "previousBindingRevision" : 1,
+          "selectionEvidenceSha256" : "04d01e02a0c5f63023221ccc183420a4197ca117552994055e6e38da8720b3c5",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : false
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 369,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 16,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.firstCrossModeRetried",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "previousBindingRevision" : 2,
+          "selectionEvidenceSha256" : "04d01e02a0c5f63023221ccc183420a4197ca117552994055e6e38da8720b3c5",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : false
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 369,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 17,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.boundRevisionRetried",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"the selected HDC-normal target has no active cross-mode binding\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 369,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 18,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.hdcNormalWithoutCrossMode",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff00000000000000000000cafe",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target does not uniquely match the current DAYU200 identity\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 796,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 19,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.secondBoardAmbiguous",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-B"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "19922944",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a2-b1-twin.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "previousBindingRevision" : 1,
+          "selectionEvidenceSha256" : "555952d9710ec8256b92099b3a4e861e6611e7eeefd18746d82575541c53f9c7",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-B",
+          "updated" : true
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 555,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 545,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 20,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.selectSecondBoard",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-B"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a2-b1.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "previousBindingRevision" : 1,
+          "selectionEvidenceSha256" : "555952d9710ec8256b92099b3a4e861e6611e7eeefd18746d82575541c53f9c7",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-B",
+          "updated" : false
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 555,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 545,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 21,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.selectSecondBoardRetried",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-B"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected historical target has no complete Runtime reactivation proof\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 555,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 545,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 22,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.reactivationUnproved",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "previousBindingRevision" : 2,
+          "selectionEvidenceSha256" : "236bf9ac0251642c163eb48e21d75a9cde6df1c5e5a46dd264ade59cf04c82fb",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : true
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 911,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 545,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 23,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.reactivated",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "Agentd"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "Agentd/rockchip-runtime"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1/wait-for-hdc"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1/reconcile-enter-loader-mode-1"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/record-wait-for-hdc-intent.json",
+          "mode" : "600",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1/wait-for-hdc/intent.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/record-reconcile-intent.json",
+          "mode" : "600",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1/reconcile-enter-loader-mode-1/intent.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/record-reconcile-receipt.json",
+          "mode" : "600",
+          "path" : "Agentd/rockchip-runtime/job-reactivation-1/reconcile-enter-loader-mode-1/receipt.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "previousBindingRevision" : 2,
+          "selectionEvidenceSha256" : "236bf9ac0251642c163eb48e21d75a9cde6df1c5e5a46dd264ade59cf04c82fb",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : false
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 911,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 545,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 24,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.reactivatedRetried",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 3,
+          "previousBindingRevision" : 2,
+          "selectionEvidenceSha256" : "c6842becf2de275a0c73bcad65b189c2e1b5a71d775124d995b8c8892d484c70",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : true
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 2200,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 25,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.loaderDrifted",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a2-b1-alias.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0999",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 3,
+          "previousBindingRevision" : 2,
+          "selectionEvidenceSha256" : "c6842becf2de275a0c73bcad65b189c2e1b5a71d775124d995b8c8892d484c70",
+          "settledJobId" : null,
+          "targetId" : "TGT-BOARD-A",
+          "updated" : false
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 2200,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 26,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.loaderDriftedRetried",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"first cross-mode binding needs a matching binding revision and an hdc-normal port observed under this binding\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 232,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 27,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.firstCrossModeWithoutHdcNormalPort",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a1.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-installed-without-readback.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target binding lineage is missing or ambiguous\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 275,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 542,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 28,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.lineageAmbiguous",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-installed.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a1-twin.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: storeFailure(\"target binding lineage collides with a durable record\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 544,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 29,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.lineageCollides",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a1-loader-adopted.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target connect key does not match its durable HDC-normal alias\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 30,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.connectKeyNotAlias",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0999",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a2-other-key.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected target has no migratable HDC-to-Loader binding lineage\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 748,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 31,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.migrationNotAdjacent",
+      "params" : {
+        "expectedBindingRevision" : 3,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a3-loader.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: admissionRejected(\"selected Loader binding does not carry current Runtime attestation\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 32,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.withoutAttestation",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a2.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-loader-unattested.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip Loader binding was refused: productionConfigurationUnavailable(\"durable binding snapshot is invalid\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-binding.lock"
+        },
+        {
+          "bytes" : 275,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "bytes" : 291,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ],
+      "index" : 33,
+      "method" : "flash.bind-current-loader",
+      "name" : "bind.serialNamedByEvidence",
+      "params" : {
+        "expectedBindingRevision" : 1,
+        "targetId" : "TGT-BOARD-A"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "8711",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-a1.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/binding-a-installed.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    }
+  ]
+}

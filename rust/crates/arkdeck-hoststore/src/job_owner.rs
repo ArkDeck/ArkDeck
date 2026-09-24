@@ -517,6 +517,49 @@ impl JobStore {
         Ok(jobs)
     }
 
+    /// Swift `RuntimeJobEngine.loaderTransitionAwaitingBinding`'s candidates:
+    /// every DAYU200 flash Job for exactly this Target and binding revision
+    /// parked in `waitingForRecovery` with an unknown outcome at its
+    /// outstanding `enter-loader-mode` intent, by identity. An unreadable row
+    /// fails the whole read.
+    pub fn loader_transitions_awaiting_binding(
+        &self,
+        target_id: &str,
+        expected_binding_revision: i64,
+    ) -> Result<Vec<String>, WireError> {
+        // Swift `ArkForgeFlashOperation.containsDurableRecordReference`, of
+        // the typed request's operation.
+        const DAYU200_FLASH: [&str; 3] =
+            ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+        let rows = self.active_rows().map_err(unreadable)?;
+        let mut jobs = Vec::new();
+        for row in &rows {
+            let record = self
+                .resident(&row.id)
+                .map(Ok)
+                .unwrap_or_else(|| JobRecord::from_row(row))?;
+            let operation = &record.request["operation"];
+            let reference = match (operation["id"].as_str(), operation["version"].as_i64()) {
+                (Some(id), Some(version)) => format!("{id}@{version}"),
+                (Some(id), None) => id.to_owned(),
+                _ => continue,
+            };
+            let target = &record.request["target"];
+            if DAYU200_FLASH.contains(&reference.as_str())
+                && target["targetId"].as_str() == Some(target_id)
+                && target["expectedBindingRevision"].as_i64() == Some(expected_binding_revision)
+                && record.state == "waitingForRecovery"
+                && record.outcome_unknown()
+                && record.recovery_step() == Some("enter-loader-mode")
+                && record.recovery_intent().is_some()
+            {
+                jobs.push(record.job_id.clone());
+            }
+        }
+        jobs.sort();
+        Ok(jobs)
+    }
+
     pub fn read_snapshot(&self, id: &str) -> Result<JobRecord, WireError> {
         if !identifier(id) {
             return Err(failure(

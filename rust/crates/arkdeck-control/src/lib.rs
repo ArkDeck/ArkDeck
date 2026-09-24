@@ -379,6 +379,21 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `flash.bind-current-loader` once its two parameters were read: the
+    /// selected Target's cross-mode binding, from the one attached board. A
+    /// host without the binding owner answers as Swift's daemon without it
+    /// does.
+    fn flash_bind_current_loader(
+        &self,
+        _target_id: &str,
+        _expected_binding_revision: i64,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Rockchip Loader binding is not configured".into(),
+            details: None,
+        })
+    }
     /// `flash.prerequisites` once its target and a supported profile were
     /// read. A host without the prerequisite observer answers as Swift's
     /// daemon without it does.
@@ -1360,6 +1375,24 @@ impl<H: HostServices> Control<H> {
                 (Some(target), Some(revision)) if revision > 0 => Response {
                     id: request.id.clone(),
                     outcome: self.host.flash_reconcile_alias(target, revision),
+                },
+                _ => Response::failure(
+                    &request.id,
+                    "invalidParams",
+                    "targetId and expectedBindingRevision are required",
+                ),
+            },
+            // As Swift's handler: its two parameters, a string and a positive
+            // integer, before its owner.
+            "flash.bind-current-loader" => match (
+                params.get("targetId").and_then(Value::as_str),
+                params
+                    .get("expectedBindingRevision")
+                    .and_then(foundation_integer),
+            ) {
+                (Some(target), Some(revision)) if revision > 0 => Response {
+                    id: request.id.clone(),
+                    outcome: self.host.flash_bind_current_loader(target, revision),
                 },
                 _ => Response::failure(
                     &request.id,

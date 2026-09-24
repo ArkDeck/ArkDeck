@@ -77,6 +77,17 @@ pub(super) struct TargetDocument {
     #[serde(rename = "aliasResolutions", skip_serializing_if = "Option::is_none")]
     resolutions: Option<Vec<Resolution>>,
 }
+/// Swift's resolution digest: its material — every member but the digest
+/// itself — as `CanonicalJSONEncoders.canonical()` encodes it. All member
+/// names are ASCII, and a `Value` serializes its keys sorted and its slashes
+/// unescaped, as that encoder does.
+fn resolution_digest(resolution: &Resolution) -> String {
+    let mut material = serde_json::to_value(resolution).expect("a resolution always encodes");
+    if let Some(members) = material.as_object_mut() {
+        members.remove("resolutionSHA256");
+    }
+    sha256_hex(&serde_json::to_vec(&material).expect("a value always encodes"))
+}
 pub(super) fn sha(value: &str) -> bool {
     value.len() == 64
         && value
@@ -292,6 +303,111 @@ impl TargetDocument {
         self.targets.push(record.clone());
         Ok((record, true))
     }
+    /// Swift `RuntimeTargetStore.advanceBindingLineage(_:)` over this
+    /// document: one adopted Target carried across a strictly adjacent,
+    /// proven binding lineage edge, keeping its identity, connect key and
+    /// adoption, with the alias resolutions naming it carried along; and
+    /// whether that changed the document. The exact current edge is
+    /// idempotent; a missing, ambiguous, colliding or skipped lineage refuses
+    /// with Swift's `storeFailure` and changes nothing.
+    pub fn advance_binding_lineage(
+        &mut self,
+        advance: &crate::rockchip_binding::LineageAdvance,
+    ) -> Result<(TargetRecord, bool), String> {
+        let failure = |detail: &str| format!("storeFailure(\"{detail}\")");
+        let (previous, current) = (
+            advance.previous_identity_sha256.as_str(),
+            advance.current_identity_sha256.as_str(),
+        );
+        let revisions = u64::try_from(advance.previous_revision)
+            .ok()
+            .zip(u64::try_from(advance.current_revision).ok());
+        let Some((previous_revision, current_revision)) =
+            revisions.filter(|(from, to)| *from > 0 && from.checked_add(1) == Some(*to))
+        else {
+            return Err(failure("invalid target binding lineage advance"));
+        };
+        if !sha(previous) || !sha(current) || previous == current {
+            return Err(failure("invalid target binding lineage advance"));
+        }
+        let current_matches: Vec<usize> = (0..self.targets.len())
+            .filter(|&index| {
+                self.targets[index].identity == current
+                    && self.targets[index].binding_revision == current_revision
+            })
+            .collect();
+        let previous_matches: Vec<usize> = (0..self.targets.len())
+            .filter(|&index| self.targets[index].identity == previous)
+            .collect();
+        if let [index] = current_matches.as_slice() {
+            if !previous_matches.is_empty()
+                || self
+                    .targets
+                    .iter()
+                    .filter(|t| t.identity == current)
+                    .count()
+                    != 1
+            {
+                return Err(failure("ambiguous completed target binding lineage"));
+            }
+            return Ok((self.targets[*index].clone(), false));
+        }
+        if !current_matches.is_empty() {
+            return Err(failure("ambiguous current target binding lineage"));
+        }
+        if self.targets.iter().any(|t| t.identity == current) {
+            return Err(failure(
+                "target binding lineage collides with a durable record",
+            ));
+        }
+        let [index] = previous_matches.as_slice() else {
+            return Err(failure(
+                "previous target binding lineage is missing or ambiguous",
+            ));
+        };
+        if self.targets[*index].binding_revision != previous_revision {
+            return Err(failure(
+                "previous target binding lineage is missing or ambiguous",
+            ));
+        }
+        let target = &mut self.targets[*index];
+        target.identity = current.into();
+        target.binding_revision = current_revision;
+        let advanced = target.clone();
+        self.carry_alias_resolutions_forward(&advanced.target_id, current, current_revision);
+        Ok((advanced, true))
+    }
+    /// Swift `carryAliasResolutionsForward`: an alias resolution names a
+    /// relation between two identities, not two revisions, so a canonical
+    /// Target's advance moves every resolution naming it to its new identity
+    /// and revision, and the chain is digested again from its start —
+    /// otherwise the advanced document would not decode.
+    fn carry_alias_resolutions_forward(&mut self, canonical: &str, identity: &str, revision: u64) {
+        let Some(resolutions) = self.resolutions.as_mut() else {
+            return;
+        };
+        if !resolutions.iter().any(|r| r.canonical == canonical) {
+            return;
+        }
+        let mut chain: Option<String> = None;
+        for resolution in resolutions.iter_mut() {
+            if resolution.canonical == canonical {
+                resolution.canonical_identity = identity.into();
+                resolution.canonical_revision = revision;
+            }
+            let seed = sha256_hex(
+                format!(
+                    "{}\n{}\n{}",
+                    resolution.alias, resolution.canonical, resolution.job
+                )
+                .as_bytes(),
+            );
+            resolution.id = format!("target-alias-resolution-{}", &seed[..32]);
+            resolution.previous = chain.take();
+            resolution.digest = resolution_digest(resolution);
+            chain = Some(resolution.digest.clone());
+        }
+    }
     /// The document as Swift's `JSONEncoder` writes it: sorted keys, pretty
     /// printed, no trailing newline.
     pub fn encode(&self) -> Result<Vec<u8>, DecodeError> {
@@ -383,16 +499,7 @@ impl TargetDocument {
                     return Err(DecodeError::Shape);
                 }
             }
-            let mut material = serde_json::to_value(r).map_err(|_| DecodeError::Shape)?;
-            material
-                .as_object_mut()
-                .ok_or(DecodeError::Shape)?
-                .remove("resolutionSHA256");
-            // All field names are ASCII. Value serializes sorted keys without slash escaping,
-            // matching CanonicalJSONEncoders.canonical() used by the Swift owner.
-            if sha256_hex(&serde_json::to_vec(&material).map_err(|_| DecodeError::Shape)?)
-                != r.digest
-            {
+            if resolution_digest(r) != r.digest {
                 return Err(DecodeError::Shape);
             }
             previous = Some(&r.digest);

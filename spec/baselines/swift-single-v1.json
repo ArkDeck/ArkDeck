@@ -174,8 +174,8 @@
       "successes": 8
     },
     "flash.bind-current-loader": {
-      "errors": 1,
-      "requests": 2,
+      "errors": 4,
+      "requests": 5,
       "successes": 1
     },
     "flash.bootloader-status": {
@@ -530,14 +530,14 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 446,
-    "requests": 980,
+    "errors": 449,
+    "requests": 983,
     "successes": 534
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "3908e9345d3cc264e960747256d72b2d61fa3a6c38ce4737eb59902870b5b28d",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "6a9a35ff4030c0416dd1090ae44a7514de2323f3c069e74ecfd8c168e5074518",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
     "spec/control/methods": "5b777a8bca385306b11cb66f79b71699889d68d4960fd145db1ad3b62aea3c9c"
   },
@@ -851,8 +851,8 @@
       "sha256": "b1e50f3140518a9b6a22c49709ec46b90e9c7be171c843cbc4cc97a434d319ac"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.bind-current-loader.jsonl": {
-      "blob": "994b0708b6f873154636ef51b5a33b399c62093e",
-      "sha256": "eaec5f034c2684ab78eca567bf54daab9cfae6d54b4762512dbdb995c28d31e0"
+      "blob": "32e36e5aaad9ec2af0714c6be90482ad95481e5f",
+      "sha256": "975ac0f45ba3caaf912756d22ece8173831581d7e42cf045a4d016c9cb1fafbd"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.bootloader-status.jsonl": {
       "blob": "9190ac0098e8fec0eadfe1784b1b59ccddf4b67d",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "fa9a7bcd6b8887d616023bfbfae3d89286d0aa5056ccd4867a55943a529d0c2b",
+  "inputDigest": "addcf9408b747b0547cfe3ae5b6c7de16f78508a374d51e658cfa791365c9127",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
