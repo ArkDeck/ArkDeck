@@ -773,6 +773,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["debug", "status"] => "debug.status",
         ["flash", "reconcile-alias"] => "flash.reconcile-alias",
         ["flash", "bootloader-status"] => "flash.bootloader-status",
+        ["flash", "device-access"] => "flash.device-access",
         ["flash", "prerequisites"] => "flash.prerequisites",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
         ["recovery", "flash-invocation", "status"] => "recovery.flash-invocation.status",

@@ -191,6 +191,10 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(target_os = "macos")]
     flash_facts: Option<arkdeck_hoststore::FlashHostFacts>,
+    /// Swift `ProductRockchipDeviceAccessObserver`: ArkForge's public socket
+    /// in the lane's runtime directory, a fresh bounded session per read.
+    #[cfg(target_os = "macos")]
+    device_access: Option<arkdeck_provider_arkforge::DeviceAccessObserver>,
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
@@ -741,6 +745,17 @@ impl Host {
         self
     }
 
+    /// `flash.device-access` reads the flashing modes the ArkForge lane's
+    /// daemon sees attached through this observer.
+    #[cfg(target_os = "macos")]
+    pub fn with_device_access(
+        mut self,
+        observer: arkdeck_provider_arkforge::DeviceAccessObserver,
+    ) -> Self {
+        self.device_access = Some(observer);
+        self
+    }
+
     /// The owners this composition holds, by name, in a fixed order: what the
     /// production composition reports at its start and its tests compare.
     #[cfg(target_os = "macos")]
@@ -775,6 +790,7 @@ impl Host {
             ("flashAliasReconciler", self.flash_alias.is_some()),
             ("flashInvocations", self.flash_invocations.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
+            ("deviceAccess", self.device_access.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -866,6 +882,8 @@ impl Host {
             flash_invocations: None,
             #[cfg(target_os = "macos")]
             flash_facts: None,
+            #[cfg(target_os = "macos")]
+            device_access: None,
             #[cfg(all(test, target_os = "macos"))]
             test_hdc_impact: None,
         }
@@ -2316,6 +2334,29 @@ impl HostServices for Host {
             _ => Err(WireError {
                 code: "internalError".into(),
                 message: "Rockchip bootloader status observation is not configured".into(),
+                details: None,
+            }),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn flash_device_access(&self) -> Result<serde_json::Value, WireError> {
+        let Some(observer) = &self.device_access else {
+            return Err(WireError {
+                code: "internalError".into(),
+                message: "Rockchip device access observation is not configured".into(),
+                details: None,
+            });
+        };
+        match observer.observe() {
+            Ok(modes) => Ok(serde_json::json!({
+                "observationCount": modes.len(),
+                "observedModes": modes.iter().map(|mode| mode.as_str()).collect::<Vec<_>>(),
+            })),
+            // As Swift's handler: one refusal for every failure, so that no
+            // socket path, provider diagnostic or USB identity is exported.
+            Err(_) => Err(WireError {
+                code: "rejected".into(),
+                message: "Rockchip device access observation failed".into(),
                 details: None,
             }),
         }

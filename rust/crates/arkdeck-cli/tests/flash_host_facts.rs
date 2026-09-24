@@ -1,8 +1,9 @@
-//! `arkdeck flash bootloader-status` and `arkdeck flash prerequisites`
-//! against a fake Runtime that answers what Swift's daemon answered in the
-//! Flash host facts oracle (`rust/tests/fixtures/flash-host-facts`): each leaf
-//! sends exactly its one request, the profile under the Runtime's name for
-//! it, and emits the Runtime's answer.
+//! `arkdeck flash bootloader-status`, `arkdeck flash prerequisites` and
+//! `arkdeck flash device-access` against a fake Runtime that answers what
+//! Swift's daemon answered (the Flash host facts oracle,
+//! `rust/tests/fixtures/flash-host-facts`, and the committed control frames):
+//! each leaf sends exactly its one request, the profile under the Runtime's
+//! name for it, and emits the Runtime's answer.
 // The fake Runtime these leaves are driven against is a Unix socket.
 #[cfg(target_os = "macos")]
 mod support;
@@ -72,6 +73,44 @@ mod runtime {
                 health(),
                 (
                     "flash.bootloader-status".to_owned(),
+                    Value::Null,
+                    refused.clone(),
+                ),
+            ],
+        );
+        assert_ne!(output.status.code(), Some(0));
+        assert_eq!(envelope["error"]["code"], "operationFailed");
+        assert_eq!(envelope["error"]["message"], refused["error"]["message"]);
+    }
+
+    /// `flash device-access` sends one request without parameters and emits
+    /// the modes as the Runtime answers them (Swift's corpus answer).
+    #[test]
+    fn device_access_sends_no_parameters_and_emits_the_modes() {
+        let answer =
+            json!({"ok":true,"result":{"observationCount":2,"observedModes":["Loader","Maskrom"]}});
+        let (output, envelope) = support::run_session(
+            &["flash", "device-access"],
+            vec![
+                health(),
+                (
+                    "flash.device-access".to_owned(),
+                    Value::Null,
+                    answer.clone(),
+                ),
+            ],
+        );
+        assert_eq!(output.status.code(), Some(0), "{envelope}");
+        assert_eq!(envelope["command"], "flash.device-access");
+        assert_eq!(envelope["result"], answer["result"]);
+        let refused = json!({"ok":false,"error":{"code":"rejected",
+            "message":"Rockchip device access observation failed"}});
+        let (output, envelope) = support::run_session(
+            &["flash", "device-access"],
+            vec![
+                health(),
+                (
+                    "flash.device-access".to_owned(),
                     Value::Null,
                     refused.clone(),
                 ),

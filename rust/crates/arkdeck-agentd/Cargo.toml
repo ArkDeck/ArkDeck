@@ -16,6 +16,11 @@ serde_json.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 arkdeck-hoststore.workspace = true
+arkdeck-provider-arkforge.workspace = true
+
+# A stand-in for `arkforged`'s public socket, spoken with ArkForge's own codec.
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+arkforge-ipc.workspace = true
 
 [lints]
 workspace = true

@@ -216,6 +216,7 @@ impl<H: HostServices> AppIngress<H> {
                     | "trace.probe"
                     | "flash.bootloader-status"
                     | "flash.prerequisites"
+                    | "flash.device-access"
             )
         {
             return refusal(
@@ -353,10 +354,11 @@ fn closed_parameters(request: &Request) -> bool {
         | "artifact.quota"
         | "trace.cache.status"
         | "trace.cache.purge"
-        // The App's Flash workspace reads the attached board's disposition
-        // and one Target's prerequisites for a published profile; neither
-        // reaches the board or names a path.
-        | "flash.bootloader-status" => &[],
+        // The App's Flash workspace reads the attached board's disposition,
+        // the flashing modes ArkForge sees and one Target's prerequisites for
+        // a published profile; none reaches the board or names a path.
+        | "flash.bootloader-status"
+        | "flash.device-access" => &[],
         "debug.probe" | "trace.probe" => &["targetId"],
         "flash.prerequisites" => &["targetId", "profileReference"],
         "history.filter.delete" => &["expectedGeneration"],

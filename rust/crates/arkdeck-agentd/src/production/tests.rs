@@ -384,6 +384,7 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             "flashAliasReconciler",
             "flashInvocations",
             "flashHostFacts",
+            "deviceAccess",
         ]
     );
     // The Flash invocation owner's directories, created owner-only beside
@@ -391,6 +392,9 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
     for name in [
         "runtime-debug-invocations",
         "runtime-debug-invocation-snapshots",
+        // The ArkForge lane's runtime directory, whose public socket the
+        // device access observer reads.
+        "arkforge",
     ] {
         let metadata = std::fs::symlink_metadata(layout.state.join(name)).unwrap();
         assert!(metadata.is_dir(), "{name}");

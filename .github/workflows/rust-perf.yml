@@ -134,6 +134,14 @@ jobs:
           rustup show active-toolchain
           rustc --version
           cargo --version
+      # ArkForge's crates come from its private repository at the pinned
+      # revision; the read-only deploy key exists for this fetch alone and is
+      # removed before the build (scripts/ci/arkforge-cargo-fetch.sh).
+      - name: Fetch the locked dependency graph
+        working-directory: rust
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
       - name: Build the Rust measurement executables
         working-directory: rust
         run: cargo build --locked --release -p arkdeck-agentd -p arkdeck-soak
@@ -217,6 +225,14 @@ jobs:
           rustup show active-toolchain
           rustc --version
           cargo --version
+      # ArkForge's crates come from its private repository at the pinned
+      # revision; the read-only deploy key exists for this fetch alone and is
+      # removed before the build (scripts/ci/arkforge-cargo-fetch.sh).
+      - name: Fetch the locked dependency graph
+        working-directory: rust
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
       - name: Build the Rust measurement executables
         working-directory: rust
         run: cargo build --locked --release -p arkdeck-agentd -p arkdeck-soak

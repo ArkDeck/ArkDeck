@@ -29,9 +29,17 @@ allow = [
     "arkdeck-control@0.1.0",
     "arkdeck-hoststore@0.1.0",
     "arkdeck-platform@0.1.0",
+    "arkdeck-provider-arkforge@0.1.0",
     "arkdeck-provider-hdc@0.1.0",
     "arkdeck-provider-workspace@0.1.0",
     "arkdeck-soak@0.1.0",
+    # First-party ArkForge crates, from the one allowed git source below at
+    # the revision Package.swift pins; they carry no third-party dependency.
+    "arkforge-authority-api@0.1.0",
+    "arkforge-client@0.1.0",
+    "arkforge-core@0.1.0",
+    "arkforge-ipc@0.1.0",
+    "arkforge-platform@0.1.0",
     "aead@0.5.2",
     "aes@0.8.4",
     "aes-gcm@0.10.3",
@@ -74,3 +82,8 @@ allow = [
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+# ArkForge, the first-party flash mechanism, is not published to a registry.
+# Its crates are taken at one exact revision (`rev` in Cargo.toml), the one
+# `Packages/ArkDeckKit/Package.swift` pins; `scripts/check-arkforge-pin.py`
+# refuses any other.
+allow-git = ["https://github.com/ArkDeck/ArkForge.git"]

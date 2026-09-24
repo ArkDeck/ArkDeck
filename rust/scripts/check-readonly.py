@@ -68,11 +68,17 @@ def assert_boundaries() -> None:
         "arkdeck-provider-workspace": {"arkdeck-platform"},
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
-        "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore"},
+        "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore", "arkdeck-provider-arkforge"},
+        # The ArkForge lane (lane D) speaks to `arkforged` only through
+        # ArkForge's own client crate; no other ArkDeck crate reaches ArkForge.
+        "arkdeck-provider-arkforge": set(),
         # Measurement composition only: in-memory provider, production owners,
         # and self-resource sampling. No client or daemon transport dependency.
         "arkdeck-soak": {"arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
     }
+    # ArkForge's crates come from its repository at one pinned revision; only
+    # the lane's provider depends on them, and only on the client.
+    arkforge = {"arkdeck-provider-arkforge": {"arkforge-client"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
     for path in manifests:
@@ -82,6 +88,9 @@ def assert_boundaries() -> None:
         internal = {key for scope in scopes for key in scope.get("dependencies", {})
                     if key.startswith("arkdeck-")}
         assert internal == allowed[name], f"unexpected dependency edge: {name}"
+        external = {key for scope in scopes for key in scope.get("dependencies", {})
+                    if key.startswith("arkforge-")}
+        assert external == arkforge.get(name, set()), f"unexpected ArkForge edge: {name}"
         assert manifest["package"]["publish"] == {"workspace": True}, name
         if name != "arkdeck-platform":
             assert manifest["lints"] == {"workspace": True}, f"unsafe must remain forbidden: {name}"
@@ -355,10 +364,11 @@ def main() -> None:
                         expected = "invalidInput"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
-                    # No composition here holds the Flash recovery broker's invocations or the
-                    # post-flash alias: as Swift's daemon without them, the two reads answer that
-                    # their owner is not configured, and the reconciler reads its parameters first.
-                    if method in {"debug.status", "recovery.flash-invocation.list", "flash.bootloader-status"}:
+                    # No composition here holds the Flash recovery broker's invocations, the
+                    # post-flash alias or the ArkForge lane's runtime directory: as Swift's daemon
+                    # without them, the reads answer that their owner is not configured, and the
+                    # reconciler reads its parameters first.
+                    if method in {"debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
                         expected = "internalError"
                     if method in {"flash.reconcile-alias", "flash.prerequisites"}:
                         expected = "invalidParams"
@@ -393,6 +403,7 @@ def main() -> None:
                     ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
                     ("prerequisites-missing-owner", "flash.prerequisites", {"targetId": "target-fixture", "profileReference": "dayu200"}, "internalError"),
+                    ("device-access-parameter", "flash.device-access", {"socketPath": "/caller/path"}, "invalidParams"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
                     ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),

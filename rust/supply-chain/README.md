@@ -68,6 +68,21 @@ release can satisfy the publisher check. RustSec advisories, contract vectors,
 failure-path tests and platform identity checks provide separate checks; they
 do not replace source audits or real Windows device acceptance.
 
+## First-party git source: ArkForge
+
+ArkForge, the device-neutral flash mechanism, is first-party and unpublished.
+Its crates (`arkforge-client` and what it needs; `arkforge-authority-api`,
+`arkforge-core` and `arkforge-ipc` for tests) come from
+`https://github.com/ArkDeck/ArkForge.git`, the one `allow-git` entry in
+`deny.toml`, at exactly the revision `Packages/ArkDeckKit/Package.swift` pins,
+and each is named in `[bans] allow`. They carry no third-party dependency and
+declare `Apache-2.0`. cargo-vet treats a crate from a non-registry source as
+first-party, so none of them has an audit or exemption entry; were a
+crates.io crate ever published under one of their names, `cargo vet` would ask
+for an explicit decision. `scripts/check-arkforge-pin.py` refuses any other
+source or revision, in `Cargo.toml` or the lock, and reruns ArkForge's own
+wire and StepPermit vectors at the pinned revision on every run.
+
 For a deliberate audit refresh, run `cargo vet regenerate imports` locally and
 review the resulting `imports.lock` diff together with the dependency change.
 Do not run `cargo vet init`, add exemptions, regenerate exemptions, or widen a
