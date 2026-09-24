@@ -97,7 +97,9 @@ dependencies = [
  "aes-gcm",
  "arkdeck-contract",
  "arkdeck-platform",
+ "arkdeck-provider-arkforge",
  "arkdeck-provider-hdc",
+ "arkforge-ipc",
  "libc",
  "serde",
  "serde_json",
@@ -119,10 +121,13 @@ dependencies = [
 name = "arkdeck-provider-arkforge"
 version = "0.1.0"
 dependencies = [
+ "arkdeck-contract",
+ "arkdeck-platform",
  "arkforge-authority-api",
  "arkforge-client",
  "arkforge-core",
  "arkforge-ipc",
+ "serde_json",
 ]
 
 [[package]]

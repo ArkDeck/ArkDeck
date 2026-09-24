@@ -27,7 +27,9 @@ use arkdeck_provider_hdc::{
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
 /// The host's USB devices, as the Runtime's census reads them.
 type Census = dyn Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync;
@@ -226,7 +228,85 @@ impl UsbProbe for CensusProbe<'_> {
     }
 }
 
-/// The ArkForge lane's Loader observation where no lane is composed: every
+/// Swift `ProductArkForgeLoaderObserver`: the dual-source proof that the device
+/// at the bound identity is a settled DAYU200 RockUSB Loader. The Runtime's
+/// census proves the exact bound serial and its current port; the ArkForge
+/// lane's daemon, through its public socket, proves independently that the
+/// device at that port is that Loader. Read-only; composed whether or not a
+/// lane runs — without a daemon on the socket, every observation refuses and
+/// the probe reports the board absent.
+pub struct ArkForgeLoader {
+    census: Arc<Census>,
+    runtime_directory: PathBuf,
+    timeout: Duration,
+}
+
+impl ArkForgeLoader {
+    /// Over `census`, reading the lane daemon's public socket in
+    /// `runtime_directory` with Swift's 15-second bound.
+    pub fn new(
+        census: impl Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync + 'static,
+        runtime_directory: &Path,
+    ) -> Self {
+        Self::shared(Arc::new(census), runtime_directory)
+    }
+
+    fn shared(census: Arc<Census>, runtime_directory: &Path) -> Self {
+        Self {
+            census,
+            runtime_directory: runtime_directory.to_path_buf(),
+            timeout: arkdeck_provider_arkforge::LOADER_OBSERVATION_TIMEOUT,
+        }
+    }
+}
+
+impl LoaderObserver for ArkForgeLoader {
+    fn observe_loader(
+        &self,
+        stable_identity_sha256: &str,
+        expected_usb_topology: Option<&str>,
+        request_id: &str,
+    ) -> Result<LoaderIdentity, String> {
+        let identity = CensusProbe(&*self.census)
+            .single_loader(stable_identity_sha256)
+            .map_err(|detail| format!("IOKit did not observe the exact bound Loader: {detail}"))?;
+        self.confirm_loader(
+            &identity,
+            stable_identity_sha256,
+            expected_usb_topology,
+            request_id,
+        )
+    }
+
+    fn confirm_loader(
+        &self,
+        identity: &LoaderIdentity,
+        stable_identity_sha256: &str,
+        expected_usb_topology: Option<&str>,
+        _request_id: &str,
+    ) -> Result<LoaderIdentity, String> {
+        if identity.serial_digest_sha256 != stable_identity_sha256 {
+            return Err("IOKit Loader identity does not match the bound target".into());
+        }
+        if let Some(expected) = expected_usb_topology.filter(|expected| !expected.is_empty())
+            && identity.topology != expected
+        {
+            return Err(format!(
+                "IOKit observed the bound Loader at USB topology {}, not the admitted topology \
+                 {expected}",
+                identity.topology
+            ));
+        }
+        arkdeck_provider_arkforge::confirm_loader(
+            &self.runtime_directory,
+            self.timeout,
+            &identity.topology,
+        )?;
+        Ok(identity.clone())
+    }
+}
+
+/// The ArkForge lane's Loader observation where none is composed: every
 /// observation refuses, which the probe reports as the board being absent.
 pub struct NoArkForgeLane;
 
@@ -265,7 +345,7 @@ const ALIAS_TOPOLOGY: &str = "dayu200HDCNormalAliasUSBTopology";
 pub struct FlashHostFacts {
     bindings: RockchipBindingStore,
     aliases: PostFlashAliasStore,
-    census: Box<Census>,
+    census: Arc<Census>,
     rockusb: NativeRockUsbIdentity,
     loader: Box<dyn LoaderObserver + Send + Sync>,
 }
@@ -280,7 +360,7 @@ impl FlashHostFacts {
         Self {
             bindings: RockchipBindingStore::new(application_support_root),
             aliases: PostFlashAliasStore::new(application_support_root),
-            census: Box::new(census),
+            census: Arc::new(census),
             rockusb: NativeRockUsbIdentity::unconfigured(),
             loader: Box::new(NoArkForgeLane),
         }
@@ -296,6 +376,14 @@ impl FlashHostFacts {
     pub fn with_loader_observer(mut self, loader: Box<dyn LoaderObserver + Send + Sync>) -> Self {
         self.loader = loader;
         self
+    }
+
+    /// Swift's product Loader observation over this facts owner's census and
+    /// the ArkForge lane's public socket in `runtime_directory`, as the live
+    /// probe composes it.
+    pub fn with_arkforge_loader(self, runtime_directory: &Path) -> Self {
+        let loader = ArkForgeLoader::shared(Arc::clone(&self.census), runtime_directory);
+        self.with_loader_observer(Box::new(loader))
     }
 
     /// `flash.bootloader-status`, as Swift's handler answers it.

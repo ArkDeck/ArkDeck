@@ -59,7 +59,6 @@ pub use operation_validation::{
     bounded_input_document, input_findings, validation_attention, validation_document,
 };
 #[cfg(target_os = "macos")]
-mod arkforge_bundle;
 #[cfg(target_os = "macos")]
 pub mod runtime_service;
 #[cfg(target_os = "macos")]

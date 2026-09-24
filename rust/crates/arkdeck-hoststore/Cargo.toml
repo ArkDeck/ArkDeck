@@ -15,9 +15,15 @@ unicode-segmentation.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
+arkdeck-provider-arkforge.workspace = true
 arkdeck-provider-hdc.workspace = true
 libc.workspace = true
 sha2.workspace = true
+
+# A stand-in for the ArkForge lane daemon's public socket, spoken with
+# ArkForge's own codec.
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+arkforge-ipc.workspace = true
 
 [lints]
 workspace = true

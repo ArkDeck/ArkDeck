@@ -281,10 +281,20 @@ pub(super) fn validate_working_directory(directory: &Path) -> io::Result<CString
 /// a member is left after 0.25 s, and report whether none is left once the
 /// following second is over.
 pub(super) fn drain_group(child: &RunningChild) -> bool {
+    drain_group_within(child, TERMINATION_GRACE, KILL_GRACE)
+}
+
+/// `drain_group` with the owner's own graces: TERM to the group and the
+/// first grace, then KILL and the second.
+pub(super) fn drain_group_within(
+    child: &RunningChild,
+    termination_grace: Duration,
+    kill_grace: Duration,
+) -> bool {
     child.signal_group(libc::SIGTERM);
-    wait_until_drained(child, TERMINATION_GRACE) || {
+    wait_until_drained(child, termination_grace) || {
         child.signal_group(libc::SIGKILL);
-        wait_until_drained(child, KILL_GRACE)
+        wait_until_drained(child, kill_grace)
     }
 }
 

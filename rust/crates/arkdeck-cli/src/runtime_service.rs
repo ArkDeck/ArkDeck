@@ -31,16 +31,16 @@
 //!   settled execution.
 //! - Human output is the JSON document, as every other leaf of this CLI.
 use crate::Invocation;
-use crate::arkforge_bundle;
 use crate::runtime_service_install;
 use crate::runtime_service_verify::{self, FreshOutcome, ReopenOutcome};
 use arkdeck_client::{Client, ClientError};
+use arkdeck_contract::arkforge_bundle;
 use arkdeck_platform::launchd::{self, LaunchctlOutput, LaunchctlRunner};
 use arkdeck_platform::{LocalEndpoint, PropertyListValue, ServerIdentity};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::io;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) const LABEL: &str = launchd::AGENT_LABEL;
@@ -75,47 +75,8 @@ const EIO: i32 = 5;
 
 // MARK: - Paths
 
-/// Foundation's `standardizedFileURL` without its `/private` rewrite: `.` and
-/// `..` removed lexically.
-pub(crate) fn lexical(path: &Path) -> PathBuf {
-    let mut out = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if !out.pop() {
-                    out.push("..");
-                }
-            }
-            other => out.push(other.as_os_str()),
-        }
-    }
-    out
-}
-
-/// Foundation's `resolvingSymlinksInPath` without its `/private` rewrite: the
-/// longest existing prefix resolved by `realpath`, the rest appended.
-pub(crate) fn resolved(path: &Path) -> PathBuf {
-    let path = lexical(path);
-    let mut tail = Vec::new();
-    let mut head = path.as_path();
-    loop {
-        if let Ok(canonical) = head.canonicalize() {
-            let mut out = canonical;
-            for component in tail.iter().rev() {
-                out.push(component);
-            }
-            return out;
-        }
-        match (head.parent(), head.file_name()) {
-            (Some(parent), Some(name)) => {
-                tail.push(name.to_owned());
-                head = parent;
-            }
-            _ => return path,
-        }
-    }
-}
+// Foundation's path arithmetic, shared with the daemon's ArkForge lane.
+pub(crate) use arkdeck_contract::foundation_path::{lexical, resolved};
 
 pub(crate) fn sha256_file(path: &Path) -> io::Result<String> {
     Ok(arkdeck_contract::sha256_hex(&std::fs::read(path)?))

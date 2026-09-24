@@ -6,21 +6,33 @@
 //! budget — a server ends when it is stopped or when it exits on its own,
 //! which its owner notices by asking. Nothing here reads an endpoint or
 //! decides readiness; that is the provider's, over this.
-use super::macos_process::{RunningChild, spawn_suspended};
+//!
+//! A paired server (Swift's `IdentityBoundDaemonLauncher`, which starts
+//! `arkforged`) is also handed one secret on stdin, and the write end of that
+//! pipe stays with its owner as the server's liveness: its close is the
+//! server's end of input, the proof its owning generation is gone.
+use super::macos_process::{RunningChild, input_pipe, spawn_suspended};
 use super::tool_process::{
-    MAX_CAPTURE_BYTES, capture, drain_group, finish, poll, validate_environment,
+    MAX_CAPTURE_BYTES, capture, drain_group, drain_group_within, finish, poll, validate_environment,
 };
 use super::{READER_CLEANUP_TIMEOUT, VerifiedTool, invalid};
 use crate::macos_server::process_birth;
-use std::ffi::OsString;
-use std::io;
+use std::ffi::{CString, OsString};
+use std::fs::File;
+use std::io::{self, Write};
+use std::os::unix::ffi::OsStrExt;
 use std::os::unix::process::ExitStatusExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Receiver;
-use std::time::Instant;
+use std::time::{Duration, Instant};
+
+/// Swift's `stopDaemonProcessGroup`: half a second after TERM, half a second
+/// after KILL, short of launchd's own budget for the owner's exit.
+const PAIRED_TERMINATION_GRACE: Duration = Duration::from_millis(500);
+const PAIRED_KILL_GRACE: Duration = Duration::from_millis(500);
 
 /// Swift `HDCManagedProcessLaunch`: what the spawn itself recorded, which no
 /// reader can manufacture later from a PID or an endpoint.
@@ -63,6 +75,8 @@ pub struct ManagedServer {
     stdout: Option<Captured>,
     stderr: Option<Captured>,
     exit: Option<ServerExit>,
+    /// A paired server's liveness: the write end of its stdin.
+    liveness: Option<File>,
 }
 
 impl ManagedServer {
@@ -77,6 +91,57 @@ impl ManagedServer {
         environment: &[(OsString, OsString)],
         capture_bytes: usize,
     ) -> io::Result<Self> {
+        Self::spawn(tool, arguments, environment, None, None, capture_bytes)
+    }
+
+    /// Swift `IdentityBoundDaemonLauncher.launch`: the verified tool in its own
+    /// process group, run in `working_directory`, handed `secret` on stdin; the
+    /// pipe's write end stays open in the returned server. `secret` is written
+    /// and never kept. A child the whole secret did not reach is stopped and
+    /// its launch refused: it could never pair, and nothing is left running
+    /// unpaired.
+    pub fn launch_paired(
+        tool: &VerifiedTool,
+        arguments: &[OsString],
+        environment: &[(OsString, OsString)],
+        working_directory: &Path,
+        secret: &[u8],
+        capture_bytes: usize,
+    ) -> io::Result<Self> {
+        let directory = CString::new(working_directory.as_os_str().as_bytes())
+            .map_err(|_| invalid("NUL in working directory"))?;
+        let (read, write) = input_pipe()?;
+        let mut server = Self::spawn(
+            tool,
+            arguments,
+            environment,
+            Some(&directory),
+            Some(&read),
+            capture_bytes,
+        )?;
+        drop(read);
+        let mut liveness = File::from(write);
+        if let Err(error) = liveness.write_all(secret) {
+            drop(liveness);
+            drain_group_within(&server.child, PAIRED_TERMINATION_GRACE, PAIRED_KILL_GRACE);
+            let _ = server.child.kill_and_wait();
+            return Err(io::Error::other(format!(
+                "the child started but the secret did not reach it ({error}); it is left \
+                 unpaired rather than started with a partial handshake"
+            )));
+        }
+        server.liveness = Some(liveness);
+        Ok(server)
+    }
+
+    fn spawn(
+        tool: &VerifiedTool,
+        arguments: &[OsString],
+        environment: &[(OsString, OsString)],
+        working_directory: Option<&CString>,
+        stdin: Option<&std::os::fd::OwnedFd>,
+        capture_bytes: usize,
+    ) -> io::Result<Self> {
         if capture_bytes == 0 || capture_bytes > MAX_CAPTURE_BYTES {
             return Err(invalid("server capture must be 1 byte..64 MiB per stream"));
         }
@@ -86,7 +151,13 @@ impl ManagedServer {
         // run — or end: a server that exits at once (Swift's
         // `foregroundExitReason`) is then an exit its owner sees, never a
         // launch that "could not be recorded" because a zombie has no birth.
-        let suspended = spawn_suspended(tool, arguments, environment, None)?;
+        let suspended = spawn_suspended(
+            tool,
+            arguments,
+            environment,
+            working_directory.map(CString::as_c_str),
+            stdin,
+        )?;
         let pid = suspended.pid();
         let birth = process_birth(pid)
             .filter(|birth| birth.start_seconds > 0 && birth.start_microseconds < 1_000_000)
@@ -122,6 +193,7 @@ impl ManagedServer {
             stdout: None,
             stderr: None,
             exit: None,
+            liveness: None,
         })
     }
 
@@ -156,10 +228,17 @@ impl ManagedServer {
     /// Ends the server — TERM to its group, then KILL — or takes the end it
     /// already had, and collects what it wrote.
     pub fn stop(mut self) -> io::Result<ServerStop> {
+        // A paired server's end of input first, so that a server handling
+        // TERM cannot briefly keep serving an owner that is gone.
+        let paired = self.liveness.take().is_some();
         let exit = match self.exit()? {
             Some(exit) => exit,
             None => {
-                drain_group(&self.child);
+                if paired {
+                    drain_group_within(&self.child, PAIRED_TERMINATION_GRACE, PAIRED_KILL_GRACE);
+                } else {
+                    drain_group(&self.child);
+                }
                 match self.child.try_wait()? {
                     Some(status) => classify(status),
                     None => return Err(io::Error::other("server did not end after termination")),
@@ -228,6 +307,51 @@ mod tests {
             assert_eq!(exit, ServerExit::Exited(3), "launch {launch}");
             assert_eq!(server.stop().unwrap().exit, ServerExit::Exited(3));
         }
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    /// Swift `IdentityBoundDaemonLauncher`: the secret arrives on stdin, whole
+    /// and nowhere else, in the named working directory; the write end is the
+    /// owner's alone, so closing it is the server's end of input. The stand-in
+    /// ignores TERM, as a service may, so its exit 11 on end of input is what
+    /// proves the owner closed its liveness first.
+    #[test]
+    fn a_paired_server_reads_its_secret_and_ends_when_its_owner_lets_go() {
+        let root =
+            std::env::temp_dir().join(format!("arkdeck-managed-paired-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("run")).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let script = root.join("paired");
+        fs::write(
+            &script,
+            "#!/bin/sh\ntrap '' TERM\npwd -P > cwd\nhead -c 32 > secret\ncat > rest\nexit 11\n",
+        )
+        .unwrap();
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+        let digest = format!("{:x}", Sha256::digest(fs::read(&script).unwrap()));
+        let tool = VerifiedTool::open(&script, &digest).unwrap();
+        let secret: Vec<u8> = (0u8..32).map(|byte| byte.wrapping_mul(7)).collect();
+        let run = fs::canonicalize(root.join("run")).unwrap();
+        let mut server =
+            ManagedServer::launch_paired(&tool, &[], &[], &run, &secret, 4096).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while fs::read(run.join("secret")).map_or(true, |bytes| bytes.len() < 32) {
+            assert!(Instant::now() < deadline, "the secret never arrived");
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        // It keeps running while its owner holds on.
+        std::thread::sleep(Duration::from_millis(100));
+        assert_eq!(server.exit().unwrap(), None);
+        assert_eq!(fs::read(run.join("secret")).unwrap(), secret);
+        assert_eq!(
+            fs::read_to_string(run.join("cwd")).unwrap().trim_end(),
+            run.to_str().unwrap()
+        );
+        let stopped = server.stop().unwrap();
+        assert_eq!(stopped.exit, ServerExit::Exited(11));
+        // Nothing but the secret ever crossed the pipe.
+        assert!(fs::read(run.join("rest")).unwrap().is_empty());
         let _ = fs::remove_dir_all(&root);
     }
 }
