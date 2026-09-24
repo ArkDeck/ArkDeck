@@ -1,0 +1,39 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-12147a80c59beb44fa66e29c95f47e51",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 451,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-a698aa1a3cd135705e7c507b8c7cf27a",
+      "mediaType" : "application\/json",
+      "name" : "port-rule-readback.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-a698aa1a3cd135705e7c507b8c7cf27a",
+      "sha256" : "0a5a7b6c27d210f045b747d9e6e9b744bb788197a8b87fa58ab0d3845ef78eed",
+      "sourceOperation" : "port-forward.create@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "verify-port-rule"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -1,0 +1,166 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "sendFile",
+    "runApprovedRemoteRead",
+    "runApprovedRemoteMutation"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "fc7e77c7b7319efa3c7929f8faad1de9454cfab0b6569c1bfc8a7533594869be",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-EAE3E799930A18D48323DCDAC658FBF46A1AD949-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+      "planDigestSHA256" : "600694d55fd146f2ddc3a8c7541f517f77a9a1f6b72f914be43dda94d0f3dc1a",
+      "reservationID" : "idem-mutation-unpublished",
+      "stepSetDigestSHA256" : "c7d0b358e1bdd6dcae08b927745889a7d165a679c336da1f05961cef75c7f58d",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-ce8967dc34b3de4312837b9a56dd5bb2",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "600694d55fd146f2ddc3a8c7541f517f77a9a1f6b72f914be43dda94d0f3dc1a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "deploy.native-library.app-owned@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-unpublished",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-unpublished",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "hdc",
+  "recoveryAction" : {
+    "arguments" : {
+      "abi" : "arm64-v8a",
+      "artifactId" : "ART-469c10579b3c5461ab4d0a891c316397",
+      "artifactLeaseId" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "backupPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/.libexample.so.arkdeck-job-ce8967dc34b3de4312837b9a56dd5bb2.backup",
+      "buildId" : "00112233445566778899aabbccddeeff10213243",
+      "bundleName" : "com.example.demo",
+      "byteCount" : 588,
+      "codeSignFormatVersion" : 1,
+      "codeSignHelperABI" : "arm64-v8a",
+      "codeSignHelperBuildId" : "4e6f5302a74bab03fa0ecb72a4f96b9b4fa45323",
+      "codeSignHelperByteCount" : 214016,
+      "codeSignHelperRemotePath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-ce8967dc34b3de4312837b9a56dd5bb2\/arkdeck-code-sign-enable",
+      "codeSignHelperSha256" : "86497e1a8f9b586169218df912895785c1c0f2d8bb3f87b2b700f6f86264f5c1",
+      "codeSignVersion" : 1,
+      "directoryPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm",
+      "elfClassBits" : 64,
+      "jobId" : "job-ce8967dc34b3de4312837b9a56dd5bb2",
+      "libraryLogicalName" : "libexample.so",
+      "loaderVisiblePath" : "\/data\/storage\/el1\/bundle\/libs\/arm\/libexample.so",
+      "machine" : 183,
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "rollbackStagingPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/.libexample.so.arkdeck-job-ce8967dc34b3de4312837b9a56dd5bb2.rollback",
+      "sha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+      "signatureByteCount" : 16,
+      "signedDataByteCount" : 256,
+      "stagingDirectoryPath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-ce8967dc34b3de4312837b9a56dd5bb2",
+      "stagingPath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-ce8967dc34b3de4312837b9a56dd5bb2\/libexample.so.staging",
+      "targetPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/libexample.so",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "kind" : "hdc.publishNativeLibrary"
+  },
+  "recoveryIntentEventID" : "intent-atomic-publish",
+  "recoveryStepID" : "atomic-publish",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-EAE3E799930A18D48323DCDAC658FBF46A1AD949-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-unpublished",
+    "inputs" : {
+      "expectedABI" : "arm64-v8a",
+      "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+      "libraryLogicalName" : "libexample.so",
+      "restartProfile" : "restartAbility",
+      "rollbackPolicy" : "autoRollback",
+      "targetBundle" : "com.example.demo",
+      "verificationProfile" : "hashProcessAndMaps"
+    },
+    "operation" : {
+      "id" : "deploy.native-library.app-owned",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-unpublished",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "verify-elf-locally abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step verify-elf-locally",
+    "hash-library abi=arm64-v8a buildId=00112233445566778899aabbccddeeff10213243 sha256=f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+    "host-step hash-library",
+    "capability consumed before first mutation",
+    "intent send-to-staging",
+    "dispatched send-to-staging; awaiting readback",
+    "intent verify-remote-staging",
+    "verified verify-remote-staging [\"buildId\", \"remoteByteCount\", \"remoteSha256\"]",
+    "intent backup-current-version",
+    "verified backup-current-version [\"backupPath\", \"backupSha256\"]",
+    "intent atomic-publish",
+    "outcomeUnknown atomic-publish; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~\/Library\/Logs\/DiagnosticReports\/ (look for a same-second entry named after the executable).",
+    "recovered: outstanding intents or unknown outcomes; no redispatch",
+    "waitingForRecovery->reconciling",
+    "reason: begin exact typed provider reconciliation",
+    "reconcile started atomic-publish",
+    "reconciling->waitingForRecovery",
+    "reason: persist exact typed reconcile decision: nativeTargetHashMismatch: published target hash differs, or it is less attested than the library it replaced; publish state is not safe to replay",
+    "reconcile inconclusive: nativeTargetHashMismatch: published target hash differs, or it is less attested than the library it replaced; publish state is not safe to replay"
+  ]
+}

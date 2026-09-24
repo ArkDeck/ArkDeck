@@ -1,0 +1,68 @@
+{
+  "journalMode" : "wal",
+  "rows" : [
+    {
+      "admissionSequence" : 1,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-mutation-notInstalled",
+      "jobId" : "job-6d4855163348f6395cbab028f2d0471e",
+      "recordSHA256" : "39663c2bf4ecc73790b3c5d1b3278f11cf487a57f7a3a77c446c6daa42521361",
+      "requestHash" : "510f75174d9bcb732031224ca7e7666a62d77d52e07a8da3e6ee0a0995d4966a",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 22
+    },
+    {
+      "admissionSequence" : 2,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-mutation-emptyHilog",
+      "jobId" : "job-b89f96da3deec3ec65deda2e635e7dea",
+      "recordSHA256" : "14352b2898769590961b5d1ef2d27ce19b032fb0849fcc5cb7b69b3a93b8779d",
+      "requestHash" : "d35f4f7f9e407a2a23d0f4666dbe96f5e01f4a4a857deb7d84860e4bcd885b57",
+      "state" : "waitingForRecovery",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 17
+    }
+  ],
+  "schema" : [
+    {
+      "name" : "runtime_job",
+      "sql" : "CREATE TABLE runtime_job(\n  job_id TEXT PRIMARY KEY,\n  idempotency_key TEXT NOT NULL UNIQUE,\n  request_hash TEXT NOT NULL,\n  state TEXT NOT NULL,\n  admission_sequence INTEGER NOT NULL,\n  created_at_utc TEXT NOT NULL,\n  created_at_order_key TEXT NOT NULL,\n  updated_at_utc TEXT NOT NULL,\n  version INTEGER NOT NULL CHECK(version >= 1),\n  initial_record_json BLOB\n)",
+      "tableName" : "runtime_job",
+      "type" : "table"
+    },
+    {
+      "name" : "runtime_job_admission_sequence_idx",
+      "sql" : "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_created_idx",
+      "sql" : "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_updated_idx",
+      "sql" : "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_1",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_2",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    }
+  ],
+  "userVersion" : 1
+}

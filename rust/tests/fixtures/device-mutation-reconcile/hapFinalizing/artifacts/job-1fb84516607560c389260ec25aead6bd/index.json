@@ -1,0 +1,39 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-d1412802738c756a68474e084b70284f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 673,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-1fb84516607560c389260ec25aead6bd",
+      "mediaType" : "application\/json",
+      "name" : "install-readback.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-1fb84516607560c389260ec25aead6bd",
+      "sha256" : "7255242223399294dcbdb42f5e5cfb23359c45e0454b546c65f234644fbbfd2f",
+      "sourceOperation" : "debug.hap@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "package-readback"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

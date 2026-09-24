@@ -1,0 +1,13 @@
+{
+  "abi" : "arm64-v8a",
+  "artifact" : "verification-report.json",
+  "attestation" : "fsVerity",
+  "buildId" : "00112233445566778899aabbccddeeff10213243",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "fsVerityDigest" : "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "jobId" : "job-a8542c33a62a4286b4976973db7f1579",
+  "loaderVerified" : "true",
+  "operation" : "deploy.native-library.app-owned@1",
+  "processIds" : "4321",
+  "publishedSha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53"
+}

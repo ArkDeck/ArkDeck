@@ -1,0 +1,57 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23461,
+          "remotePort" : 34571
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23461,
+            "minimum" : 23461
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34571,
+            "minimum" : 34571
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -1,0 +1,237 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "createPortForward",
+    "verifyRemoteState"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "4fb43ec693484f344c4e90f528d90a3e1d375f3f65a8d7c0fa1e049355f1f613",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+      "reservationID" : "idem-mutation-create",
+      "stepSetDigestSHA256" : "068433ae9d92331b016464f50ab9e956c2c8423491fc97b453527e0d04916072",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-a698aa1a3cd135705e7c507b8c7cf27a",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "port-forward.create@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-create",
+    "inputs" : {
+      "direction" : "forward",
+      "localPort" : 23461,
+      "remotePort" : 34571
+    },
+    "operation" : {
+      "id" : "port-forward.create",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-create",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-create",
+    "inputs" : {
+      "direction" : "forward",
+      "localPort" : 23461,
+      "remotePort" : 34571
+    },
+    "operation" : {
+      "id" : "port-forward.create",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-create",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "10860",
+      "lastSequence" : 20,
+      "sha256" : "ac78be5f5d30196d584fe255d00b2250c5f7a69989d4037c474330e056b702c7"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-a698aa1a3cd135705e7c507b8c7cf27a",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "76396",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "11246",
+      "lastSequence" : 21,
+      "sha256" : "32524f0d6b14151f7755d9df50040b7c5e1e93766180324299bb8f94eecf9f29"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "5073",
+      "manifestSHA256" : "0a880b2ef401b32c908fff1092bc8d1437ff309f072c6da8fca745e549d3d0dd",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "0a880b2ef401b32c908fff1092bc8d1437ff309f072c6da8fca745e549d3d0dd",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-a698aa1a3cd135705e7c507b8c7cf27a",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-a698aa1a3cd135705e7c507b8c7cf27a",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "capability consumed before first mutation",
+    "intent create-port-rule",
+    "outcomeUnknown create-port-rule; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~\/Library\/Logs\/DiagnosticReports\/ (look for a same-second entry named after the executable).",
+    "recovered: outstanding intents or unknown outcomes; no redispatch",
+    "waitingForRecovery->reconciling",
+    "reason: begin exact typed provider reconciliation",
+    "reconcile started create-port-rule",
+    "reconciling->resumeAtConfirmedSafeBoundary",
+    "reason: persist exact typed reconcile decision: confirmed completed [\"postconditionPresent\"]",
+    "reconciled: confirmed completed create-port-rule",
+    "recovered: journal clean",
+    "resumeAtConfirmedSafeBoundary->running",
+    "reason: resume confirmed durable provider boundary",
+    "resume skipped journal-confirmed step confirm-evidence-target",
+    "resume skipped journal-confirmed step read-evidence-model",
+    "resume skipped journal-confirmed step read-evidence-firmware",
+    "resume skipped journal-confirmed step create-port-rule",
+    "intent verify-port-rule",
+    "verified verify-port-rule [\"present\"]",
+    "artifact port-rule-readback.json -> ART-12147a80c59beb44fa66e29c95f47e51",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

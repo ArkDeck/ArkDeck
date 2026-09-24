@@ -1,0 +1,72 @@
+[
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-7dd23f0c724b55c0e2c644de0063493d"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-7dd23f0c724b55c0e2c644de0063493d/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-7dd23f0c724b55c0e2c644de0063493d/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-7dd23f0c724b55c0e2c644de0063493d/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-84892206b79174192e1fb101138299c5"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-84892206b79174192e1fb101138299c5/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-84892206b79174192e1fb101138299c5/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-84892206b79174192e1fb101138299c5/journal.jsonl"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/.runtime-capabilities.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/runtime-capabilities.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/runtime-capabilities.ledger"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "session-owner/.session-storage.lock"
+  }
+]

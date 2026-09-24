@@ -1,0 +1,63 @@
+jobCreated
+queued->preflight
+preflight->running
+reason: steps-start
+host-step preflight-host-storage
+intent confirm-evidence-target
+verified confirm-evidence-target ["deviceIdentitySHA256", "state", "transport"]
+evidence-preflight confirm-evidence-target
+intent read-evidence-model
+verified read-evidence-model ["value"]
+evidence-preflight read-evidence-model
+intent read-evidence-firmware
+verified read-evidence-firmware ["value"]
+evidence-preflight read-evidence-firmware
+intent preflight-device-storage
+verified preflight-device-storage ["availableBytes"]
+skipped observe-application-liveness: step not selected by the request inputs
+skipped capture-hilog: step not selected by the request inputs
+skipped capture-ui-dump: step not selected by the request inputs
+skipped capture-advanced-ui-dump: step not selected by the request inputs
+skipped capture-crash-index: step not selected by the request inputs
+skipped capture-crash-log: step not selected by the request inputs
+capability consumed before first mutation
+intent capture-ui-tree
+outcomeUnknown capture-ui-tree; durable intent left outstanding
+running->waitingForRecovery
+reason: outcomeUnknown: process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for a same-second entry named after the executable).
+recovered: outstanding intents or unknown outcomes; no redispatch
+waitingForRecovery->reconciling
+reason: begin exact typed provider reconciliation
+reconcile started capture-ui-tree
+reconciling->resumeAtConfirmedSafeBoundary
+reason: persist exact typed reconcile decision: confirmed completed ["postconditionPresent"]
+reconciled: confirmed completed capture-ui-tree
+resumeAtConfirmedSafeBoundary->running
+reason: resume confirmed durable provider boundary
+host-step preflight-host-storage
+resume skipped journal-confirmed step confirm-evidence-target
+resume skipped journal-confirmed step read-evidence-model
+resume skipped journal-confirmed step read-evidence-firmware
+resume skipped journal-confirmed step preflight-device-storage
+skipped observe-application-liveness: step not selected by the request inputs
+skipped capture-hilog: step not selected by the request inputs
+skipped capture-ui-dump: step not selected by the request inputs
+skipped capture-advanced-ui-dump: step not selected by the request inputs
+skipped capture-crash-index: step not selected by the request inputs
+skipped capture-crash-log: step not selected by the request inputs
+resume skipped journal-confirmed step capture-ui-tree
+intent receive-ui-tree
+verified receive-ui-tree ["byteCount", "localArtifact", "sha256"]
+artifact ui-tree.json -> ART-db67f88c3a9bb67ec86fbb269f16b4f8
+intent cleanup-ui-tree-temp
+verified cleanup-ui-tree-temp ["cleaned"]
+skipped capture-screenshot: step not selected by the request inputs
+skipped receive-screenshot: upstream capture-screenshot did not run: step not selected by the request inputs
+skipped cleanup-screenshot-temp: upstream capture-screenshot did not run: step not selected by the request inputs
+skipped capture-trace: step not selected by the request inputs
+skipped receive-trace-artifact: upstream capture-trace did not run: step not selected by the request inputs
+skipped cleanup-remote-temp: upstream capture-trace did not run: step not selected by the request inputs
+host-step postprocess-index
+host-step finalize-session
+running->finalizing
+reason: steps-complete

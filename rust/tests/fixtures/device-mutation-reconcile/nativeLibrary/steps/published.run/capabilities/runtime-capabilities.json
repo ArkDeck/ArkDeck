@@ -1,0 +1,75 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-EAE3E799930A18D48323DCDAC658FBF46A1AD949-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "expectedABI" : "arm64-v8a",
+          "libraryArtifactLease" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+          "libraryLogicalName" : "libexample.so",
+          "restartProfile" : "restartAbility",
+          "rollbackPolicy" : "autoRollback",
+          "targetBundle" : "com.example.demo",
+          "verificationProfile" : "hashProcessAndMaps"
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "expectedABI" : {
+            "kind" : "exactString",
+            "value" : "arm64-v8a"
+          },
+          "libraryArtifactLease" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397"
+          },
+          "libraryLogicalName" : {
+            "kind" : "exactString",
+            "value" : "libexample.so"
+          },
+          "restartProfile" : {
+            "kind" : "exactString",
+            "value" : "restartAbility"
+          },
+          "rollbackPolicy" : {
+            "kind" : "exactString",
+            "value" : "autoRollback"
+          },
+          "targetBundle" : {
+            "kind" : "exactString",
+            "value" : "com.example.demo"
+          },
+          "verificationProfile" : {
+            "kind" : "exactString",
+            "value" : "hashProcessAndMaps"
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:deploy.native-library.app-owned@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "deploy.native-library.app-owned",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
