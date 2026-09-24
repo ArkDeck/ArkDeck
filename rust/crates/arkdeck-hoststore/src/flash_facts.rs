@@ -51,7 +51,7 @@ fn admission(detail: &str) -> String {
     format!("admissionRejected({})", swift_quoted(detail))
 }
 
-fn post_flash(error: crate::post_flash_alias::PostFlashAliasError) -> String {
+pub(crate) fn post_flash(error: crate::post_flash_alias::PostFlashAliasError) -> String {
     format!(
         "productionConfigurationUnavailable({})",
         swift_quoted(error.detail())
@@ -124,11 +124,12 @@ impl NativeRockUsbIdentity {
 
 /// The durable Target a read found, as Swift's `RuntimeTargetRecord`.
 #[derive(Clone, Debug)]
-struct TargetRecord {
-    target_id: String,
-    identity: String,
-    binding_revision: i64,
-    connect_key: String,
+pub(crate) struct TargetRecord {
+    pub(crate) target_id: String,
+    pub(crate) identity: String,
+    pub(crate) binding_revision: i64,
+    pub(crate) connect_key: String,
+    pub(crate) adopted_at: String,
 }
 
 impl TargetRecord {
@@ -144,7 +145,7 @@ impl TargetRecord {
 
 /// Swift `RuntimeTargetStore.list()`, with Swift's `storeFailure` when the
 /// store cannot be read.
-fn target_records(targets: &TargetStore) -> Result<Vec<TargetRecord>, String> {
+pub(crate) fn target_records(targets: &TargetStore) -> Result<Vec<TargetRecord>, String> {
     let records = targets.records().map_err(|error| {
         format!(
             "storeFailure({})",
@@ -159,13 +160,14 @@ fn target_records(targets: &TargetStore) -> Result<Vec<TargetRecord>, String> {
                 identity: record["stablePhysicalIdentitySHA256"].as_str()?.to_owned(),
                 binding_revision: record["bindingRevision"].as_i64()?,
                 connect_key: record["connectKey"].as_str()?.to_owned(),
+                adopted_at: record["adoptedAtUTC"].as_str()?.to_owned(),
             })
         })
         .collect())
 }
 
 /// Swift `RockchipPostFlashHDCBinding.covers(target:binding:)`.
-fn alias_covers(
+pub(crate) fn alias_covers(
     alias: &PostFlashBinding,
     target: &TargetRecord,
     binding: &BindingSnapshot,

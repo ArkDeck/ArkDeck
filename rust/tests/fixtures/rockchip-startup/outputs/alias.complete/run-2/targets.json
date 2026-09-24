@@ -1,0 +1,54 @@
+{
+  "aliasResolutions" : [
+    {
+      "aliasBindingRevision" : 1,
+      "aliasStableIdentitySHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+      "aliasTargetID" : "TGT-815c2c2e87c5",
+      "canonicalBindingRevision" : 2,
+      "canonicalStableIdentitySHA256" : "13a5ef78951cc06d16988424c74d12fef4ea19eff9a30773867e770a0fd9819c",
+      "canonicalTargetID" : "TGT-8b3d0a34cf32",
+      "confirmedStepIDs" : [
+        "enter-loader-mode",
+        "flash-partitions",
+        "verify-flash-readback",
+        "reboot-device",
+        "wait-for-hdc",
+        "rebind-and-verify-build"
+      ],
+      "coveredUnknownIntents" : [
+        {
+          "effect" : "deviceMutation",
+          "intentEventID" : "intent-enter-loader-mode",
+          "jobID" : "job-22222222222222222222222222222222",
+          "stepID" : "enter-loader-mode"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:10:00Z",
+      "establishingFlashJobID" : "job-11111111111111111111111111111111",
+      "establishingFlashPlanDigestSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "resolutionID" : "target-alias-resolution-7883c4998b17ac3d935d966afaa971b0",
+      "resolutionSHA256" : "5c15a2197a8efccea8e0387918d07cdbc2e5fb1ee0b85b482fe67a486cd5c58d",
+      "routedHDCIdentitySHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+      "routedUSBTopology" : "42"
+    }
+  ],
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-08-08T00:00:00Z",
+      "bindingRevision" : 2,
+      "connectKey" : "original-hdc-address",
+      "stablePhysicalIdentitySHA256" : "13a5ef78951cc06d16988424c74d12fef4ea19eff9a30773867e770a0fd9819c",
+      "targetID" : "TGT-8b3d0a34cf32",
+      "toolVersion" : "3.2.0f"
+    },
+    {
+      "adoptedAtUTC" : "2026-08-08T00:01:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "post-flash-hdc-address",
+      "stablePhysicalIdentitySHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+      "targetID" : "TGT-815c2c2e87c5",
+      "toolVersion" : "3.2.0f"
+    }
+  ]
+}

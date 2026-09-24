@@ -242,6 +242,20 @@ impl Host {
         let _ = self.quarantined.set(recovered.quarantined.clone());
         Ok(Some(recovered))
     }
+    /// Once Jobs are recovered, the line naming the enter-Loader transition
+    /// that awaits the binding the start-up reconciliation carried its Target
+    /// to (`RockchipStartup::awaiting_transition`); an error stops the start.
+    /// None without a Job owner.
+    #[cfg(target_os = "macos")]
+    pub fn loader_transition_awaiting(
+        &self,
+        startup: &arkdeck_hoststore::RockchipStartup,
+    ) -> Result<Option<String>, String> {
+        match &self.jobs {
+            Some(jobs) => startup.awaiting_transition(jobs),
+            None => Ok(None),
+        }
+    }
     /// `agent.run` and `agent.status` advance and read this owner's
     /// executions, which own Jobs of the Job owner.
     #[cfg(target_os = "macos")]

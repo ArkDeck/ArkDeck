@@ -1,0 +1,13 @@
+{
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-08-08T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "original-hdc-address",
+      "stablePhysicalIdentitySHA256" : "8b3d0a34cf3246f98426fbfe29895918bbe446ae3f0e6dc9cffb3e7e49dd814c",
+      "targetID" : "TGT-8b3d0a34cf32",
+      "toolVersion" : "3.2.0f"
+    }
+  ]
+}

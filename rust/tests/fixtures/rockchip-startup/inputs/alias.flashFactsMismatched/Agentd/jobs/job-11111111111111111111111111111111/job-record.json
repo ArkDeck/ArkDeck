@@ -1,0 +1,106 @@
+{
+  "actualEffect" : "destructive",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-08-08T00:05:00Z",
+    "consumptionFingerprintSHA256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-ALIAS-FIXTURE",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "planDigestSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "reservationID" : "idempotency-job-11111111111111111111111111111111",
+      "stepSetDigestSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "targetBindingDigestSHA256" : "fbcd18992fe46e0926ceb29602e6de3ad7050dec0f47da75594a798c6eff4e1f",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-12-31T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-08-08T00:05:00Z",
+  "finishedAtUTC" : "2026-08-08T00:10:00Z",
+  "jobID" : "job-11111111111111111111111111111111",
+  "materializedBindingRevision" : 2,
+  "materializedPlanDigest" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "materializedStableTargetIdentitySHA256" : "13a5ef78951cc06d16988424c74d12fef4ea19eff9a30773867e770a0fd9819c",
+  "operationReference" : "flash.dayu200",
+  "originalSubmissionRequest" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-ALIAS-FIXTURE"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-job-11111111111111111111111111111111",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:alias-fixture:ART-0123456789abcdef0123456789abcdef",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "request-job-11111111111111111111111111111111",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 2,
+      "targetId" : "TGT-8b3d0a34cf32"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-ALIAS-FIXTURE"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-job-11111111111111111111111111111111",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:alias-fixture:ART-0123456789abcdef0123456789abcdef",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "request-job-11111111111111111111111111111111",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 2,
+      "targetId" : "TGT-8b3d0a34cf32"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-08-08T00:05:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+
+  ]
+}

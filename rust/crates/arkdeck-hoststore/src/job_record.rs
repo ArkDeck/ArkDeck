@@ -354,12 +354,14 @@ impl JobRecord {
         if let Some(original) = &record.original_request {
             request(original)?;
         }
+        // Swift writes the catalog descriptor's reference, which names a
+        // singleton operation (`flash.dayu200`) by its bare id.
         let operation = &record.request["operation"];
-        let expected = format!(
-            "{}@{}",
-            operation["id"].as_str().unwrap_or(""),
-            operation["version"].as_i64().unwrap_or(1)
-        );
+        let id = operation["id"].as_str().unwrap_or("");
+        let expected = match operation["version"].as_i64() {
+            Some(version) => format!("{id}@{version}"),
+            None => id.to_owned(),
+        };
         if expected != record.operation {
             return Err(unreadable(()));
         }
@@ -524,6 +526,19 @@ impl JobRecord {
     pub(super) fn operation(&self) -> &str {
         &self.operation
     }
+    /// Swift `RuntimeJobEngine.isDayu200Flash`: the typed request's operation
+    /// is one of `ArkForgeFlashOperation`'s durable references (the canonical
+    /// one, its compatibility alias, or the pre-singleton `@1` alias).
+    pub(crate) fn dayu200_flash(&self) -> bool {
+        const DURABLE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+        let operation = &self.request["operation"];
+        let reference = match (operation["id"].as_str(), operation["version"].as_i64()) {
+            (Some(id), Some(version)) => format!("{id}@{version}"),
+            (Some(id), None) => id.to_owned(),
+            _ => return false,
+        };
+        DURABLE.contains(&reference.as_str())
+    }
     pub(crate) fn materialized_plan(&self) -> Option<&str> {
         self.plan.as_deref()
     }
@@ -651,6 +666,9 @@ impl JobRecord {
     }
     pub(super) fn finished_at(&self) -> Option<&str> {
         self.finished.as_deref()
+    }
+    pub(super) fn started_at(&self) -> Option<&str> {
+        self.started.as_deref()
     }
     pub(super) fn operation_failure(&self) -> Option<&Value> {
         self.operation_failure.as_ref()
