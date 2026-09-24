@@ -1,0 +1,5061 @@
+{
+  "cases" : [
+    {
+      "arguments" : [
+        "--analyze-crash-ledger"
+      ],
+      "exitStatus" : 64,
+      "name" : "usage-no-path",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}",
+        "{input}"
+      ],
+      "exitStatus" : 64,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "usage-two-paths",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "crash-index.txt"
+      ],
+      "exitStatus" : 64,
+      "name" : "usage-relative-path",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        ""
+      ],
+      "exitStatus" : 64,
+      "name" : "usage-empty-path",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "/́private/tmp/crash-index.txt"
+      ],
+      "exitStatus" : 64,
+      "name" : "usage-combining-mark-on-the-slash",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "؀/private/tmp/crash-index.txt"
+      ],
+      "exitStatus" : 64,
+      "name" : "usage-prepended-mark-before-the-slash",
+      "stderr" : "--analyze-crash-ledger requires one absolute artifact path\n",
+      "stderrIsPrefix" : false,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{missing}"
+      ],
+      "exitStatus" : 1,
+      "name" : "read-missing-file",
+      "stderr" : "crash-ledger analysis failed: ",
+      "stderrIsPrefix" : true,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{directory}"
+      ],
+      "exitStatus" : 1,
+      "name" : "read-directory",
+      "stderr" : "crash-ledger analysis failed: ",
+      "stderrIsPrefix" : true,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "/"
+      ],
+      "exitStatus" : 1,
+      "name" : "read-root",
+      "stderr" : "crash-ledger analysis failed: ",
+      "stderrIsPrefix" : true,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 1,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 0,
+      "name" : "read-unreadable-file",
+      "stderr" : "crash-ledger analysis failed: ",
+      "stderrIsPrefix" : true,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}/."
+      ],
+      "exitStatus" : 1,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "read-dot-after-a-file",
+      "stderr" : "crash-ledger analysis failed: ",
+      "stderrIsPrefix" : true,
+      "stdout" : ""
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{inputVolume}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS5kZW1vLTIwMDEwMDM5LTIwMjYwOTE0MDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "path-volume-alias",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.demo\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example.demo-20010039-20260914000000\",\"timestamp\":\"20260914000000\",\"uid\":\"20010039\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}/"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "path-trailing-slash",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}///"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "path-trailing-slashes",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{directory}/.//crash-index.txt"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "path-dot-segments",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "",
+      "inputMode" : 384,
+      "name" : "empty-file",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerHeaderAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHRsb2cgbGlzdAoqKioqKioKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "no-header",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerHeaderAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "ZmF1bHQgbG9nIGxpc3Q6CioqKioqKgoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "header-in-another-case",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerHeaderAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6Cg==",
+      "inputMode" : 384,
+      "name" : "header-only",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "header-and-one-fence",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpObyBmYXVsdCBsb2cgZXhpc3QuCg==",
+      "inputMode" : 384,
+      "name" : "header-one-fence-and-the-empty-marker",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6Ck5vIGZhdWx0IGxvZyBleGlzdC4K",
+      "inputMode" : 384,
+      "name" : "empty-marker-without-fences",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "CkZhdWx0IGxvZyBsaXN0OgoqKioqKioKKioqKioqCk5vIGZhdWx0IGxvZyBleGlzdC4K",
+      "inputMode" : 384,
+      "name" : "measured-empty-ledger",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "YW5zd2VyZWQKRmF1bHQgbG9nIGxpc3Q6CioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "runtime-fixture-source",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "KioqKioqCmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCkZhdWx0IGxvZyBsaXN0Ogo=",
+      "inputMode" : 384,
+      "name" : "header-after-the-fences",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "PT0gRmF1bHQgbG9nIGxpc3Q6ID09CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "header-inside-a-line",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "aGlsb2cgbm9pc2UKRmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgp0cmFpbGluZyB0ZXh0Cm1vcmUtdHJhaWxpbmctdGV4dAo=",
+      "inputMode" : 384,
+      "name" : "text-around-the-listing",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6Ck5vIGZhdWx0IGxvZyBleGlzdC4KKioqKioqCmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "fences-win-over-the-empty-marker",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLTItMjAyNjAxMDEwMDAwMDEKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "a-fence-between-entries",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqCmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqKgoqKiAqKioqCg==",
+      "inputMode" : 384,
+      "name" : "near-fences",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6zIEKKioqKioqCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "header-with-a-combining-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerHeaderAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "2IBGYXVsdCBsb2cgbGlzdDoKKioqKioqCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "header-after-a-prepended-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerHeaderAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6Ck5vIGZhdWx0IGxvZyBleGlzdC7igI0K",
+      "inputMode" : 384,
+      "name" : "empty-marker-joined-by-zwj",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS5kZW1vLTIwMDEwMDM5LTIwMjYwOTE0MDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "one-native-crash",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.demo\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example.demo-20010039-20260914000000\",\"timestamp\":\"20260914000000\",\"uid\":\"20010039\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLndhdGVyZmxvdy0yMDAxMDA0Mi0yMDI2MDczMTE2MjEzNApjcHBjcmFzaC1jb20ub2hvcy5zY2VuZWJvYXJkLTIwMDEwMDE2LTIwMjYwNzMxMDgxNTAyCmFwcGZyZWV6ZS1jb20uZXhhbXBsZS5teS1hcHAtMjAwMTAwNDMtMjAyNjA4MDEwOTMwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "measured-kinds",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.waterflow\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.waterflow-20010042-20260731162134\",\"timestamp\":\"20260731162134\",\"uid\":\"20010042\"},{\"bundle\":\"com.ohos.sceneboard\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.ohos.sceneboard-20010016-20260731081502\",\"timestamp\":\"20260731081502\",\"uid\":\"20010016\"},{\"bundle\":\"com.example.my-app\",\"kind\":\"appfreeze\",\"name\":\"appfreeze-com.example.my-app-20010043-20260801093000\",\"timestamp\":\"20260801093000\",\"uid\":\"20010043\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6DQoqKioqKioNCmpzY3Jhc2gtY29tLmV4YW1wbGUud2F0ZXJmbG93LTIwMDEwMDQyLTIwMjYwNzMxMTYyMTM0DQpjcHBjcmFzaC1jb20ub2hvcy5zY2VuZWJvYXJkLTIwMDEwMDE2LTIwMjYwNzMxMDgxNTAyDQoqKioqKioNCg==",
+      "inputMode" : 384,
+      "name" : "crlf-lines",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.waterflow\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.waterflow-20010042-20260731162134\",\"timestamp\":\"20260731162134\",\"uid\":\"20010042\"},{\"bundle\":\"com.ohos.sceneboard\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.ohos.sceneboard-20010016-20260731081502\",\"timestamp\":\"20260731081502\",\"uid\":\"20010016\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6DSoqKioqKg1qc2NyYXNoLWNvbS5leGFtcGxlLndhdGVyZmxvdy0yMDAxMDA0Mi0yMDI2MDczMTE2MjEzNA1jcHBjcmFzaC1jb20ub2hvcy5zY2VuZWJvYXJkLTIwMDEwMDE2LTIwMjYwNzMxMDgxNTAyDSoqKioqKg0=",
+      "inputMode" : 384,
+      "name" : "cr-lines",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.waterflow\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.waterflow-20010042-20260731162134\",\"timestamp\":\"20260731162134\",\"uid\":\"20010042\"},{\"bundle\":\"com.ohos.sceneboard\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.ohos.sceneboard-20010016-20260731081502\",\"timestamp\":\"20260731081502\",\"uid\":\"20010016\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6woUqKioqKirigKhjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAw4oCpanNjcmFzaC1jb20uZXhhbXBsZS0yLTIwMjYwMTAxMDAwMDAxC2FwcGZyZWV6ZS1jb20uZXhhbXBsZS0zLTIwMjYwMTAxMDAwMDAyDCoqKioqKg==",
+      "inputMode" : 384,
+      "name" : "unicode-line-separators",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"},{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-2-20260101000001\",\"timestamp\":\"20260101000001\",\"uid\":\"2\"},{\"bundle\":\"com.example\",\"kind\":\"appfreeze\",\"name\":\"appfreeze-com.example-3-20260101000002\",\"timestamp\":\"20260101000002\",\"uid\":\"3\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgoKICAgCgkK44CACmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKwqAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "blank-lines-between-the-fences",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "ICBGYXVsdCBsb2cgbGlzdDogIAogCSoqKioqKsKgCuGagGNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDDigIAK4oCB4oCC4oCD4oCE4oCF4oCG4oCH4oCI4oCJ4oCKanNjcmFzaC1jb20uZXhhbXBsZS0yLTIwMjYwMTAxMDAwMDAx4oCLCuKAr2FwcGZyZWV6ZS1jb20uZXhhbXBsZS0zLTIwMjYwMTAxMDAwMDAy4oGf44CACgkqKioqKioJCg==",
+      "inputMode" : 384,
+      "name" : "padded-lines",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"},{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-2-20260101000001\",\"timestamp\":\"20260101000001\",\"uid\":\"2\"},{\"bundle\":\"com.example\",\"kind\":\"appfreeze\",\"name\":\"appfreeze-com.example-3-20260101000002\",\"timestamp\":\"20260101000002\",\"uid\":\"3\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAw77u/CioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "unicode-format-characters-are-not-trimmed",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "three-fields",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "timestamp-thirteen-digits",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "timestamp-fifteen-digits",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDBhCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "timestamp-with-a-letter",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0tMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "uid-empty",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0yMDAxYS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "uid-with-a-letter",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHAyY3Jhc2gtY29tLmV4YW1wbGUtMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "kind-with-a-digit",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgotY29tLmV4YW1wbGUtMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "kind-empty",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC0tMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "bundle-empty",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS5teS1sb25nLWFwcC0yMDAxMDAzOS0yMDI2MDkxNDAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "bundle-with-hyphens",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.my-long-app\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example.my-long-app-20010039-20260914000000\",\"timestamp\":\"20260914000000\",\"uid\":\"20010039\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC0tLS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "bundle-of-hyphens",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"--\",\"kind\":\"cppcrash\",\"name\":\"cppcrash----1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgoACioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "a-line-of-nul",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1hImJcYy9kAGUBZghnG2gfaX9qCWviv79sLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "json-escapes-in-the-bundle",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"a\\\"b\\\\c/d\\u0000e\\u0001f\\bg\\u001bh\\u001fij\\tk⿿l\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-a\\\"b\\\\c/d\\u0000e\\u0001f\\bg\\u001bh\\u001fij\\tk⿿l-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDAtMjAwMTAwMDAtMjAyNjA5MDAwMDAwMDAKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAxLTIwMDEwMDAxLTIwMjYwOTAwMDAwMDAxCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMi0yMDAxMDAwMi0yMDI2MDkwMDAwMDAwMgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDMtMjAwMTAwMDMtMjAyNjA5MDAwMDAwMDMKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA0LTIwMDEwMDA0LTIwMjYwOTAwMDAwMDA0CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNS0yMDAxMDAwNS0yMDI2MDkwMDAwMDAwNQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDYtMjAwMTAwMDYtMjAyNjA5MDAwMDAwMDYKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAwLTIwMDEwMDA3LTIwMjYwOTAwMDAwMDA3CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMS0yMDAxMDAwOC0yMDI2MDkwMDAwMDAwOApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDItMjAwMTAwMDktMjAyNjA5MDAwMDAwMDkKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAzLTIwMDEwMDEwLTIwMjYwOTAwMDAwMDEwCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNC0yMDAxMDAxMS0yMDI2MDkwMDAwMDAxMQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDUtMjAwMTAwMTItMjAyNjA5MDAwMDAwMTIKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA2LTIwMDEwMDEzLTIwMjYwOTAwMDAwMDEzCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMC0yMDAxMDAxNC0yMDI2MDkwMDAwMDAxNApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDEtMjAwMTAwMTUtMjAyNjA5MDAwMDAwMTUKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAyLTIwMDEwMDE2LTIwMjYwOTAwMDAwMDE2CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMy0yMDAxMDAxNy0yMDI2MDkwMDAwMDAxNwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDQtMjAwMTAwMTgtMjAyNjA5MDAwMDAwMTgKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA1LTIwMDEwMDE5LTIwMjYwOTAwMDAwMDE5CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNi0yMDAxMDAyMC0yMDI2MDkwMDAwMDAyMApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDAtMjAwMTAwMjEtMjAyNjA5MDAwMDAwMjEKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAxLTIwMDEwMDIyLTIwMjYwOTAwMDAwMDIyCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMi0yMDAxMDAyMy0yMDI2MDkwMDAwMDAyMwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDMtMjAwMTAwMjQtMjAyNjA5MDAwMDAwMjQKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA0LTIwMDEwMDI1LTIwMjYwOTAwMDAwMDI1CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNS0yMDAxMDAyNi0yMDI2MDkwMDAwMDAyNgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDYtMjAwMTAwMjctMjAyNjA5MDAwMDAwMjcKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAwLTIwMDEwMDI4LTIwMjYwOTAwMDAwMDI4CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMS0yMDAxMDAyOS0yMDI2MDkwMDAwMDAyOQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDItMjAwMTAwMzAtMjAyNjA5MDAwMDAwMzAKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAzLTIwMDEwMDMxLTIwMjYwOTAwMDAwMDMxCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNC0yMDAxMDAzMi0yMDI2MDkwMDAwMDAzMgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDUtMjAwMTAwMzMtMjAyNjA5MDAwMDAwMzMKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA2LTIwMDEwMDM0LTIwMjYwOTAwMDAwMDM0CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMC0yMDAxMDAzNS0yMDI2MDkwMDAwMDAzNQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDEtMjAwMTAwMzYtMjAyNjA5MDAwMDAwMzYKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAyLTIwMDEwMDM3LTIwMjYwOTAwMDAwMDM3CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMy0yMDAxMDAzOC0yMDI2MDkwMDAwMDAzOApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDQtMjAwMTAwMzktMjAyNjA5MDAwMDAwMzkKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA1LTIwMDEwMDQwLTIwMjYwOTAwMDAwMDQwCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNi0yMDAxMDA0MS0yMDI2MDkwMDAwMDA0MQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDAtMjAwMTAwNDItMjAyNjA5MDAwMDAwNDIKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAxLTIwMDEwMDQzLTIwMjYwOTAwMDAwMDQzCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMi0yMDAxMDA0NC0yMDI2MDkwMDAwMDA0NApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDMtMjAwMTAwNDUtMjAyNjA5MDAwMDAwNDUKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA0LTIwMDEwMDQ2LTIwMjYwOTAwMDAwMDQ2CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNS0yMDAxMDA0Ny0yMDI2MDkwMDAwMDA0Nwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDYtMjAwMTAwNDgtMjAyNjA5MDAwMDAwNDgKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAwLTIwMDEwMDQ5LTIwMjYwOTAwMDAwMDQ5CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMS0yMDAxMDA1MC0yMDI2MDkwMDAwMDA1MApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDItMjAwMTAwNTEtMjAyNjA5MDAwMDAwNTEKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAzLTIwMDEwMDUyLTIwMjYwOTAwMDAwMDUyCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNC0yMDAxMDA1My0yMDI2MDkwMDAwMDA1Mwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDUtMjAwMTAwNTQtMjAyNjA5MDAwMDAwNTQKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA2LTIwMDEwMDU1LTIwMjYwOTAwMDAwMDU1CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMC0yMDAxMDA1Ni0yMDI2MDkwMDAwMDA1Ngpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDEtMjAwMTAwNTctMjAyNjA5MDAwMDAwNTcKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAyLTIwMDEwMDU4LTIwMjYwOTAwMDAwMDU4CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMy0yMDAxMDA1OS0yMDI2MDkwMDAwMDA1OQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDQtMjAwMTAwNjAtMjAyNjA5MDAwMDAwNjAKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA1LTIwMDEwMDYxLTIwMjYwOTAwMDAwMDYxCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNi0yMDAxMDA2Mi0yMDI2MDkwMDAwMDA2Mgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDAtMjAwMTAwNjMtMjAyNjA5MDAwMDAwNjMKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAxLTIwMDEwMDY0LTIwMjYwOTAwMDAwMDY0CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMi0yMDAxMDA2NS0yMDI2MDkwMDAwMDA2NQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDMtMjAwMTAwNjYtMjAyNjA5MDAwMDAwNjYKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA0LTIwMDEwMDY3LTIwMjYwOTAwMDAwMDY3CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNS0yMDAxMDA2OC0yMDI2MDkwMDAwMDA2OApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDYtMjAwMTAwNjktMjAyNjA5MDAwMDAwNjkKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAwLTIwMDEwMDcwLTIwMjYwOTAwMDAwMDcwCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMS0yMDAxMDA3MS0yMDI2MDkwMDAwMDA3MQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDItMjAwMTAwNzItMjAyNjA5MDAwMDAwNzIKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAzLTIwMDEwMDczLTIwMjYwOTAwMDAwMDczCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNC0yMDAxMDA3NC0yMDI2MDkwMDAwMDA3NApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDUtMjAwMTAwNzUtMjAyNjA5MDAwMDAwNzUKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA2LTIwMDEwMDc2LTIwMjYwOTAwMDAwMDc2CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMC0yMDAxMDA3Ny0yMDI2MDkwMDAwMDA3Nwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDEtMjAwMTAwNzgtMjAyNjA5MDAwMDAwNzgKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAyLTIwMDEwMDc5LTIwMjYwOTAwMDAwMDc5CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMy0yMDAxMDA4MC0yMDI2MDkwMDAwMDA4MApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDQtMjAwMTAwODEtMjAyNjA5MDAwMDAwODEKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA1LTIwMDEwMDgyLTIwMjYwOTAwMDAwMDgyCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNi0yMDAxMDA4My0yMDI2MDkwMDAwMDA4Mwpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDAtMjAwMTAwODQtMjAyNjA5MDAwMDAwODQKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAxLTIwMDEwMDg1LTIwMjYwOTAwMDAwMDg1CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMi0yMDAxMDA4Ni0yMDI2MDkwMDAwMDA4Ngpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDMtMjAwMTAwODctMjAyNjA5MDAwMDAwODcKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA0LTIwMDEwMDg4LTIwMjYwOTAwMDAwMDg4CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNS0yMDAxMDA4OS0yMDI2MDkwMDAwMDA4OQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDYtMjAwMTAwOTAtMjAyNjA5MDAwMDAwOTAKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAwLTIwMDEwMDkxLTIwMjYwOTAwMDAwMDkxCmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMS0yMDAxMDA5Mi0yMDI2MDkwMDAwMDA5Mgpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDItMjAwMTAwOTMtMjAyNjA5MDAwMDAwOTMKanNjcmFzaC1jb20uZXhhbXBsZS5hcHAzLTIwMDEwMDk0LTIwMjYwOTAwMDAwMDk0CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwNC0yMDAxMDA5NS0yMDI2MDkwMDAwMDA5NQpqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDUtMjAwMTAwOTYtMjAyNjA5MDAwMDAwOTYKanNjcmFzaC1jb20uZXhhbXBsZS5hcHA2LTIwMDEwMDk3LTIwMjYwOTAwMDAwMDk3CmpzY3Jhc2gtY29tLmV4YW1wbGUuYXBwMC0yMDAxMDA5OC0yMDI2MDkwMDAwMDA5OApqc2NyYXNoLWNvbS5leGFtcGxlLmFwcDEtMjAwMTAwOTktMjAyNjA5MDAwMDAwOTkKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "many-entries",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010000-20260900000000\",\"timestamp\":\"20260900000000\",\"uid\":\"20010000\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010001-20260900000001\",\"timestamp\":\"20260900000001\",\"uid\":\"20010001\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010002-20260900000002\",\"timestamp\":\"20260900000002\",\"uid\":\"20010002\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010003-20260900000003\",\"timestamp\":\"20260900000003\",\"uid\":\"20010003\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010004-20260900000004\",\"timestamp\":\"20260900000004\",\"uid\":\"20010004\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010005-20260900000005\",\"timestamp\":\"20260900000005\",\"uid\":\"20010005\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010006-20260900000006\",\"timestamp\":\"20260900000006\",\"uid\":\"20010006\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010007-20260900000007\",\"timestamp\":\"20260900000007\",\"uid\":\"20010007\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010008-20260900000008\",\"timestamp\":\"20260900000008\",\"uid\":\"20010008\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010009-20260900000009\",\"timestamp\":\"20260900000009\",\"uid\":\"20010009\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010010-20260900000010\",\"timestamp\":\"20260900000010\",\"uid\":\"20010010\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010011-20260900000011\",\"timestamp\":\"20260900000011\",\"uid\":\"20010011\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010012-20260900000012\",\"timestamp\":\"20260900000012\",\"uid\":\"20010012\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010013-20260900000013\",\"timestamp\":\"20260900000013\",\"uid\":\"20010013\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010014-20260900000014\",\"timestamp\":\"20260900000014\",\"uid\":\"20010014\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010015-20260900000015\",\"timestamp\":\"20260900000015\",\"uid\":\"20010015\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010016-20260900000016\",\"timestamp\":\"20260900000016\",\"uid\":\"20010016\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010017-20260900000017\",\"timestamp\":\"20260900000017\",\"uid\":\"20010017\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010018-20260900000018\",\"timestamp\":\"20260900000018\",\"uid\":\"20010018\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010019-20260900000019\",\"timestamp\":\"20260900000019\",\"uid\":\"20010019\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010020-20260900000020\",\"timestamp\":\"20260900000020\",\"uid\":\"20010020\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010021-20260900000021\",\"timestamp\":\"20260900000021\",\"uid\":\"20010021\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010022-20260900000022\",\"timestamp\":\"20260900000022\",\"uid\":\"20010022\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010023-20260900000023\",\"timestamp\":\"20260900000023\",\"uid\":\"20010023\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010024-20260900000024\",\"timestamp\":\"20260900000024\",\"uid\":\"20010024\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010025-20260900000025\",\"timestamp\":\"20260900000025\",\"uid\":\"20010025\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010026-20260900000026\",\"timestamp\":\"20260900000026\",\"uid\":\"20010026\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010027-20260900000027\",\"timestamp\":\"20260900000027\",\"uid\":\"20010027\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010028-20260900000028\",\"timestamp\":\"20260900000028\",\"uid\":\"20010028\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010029-20260900000029\",\"timestamp\":\"20260900000029\",\"uid\":\"20010029\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010030-20260900000030\",\"timestamp\":\"20260900000030\",\"uid\":\"20010030\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010031-20260900000031\",\"timestamp\":\"20260900000031\",\"uid\":\"20010031\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010032-20260900000032\",\"timestamp\":\"20260900000032\",\"uid\":\"20010032\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010033-20260900000033\",\"timestamp\":\"20260900000033\",\"uid\":\"20010033\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010034-20260900000034\",\"timestamp\":\"20260900000034\",\"uid\":\"20010034\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010035-20260900000035\",\"timestamp\":\"20260900000035\",\"uid\":\"20010035\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010036-20260900000036\",\"timestamp\":\"20260900000036\",\"uid\":\"20010036\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010037-20260900000037\",\"timestamp\":\"20260900000037\",\"uid\":\"20010037\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010038-20260900000038\",\"timestamp\":\"20260900000038\",\"uid\":\"20010038\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010039-20260900000039\",\"timestamp\":\"20260900000039\",\"uid\":\"20010039\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010040-20260900000040\",\"timestamp\":\"20260900000040\",\"uid\":\"20010040\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010041-20260900000041\",\"timestamp\":\"20260900000041\",\"uid\":\"20010041\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010042-20260900000042\",\"timestamp\":\"20260900000042\",\"uid\":\"20010042\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010043-20260900000043\",\"timestamp\":\"20260900000043\",\"uid\":\"20010043\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010044-20260900000044\",\"timestamp\":\"20260900000044\",\"uid\":\"20010044\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010045-20260900000045\",\"timestamp\":\"20260900000045\",\"uid\":\"20010045\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010046-20260900000046\",\"timestamp\":\"20260900000046\",\"uid\":\"20010046\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010047-20260900000047\",\"timestamp\":\"20260900000047\",\"uid\":\"20010047\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010048-20260900000048\",\"timestamp\":\"20260900000048\",\"uid\":\"20010048\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010049-20260900000049\",\"timestamp\":\"20260900000049\",\"uid\":\"20010049\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010050-20260900000050\",\"timestamp\":\"20260900000050\",\"uid\":\"20010050\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010051-20260900000051\",\"timestamp\":\"20260900000051\",\"uid\":\"20010051\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010052-20260900000052\",\"timestamp\":\"20260900000052\",\"uid\":\"20010052\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010053-20260900000053\",\"timestamp\":\"20260900000053\",\"uid\":\"20010053\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010054-20260900000054\",\"timestamp\":\"20260900000054\",\"uid\":\"20010054\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010055-20260900000055\",\"timestamp\":\"20260900000055\",\"uid\":\"20010055\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010056-20260900000056\",\"timestamp\":\"20260900000056\",\"uid\":\"20010056\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010057-20260900000057\",\"timestamp\":\"20260900000057\",\"uid\":\"20010057\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010058-20260900000058\",\"timestamp\":\"20260900000058\",\"uid\":\"20010058\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010059-20260900000059\",\"timestamp\":\"20260900000059\",\"uid\":\"20010059\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010060-20260900000060\",\"timestamp\":\"20260900000060\",\"uid\":\"20010060\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010061-20260900000061\",\"timestamp\":\"20260900000061\",\"uid\":\"20010061\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010062-20260900000062\",\"timestamp\":\"20260900000062\",\"uid\":\"20010062\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010063-20260900000063\",\"timestamp\":\"20260900000063\",\"uid\":\"20010063\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010064-20260900000064\",\"timestamp\":\"20260900000064\",\"uid\":\"20010064\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010065-20260900000065\",\"timestamp\":\"20260900000065\",\"uid\":\"20010065\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010066-20260900000066\",\"timestamp\":\"20260900000066\",\"uid\":\"20010066\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010067-20260900000067\",\"timestamp\":\"20260900000067\",\"uid\":\"20010067\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010068-20260900000068\",\"timestamp\":\"20260900000068\",\"uid\":\"20010068\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010069-20260900000069\",\"timestamp\":\"20260900000069\",\"uid\":\"20010069\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010070-20260900000070\",\"timestamp\":\"20260900000070\",\"uid\":\"20010070\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010071-20260900000071\",\"timestamp\":\"20260900000071\",\"uid\":\"20010071\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010072-20260900000072\",\"timestamp\":\"20260900000072\",\"uid\":\"20010072\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010073-20260900000073\",\"timestamp\":\"20260900000073\",\"uid\":\"20010073\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010074-20260900000074\",\"timestamp\":\"20260900000074\",\"uid\":\"20010074\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010075-20260900000075\",\"timestamp\":\"20260900000075\",\"uid\":\"20010075\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010076-20260900000076\",\"timestamp\":\"20260900000076\",\"uid\":\"20010076\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010077-20260900000077\",\"timestamp\":\"20260900000077\",\"uid\":\"20010077\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010078-20260900000078\",\"timestamp\":\"20260900000078\",\"uid\":\"20010078\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010079-20260900000079\",\"timestamp\":\"20260900000079\",\"uid\":\"20010079\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010080-20260900000080\",\"timestamp\":\"20260900000080\",\"uid\":\"20010080\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010081-20260900000081\",\"timestamp\":\"20260900000081\",\"uid\":\"20010081\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010082-20260900000082\",\"timestamp\":\"20260900000082\",\"uid\":\"20010082\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010083-20260900000083\",\"timestamp\":\"20260900000083\",\"uid\":\"20010083\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010084-20260900000084\",\"timestamp\":\"20260900000084\",\"uid\":\"20010084\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010085-20260900000085\",\"timestamp\":\"20260900000085\",\"uid\":\"20010085\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010086-20260900000086\",\"timestamp\":\"20260900000086\",\"uid\":\"20010086\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010087-20260900000087\",\"timestamp\":\"20260900000087\",\"uid\":\"20010087\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010088-20260900000088\",\"timestamp\":\"20260900000088\",\"uid\":\"20010088\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010089-20260900000089\",\"timestamp\":\"20260900000089\",\"uid\":\"20010089\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010090-20260900000090\",\"timestamp\":\"20260900000090\",\"uid\":\"20010090\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010091-20260900000091\",\"timestamp\":\"20260900000091\",\"uid\":\"20010091\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010092-20260900000092\",\"timestamp\":\"20260900000092\",\"uid\":\"20010092\"},{\"bundle\":\"com.example.app2\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app2-20010093-20260900000093\",\"timestamp\":\"20260900000093\",\"uid\":\"20010093\"},{\"bundle\":\"com.example.app3\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app3-20010094-20260900000094\",\"timestamp\":\"20260900000094\",\"uid\":\"20010094\"},{\"bundle\":\"com.example.app4\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app4-20010095-20260900000095\",\"timestamp\":\"20260900000095\",\"uid\":\"20010095\"},{\"bundle\":\"com.example.app5\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app5-20010096-20260900000096\",\"timestamp\":\"20260900000096\",\"uid\":\"20010096\"},{\"bundle\":\"com.example.app6\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app6-20010097-20260900000097\",\"timestamp\":\"20260900000097\",\"uid\":\"20010097\"},{\"bundle\":\"com.example.app0\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app0-20010098-20260900000098\",\"timestamp\":\"20260900000098\",\"uid\":\"20010098\"},{\"bundle\":\"com.example.app1\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.app1-20010099-20260900000099\",\"timestamp\":\"20260900000099\",\"uid\":\"20010099\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgr/CioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "invalid-utf8",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"invalidEncoding\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgrtoIAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "surrogate-encoding",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"invalidEncoding\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "77u/KioqKioqCmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCkZhdWx0IGxvZyBsaXN0Ogo=",
+      "inputMode" : 384,
+      "name" : "byte-order-mark-then-a-fence",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "77u/77u/KioqKioqCmNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCkZhdWx0IGxvZyBsaXN0Ogo=",
+      "inputMode" : 384,
+      "name" : "two-byte-order-marks-then-a-fence",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"ledgerFenceAbsent\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "77u//w==",
+      "inputMode" : 384,
+      "name" : "byte-order-mark-then-invalid-utf8",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"invalidEncoding\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLdmi2aDZoNmhLdmi2aDZotmm2aDZp9mj2aHZodmm2aLZodmj2aQKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "arabic-indic-digits",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-٢٠٠١-٢٠٢٦٠٧٣١١٦٢١٣٤\",\"timestamp\":\"٢٠٢٦٠٧٣١١٦٢١٣٤\",\"uid\":\"٢٠٠١\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLe+8ku+8kC3vvJLvvJDvvJLvvJbvvJDvvJfvvJPvvJHvvJHvvJbvvJLvvJHvvJPvvJQKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "fullwidth-digits",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-２０-２０２６０７３１１６２１３４\",\"timestamp\":\"２０２６０７３１１６２１３４\",\"uid\":\"２０\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLeS4gOS6jOS4iS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "han-numerals-in-the-uid",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-一二三-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"一二三\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpqc2NyYXNoLWNvbS5leGFtcGxlLcK9wrItMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "fractions-and-superscripts-in-the-uid",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example-½²-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"½²\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgrjgq/jg6njg4Pjgrfjg6UtY29tLmV4YW1wbGUtMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "kind-in-katakana",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"クラッシュ\",\"name\":\"クラッシュ-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgrvo4FjcmFzaC1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "kind-of-private-use-letters",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"crash\",\"name\":\"crash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHDMgWNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "kind-with-a-combining-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cpṕcrash\",\"name\":\"cpṕcrash-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgrMgWNwcGNyYXNoLWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "kind-starting-with-a-combining-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgrgpJXgpY3gpLfgpKTgpY3gpLAtY29tLmV4YW1wbGUtMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "kind-with-an-indic-conjunct",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"क्षत्र\",\"name\":\"क्षत्र-com.example-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLTLMgTAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "timestamp-with-combining-marks",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.example-1-2́0260101000000\",\"timestamp\":\"2́0260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZS0xLcyBMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "timestamp-starting-with-a-combining-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uYS3MgWItMS0yMDI2MDEwMTAwMDAwMAoqKioqKioK",
+      "inputMode" : 384,
+      "name" : "hyphen-with-a-combining-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.a-́b\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.a-́b-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaNiALWNvbS5leGFtcGxlLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "hyphen-after-a-prepended-mark",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcmFzaOC1ji1jb20uZXhhbXBsZS0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "kind-ending-in-a-prepended-letter",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20uZXhhbXBsZeC1ji0xLTIwMjYwMTAxMDAwMDAwCioqKioqKgo=",
+      "inputMode" : 384,
+      "name" : "bundle-ending-in-a-prepended-letter",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[],\"schemaVersion\":\"1.0.0\",\"status\":\"unreadable\",\"unreadableReason\":\"entryNameUnparseable\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20u8J+nkeKAjfCfkrsuYXBwLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "emoji-in-the-bundle",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.🧑‍💻.app\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.🧑‍💻.app-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{input}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6CioqKioqKgpjcHBjcmFzaC1jb20u8J+HqPCfh7Pwn4eoLTEtMjAyNjAxMDEwMDAwMDAKKioqKioqCg==",
+      "inputMode" : 384,
+      "name" : "regional-indicators-in-the-bundle",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.🇨🇳🇨\",\"kind\":\"cppcrash\",\"name\":\"cppcrash-com.🇨🇳🇨-1-20260101000000\",\"timestamp\":\"20260101000000\",\"uid\":\"1\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    },
+    {
+      "arguments" : [
+        "--analyze-crash-ledger",
+        "{inputVolume}"
+      ],
+      "exitStatus" : 0,
+      "input" : "RmF1bHQgbG9nIGxpc3Q6DQoqKioqKioNCmpzY3Jhc2gtY29tLmV4YW1wbGUubXktYXBwLTIwMDEwMDM5LTIwMjYwOTI0MDAwMDAwDQoqKioqKioNCg==",
+      "inputMode" : 384,
+      "name" : "runtime-service-probe",
+      "stderr" : "",
+      "stderrIsPrefix" : false,
+      "stdout" : "{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"entries\":[{\"bundle\":\"com.example.my-app\",\"kind\":\"jscrash\",\"name\":\"jscrash-com.example.my-app-20010039-20260924000000\",\"timestamp\":\"20260924000000\",\"uid\":\"20010039\"}],\"schemaVersion\":\"1.0.0\",\"status\":\"answered\"}"
+    }
+  ],
+  "properties" : {
+    "isLetter" : [
+      [
+        65,
+        90
+      ],
+      [
+        97,
+        122
+      ],
+      [
+        170,
+        170
+      ],
+      [
+        181,
+        181
+      ],
+      [
+        186,
+        186
+      ],
+      [
+        192,
+        214
+      ],
+      [
+        216,
+        246
+      ],
+      [
+        248,
+        705
+      ],
+      [
+        710,
+        721
+      ],
+      [
+        736,
+        740
+      ],
+      [
+        748,
+        748
+      ],
+      [
+        750,
+        750
+      ],
+      [
+        837,
+        837
+      ],
+      [
+        867,
+        884
+      ],
+      [
+        886,
+        887
+      ],
+      [
+        890,
+        893
+      ],
+      [
+        895,
+        895
+      ],
+      [
+        902,
+        902
+      ],
+      [
+        904,
+        906
+      ],
+      [
+        908,
+        908
+      ],
+      [
+        910,
+        929
+      ],
+      [
+        931,
+        1013
+      ],
+      [
+        1015,
+        1153
+      ],
+      [
+        1162,
+        1327
+      ],
+      [
+        1329,
+        1366
+      ],
+      [
+        1369,
+        1369
+      ],
+      [
+        1376,
+        1416
+      ],
+      [
+        1456,
+        1469
+      ],
+      [
+        1471,
+        1471
+      ],
+      [
+        1473,
+        1474
+      ],
+      [
+        1476,
+        1477
+      ],
+      [
+        1479,
+        1479
+      ],
+      [
+        1488,
+        1514
+      ],
+      [
+        1519,
+        1522
+      ],
+      [
+        1552,
+        1562
+      ],
+      [
+        1568,
+        1623
+      ],
+      [
+        1625,
+        1631
+      ],
+      [
+        1646,
+        1747
+      ],
+      [
+        1749,
+        1756
+      ],
+      [
+        1761,
+        1768
+      ],
+      [
+        1773,
+        1775
+      ],
+      [
+        1786,
+        1788
+      ],
+      [
+        1791,
+        1791
+      ],
+      [
+        1808,
+        1855
+      ],
+      [
+        1869,
+        1969
+      ],
+      [
+        1994,
+        2026
+      ],
+      [
+        2036,
+        2037
+      ],
+      [
+        2042,
+        2042
+      ],
+      [
+        2048,
+        2071
+      ],
+      [
+        2074,
+        2092
+      ],
+      [
+        2112,
+        2136
+      ],
+      [
+        2144,
+        2154
+      ],
+      [
+        2160,
+        2183
+      ],
+      [
+        2185,
+        2191
+      ],
+      [
+        2199,
+        2199
+      ],
+      [
+        2208,
+        2249
+      ],
+      [
+        2260,
+        2271
+      ],
+      [
+        2275,
+        2281
+      ],
+      [
+        2288,
+        2363
+      ],
+      [
+        2365,
+        2380
+      ],
+      [
+        2382,
+        2384
+      ],
+      [
+        2389,
+        2403
+      ],
+      [
+        2417,
+        2435
+      ],
+      [
+        2437,
+        2444
+      ],
+      [
+        2447,
+        2448
+      ],
+      [
+        2451,
+        2472
+      ],
+      [
+        2474,
+        2480
+      ],
+      [
+        2482,
+        2482
+      ],
+      [
+        2486,
+        2489
+      ],
+      [
+        2493,
+        2500
+      ],
+      [
+        2503,
+        2504
+      ],
+      [
+        2507,
+        2508
+      ],
+      [
+        2510,
+        2510
+      ],
+      [
+        2519,
+        2519
+      ],
+      [
+        2524,
+        2525
+      ],
+      [
+        2527,
+        2531
+      ],
+      [
+        2544,
+        2545
+      ],
+      [
+        2556,
+        2556
+      ],
+      [
+        2561,
+        2563
+      ],
+      [
+        2565,
+        2570
+      ],
+      [
+        2575,
+        2576
+      ],
+      [
+        2579,
+        2600
+      ],
+      [
+        2602,
+        2608
+      ],
+      [
+        2610,
+        2611
+      ],
+      [
+        2613,
+        2614
+      ],
+      [
+        2616,
+        2617
+      ],
+      [
+        2622,
+        2626
+      ],
+      [
+        2631,
+        2632
+      ],
+      [
+        2635,
+        2636
+      ],
+      [
+        2641,
+        2641
+      ],
+      [
+        2649,
+        2652
+      ],
+      [
+        2654,
+        2654
+      ],
+      [
+        2672,
+        2677
+      ],
+      [
+        2689,
+        2691
+      ],
+      [
+        2693,
+        2701
+      ],
+      [
+        2703,
+        2705
+      ],
+      [
+        2707,
+        2728
+      ],
+      [
+        2730,
+        2736
+      ],
+      [
+        2738,
+        2739
+      ],
+      [
+        2741,
+        2745
+      ],
+      [
+        2749,
+        2757
+      ],
+      [
+        2759,
+        2761
+      ],
+      [
+        2763,
+        2764
+      ],
+      [
+        2768,
+        2768
+      ],
+      [
+        2784,
+        2787
+      ],
+      [
+        2809,
+        2812
+      ],
+      [
+        2817,
+        2819
+      ],
+      [
+        2821,
+        2828
+      ],
+      [
+        2831,
+        2832
+      ],
+      [
+        2835,
+        2856
+      ],
+      [
+        2858,
+        2864
+      ],
+      [
+        2866,
+        2867
+      ],
+      [
+        2869,
+        2873
+      ],
+      [
+        2877,
+        2884
+      ],
+      [
+        2887,
+        2888
+      ],
+      [
+        2891,
+        2892
+      ],
+      [
+        2902,
+        2903
+      ],
+      [
+        2908,
+        2909
+      ],
+      [
+        2911,
+        2915
+      ],
+      [
+        2929,
+        2929
+      ],
+      [
+        2946,
+        2947
+      ],
+      [
+        2949,
+        2954
+      ],
+      [
+        2958,
+        2960
+      ],
+      [
+        2962,
+        2965
+      ],
+      [
+        2969,
+        2970
+      ],
+      [
+        2972,
+        2972
+      ],
+      [
+        2974,
+        2975
+      ],
+      [
+        2979,
+        2980
+      ],
+      [
+        2984,
+        2986
+      ],
+      [
+        2990,
+        3001
+      ],
+      [
+        3006,
+        3010
+      ],
+      [
+        3014,
+        3016
+      ],
+      [
+        3018,
+        3020
+      ],
+      [
+        3024,
+        3024
+      ],
+      [
+        3031,
+        3031
+      ],
+      [
+        3072,
+        3084
+      ],
+      [
+        3086,
+        3088
+      ],
+      [
+        3090,
+        3112
+      ],
+      [
+        3114,
+        3129
+      ],
+      [
+        3133,
+        3140
+      ],
+      [
+        3142,
+        3144
+      ],
+      [
+        3146,
+        3148
+      ],
+      [
+        3157,
+        3158
+      ],
+      [
+        3160,
+        3162
+      ],
+      [
+        3164,
+        3165
+      ],
+      [
+        3168,
+        3171
+      ],
+      [
+        3200,
+        3203
+      ],
+      [
+        3205,
+        3212
+      ],
+      [
+        3214,
+        3216
+      ],
+      [
+        3218,
+        3240
+      ],
+      [
+        3242,
+        3251
+      ],
+      [
+        3253,
+        3257
+      ],
+      [
+        3261,
+        3268
+      ],
+      [
+        3270,
+        3272
+      ],
+      [
+        3274,
+        3276
+      ],
+      [
+        3285,
+        3286
+      ],
+      [
+        3292,
+        3294
+      ],
+      [
+        3296,
+        3299
+      ],
+      [
+        3313,
+        3315
+      ],
+      [
+        3328,
+        3340
+      ],
+      [
+        3342,
+        3344
+      ],
+      [
+        3346,
+        3386
+      ],
+      [
+        3389,
+        3396
+      ],
+      [
+        3398,
+        3400
+      ],
+      [
+        3402,
+        3404
+      ],
+      [
+        3406,
+        3406
+      ],
+      [
+        3412,
+        3415
+      ],
+      [
+        3423,
+        3427
+      ],
+      [
+        3450,
+        3455
+      ],
+      [
+        3457,
+        3459
+      ],
+      [
+        3461,
+        3478
+      ],
+      [
+        3482,
+        3505
+      ],
+      [
+        3507,
+        3515
+      ],
+      [
+        3517,
+        3517
+      ],
+      [
+        3520,
+        3526
+      ],
+      [
+        3535,
+        3540
+      ],
+      [
+        3542,
+        3542
+      ],
+      [
+        3544,
+        3551
+      ],
+      [
+        3570,
+        3571
+      ],
+      [
+        3585,
+        3642
+      ],
+      [
+        3648,
+        3654
+      ],
+      [
+        3661,
+        3661
+      ],
+      [
+        3713,
+        3714
+      ],
+      [
+        3716,
+        3716
+      ],
+      [
+        3718,
+        3722
+      ],
+      [
+        3724,
+        3747
+      ],
+      [
+        3749,
+        3749
+      ],
+      [
+        3751,
+        3769
+      ],
+      [
+        3771,
+        3773
+      ],
+      [
+        3776,
+        3780
+      ],
+      [
+        3782,
+        3782
+      ],
+      [
+        3789,
+        3789
+      ],
+      [
+        3804,
+        3807
+      ],
+      [
+        3840,
+        3840
+      ],
+      [
+        3904,
+        3911
+      ],
+      [
+        3913,
+        3948
+      ],
+      [
+        3953,
+        3971
+      ],
+      [
+        3976,
+        3991
+      ],
+      [
+        3993,
+        4028
+      ],
+      [
+        4096,
+        4150
+      ],
+      [
+        4152,
+        4152
+      ],
+      [
+        4155,
+        4159
+      ],
+      [
+        4176,
+        4239
+      ],
+      [
+        4250,
+        4253
+      ],
+      [
+        4256,
+        4293
+      ],
+      [
+        4295,
+        4295
+      ],
+      [
+        4301,
+        4301
+      ],
+      [
+        4304,
+        4346
+      ],
+      [
+        4348,
+        4680
+      ],
+      [
+        4682,
+        4685
+      ],
+      [
+        4688,
+        4694
+      ],
+      [
+        4696,
+        4696
+      ],
+      [
+        4698,
+        4701
+      ],
+      [
+        4704,
+        4744
+      ],
+      [
+        4746,
+        4749
+      ],
+      [
+        4752,
+        4784
+      ],
+      [
+        4786,
+        4789
+      ],
+      [
+        4792,
+        4798
+      ],
+      [
+        4800,
+        4800
+      ],
+      [
+        4802,
+        4805
+      ],
+      [
+        4808,
+        4822
+      ],
+      [
+        4824,
+        4880
+      ],
+      [
+        4882,
+        4885
+      ],
+      [
+        4888,
+        4954
+      ],
+      [
+        4992,
+        5007
+      ],
+      [
+        5024,
+        5109
+      ],
+      [
+        5112,
+        5117
+      ],
+      [
+        5121,
+        5740
+      ],
+      [
+        5743,
+        5759
+      ],
+      [
+        5761,
+        5786
+      ],
+      [
+        5792,
+        5866
+      ],
+      [
+        5870,
+        5880
+      ],
+      [
+        5888,
+        5907
+      ],
+      [
+        5919,
+        5939
+      ],
+      [
+        5952,
+        5971
+      ],
+      [
+        5984,
+        5996
+      ],
+      [
+        5998,
+        6000
+      ],
+      [
+        6002,
+        6003
+      ],
+      [
+        6016,
+        6067
+      ],
+      [
+        6070,
+        6088
+      ],
+      [
+        6103,
+        6103
+      ],
+      [
+        6108,
+        6108
+      ],
+      [
+        6176,
+        6264
+      ],
+      [
+        6272,
+        6314
+      ],
+      [
+        6320,
+        6389
+      ],
+      [
+        6400,
+        6430
+      ],
+      [
+        6432,
+        6443
+      ],
+      [
+        6448,
+        6456
+      ],
+      [
+        6480,
+        6509
+      ],
+      [
+        6512,
+        6516
+      ],
+      [
+        6528,
+        6571
+      ],
+      [
+        6576,
+        6601
+      ],
+      [
+        6656,
+        6683
+      ],
+      [
+        6688,
+        6750
+      ],
+      [
+        6753,
+        6772
+      ],
+      [
+        6823,
+        6823
+      ],
+      [
+        6847,
+        6848
+      ],
+      [
+        6860,
+        6862
+      ],
+      [
+        6912,
+        6963
+      ],
+      [
+        6965,
+        6979
+      ],
+      [
+        6981,
+        6988
+      ],
+      [
+        7040,
+        7081
+      ],
+      [
+        7084,
+        7087
+      ],
+      [
+        7098,
+        7141
+      ],
+      [
+        7143,
+        7153
+      ],
+      [
+        7168,
+        7222
+      ],
+      [
+        7245,
+        7247
+      ],
+      [
+        7258,
+        7293
+      ],
+      [
+        7296,
+        7306
+      ],
+      [
+        7312,
+        7354
+      ],
+      [
+        7357,
+        7359
+      ],
+      [
+        7401,
+        7404
+      ],
+      [
+        7406,
+        7411
+      ],
+      [
+        7413,
+        7414
+      ],
+      [
+        7418,
+        7418
+      ],
+      [
+        7424,
+        7615
+      ],
+      [
+        7635,
+        7668
+      ],
+      [
+        7680,
+        7957
+      ],
+      [
+        7960,
+        7965
+      ],
+      [
+        7968,
+        8005
+      ],
+      [
+        8008,
+        8013
+      ],
+      [
+        8016,
+        8023
+      ],
+      [
+        8025,
+        8025
+      ],
+      [
+        8027,
+        8027
+      ],
+      [
+        8029,
+        8029
+      ],
+      [
+        8031,
+        8061
+      ],
+      [
+        8064,
+        8116
+      ],
+      [
+        8118,
+        8124
+      ],
+      [
+        8126,
+        8126
+      ],
+      [
+        8130,
+        8132
+      ],
+      [
+        8134,
+        8140
+      ],
+      [
+        8144,
+        8147
+      ],
+      [
+        8150,
+        8155
+      ],
+      [
+        8160,
+        8172
+      ],
+      [
+        8178,
+        8180
+      ],
+      [
+        8182,
+        8188
+      ],
+      [
+        8305,
+        8305
+      ],
+      [
+        8319,
+        8319
+      ],
+      [
+        8336,
+        8348
+      ],
+      [
+        8450,
+        8450
+      ],
+      [
+        8455,
+        8455
+      ],
+      [
+        8458,
+        8467
+      ],
+      [
+        8469,
+        8469
+      ],
+      [
+        8473,
+        8477
+      ],
+      [
+        8484,
+        8484
+      ],
+      [
+        8486,
+        8486
+      ],
+      [
+        8488,
+        8488
+      ],
+      [
+        8490,
+        8493
+      ],
+      [
+        8495,
+        8505
+      ],
+      [
+        8508,
+        8511
+      ],
+      [
+        8517,
+        8521
+      ],
+      [
+        8526,
+        8526
+      ],
+      [
+        8544,
+        8584
+      ],
+      [
+        9398,
+        9449
+      ],
+      [
+        11264,
+        11492
+      ],
+      [
+        11499,
+        11502
+      ],
+      [
+        11506,
+        11507
+      ],
+      [
+        11520,
+        11557
+      ],
+      [
+        11559,
+        11559
+      ],
+      [
+        11565,
+        11565
+      ],
+      [
+        11568,
+        11623
+      ],
+      [
+        11631,
+        11631
+      ],
+      [
+        11648,
+        11670
+      ],
+      [
+        11680,
+        11686
+      ],
+      [
+        11688,
+        11694
+      ],
+      [
+        11696,
+        11702
+      ],
+      [
+        11704,
+        11710
+      ],
+      [
+        11712,
+        11718
+      ],
+      [
+        11720,
+        11726
+      ],
+      [
+        11728,
+        11734
+      ],
+      [
+        11736,
+        11742
+      ],
+      [
+        11744,
+        11775
+      ],
+      [
+        11823,
+        11823
+      ],
+      [
+        12293,
+        12295
+      ],
+      [
+        12321,
+        12329
+      ],
+      [
+        12337,
+        12341
+      ],
+      [
+        12344,
+        12348
+      ],
+      [
+        12353,
+        12438
+      ],
+      [
+        12445,
+        12447
+      ],
+      [
+        12449,
+        12538
+      ],
+      [
+        12540,
+        12543
+      ],
+      [
+        12549,
+        12591
+      ],
+      [
+        12593,
+        12686
+      ],
+      [
+        12704,
+        12735
+      ],
+      [
+        12784,
+        12799
+      ],
+      [
+        13312,
+        19903
+      ],
+      [
+        19968,
+        42124
+      ],
+      [
+        42192,
+        42237
+      ],
+      [
+        42240,
+        42508
+      ],
+      [
+        42512,
+        42527
+      ],
+      [
+        42538,
+        42539
+      ],
+      [
+        42560,
+        42606
+      ],
+      [
+        42612,
+        42619
+      ],
+      [
+        42623,
+        42735
+      ],
+      [
+        42775,
+        42783
+      ],
+      [
+        42786,
+        42888
+      ],
+      [
+        42891,
+        42972
+      ],
+      [
+        42993,
+        43013
+      ],
+      [
+        43015,
+        43047
+      ],
+      [
+        43072,
+        43123
+      ],
+      [
+        43136,
+        43203
+      ],
+      [
+        43205,
+        43205
+      ],
+      [
+        43250,
+        43255
+      ],
+      [
+        43259,
+        43259
+      ],
+      [
+        43261,
+        43263
+      ],
+      [
+        43274,
+        43306
+      ],
+      [
+        43312,
+        43346
+      ],
+      [
+        43360,
+        43388
+      ],
+      [
+        43392,
+        43442
+      ],
+      [
+        43444,
+        43455
+      ],
+      [
+        43471,
+        43471
+      ],
+      [
+        43488,
+        43503
+      ],
+      [
+        43514,
+        43518
+      ],
+      [
+        43520,
+        43574
+      ],
+      [
+        43584,
+        43597
+      ],
+      [
+        43616,
+        43638
+      ],
+      [
+        43642,
+        43710
+      ],
+      [
+        43712,
+        43712
+      ],
+      [
+        43714,
+        43714
+      ],
+      [
+        43739,
+        43741
+      ],
+      [
+        43744,
+        43759
+      ],
+      [
+        43762,
+        43765
+      ],
+      [
+        43777,
+        43782
+      ],
+      [
+        43785,
+        43790
+      ],
+      [
+        43793,
+        43798
+      ],
+      [
+        43808,
+        43814
+      ],
+      [
+        43816,
+        43822
+      ],
+      [
+        43824,
+        43866
+      ],
+      [
+        43868,
+        43881
+      ],
+      [
+        43888,
+        44010
+      ],
+      [
+        44032,
+        55203
+      ],
+      [
+        55216,
+        55238
+      ],
+      [
+        55243,
+        55291
+      ],
+      [
+        63618,
+        63618
+      ],
+      [
+        63642,
+        63646
+      ],
+      [
+        63650,
+        63655
+      ],
+      [
+        63672,
+        63672
+      ],
+      [
+        63681,
+        63702
+      ],
+      [
+        63744,
+        64109
+      ],
+      [
+        64112,
+        64217
+      ],
+      [
+        64256,
+        64262
+      ],
+      [
+        64275,
+        64279
+      ],
+      [
+        64285,
+        64296
+      ],
+      [
+        64298,
+        64310
+      ],
+      [
+        64312,
+        64316
+      ],
+      [
+        64318,
+        64318
+      ],
+      [
+        64320,
+        64321
+      ],
+      [
+        64323,
+        64324
+      ],
+      [
+        64326,
+        64433
+      ],
+      [
+        64467,
+        64829
+      ],
+      [
+        64848,
+        64911
+      ],
+      [
+        64914,
+        64967
+      ],
+      [
+        65008,
+        65019
+      ],
+      [
+        65136,
+        65140
+      ],
+      [
+        65142,
+        65276
+      ],
+      [
+        65313,
+        65338
+      ],
+      [
+        65345,
+        65370
+      ],
+      [
+        65382,
+        65470
+      ],
+      [
+        65474,
+        65479
+      ],
+      [
+        65482,
+        65487
+      ],
+      [
+        65490,
+        65495
+      ],
+      [
+        65498,
+        65500
+      ],
+      [
+        65536,
+        65547
+      ],
+      [
+        65549,
+        65574
+      ],
+      [
+        65576,
+        65594
+      ],
+      [
+        65596,
+        65597
+      ],
+      [
+        65599,
+        65613
+      ],
+      [
+        65616,
+        65629
+      ],
+      [
+        65664,
+        65786
+      ],
+      [
+        65856,
+        65908
+      ],
+      [
+        66176,
+        66204
+      ],
+      [
+        66208,
+        66256
+      ],
+      [
+        66304,
+        66335
+      ],
+      [
+        66349,
+        66378
+      ],
+      [
+        66384,
+        66426
+      ],
+      [
+        66432,
+        66461
+      ],
+      [
+        66464,
+        66499
+      ],
+      [
+        66504,
+        66511
+      ],
+      [
+        66513,
+        66517
+      ],
+      [
+        66560,
+        66717
+      ],
+      [
+        66736,
+        66771
+      ],
+      [
+        66776,
+        66811
+      ],
+      [
+        66816,
+        66855
+      ],
+      [
+        66864,
+        66915
+      ],
+      [
+        66928,
+        66938
+      ],
+      [
+        66940,
+        66954
+      ],
+      [
+        66956,
+        66962
+      ],
+      [
+        66964,
+        66965
+      ],
+      [
+        66967,
+        66977
+      ],
+      [
+        66979,
+        66993
+      ],
+      [
+        66995,
+        67001
+      ],
+      [
+        67003,
+        67004
+      ],
+      [
+        67008,
+        67059
+      ],
+      [
+        67072,
+        67382
+      ],
+      [
+        67392,
+        67413
+      ],
+      [
+        67424,
+        67431
+      ],
+      [
+        67456,
+        67461
+      ],
+      [
+        67463,
+        67504
+      ],
+      [
+        67506,
+        67514
+      ],
+      [
+        67584,
+        67589
+      ],
+      [
+        67592,
+        67592
+      ],
+      [
+        67594,
+        67637
+      ],
+      [
+        67639,
+        67640
+      ],
+      [
+        67644,
+        67644
+      ],
+      [
+        67647,
+        67669
+      ],
+      [
+        67680,
+        67702
+      ],
+      [
+        67712,
+        67742
+      ],
+      [
+        67808,
+        67826
+      ],
+      [
+        67828,
+        67829
+      ],
+      [
+        67840,
+        67861
+      ],
+      [
+        67872,
+        67897
+      ],
+      [
+        67904,
+        67929
+      ],
+      [
+        67968,
+        68023
+      ],
+      [
+        68030,
+        68031
+      ],
+      [
+        68096,
+        68099
+      ],
+      [
+        68101,
+        68102
+      ],
+      [
+        68108,
+        68115
+      ],
+      [
+        68117,
+        68119
+      ],
+      [
+        68121,
+        68149
+      ],
+      [
+        68192,
+        68220
+      ],
+      [
+        68224,
+        68252
+      ],
+      [
+        68288,
+        68295
+      ],
+      [
+        68297,
+        68324
+      ],
+      [
+        68352,
+        68405
+      ],
+      [
+        68416,
+        68437
+      ],
+      [
+        68448,
+        68466
+      ],
+      [
+        68480,
+        68497
+      ],
+      [
+        68608,
+        68680
+      ],
+      [
+        68736,
+        68786
+      ],
+      [
+        68800,
+        68850
+      ],
+      [
+        68864,
+        68903
+      ],
+      [
+        68938,
+        68965
+      ],
+      [
+        68969,
+        68969
+      ],
+      [
+        68975,
+        68997
+      ],
+      [
+        69248,
+        69289
+      ],
+      [
+        69291,
+        69292
+      ],
+      [
+        69296,
+        69297
+      ],
+      [
+        69314,
+        69319
+      ],
+      [
+        69370,
+        69372
+      ],
+      [
+        69376,
+        69404
+      ],
+      [
+        69415,
+        69415
+      ],
+      [
+        69424,
+        69445
+      ],
+      [
+        69488,
+        69505
+      ],
+      [
+        69552,
+        69572
+      ],
+      [
+        69600,
+        69622
+      ],
+      [
+        69632,
+        69701
+      ],
+      [
+        69745,
+        69749
+      ],
+      [
+        69760,
+        69816
+      ],
+      [
+        69826,
+        69826
+      ],
+      [
+        69840,
+        69864
+      ],
+      [
+        69888,
+        69938
+      ],
+      [
+        69956,
+        69959
+      ],
+      [
+        69968,
+        70002
+      ],
+      [
+        70006,
+        70006
+      ],
+      [
+        70016,
+        70079
+      ],
+      [
+        70081,
+        70084
+      ],
+      [
+        70094,
+        70095
+      ],
+      [
+        70106,
+        70106
+      ],
+      [
+        70108,
+        70108
+      ],
+      [
+        70144,
+        70161
+      ],
+      [
+        70163,
+        70196
+      ],
+      [
+        70199,
+        70199
+      ],
+      [
+        70206,
+        70209
+      ],
+      [
+        70272,
+        70278
+      ],
+      [
+        70280,
+        70280
+      ],
+      [
+        70282,
+        70285
+      ],
+      [
+        70287,
+        70301
+      ],
+      [
+        70303,
+        70312
+      ],
+      [
+        70320,
+        70376
+      ],
+      [
+        70400,
+        70403
+      ],
+      [
+        70405,
+        70412
+      ],
+      [
+        70415,
+        70416
+      ],
+      [
+        70419,
+        70440
+      ],
+      [
+        70442,
+        70448
+      ],
+      [
+        70450,
+        70451
+      ],
+      [
+        70453,
+        70457
+      ],
+      [
+        70461,
+        70468
+      ],
+      [
+        70471,
+        70472
+      ],
+      [
+        70475,
+        70476
+      ],
+      [
+        70480,
+        70480
+      ],
+      [
+        70487,
+        70487
+      ],
+      [
+        70493,
+        70499
+      ],
+      [
+        70528,
+        70537
+      ],
+      [
+        70539,
+        70539
+      ],
+      [
+        70542,
+        70542
+      ],
+      [
+        70544,
+        70581
+      ],
+      [
+        70583,
+        70592
+      ],
+      [
+        70594,
+        70594
+      ],
+      [
+        70597,
+        70597
+      ],
+      [
+        70599,
+        70602
+      ],
+      [
+        70604,
+        70605
+      ],
+      [
+        70609,
+        70609
+      ],
+      [
+        70611,
+        70611
+      ],
+      [
+        70656,
+        70721
+      ],
+      [
+        70723,
+        70725
+      ],
+      [
+        70727,
+        70730
+      ],
+      [
+        70751,
+        70753
+      ],
+      [
+        70784,
+        70849
+      ],
+      [
+        70852,
+        70853
+      ],
+      [
+        70855,
+        70855
+      ],
+      [
+        71040,
+        71093
+      ],
+      [
+        71096,
+        71102
+      ],
+      [
+        71128,
+        71133
+      ],
+      [
+        71168,
+        71230
+      ],
+      [
+        71232,
+        71232
+      ],
+      [
+        71236,
+        71236
+      ],
+      [
+        71296,
+        71349
+      ],
+      [
+        71352,
+        71352
+      ],
+      [
+        71424,
+        71450
+      ],
+      [
+        71453,
+        71466
+      ],
+      [
+        71488,
+        71494
+      ],
+      [
+        71680,
+        71736
+      ],
+      [
+        71840,
+        71903
+      ],
+      [
+        71935,
+        71942
+      ],
+      [
+        71945,
+        71945
+      ],
+      [
+        71948,
+        71955
+      ],
+      [
+        71957,
+        71958
+      ],
+      [
+        71960,
+        71989
+      ],
+      [
+        71991,
+        71992
+      ],
+      [
+        71995,
+        71996
+      ],
+      [
+        71999,
+        72002
+      ],
+      [
+        72096,
+        72103
+      ],
+      [
+        72106,
+        72151
+      ],
+      [
+        72154,
+        72159
+      ],
+      [
+        72161,
+        72161
+      ],
+      [
+        72163,
+        72164
+      ],
+      [
+        72192,
+        72242
+      ],
+      [
+        72245,
+        72254
+      ],
+      [
+        72272,
+        72343
+      ],
+      [
+        72349,
+        72349
+      ],
+      [
+        72368,
+        72440
+      ],
+      [
+        72544,
+        72551
+      ],
+      [
+        72640,
+        72672
+      ],
+      [
+        72704,
+        72712
+      ],
+      [
+        72714,
+        72758
+      ],
+      [
+        72760,
+        72766
+      ],
+      [
+        72768,
+        72768
+      ],
+      [
+        72818,
+        72847
+      ],
+      [
+        72850,
+        72871
+      ],
+      [
+        72873,
+        72886
+      ],
+      [
+        72960,
+        72966
+      ],
+      [
+        72968,
+        72969
+      ],
+      [
+        72971,
+        73014
+      ],
+      [
+        73018,
+        73018
+      ],
+      [
+        73020,
+        73021
+      ],
+      [
+        73023,
+        73025
+      ],
+      [
+        73027,
+        73027
+      ],
+      [
+        73030,
+        73031
+      ],
+      [
+        73056,
+        73061
+      ],
+      [
+        73063,
+        73064
+      ],
+      [
+        73066,
+        73102
+      ],
+      [
+        73104,
+        73105
+      ],
+      [
+        73107,
+        73110
+      ],
+      [
+        73112,
+        73112
+      ],
+      [
+        73136,
+        73179
+      ],
+      [
+        73440,
+        73462
+      ],
+      [
+        73472,
+        73488
+      ],
+      [
+        73490,
+        73530
+      ],
+      [
+        73534,
+        73536
+      ],
+      [
+        73648,
+        73648
+      ],
+      [
+        73728,
+        74649
+      ],
+      [
+        74752,
+        74862
+      ],
+      [
+        74880,
+        75075
+      ],
+      [
+        77712,
+        77808
+      ],
+      [
+        77824,
+        78895
+      ],
+      [
+        78913,
+        78918
+      ],
+      [
+        78944,
+        82938
+      ],
+      [
+        82944,
+        83526
+      ],
+      [
+        90368,
+        90414
+      ],
+      [
+        92160,
+        92728
+      ],
+      [
+        92736,
+        92766
+      ],
+      [
+        92784,
+        92862
+      ],
+      [
+        92880,
+        92909
+      ],
+      [
+        92928,
+        92975
+      ],
+      [
+        92992,
+        92995
+      ],
+      [
+        93027,
+        93047
+      ],
+      [
+        93053,
+        93071
+      ],
+      [
+        93504,
+        93548
+      ],
+      [
+        93760,
+        93823
+      ],
+      [
+        93856,
+        93880
+      ],
+      [
+        93883,
+        93907
+      ],
+      [
+        93952,
+        94026
+      ],
+      [
+        94031,
+        94087
+      ],
+      [
+        94095,
+        94111
+      ],
+      [
+        94176,
+        94177
+      ],
+      [
+        94179,
+        94179
+      ],
+      [
+        94192,
+        94198
+      ],
+      [
+        94208,
+        101589
+      ],
+      [
+        101631,
+        101662
+      ],
+      [
+        101760,
+        101874
+      ],
+      [
+        110576,
+        110579
+      ],
+      [
+        110581,
+        110587
+      ],
+      [
+        110589,
+        110590
+      ],
+      [
+        110592,
+        110882
+      ],
+      [
+        110898,
+        110898
+      ],
+      [
+        110928,
+        110930
+      ],
+      [
+        110933,
+        110933
+      ],
+      [
+        110948,
+        110951
+      ],
+      [
+        110960,
+        111355
+      ],
+      [
+        113664,
+        113770
+      ],
+      [
+        113776,
+        113788
+      ],
+      [
+        113792,
+        113800
+      ],
+      [
+        113808,
+        113817
+      ],
+      [
+        113822,
+        113822
+      ],
+      [
+        119808,
+        119892
+      ],
+      [
+        119894,
+        119964
+      ],
+      [
+        119966,
+        119967
+      ],
+      [
+        119970,
+        119970
+      ],
+      [
+        119973,
+        119974
+      ],
+      [
+        119977,
+        119980
+      ],
+      [
+        119982,
+        119993
+      ],
+      [
+        119995,
+        119995
+      ],
+      [
+        119997,
+        120003
+      ],
+      [
+        120005,
+        120069
+      ],
+      [
+        120071,
+        120074
+      ],
+      [
+        120077,
+        120084
+      ],
+      [
+        120086,
+        120092
+      ],
+      [
+        120094,
+        120121
+      ],
+      [
+        120123,
+        120126
+      ],
+      [
+        120128,
+        120132
+      ],
+      [
+        120134,
+        120134
+      ],
+      [
+        120138,
+        120144
+      ],
+      [
+        120146,
+        120485
+      ],
+      [
+        120488,
+        120512
+      ],
+      [
+        120514,
+        120538
+      ],
+      [
+        120540,
+        120570
+      ],
+      [
+        120572,
+        120596
+      ],
+      [
+        120598,
+        120628
+      ],
+      [
+        120630,
+        120654
+      ],
+      [
+        120656,
+        120686
+      ],
+      [
+        120688,
+        120712
+      ],
+      [
+        120714,
+        120744
+      ],
+      [
+        120746,
+        120770
+      ],
+      [
+        120772,
+        120779
+      ],
+      [
+        122624,
+        122654
+      ],
+      [
+        122661,
+        122666
+      ],
+      [
+        122880,
+        122886
+      ],
+      [
+        122888,
+        122904
+      ],
+      [
+        122907,
+        122913
+      ],
+      [
+        122915,
+        122916
+      ],
+      [
+        122918,
+        122922
+      ],
+      [
+        122928,
+        122989
+      ],
+      [
+        123023,
+        123023
+      ],
+      [
+        123136,
+        123180
+      ],
+      [
+        123191,
+        123197
+      ],
+      [
+        123214,
+        123214
+      ],
+      [
+        123536,
+        123565
+      ],
+      [
+        123584,
+        123627
+      ],
+      [
+        124112,
+        124139
+      ],
+      [
+        124368,
+        124397
+      ],
+      [
+        124400,
+        124400
+      ],
+      [
+        124608,
+        124638
+      ],
+      [
+        124640,
+        124661
+      ],
+      [
+        124670,
+        124671
+      ],
+      [
+        124896,
+        124902
+      ],
+      [
+        124904,
+        124907
+      ],
+      [
+        124909,
+        124910
+      ],
+      [
+        124912,
+        124926
+      ],
+      [
+        124928,
+        125124
+      ],
+      [
+        125184,
+        125251
+      ],
+      [
+        125255,
+        125255
+      ],
+      [
+        125259,
+        125259
+      ],
+      [
+        126464,
+        126467
+      ],
+      [
+        126469,
+        126495
+      ],
+      [
+        126497,
+        126498
+      ],
+      [
+        126500,
+        126500
+      ],
+      [
+        126503,
+        126503
+      ],
+      [
+        126505,
+        126514
+      ],
+      [
+        126516,
+        126519
+      ],
+      [
+        126521,
+        126521
+      ],
+      [
+        126523,
+        126523
+      ],
+      [
+        126530,
+        126530
+      ],
+      [
+        126535,
+        126535
+      ],
+      [
+        126537,
+        126537
+      ],
+      [
+        126539,
+        126539
+      ],
+      [
+        126541,
+        126543
+      ],
+      [
+        126545,
+        126546
+      ],
+      [
+        126548,
+        126548
+      ],
+      [
+        126551,
+        126551
+      ],
+      [
+        126553,
+        126553
+      ],
+      [
+        126555,
+        126555
+      ],
+      [
+        126557,
+        126557
+      ],
+      [
+        126559,
+        126559
+      ],
+      [
+        126561,
+        126562
+      ],
+      [
+        126564,
+        126564
+      ],
+      [
+        126567,
+        126570
+      ],
+      [
+        126572,
+        126578
+      ],
+      [
+        126580,
+        126583
+      ],
+      [
+        126585,
+        126588
+      ],
+      [
+        126590,
+        126590
+      ],
+      [
+        126592,
+        126601
+      ],
+      [
+        126603,
+        126619
+      ],
+      [
+        126625,
+        126627
+      ],
+      [
+        126629,
+        126633
+      ],
+      [
+        126635,
+        126651
+      ],
+      [
+        127280,
+        127305
+      ],
+      [
+        127312,
+        127337
+      ],
+      [
+        127344,
+        127369
+      ],
+      [
+        131072,
+        173791
+      ],
+      [
+        173824,
+        178205
+      ],
+      [
+        178208,
+        183981
+      ],
+      [
+        183984,
+        191456
+      ],
+      [
+        191472,
+        192093
+      ],
+      [
+        194560,
+        195101
+      ],
+      [
+        196608,
+        201546
+      ],
+      [
+        201552,
+        210041
+      ]
+    ],
+    "isNewline" : [
+      [
+        10,
+        13
+      ],
+      [
+        133,
+        133
+      ],
+      [
+        8232,
+        8233
+      ]
+    ],
+    "isNumber" : [
+      [
+        48,
+        57
+      ],
+      [
+        178,
+        179
+      ],
+      [
+        185,
+        185
+      ],
+      [
+        188,
+        190
+      ],
+      [
+        1632,
+        1641
+      ],
+      [
+        1776,
+        1785
+      ],
+      [
+        1984,
+        1993
+      ],
+      [
+        2406,
+        2415
+      ],
+      [
+        2534,
+        2543
+      ],
+      [
+        2548,
+        2553
+      ],
+      [
+        2662,
+        2671
+      ],
+      [
+        2790,
+        2799
+      ],
+      [
+        2918,
+        2927
+      ],
+      [
+        2930,
+        2935
+      ],
+      [
+        3046,
+        3058
+      ],
+      [
+        3174,
+        3183
+      ],
+      [
+        3192,
+        3198
+      ],
+      [
+        3302,
+        3311
+      ],
+      [
+        3416,
+        3422
+      ],
+      [
+        3430,
+        3448
+      ],
+      [
+        3558,
+        3567
+      ],
+      [
+        3664,
+        3673
+      ],
+      [
+        3792,
+        3801
+      ],
+      [
+        3872,
+        3891
+      ],
+      [
+        4160,
+        4169
+      ],
+      [
+        4240,
+        4249
+      ],
+      [
+        4969,
+        4988
+      ],
+      [
+        5870,
+        5872
+      ],
+      [
+        6112,
+        6121
+      ],
+      [
+        6128,
+        6137
+      ],
+      [
+        6160,
+        6169
+      ],
+      [
+        6470,
+        6479
+      ],
+      [
+        6608,
+        6618
+      ],
+      [
+        6784,
+        6793
+      ],
+      [
+        6800,
+        6809
+      ],
+      [
+        6992,
+        7001
+      ],
+      [
+        7088,
+        7097
+      ],
+      [
+        7232,
+        7241
+      ],
+      [
+        7248,
+        7257
+      ],
+      [
+        8304,
+        8304
+      ],
+      [
+        8308,
+        8313
+      ],
+      [
+        8320,
+        8329
+      ],
+      [
+        8528,
+        8578
+      ],
+      [
+        8581,
+        8585
+      ],
+      [
+        9312,
+        9371
+      ],
+      [
+        9450,
+        9471
+      ],
+      [
+        10102,
+        10131
+      ],
+      [
+        11517,
+        11517
+      ],
+      [
+        12295,
+        12295
+      ],
+      [
+        12321,
+        12329
+      ],
+      [
+        12344,
+        12346
+      ],
+      [
+        12690,
+        12693
+      ],
+      [
+        12832,
+        12841
+      ],
+      [
+        12872,
+        12879
+      ],
+      [
+        12881,
+        12895
+      ],
+      [
+        12928,
+        12937
+      ],
+      [
+        12977,
+        12991
+      ],
+      [
+        13317,
+        13317
+      ],
+      [
+        13443,
+        13443
+      ],
+      [
+        14378,
+        14378
+      ],
+      [
+        15181,
+        15181
+      ],
+      [
+        19968,
+        19968
+      ],
+      [
+        19971,
+        19971
+      ],
+      [
+        19975,
+        19975
+      ],
+      [
+        19977,
+        19977
+      ],
+      [
+        20004,
+        20004
+      ],
+      [
+        20061,
+        20061
+      ],
+      [
+        20108,
+        20108
+      ],
+      [
+        20116,
+        20116
+      ],
+      [
+        20118,
+        20118
+      ],
+      [
+        20140,
+        20140
+      ],
+      [
+        20159,
+        20160
+      ],
+      [
+        20191,
+        20191
+      ],
+      [
+        20200,
+        20200
+      ],
+      [
+        20237,
+        20237
+      ],
+      [
+        20336,
+        20336
+      ],
+      [
+        20457,
+        20457
+      ],
+      [
+        20486,
+        20486
+      ],
+      [
+        20740,
+        20740
+      ],
+      [
+        20806,
+        20806
+      ],
+      [
+        20841,
+        20841
+      ],
+      [
+        20843,
+        20843
+      ],
+      [
+        20845,
+        20845
+      ],
+      [
+        21313,
+        21313
+      ],
+      [
+        21315,
+        21317
+      ],
+      [
+        21324,
+        21324
+      ],
+      [
+        21441,
+        21444
+      ],
+      [
+        22235,
+        22235
+      ],
+      [
+        22769,
+        22769
+      ],
+      [
+        22777,
+        22777
+      ],
+      [
+        24186,
+        24186
+      ],
+      [
+        24318,
+        24319
+      ],
+      [
+        24332,
+        24334
+      ],
+      [
+        24336,
+        24336
+      ],
+      [
+        25296,
+        25296
+      ],
+      [
+        25342,
+        25342
+      ],
+      [
+        25420,
+        25420
+      ],
+      [
+        26578,
+        26578
+      ],
+      [
+        27934,
+        27934
+      ],
+      [
+        28422,
+        28422
+      ],
+      [
+        29590,
+        29590
+      ],
+      [
+        30334,
+        30334
+      ],
+      [
+        30357,
+        30357
+      ],
+      [
+        31213,
+        31213
+      ],
+      [
+        32902,
+        32902
+      ],
+      [
+        33836,
+        33836
+      ],
+      [
+        36014,
+        36014
+      ],
+      [
+        36019,
+        36019
+      ],
+      [
+        36144,
+        36144
+      ],
+      [
+        37390,
+        37390
+      ],
+      [
+        38057,
+        38057
+      ],
+      [
+        38433,
+        38433
+      ],
+      [
+        38470,
+        38470
+      ],
+      [
+        38476,
+        38476
+      ],
+      [
+        38520,
+        38520
+      ],
+      [
+        38646,
+        38646
+      ],
+      [
+        42528,
+        42537
+      ],
+      [
+        42726,
+        42735
+      ],
+      [
+        43056,
+        43061
+      ],
+      [
+        43216,
+        43225
+      ],
+      [
+        43264,
+        43273
+      ],
+      [
+        43472,
+        43481
+      ],
+      [
+        43504,
+        43513
+      ],
+      [
+        43600,
+        43609
+      ],
+      [
+        44016,
+        44025
+      ],
+      [
+        63851,
+        63851
+      ],
+      [
+        63859,
+        63859
+      ],
+      [
+        63864,
+        63864
+      ],
+      [
+        63922,
+        63922
+      ],
+      [
+        63953,
+        63953
+      ],
+      [
+        63955,
+        63955
+      ],
+      [
+        63997,
+        63997
+      ],
+      [
+        65296,
+        65305
+      ],
+      [
+        65799,
+        65843
+      ],
+      [
+        65856,
+        65912
+      ],
+      [
+        65930,
+        65931
+      ],
+      [
+        66273,
+        66299
+      ],
+      [
+        66336,
+        66339
+      ],
+      [
+        66369,
+        66369
+      ],
+      [
+        66378,
+        66378
+      ],
+      [
+        66513,
+        66517
+      ],
+      [
+        66720,
+        66729
+      ],
+      [
+        67672,
+        67679
+      ],
+      [
+        67705,
+        67711
+      ],
+      [
+        67751,
+        67759
+      ],
+      [
+        67835,
+        67839
+      ],
+      [
+        67862,
+        67867
+      ],
+      [
+        68028,
+        68029
+      ],
+      [
+        68032,
+        68047
+      ],
+      [
+        68050,
+        68095
+      ],
+      [
+        68160,
+        68168
+      ],
+      [
+        68221,
+        68222
+      ],
+      [
+        68253,
+        68255
+      ],
+      [
+        68331,
+        68335
+      ],
+      [
+        68440,
+        68447
+      ],
+      [
+        68472,
+        68479
+      ],
+      [
+        68521,
+        68527
+      ],
+      [
+        68858,
+        68863
+      ],
+      [
+        68912,
+        68921
+      ],
+      [
+        68928,
+        68937
+      ],
+      [
+        69216,
+        69246
+      ],
+      [
+        69405,
+        69414
+      ],
+      [
+        69457,
+        69460
+      ],
+      [
+        69573,
+        69579
+      ],
+      [
+        69714,
+        69743
+      ],
+      [
+        69872,
+        69881
+      ],
+      [
+        69942,
+        69951
+      ],
+      [
+        70096,
+        70105
+      ],
+      [
+        70113,
+        70132
+      ],
+      [
+        70384,
+        70393
+      ],
+      [
+        70736,
+        70745
+      ],
+      [
+        70864,
+        70873
+      ],
+      [
+        71248,
+        71257
+      ],
+      [
+        71360,
+        71369
+      ],
+      [
+        71376,
+        71395
+      ],
+      [
+        71472,
+        71483
+      ],
+      [
+        71904,
+        71922
+      ],
+      [
+        72016,
+        72025
+      ],
+      [
+        72688,
+        72697
+      ],
+      [
+        72784,
+        72812
+      ],
+      [
+        73040,
+        73049
+      ],
+      [
+        73120,
+        73129
+      ],
+      [
+        73184,
+        73193
+      ],
+      [
+        73552,
+        73561
+      ],
+      [
+        73664,
+        73684
+      ],
+      [
+        73784,
+        73785
+      ],
+      [
+        73849,
+        73849
+      ],
+      [
+        74278,
+        74278
+      ],
+      [
+        74283,
+        74283
+      ],
+      [
+        74507,
+        74507
+      ],
+      [
+        74509,
+        74509
+      ],
+      [
+        74649,
+        74649
+      ],
+      [
+        74752,
+        74862
+      ],
+      [
+        90416,
+        90425
+      ],
+      [
+        92768,
+        92777
+      ],
+      [
+        92864,
+        92873
+      ],
+      [
+        93008,
+        93017
+      ],
+      [
+        93019,
+        93025
+      ],
+      [
+        93552,
+        93561
+      ],
+      [
+        93824,
+        93846
+      ],
+      [
+        94196,
+        94198
+      ],
+      [
+        118000,
+        118009
+      ],
+      [
+        119488,
+        119507
+      ],
+      [
+        119520,
+        119539
+      ],
+      [
+        119648,
+        119672
+      ],
+      [
+        120782,
+        120831
+      ],
+      [
+        123200,
+        123209
+      ],
+      [
+        123632,
+        123641
+      ],
+      [
+        124144,
+        124153
+      ],
+      [
+        124401,
+        124410
+      ],
+      [
+        125127,
+        125135
+      ],
+      [
+        125264,
+        125273
+      ],
+      [
+        126065,
+        126123
+      ],
+      [
+        126125,
+        126127
+      ],
+      [
+        126129,
+        126132
+      ],
+      [
+        126209,
+        126253
+      ],
+      [
+        126255,
+        126269
+      ],
+      [
+        127232,
+        127244
+      ],
+      [
+        130032,
+        130041
+      ],
+      [
+        131073,
+        131073
+      ],
+      [
+        131172,
+        131172
+      ],
+      [
+        131298,
+        131298
+      ],
+      [
+        131361,
+        131361
+      ],
+      [
+        133418,
+        133418
+      ],
+      [
+        133507,
+        133507
+      ],
+      [
+        133516,
+        133516
+      ],
+      [
+        133532,
+        133532
+      ],
+      [
+        133866,
+        133866
+      ],
+      [
+        133885,
+        133885
+      ],
+      [
+        133913,
+        133913
+      ],
+      [
+        140176,
+        140176
+      ],
+      [
+        141720,
+        141720
+      ],
+      [
+        146203,
+        146203
+      ],
+      [
+        156269,
+        156269
+      ],
+      [
+        194704,
+        194704
+      ]
+    ],
+    "whitespaces" : [
+      [
+        9,
+        9
+      ],
+      [
+        32,
+        32
+      ],
+      [
+        160,
+        160
+      ],
+      [
+        5760,
+        5760
+      ],
+      [
+        8192,
+        8203
+      ],
+      [
+        8239,
+        8239
+      ],
+      [
+        8287,
+        8287
+      ],
+      [
+        12288,
+        12288
+      ]
+    ]
+  },
+  "schemaVersion" : "arkdeck.crash-ledger-analyzer-oracle/1"
+}

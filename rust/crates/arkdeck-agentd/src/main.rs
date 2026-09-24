@@ -11,6 +11,8 @@ mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;
 #[cfg(target_os = "macos")]
+mod crash_ledger_analyzer;
+#[cfg(target_os = "macos")]
 mod cutover_preflight;
 #[cfg(target_os = "macos")]
 mod development_mutation;
@@ -726,15 +728,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    // The M5 cutover preflight is a one-shot read of the production layout,
-    // answered before any composition is considered (`cutover_preflight.rs`).
+    // Two one-shot modes are answered before any composition is considered:
+    // Swift's crash-ledger analyzer, which the Runtime runs as its analyzer
+    // child (`crash_ledger_analyzer.rs`), and the M5 cutover preflight, a
+    // read of the production layout (`cutover_preflight.rs`).
     #[cfg(target_os = "macos")]
     {
         let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-        if arguments
-            .first()
-            .is_some_and(|argument| argument == cutover_preflight::FLAG)
-        {
+        let first = arguments.first();
+        if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
+            std::process::exit(crash_ledger_analyzer::run(&arguments));
+        }
+        if first.is_some_and(|argument| argument == cutover_preflight::FLAG) {
             std::process::exit(cutover_preflight::run(&arguments));
         }
     }

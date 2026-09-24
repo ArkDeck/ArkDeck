@@ -11,7 +11,7 @@ pub(crate) const ANALYZER_REF: &str = "crash-signature@1";
 pub(crate) const ANALYZER_VERSION: &str = "arkdeck-fault-log-ledger@1";
 /// `AnalyzerProvider.derivedArtifactName`.
 pub(crate) const DERIVED_NAME: &str = "crash-signature.json";
-const SCHEMA_VERSION: &str = "1.0.0";
+pub(crate) const SCHEMA_VERSION: &str = "1.0.0";
 
 /// Swift `ProviderProcessReceipt` for a child that exited.
 pub(crate) struct Receipt<'a> {

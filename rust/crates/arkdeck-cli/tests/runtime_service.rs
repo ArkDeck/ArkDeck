@@ -15,7 +15,9 @@ use arkdeck_cli::runtime_service::{
     LaunchAgentPaths, PlainFailure, ServiceAnswer, ServiceHost, restart_leaf, status_leaf,
     verify_leaf,
 };
-use arkdeck_cli::runtime_service_install::{install_leaf, uninstall_leaf, update_leaf};
+use arkdeck_cli::runtime_service_install::{
+    ANALYZER_PROBE_ANSWER, ANALYZER_PROBE_LISTING, install_leaf, uninstall_leaf, update_leaf,
+};
 use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, validate_method_value};
 use arkdeck_platform::launchd::{LaunchctlOutput, LaunchctlRunner};
 use serde_json::{Map, Value, json};
@@ -495,7 +497,6 @@ fn host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
         poll_interval: Duration::from_millis(20),
         default_daemon_bundle: None,
         relocated_home: true,
-        rust_daemon_analyzes_crash_ledgers: false,
         preflight_timeout: Duration::from_secs(30),
     }
 }
@@ -1641,7 +1642,39 @@ enum Daemon {
         first: Value,
         held: Value,
         busy: Option<Value>,
+        analyzer: Analyzer,
     },
+}
+
+/// How a Rust helper's daemon answers `--analyze-crash-ledger`, which the
+/// update asks before a plist names it as the analyzer.
+#[derive(Clone, Copy)]
+enum Analyzer {
+    /// Swift's recorded answer, and only to the probe listing.
+    Answers,
+    /// As the Rust daemon did before the mode: every argument refused.
+    Absent,
+    /// Exit 0 with another document.
+    Misanswers,
+}
+
+/// The recorded Swift oracle's case the update's analyzer probe is.
+fn probe_case() -> Value {
+    let oracle: Value = serde_json::from_slice(
+        &fs::read(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/crash-ledger-analyzer/oracle.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    oracle["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "runtime-service-probe")
+        .unwrap()
+        .clone()
 }
 
 /// A helper bundle below the test root (outside the home) whose daemon logs
@@ -1669,7 +1702,34 @@ impl Helper {
                  printf 'unknown argument %s\\n' \"$1\" >&2\nexit 64\nfi\nexit 0\n"
                 .to_owned(),
             Daemon::Other => "printf 'usage: another daemon\\n' >&2\nexit 64\n".to_owned(),
-            Daemon::Rust { first, held, busy } => {
+            Daemon::Rust {
+                first,
+                held,
+                busy,
+                analyzer,
+            } => {
+                let analyzes = match analyzer {
+                    Analyzer::Answers => {
+                        let (listing, answer) = (root.join("probe.txt"), root.join("answer.json"));
+                        fs::write(&listing, ANALYZER_PROBE_LISTING).unwrap();
+                        fs::write(&answer, ANALYZER_PROBE_ANSWER).unwrap();
+                        format!(
+                            "[ \"$#\" -eq 2 ] && /usr/bin/cmp -s \"$2\" '{}' || exit 65\n\
+                             /bin/cat '{}'\nexit 0",
+                            listing.display(),
+                            answer.display()
+                        )
+                    }
+                    Analyzer::Absent => "printf 'arkdeck-agentd: arkdeck-agentd takes no device, \
+                         command, path or authority arguments; configure the local host \
+                         environment\\n' >&2\nexit 69"
+                        .to_owned(),
+                    Analyzer::Misanswers => {
+                        "printf '%s' '{\"status\":\"answered\"}'\nexit 0".to_owned()
+                    }
+                };
+                let analyzes =
+                    format!("if [ \"$1\" = --analyze-crash-ledger ]; then\n{analyzes}\nfi\n");
                 let (first_path, held_path) = (root.join("first.json"), root.join("held.json"));
                 fs::write(&first_path, serde_json::to_vec(first).unwrap()).unwrap();
                 fs::write(&held_path, serde_json::to_vec(held).unwrap()).unwrap();
@@ -1684,7 +1744,7 @@ impl Helper {
                     )
                 });
                 format!(
-                    "{busy}if [ \"$2\" = --hold-instance-lock ]; then /bin/cat '{}'; \
+                    "{analyzes}{busy}if [ \"$2\" = --hold-instance-lock ]; then /bin/cat '{}'; \
                      else /bin/cat '{}'; fi\nexit 0\n",
                     held_path.display(),
                     first_path.display()
@@ -2001,8 +2061,111 @@ fn update_refuses_a_helper_whose_daemon_is_neither_runtime() {
     assert_eq!(tree(&home.paths.home), before);
 }
 
+/// The update's analyzer probe is the Swift oracle's `runtime-service-probe`
+/// case: the listing it hands the daemon, and the answer it requires.
 #[test]
-fn update_to_the_rust_daemon_is_refused_by_name_until_it_analyzes_crash_ledgers() {
+fn the_analyzer_probe_is_the_recorded_swift_case() {
+    let case = probe_case();
+    assert_eq!(
+        case["arguments"],
+        json!(["--analyze-crash-ledger", "{inputVolume}"])
+    );
+    assert_eq!(case["exitStatus"], 0);
+    assert_eq!(
+        case["input"].as_str().unwrap(),
+        base64(ANALYZER_PROBE_LISTING)
+    );
+    assert_eq!(
+        case["stdout"].as_str().unwrap().as_bytes(),
+        ANALYZER_PROBE_ANSWER
+    );
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const DIGITS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut text = String::new();
+    for group in bytes.chunks(3) {
+        let value = group.iter().enumerate().fold(0u32, |value, (index, byte)| {
+            value | u32::from(*byte) << (16 - 8 * index)
+        });
+        for index in 0..4 {
+            text.push(if index <= group.len() {
+                DIGITS[(value >> (18 - 6 * index) & 63) as usize] as char
+            } else {
+                '='
+            });
+        }
+    }
+    text
+}
+
+/// One logged run of a helper's daemon: its arguments, then `HOME`,
+/// `CFFIXED_USER_HOME`, `ARKDECK_RUNTIME_COMPOSITION` and `USER`.
+fn is_analyzer_probe(run: &str) -> bool {
+    // The Runtime's analyzer child: the listing's `/.vol` alias, and no
+    // environment at all.
+    run.strip_prefix("--analyze-crash-ledger /.vol/")
+        .and_then(|rest| rest.strip_suffix("||||"))
+        .and_then(|alias| alias.split_once('/'))
+        .is_some_and(|(device, inode)| {
+            [device, inode]
+                .iter()
+                .all(|number| !number.is_empty() && number.bytes().all(|b| b.is_ascii_digit()))
+        })
+}
+
+#[test]
+fn update_to_a_rust_daemon_that_does_not_analyze_crash_ledgers_is_refused_by_name() {
+    for (analyzer, reason) in [
+        (
+            Analyzer::Absent,
+            "(exit 69: arkdeck-agentd: arkdeck-agentd takes no device, command, path or \
+             authority arguments; configure the local host environment)",
+        ),
+        (
+            Analyzer::Misanswers,
+            "(it answered other than Swift's analyzer)",
+        ),
+    ] {
+        let home = Home::new();
+        home.install();
+        let helper = Helper::new(
+            &home,
+            "src",
+            &Daemon::Rust {
+                first: preflight_document(&home, json!([]), false),
+                held: preflight_document(&home, json!([]), true),
+                busy: None,
+                analyzer,
+            },
+        );
+        let before = tree(&home.paths.home);
+        let launchd = Launchd::loaded();
+        let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+        let failure = answer.failure.unwrap();
+        assert_eq!(failure.exit_code, 69);
+        assert!(
+            failure.message.contains("ARKDECK_ANALYZER_PATH")
+                && failure.message.contains("--analyze-crash-ledger")
+                && failure.message.contains(reason)
+                && failure.message.ends_with("nothing was changed"),
+            "{}",
+            failure.message
+        );
+        assert_eq!(launchd.calls(), [print_call()]);
+        assert_eq!(tree(&home.paths.home), before);
+        // The lock-free pass, then the probe, as the Runtime runs its analyzer.
+        let runs = helper.runs();
+        assert_eq!(runs.len(), 2, "{runs:?}");
+        assert!(runs[0].starts_with("--cutover-preflight|"), "{runs:?}");
+        assert!(is_analyzer_probe(&runs[1]), "{runs:?}");
+    }
+}
+
+/// An installed signing preset refuses the update before the new helper's
+/// daemon is asked anything, whether or not it would analyze crash ledgers.
+#[test]
+fn a_signing_preset_refuses_the_cutover_before_the_helper_runs() {
     let home = Home::new();
     home.install();
     let helper = Helper::new(
@@ -2012,26 +2175,29 @@ fn update_to_the_rust_daemon_is_refused_by_name_until_it_analyzes_crash_ledgers(
             first: preflight_document(&home, json!([]), false),
             held: preflight_document(&home, json!([]), true),
             busy: None,
+            analyzer: Analyzer::Answers,
         },
     );
+    directory(home.paths.signing_receipt.parent().unwrap());
+    fs::write(&home.paths.signing_receipt, b"{}").unwrap();
     let before = tree(&home.paths.home);
     let launchd = Launchd::loaded();
     let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
     let failure = answer.failure.unwrap();
     assert_eq!(failure.exit_code, 69);
     assert!(
-        failure.message.contains("ARKDECK_ANALYZER_PATH")
-            && failure.message.contains("--analyze-crash-ledger")
-            && failure.message.ends_with("nothing was changed"),
+        failure.message.contains("signing preset") && failure.message.contains("Q8"),
         "{}",
         failure.message
     );
-    assert_eq!(launchd.calls(), [print_call()]);
+    assert!(
+        launchd
+            .calls()
+            .iter()
+            .all(|call| call.starts_with("print "))
+    );
     assert_eq!(tree(&home.paths.home), before);
-    // Only the lock-free pass ran.
-    let runs = helper.runs();
-    assert_eq!(runs.len(), 1);
-    assert!(runs[0].starts_with("--cutover-preflight|"), "{runs:?}");
+    assert_eq!(helper.runs(), Vec::<String>::new());
 }
 
 /// The held pass while the old daemon still holds its instance lock.
@@ -2047,14 +2213,6 @@ fn running(home: &Home) -> Value {
     held
 }
 
-/// The service manager with the analyzer gate open, as it will be once the
-/// Rust daemon answers `--analyze-crash-ledger`.
-fn cutover_host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
-    let mut host = host(home, launchd);
-    host.rust_daemon_analyzes_crash_ledgers = true;
-    host
-}
-
 #[test]
 fn the_cutover_takes_both_preflight_passes_and_records_the_old_state() {
     let home = Home::new();
@@ -2068,13 +2226,11 @@ fn the_cutover_takes_both_preflight_passes_and_records_the_old_state() {
             first: preflight_document(&home, json!([]), false),
             held: held.clone(),
             busy: Some(running(&home)),
+            analyzer: Analyzer::Answers,
         },
     );
     let launchd = Launchd::loaded();
-    let answer = update_leaf(
-        &cutover_host(&home, &launchd),
-        &update_options(&helper, &home),
-    );
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
     assert_eq!(answer.failure, None);
     let domain = domain();
     assert_eq!(
@@ -2086,21 +2242,25 @@ fn the_cutover_takes_both_preflight_passes_and_records_the_old_state() {
             format!("bootstrap {domain} {}", text(&home.paths.plist)),
         ]
     );
-    // First lock-free, then holding the instance lock once the old service
-    // is out, asked again while the old daemon still held it.
-    let runs: Vec<String> = helper
-        .runs()
+    // First lock-free, then the analyzer probe as the Runtime runs its
+    // analyzer, then holding the instance lock once the old service is out,
+    // asked again while the old daemon still held it.
+    let runs = helper.runs();
+    assert!(is_analyzer_probe(&runs[1]), "{runs:?}");
+    let runs: Vec<&str> = runs
         .iter()
-        .map(|run| run.split('|').next().unwrap().to_owned())
+        .map(|run| run.split('|').next().unwrap())
         .collect();
     assert_eq!(
-        runs,
+        [runs[0], runs[2], runs[3]],
         [
             "--cutover-preflight",
             "--cutover-preflight --hold-instance-lock",
             "--cutover-preflight --hold-instance-lock"
-        ]
+        ],
+        "{runs:?}"
     );
+    assert_eq!(runs.len(), 4, "{runs:?}");
     // The snapshot summary, owner-only, as the held pass answered it.
     let snapshot = home
         .paths
@@ -2157,14 +2317,12 @@ fn a_cutover_the_first_pass_refuses_changes_nothing() {
             first: preflight_document(&home, blocks, false),
             held: preflight_document(&home, json!([]), true),
             busy: None,
+            analyzer: Analyzer::Answers,
         },
     );
     let before = tree(&home.paths.home);
     let launchd = Launchd::loaded();
-    let answer = update_leaf(
-        &cutover_host(&home, &launchd),
-        &update_options(&helper, &home),
-    );
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
     assert_eq!(
         answer.failure,
         Some(PlainFailure {
@@ -2177,7 +2335,10 @@ fn a_cutover_the_first_pass_refuses_changes_nothing() {
     );
     assert_eq!(launchd.calls(), [print_call()]);
     assert_eq!(tree(&home.paths.home), before);
-    assert_eq!(helper.runs().len(), 1);
+    // The lock-free pass and the analyzer probe; nothing held.
+    let runs = helper.runs();
+    assert_eq!(runs.len(), 2, "{runs:?}");
+    assert!(is_analyzer_probe(&runs[1]), "{runs:?}");
 }
 
 #[test]
@@ -2192,14 +2353,12 @@ fn a_cutover_the_held_pass_refuses_starts_the_old_service_again() {
             first: preflight_document(&home, json!([]), false),
             held,
             busy: None,
+            analyzer: Analyzer::Answers,
         },
     );
     let before = tree(&home.paths.home);
     let launchd = Launchd::loaded();
-    let answer = update_leaf(
-        &cutover_host(&home, &launchd),
-        &update_options(&helper, &home),
-    );
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
     let failure = answer.failure.unwrap();
     assert_eq!(failure.exit_code, 75);
     // Asked again while the old daemon may still be letting its lock go.
