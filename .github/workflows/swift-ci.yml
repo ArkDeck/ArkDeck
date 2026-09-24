@@ -333,6 +333,10 @@ jobs:
     needs: plan
     if: needs.plan.outputs.rust == 'true'
     uses: ./.github/workflows/rust-ci.yml
+    # Only the read-only ArkForge deploy key, for the locked fetch of
+    # ArkForge's pinned crates; never `inherit`.
+    secrets:
+      ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
 
   # Stable required-check name.  A job-level skip is a successful no-op;
   # workflow-level paths filters are intentionally absent because GitHub can

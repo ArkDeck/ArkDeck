@@ -402,6 +402,16 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `flash.device-access`, which takes no parameter: the Rockchip flashing
+    /// modes the ArkForge lane's daemon sees attached. A host without the
+    /// observer answers as Swift's daemon without it.
+    fn flash_device_access(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Rockchip device access observation is not configured".into(),
+            details: None,
+        })
+    }
     /// `debug.status` and `recovery.flash-invocation.list`: the reads of the
     /// Runtime Flash invocation owner, which checks their parameters itself
     /// once it is composed, as Swift's handler does. A host without the owner
@@ -1378,6 +1388,17 @@ impl<H: HostServices> Control<H> {
             "flash.bootloader-status" => Response {
                 id: request.id.clone(),
                 outcome: self.host.flash_bootloader_status(),
+            },
+            // As Swift's handler: any parameter is refused, before the
+            // observer; absent and empty parameters are the same request.
+            "flash.device-access" if !params.is_empty() => Response::failure(
+                &request.id,
+                "invalidParams",
+                "Device access discovery does not accept parameters",
+            ),
+            "flash.device-access" => Response {
+                id: request.id.clone(),
+                outcome: self.host.flash_device_access(),
             },
             // As Swift's handler: the owner before the parameters, which the
             // owner checks itself.

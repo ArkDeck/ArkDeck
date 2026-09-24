@@ -160,11 +160,12 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
                 | "target.display-name.clear"
                 | "device.display-name.set"
                 | "device.display-name.clear"
-                // Swift's daemon without its Flash invocation owner, or
-                // without its bootloader status observer.
+                // Swift's daemon without its Flash invocation owner, its
+                // bootloader status observer or its device access observer.
                 | "debug.status"
                 | "recovery.flash-invocation.list"
                 | "flash.bootloader-status"
+                | "flash.device-access"
         ) {
             "internalError"
         } else if matches!(*method, "flash.reconcile-alias" | "flash.prerequisites") {

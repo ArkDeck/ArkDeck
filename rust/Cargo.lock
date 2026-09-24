@@ -45,7 +45,9 @@ dependencies = [
  "arkdeck-control",
  "arkdeck-hoststore",
  "arkdeck-platform",
+ "arkdeck-provider-arkforge",
  "arkdeck-provider-hdc",
+ "arkforge-ipc",
  "serde",
  "serde_json",
 ]
@@ -114,6 +116,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkdeck-provider-arkforge"
+version = "0.1.0"
+dependencies = [
+ "arkforge-authority-api",
+ "arkforge-client",
+ "arkforge-core",
+ "arkforge-ipc",
+]
+
+[[package]]
 name = "arkdeck-provider-hdc"
 version = "0.1.0"
 dependencies = [
@@ -147,6 +159,41 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "arkforge-authority-api"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eee578720c5bae76b2574a6aaf25b536bc491c86#eee578720c5bae76b2574a6aaf25b536bc491c86"
+dependencies = [
+ "arkforge-core",
+]
+
+[[package]]
+name = "arkforge-client"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eee578720c5bae76b2574a6aaf25b536bc491c86#eee578720c5bae76b2574a6aaf25b536bc491c86"
+dependencies = [
+ "arkforge-ipc",
+ "arkforge-platform",
+]
+
+[[package]]
+name = "arkforge-core"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eee578720c5bae76b2574a6aaf25b536bc491c86#eee578720c5bae76b2574a6aaf25b536bc491c86"
+
+[[package]]
+name = "arkforge-ipc"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eee578720c5bae76b2574a6aaf25b536bc491c86#eee578720c5bae76b2574a6aaf25b536bc491c86"
+dependencies = [
+ "arkforge-core",
+]
+
+[[package]]
+name = "arkforge-platform"
+version = "0.1.0"
+source = "git+https://github.com/ArkDeck/ArkForge.git?rev=eee578720c5bae76b2574a6aaf25b536bc491c86#eee578720c5bae76b2574a6aaf25b536bc491c86"
 
 [[package]]
 name = "block-buffer"

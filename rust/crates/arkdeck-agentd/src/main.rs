@@ -1,6 +1,8 @@
 #[cfg(target_os = "macos")]
 mod app_ingress;
 #[cfg(target_os = "macos")]
+mod arkforge_lane;
+#[cfg(target_os = "macos")]
 mod bootstrap_readers;
 #[cfg(all(test, target_os = "macos"))]
 mod cleanup_debt_control;
@@ -405,6 +407,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(
                 &root.join("jobs-state"),
             )?)
+            // Swift's device access observer: ArkForge's public socket in the
+            // lane's runtime directory beside the Job state.
+            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+                arkforge_lane::runtime_directory(&root.join("jobs-state")),
+            ))
             // As the Swift daemon: an analyzer is configured only by naming its
             // executable, and a named path that is not one fails startup.
             .with_planning(
@@ -783,6 +790,8 @@ fn main() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod debug_read_control;
+#[cfg(all(test, target_os = "macos"))]
+mod device_access_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_facts_control;
 #[cfg(all(test, target_os = "macos"))]

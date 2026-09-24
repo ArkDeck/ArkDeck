@@ -2,8 +2,18 @@ name: Rust CI
 
 # Called only by the shared planner. Its result is required by the existing
 # swift aggregate, so a Rust failure cannot leave branch protection green.
+#
+# ArkForge's crates come from its private repository at the revision
+# Package.swift pins, so each job's locked fetch needs the read-only deploy key
+# the Swift lanes use. The caller passes that one secret and nothing else; it
+# reaches only the fetch steps, which build and run nothing, and the key is
+# removed before any later step runs checked-out code
+# (scripts/ci/arkforge-cargo-fetch.sh).
 on:
   workflow_call:
+    secrets:
+      ARKFORGE_DEPLOY_KEY:
+        required: true
 
 permissions:
   contents: read
@@ -75,11 +85,20 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Fetch the locked dependency graph for all host platforms
-        run: cargo fetch --locked
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
 
       - name: Contract isolation and provenance regression tests
         working-directory: .
         run: python rust/scripts/test_contract_checks.py
+
+      # One ArkForge revision for both lanes: the Rust pin, locked, must be the
+      # one Package.swift pins, and ArkForge's own wire and StepPermit vectors
+      # must still hold at it (from the checkout the fetch above cached).
+      - name: One ArkForge revision for both lanes, and its published vectors
+        working-directory: .
+        run: python rust/scripts/check-arkforge-pin.py --run-vectors
 
       # cargo-deny and cargo-vet are the policy checkers, not the workspace,
       # and compiling them from source on every run was the Swift CI critical
@@ -189,7 +208,9 @@ jobs:
           cargo --version
 
       - name: Fetch the locked dependency graph for all host platforms
-        run: cargo fetch --locked
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
 
       # The contract steps around these regenerate from the checkout or build
       # their own source views under rust/target. These two steps are the only

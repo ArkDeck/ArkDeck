@@ -544,6 +544,11 @@ pub(crate) fn compose(
         .with_flash_host_facts(arkdeck_hoststore::FlashHostFacts::new(
             &layout.application_support,
             arkdeck_platform::usb_host_devices,
+        ))
+        // Swift's device access observer, composed whether or not a lane is:
+        // ArkForge's public socket in `…/Agentd/arkforge`.
+        .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+            crate::arkforge_lane::runtime_directory(&layout.state),
         ));
     // The App creates its Trace cache in its container; this Runtime reads it
     // where it is and never creates it.

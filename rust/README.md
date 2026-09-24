@@ -23,6 +23,14 @@ python scripts/test_contract_checks.py
 python scripts/check-contracts.py
 ```
 
+`cargo fetch --locked` needs read access to ArkForge's private repository: its
+crates are taken from it at the revision `Packages/ArkDeckKit/Package.swift`
+pins. Locally, `CARGO_NET_GIT_FETCH_WITH_CLI=true` lets Cargo fetch with your
+Git credentials; CI fetches with the read-only deploy key the Swift lanes use,
+present for that step alone (`scripts/ci/arkforge-cargo-fetch.sh`).
+`python scripts/check-arkforge-pin.py --run-vectors` checks that the two pins
+agree and reruns ArkForge's own wire and StepPermit vectors at that revision.
+
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
 checkout and requires no difference; `check-contracts.py` builds its own
@@ -402,7 +410,9 @@ their single source, which `arkdeck debug template list` also discloses.
 `arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 `arkdeck-provider-workspace` is the workspace provider's signing and credential
-layer and depends only on `arkdeck-platform`.
+layer and depends only on `arkdeck-platform`. `arkdeck-provider-arkforge` is the
+ArkForge lane: it reaches `arkforged` only through ArkForge's own
+`arkforge-client`, and no other crate depends on an ArkForge crate.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while

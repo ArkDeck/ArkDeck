@@ -260,7 +260,12 @@ the implemented ones. The Rust CLI serves 119 leaves.
 | Records | `ARKDECK_PYTHON=<validation venv> sh scripts/check-sdd.sh` | exit 0; 0 errors, 0 warnings (`fhf-sdd.log`) |
 | CLI audit | `cli-parity-audit.py <this build's arkdeck>` | exit 0 (`fhf-cli-audit.log`) |
 
-**CI.** Pending.
+**CI.** PR #2150 (recorded in the next slice, M4-2a), head `c7e00256`: SDD
+Guard run 36040299101 success; Swift CI run 36040299340 success — the `swift`
+aggregate, `swift-tests`, `ds-interactions`, the Rust host-independent checks
+and the Rust workspace on ubuntu-latest, macos-26 and windows-latest; `app-build`
+skipped by the plan. Squash-merged by the coordinating session as `main`
+`a5902947` (2026-09-24T18:49:55Z).
 
 No device, installed service, ArkForge daemon or App was used, and nothing
 here is device evidence.

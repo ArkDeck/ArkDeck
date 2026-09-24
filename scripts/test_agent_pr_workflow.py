@@ -29,6 +29,7 @@ RUST_POLICY_TOOLS_CACHE_KEY = (
     "-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}"
 )
 ARKFORGE_AUTH_PATH = REPOSITORY_ROOT / "scripts" / "ci" / "arkforge-package-auth.sh"
+ARKFORGE_CARGO_FETCH_PATH = REPOSITORY_ROOT / "scripts" / "ci" / "arkforge-cargo-fetch.sh"
 EXPECTED_PATTERNS = ("agent/**", "!agent/host-loop/**")
 EXPECTED_PUSH_FLOW = '    branches: [main, "agent/**"]'
 
@@ -326,9 +327,14 @@ def validate_automatic_check_contract(
         )
 
     allowed_swift_secret = "${{ secrets.ARKFORGE_DEPLOY_KEY }}"
-    if swift_text.count(allowed_swift_secret) != 2:
+    if swift_text.count(allowed_swift_secret) != 3:
         raise WorkflowContractError(
-            "Swift CI must expose the ArkForge deploy key only to both setup steps"
+            "Swift CI must expose the ArkForge deploy key only to both setup steps "
+            "and to the Rust lane's locked fetch"
+        )
+    if _job_block(swift_text, "rust-checks").count(RUST_CHECKS_SECRET) != 1:
+        raise WorkflowContractError(
+            "the Rust lane must receive the ArkForge deploy key by name, and nothing else"
         )
     capability_text = agent_text + sdd_text + swift_text.replace(allowed_swift_secret, "")
     forbidden = (
@@ -513,6 +519,7 @@ def validate_automatic_check_contract(
         "    needs: plan\n",
         "    if: needs.plan.outputs.rust == 'true'\n",
         "    uses: ./.github/workflows/rust-ci.yml\n",
+        RUST_CHECKS_SECRET,
     )
     for token in required_plan:
         if token not in plan_job:
@@ -561,6 +568,29 @@ def validate_automatic_check_contract(
 
 
 RUST_CI_JOBS = ("policy", "workspace")
+# The Rust lane receives exactly one secret, the read-only ArkForge deploy key,
+# by name. Each job hands it to its locked fetch alone: the wrapper keeps the
+# key and the SSH rewrite of github.com out of GITHUB_ENV and removes the key
+# before any later step builds or runs checked-out code.
+RUST_CHECKS_SECRET = (
+    "    secrets:\n"
+    "      ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}\n"
+)
+RUST_FETCH_SECRET = "${{ secrets.ARKFORGE_DEPLOY_KEY }}"
+RUST_FETCH_RUN = "run: sh ../scripts/ci/arkforge-cargo-fetch.sh"
+RUST_FETCH_STEP = (
+    "      - name: Fetch the locked dependency graph for all host platforms\n"
+    "        env:\n"
+    "          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}\n"
+    "        run: sh ../scripts/ci/arkforge-cargo-fetch.sh\n"
+)
+RUST_SECRET_DECLARATION = (
+    "on:\n"
+    "  workflow_call:\n"
+    "    secrets:\n"
+    "      ARKFORGE_DEPLOY_KEY:\n"
+    "        required: true\n"
+)
 # Both jobs check out, set up and fetch the same way: every contract digest is
 # over repository bytes on every host.
 RUST_SHARED_JOB_TOKENS = (
@@ -573,7 +603,7 @@ RUST_SHARED_JOB_TOKENS = (
     "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
     "rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update",
     "rustup show active-toolchain",
-    "run: cargo fetch --locked",
+    RUST_FETCH_STEP,
 )
 # Answers that cannot depend on the host: each runs exactly once, in `policy`.
 RUST_POLICY_TOKENS = (
@@ -581,6 +611,10 @@ RUST_POLICY_TOKENS = (
     "run: cargo fmt --all --check",
     "        working-directory: .\n"
     "        run: python rust/scripts/test_contract_checks.py\n",
+    # One ArkForge revision for both lanes, and ArkForge's own wire and
+    # StepPermit vectors rerun at it.
+    "        working-directory: .\n"
+    "        run: python rust/scripts/check-arkforge-pin.py --run-vectors\n",
     # cargo-deny and cargo-vet are memoized between hosted runs. The memo
     # must stay exact (one key naming both pinned versions and the pinned
     # toolchain, no prefix fallback), be written only by protected main,
@@ -679,13 +713,28 @@ def validate_rust_ci_contract(text: str) -> None:
                 raise WorkflowContractError(
                     f"Rust CI must run this check exactly once, in the {name} job: {token}"
                 )
+    if RUST_SECRET_DECLARATION not in text:
+        raise WorkflowContractError(
+            "Rust CI must declare the ArkForge deploy key as its one required secret"
+        )
+    if (
+        text.count(RUST_FETCH_SECRET) != 2
+        or text.count(RUST_FETCH_STEP) != 2
+        or policy.count(RUST_FETCH_STEP) != 1
+        or workspace.count(RUST_FETCH_STEP) != 1
+    ):
+        raise WorkflowContractError(
+            "Rust CI must hand the ArkForge deploy key to each job's locked fetch and "
+            "to no other step"
+        )
     for token in (
         "continue-on-error:", "secrets.", "secrets[", "secrets: inherit",
         "contents: write", "id-token: write", "cargo vet init",
         "cargo vet regenerate", "cargo vet add-exemption", "|| true",
-        "--depth=", "--depth ", "restore-keys:",
+        "--depth=", "--depth ", "restore-keys:", "arkforge-package-auth.sh",
+        "run: cargo fetch",
     ):
-        if token in text:
+        if token in text.replace(RUST_FETCH_SECRET, ""):
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
     if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2 or policy.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
         raise WorkflowContractError(
@@ -701,15 +750,23 @@ def validate_rust_ci_contract(text: str) -> None:
             "Rust CI must restore, install on a miss, read back the pinned versions "
             "and save before the dependency policy checks"
         )
-    if policy.index("run: cargo fetch --locked") > policy.index("run: cargo vet --locked"):
-        raise WorkflowContractError("Rust CI must fetch locked metadata before locked vet")
+    if not (
+        policy.index(RUST_FETCH_RUN)
+        < policy.index("run: python rust/scripts/test_contract_checks.py")
+        < policy.index("run: python rust/scripts/check-arkforge-pin.py --run-vectors")
+        < policy.index("run: cargo vet --locked")
+    ):
+        raise WorkflowContractError(
+            "Rust CI must fetch locked metadata before it runs checked-out code, "
+            "the ArkForge pin check and locked vet"
+        )
     if policy.index("rustup toolchain install") > policy.index(
         "run: python rust/scripts/generate-contract.py --check"
     ):
         raise WorkflowContractError("Rust CI must install rustfmt before checking generated inputs")
     order = [
         workspace.index("rustup toolchain install"),
-        workspace.index("run: cargo fetch --locked"),
+        workspace.index(RUST_FETCH_RUN),
         workspace.index("run: cargo clippy --workspace"),
         workspace.index("run: python rust/scripts/workspace-tests.py"),
         workspace.index("run: python rust/scripts/check-contracts.py"),
@@ -719,6 +776,58 @@ def validate_rust_ci_contract(text: str) -> None:
         raise WorkflowContractError(
             "Rust workspace job must fetch locked metadata before it lints, tests and "
             "runs the contract views, and preserve recordings after their producer runs"
+        )
+
+
+def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
+    """Pin the Rust lanes' locked fetch: the deploy key for that fetch alone."""
+
+    required = (
+        "set -eu",
+        "umask 077",
+        'transport="${RUNNER_TEMP}/arkforge-cargo-transport.env"',
+        'sh "$here/arkforge-package-auth.sh" cleanup',
+        'rm -f "$transport"',
+        "trap remove EXIT",
+        'GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup',
+        # Git Bash on Windows cannot set an NTFS mode: the key goes into a
+        # directory mktemp creates for that user, pinned and checked as the
+        # auth script does, and removed on exit.
+        "MINGW* | MSYS* | CYGWIN*) windows=true ;;",
+        "credentials=$(mktemp -d)",
+        'ssh-keygen -y -f "$credentials/id_ed25519" </dev/null >/dev/null 2>&1',
+        "-o StrictHostKeyChecking=yes",
+        'rm -f "$credentials/id_ed25519" "$credentials/known_hosts"',
+        "CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked",
+    )
+    for token in required:
+        if token not in fetch_text:
+            raise WorkflowContractError(f"ArkForge cargo fetch missing contract token: {token}")
+    if fetch_text.index("trap remove EXIT") > min(
+        fetch_text.index('GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup'),
+        fetch_text.index("credentials=$(mktemp -d)"),
+    ):
+        raise WorkflowContractError("ArkForge cargo fetch must arm its cleanup before setup")
+    pinned = re.search(r"readonly github_ed25519_host_key='([^']+)'", fetch_text)
+    if pinned is None or pinned.group(1) != (
+        "github.com ssh-ed25519 "
+        "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+    ):
+        raise WorkflowContractError(
+            "ArkForge cargo fetch must pin the host key the auth script pins"
+        )
+    # Nothing is built or run while the key exists, and nothing it configures
+    # reaches a later step.
+    for token in (
+        "cargo build", "cargo test", "cargo run", "cargo clippy", "cargo install",
+        '>> "$GITHUB_ENV"', "GITHUB_OUTPUT", "cargo fetch\n", "|| true",
+        "StrictHostKeyChecking=no",
+    ):
+        if token in fetch_text:
+            raise WorkflowContractError(f"ArkForge cargo fetch contains forbidden token: {token}")
+    if fetch_text.count("GITHUB_ENV=") != 1:
+        raise WorkflowContractError(
+            "ArkForge cargo fetch must hand the auth script a private GITHUB_ENV only"
         )
 
 
@@ -875,6 +984,88 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             ARKFORGE_AUTH_PATH.read_text(encoding="utf-8"),
         )
         validate_rust_ci_contract(RUST_WORKFLOW_PATH.read_text(encoding="utf-8"))
+        validate_arkforge_cargo_fetch(ARKFORGE_CARGO_FETCH_PATH.read_text(encoding="utf-8"))
+
+    def test_the_arkforge_deploy_key_reaches_only_the_rust_lanes_locked_fetch(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
+        agent = WORKFLOW_PATH.read_text(encoding="utf-8")
+        sdd = SDD_WORKFLOW_PATH.read_text(encoding="utf-8")
+        fetch = ARKFORGE_CARGO_FETCH_PATH.read_text(encoding="utf-8")
+        lint = "        run: cargo clippy --workspace --all-targets -- -D warnings\n"
+        rust_mutations = (
+            # A fetch without the key-bounding wrapper.
+            rust.replace(RUST_FETCH_RUN, "run: cargo fetch --locked"),
+            # The key handed to a step that runs checked-out code.
+            rust.replace(
+                lint,
+                "        env:\n          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}\n" + lint,
+            ),
+            # The key configured for the whole job through GITHUB_ENV.
+            rust.replace(
+                RUST_FETCH_RUN, "run: sh ../scripts/ci/arkforge-package-auth.sh setup", 1
+            ),
+            # The secret no longer declared, or declared optional.
+            rust.replace("        required: true\n", "        required: false\n"),
+            # The pin check dropped, or no longer rerunning ArkForge's vectors.
+            rust.replace(
+                "run: python rust/scripts/check-arkforge-pin.py --run-vectors",
+                "run: python rust/scripts/check-arkforge-pin.py",
+            ),
+            # Fetched after the first step that runs checked-out code.
+            rust.replace(
+                "      - name: Contract isolation and provenance regression tests\n"
+                "        working-directory: .\n"
+                "        run: python rust/scripts/test_contract_checks.py\n",
+                "",
+            ).replace(
+                "      - name: Format check\n",
+                "      - name: Contract isolation and provenance regression tests\n"
+                "        working-directory: .\n"
+                "        run: python rust/scripts/test_contract_checks.py\n\n"
+                "      - name: Format check\n",
+            ),
+        )
+        for mutated in rust_mutations:
+            self.assertNotEqual(mutated, rust)
+            with self.assertRaises(WorkflowContractError):
+                validate_rust_ci_contract(mutated)
+        swift_mutations = (
+            swift.replace(RUST_CHECKS_SECRET, "    secrets: inherit\n"),
+            swift.replace(RUST_CHECKS_SECRET, ""),
+            swift.replace(
+                RUST_CHECKS_SECRET,
+                RUST_CHECKS_SECRET + "      OTHER_KEY: ${{ secrets.OTHER_KEY }}\n",
+            ),
+        )
+        for mutated in swift_mutations:
+            self.assertNotEqual(mutated, swift)
+            with self.assertRaises(WorkflowContractError):
+                validate_automatic_check_contract(agent, sdd, mutated)
+        fetch_mutations = (
+            # Setup writing the real GITHUB_ENV: every later step inherits it.
+            fetch.replace(
+                'GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup',
+                'sh "$here/arkforge-package-auth.sh" setup',
+            ),
+            # The Windows key without its host pin, or kept after the fetch.
+            fetch.replace("-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=no"),
+            fetch.replace("AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl", "AAAA"),
+            fetch.replace('rm -f "$credentials/id_ed25519" "$credentials/known_hosts"', ":"),
+            # No cleanup on exit, or cleanup armed after the key is written.
+            fetch.replace("trap remove EXIT\n", ""),
+            fetch.replace("trap remove EXIT\n", "").replace(
+                "CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked",
+                "trap remove EXIT\nCARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked",
+            ),
+            # Anything built or run while the key exists.
+            fetch + "cargo build --locked\n",
+            fetch.replace("cargo fetch --locked", "cargo fetch"),
+        )
+        for mutated in fetch_mutations:
+            self.assertNotEqual(mutated, fetch)
+            with self.assertRaises(WorkflowContractError):
+                validate_arkforge_cargo_fetch(mutated)
 
     def test_rust_checks_reject_skipped_hosts_and_unlocked_or_bypassed_policy(self) -> None:
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
