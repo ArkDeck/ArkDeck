@@ -250,6 +250,63 @@ pub fn assert_store(fixture: &Path, prefix: &str, jobs: &Path) {
     }
 }
 
+/// As [`assert_store`], for every Job but `except`, whose files and index row
+/// a declared difference changes and the caller checks: the other Jobs'
+/// files byte for byte, the same file names below `except`, and every index
+/// row but that one's version and record digest. Answers `except`'s actual
+/// and recorded index rows.
+pub fn assert_store_except(
+    fixture: &Path,
+    prefix: &str,
+    jobs: &Path,
+    except: &str,
+) -> (Value, Value) {
+    let actual_index = index(jobs);
+    let mut recorded_index = document(fixture, &format!("{prefix}/index.json"));
+    let row = |index: &Value| {
+        index["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["jobId"] == except)
+            .cloned()
+            .unwrap_or_else(|| panic!("{prefix}: no index row for {except}"))
+    };
+    let (actual_row, recorded_row) = (row(&actual_index), row(&recorded_index));
+    for recorded in recorded_index["rows"].as_array_mut().unwrap() {
+        if recorded["jobId"] == except {
+            recorded["version"] = actual_row["version"].clone();
+            recorded["recordSHA256"] = actual_row["recordSHA256"].clone();
+        }
+    }
+    assert_eq!(actual_index, recorded_index, "{prefix}/index.json");
+    let (mut actual, mut recorded) = (BTreeMap::new(), BTreeMap::new());
+    walk(&jobs.join("jobs"), prefix, &mut actual, &mut Vec::new());
+    walk(
+        &fixture.join(prefix).join("jobs"),
+        prefix,
+        &mut recorded,
+        &mut Vec::new(),
+    );
+    assert_eq!(
+        actual.keys().collect::<Vec<_>>(),
+        recorded.keys().collect::<Vec<_>>(),
+        "{prefix}"
+    );
+    let excepted = format!("{prefix}/{except}/");
+    for (path, bytes) in recorded
+        .iter()
+        .filter(|(path, _)| !path.starts_with(&excepted))
+    {
+        assert_eq!(
+            String::from_utf8_lossy(&actual[path]),
+            String::from_utf8_lossy(bytes),
+            "{path}"
+        );
+    }
+    (actual_row, recorded_row)
+}
+
 /// Every entry below `base` as `prefix/<relative path>`: each file's bytes
 /// (a Job record's read machine-independently) and each entry's kind and mode.
 fn walk(

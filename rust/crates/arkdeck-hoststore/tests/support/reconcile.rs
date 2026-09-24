@@ -430,6 +430,20 @@ impl Daemon {
     /// the calls the fake had received.
     pub fn assert_snapshot(&self, prefix: &str) {
         assert_store(&self.fixture, prefix, &self.default_root);
+        self.assert_capabilities(prefix);
+        let calls = self.fixture.join(prefix).join("hdc-invocations.log");
+        if calls.exists() {
+            assert_eq!(
+                self.calls(),
+                fs::read_to_string(calls).unwrap(),
+                "{prefix}/hdc-invocations.log"
+            );
+        }
+    }
+
+    /// Every file of the capability store against the oracle's snapshot
+    /// under `prefix`, byte for byte.
+    pub fn assert_capabilities(&self, prefix: &str) {
         let files = |base: &Path| -> BTreeMap<String, Vec<u8>> {
             let mut files = BTreeMap::new();
             for entry in fs::read_dir(base).into_iter().flatten() {
@@ -453,14 +467,6 @@ impl Daemon {
                 String::from_utf8_lossy(&actual[name]),
                 String::from_utf8_lossy(bytes),
                 "{prefix}/capabilities/{name}"
-            );
-        }
-        let calls = self.fixture.join(prefix).join("hdc-invocations.log");
-        if calls.exists() {
-            assert_eq!(
-                self.calls(),
-                fs::read_to_string(calls).unwrap(),
-                "{prefix}/hdc-invocations.log"
             );
         }
     }

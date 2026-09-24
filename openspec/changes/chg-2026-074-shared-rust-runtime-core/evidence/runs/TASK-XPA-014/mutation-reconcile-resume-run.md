@@ -252,7 +252,12 @@ tests beyond the oracle, App, device.
 
 ## CI
 
-Pending.
+PR #2138, two commits, head `1965ae71a`; merged as `a7229512d`.
+
+- SDD Guard `35941603974` passed (`guard`, `ds-tokens`); Agent PR `35941604083` passed.
+- Swift CI `35941604270` passed: `plan`, `swift-tests`, `ds-interactions`, Rust host-independent
+  checks, the Rust workspace on ubuntu-latest, macos-26 (job `107450502546`) and windows-latest,
+  and the `swift` aggregate. `app-build` was skipped by the plan; a skipped job is not a pass.
 
 ## Not in this slice
 

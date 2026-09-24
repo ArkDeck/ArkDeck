@@ -15,13 +15,21 @@
 //! ls`), a debug HAP's staging, packages and ability (the owned path or
 //! directory, `bm dump`, `pidof`), a diagnostic capture's owned file (`ls
 //! -ld`), and a native library deployment's steps (its own inspection, whose
-//! verdict table never calls a publish or a rollback not executed). The
-//! screen sequence's capture and cleanup are ported as Swift runs them: its
-//! materialization does not know their kinds, so the reconcile, once begun,
-//! fails. Every other persisted action is refused by the reconciler before
-//! anything is written: the read-only actions Swift's provider has no
-//! reconcile source for, whose answer journals Swift's debug rendering of the
-//! action.
+//! verdict table never calls a publish or a rollback not executed). Every
+//! other persisted action is refused by the reconciler before anything is
+//! written: the read-only actions Swift's provider has no reconcile source
+//! for, whose answer journals Swift's debug rendering of the action.
+//!
+//! Two declared differences from Swift, each a Swift defect fixed here under
+//! the maintainer's rule of 2026-09-20 (applied by the coordinating session
+//! on 2026-09-24). A screen sequence's capture and cleanup, whose kinds
+//! Swift's materialization does not know — so that there a reconcile of
+//! either, once begun, fails, and the Job can never be concluded — are read
+//! back as a capture file leg is (`ls -ld` of the archive and the frames
+//! directory, [`ParkedScreenSequence`]); what those probes cannot settle
+//! stays parked. And a receive or a cleanup of a JPEG still is rebuilt with
+//! the still's own suffix, where Swift rebuilds the `.png` the device never
+//! wrote and refuses the record.
 use super::{Decision, other};
 use crate::artifact_read_owner::swift_string;
 use crate::device_facts::{DeviceFacts, HdcComposition};
@@ -29,15 +37,15 @@ use crate::device_steps::{StepAction, StepContext, refusal_detail};
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_provider_hdc::{
     DebugReadTemplate, Direction, DispatchFailure, Expected, FileAction, FileActionError,
-    HapAction, NativeAction, Outcome, OwnedRemotePath, PointerInput, PortAction, PortRule,
-    Reconcile,
+    HapAction, NativeAction, Outcome, OwnedRemotePath, ParkedScreenSequence, PointerInput,
+    PortAction, PortRule, Reconcile,
 };
 use serde_json::{Map, Value};
 
 /// The persisted kinds whose reconcile is ported: Swift's read-only families
 /// that its provider confirms not executed, the pointer gesture, which has no
-/// readback, every mutation Swift reads back, and the two kinds Swift's
-/// materialization does not know.
+/// readback, every mutation Swift reads back, and the screen sequence's two,
+/// which Swift's materialization does not know and this Runtime reads back.
 const PORTED: [&str; 38] = [
     "hdc.observeTool",
     "hdc.observeServer",
@@ -115,6 +123,10 @@ pub(super) enum DeviceAction {
     Written(OwnedRemotePath),
     /// A native library deployment's mutation, read back by its inspection.
     Native(Box<NativeAction>),
+    /// A screen sequence's capture or cleanup, read back by the presence of
+    /// its archive and frames directory (a declared difference: Swift cannot
+    /// materialize either kind).
+    Sequence(ParkedScreenSequence),
 }
 
 /// Swift's interpolation of `DeviceProviderError.unsupportedAction`, which
@@ -314,8 +326,9 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
 
 /// The kinds each of a debug HAP's, a native deployment's and a diagnostic
 /// capture's families rebuilds (a cleanup of an owned path as the debug
-/// HAP's family rebuilds it: the one action both run), or Swift's refusal of
-/// a kind no family knows.
+/// HAP's family rebuilds it: the one action both run), the screen
+/// sequence's two, which only this Runtime reads, or Swift's refusal of a
+/// kind no family knows.
 fn family_action(kind: &str, arguments: &Map<String, Value>) -> Result<DeviceAction, WireError> {
     if let Some(action) = HapAction::from_persisted(kind, arguments).map_err(refused)? {
         return Ok(if action.effect() == "readOnly" {
@@ -336,6 +349,9 @@ fn family_action(kind: &str, arguments: &Map<String, Value>) -> Result<DeviceAct
             Some(path) => DeviceAction::Written(path.clone()),
             None => DeviceAction::ReadOnly,
         });
+    }
+    if let Some(parked) = ParkedScreenSequence::from_persisted(kind, arguments).map_err(refused)? {
+        return Ok(DeviceAction::Sequence(parked));
     }
     Err(unsupported(&format!(
         "persisted typed provider action kind {kind} is unknown"
@@ -438,16 +454,45 @@ pub(super) fn decide(
                 return Decision::Unknown(NO_READBACK.into());
             };
             match read(&StepAction::Native(Box::new(readback))) {
-                Ok(outcome) => match original.reconcile(outcome) {
-                    Reconcile::ConfirmedCompleted(summary) => {
-                        Decision::Completed(summary.into_keys().collect())
-                    }
-                    Reconcile::ConfirmedNotExecuted => Decision::NotExecuted,
-                    Reconcile::StillUnknown(reason) => Decision::Unknown(reason),
-                },
+                Ok(outcome) => concluded(original.reconcile(outcome)),
                 Err(decision) => decision,
             }
         }
+        // Each probe dispatched once, in order; one that cannot be lowered
+        // or dispatched leaves the step unknown, and nothing is resent.
+        DeviceAction::Sequence(parked) => {
+            let mut presences = Vec::new();
+            for probe in parked.readbacks() {
+                match read(&StepAction::Hap(probe)) {
+                    Ok(outcome) => presences.push(definite_presence(&outcome)),
+                    Err(decision) => return decision,
+                }
+            }
+            concluded(parked.reconcile(&presences))
+        }
+    }
+}
+
+/// A provider's reconcile outcome as the reconcile's decision.
+fn concluded(outcome: Reconcile) -> Decision {
+    match outcome {
+        Reconcile::ConfirmedCompleted(summary) => {
+            Decision::Completed(summary.into_keys().collect())
+        }
+        Reconcile::ConfirmedNotExecuted => Decision::NotExecuted,
+        Reconcile::StillUnknown(reason) => Decision::Unknown(reason),
+    }
+}
+
+/// What a presence probe showed: the path there or not, or nothing definite.
+fn definite_presence(outcome: &Outcome) -> Option<bool> {
+    match outcome {
+        Outcome::Verified(summary) => match summary.get("present").map(String::as_str) {
+            Some("true") => Some(true),
+            Some("false") => Some(false),
+            _ => None,
+        },
+        _ => None,
     }
 }
 
@@ -456,15 +501,7 @@ pub(super) fn decide(
 /// wanted concludes it completed, the other one not executed; anything else
 /// stays unknown.
 fn verify_presence(desired: Option<bool>, outcome: &Outcome) -> Decision {
-    let present = match outcome {
-        Outcome::Verified(summary) => match summary.get("present").map(String::as_str) {
-            Some("true") => Some(true),
-            Some("false") => Some(false),
-            _ => None,
-        },
-        _ => None,
-    };
-    let Some(present) = present else {
+    let Some(present) = definite_presence(outcome) else {
         return Decision::Unknown("dedicated readback did not produce a definite presence".into());
     };
     let Some(desired) = desired else {
@@ -670,20 +707,80 @@ mod tests {
                     json!({"remotePath": "/data/local/tmp/elsewhere.json"}))}),
                 "persisted hdc.captureComponentTree remote path does not match its owned components",
             ),
-            // Swift's materialization does not know the screen sequence's
-            // kinds: a reconcile of either fails once it has begun.
+            // A screen sequence's frames directory is owned as its archive is.
+            (
+                json!({"kind": "hdc.cleanupScreenSequence", "arguments": with(
+                    owned("capture-screen-sequence", ".tar"), json!({"frameCount": 3,
+                        "framesDirectory": "/data/local/tmp/elsewhere-frames"}))}),
+                "persisted hdc.cleanupScreenSequence frames directory does not match its owned \
+                 components",
+            ),
             (
                 json!({"kind": "hdc.captureScreenSequence", "arguments": owned(
                     "capture-screen-sequence", ".tar")}),
-                "persisted typed provider action kind hdc.captureScreenSequence is unknown",
+                "persisted hdc.captureScreenSequence is missing string framesDirectory",
             ),
             (
-                json!({"kind": "hdc.cleanupScreenSequence", "arguments": owned(
-                    "capture-screen-sequence", ".tar")}),
-                "persisted typed provider action kind hdc.cleanupScreenSequence is unknown",
+                json!({"kind": "hdc.receiveOwnedArtifact", "arguments": with(
+                    owned("capture-screenshot", ".gif"), json!({"maximumBytes": 67108864}))}),
+                "persisted hdc.receiveOwnedArtifact remote path does not match its owned components",
             ),
         ] {
             assert_eq!(refusal(action), message);
+        }
+        // Declared differences from Swift, whose materialization refuses
+        // them: a JPEG still's receive and cleanup are read with the still's
+        // own suffix, and a screen sequence's capture and cleanup are read
+        // back through the paths they own.
+        assert!(matches!(
+            materialize(
+                &json!({"kind": "hdc.receiveOwnedArtifact", "arguments": with(
+                owned("capture-screenshot", ".jpeg"), json!({"maximumBytes": 67108864,
+                    "expectedLeadingBytes": "ffd8ffe0"}))})
+            ),
+            Ok(DeviceAction::ReadOnly)
+        ));
+        let Ok(DeviceAction::Hap(still)) =
+            materialize(&json!({"kind": "hdc.cleanupOwnedRemotePath",
+            "arguments": owned("capture-screenshot", ".jpeg")}))
+        else {
+            panic!("a JPEG still's cleanup");
+        };
+        assert_eq!(
+            still.readback(),
+            Some(HapAction::ReadOwnedPathPresence {
+                path: OwnedRemotePath::stable(
+                    job,
+                    "capture-screenshot",
+                    arkdeck_provider_hdc::ImageType::Jpeg
+                )
+                .unwrap()
+            })
+        );
+        let frames = format!("/data/local/tmp/arkdeck-{job}-capture-screen-sequence-owned-frames");
+        for (kind, extra, cleanup) in [
+            (
+                "hdc.captureScreenSequence",
+                json!({"framesDirectory": frames, "frameCount": 3, "imageType": "jpeg"}),
+                false,
+            ),
+            (
+                "hdc.cleanupScreenSequence",
+                json!({"framesDirectory": frames, "frameCount": 3}),
+                true,
+            ),
+        ] {
+            let action = json!({"kind": kind,
+                "arguments": with(owned("capture-screen-sequence", ".tar"), extra)});
+            let Ok(DeviceAction::Sequence(parked)) = materialize(&action) else {
+                panic!("{action}");
+            };
+            assert_eq!(parked.cleanup, cleanup);
+            assert_eq!(parked.frames.remote_path, frames);
+            assert_eq!(
+                parked.archive.remote_path,
+                format!("/data/local/tmp/arkdeck-{job}-capture-screen-sequence-owned.tar")
+            );
         }
         for kind in [
             "hdc.readPortForwardPresence",
@@ -705,6 +802,164 @@ mod tests {
         ] {
             assert!(ported(kind), "{kind}");
         }
+    }
+
+    /// A dispatcher answering each probe from a script in order, and
+    /// recording every argv it was given.
+    struct Scripted {
+        answers: std::sync::Mutex<Vec<Result<arkdeck_provider_hdc::Receipt, DispatchFailure>>>,
+        seen: std::sync::Mutex<Vec<Vec<String>>>,
+    }
+
+    impl arkdeck_provider_hdc::HdcDispatch for Scripted {
+        fn dispatch(
+            &self,
+            plan: &arkdeck_provider_hdc::ProcessPlan,
+        ) -> Result<arkdeck_provider_hdc::Receipt, DispatchFailure> {
+            self.seen.lock().unwrap().push(plan.arguments.clone());
+            self.answers.lock().unwrap().remove(0)
+        }
+    }
+
+    /// An `ls -ld` answer: one listing line, or the not-found grammar.
+    fn listing(
+        path: &str,
+        present: bool,
+    ) -> Result<arkdeck_provider_hdc::Receipt, DispatchFailure> {
+        Ok(arkdeck_provider_hdc::Receipt {
+            exit_status: 0,
+            stdout: if present {
+                format!("drwxrwxrwx 2 shell shell 3452 2026-09-14 00:00 {path}\n")
+            } else {
+                format!("ls: {path}: No such file or directory\n")
+            }
+            .into_bytes(),
+            stderr: Vec::new(),
+            truncated: false,
+            duration: std::time::Duration::ZERO,
+        })
+    }
+
+    /// A parked screen sequence step (a declared difference from Swift) is
+    /// concluded by `ls -ld` probes alone, each dispatched once under the
+    /// reconcile's step identity, and never resent: the capture by its
+    /// archive and frames directory, the cleanup by its frames directory;
+    /// what the probes cannot settle — a partial capture, an indefinite or
+    /// failed probe — stays unknown.
+    #[test]
+    fn a_parked_screen_sequence_is_concluded_by_its_probes_alone() {
+        let job = "job-84892206b79174192e1fb101138299c5";
+        let archive = format!("/data/local/tmp/arkdeck-{job}-capture-screen-sequence-owned.tar");
+        let frames = format!("/data/local/tmp/arkdeck-{job}-capture-screen-sequence-owned-frames");
+        let parked = |kind: &str| {
+            let arguments = json!({"jobId": job, "stepId": "capture-screen-sequence",
+                "nonce": "owned", "remotePath": archive, "framesDirectory": frames,
+                "frameCount": 3, "imageType": "jpeg"});
+            materialize(&json!({"kind": kind, "arguments": arguments})).unwrap()
+        };
+        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "reconcile-sequence-{:x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        std::os::unix::fs::DirBuilderExt::mode(&mut std::fs::DirBuilder::new(), 0o700)
+            .create(&root)
+            .unwrap();
+        let targets = crate::TargetStore::open(&root).unwrap();
+        let facts = DeviceFacts {
+            target_id: "TGT-3ba3f5f43b92".into(),
+            binding_revision: 1,
+            tool_version: "3.2.0d".into(),
+            tool_sha256: "0".repeat(64),
+            connect_key: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            identity: "1".repeat(64),
+        };
+        let attempt = format!("recovery-{job}-12");
+        let decide_with =
+            |action: &DeviceAction,
+             answers: Vec<Result<arkdeck_provider_hdc::Receipt, DispatchFailure>>| {
+                let scripted = Scripted {
+                    answers: std::sync::Mutex::new(answers),
+                    seen: std::sync::Mutex::new(Vec::new()),
+                };
+                let hdc = HdcComposition {
+                    targets: &targets,
+                    dispatch: &scripted,
+                    receive_root: None,
+                    tool_sha256: &facts.tool_sha256,
+                    now: || Some("2026-09-14T00:00:00Z".into()),
+                    code_sign_helper: None,
+                };
+                let decision = decide(
+                    action,
+                    &hdc,
+                    &facts,
+                    job,
+                    "capture-screen-sequence",
+                    &attempt,
+                );
+                let seen = scripted.seen.into_inner().unwrap();
+                assert!(scripted.answers.into_inner().unwrap().is_empty());
+                (decision, seen)
+            };
+        let probe = |path: &str| {
+            ["-t", facts.connect_key.as_str(), "shell", "ls", "-ld", path]
+                .map(str::to_owned)
+                .to_vec()
+        };
+        let capture = parked("hdc.captureScreenSequence");
+        let cleanup = parked("hdc.cleanupScreenSequence");
+        // The capture: archive there, completed; nothing there, not
+        // executed; frames without their archive, unknown.
+        let (decision, seen) = decide_with(
+            &capture,
+            vec![listing(&archive, true), listing(&frames, true)],
+        );
+        assert!(matches!(decision, Decision::Completed(keys) if keys == ["postconditionPresent"]));
+        assert_eq!(seen, [probe(&archive), probe(&frames)]);
+        let (decision, _) = decide_with(
+            &capture,
+            vec![listing(&archive, false), listing(&frames, false)],
+        );
+        assert!(matches!(decision, Decision::NotExecuted));
+        let (decision, _) = decide_with(
+            &capture,
+            vec![listing(&archive, false), listing(&frames, true)],
+        );
+        assert!(matches!(decision, Decision::Unknown(reason)
+            if reason == format!("frames directory {frames} remains without its archive \
+                {archive}; original not resent")));
+        // An answer no presence reads, or a probe that cannot be dispatched,
+        // settles nothing; a failed probe ends the reconcile's dispatches.
+        let garbled = Ok(arkdeck_provider_hdc::Receipt {
+            exit_status: 1,
+            stdout: Vec::new(),
+            stderr: b"hdc: device offline\n".to_vec(),
+            truncated: false,
+            duration: std::time::Duration::ZERO,
+        });
+        let (decision, seen) = decide_with(&capture, vec![garbled, listing(&frames, false)]);
+        assert!(matches!(decision, Decision::Unknown(reason)
+            if reason == "dedicated readback did not produce a definite presence"));
+        assert_eq!(seen.len(), 2);
+        let (decision, seen) = decide_with(
+            &capture,
+            vec![Err(DispatchFailure::Unobservable(
+                "process timed out".into(),
+            ))],
+        );
+        assert!(matches!(decision, Decision::Unknown(reason)
+            if reason == "dedicated readback failed: outcomeUnknown(\"process timed out\"); \
+                original not resent"));
+        assert_eq!(seen, [probe(&archive)]);
+        // The cleanup: frames directory gone, completed; still there, not
+        // executed. Only the directory is probed.
+        let (decision, seen) = decide_with(&cleanup, vec![listing(&frames, false)]);
+        assert!(matches!(decision, Decision::Completed(keys) if keys == ["postconditionPresent"]));
+        assert_eq!(seen, [probe(&frames)]);
+        let (decision, _) = decide_with(&cleanup, vec![listing(&frames, true)]);
+        assert!(matches!(decision, Decision::NotExecuted));
+        drop(targets);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

@@ -37,9 +37,9 @@ mod trace_probe;
 pub use capture_files::{
     DirectoryPurpose, FaultLogName, FileAction, FileActionError, FilePlan, FileReceipt,
     HostLanding, ImageType, Invocation, JFIF_MAGIC, Landed, LivenessRequest, OwnedRemoteDirectory,
-    OwnedRemotePath, PNG_MAGIC, RECEIVE_MAXIMUM_BYTES, ReceiveArtifact, STDOUT_BUDGET,
-    ScreenSequenceRequest, TraceRequest, fault_log_entries, file_producer_step_id, host_landing,
-    path_presence, remote_regular_file_byte_count, run, screenshot_image_type,
+    OwnedRemotePath, PNG_MAGIC, ParkedScreenSequence, RECEIVE_MAXIMUM_BYTES, ReceiveArtifact,
+    STDOUT_BUDGET, ScreenSequenceRequest, TraceRequest, fault_log_entries, file_producer_step_id,
+    host_landing, path_presence, remote_regular_file_byte_count, run, screenshot_image_type,
 };
 pub use debug_hap::{
     AbilityReference, BundleReference, HapAction, ResolvedArtifact, StagedArtifact, StagedPackage,
