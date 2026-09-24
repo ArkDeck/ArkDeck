@@ -1,0 +1,9 @@
+{
+  "applicationSupportRoot" : "/tmp/arkdeck-loader-binding-oracle",
+  "nowUTC" : "2026-09-25T00:00:00Z",
+  "owners" : [
+    "ProductRockchipLoaderBindingCoordinator"
+  ],
+  "producer" : "LoaderBindingOracleContractTests",
+  "stateDirectory" : "/tmp/arkdeck-loader-binding-oracle/state"
+}

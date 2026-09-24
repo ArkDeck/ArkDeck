@@ -372,12 +372,13 @@ def main() -> None:
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
                     # No composition here holds the Flash recovery broker's invocations, the
-                    # post-flash alias or the ArkForge lane's runtime directory: as Swift's daemon
-                    # without them, the reads answer that their owner is not configured, and the
-                    # reconciler reads its parameters first.
+                    # post-flash alias, the Loader binding or the ArkForge lane's runtime
+                    # directory: as Swift's daemon without them, the reads answer that their owner
+                    # is not configured, and the reconciler and the binding read their parameters
+                    # first.
                     if method in {"debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
                         expected = "internalError"
-                    if method in {"flash.reconcile-alias", "flash.prerequisites"}:
+                    if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader"}:
                         expected = "invalidParams"
                     # Without parameters, as Swift's handler, every workspace method but the
                     # project list is refused before its owner is asked.
@@ -409,6 +410,7 @@ def main() -> None:
                     ("trace-probe-bad-type", "trace.probe", {"targetId": 1}, "invalidParams"),
                     ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
+                    ("bind-loader-missing-owner", "flash.bind-current-loader", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
                     ("prerequisites-missing-owner", "flash.prerequisites", {"targetId": "target-fixture", "profileReference": "dayu200"}, "internalError"),
                     ("device-access-parameter", "flash.device-access", {"socketPath": "/caller/path"}, "invalidParams"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),

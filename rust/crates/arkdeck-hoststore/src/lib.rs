@@ -314,8 +314,16 @@ pub use flash_invocations::{FlashInvocations, MAXIMUM_DESTRUCTIVE_EPOCHS};
 mod rockchip_binding;
 #[cfg(target_os = "macos")]
 pub use rockchip_binding::{
-    BindingError, BindingSnapshot, BoundTarget, LineageAdvance, RockchipBindingStore,
+    BindingError, BindingSnapshot, BoundTarget, LineageAdvance, RecoveryProof, RockchipBindingStore,
 };
+#[cfg(target_os = "macos")]
+mod rockchip_reactivation;
+#[cfg(target_os = "macos")]
+pub use rockchip_reactivation::{ReactivationProof, ReactivationProofSource};
+#[cfg(target_os = "macos")]
+mod loader_binding;
+#[cfg(target_os = "macos")]
+pub use loader_binding::LoaderBinding;
 #[cfg(target_os = "macos")]
 mod flash_facts;
 #[cfg(target_os = "macos")]

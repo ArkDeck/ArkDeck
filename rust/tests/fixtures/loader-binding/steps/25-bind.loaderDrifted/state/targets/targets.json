@@ -1,0 +1,57 @@
+{
+  "aliasResolutions" : [
+    {
+      "aliasBindingRevision" : 1,
+      "aliasStableIdentitySHA256" : "30b2d8460ace23ae4bbf3b0180f2cb98b93e7fa5d7f448cc6eb9ae5ff596822a",
+      "aliasTargetID" : "TGT-ALIAS",
+      "canonicalBindingRevision" : 3,
+      "canonicalStableIdentitySHA256" : "6f835980f1a8427b21d20dd192349e29d0acf0aa459364c1e0741a26a61aa3c2",
+      "canonicalTargetID" : "TGT-BOARD-A",
+      "confirmedStepIDs" : [
+        "enter-loader-mode",
+        "flash-partitions",
+        "verify-flash-readback",
+        "reboot-device",
+        "wait-for-hdc",
+        "rebind-and-verify-build"
+      ],
+      "coveredUnknownIntents" : [
+
+      ],
+      "establishedAtUTC" : "2026-09-20T00:00:00Z",
+      "establishingFlashJobID" : "job-flash-alias-1",
+      "establishingFlashPlanDigestSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "resolutionID" : "target-alias-resolution-cfa7f4fa903d1ca82d1afd1eb085b35f",
+      "resolutionSHA256" : "fd427cb1610af1f379c72910fad2ececa6facffa680a41968733305ed221a403",
+      "routedHDCIdentitySHA256" : "30b2d8460ace23ae4bbf3b0180f2cb98b93e7fa5d7f448cc6eb9ae5ff596822a",
+      "routedUSBTopology" : "18874368"
+    }
+  ],
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-09-01T00:00:00Z",
+      "bindingRevision" : 3,
+      "connectKey" : "1501ffff00000000000000000000cafe",
+      "stablePhysicalIdentitySHA256" : "6f835980f1a8427b21d20dd192349e29d0acf0aa459364c1e0741a26a61aa3c2",
+      "targetID" : "TGT-BOARD-A",
+      "toolVersion" : "3.2.0f"
+    },
+    {
+      "adoptedAtUTC" : "2026-09-01T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "1501ffff0000000000000000000beef1",
+      "stablePhysicalIdentitySHA256" : "9ec17d940e52b73a8099491855579c72f8055732fa5218f8578c641706685682",
+      "targetID" : "TGT-BOARD-B",
+      "toolVersion" : "3.2.0f"
+    },
+    {
+      "adoptedAtUTC" : "2026-09-01T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "1501ffff000000000000000000000a1a",
+      "stablePhysicalIdentitySHA256" : "30b2d8460ace23ae4bbf3b0180f2cb98b93e7fa5d7f448cc6eb9ae5ff596822a",
+      "targetID" : "TGT-ALIAS",
+      "toolVersion" : "3.2.0f"
+    }
+  ]
+}

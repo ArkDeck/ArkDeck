@@ -53,6 +53,13 @@ pub struct TargetStore {
     /// over this owner shares (`device_lane.rs`).
     lanes: crate::device_lane::DeviceMutationLanes,
 }
+/// The Target a binding lineage advance left.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AdvancedTarget {
+    pub(crate) target_id: String,
+    pub(crate) identity_sha256: String,
+    pub(crate) binding_revision: u64,
+}
 /// Swift `routeObservationFreshnessSeconds`.
 const ROUTE_OBSERVATION_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(5);
 /// Swift `RuntimeTargetHDCRoute`: where an adopted Target's HDC commands go.
@@ -757,6 +764,59 @@ impl TargetStore {
             ))
         })
         .map(|value| value.as_array().cloned().unwrap_or_default())
+    }
+
+    /// Swift `RuntimeTargetStore.advanceBindingLineage(_:)`: the adjacent
+    /// lineage edge a published Loader binding drew, applied to the binding
+    /// document under both locks and published only when it changed it. A
+    /// refusal is Swift's rendered `storeFailure`; a document this store cannot
+    /// read or publish is refused in the same case, with this store's detail.
+    pub(crate) fn advance_binding_lineage(
+        &self,
+        advance: &crate::rockchip_binding::LineageAdvance,
+    ) -> Result<AdvancedTarget, String> {
+        let mut advanced = None;
+        self.publishing("", |targets, _| {
+            let (record, updated) =
+                targets
+                    .advance_binding_lineage(advance)
+                    .map_err(|refusal| WireError {
+                        code: "storeFailure".into(),
+                        message: refusal,
+                        details: None,
+                    })?;
+            let publications = if updated {
+                vec![Publication::Targets(
+                    targets.encode().map_err(|_| unreadable(""))?,
+                )]
+            } else {
+                Vec::new()
+            };
+            advanced = Some(AdvancedTarget {
+                target_id: record.target_id,
+                identity_sha256: record.identity,
+                binding_revision: record.binding_revision,
+            });
+            Ok((Value::Null, publications))
+        })
+        .map_err(|error| match error.code.as_str() {
+            "storeFailure" => error.message,
+            "recordUnreadable" => format!(
+                "storeFailure({})",
+                crate::strict_json::swift_quoted(&format!(
+                    "undecodable target store: {}",
+                    error.message
+                ))
+            ),
+            _ => format!(
+                "storeFailure({})",
+                crate::strict_json::swift_quoted(&format!(
+                    "cannot persist target store: {}",
+                    error.message
+                ))
+            ),
+        })?;
+        advanced.ok_or_else(|| "storeFailure(\"invalid target binding lineage advance\")".into())
     }
 
     /// Presentation lookup from provider-observed addresses. This does not select

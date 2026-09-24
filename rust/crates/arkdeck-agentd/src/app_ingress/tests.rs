@@ -185,6 +185,7 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "flash.bootloader-status",
             "flash.prerequisites",
             "flash.device-access",
+            "flash.bind-current-loader",
         ]
         .contains(method)
         {
@@ -466,6 +467,9 @@ mod flash_facts_tests;
 
 #[path = "device_access_tests.rs"]
 mod device_access_tests;
+
+#[path = "loader_binding_tests.rs"]
+mod loader_binding_tests;
 
 #[path = "production_tests.rs"]
 mod production_tests;

@@ -168,7 +168,10 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
                 | "flash.device-access"
         ) {
             "internalError"
-        } else if matches!(*method, "flash.reconcile-alias" | "flash.prerequisites") {
+        } else if matches!(
+            *method,
+            "flash.reconcile-alias" | "flash.prerequisites" | "flash.bind-current-loader"
+        ) {
             // Swift reads these parameters before their owners.
             "invalidParams"
         } else {

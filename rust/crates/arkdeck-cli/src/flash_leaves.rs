@@ -1,10 +1,11 @@
 //! The Flash leaves that read or repair what the Runtime keeps about a board
 //! without changing the board: `flash bootloader-status`, `flash
-//! prerequisites`, `flash reconcile-alias` and `recovery flash-invocation
-//! list|status`, with `debug status`, the legacy spelling of the last. Each is
-//! one request, answered as the Runtime answers it (Swift
+//! prerequisites`, `flash reconcile-alias`, `flash bind-loader` and `recovery
+//! flash-invocation list|status`, with `debug status`, the legacy spelling of
+//! the last. Each is one request, answered as the Runtime answers it (Swift
 //! `runFlashObservation` and `emitFlashInvocation`); every judgement of the
-//! board, the alias and the invocation documents is the Runtime's.
+//! board, the binding, the alias and the invocation documents is the
+//! Runtime's.
 use crate::CliError;
 use serde_json::{Map, Value, json};
 
@@ -35,25 +36,29 @@ pub(crate) fn configure(
                 .ok_or_else(|| invalid("flash prerequisites requires --device-profile"))?;
             fields.insert("profileReference".into(), profile);
         }
-        "flash.reconcile-alias" => {
+        // Both name a Target and the revision the caller saw; Swift sends
+        // the revision as an integer.
+        "flash.reconcile-alias" | "flash.bind-loader" => {
+            let leaf = if command == "flash.bind-loader" {
+                "flash bind-loader"
+            } else {
+                "flash reconcile-alias"
+            };
             if !fields.contains_key("targetId") {
-                return Err(invalid("flash reconcile-alias requires --target"));
+                return Err(invalid(&format!("{leaf} requires --target")));
             }
             let text = fields
                 .get("expectedBindingRevision")
                 .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    invalid("flash reconcile-alias requires --expected-binding-revision")
-                })?;
+                .ok_or_else(|| invalid(&format!("{leaf} requires --expected-binding-revision")))?;
             let revision = text
                 .parse::<i64>()
                 .ok()
                 .filter(|revision| *revision >= 1 && revision.to_string() == text)
                 .ok_or_else(|| {
-                    invalid(
-                        "flash reconcile-alias --expected-binding-revision must be a positive \
-                         integer",
-                    )
+                    invalid(&format!(
+                        "{leaf} --expected-binding-revision must be a positive integer"
+                    ))
                 })?;
             fields.insert("expectedBindingRevision".into(), json!(revision));
         }

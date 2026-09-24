@@ -404,6 +404,7 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             "flashInvocations",
             "flashHostFacts",
             "deviceAccess",
+            "loaderBinding",
         ]
     );
     // The Flash invocation owner's directories, created owner-only beside

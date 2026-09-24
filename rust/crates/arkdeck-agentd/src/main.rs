@@ -494,13 +494,23 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_flash_host_facts(
                 arkdeck_hoststore::FlashHostFacts::new(
                     &root,
-                    development_usb::flash_census(source, file),
+                    development_usb::flash_census(source, file.clone()),
                 )
                 .with_rockusb(composed.rockusb())
                 .with_arkforge_loader(&composed.runtime_directory),
             )
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
                 &composed.runtime_directory,
+            ))
+            // Swift's Loader binding coordinator over the same root, census
+            // and lane directory, with the Runtime's records below the root.
+            .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
+                &root,
+                development_usb::flash_census(source, file.clone()),
+                arkdeck_hoststore::ArkForgeLoader::new(
+                    development_usb::flash_census(source, file),
+                    &composed.runtime_directory,
+                ),
             ));
         arkforge = Some(composed);
         // Acknowledged, and with the development HDC started as the managed
@@ -827,5 +837,7 @@ mod device_access_control;
 mod flash_host_facts_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_reads_control;
+#[cfg(all(test, target_os = "macos"))]
+mod loader_binding_control;
 #[cfg(all(test, target_os = "macos"))]
 mod trace_probe_control;

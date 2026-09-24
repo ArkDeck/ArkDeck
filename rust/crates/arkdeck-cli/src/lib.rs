@@ -771,6 +771,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["debug", "probe"] => "debug.probe",
         ["debug", "status"] => "debug.status",
         ["flash", "reconcile-alias"] => "flash.reconcile-alias",
+        ["flash", "bind-loader"] => "flash.bind-loader",
         ["flash", "bootloader-status"] => "flash.bootloader-status",
         ["flash", "device-access"] => "flash.device-access",
         ["flash", "prerequisites"] => "flash.prerequisites",
@@ -943,7 +944,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     }
     let allowed: &[&str] = match command {
         "debug.probe" => &["targetId"],
-        "flash.reconcile-alias" => &["targetId", "expectedBindingRevision"],
+        "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
@@ -1522,6 +1523,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             // Swift's handler reads the invocation through `debug.status`, the
             // wire method `debug status` also sends.
             "debug.status"
+        } else if command == "flash.bind-loader" {
+            "flash.bind-current-loader"
         } else {
             command
         },
@@ -1597,6 +1600,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "control-action.show"
                     | "control-action.reconcile"
                     | "flash.reconcile-alias"
+                    | "flash.bind-loader"
                     | "flash.prerequisites"
                     | "recovery.flash-invocation.list"
                     | "recovery.flash-invocation.status"

@@ -217,6 +217,7 @@ impl<H: HostServices> AppIngress<H> {
                     | "flash.bootloader-status"
                     | "flash.prerequisites"
                     | "flash.device-access"
+                    | "flash.bind-current-loader"
             )
         {
             return refusal(
@@ -361,6 +362,10 @@ fn closed_parameters(request: &Request) -> bool {
         | "flash.device-access" => &[],
         "debug.probe" | "trace.probe" => &["targetId"],
         "flash.prerequisites" => &["targetId", "profileReference"],
+        // The App selects an adopted Target and the revision it saw; every
+        // identity and port is read afresh by the Runtime, which writes only
+        // its own binding and the Target's lineage.
+        "flash.bind-current-loader" => &["targetId", "expectedBindingRevision"],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",

@@ -1,17 +1,16 @@
 //! Swift `RockchipProductBindingStore` and `RockchipProductBindingSnapshot`
-//! (`RockchipDeviceBinding.swift`), read side: the owner-only cross-mode
-//! binding of a DAYU200, `rockchip-binding.json` in the Application Support
-//! root (the parent of the daemon state directory), and the rules that decide
-//! from its evidence whether it covers a Runtime Target or a live USB
-//! personality.
+//! (`RockchipDeviceBinding.swift`): the owner-only cross-mode binding of a
+//! DAYU200, `rockchip-binding.json` in the Application Support root (the
+//! parent of the daemon state directory), the rules that decide from its
+//! evidence whether it covers a Runtime Target or a live USB personality, and
+//! the Loader binding owner's three compare-and-swap writes of it.
 //!
-//! The binding is written by the Loader binding owner (M4-4); nothing here
-//! writes it. A read prepares the root as Swift's does — created owner-only
-//! when absent and made owner-only whether or not it existed — and every
-//! refusal is Swift's `productionConfigurationUnavailable` detail.
+//! Every access prepares the root as Swift's does — created owner-only when
+//! absent and made owner-only whether or not it existed — and every refusal
+//! is Swift's `productionConfigurationUnavailable` detail.
 use crate::strict_json::swift_quoted;
 use arkdeck_contract::sha256_hex;
-use arkdeck_platform::{HostDirectory, OwnerOnlyReadFailure, UsbHostDevice};
+use arkdeck_platform::{DocumentPublishError, HostDirectory, OwnerOnlyReadFailure, UsbHostDevice};
 use arkdeck_provider_hdc::{is_dayu200_hdc_normal, is_dayu200_loader};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -34,7 +33,7 @@ impl BindingError {
     }
 }
 
-fn refuse(detail: &'static str) -> BindingError {
+pub(crate) fn refuse(detail: &'static str) -> BindingError {
     BindingError(detail)
 }
 
@@ -76,6 +75,8 @@ impl RockchipBindingStore {
     pub const FILE_NAME: &'static str = "rockchip-binding.json";
     /// Swift `maximumDocumentBytes`.
     pub const MAXIMUM_BYTES: usize = 64 * 1_024;
+    /// Swift `lockFileName`.
+    pub const LOCK_NAME: &'static str = ".rockchip-binding.lock";
 
     pub fn new(root: &Path) -> Self {
         Self {
@@ -87,6 +88,169 @@ impl RockchipBindingStore {
     /// without a lock — `None` when absent.
     pub fn load_if_present(&self) -> Result<Option<BindingSnapshot>, BindingError> {
         let root = self.prepare_root()?;
+        Self::load(&root)
+    }
+
+    /// Swift `loadExisting()`: as [`Self::load_if_present`], but an absent
+    /// binding refuses.
+    pub fn load_existing(&self) -> Result<BindingSnapshot, BindingError> {
+        self.load_if_present()?
+            .ok_or_else(|| refuse("durable Rockchip binding is not installed"))
+    }
+
+    /// Swift `replace(expectedRevision:expectedSerialSHA256:with:)`: exactly
+    /// the expected binding replaced by the one adjacent revision a Loader
+    /// rebind observed. The caller has applied the rebind policy.
+    pub fn replace(
+        &self,
+        expected_revision: i64,
+        expected_serial_sha256: &str,
+        candidate: &BindingSnapshot,
+    ) -> Result<BindingSnapshot, BindingError> {
+        self.compare_and_swap(
+            expected_revision,
+            expected_serial_sha256,
+            expected_revision.saturating_add(1),
+            candidate,
+            "durable binding changed before Loader rebind",
+        )
+    }
+
+    /// Swift `activateSelectedInitialTarget(expectedRevision:
+    /// expectedSerialSHA256:with:)`: the singleton binding switched to an
+    /// adopted revision-1 Target of another identity, with the selection it
+    /// was made by — never a revision advance.
+    pub fn activate_selected_initial_target(
+        &self,
+        expected_revision: i64,
+        expected_serial_sha256: &str,
+        candidate: &BindingSnapshot,
+    ) -> Result<BindingSnapshot, BindingError> {
+        if candidate.revision != 1
+            || candidate.identity() == expected_serial_sha256
+            || !candidate
+                .evidence
+                .iter()
+                .any(|entry| entry.starts_with("rebind:user-selection-sha256="))
+        {
+            return Err(refuse("selected initial target binding is invalid"));
+        }
+        self.compare_and_swap(
+            expected_revision,
+            expected_serial_sha256,
+            1,
+            candidate,
+            "durable binding changed before selected target activation",
+        )
+    }
+
+    /// Swift `activateSelectedTarget(expectedRevision:expectedSerialSHA256:
+    /// with:)`: the singleton binding switched to an advanced Target, at its
+    /// own revision, only with the complete same-revision reactivation
+    /// evidence and a confirmed HDC-normal alias.
+    pub fn activate_selected_target(
+        &self,
+        expected_revision: i64,
+        expected_serial_sha256: &str,
+        candidate: &BindingSnapshot,
+    ) -> Result<BindingSnapshot, BindingError> {
+        let invalid = || refuse("selected advanced target binding is invalid");
+        if candidate.revision <= 1 || candidate.identity() == expected_serial_sha256 {
+            return Err(invalid());
+        }
+        if candidate.runtime_target_lineage_advance()?.is_some()
+            || candidate.confirmed_hdc_normal_alias()?.is_none()
+        {
+            return Err(invalid());
+        }
+        let Some(target_id) = candidate.reactivated_target_id()? else {
+            return Err(invalid());
+        };
+        if candidate
+            .reactivation_selection_evidence(&target_id)?
+            .is_none()
+        {
+            return Err(invalid());
+        }
+        self.compare_and_swap(
+            expected_revision,
+            expected_serial_sha256,
+            candidate.revision,
+            candidate,
+            "durable binding changed before selected target reactivation",
+        )
+    }
+
+    /// Swift `compareAndSwap`: under the binding's lock, the document
+    /// replaced only while it is still the expected revision of the expected
+    /// serial, then read back.
+    fn compare_and_swap(
+        &self,
+        expected_revision: i64,
+        expected_serial_sha256: &str,
+        required_candidate_revision: i64,
+        candidate: &BindingSnapshot,
+        mismatch: &'static str,
+    ) -> Result<BindingSnapshot, BindingError> {
+        candidate.validate()?;
+        let root = self.prepare_root()?;
+        let _lock = self.lock(&root)?;
+        let existing = Self::load(&root)?
+            .ok_or_else(|| refuse("durable Rockchip binding is not installed"))?;
+        if existing.revision != expected_revision
+            || existing.identity() != expected_serial_sha256
+            || candidate.revision != required_candidate_revision
+        {
+            return Err(refuse(mismatch));
+        }
+        let document = candidate.encode();
+        if document.len() > Self::MAXIMUM_BYTES {
+            return Err(refuse("binding document exceeds its product limit"));
+        }
+        root.publish_document(Self::FILE_NAME, &document, Self::MAXIMUM_BYTES)
+            .map_err(|error| {
+                refuse(match error {
+                    // Nothing was renamed into place.
+                    DocumentPublishError::BeforePublication(_) => {
+                        "binding replacement cannot be committed"
+                    }
+                    // Renamed, but not proved durable.
+                    DocumentPublishError::OutcomeUnknown(_) => {
+                        "binding directory cannot be synchronized"
+                    }
+                })
+            })?;
+        match Self::load(&root)? {
+            Some(readback) if readback == *candidate => Ok(readback),
+            _ => Err(refuse("binding replacement readback failed")),
+        }
+    }
+
+    /// Swift's binding lock: `.rockchip-binding.lock`, created owner-only
+    /// when absent, exactly mode 0600, taken exclusively and waited for; it
+    /// is unlocked explicitly when dropped.
+    fn lock(&self, root: &HostDirectory) -> Result<arkdeck_platform::HostReadLock, BindingError> {
+        let lock = root.wait_lock(Self::LOCK_NAME, false).map_err(|error| {
+            refuse(if error.kind() == std::io::ErrorKind::InvalidData {
+                "binding lock must be an owner-only regular file"
+            } else {
+                "binding lock cannot be acquired"
+            })
+        })?;
+        match root.document_metadata(Self::LOCK_NAME) {
+            Ok(metadata)
+                if std::os::unix::fs::PermissionsExt::mode(&metadata.permissions()) & 0o777
+                    == 0o600 =>
+            {
+                Ok(lock)
+            }
+            _ => Err(refuse("binding lock must be an owner-only regular file")),
+        }
+    }
+
+    /// Swift `load(rootDescriptor:)`: the document at the prepared root read
+    /// owner-only, its four members decoded and validated; `None` when absent.
+    fn load(root: &HostDirectory) -> Result<Option<BindingSnapshot>, BindingError> {
         let Some(bytes) = root
             .read_owner_only_detailed(Self::FILE_NAME, Self::MAXIMUM_BYTES)
             .map_err(|refused| {
@@ -159,7 +323,7 @@ fn decode(bytes: &[u8]) -> Result<BindingSnapshot, BindingError> {
 }
 
 /// Swift `RockchipDigestValidation.isCanonicalSHA256`.
-fn canonical_sha256(value: &str) -> bool {
+pub(crate) fn canonical_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -167,7 +331,7 @@ fn canonical_sha256(value: &str) -> bool {
 }
 
 /// Swift's check of a topology: ASCII digits, and no leading zero but `0`.
-fn canonical_topology(value: &str) -> bool {
+pub(crate) fn canonical_topology(value: &str) -> bool {
     !value.is_empty()
         && value.bytes().all(|byte| byte.is_ascii_digit())
         && (value == "0" || !value.starts_with('0'))
@@ -195,9 +359,94 @@ fn reactivated_target_identity(value: &str) -> bool {
 /// Swift `ReactivationEvidence`.
 struct Reactivation {
     target_id: String,
+    selection: String,
 }
 
+/// Swift `RockchipLoaderBindingRecoveryProof`: the adjacent Target revisions
+/// a published Loader binding drew and the Runtime selection it recorded.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecoveryProof {
+    pub previous_revision: i64,
+    pub current_revision: i64,
+    pub selection_evidence_sha256: String,
+}
+
+/// The readback of a Loader seen in its hdc-normal personality, which every
+/// cross-mode lineage records.
+const LOADER_READBACK: &str = "product:e0-iokit-single-loader-readback";
+
 impl BindingSnapshot {
+    /// The document as Swift's store writes it: `JSONEncoder` with
+    /// `.sortedKeys` (every slash escaped) and one trailing newline.
+    pub fn encode(&self) -> Vec<u8> {
+        let text = |value: &str| {
+            serde_json::to_string(value)
+                .expect("a string always encodes")
+                .replace('/', "\\/")
+        };
+        let evidence: Vec<String> = self.evidence.iter().map(|entry| text(entry)).collect();
+        format!(
+            "{{\"evidence\":[{}],\"revision\":{},\"serial\":{},\"usbTopology\":{}}}\n",
+            evidence.join(","),
+            self.revision,
+            text(&self.serial),
+            text(&self.usb_topology)
+        )
+        .into_bytes()
+    }
+
+    /// Swift `reactivationSelectionEvidence(targetID:)`: the selection of a
+    /// complete same-revision reactivation of exactly this Target.
+    pub fn reactivation_selection_evidence(
+        &self,
+        target_id: &str,
+    ) -> Result<Option<String>, BindingError> {
+        Ok(self
+            .reactivation()?
+            .filter(|reactivation| reactivation.target_id == target_id)
+            .map(|reactivation| reactivation.selection))
+    }
+
+    /// Swift `reactivatedTargetID()`.
+    pub fn reactivated_target_id(&self) -> Result<Option<String>, BindingError> {
+        Ok(self
+            .reactivation()?
+            .map(|reactivation| reactivation.target_id))
+    }
+
+    /// Swift `loaderBindingRecoveryProof()`: the adjacent revisions and the
+    /// selection of a published Loader binding, enough to finish settling
+    /// the enter-Loader intent it answered; none unless the binding is a
+    /// complete confirmed lineage with one Runtime selection.
+    pub fn loader_binding_recovery_proof(&self) -> Result<Option<RecoveryProof>, BindingError> {
+        if !self.evidence.iter().any(|entry| entry == LOADER_READBACK)
+            || self
+                .evidence
+                .iter()
+                .filter(|entry| entry.starts_with("rebind:"))
+                .count()
+                != 1
+        {
+            return Ok(None);
+        }
+        let Some(advance) = self.runtime_target_lineage_advance()? else {
+            return Ok(None);
+        };
+        if self.confirmed_hdc_normal_alias()?.is_none() {
+            return Ok(None);
+        }
+        match self.values("rebind:user-selection-sha256=").as_slice() {
+            [selection] if canonical_sha256(selection) => Ok(Some(RecoveryProof {
+                previous_revision: advance.previous_revision,
+                current_revision: advance.current_revision,
+                selection_evidence_sha256: (*selection).to_owned(),
+            })),
+            _ => Err(refuse(
+                "durable Loader binding selection evidence is invalid or ambiguous",
+            )),
+        }
+    }
+
     /// Swift `validate(_:)`.
     fn validate(&self) -> Result<(), BindingError> {
         let valid = self.revision > 0
@@ -224,7 +473,8 @@ impl BindingSnapshot {
             .collect()
     }
 
-    fn identity(&self) -> String {
+    /// The digest of the bound serial, the identity every comparison uses.
+    pub fn identity(&self) -> String {
         sha256_hex(self.serial.as_bytes())
     }
 
@@ -303,10 +553,7 @@ impl BindingSnapshot {
         let aliases = self.values("identity:hdc-normal-alias-sha256=");
         let alias_topologies = self.values("binding:hdc-normal-alias-usb-topology=");
         if self.revision <= 1
-            || !self
-                .evidence
-                .iter()
-                .any(|entry| entry == "product:e0-iokit-single-loader-readback")
+            || !self.evidence.iter().any(|entry| entry == LOADER_READBACK)
             || !self.values("identity:previous-serial-sha256=").is_empty()
             || !self.values("binding:previous-revision=").is_empty()
             || !self.values("binding:previous-usb-topology=").is_empty()
@@ -370,6 +617,7 @@ impl BindingSnapshot {
         }
         Ok(Some(Reactivation {
             target_id: (*target_id).to_owned(),
+            selection: (*selection).to_owned(),
         }))
     }
 
@@ -377,11 +625,7 @@ impl BindingSnapshot {
     /// binding's confirmed lineage accepts besides its current identity, as
     /// its identity digest and topology.
     pub fn confirmed_hdc_normal_alias(&self) -> Result<Option<(String, String)>, BindingError> {
-        if !self
-            .evidence
-            .iter()
-            .any(|entry| entry == "product:e0-iokit-single-loader-readback")
-        {
+        if !self.evidence.iter().any(|entry| entry == LOADER_READBACK) {
             return Ok(None);
         }
         let adjacent = self.runtime_target_lineage_advance()?.is_some();
