@@ -9,13 +9,15 @@ mod workspace_project;
 #[cfg(target_os = "macos")]
 pub use workspace_project::{
     CredentialAcquire, PinPair, PinningResult, ToolchainAcquire, WorkspaceCredentialPinning,
-    WorkspaceProjectStore, WorkspaceReference, WorkspaceStartupRecord, WorkspaceToolchainPinning,
-    WorkspaceUse,
+    WorkspacePresetComposition, WorkspaceProjectStore, WorkspaceReference, WorkspaceStartupRecord,
+    WorkspaceToolchainPinning, WorkspaceUse,
 };
 #[cfg(target_os = "macos")]
 mod workspace_composition;
 #[cfg(target_os = "macos")]
-pub use workspace_composition::WorkspaceComposition;
+pub use workspace_composition::{
+    CompositionNotes, ResolvedToolchain, ToolchainResolver, WorkspaceComposition,
+};
 #[cfg(target_os = "macos")]
 mod workspace_isolation;
 #[cfg(target_os = "macos")]
@@ -27,7 +29,16 @@ pub use workspace_patch::{
 #[cfg(target_os = "macos")]
 mod workspace_profile;
 #[cfg(target_os = "macos")]
-pub use workspace_profile::{ProfilePresets, WorkspaceCommandPreset, WorkspaceProfile};
+pub use workspace_profile::{
+    ProfilePresets, RegisteredBuildPreset, RegisteredKind, SigningPresetRef, VerifiedResource,
+    WorkspaceCommandPreset, WorkspaceProfile,
+};
+#[cfg(target_os = "macos")]
+mod workspace_build;
+#[cfg(target_os = "macos")]
+mod workspace_signing;
+#[cfg(target_os = "macos")]
+pub use workspace_signing::{SigningSetup, credential_pinning, keychain_credential_pinning};
 #[cfg(target_os = "macos")]
 mod workspace_support;
 

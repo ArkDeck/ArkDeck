@@ -851,6 +851,7 @@ impl WorkspaceProjectStore {
                 }
                 transaction.save(&next)?;
                 let next = self.reconcile(transaction, next)?;
+                self.forget_applied_preset(preset);
                 next.presets[index].resource()
             },
         )

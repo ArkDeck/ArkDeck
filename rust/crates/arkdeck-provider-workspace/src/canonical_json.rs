@@ -13,6 +13,47 @@ pub(crate) fn encode(value: &Value) -> Option<Vec<u8>> {
     Some(output)
 }
 
+/// Swift `CanonicalJSONEncoders.canonical()` — `[.sortedKeys,
+/// .withoutEscapingSlashes]` — for the same string- and integer-valued
+/// documents: no whitespace at all.
+pub(crate) fn encode_compact(value: &Value) -> Option<Vec<u8>> {
+    let mut output = Vec::new();
+    write_compact(value, &mut output)?;
+    Some(output)
+}
+
+fn write_compact(value: &Value, output: &mut Vec<u8>) -> Option<()> {
+    match value {
+        Value::Object(fields) => {
+            let mut keys: Vec<&String> = fields.keys().collect();
+            keys.sort_unstable();
+            output.push(b'{');
+            for (index, key) in keys.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                output.extend(serde_json::to_vec(key).ok()?);
+                output.push(b':');
+                write_compact(&fields[key.as_str()], output)?;
+            }
+            output.push(b'}');
+        }
+        Value::Array(values) => {
+            output.push(b'[');
+            for (index, value) in values.iter().enumerate() {
+                if index > 0 {
+                    output.push(b',');
+                }
+                write_compact(value, output)?;
+            }
+            output.push(b']');
+        }
+        Value::Number(number) if !number.is_i64() && !number.is_u64() => return None,
+        other => output.extend(serde_json::to_vec(other).ok()?),
+    }
+    Some(())
+}
+
 fn line(output: &mut Vec<u8>, depth: usize) {
     output.push(b'\n');
     output.resize(output.len() + 2 * depth, b' ');
@@ -80,5 +121,16 @@ mod tests {
         );
         assert_eq!(encode(&json!({})).unwrap(), b"{\n\n}");
         assert!(encode(&json!({"a": 0.5})).is_none());
+    }
+
+    /// Printed by Foundation `JSONEncoder([.sortedKeys,
+    /// .withoutEscapingSlashes])`.
+    #[test]
+    fn the_compact_form_matches_the_foundation_spelling() {
+        let value = json!({"b": ["x/y", 2], "a": {"d": "", "c": 1}, "e": []});
+        assert_eq!(
+            String::from_utf8(super::encode_compact(&value).unwrap()).unwrap(),
+            r#"{"a":{"c":1,"d":""},"b":["x/y",2],"e":[]}"#
+        );
     }
 }

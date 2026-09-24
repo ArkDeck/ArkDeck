@@ -102,6 +102,50 @@ pub(crate) fn release_in(
     Ok(record.references.len() != before)
 }
 
+/// Swift `resolve(_:expectedGeneration:owner:)` on a loaded index: the
+/// files an available record's exact pin names — its Node launcher, Hvigor
+/// script, SDK root and every other pinned child — once the record is
+/// verified. The resolution requires the owner's own pin at the record's
+/// current generation, so a preset can only run the toolchain it pinned.
+pub(crate) fn resolve_in(
+    index: &mut Index,
+    reference: &str,
+    expected_generation: &str,
+    owner: &Owner,
+    verify: &dyn Fn(&Record) -> Result<(), WireError>,
+) -> Result<crate::workspace_composition::ResolvedToolchain, WireError> {
+    let record = find(index, reference)?;
+    if record.state != "available"
+        || expected_generation != record.generation.to_string()
+        || !record.references.contains(owner)
+    {
+        return Err(failure(
+            "resourceConflict",
+            "DevEco resolution requires an exact workspace-preset pin",
+        ));
+    }
+    verify(record)?;
+    let root = record.root.path.trim_end_matches('/');
+    Ok(crate::workspace_composition::ResolvedToolchain {
+        node_path: format!("{root}/tools/node/bin/node"),
+        hvigor_script_path: format!("{root}/tools/hvigor/bin/hvigorw.js"),
+        sdk_root_path: format!("{root}/sdk"),
+        verified_resources: record
+            .children
+            .iter()
+            .filter(|child| child.role != "node")
+            .filter_map(|child| {
+                Some(crate::workspace_profile::VerifiedResource {
+                    path: format!("{root}/{}", child.relative_path),
+                    sha256: child.sha256.clone(),
+                    byte_count: u64::try_from(child.byte_count).ok()?,
+                    require_executable: child.executable,
+                })
+            })
+            .collect(),
+    })
+}
+
 /// The encoded index Swift's `saveIndex` publishes, validated as a reader
 /// would read it back.
 pub(crate) fn encode(index: &Index) -> Result<Vec<u8>, WireError> {
@@ -168,6 +212,28 @@ impl DevEcoRegistryStore {
                 &owner,
                 &verify_content,
             )
+        })
+    }
+
+    /// Resolves the toolchain the owner's exact pin names, as Swift's
+    /// `resolve`: the record re-measured, nothing written.
+    pub fn resolve(
+        &self,
+        reference: &str,
+        expected_generation: u64,
+        kind: &str,
+        id: &str,
+    ) -> Result<crate::workspace_composition::ResolvedToolchain, WireError> {
+        let owner = owner(kind, id)?;
+        self.pin_transaction(|index| {
+            resolve_in(
+                index,
+                reference,
+                &expected_generation.to_string(),
+                &owner,
+                &verify_content,
+            )
+            .map(|resolved| (resolved, false))
         })
     }
 
@@ -443,5 +509,76 @@ mod tests {
                 "{kind} {id}"
             );
         }
+    }
+
+    /// A resolution requires the owner's own pin at the current generation
+    /// and a verified record, and names the pinned children but Node.
+    #[test]
+    fn a_resolution_names_the_pinned_toolchain_only_for_its_exact_pin() {
+        let cases: Value =
+            serde_json::from_slice(&std::fs::read(oracle().join("cases.json")).unwrap()).unwrap();
+        // The first timeline's state after its first successful acquire.
+        let timeline = &cases["timelines"][0];
+        let step = timeline["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|step| step["call"] == "acquire" && step["error"].is_null())
+            .expect("a recorded acquire");
+        let bytes = std::fs::read(
+            oracle().join(format!("states/{}.json", step["state"].as_str().unwrap())),
+        )
+        .unwrap();
+        let (mut index, _) = crate::deveco_registry::read_index(&bytes).unwrap();
+        let reference = step["reference"].as_str().unwrap();
+        let generation = step["expectedGeneration"].as_str().unwrap();
+        let pinned = owner(
+            step["owner"]["kind"].as_str().unwrap(),
+            step["owner"]["id"].as_str().unwrap(),
+        )
+        .unwrap();
+        let verified = |_: &Record| Ok(());
+        let resolved = resolve_in(&mut index, reference, generation, &pinned, &verified).unwrap();
+        let root = index
+            .records
+            .iter()
+            .find(|record| record.reference == reference)
+            .unwrap()
+            .root
+            .path
+            .clone();
+        assert_eq!(resolved.node_path, format!("{root}/tools/node/bin/node"));
+        assert_eq!(
+            resolved.hvigor_script_path,
+            format!("{root}/tools/hvigor/bin/hvigorw.js")
+        );
+        assert_eq!(resolved.sdk_root_path, format!("{root}/sdk"));
+        assert!(!resolved.verified_resources.is_empty());
+        assert!(
+            resolved
+                .verified_resources
+                .iter()
+                .all(|resource| !resource.path.ends_with("/tools/node/bin/node"))
+        );
+        let conflict = |result: Result<_, WireError>| {
+            assert_eq!(result.unwrap_err().code, "resourceConflict");
+        };
+        let other = owner("workspacePreset", "preset-someone-else").unwrap();
+        conflict(resolve_in(
+            &mut index, reference, generation, &other, &verified,
+        ));
+        conflict(resolve_in(&mut index, reference, "999", &pinned, &verified));
+        let drifted = |_: &Record| {
+            Err(failure(
+                "recordUnreadable",
+                "registered DevEco root, manifests or child tools changed",
+            ))
+        };
+        assert_eq!(
+            resolve_in(&mut index, reference, generation, &pinned, &drifted)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
     }
 }

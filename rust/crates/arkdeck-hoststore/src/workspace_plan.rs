@@ -13,13 +13,17 @@
 //!   the executable by its digest, and an apply also by its patch Artifact's
 //!   facts, which name the capability it is admitted under.
 //!
+//! - `workspace.build-openharmony@1` is one process too: the build preset's
+//!   pinned executable with the preset's own closed argv, in the project root;
+//!   the request names the preset and supplies no argument.
+//!
 //! Swift materializes every plan for the authorization envelope's Job, so the
 //! plan names what that Job would do — the copy it would make, the attempt it
 //! would record; a run materializes it again for its own Job. The typed intent
 //! of a copy carries the engine clock, so two plans of one request agree only
 //! within one clock tick, as Swift's do.
 use super::*;
-use crate::workspace_composition::LeasedPatch;
+use crate::workspace_composition::LeasedInput;
 use crate::workspace_isolation::DESCRIPTOR;
 use crate::workspace_patch::PatchAction;
 
@@ -28,7 +32,7 @@ pub(crate) const AUTHORIZATION_PLAN_JOB: &str = "job-authorization-envelope";
 
 /// The facts a leased Artifact names, as Swift's materialization records
 /// them for the capability.
-fn artifact_facts(leased: &LeasedPatch) -> BTreeMap<String, String> {
+fn artifact_facts(leased: &LeasedInput) -> BTreeMap<String, String> {
     BTreeMap::from([
         ("artifactId".to_owned(), leased.artifact_id.clone()),
         ("artifactSha256".to_owned(), leased.sha256.clone()),
@@ -41,18 +45,21 @@ fn artifact_facts(leased: &LeasedPatch) -> BTreeMap<String, String> {
 
 impl JobPlanner<'_> {
     /// Swift `resolvedInputArtifact` plus `validateResolvedInputArtifact` for
-    /// a workspace patch: its lease resolved, bound to the request's own
-    /// target, as the payload file it names.
-    pub(crate) fn resolve_patch(
+    /// a workspace input — a patch, an unsigned HAP: its lease resolved,
+    /// bound to the request's own target, as the payload file it names.
+    pub(crate) fn resolve_input(
         &self,
         request: &OperationRequest,
-    ) -> Result<LeasedPatch, PlanRefusal> {
+        reference: &str,
+        input: &str,
+        label: &str,
+    ) -> Result<LeasedInput, PlanRefusal> {
         let (Some(artifacts), Some(Value::String(lease))) =
-            (self.artifacts, request.inputs.get("patchArtifactRef"))
+            (self.artifacts, request.inputs.get(input))
         else {
             return Err(refusal(
                 "invalidInput",
-                "workspace.apply-patch@1 requires a configured Artifact lease store",
+                format!("{reference} requires a configured Artifact lease store"),
             ));
         };
         let leased = self
@@ -60,7 +67,7 @@ impl JobPlanner<'_> {
             .map_err(|reason| {
                 refusal(
                     "invalidInput",
-                    format!("workspace patch Artifact lease is not resolvable: {reason}"),
+                    format!("{label} Artifact lease is not resolvable: {reason}"),
                 )
             })?;
         let (Some(path), Some(sha256), Some(byte_count)) = (
@@ -70,7 +77,7 @@ impl JobPlanner<'_> {
         ) else {
             return Err(internal_failure());
         };
-        Ok(LeasedPatch {
+        Ok(LeasedInput {
             artifact_id: leased.artifact_id.clone(),
             path: path.to_owned(),
             sha256: sha256.to_owned(),
@@ -113,11 +120,21 @@ impl JobPlanner<'_> {
                 format!("{reference} is host-only: a request must not pin a binding revision"),
             ));
         }
-        // The patch lease is resolved before anything else is materialized.
-        let leased = if reference == "workspace.apply-patch@1" {
-            Some(self.resolve_patch(request)?)
-        } else {
-            None
+        // An input lease is resolved before anything else is materialized.
+        let leased = match reference.as_str() {
+            "workspace.apply-patch@1" => Some(self.resolve_input(
+                request,
+                &reference,
+                "patchArtifactRef",
+                "workspace patch",
+            )?),
+            crate::workspace_composition::SIGN => Some(self.resolve_input(
+                request,
+                &reference,
+                "unsignedHapArtifactLease",
+                "unsigned HAP",
+            )?),
+            _ => None,
         };
         self.refuse_debug_permit(request)?;
         let preflight = |error: String| {
@@ -145,6 +162,27 @@ impl JobPlanner<'_> {
                         "journalArguments": intent.journal_arguments(),
                         "processKind": "hostWorkspace",
                         "hostManagedDescriptor": format!("{DESCRIPTOR}#action-sha256:{action}"),
+                    })
+                }
+                (crate::workspace_composition::SIGN, "signWorkspaceOpenHarmonyHap") => {
+                    let action = workspace
+                        .sign_action(
+                            &reference,
+                            &request.inputs,
+                            AUTHORIZATION_PLAN_JOB,
+                            leased.as_ref(),
+                        )
+                        .map_err(preflight)?;
+                    workspace
+                        .lower_sign(&action, AUTHORIZATION_PLAN_JOB)
+                        .map_err(preflight)?;
+                    json!({
+                        "journalArguments": crate::workspace_composition::sign_journal_arguments(&action),
+                        "processKind": "process",
+                        "executableSHA256": action.preset.java_executable.sha256,
+                        "workingDirectory": action.output.directory,
+                        "argumentSummary": action.sign_arguments(),
+                        "timeoutSeconds": arkdeck_provider_workspace::signer::SIGN_TIMEOUT.as_secs(),
                     })
                 }
                 ("workspace.apply-patch@1", "applyWorkspacePatch")
@@ -188,6 +226,27 @@ impl JobPlanner<'_> {
                     }
                     process
                 }
+                ("workspace.build-openharmony@1", "buildWorkspaceOpenHarmony") => {
+                    let action = workspace
+                        .build_action(&reference, &request.inputs)
+                        .map_err(preflight)?;
+                    workspace.lower_build(&action).map_err(preflight)?;
+                    let invocation = &action.invocation;
+                    let mut process = json!({
+                        "journalArguments": crate::workspace_build::BuildAction::journal_arguments(
+                            &request.inputs,
+                        ),
+                        "processKind": "process",
+                        "executableSHA256": invocation.executable_sha256,
+                        "workingDirectory": invocation.project_root,
+                        "argumentSummary": invocation.arguments,
+                        "timeoutSeconds": invocation.timeout_seconds,
+                    });
+                    if let Some(zero) = &invocation.argument_zero {
+                        process["argumentZero"] = json!(zero);
+                    }
+                    process
+                }
                 _ => return Err(internal_failure()),
             };
             let mut entry = json!({
@@ -209,9 +268,13 @@ impl JobPlanner<'_> {
             "steps": steps,
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
-        Ok((
-            sha256_hex(&bytes),
-            leased.as_ref().map(artifact_facts).unwrap_or_default(),
-        ))
+        // Only a mutation's plan binds its input's facts, which its
+        // capability is matched against.
+        let facts = if reference == "workspace.apply-patch@1" {
+            leased.as_ref().map(artifact_facts).unwrap_or_default()
+        } else {
+            BTreeMap::new()
+        };
+        Ok((sha256_hex(&bytes), facts))
     }
 }

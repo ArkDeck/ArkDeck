@@ -44,6 +44,11 @@ pub struct VerifiedTool {
     pub(crate) path: PathBuf,
     sha256: String,
     initial: Metadata,
+    /// Swift `ProcessRequest.argumentZero`: the child's `argv[0]` when the
+    /// executable is a multi-call binary selected by it. It never selects the
+    /// executable, which is always the retained inode.
+    #[cfg(target_os = "macos")]
+    pub(crate) argument_zero: Option<std::ffi::OsString>,
     #[cfg(windows)]
     pub(crate) identity: crate::windows::FileIdentity,
     #[cfg(windows)]
@@ -79,6 +84,8 @@ impl VerifiedTool {
             path,
             sha256: expected_sha256.into(),
             initial,
+            #[cfg(target_os = "macos")]
+            argument_zero: None,
             #[cfg(windows)]
             identity,
             #[cfg(windows)]
@@ -92,6 +99,16 @@ impl VerifiedTool {
     /// path, is what a launch uses.
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// The same tool, its children started with `zero` as `argv[0]` (Swift
+    /// `ProcessRequest.argumentZero`, for a multi-call binary such as
+    /// `swift-package` run as `swift-build`). The launch still uses the
+    /// retained inode; the value only names the role.
+    #[cfg(target_os = "macos")]
+    pub fn with_argument_zero(mut self, zero: impl Into<std::ffi::OsString>) -> Self {
+        self.argument_zero = Some(zero.into());
+        self
     }
 
     pub fn sha256(&self) -> &str {

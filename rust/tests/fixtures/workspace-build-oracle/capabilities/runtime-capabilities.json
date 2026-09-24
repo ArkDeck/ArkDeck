@@ -1,0 +1,129 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-2DC18C8E5975B65BF26A590D33418DDAB5BC8E63-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "buildPresetRef" : "oracle-debug",
+          "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+          "projectRef" : "evolution-945bee85a8b91204bad1"
+        },
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "buildPresetRef" : {
+            "kind" : "exactString",
+            "value" : "oracle-debug"
+          },
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-945bee85a8b91204bad1"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.build-openharmony@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.build-openharmony",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+          "kind" : "workspaceIdentity",
+          "sha256" : "4581021f04951d1a3f27d24405cedb03f217ca5f0c5fd620d62a85fc372b4458"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "36fe97a623b6f311b369d59ed165bbbaafea379ed125691678b6501c1866755d",
+          "consumedAtUTC" : "2026-09-25T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-ae22d6e48bcd5a65a9bf9cc5ef3d3915",
+          "materializedPlanDigest" : "8439605ff78155490c9617894751c7d76e2274e5aa42b4f68bcbee1156f5bb24",
+          "operationReference" : "workspace.build-openharmony@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-ae22d6e48bcd5a65a9bf9cc5ef3d3915",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "e0292fac0493daca90ac3289fe98f750e73f9eab979f03724bc0d1e9252fd51a",
+              "recordSHA256" : "da269ccd988066350b7be9df2af05e0ccfa3fa9360414a83c0ed12a853762d40",
+              "recordedAtUTC" : "2026-09-25T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "32b8b8ee82fb1d1efe4265908c019a2fc80efc522a7df503463b0e0ed3d21096",
+          "receiptSHA256" : "e0292fac0493daca90ac3289fe98f750e73f9eab979f03724bc0d1e9252fd51a",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idempotency-build"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-D9CB69D02F509FBAF2B9DCB8C284A12D9DC38F72-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "buildPresetRef" : "oracle-missing-module",
+          "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+          "projectRef" : "evolution-945bee85a8b91204bad1"
+        },
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "buildPresetRef" : {
+            "kind" : "exactString",
+            "value" : "oracle-missing-module"
+          },
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-945bee85a8b91204bad1"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.build-openharmony@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.build-openharmony",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "35ec79dec984433bd0f30eb88d625f0a67cee2ea633ae939335431608f43d75d",
+          "kind" : "workspaceIdentity",
+          "sha256" : "4581021f04951d1a3f27d24405cedb03f217ca5f0c5fd620d62a85fc372b4458"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

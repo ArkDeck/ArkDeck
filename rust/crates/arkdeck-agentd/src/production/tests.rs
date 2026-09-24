@@ -59,6 +59,11 @@ fn every_root_is_swifts_below_the_one_home() {
     assert_eq!(layout.application_support, support);
     assert_eq!(layout.sessions, support.join("Sessions"));
     assert_eq!(layout.bootstrap, support.join("Bootstrap/v1"));
+    assert_eq!(layout.signing, support.join("Signing/OpenHarmony"));
+    assert_eq!(
+        layout.installed_daemon,
+        support.join("Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd")
+    );
     assert_eq!(
         layout.trace_cache,
         home.join(
@@ -438,6 +443,11 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
     assert_eq!(composition.omitted.len(), 3, "{:?}", composition.omitted);
     // Swift's Job index is at the state root, beside the other owners.
     assert!(layout.state.join("runtime-jobs.sqlite3").is_file());
+    // The default daemon reconciled the signing credential owner with the
+    // preset store at its start, which creates the owner's root and ledger,
+    // and keeps its signing attempts in the state directory.
+    assert!(layout.signing.join("credential-owner-v1.json").is_file());
+    assert!(layout.state.join("workspace-signing-attempts").is_dir());
     // Everything created is below the home and owner-only; the App's
     // container is never created.
     assert!(!home.0.join("Library/Containers").exists());

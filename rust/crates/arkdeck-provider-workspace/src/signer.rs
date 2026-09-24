@@ -167,17 +167,22 @@ pub fn sign_hap(
         },
     ];
     drop(pair);
+    // The child runs in the attempt directory by its physical spelling; the
+    // action names it as Foundation spells it.
+    let directory = std::fs::canonicalize(&action.output.directory)
+        .map_err(|_| PtyError::LaunchFailed(std::io::Error::other("attempt directory")));
     let exchange = VerifiedTool::open(
         &action.preset.java_executable.path,
         &action.preset.java_executable.sha256,
     )
     .map_err(|_| PtyError::LaunchFailed(std::io::Error::other("java identity")))
-    .and_then(|java| {
+    .and_then(|java| Ok((java, directory?)))
+    .and_then(|(java, directory)| {
         java.run_pty_exchange(
             &PtyRequest {
                 arguments: &arguments,
                 environment: &[],
-                working_directory: Some(Path::new(&action.output.directory)),
+                working_directory: Some(&directory),
                 timeout: SIGN_TIMEOUT,
             },
             &interactions,
@@ -258,12 +263,14 @@ pub fn verify_and_record(action: &SigningAction) -> Result<BTreeMap<String, Stri
         &action.preset.java_executable.sha256,
     )
     .map_err(|error| SigningError::io(error.to_string()))?;
+    let directory = std::fs::canonicalize(&action.output.directory)
+        .map_err(|error| SigningError::io(error.to_string()))?;
     let execution = java
         .run_tool(
             &ToolRequest {
                 arguments: &arguments,
                 environment: &[],
-                working_directory: Some(Path::new(&action.output.directory)),
+                working_directory: Some(&directory),
                 limits: ToolLimits {
                     timeout: VERIFY_TIMEOUT,
                     capture_bytes: VERIFY_CAPTURE_BYTES,
@@ -350,6 +357,27 @@ pub fn read_verified_result(
         return Err(SigningError::drift("signed HAP recovery output"));
     }
     Ok(summary)
+}
+
+/// Swift `OpenHarmonySigningWorkspaceDispatcher.recoveredReceipt(action:)`:
+/// a product a reconcile found, as the receipt it republishes — the recorded
+/// verification read back, or `verify-app` run once more and recorded when
+/// no record exists — never a second `sign-app`.
+pub fn recovered_receipt(action: &SigningAction) -> Result<SignedHap, SigningError> {
+    let summary = if Path::new(&action.output.result_record).exists() {
+        read_verified_result(action)?
+    } else {
+        verify_and_record(action)?
+    };
+    let (byte_count, sha256) = measured_hap(&action.output.signed_hap, MAX_HAP_BYTES)?;
+    Ok(SignedHap {
+        summary,
+        result_record: action.output.result_record.clone(),
+        signed_hap: action.output.signed_hap.clone(),
+        byte_count,
+        sha256,
+        duration: Duration::ZERO,
+    })
 }
 
 /// Swift `identityBoundJARArguments`: the argv must name the preset's JAR at

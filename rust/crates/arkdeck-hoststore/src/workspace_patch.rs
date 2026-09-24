@@ -351,7 +351,7 @@ pub(crate) struct Invocation {
 }
 
 impl Invocation {
-    fn value(&self) -> Value {
+    pub(crate) fn value(&self) -> Value {
         let mut value = json!({
             "operation": self.operation, "projectRef": self.project_ref,
             "projectRoot": self.project_root, "presetID": self.preset_id,
@@ -364,7 +364,7 @@ impl Invocation {
         value
     }
 
-    fn decode(value: &Value) -> Option<Self> {
+    pub(crate) fn decode(value: &Value) -> Option<Self> {
         let fields = value.as_object()?;
         let text = |key: &str| Some(fields.get(key)?.as_str()?.to_owned());
         let executable = fields.get("executable")?.as_object()?;
@@ -849,13 +849,24 @@ impl AttemptStore {
 
 // MARK: - The tool
 
-/// One run of a patch preset's pinned executable, as Swift's descriptor-bound
-/// dispatcher runs a workspace process plan.
+/// One run of a workspace preset's pinned executable, as Swift's
+/// descriptor-bound dispatcher runs a workspace process plan.
 pub struct ToolInvocation<'a> {
     /// The executable the profile pinned, and the digest it was pinned by.
     pub executable_path: &'a str,
     pub executable_sha256: &'a str,
+    /// Swift `ProcessRequest.argumentZero`: the role a multi-call executable
+    /// runs as; `None` names the executable itself.
+    pub argument_zero: Option<&'a str>,
     pub arguments: &'a [String],
+    /// Overlaid on the clean base environment: what Swift's composition names
+    /// for this executable (`childEnvironmentByExecutablePath`) and the parts
+    /// of its own base a build needs.
+    pub environment: &'a [(String, String)],
+    /// The files the executable reads, each opened by its pinned identity
+    /// before the spawn and held until the child is gone (Swift's verified
+    /// resources for this executable).
+    pub resources: &'a [crate::workspace_profile::VerifiedResource],
     /// The project root the argv names; the child runs in it.
     pub working_directory: &'a str,
     pub timeout_seconds: i64,
@@ -888,19 +899,48 @@ pub trait WorkspaceToolDispatch: Send + Sync {
 
 /// The production dispatch: the executable opened by the digest its profile
 /// pinned and started from its retained inode, argv only, no shell, the
-/// clean base environment, `/dev/null` as stdin and each stream bounded.
+/// clean base environment plus the invocation's overlay, `/dev/null` as stdin
+/// and each stream bounded; every verified resource opened by its pinned
+/// identity first and held until the child is gone.
 pub struct VerifiedToolDispatch;
 
 impl WorkspaceToolDispatch for VerifiedToolDispatch {
     fn dispatch(&self, invocation: &ToolInvocation<'_>) -> Result<ToolReceipt, ToolFailure> {
         use arkdeck_platform::{
-            ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool,
+            ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedSource, VerifiedTool,
         };
+        use std::os::unix::fs::PermissionsExt;
         let refused = |error: &dyn std::fmt::Display| {
             ToolFailure::Failed(format!("dispatch refused: {error}"))
         };
-        let tool = VerifiedTool::open(invocation.executable_path, invocation.executable_sha256)
+        // Swift opens every resource before the spawn; one that no longer
+        // measures as pinned refuses the dispatch, and nothing runs.
+        let held = invocation
+            .resources
+            .iter()
+            .map(|resource| {
+                let source = VerifiedSource::open(
+                    Path::new(&resource.path),
+                    &resource.sha256,
+                    resource.byte_count,
+                )
+                .ok()?;
+                let executable = fs::metadata(&resource.path)
+                    .is_ok_and(|metadata| metadata.permissions().mode() & 0o111 != 0);
+                (!resource.require_executable || executable).then_some(source)
+            })
+            .collect::<Option<Vec<VerifiedSource>>>()
+            .ok_or_else(|| ToolFailure::Failed("dispatch resource identity refused".into()))?;
+        let mut tool = VerifiedTool::open(invocation.executable_path, invocation.executable_sha256)
             .map_err(|error| refused(&error))?;
+        if let Some(zero) = invocation.argument_zero {
+            tool = tool.with_argument_zero(zero);
+        }
+        let environment: Vec<(std::ffi::OsString, std::ffi::OsString)> = invocation
+            .environment
+            .iter()
+            .map(|(key, value)| (key.into(), value.into()))
+            .collect();
         // The child runs in the directory the argv names; the spawn needs its
         // physical spelling.
         let directory =
@@ -913,15 +953,18 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         let timeout = u64::try_from(invocation.timeout_seconds.max(1)).unwrap_or(1);
         let request = ToolRequest {
             arguments: &arguments,
-            environment: &[],
+            environment: &environment,
             working_directory: Some(&directory),
             limits: ToolLimits {
                 timeout: std::time::Duration::from_secs(timeout),
                 capture_bytes: CAPTURE_BYTES,
             },
         };
-        // A patch step is cancelled at its safe boundaries, never mid-child.
-        match tool.run_tool(&request, &|| false) {
+        // A workspace step is cancelled at its safe boundaries, never
+        // mid-child.
+        let ran = tool.run_tool(&request, &|| false);
+        drop(held);
+        match ran {
             Err(ToolRunError::Refused(error)) => Err(refused(&error)),
             Err(ToolRunError::Unobservable(error)) => Err(ToolFailure::OutcomeUnknown(format!(
                 "dispatch outcome unobservable: {error}"

@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "signWorkspaceOpenHarmonyHap"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-ffa73cfa37b9016e95bd10e5c9780e1a",
+  "materializedPlanDigest" : "d3030684920435e2321cf1af7c06fa0c618cb9c71437831c39e4e11f452eea58",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.sign-openharmony-hap@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-rejected",
+    "inputs" : {
+      "projectRef" : "SignOracleProject",
+      "signingPresetRef" : "preset-signing-oracle",
+      "unsignedHapArtifactLease" : "lease-v1:job-input-hap:ART-fe0e32028d5f7e03b71f80c25a947833"
+    },
+    "operation" : {
+      "id" : "workspace.sign-openharmony-hap",
+      "version" : 1
+    },
+    "requestId" : "request-rejected",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJzaWduT3Blbkhhcm1vbnlIYXAiOnsiXzAiOnsiaW5wdXRBcnRpZmFjdElEIjoiQVJULWZlMGUzMjAyOGQ1ZjdlMDNiNzFmODBjMjVhOTQ3ODMzIiwiaW5wdXRCeXRlQ291bnQiOjM3LCJpbnB1dEZpbGVQYXRoIjoiL3ByaXZhdGUvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL2FydGlmYWN0cy9qb2ItaW5wdXQtaGFwL0FSVC1mZTBlMzIwMjhkNWY3ZTAzYjcxZjgwYzI1YTk0NzgzMyIsImlucHV0U0hBMjU2IjoiNmQ5ZWFmN2NhNmMyZTkxYzU1YTIxNGNjOTVhMDUxMDk2ZWU3M2Q5ZGJiZjc2MWI5MzA4ZmFkMWI0MGFhMTMxYyIsImpvYklEIjoiam9iLWZmYTczY2ZhMzdiOTAxNmU5NWJkMTBlNWM5NzgwZTFhIiwib3V0cHV0Ijp7ImNlcnRpZmljYXRlQ2hhaW5SZWFkYmFjayI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2Utc2lnbi1vcmFjbGUvc2lnbmluZy1hdHRlbXB0cy9iZTY0NTRjYWMyMjU1NjJmNTVhMTQ1NmQxNzA0NTVmYS9jZXJ0aWZpY2F0ZS1jaGFpbi5jZXIiLCJkaXJlY3RvcnkiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL3NpZ25pbmctYXR0ZW1wdHMvYmU2NDU0Y2FjMjI1NTYyZjU1YTE0NTZkMTcwNDU1ZmEiLCJwcm9maWxlUmVhZGJhY2siOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL3NpZ25pbmctYXR0ZW1wdHMvYmU2NDU0Y2FjMjI1NTYyZjU1YTE0NTZkMTcwNDU1ZmEvcHJvZmlsZS1yZWFkYmFjay5wN2IiLCJyZXN1bHRSZWNvcmQiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL3NpZ25pbmctYXR0ZW1wdHMvYmU2NDU0Y2FjMjI1NTYyZjU1YTE0NTZkMTcwNDU1ZmEvc2lnbmluZy1yZXN1bHQuanNvbiIsInNpZ25lZEhBUCI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2Utc2lnbi1vcmFjbGUvc2lnbmluZy1hdHRlbXB0cy9iZTY0NTRjYWMyMjU1NjJmNTVhMTQ1NmQxNzA0NTVmYS9zaWduZWQuaGFwIn0sInByZXNldCI6eyJhcHBDZXJ0aWZpY2F0ZSI6eyJieXRlQ291bnQiOjE5LCJwYXRoIjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS1zaWduLW9yYWNsZS9tYXRlcmlhbC9yZWxlYXNlLmNlciIsInNoYTI1NiI6IjA3MTUwNzliYzVhYjQxNWJkNzY1ZGVkNWUzYzNhY2ZkZTdkNmY0Y2M4MmFkZmQwNTBhYzA3ZDc2NzRjOWZiZDYifSwiaW5zdGFsbGVkQXRVVEMiOiIyMDI2LTA5LTI1VDAwOjAwOjAwWiIsImphdmFFeGVjdXRhYmxlIjp7ImJ5dGVDb3VudCI6MjY3NywicGF0aCI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2Utc2lnbi1vcmFjbGUvdG9vbHMvamF2YSIsInNoYTI1NiI6IjA3ZDUyZjA0MzFlYTQ2OWYyMWIzM2VkMzk1MTZlZTQ5MDhlNzg2MGUwMWE0ODgzODA5ZTI3OGE1ZGIxYTU2ZmUifSwia2V5QWxpYXMiOiJvcmFjbGUta2V5Iiwia2V5UGFzc3dvcmRBY2NvdW50Ijoib3Blbmhhcm1vbnktcmVsZWFzZUAxfGtleSIsImtleWNoYWluQWNjZXNzU2NoZW1hIjoiZGF0YS1wcm90ZWN0aW9uLWFjY2Vzcy1ncm91cC12MSIsImtleXN0b3JlIjp7ImJ5dGVDb3VudCI6MTYsInBhdGgiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL21hdGVyaWFsL3JlbGVhc2UucDEyIiwic2hhMjU2IjoiNWZjMjI4MjdkNmVkNmYzODQ2YzZmY2MxY2YzNWZhODVmNDkwN2JkMjY5YzExMjZlOTVjODgzMDM2NjA2ZWI4ZiJ9LCJrZXlzdG9yZVBhc3N3b3JkQWNjb3VudCI6Im9wZW5oYXJtb255LXJlbGVhc2VAMXxrZXlzdG9yZSIsInByZXNldElEIjoib3Blbmhhcm1vbnktcmVsZWFzZUAxIiwicHJvamVjdFJlZiI6IlNpZ25PcmFjbGVQcm9qZWN0Iiwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2stb3Blbmhhcm1vbnktc2lnbmluZy92MSIsInNlY3JldEVudmVsb3BlQWNjb3VudCI6Im9wZW5oYXJtb255LXJlbGVhc2VAMXxzZWNyZXQtZW52ZWxvcGUtNWQzYzFmMGUtN2EyYi00YzlkLThlNmYtMGExYjJjM2Q0ZTVmIiwic2lnbmVkUHJvZmlsZSI6eyJieXRlQ291bnQiOjE1LCJwYXRoIjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS1zaWduLW9yYWNsZS9tYXRlcmlhbC9yZWxlYXNlLnA3YiIsInNoYTI1NiI6ImU5NDY0MmExZTEyNDc0MjI0ODdmN2E5NzZmMjBhZWFkOThhNDM3ZjhmMzQzN2Y5MDhhMDgxNjEzNGRhNzcyYTQifSwic2lnbmVySkFSIjp7ImJ5dGVDb3VudCI6MjEsInBhdGgiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXNpZ24tb3JhY2xlL21hdGVyaWFsL2hhcC1zaWduLXRvb2wuamFyIiwic2hhMjU2IjoiNjlmNWZjMjU0NjFhMmIxZDI3NTgwNWU1ODI3ODI1NjZmNjlkYWYwOTAwODhiOGJhYmI3OTM0MmIxMjFlOWVjNSJ9LCJzaWduaW5nQWxnb3JpdGhtIjoiU0hBMjU2d2l0aEVDRFNBIn0sInByb2plY3RSZWYiOiJTaWduT3JhY2xlUHJvamVjdCIsInNpZ25pbmdQcmVzZXRSZWYiOiJwcmVzZXQtc2lnbmluZy1vcmFjbGUifX19"
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-sign-workspace-hap",
+  "recoveryStepID" : "sign-workspace-hap",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-rejected",
+    "inputs" : {
+      "projectRef" : "SignOracleProject",
+      "signingPresetRef" : "preset-signing-oracle",
+      "unsignedHapArtifactLease" : "lease-v1:job-input-hap:ART-fe0e32028d5f7e03b71f80c25a947833"
+    },
+    "operation" : {
+      "id" : "workspace.sign-openharmony-hap",
+      "version" : 1
+    },
+    "requestId" : "request-rejected",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent sign-workspace-hap",
+    "outcomeUnknown sign-workspace-hap; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: hapsigner did not exit successfully (termination=exit:74; completedPrompts=2; observedOutputBytes=160; diagnosticCode=keystorePasswordRejected); output requires readback"
+  ]
+}

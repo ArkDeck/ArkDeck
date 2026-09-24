@@ -71,9 +71,9 @@ const RUNNABLE: [&str; 4] = [
 
 /// Whether this Runtime executes an admitted Job of `operation`: the analyzer
 /// here, a device-bound operation (`debug.hap@1` among them) through its HDC
-/// composition, a Runtime-owned workspace copy and the patches applied to and
-/// reverted from a workspace through its workspace composition. Every other
-/// Job is refused before its run starts.
+/// composition, a Runtime-owned workspace copy, the patches applied to and
+/// reverted from a workspace and a workspace build through its workspace
+/// composition. Every other Job is refused before its run starts.
 pub(crate) fn executes(operation: &str) -> bool {
     operation == OPERATION || crate::device_run::runs(operation) || workspace_run::runs(operation)
 }
@@ -378,10 +378,16 @@ impl JobRunner<'_> {
                 None,
             ));
         }
-        // An analyzer or workspace Job is never resumed here, and a
-        // complete-overwrite recovery belongs to the flash lane this Runtime
-        // does not hold.
-        if state != "preflight" && (!device || state == "recoveringByCompleteOverwrite") {
+        // An analyzer or workspace Job is never resumed here — but a signing
+        // Job a reconcile confirmed at its safe boundary, whose products it
+        // republished — and a complete-overwrite recovery belongs to the
+        // flash lane this Runtime does not hold.
+        let resumed_signing = record.operation() == crate::workspace_composition::SIGN
+            && state == "resumeAtConfirmedSafeBoundary";
+        if state != "preflight"
+            && !resumed_signing
+            && (!device || state == "recoveringByCompleteOverwrite")
+        {
             return Err(proven(
                 "resourceConflict",
                 format!(
@@ -442,6 +448,14 @@ impl JobRunner<'_> {
                 if run.record.operation() == workspace_run::WORKSPACE_OPERATION =>
             {
                 self.execute_workspace(&mut run, workspace)?
+            }
+            (None, Some(workspace)) if run.record.operation() == crate::workspace_build::BUILD => {
+                self.execute_workspace_build(&mut run, workspace)?
+            }
+            (None, Some(workspace))
+                if run.record.operation() == crate::workspace_composition::SIGN =>
+            {
+                self.execute_workspace_sign(&mut run, workspace)?
             }
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,

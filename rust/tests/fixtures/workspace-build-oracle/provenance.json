@@ -1,0 +1,21 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_BUILD_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspaceBuildOracleContractTests",
+  "determinism": "the clock is fixed, the root is fixed and the requests are canonical JSON, so every Job, capability and Artifact identity repeats; node.sh and hvigorw.js stand in for a registered DevEco toolchain's Node launcher and Hvigor script with fixed bytes, so the plans and capabilities name the same executable and resource on every host; two recordings were identical",
+  "durable": "capabilities/ is the capability store's checkpoint and ledger, artifacts/<job>/ART-* the payloads the successful build (build.log, unsigned.hap) and the failed one (build.log) published, parked-record.json the durable record of the Job whose receipt was lost after its child ran",
+  "files": {
+    "artifacts/job-ae22d6e48bcd5a65a9bf9cc5ef3d3915/ART-0ca49086bbecc20181d86e1967e3c6a6": "1e736040a1086d1fc7134443979ce1197c50dc29e7529ed13dd696e3d70e197b",
+    "artifacts/job-ae22d6e48bcd5a65a9bf9cc5ef3d3915/ART-426cc82c00f57204f33c892706762765": "dca4a8900b77105b88e221f549f02be1429aa21766e4e0d384eac17bc6efb10f",
+    "artifacts/job-f0b05aa1bf60059f4585ce436eead7cd/ART-03a90a7825a78d9d76a63c02fe3797d9": "579c25833903207ec924cfa40213c8f011e697ac4f44ab30633e685ed3d9f731",
+    "capabilities/runtime-capabilities.json": "b3ba43886780f3a3785453fbae7d261b1d6f5c02b02401fceb58dad394c2f967",
+    "capabilities/runtime-capabilities.ledger": "a45758bcd07fb5ea8167ab92792d7460746b63cb11a6dd73d157e97466db0915",
+    "frames.jsonl": "67b9121b01497645f3f544fd4b8ffc5a434555551ec64d9dba7f5547b14c8f30",
+    "hvigorw.js": "564929cdae248c00065d9e7ce4cdef1955408f281e28bb2f4f0f31aa68ca87cd",
+    "node.sh": "ee7d66eef234ff50a9dd66b65c2b23219058dbaf4560e6368d5bcd8f6e4be7c8",
+    "parked-record.json": "430c31e5bb461b679db3c3183a5a9ca55572650b56011fe33114a04f9bdee0d5"
+  },
+  "frames": "job.submit and job.run of the Runtime-owned copy, then job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.build-openharmony@1 Job, in the order the control plane answered them",
+  "recordedBy": "WorkspaceBuildOracleContractTests.testTheControlPlaneBuildsACopyAsRecorded",
+  "replayedBy": "the Rust port of workspace.build-openharmony@1 (TASK-XPA-015, M3)",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager, and DescriptorBoundProcessDispatcher naming DEVECO_SDK_HOME for the stand-in Node launcher, over a fabricated source tree under /private/tmp/arkdeck-workspace-build-oracle; the build dispatch loses its receipt only where the sequence says so",
+  "why": "the job.* corpora carry no frame of this operation and are deduplicated by shape, so they cannot be replayed as one sequence"
+}

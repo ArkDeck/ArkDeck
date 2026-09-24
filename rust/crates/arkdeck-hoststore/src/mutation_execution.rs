@@ -225,7 +225,7 @@ impl JobRunner<'_> {
         run: &mut Run,
         descriptor: &CatalogOperation,
         workspace: &crate::WorkspaceComposition,
-        leased: Option<&crate::workspace_composition::LeasedPatch>,
+        leased: Option<&crate::workspace_composition::LeasedInput>,
     ) -> Result<MutationConsumption, String> {
         let reject = |detail: String| format!("authorizationRequired: {detail}");
         let owner = self

@@ -17,6 +17,8 @@ unicode-segmentation.workspace = true
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
 arkdeck-provider-arkforge.workspace = true
 arkdeck-provider-hdc.workspace = true
+# Workspace signing (TASK-XPA-015): the design's crate graph, RUNTIME --> PWS.
+arkdeck-provider-workspace.workspace = true
 libc.workspace = true
 sha2.workspace = true
 

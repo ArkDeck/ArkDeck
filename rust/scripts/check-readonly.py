@@ -58,10 +58,15 @@ def assert_boundaries() -> None:
         "arkdeck-platform": set(),
         "arkdeck-control": {"arkdeck-contract"},
         # The Job engine lowers device steps through the HDC provider's typed
-        # actions (the design's crate graph: RUNTIME --> PHDC).
+        # actions and signs workspace HAPs through the workspace provider's
+        # signer and credential owner (the design's crate graph:
+        # RUNTIME --> PHDC & PWS).
         # The flash facts read the ArkForge lane's public socket through its
         # provider (the dual-source Loader observation).
-        "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-provider-arkforge"},
+        "arkdeck-hoststore": {
+            "arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc",
+            "arkdeck-provider-arkforge", "arkdeck-provider-workspace",
+        },
         # Debug template lowering reads the closed template definitions from the
         # pure contract crate, their single source, which the CLI also discloses.
         "arkdeck-provider-hdc": {"arkdeck-contract", "arkdeck-platform"},

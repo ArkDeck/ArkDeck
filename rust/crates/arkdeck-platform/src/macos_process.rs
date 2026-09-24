@@ -350,14 +350,19 @@ pub(super) fn spawn_suspended(
     Ok(SuspendedChild(child))
 }
 
-/// argv[0] is the tool's real path; the environment is the clean base every
-/// identity-bound spawn gets, plus what the caller named.
+/// argv[0] is the tool's real path, or the role it was given as its argument
+/// zero; the environment is the clean base every identity-bound spawn gets,
+/// plus what the caller named.
 fn argv_and_environment(
     tool: &VerifiedTool,
     args: &[OsString],
     environment: &[(OsString, OsString)],
 ) -> io::Result<(Vec<CString>, Vec<CString>)> {
-    let argv: Vec<CString> = std::iter::once(tool.path.as_os_str())
+    let zero = tool
+        .argument_zero
+        .as_deref()
+        .unwrap_or(tool.path.as_os_str());
+    let argv: Vec<CString> = std::iter::once(zero)
         .chain(args.iter().map(OsString::as_os_str))
         .map(|argument| CString::new(argument.as_bytes()).map_err(|_| invalid("NUL in argv")))
         .collect::<io::Result<_>>()?;

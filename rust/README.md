@@ -2201,12 +2201,17 @@ credential goes through Swift's crash-recovered dependency transaction: the
 intent is written first, completed by the next access if the process dies, and
 abandoned if a pin is refused. The pins go through the
 `WorkspaceToolchainPinning` and `WorkspaceCredentialPinning` owners the
-composition root passes to `with_dependency_pinning`. The isolated daemon
-passes the toolchain owner: `DevEcoRegistryStore::acquire/release`
+composition root passes to `with_dependency_pinning`. Both compositions pass
+the toolchain owner: `DevEcoRegistryStore::acquire/release`
 (`tool_retirement::pins`) hold a preset's pin in its own bootstrap registry,
 as Swift's `BootstrapDevEcoToolchainRegistry` holds it, and retirement refuses
-a pinned toolchain. It passes no credential owner yet, so a signing preset is
-refused as Swift refuses it without one.
+a pinned toolchain. The production composition also passes the credential
+owner (`arkdeck_hoststore::keychain_credential_pinning` over
+`arkdeck_provider_workspace::credential_owner`, Swift's
+`OpenHarmonySigningCredentialOwner` and its `credential-owner-v1.json`
+ledger): the credential's project binding is checked without secrets before
+the store writes its intent, and again at the pin. The isolated daemon passes
+none, so a signing preset is refused there as Swift refuses it without one.
 `AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals`
 is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
 frames in order.
@@ -2225,8 +2230,23 @@ the running signer's argv and environment from the kernel to show no password
 reaches them. `tests/deveco_password.rs` replays vectors Swift produced. The
 `spk10_probe` and hoststore `spk10_hvigor` examples are the by-hand probes of
 the real signer, the real DevEco material and Hvigor through a registered
-DevEco toolchain. The Job composition of the 13 `workspace.*` operations is M3
-work.
+DevEco toolchain.
+
+Five of the 13 `workspace.*` operations run as Jobs on the Rust daemon
+(`workspace_run.rs`): `prepare-isolated-copy`, `apply-patch`, `revert-patch`,
+`build-openharmony` and `sign-openharmony-hap`; the other eight are M3 work. A
+build (`workspace_build.rs`) runs a registered Hvigor preset, composed at
+start-up through its exact DevEco pin (`DevEcoRegistryStore::resolve`), with
+every pinned file held open by digest while the child runs, and lands a
+Runtime-owned copy's unsigned HAP. Signing (`workspace_signing.rs`,
+`workspace_composition.rs`) signs with a registered signing preset through
+`signer::sign_hap`, reconciles a parked Job from its own attempt directory and
+never signs it again; the production composition reads the account's preset
+store and the Data Protection Keychain and releases, at start-up, the
+credential pins no preset record carries, while the isolated daemon signs
+nothing. `tests/workspace_build_oracle.rs` and `tests/workspace_sign_oracle.rs`
+replay the Swift oracles (`WorkspaceBuildOracleContractTests`,
+`WorkspaceSignOracleContractTests`).
 
 ## Crash-ledger analyzer mode (TASK-XPA-015)
 

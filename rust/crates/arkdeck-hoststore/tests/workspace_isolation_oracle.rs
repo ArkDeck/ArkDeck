@@ -39,6 +39,12 @@ fn oracle_now() -> Option<String> {
     Some(TIMESTAMP.into())
 }
 
+/// A composition root with no DevEco registry: no registered Hvigor preset
+/// resolves.
+fn no_toolchains(_: &str, _: u64, _: &str) -> Result<arkdeck_hoststore::ResolvedToolchain, String> {
+    Err("no DevEco registry is composed".into())
+}
+
 /// A private scratch root, removed when the test ends.
 struct Root(PathBuf);
 
@@ -854,8 +860,11 @@ fn a_registered_project_is_copied_and_its_copy_adopted_after_restart() {
         &root.0,
         "/nonexistent-home",
         oracle_now,
+        &no_toolchains,
+        None,
     )
     .unwrap();
+    let unadopted = unadopted.unadopted;
     assert!(unadopted.is_empty());
     let owners = Owners::new(root, workspace);
     let profile_revision = |files: &[(&str, &[u8])]| {
@@ -920,8 +929,11 @@ fn a_registered_project_is_copied_and_its_copy_adopted_after_restart() {
         &owners.root.0,
         "/nonexistent-home",
         oracle_now,
+        &no_toolchains,
+        None,
     )
     .unwrap();
+    let unadopted = unadopted.unadopted;
     assert!(unadopted.is_empty(), "{unadopted:?}");
     let evolution: Vec<String> = fs::read_dir(owners.root.join("evolution-workspaces"))
         .unwrap()

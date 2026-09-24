@@ -1,0 +1,21 @@
+{
+  "appCertificateSha256" : "0715079bc5ab415bd765ded5e3c3acfde7d6f4cc82adfd050ac07d7674c9fbd6",
+  "artifact" : "signing-report.json",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "certificateChainReadbackSha256" : "0cf433717513e5575649bdbf04a47c7f5e521c78c12b423dafe251057c8541c4",
+  "javaSha256" : "07d52f0431ea469f21b33ed39516ee4908e7860e01a4883809e278a5db1a56fe",
+  "jobId" : "job-2268f559559a94ce5fb1b00b4db9e87b",
+  "keystoreSha256" : "5fc22827d6ed6f3846c6fcc1cf35fa85f4907bd269c1126e95c883036606eb8f",
+  "operation" : "workspace.sign-openharmony-hap@1",
+  "profileReadbackSha256" : "4d5fd5739bc8977b9004af4061c14de70b37399e611c5515fa2d3b35a57e6364",
+  "projectRef" : "SignOracleProject",
+  "signedHapByteCount" : "112",
+  "signedHapSha256" : "cf0576b2c10b39726a20653925e71699514c2e237d44e5f4e98e1e3d4d4ed10f",
+  "signedProfileSha256" : "e94642a1e1247422487f7a976f20aead98a437f8f3437f908a0816134da772a4",
+  "signerJarSha256" : "69f5fc25461a2b1d275805e582782566f69daf090088b8babb79342b121e9ec5",
+  "signingPresetRef" : "preset-signing-oracle",
+  "sourceArtifactId" : "ART-b9021b0a4cfdb6cf3a73558d0adb27e2",
+  "sourceByteCount" : "90",
+  "sourceSha256" : "c4eaf8e0914a787dea044962a793ea1468d7093540a8ddd993533db386d055da",
+  "verification" : "verified"
+}

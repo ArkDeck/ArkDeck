@@ -68,6 +68,9 @@ pub struct WorkspaceProjectStore {
     /// Swift `appliedGenerations`: the generation of every project the
     /// Runtime composed when it started. A Job acquires only those.
     applied: Mutex<BTreeMap<String, u64>>,
+    /// Swift `appliedPresetGenerations`: the generation of every registered
+    /// preset the Runtime composed when it started. A Job names only those.
+    applied_presets: Mutex<BTreeMap<String, u64>>,
     /// Swift `uses` and `presetUses`: the Jobs materializing against a
     /// project or preset right now, which its update and removal wait out.
     uses: Mutex<(HashMap<String, usize>, HashMap<String, usize>)>,
@@ -101,6 +104,23 @@ impl Drop for WorkspaceUse<'_> {
             end(presets, preset);
         }
     }
+}
+
+/// Swift `RuntimeWorkspacePresetComposition`: an available registered
+/// preset as the composition root reads it at start-up.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WorkspacePresetComposition {
+    pub preset_ref: String,
+    pub project_ref: String,
+    pub generation: u64,
+    pub kind: String,
+    pub toolchain_ref: Option<String>,
+    pub toolchain_generation: Option<u64>,
+    pub credential_ref: Option<String>,
+    pub timeout_seconds: i64,
+    pub module: Option<String>,
+    pub product: Option<String>,
+    pub build_mode: Option<String>,
 }
 
 /// Swift `RuntimeWorkspaceProjectStartupRecord`, private half included: a
@@ -296,6 +316,7 @@ impl WorkspaceProjectStore {
             toolchain_pinning: None,
             credential_pinning: None,
             applied: Mutex::new(BTreeMap::new()),
+            applied_presets: Mutex::new(BTreeMap::new()),
             uses: Mutex::new((HashMap::new(), HashMap::new())),
         })
     }
@@ -337,6 +358,51 @@ impl WorkspaceProjectStore {
     pub fn mark_applied(&self, projects: BTreeMap<String, u64>) {
         if let Ok(mut applied) = self.applied.lock() {
             *applied = projects;
+        }
+    }
+
+    /// Swift `markApplied(projects:presets:)` for the presets: the registered
+    /// preset generations this Runtime composed when it started.
+    pub fn mark_applied_presets(&self, presets: BTreeMap<String, u64>) {
+        if let Ok(mut applied) = self.applied_presets.lock() {
+            *applied = presets;
+        }
+    }
+
+    /// Swift `presetCompositionRecords()`: every available registered
+    /// preset, by reference, each with valid timestamps.
+    pub fn preset_composition_records(&self) -> Result<Vec<WorkspacePresetComposition>, WireError> {
+        self.with_document(
+            || Ok(()),
+            |_, document| {
+                let mut records = Vec::new();
+                for record in document.presets.iter().filter(|record| record.available()) {
+                    record.resource()?;
+                    records.push(WorkspacePresetComposition {
+                        preset_ref: record.preset_ref.clone(),
+                        project_ref: record.project_ref.clone(),
+                        generation: record.generation,
+                        kind: record.kind.clone(),
+                        toolchain_ref: record.toolchain_ref.clone(),
+                        toolchain_generation: record.toolchain_generation,
+                        credential_ref: record.credential_ref.clone(),
+                        timeout_seconds: record.timeout_seconds,
+                        module: record.constraints.module.clone(),
+                        product: record.constraints.product.clone(),
+                        build_mode: record.constraints.build_mode.clone(),
+                    });
+                }
+                records.sort_by(|a, b| a.preset_ref.cmp(&b.preset_ref));
+                Ok(records)
+            },
+        )
+    }
+
+    /// Swift's removal of a preset from `appliedPresetGenerations` once the
+    /// preset is removed: a later registration must restart to be composed.
+    pub(super) fn forget_applied_preset(&self, preset_ref: &str) {
+        if let Ok(mut applied) = self.applied_presets.lock() {
+            applied.remove(preset_ref);
         }
     }
 
@@ -384,26 +450,30 @@ impl WorkspaceProjectStore {
                          submitting a Job",
                     ));
                 }
-                // Swift reads the presets in order; the first decides, because
-                // this Runtime composes no registered preset, so none is
-                // applied.
-                if let Some(preset) = preset_refs.first() {
-                    if !document.presets.iter().any(|candidate| {
+                // Swift reads the presets in order: each must be registered
+                // for this project and composed, at this generation, when the
+                // Runtime started.
+                let applied_presets = self.applied_presets.lock().map_err(unreadable)?;
+                for preset in preset_refs {
+                    let Some(record) = document.presets.iter().find(|candidate| {
                         candidate.project_ref == project_ref
                             && candidate.available()
                             && &candidate.preset_ref == preset
-                    }) {
+                    }) else {
                         return Err(failure(
                             "workspaceReferenceNotFound",
                             "workspace preset is not registered for this project",
                         ));
+                    };
+                    if applied_presets.get(preset) != Some(&record.generation) {
+                        return Err(failure(
+                            "operationUnavailable",
+                            "workspace preset configuration changed; restart the Runtime before \
+                             submitting a Job",
+                        ));
                     }
-                    return Err(failure(
-                        "operationUnavailable",
-                        "workspace preset configuration changed; restart the Runtime before \
-                         submitting a Job",
-                    ));
                 }
+                drop(applied_presets);
                 let mut uses = self.uses.lock().map_err(unreadable)?;
                 *uses.0.entry(project_ref.to_owned()).or_default() += 1;
                 let mut presets = preset_refs.to_vec();

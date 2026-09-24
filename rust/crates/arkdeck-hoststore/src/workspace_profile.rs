@@ -7,10 +7,9 @@
 //!
 //! A registered project's profile is built by its kind exactly as Swift's
 //! composition root builds it (`arkDeck`, `waterFlowDemo`), with its code-owned
-//! presets and pinned system tools. The presets a caller registers through
-//! `workspace.preset.*` are not composed yet: the operations that run them are
-//! not materialized by this Runtime, and their tools are not part of the
-//! identities re-measured below.
+//! presets and pinned system tools, and — for an OpenHarmony project — the
+//! Hvigor build presets registered through `workspace.preset.*` whose DevEco
+//! toolchain resolved at start-up (`RegisteredBuildPreset`).
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_support::{
     self as support, foundation_resolved, foundation_standardized, is_identifier, is_safe_glob,
@@ -81,8 +80,18 @@ impl ExecutableIdentity {
     }
 }
 
-/// Swift `WorkspaceCommandPreset`, less the verified resources no composed
-/// preset carries yet.
+/// Swift `ResolvedExecutableResource`: a file a preset's executable reads,
+/// pinned by its path, SHA-256 and length and held open while the child runs
+/// (a registered toolchain's Hvigor script, its manifests).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifiedResource {
+    pub path: String,
+    pub sha256: String,
+    pub byte_count: u64,
+    pub require_executable: bool,
+}
+
+/// Swift `WorkspaceCommandPreset`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkspaceCommandPreset {
     preset_id: String,
@@ -90,6 +99,7 @@ pub struct WorkspaceCommandPreset {
     argument_zero: Option<String>,
     fixed_arguments: Vec<String>,
     timeout_seconds: i64,
+    verified_resources: Vec<VerifiedResource>,
 }
 
 impl WorkspaceCommandPreset {
@@ -101,12 +111,33 @@ impl WorkspaceCommandPreset {
         fixed_arguments: &[&str],
         timeout_seconds: i64,
     ) -> Result<Self, String> {
+        Self::hashing_with_resources(
+            preset_id,
+            path,
+            argument_zero,
+            fixed_arguments,
+            timeout_seconds,
+            Vec::new(),
+        )
+    }
+
+    /// Swift's initializer with the files the executable reads, each pinned
+    /// by the caller (a registered toolchain's record).
+    pub fn hashing_with_resources(
+        preset_id: &str,
+        path: &str,
+        argument_zero: Option<&str>,
+        fixed_arguments: &[&str],
+        timeout_seconds: i64,
+        verified_resources: Vec<VerifiedResource>,
+    ) -> Result<Self, String> {
         Self::new(
             preset_id,
             ExecutableIdentity::hashing(path)?,
             argument_zero.map(str::to_owned),
             fixed_arguments.iter().map(|&a| a.to_owned()).collect(),
             timeout_seconds,
+            verified_resources,
         )
     }
 
@@ -116,6 +147,7 @@ impl WorkspaceCommandPreset {
         argument_zero: Option<String>,
         fixed_arguments: Vec<String>,
         timeout_seconds: i64,
+        verified_resources: Vec<VerifiedResource>,
     ) -> Result<Self, String> {
         if !is_identifier(preset_id) {
             return Err("workspace preset id is malformed".into());
@@ -124,11 +156,22 @@ impl WorkspaceCommandPreset {
             return Err("workspace preset timeout is outside 1...7200".into());
         }
         let bounded = |value: &str| !value.contains('\0') && value.len() <= 4_096;
+        let mut paths: Vec<&str> = verified_resources.iter().map(|r| r.path.as_str()).collect();
+        paths.sort_unstable();
+        paths.dedup();
         if !argument_zero
             .as_deref()
             .is_none_or(|zero| !zero.is_empty() && bounded(zero))
             || fixed_arguments.len() > 128
             || !fixed_arguments.iter().all(|argument| bounded(argument))
+            || verified_resources.len() > 16
+            || paths.len() != verified_resources.len()
+            || !verified_resources.iter().all(|resource| {
+                resource.path.starts_with('/')
+                    && foundation_standardized(&resource.path) == resource.path
+                    && is_sha256(&resource.sha256)
+                    && resource.byte_count > 0
+            })
         {
             return Err("workspace preset arguments or verified resources are not bounded".into());
         }
@@ -138,11 +181,14 @@ impl WorkspaceCommandPreset {
             argument_zero,
             fixed_arguments,
             timeout_seconds,
+            verified_resources,
         })
     }
 
     /// Swift `EvolutionWorkspaceManager.derivedProfile`'s `rebased`: every
-    /// argument naming the source root names the copy's instead.
+    /// argument naming the source root names the copy's instead. Like Swift's,
+    /// the rebased preset keeps no verified resources of its own: a dispatch
+    /// holds the resources the start-up profiles pinned for its executable.
     fn rebased(&self, source: &str, destination: &str) -> Result<Self, String> {
         let rebase = |value: &String| {
             if value == source {
@@ -159,7 +205,41 @@ impl WorkspaceCommandPreset {
             self.argument_zero.clone(),
             self.fixed_arguments.iter().map(rebase).collect(),
             self.timeout_seconds,
+            Vec::new(),
         )
+    }
+}
+
+/// Swift `WorkspaceSigningPreset`: a registered signing preset — a closed
+/// identity, the credential it pinned by content reference, a timeout. It is
+/// not a path, a key alias or a secret.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SigningPresetRef {
+    pub(crate) preset_id: String,
+    pub(crate) credential_ref: String,
+    pub(crate) timeout_seconds: i64,
+}
+
+impl SigningPresetRef {
+    /// Swift's initializer: an identifier, a `credential:sha256-` reference,
+    /// a timeout within 1...3600 seconds.
+    pub fn new(
+        preset_id: &str,
+        credential_ref: &str,
+        timeout_seconds: i64,
+    ) -> Result<Self, String> {
+        let digest = credential_ref.strip_prefix("credential:sha256-");
+        if !is_identifier(preset_id)
+            || !digest.is_some_and(is_sha256)
+            || !(1..=3_600).contains(&timeout_seconds)
+        {
+            return Err("workspace signing preset is malformed".into());
+        }
+        Ok(Self {
+            preset_id: preset_id.into(),
+            credential_ref: credential_ref.into(),
+            timeout_seconds,
+        })
     }
 }
 
@@ -188,6 +268,12 @@ pub struct WorkspaceProfile {
     test: BTreeMap<String, WorkspaceCommandPreset>,
     symbol: BTreeMap<String, WorkspaceCommandPreset>,
     build_products: BTreeMap<String, String>,
+    /// Swift `signingPresets`: the registered signing presets, by reference.
+    pub(crate) signing: BTreeMap<String, SigningPresetRef>,
+    /// Swift `allowsLegacySigningPresetFallback`: whether a profile with no
+    /// registered signing preset may sign with the installed receipt named by
+    /// its fixed preset identity. A registered project never may.
+    pub(crate) allows_legacy_signing: bool,
     pub(crate) kind: ProfileKind,
     pub(crate) source_project_ref: Option<String>,
 }
@@ -236,9 +322,27 @@ impl WorkspaceProfile {
             test: keyed(presets.test),
             symbol: keyed(presets.symbol),
             build_products: presets.build_products,
+            signing: BTreeMap::new(),
+            allows_legacy_signing: true,
             kind: ProfileKind::Primary,
             source_project_ref: None,
         })
+    }
+
+    /// The same profile with its registered signing presets, and whether it
+    /// may fall back to the installed receipt when it has none (Swift's
+    /// `signingPresets` and `allowsLegacySigningPresetFallback`).
+    pub fn with_signing(
+        mut self,
+        presets: Vec<SigningPresetRef>,
+        allows_legacy_signing: bool,
+    ) -> Self {
+        self.signing = presets
+            .into_iter()
+            .map(|preset| (preset.preset_id.clone(), preset))
+            .collect();
+        self.allows_legacy_signing = allows_legacy_signing;
+        self
     }
 
     /// Swift `WorkspaceProjectProfile.init`'s checks, the root made
@@ -350,8 +454,34 @@ impl WorkspaceProfile {
     }
 
     /// Swift `WorkspaceProjectProfile.waterFlowDemo(rootURL:projectRef:...)`
-    /// for a registered project, whose registered presets are not composed.
+    /// for a registered project with no registered preset resolved.
     pub fn water_flow(root: &str, project_ref: &str, home: &str) -> Result<Self, String> {
+        Self::water_flow_with(root, project_ref, home, &[])
+    }
+
+    /// Swift `waterFlowDemo(rootURL:projectRef:registeredPresets:)` for a
+    /// registered project: its code-owned tools, and the Hvigor build and test
+    /// presets registered against it whose DevEco toolchain resolved, each as
+    /// Node running the pinned `hvigorw.js` with the preset's closed argv.
+    pub fn water_flow_with(
+        root: &str,
+        project_ref: &str,
+        home: &str,
+        registered: &[RegisteredBuildPreset],
+    ) -> Result<Self, String> {
+        Self::water_flow_registered(root, project_ref, home, registered, Vec::new())
+    }
+
+    /// `water_flow_with`, and the signing presets registered against the
+    /// project whose credential resolved. A registered project never falls
+    /// back to the installed receipt, as Swift's registered profile does not.
+    pub fn water_flow_registered(
+        root: &str,
+        project_ref: &str,
+        home: &str,
+        registered: &[RegisteredBuildPreset],
+        signing: Vec<SigningPresetRef>,
+    ) -> Result<Self, String> {
         let root = foundation_resolved(root);
         let home = foundation_standardized(home);
         if ["Desktop", "Documents", "Downloads"].iter().any(|folder| {
@@ -395,6 +525,65 @@ impl WorkspaceProfile {
         } else {
             None
         };
+        let mut build = Vec::new();
+        let mut test = Vec::new();
+        let mut build_products = BTreeMap::new();
+        for preset in registered {
+            let hvigor = foundation_resolved(&preset.hvigor_script_path);
+            if !preset.node_path.starts_with('/')
+                || !preset.hvigor_script_path.starts_with('/')
+                || fs::metadata(&hvigor).is_err()
+            {
+                return Err(
+                    "workspace.presetUnavailable: registered Hvigor toolchain drifted".into(),
+                );
+            }
+            let (module, product, mode) = (&preset.module, &preset.product, &preset.build_mode);
+            let (module_product, product_argument, mode_argument) = (
+                format!("module={module}@{product}"),
+                format!("product={product}"),
+                format!("buildMode={mode}"),
+            );
+            let task = if preset.kind == RegisteredKind::Build {
+                "assembleHap"
+            } else {
+                "test"
+            };
+            let command = WorkspaceCommandPreset::hashing_with_resources(
+                &preset.preset_ref,
+                &preset.node_path,
+                None,
+                &[
+                    &hvigor,
+                    task,
+                    "--mode",
+                    "module",
+                    "-p",
+                    &module_product,
+                    "-p",
+                    &product_argument,
+                    "-p",
+                    &mode_argument,
+                    "--analyze=normal",
+                    "--parallel",
+                    "--incremental",
+                    "--no-daemon",
+                ],
+                preset.timeout_seconds,
+                preset.verified_resources.clone(),
+            )?;
+            if preset.kind == RegisteredKind::Build {
+                build_products.insert(
+                    preset.preset_ref.clone(),
+                    format!(
+                        "{module}/build/{product}/outputs/{product}/{module}-{product}-unsigned.hap"
+                    ),
+                );
+                build.push(command);
+            } else {
+                test.push(command);
+            }
+        }
         Self::primary(
             "waterflow-openharmony@1",
             project_ref,
@@ -411,9 +600,13 @@ impl WorkspaceProfile {
                 source_control,
                 source_reader: Some(reader),
                 archive_checkpoint: Some(checkpoint),
+                build,
+                test,
+                build_products,
                 ..ProfilePresets::default()
             },
         )
+        .map(|profile| profile.with_signing(signing, false))
     }
 
     /// Swift `EvolutionWorkspaceManager.derivedProfile`: the copy is never a
@@ -446,6 +639,8 @@ impl WorkspaceProfile {
             test: rebased_map(&self.test)?,
             symbol: rebased_map(&self.symbol)?,
             build_products: self.build_products.clone(),
+            signing: self.signing.clone(),
+            allows_legacy_signing: self.allows_legacy_signing,
             kind: ProfileKind::Evolution,
             source_project_ref: Some(self.project_ref.clone()),
         })
@@ -474,14 +669,23 @@ impl WorkspaceProfile {
     }
 
     /// Swift `runtimeAvailability(for:profile:)` for the operations this
-    /// Runtime materializes: the reason it is unavailable, if it is.
+    /// Runtime materializes: the reason it is unavailable, if it is. Signing
+    /// is judged by the composition, which holds the credential owner.
     pub(crate) fn unavailability(&self, reference: &str, isolation: bool) -> Option<String> {
         let has_preset = match reference {
             "workspace.prepare-isolated-copy@1" => isolation && self.kind == ProfileKind::Primary,
             // Every profile carries its patch preset.
             "workspace.apply-patch@1" | "workspace.revert-patch@1" => true,
+            "workspace.build-openharmony@1" => !self.build.is_empty(),
             _ => return Some("workspace.unsupportedOperation".into()),
         };
+        self.preset_unavailability(has_preset)
+    }
+
+    /// The rest of Swift's `runtimeAvailability(for:profile:)` once whether
+    /// the profile has a preset for the operation is known: a preset, then
+    /// every pinned executable measuring as pinned.
+    pub(crate) fn preset_unavailability(&self, has_preset: bool) -> Option<String> {
         if !has_preset {
             return Some("workspace.presetUnavailable".into());
         }
@@ -516,6 +720,69 @@ impl WorkspaceProfile {
             arguments: argv,
             timeout_seconds: self.patch.timeout_seconds,
         }
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over a build preset: its
+    /// own closed argv, run by the executable it pinned; `None` when the
+    /// profile declares no such preset.
+    pub(crate) fn build_invocation(
+        &self,
+        operation: &str,
+        preset_id: &str,
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.build.get(preset_id)?;
+        Some(crate::workspace_patch::Invocation {
+            operation: operation.into(),
+            project_ref: self.project_ref.clone(),
+            project_root: self.project_root.clone(),
+            preset_id: preset.preset_id.clone(),
+            executable_path: preset.executable.path.clone(),
+            executable_sha256: preset.executable.sha256.clone(),
+            argument_zero: preset.argument_zero.clone(),
+            arguments: preset.fixed_arguments.clone(),
+            timeout_seconds: preset.timeout_seconds,
+        })
+    }
+
+    /// The deployable product a build preset declares, relative to the root.
+    pub(crate) fn build_product(&self, preset_id: &str) -> Option<&str> {
+        self.build_products.get(preset_id).map(String::as_str)
+    }
+
+    /// Swift `WorkspaceActionExecutableResolver.resourcesByExecutable`: every
+    /// verified resource the presets of these profiles pin for each executable,
+    /// once, in path order.
+    pub(crate) fn resources_by_executable(
+        profiles: &[WorkspaceProfile],
+    ) -> BTreeMap<(String, String), Vec<VerifiedResource>> {
+        let mut resources: BTreeMap<(String, String), Vec<VerifiedResource>> = BTreeMap::new();
+        for profile in profiles {
+            let presets = [Some(&profile.inspection), Some(&profile.patch)]
+                .into_iter()
+                .chain([
+                    profile.source_control.as_ref(),
+                    profile.source_reader.as_ref(),
+                    profile.archive_checkpoint.as_ref(),
+                ])
+                .flatten()
+                .chain(profile.build.values())
+                .chain(profile.test.values())
+                .chain(profile.symbol.values());
+            for preset in presets {
+                let key = (
+                    preset.executable.path.clone(),
+                    preset.executable.sha256.clone(),
+                );
+                let entry = resources.entry(key).or_default();
+                for resource in &preset.verified_resources {
+                    if !entry.contains(resource) {
+                        entry.push(resource.clone());
+                    }
+                }
+                entry.sort_by(|a, b| (&a.path, &a.sha256).cmp(&(&b.path, &b.sha256)));
+            }
+        }
+        resources
     }
 
     /// Swift `profile.executableIdentities.contains(invocation.executable)`:
@@ -593,6 +860,30 @@ pub(crate) fn automatic_issuance_permitted(
         None => descriptor.default_policy_issuance(),
         Some(facts) => facts.isolated_task_copy,
     }
+}
+
+/// Which registered Hvigor task a preset runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RegisteredKind {
+    Build,
+    Test,
+}
+
+/// Swift `RuntimeWorkspaceResolvedPreset` for a registered Hvigor preset: the
+/// preset's closed constraints and the DevEco toolchain its pin resolved to —
+/// the Node launcher, the Hvigor script and every other file the record pins.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegisteredBuildPreset {
+    pub kind: RegisteredKind,
+    pub preset_ref: String,
+    pub module: String,
+    pub product: String,
+    pub build_mode: String,
+    pub timeout_seconds: i64,
+    pub node_path: String,
+    pub hvigor_script_path: String,
+    pub sdk_root_path: String,
+    pub verified_resources: Vec<VerifiedResource>,
 }
 
 /// Swift `WorkspaceProjectProfileRegistry`: every resolvable profile by its

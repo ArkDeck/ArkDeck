@@ -1,0 +1,9 @@
+PKarkdeck-fake-hvigor assembleHap entry@default
+== entry/src/main/ets/entryability/EntryAbility.ets
+export default class EntryAbility {}
+== entry/src/main/ets/pages/Index.ets
+@Entry
+@Component
+struct Index {
+  build() {}
+}
