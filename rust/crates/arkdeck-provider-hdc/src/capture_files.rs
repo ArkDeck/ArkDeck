@@ -18,6 +18,7 @@
 //! inventory), the storage preflight and the observe steps are
 //! [`crate::Action`]'s; the Job's products, index and summary are the store
 //! owner's.
+use crate::debug_hap::PersistedArguments;
 use crate::{DispatchFailure, HdcDispatch, Outcome, Persisted, ProcessPlan, Receipt, RequestError};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -842,6 +843,95 @@ impl FileAction {
             | Self::CaptureScreenSequence { .. }
             | Self::CleanupScreenSequence { .. }
             | Self::CleanupOwnedRemotePath { .. } => "deviceMutation",
+        }
+    }
+
+    /// Swift `PersistedTypedProviderAction.materialize()` for the persisted
+    /// kinds of these legs Swift knows: the action a kind and its arguments
+    /// name, rebuilt through the same constructors, in Swift's order, and
+    /// refused as Swift refuses it. `None` is a kind of another family — or
+    /// one of the screen sequence's two, which Swift's materialization does
+    /// not know. A cleanup of an owned path is the one kind the debug HAP's
+    /// family shares; it is rebuilt here as this leg's.
+    pub fn from_persisted(
+        kind: &str,
+        arguments: &Map<String, Value>,
+    ) -> Result<Option<Self>, FileActionError> {
+        let persisted = PersistedArguments { kind, arguments };
+        Ok(Some(match kind {
+            "hdc.captureCrashIndex" => Self::CaptureCrashIndex {
+                byte_budget: persisted.integer("byteBudget")?,
+            },
+            "hdc.captureCrashLog" => Self::CaptureCrashLog {
+                name: FaultLogName::new(persisted.string("faultLogName")?)?,
+                byte_budget: persisted.integer("byteBudget")?,
+            },
+            "hdc.captureTrace" => {
+                let request = TraceRequest::new(
+                    persisted.integer("durationSeconds")?,
+                    persisted.string_array("categories")?,
+                    persisted.integer("bufferKB")?,
+                    false,
+                    None,
+                )?;
+                Self::CaptureTrace {
+                    request,
+                    path: persisted.owned_path(ImageType::Png)?,
+                }
+            }
+            "hdc.captureComponentTree" => Self::CaptureComponentTree {
+                path: persisted.owned_path(ImageType::Png)?,
+            },
+            // An absent or unknown type is a PNG, as Swift reads it.
+            "hdc.captureScreenshot" => {
+                let image_type = persisted
+                    .string("imageType")
+                    .ok()
+                    .and_then(ImageType::parse)
+                    .unwrap_or(ImageType::Png);
+                Self::CaptureScreenshot {
+                    image_type,
+                    path: persisted.owned_path(image_type)?,
+                }
+            }
+            "hdc.receiveOwnedArtifact" => {
+                let path = persisted.owned_path(ImageType::Png)?;
+                let expected_sha256 = persisted.optional_string("expectedSha256")?;
+                let maximum_bytes = persisted.integer("maximumBytes")?;
+                let leading = persisted.optional_string("expectedLeadingBytes")?;
+                Self::ReceiveOwnedArtifact(ReceiveArtifact {
+                    path,
+                    expected_sha256: expected_sha256.map(str::to_owned),
+                    maximum_bytes,
+                    expected_leading_bytes: leading.map(lenient_hex),
+                })
+            }
+            "hdc.observeApplicationLiveness" => {
+                let bundle = persisted.bundle()?;
+                Self::ObserveApplicationLiveness(LivenessRequest::new(
+                    bundle.bundle_name(),
+                    persisted.optional_string("abilityName")?,
+                    persisted.optional_string("processName")?,
+                    persisted.optional_string("expectedDeployedArtifactDigest")?,
+                )?)
+            }
+            "hdc.cleanupOwnedRemotePath" => Self::CleanupOwnedRemotePath {
+                path: persisted.owned_path(ImageType::Png)?,
+            },
+            _ => return Ok(None),
+        }))
+    }
+
+    /// The provider-owned file a capture leg writes on the device, which a
+    /// reconcile reads back to conclude the capture (Swift
+    /// `reconciliationReadback`: `.readOwnedPathPresence(path)`); none for a
+    /// leg that writes no such file.
+    pub fn written_path(&self) -> Option<&OwnedRemotePath> {
+        match self {
+            Self::CaptureTrace { path, .. }
+            | Self::CaptureComponentTree { path }
+            | Self::CaptureScreenshot { path, .. } => Some(path),
+            _ => None,
         }
     }
 
@@ -1949,6 +2039,19 @@ fn verified<const N: usize>(facts: [(&str, String); N]) -> Outcome {
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+/// Swift's reading of a persisted `expectedLeadingBytes`: two characters at
+/// a time while two remain, each pair a byte when it is hexadecimal and
+/// skipped when it is not.
+fn lenient_hex(text: &str) -> Vec<u8> {
+    let characters: Vec<char> = text.chars().collect();
+    characters
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .filter_map(|pair| u8::from_str_radix(&pair.iter().collect::<String>(), 16).ok())
+        .collect()
 }
 
 #[cfg(test)]
@@ -3270,6 +3373,76 @@ mod tests {
             summary["applicationRef"],
             hex(&Sha256::digest(b"com.example.demo||com.example.demo"))
         );
+    }
+
+    /// Swift's materialization reads every persisted form of these legs back
+    /// as the action that persisted it; a pair of characters that is not
+    /// hexadecimal is skipped and an odd last one dropped, as Swift reads
+    /// `expectedLeadingBytes`; a receive or cleanup is rebuilt with Swift's
+    /// default PNG suffix, so a JPEG still's path is refused as Swift refuses
+    /// it; the screen sequence's kinds are unknown to it.
+    #[test]
+    fn persisted_forms_materialize_back_as_swift_reads_them() {
+        let as_map = |arguments: Vec<(&str, Persisted)>| -> Map<String, Value> {
+            arguments
+                .into_iter()
+                .map(|(key, value)| {
+                    let value = match value {
+                        Persisted::Text(text) => Value::from(text),
+                        Persisted::Integer(number) => Value::from(number),
+                        Persisted::Texts(texts) => Value::from(texts),
+                    };
+                    (key.to_owned(), value)
+                })
+                .collect()
+        };
+        let tree = OwnedRemotePath::new("job-1", "capture-ui-tree", "n1", ImageType::Png).unwrap();
+        let jpeg =
+            OwnedRemotePath::new("job-1", "capture-screenshot", "n2", ImageType::Jpeg).unwrap();
+        let png =
+            OwnedRemotePath::new("job-1", "capture-screenshot", "n2", ImageType::Png).unwrap();
+        let actions = [
+            trace(),
+            FileAction::CaptureComponentTree { path: tree.clone() },
+            FileAction::CaptureScreenshot {
+                image_type: ImageType::Jpeg,
+                path: jpeg.clone(),
+            },
+            FileAction::ReceiveOwnedArtifact(ReceiveArtifact {
+                path: png,
+                expected_sha256: Some("ab".repeat(32)),
+                maximum_bytes: RECEIVE_MAXIMUM_BYTES,
+                expected_leading_bytes: Some(PNG_MAGIC.to_vec()),
+            }),
+            FileAction::CleanupOwnedRemotePath { path: tree },
+            FileAction::CaptureCrashIndex { byte_budget: 4096 },
+            FileAction::CaptureCrashLog {
+                name: FaultLogName::new("cppcrash-com.example.demo-20260731").unwrap(),
+                byte_budget: 4096,
+            },
+            FileAction::ObserveApplicationLiveness(
+                LivenessRequest::new("com.example.demo", Some("EntryAbility"), None, None).unwrap(),
+            ),
+        ];
+        for action in actions {
+            let (kind, arguments) = action.persisted();
+            assert_eq!(
+                FileAction::from_persisted(kind, &as_map(arguments)),
+                Ok(Some(action))
+            );
+        }
+        assert_eq!(lenient_hex("ffd8ffe0"), JFIF_MAGIC);
+        assert_eq!(lenient_hex("zzff0"), [0xff]);
+        let (kind, arguments) = FileAction::CleanupOwnedRemotePath { path: jpeg }.persisted();
+        assert!(
+            FileAction::from_persisted(kind, &as_map(arguments))
+                .unwrap_err()
+                .to_string()
+                .contains("remote path does not match its owned components")
+        );
+        for kind in ["hdc.captureScreenSequence", "hdc.cleanupScreenSequence"] {
+            assert_eq!(FileAction::from_persisted(kind, &Map::new()), Ok(None));
+        }
     }
 
     /// The persisted forms Swift journals, and the remaining verdicts.

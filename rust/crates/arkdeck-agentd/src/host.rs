@@ -60,6 +60,17 @@ impl RunSlot {
     }
 }
 
+/// What a `job.run` of one Job meets in this owner.
+#[cfg(target_os = "macos")]
+enum RunClaim {
+    /// The slot this run now holds the Job in.
+    Own(std::sync::Arc<RunSlot>),
+    /// The run or cancellation already holding the Job.
+    Held(std::sync::Arc<RunSlot>),
+    /// A reconcile of the Job under way, which the run waits out.
+    Reconciling(std::sync::Arc<RunSlot>),
+}
+
 pub struct Host {
     /// What start-up recovery set aside, in its order: a Job whose durable
     /// record this build cannot read, and the reason. `doctor` names them,
@@ -481,6 +492,24 @@ impl Host {
             capabilities: self.capabilities.as_ref()?,
             holds: &self.holds,
         })
+    }
+    /// The slot a `job.run` of `job` runs in, unless a run or cancellation
+    /// already holds the Job or a reconcile of it is under way. `running` is
+    /// locked before `reconciling`, as `job.reconcile` locks them, so a run
+    /// and a reconcile never both begin on one Job; none if a lock is
+    /// poisoned.
+    #[cfg(target_os = "macos")]
+    fn claim_run(&self, job: &str) -> Option<RunClaim> {
+        let mut running = self.running.lock().ok()?;
+        if let Some(reconcile) = self.reconciling.lock().ok()?.get(job).cloned() {
+            return Some(RunClaim::Reconciling(reconcile));
+        }
+        if let Some(slot) = running.get(job).cloned() {
+            return Some(RunClaim::Held(slot));
+        }
+        let slot = std::sync::Arc::new(RunSlot::default());
+        running.insert(job.to_owned(), slot.clone());
+        Some(RunClaim::Own(slot))
     }
     /// Swift `startJob`: the Job an execution has just come to own runs in
     /// the background, in the slot every `job.run` and `job.cancel` of it
@@ -1422,18 +1451,25 @@ impl HostServices for Host {
             return run(None);
         };
         let slot = loop {
-            let mut running = self.running.lock().map_err(|_| uncertain())?;
-            let Some(slot) = running.get(job).cloned() else {
-                let slot = std::sync::Arc::new(RunSlot::default());
-                running.insert(job.to_owned(), slot.clone());
-                break slot;
-            };
-            drop(running);
-            let outcome = slot.wait();
-            // A run waits out a cancellation of its Job, then meets what the
-            // cancellation left.
-            if !slot.cancelling {
-                return outcome.unwrap_or_else(|| Err(uncertain()));
+            match self.claim_run(job).ok_or_else(uncertain)? {
+                RunClaim::Own(slot) => break slot,
+                // A run waits out a reconcile of its Job under way, then
+                // meets what the reconcile left: now that a run resumes a
+                // Job a reconcile concludes, the two never drive one Job at
+                // once (Swift's run joins a failure finalization under way).
+                RunClaim::Reconciling(reconcile) => {
+                    if reconcile.wait().is_none() {
+                        return Err(uncertain());
+                    }
+                }
+                RunClaim::Held(slot) => {
+                    let outcome = slot.wait();
+                    // A run waits out a cancellation of its Job, then meets
+                    // what the cancellation left.
+                    if !slot.cancelling {
+                        return outcome.unwrap_or_else(|| Err(uncertain()));
+                    }
+                }
             }
         };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
@@ -1656,8 +1692,32 @@ impl HostServices for Host {
                 });
         // A device-bound Job is reconciled against fresh facts through the
         // HDC composition its runs use, and its use settled in the store its
-        // admission reserved it in.
+        // admission reserved it in. A debug HAP's failure finalization runs
+        // through the runner its runs use, over the same owners.
         let hdc = self.hdc();
+        let runner =
+            self.planning
+                .as_ref()
+                .map(|(state_root, analyzer)| arkdeck_hoststore::JobRunner {
+                    imports: self.imports.as_deref(),
+                    mutation: self.authority().map(|authority| {
+                        arkdeck_hoststore::MutationExecution {
+                            authority,
+                            state_root,
+                        }
+                    }),
+                    jobs,
+                    artifacts,
+                    analyzer: analyzer.as_ref(),
+                    quota: ARTIFACT_QUOTA,
+                    home: &self.home,
+                    now: arkdeck_hoststore::runtime_now,
+                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    sessions: publisher.as_ref(),
+                    cancellation: None,
+                    after_commit: None,
+                    hdc: hdc.as_ref(),
+                });
         let reconciler = arkdeck_hoststore::JobReconciler {
             jobs,
             artifacts,
@@ -1666,6 +1726,7 @@ impl HostServices for Host {
             sessions: publisher.as_ref(),
             hdc: hdc.as_ref(),
             capabilities: self.capabilities.as_deref(),
+            runner: runner.as_ref(),
         };
         // Swift attaches no details to any `job.reconcile` refusal.
         let uncertain = || WireError {
@@ -1676,19 +1737,18 @@ impl HostServices for Host {
         let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
             return reconciler.handle(params);
         };
-        let executing = self
-            .running
-            .lock()
-            .map_err(|_| uncertain())?
-            .get(job)
-            .is_some_and(|slot| !slot.cancelling);
-        if executing {
-            return reconciler.status(params);
-        }
         let slot = {
+            // `running`, then `reconciling`, as `claim_run` takes them: a run
+            // and a reconcile never both begin on one Job.
+            let running = self.running.lock().map_err(|_| uncertain())?;
+            if running.get(job).is_some_and(|slot| !slot.cancelling) {
+                drop(running);
+                return reconciler.status(params);
+            }
             let mut reconciling = self.reconciling.lock().map_err(|_| uncertain())?;
             if let Some(slot) = reconciling.get(job).cloned() {
                 drop(reconciling);
+                drop(running);
                 return slot.wait().unwrap_or_else(|| Err(uncertain()));
             }
             let slot = std::sync::Arc::new(RunSlot::default());
@@ -2898,5 +2958,42 @@ mod cancellation_tests {
             assert_eq!(run.join().unwrap().unwrap_err().code, "resourceNotFound");
         });
         assert!(host.running.lock().unwrap().is_empty());
+    }
+
+    /// A run resumes Jobs a reconcile concludes, so it never drives a Job
+    /// beside a reconcile of it: a run of a Job a reconcile holds waits the
+    /// reconcile out without taking the Job, then starts its own and meets
+    /// the Job as the reconcile left it; a run of a Job another run holds
+    /// joins that one.
+    #[test]
+    fn a_run_waits_out_a_reconcile_of_its_job_under_way() {
+        let fixture = Fixture::new();
+        let host = fixture.host();
+        let reconcile = Arc::new(RunSlot::default());
+        host.reconciling
+            .lock()
+            .unwrap()
+            .insert("job-c".into(), reconcile.clone());
+        std::thread::scope(|scope| {
+            let run = scope.spawn(|| host.job_run(&job("job-c")));
+            // The run holds the reconcile's slot: the map, this test and it.
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while Arc::strong_count(&reconcile) < 3 {
+                assert!(Instant::now() < deadline, "the run never met the reconcile");
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert!(!run.is_finished());
+            assert!(!host.running.lock().unwrap().contains_key("job-c"));
+            // Released before its waiters wake, as job_reconcile lets go.
+            host.reconciling.lock().unwrap().remove("job-c");
+            reconcile.finish(&Ok(serde_json::json!({})));
+            assert_eq!(run.join().unwrap().unwrap_err().code, "resourceNotFound");
+        });
+        assert!(host.running.lock().unwrap().is_empty());
+        let slot = hold(&host, "job-d", false);
+        assert!(matches!(
+            host.claim_run("job-d"),
+            Some(RunClaim::Held(held)) if Arc::ptr_eq(&held, &slot)
+        ));
     }
 }

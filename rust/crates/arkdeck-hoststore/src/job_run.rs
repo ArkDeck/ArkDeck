@@ -18,10 +18,17 @@
 //! parks the Job instead. Once the child has finished, a request changes
 //! nothing.
 //!
-//! Only a Job at its admitted `preflight` boundary runs. Swift resumes a
-//! `running` Job after its own restart recovery; until recovery is ported
-//! (ADR-0009 decisions 2/4, L.1 item 13) the Rust owner refuses it, with the
-//! zero-dispatch proof, as it refuses every operation but this analyzer.
+//! An analyzer Job runs from its admitted `preflight` boundary only. A
+//! device-bound Job is also resumed as Swift's `runOwned` resumes it (ADR-0009
+//! decisions 2 and 4, L.1 item 13): at the confirmed safe boundary a
+//! reconcile reached (`resumeAtConfirmedSafeBoundary`), from `running` once a
+//! restart found nothing outstanding in its journal, and a debug HAP's
+//! failure finalization from `finalizing`. The journal must stand exactly at
+//! that boundary — no torn tail, no outstanding intent, no unknown outcome,
+//! a confirmed decision for the reconciled boundary — or nothing is
+//! dispatched; the steps it confirmed are never run again
+//! (`device_run.rs`), and a resumed Job continues under the capability use
+//! it holds, never a second one (`mutation_execution.rs`).
 use crate::analyzer_output::{self, ANALYZER_REF, ANALYZER_VERSION, DERIVED_NAME, Receipt, Source};
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
@@ -178,8 +185,9 @@ pub(crate) struct Run {
     pub(crate) sequence: i64,
     pub(crate) now: fn() -> Option<String>,
     /// The admission evidence of the capability use this run consumed and
-    /// made durable itself. A later mutation of the same run continues under
-    /// that use; evidence the run did not write is never continued.
+    /// made durable itself, or the one a resumed Job holds and the run took
+    /// over. A later mutation of the same run continues under that use;
+    /// other evidence on the record is never continued.
     pub(crate) consumed: Option<Value>,
 }
 
@@ -335,8 +343,7 @@ impl JobRunner<'_> {
                 Some(id),
             ));
         }
-        // Swift continues a `finalizing` debug HAP's failure finalization;
-        // here it is refused below with every other resumption.
+        // Swift continues a `finalizing` debug HAP's failure finalization.
         let finalizing_hap = record.operation() == "debug.hap@1" && state == "finalizing";
         if !RUNNABLE.contains(&state.as_str()) && !finalizing_hap {
             return Err(proven(
@@ -356,11 +363,14 @@ impl JobRunner<'_> {
                 None,
             ));
         }
-        if state != "preflight" {
+        // An analyzer Job is never resumed here, and a complete-overwrite
+        // recovery belongs to the flash lane this Runtime does not hold.
+        if state != "preflight" && (!device || state == "recoveringByCompleteOverwrite") {
             return Err(proven(
                 "resourceConflict",
                 format!(
-                    "job {id} is {state}; the Rust Runtime resumes no Job before recovery is ported"
+                    "job {id} is {state}; the Rust Runtime resumes no {} Job from it",
+                    record.operation()
                 ),
                 None,
             ));
@@ -375,17 +385,25 @@ impl JobRunner<'_> {
         let directory = self.jobs.job_directory(id).map_err(|_| uncertain())?;
         let journal = JournalWriter::open(&directory, false).map_err(|_| uncertain())?;
         let facts = journal.facts();
+        // The journal must stand at the very boundary the record names: a
+        // resumption is never a replay. A debug HAP's failure finalization
+        // parks itself on what its journal leaves unresolved, as Swift's does.
+        let unresolved =
+            !facts.outstanding_intents.is_empty() || !facts.unknown_outcomes.is_empty();
+        let decided = state != "resumeAtConfirmedSafeBoundary"
+            || facts.last_reconcile_outcome_certainty.as_deref() == Some("confirmed");
         if facts.has_torn_tail
-            || facts.current_state.as_deref() != Some("preflight")
-            || !facts.outstanding_intents.is_empty()
-            || !facts.unknown_outcomes.is_empty()
+            || facts.current_state.as_deref() != Some(state.as_str())
             || facts.finalized
+            || (unresolved && !finalizing_hap)
+            || !decided
+            || record.outcome_unknown()
         {
             return Err(proven(
                 "resourceConflict",
                 format!(
-                    "job {id}'s journal has left its admitted preflight boundary; the Rust Runtime \
-                     resumes no Job before recovery is ported"
+                    "job {id}'s journal does not stand at its {state} boundary; nothing was \
+                     dispatched"
                 ),
                 None,
             ));
@@ -397,6 +415,11 @@ impl JobRunner<'_> {
             now: self.now,
             consumed: None,
         };
+        // A resumed Job continues under the use it holds, never a new one.
+        if state != "preflight" {
+            self.take_over_held_use(&mut run)
+                .map_err(|message| proven("rejected", message, Some(id)))?;
+        }
         match self.hdc.filter(|_| device) {
             Some(hdc) => self.execute_device(&mut run, hdc)?,
             None => self.execute(&mut run)?,

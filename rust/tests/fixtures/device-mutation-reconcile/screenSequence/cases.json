@@ -1,0 +1,1218 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "deduplicated" : false,
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "newDispatchCount" : 0,
+          "schemaVersion" : "arkdeck.job-acceptance/1"
+        }
+      },
+      "method" : "job.submit",
+      "name" : "receiveKilled.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-receiveKilled\",\"inputs\":{\"frameCount\":3},\"operation\":{\"id\":\"capture.screen-sequence\",\"version\":1},\"requestId\":\"req-mutation-receiveKilled\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "unknownOutcome",
+            "code" : "outcomeUnknown",
+            "recovery" : "awaitRuntimeReconciliation",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "nextAction" : {
+            "kind" : "reconcile",
+            "owner" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            },
+            "reasonCode" : "recovery.outcomeUnknown",
+            "resource" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "outcomeUnknown",
+          "outcomeUnknown" : true,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "waitingForRecovery",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      },
+      "method" : "job.run",
+      "mode" : "receiveKilled",
+      "name" : "receiveKilled.run",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : [
+        {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "unknownOutcome",
+            "code" : "outcomeUnknown",
+            "recovery" : "awaitRuntimeReconciliation",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "nextAction" : {
+            "kind" : "reconcile",
+            "owner" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            },
+            "reasonCode" : "recovery.outcomeUnknown",
+            "resource" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "outcomeUnknown",
+          "outcomeUnknown" : true,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "waitingForRecovery",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      ],
+      "method" : "recoverActiveJobs",
+      "name" : "restart"
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "externalTool",
+            "code" : "executionConfirmedNotPerformed",
+            "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "failed",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "sourceIntegrityFailed",
+            "state" : "failed"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "failed",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      },
+      "method" : "job.reconcile",
+      "name" : "reconcileReceiveKilled",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "deduplicated" : false,
+          "jobId" : "job-84892206b79174192e1fb101138299c5",
+          "newDispatchCount" : 0,
+          "schemaVersion" : "arkdeck.job-acceptance/1"
+        }
+      },
+      "method" : "job.submit",
+      "name" : "missingArchive.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-mutation-missingArchive\",\"inputs\":{\"frameCount\":3},\"operation\":{\"id\":\"capture.screen-sequence\",\"version\":1},\"requestId\":\"req-mutation-missingArchive\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "unknownOutcome",
+            "code" : "outcomeUnknown",
+            "recovery" : "awaitRuntimeReconciliation",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-84892206b79174192e1fb101138299c5",
+          "nextAction" : {
+            "kind" : "reconcile",
+            "owner" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            },
+            "reasonCode" : "recovery.outcomeUnknown",
+            "resource" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "outcomeUnknown",
+          "outcomeUnknown" : true,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-84892206b79174192e1fb101138299c5",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "waitingForRecovery",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      },
+      "method" : "job.run",
+      "mode" : "missingArchive",
+      "name" : "missingArchive.run",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : [
+        {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "unknownOutcome",
+            "code" : "outcomeUnknown",
+            "recovery" : "awaitRuntimeReconciliation",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-84892206b79174192e1fb101138299c5",
+          "nextAction" : {
+            "kind" : "reconcile",
+            "owner" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            },
+            "reasonCode" : "recovery.outcomeUnknown",
+            "resource" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "outcomeUnknown",
+          "outcomeUnknown" : true,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-84892206b79174192e1fb101138299c5",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "waitingForRecovery",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      ],
+      "method" : "recoverActiveJobs",
+      "name" : "secondRestart"
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "message" : "persisted typed provider action kind hdc.captureScreenSequence is unknown"
+        },
+        "ok" : false
+      },
+      "method" : "job.reconcile",
+      "name" : "reconcileMissingArchive",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "message" : "persisted typed provider action kind hdc.captureScreenSequence is unknown"
+        },
+        "ok" : false
+      },
+      "method" : "job.reconcile",
+      "name" : "reconcileMissingArchiveAgain",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceConflict",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "job job-84892206b79174192e1fb101138299c5 is reconciling, not runnable"
+        },
+        "ok" : false
+      },
+      "method" : "job.run",
+      "mode" : "normal",
+      "name" : "missingArchive.resume",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "externalTool",
+            "code" : "executionConfirmedNotPerformed",
+            "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "failed",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "sourceIntegrityFailed",
+            "state" : "failed"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "failed",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      },
+      "method" : "job.status",
+      "name" : "receiveKilled.job.status",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualStepKinds" : [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteFile",
+            "receiveFile"
+          ],
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "events" : {
+            "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+            "method" : "job.events"
+          },
+          "evidence" : {
+            "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+            "method" : "job.evidence"
+          },
+          "job" : {
+            "actualEffect" : "deviceMutation",
+            "createdAtUtc" : "2026-09-14T00:00:00Z",
+            "executionMode" : "execute",
+            "failure" : {
+              "category" : "externalTool",
+              "code" : "executionConfirmedNotPerformed",
+              "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+              "retryability" : "runtimeDecisionRequired",
+              "schemaVersion" : "1.0.0"
+            },
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+            "nextAction" : {
+              "kind" : "readResult",
+              "owner" : {
+                "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                "kind" : "job"
+              },
+              "reasonCode" : "job.resultAvailable",
+              "resource" : {
+                "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                "kind" : "job"
+              }
+            },
+            "operation" : "capture.screen-sequence@1",
+            "outcome" : "failed",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : 0,
+            "processProgress" : null,
+            "recoveryEpochId" : null,
+            "resolvedByTargetAliasResolutionId" : null,
+            "schemaVersion" : "arkdeck.job-status/1",
+            "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+            "sessionPublication" : {
+              "catalogGeneration" : null,
+              "manifestSha256" : null,
+              "reasonCode" : "sourceIntegrityFailed",
+              "state" : "failed"
+            },
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "state" : "failed",
+            "supersededByRecoveryEpochId" : null,
+            "targetId" : "TGT-3ba3f5f43b92",
+            "threadId" : null,
+            "waitingForHuman" : false,
+            "workspaceKind" : "toolkit"
+          },
+          "materializedBindingRevision" : 1,
+          "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+          "materializedStableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+          "providerId" : "hdc",
+          "request" : {
+            "authorization" : {
+              "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+            },
+            "documentType" : "runtime-operation-request",
+            "idempotencyKey" : "idem-mutation-receiveKilled",
+            "inputs" : {
+              "frameCount" : 3
+            },
+            "operation" : {
+              "id" : "capture.screen-sequence",
+              "version" : 1
+            },
+            "requestId" : "req-mutation-receiveKilled",
+            "requestedOutputs" : [
+              "derivedArtifacts"
+            ],
+            "schemaVersion" : "1.0.0",
+            "target" : {
+              "expectedBindingRevision" : 1,
+              "targetId" : "TGT-3ba3f5f43b92"
+            }
+          },
+          "ringCoverage" : null,
+          "schemaVersion" : "arkdeck.job/1",
+          "screenSequence" : {
+            "capturedFrameCount" : 3,
+            "frameDurationsSeconds" : [
+              0.5,
+              0.5,
+              0.5
+            ],
+            "requestedFrameCount" : 3
+          },
+          "timeline" : {
+            "entries" : [
+              "jobCreated",
+              "queued->preflight",
+              "preflight->running",
+              "reason: steps-start",
+              "host-step preflight-host-storage",
+              "intent confirm-evidence-target",
+              "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+              "intent read-evidence-model",
+              "verified read-evidence-model [\"value\"]",
+              "intent read-evidence-firmware",
+              "verified read-evidence-firmware [\"value\"]",
+              "intent preflight-device-storage",
+              "verified preflight-device-storage [\"availableBytes\"]",
+              "capability consumed before first mutation",
+              "intent capture-screen-sequence",
+              "verified capture-screen-sequence [\"capturedFrameCount\", \"frameDurationsSeconds\", \"observedFramesPerSecond\", \"remoteByteCount\", \"requestedFrameCount\"]",
+              "intent receive-screen-sequence",
+              "outcomeUnknown receive-screen-sequence; durable intent left outstanding",
+              "running->waitingForRecovery",
+              "reason: outcomeUnknown: process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for a same-second entry named after the executable).",
+              "recovered: outstanding intents or unknown outcomes; no redispatch",
+              "waitingForRecovery->reconciling",
+              "reason: begin exact typed provider reconciliation",
+              "reconcile started receive-screen-sequence",
+              "reconciling->finalizing",
+              "reason: persist exact typed reconcile decision: confirmed not executed; original not resent",
+              "finalizing->failed",
+              "reason: reconciliation confirmed receive-screen-sequence did not complete",
+              "reconciled: confirmed not executed receive-screen-sequence"
+            ],
+            "kind" : "inline"
+          }
+        }
+      },
+      "method" : "job.show",
+      "name" : "receiveKilled.job.show",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "artifacts" : [
+
+          ],
+          "cleanup" : [
+
+          ],
+          "evidence" : {
+            "actualEffect" : "deviceMutation",
+            "actualStepKinds" : [
+              "probeDevice",
+              "runApprovedRemoteRead",
+              "preflightDeviceStorage",
+              "captureRemoteFile",
+              "receiveFile"
+            ],
+            "artifacts" : [
+
+            ],
+            "authority" : {
+              "admittedAtUtc" : "2026-09-14T00:00:00Z",
+              "artifactDigest" : null,
+              "consumptionFingerprintSha256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+              "kind" : "runtimeCapability",
+              "planDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+              "recoveryEpoch" : null,
+              "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+              "reservationId" : "idem-mutation-receiveKilled",
+              "stepSetDigest" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
+              "targetBindingDigest" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+              "useOrdinal" : 1,
+              "validUntilUtc" : "2026-10-14T00:00:00Z"
+            },
+            "bindingRevision" : 1,
+            "blockers" : [
+              "artifactIntegrityFailed"
+            ],
+            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "executionMode" : "execute",
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+            "inventoryAvailable" : true,
+            "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+            "missingRequiredArtifacts" : [
+              "frames.tar",
+              "sequence.json"
+            ],
+            "observation" : null,
+            "operationReference" : "capture.screen-sequence@1",
+            "outcomeUnknown" : false,
+            "parameters" : {
+              "frameCount" : 3
+            },
+            "providerId" : "hdc",
+            "recoveryEpoch" : null,
+            "schemaVersion" : "arkdeck.job-evidence/1",
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "status" : "artifactIntegrityFailed",
+            "targetId" : "TGT-3ba3f5f43b92",
+            "terminalState" : "failed",
+            "traceProbeAfter" : null,
+            "traceProbeBefore" : null
+          },
+          "job" : {
+            "actualEffect" : "deviceMutation",
+            "createdAtUtc" : "2026-09-14T00:00:00Z",
+            "executionMode" : "execute",
+            "failure" : {
+              "category" : "externalTool",
+              "code" : "executionConfirmedNotPerformed",
+              "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+              "retryability" : "runtimeDecisionRequired",
+              "schemaVersion" : "1.0.0"
+            },
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+            "nextAction" : {
+              "kind" : "readResult",
+              "owner" : {
+                "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                "kind" : "job"
+              },
+              "reasonCode" : "job.resultAvailable",
+              "resource" : {
+                "id" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                "kind" : "job"
+              }
+            },
+            "operation" : "capture.screen-sequence@1",
+            "outcome" : "failed",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : 0,
+            "processProgress" : null,
+            "recoveryEpochId" : null,
+            "resolvedByTargetAliasResolutionId" : null,
+            "schemaVersion" : "arkdeck.job-status/1",
+            "sessionId" : "session-job-7dd23f0c724b55c0e2c644de0063493d",
+            "sessionPublication" : {
+              "catalogGeneration" : null,
+              "manifestSha256" : null,
+              "reasonCode" : "sourceIntegrityFailed",
+              "state" : "failed"
+            },
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "state" : "failed",
+            "supersededByRecoveryEpochId" : null,
+            "targetId" : "TGT-3ba3f5f43b92",
+            "threadId" : null,
+            "waitingForHuman" : false,
+            "workspaceKind" : "toolkit"
+          },
+          "nextAction" : null,
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.job-result/1",
+          "terminal" : true
+        }
+      },
+      "method" : "job.result",
+      "name" : "receiveKilled.job.result",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "actualStepKinds" : [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteFile",
+            "receiveFile"
+          ],
+          "artifacts" : [
+
+          ],
+          "authority" : {
+            "admittedAtUtc" : "2026-09-14T00:00:00Z",
+            "artifactDigest" : null,
+            "consumptionFingerprintSha256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+            "kind" : "runtimeCapability",
+            "planDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+            "recoveryEpoch" : null,
+            "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+            "reservationId" : "idem-mutation-receiveKilled",
+            "stepSetDigest" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
+            "targetBindingDigest" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+            "useOrdinal" : 1,
+            "validUntilUtc" : "2026-10-14T00:00:00Z"
+          },
+          "bindingRevision" : 1,
+          "blockers" : [
+            "artifactIntegrityFailed"
+          ],
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "executionMode" : "execute",
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+          "inventoryAvailable" : true,
+          "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d",
+          "missingRequiredArtifacts" : [
+            "frames.tar",
+            "sequence.json"
+          ],
+          "observation" : null,
+          "operationReference" : "capture.screen-sequence@1",
+          "outcomeUnknown" : false,
+          "parameters" : {
+            "frameCount" : 3
+          },
+          "providerId" : "hdc",
+          "recoveryEpoch" : null,
+          "schemaVersion" : "arkdeck.job-evidence/1",
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "status" : "artifactIntegrityFailed",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "terminalState" : "failed",
+          "traceProbeAfter" : null,
+          "traceProbeBefore" : null
+        }
+      },
+      "method" : "job.evidence",
+      "name" : "receiveKilled.job.evidence",
+      "params" : {
+        "jobId" : "job-7dd23f0c724b55c0e2c644de0063493d"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "unknownOutcome",
+            "code" : "outcomeUnknown",
+            "recovery" : "awaitRuntimeReconciliation",
+            "retryability" : "runtimeDecisionRequired",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "jobId" : "job-84892206b79174192e1fb101138299c5",
+          "nextAction" : {
+            "kind" : "reconcile",
+            "owner" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            },
+            "reasonCode" : "recovery.outcomeUnknown",
+            "resource" : {
+              "id" : "job-84892206b79174192e1fb101138299c5",
+              "kind" : "job"
+            }
+          },
+          "operation" : "capture.screen-sequence@1",
+          "outcome" : "outcomeUnknown",
+          "outcomeUnknown" : true,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-84892206b79174192e1fb101138299c5",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "state" : "reconciling",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-3ba3f5f43b92",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "toolkit"
+        }
+      },
+      "method" : "job.status",
+      "name" : "missingArchive.job.status",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualStepKinds" : [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteFile"
+          ],
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "events" : {
+            "jobId" : "job-84892206b79174192e1fb101138299c5",
+            "method" : "job.events"
+          },
+          "evidence" : {
+            "jobId" : "job-84892206b79174192e1fb101138299c5",
+            "method" : "job.evidence"
+          },
+          "job" : {
+            "actualEffect" : "deviceMutation",
+            "createdAtUtc" : "2026-09-14T00:00:00Z",
+            "executionMode" : "execute",
+            "failure" : {
+              "category" : "unknownOutcome",
+              "code" : "outcomeUnknown",
+              "recovery" : "awaitRuntimeReconciliation",
+              "retryability" : "runtimeDecisionRequired",
+              "schemaVersion" : "1.0.0"
+            },
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-84892206b79174192e1fb101138299c5",
+            "nextAction" : {
+              "kind" : "reconcile",
+              "owner" : {
+                "id" : "job-84892206b79174192e1fb101138299c5",
+                "kind" : "job"
+              },
+              "reasonCode" : "recovery.outcomeUnknown",
+              "resource" : {
+                "id" : "job-84892206b79174192e1fb101138299c5",
+                "kind" : "job"
+              }
+            },
+            "operation" : "capture.screen-sequence@1",
+            "outcome" : "outcomeUnknown",
+            "outcomeUnknown" : true,
+            "outstandingResidueCount" : 0,
+            "processProgress" : null,
+            "recoveryEpochId" : null,
+            "resolvedByTargetAliasResolutionId" : null,
+            "schemaVersion" : "arkdeck.job-status/1",
+            "sessionId" : "session-job-84892206b79174192e1fb101138299c5",
+            "sessionPublication" : {
+              "catalogGeneration" : null,
+              "manifestSha256" : null,
+              "reasonCode" : "noCurrentPublicationRecord",
+              "state" : "unavailable"
+            },
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "state" : "reconciling",
+            "supersededByRecoveryEpochId" : null,
+            "targetId" : "TGT-3ba3f5f43b92",
+            "threadId" : null,
+            "waitingForHuman" : false,
+            "workspaceKind" : "toolkit"
+          },
+          "materializedBindingRevision" : 1,
+          "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+          "materializedStableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+          "providerId" : "hdc",
+          "request" : {
+            "authorization" : {
+              "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+            },
+            "documentType" : "runtime-operation-request",
+            "idempotencyKey" : "idem-mutation-missingArchive",
+            "inputs" : {
+              "frameCount" : 3
+            },
+            "operation" : {
+              "id" : "capture.screen-sequence",
+              "version" : 1
+            },
+            "requestId" : "req-mutation-missingArchive",
+            "requestedOutputs" : [
+              "derivedArtifacts"
+            ],
+            "schemaVersion" : "1.0.0",
+            "target" : {
+              "expectedBindingRevision" : 1,
+              "targetId" : "TGT-3ba3f5f43b92"
+            }
+          },
+          "ringCoverage" : null,
+          "schemaVersion" : "arkdeck.job/1",
+          "screenSequence" : null,
+          "timeline" : {
+            "entries" : [
+              "jobCreated",
+              "queued->preflight",
+              "preflight->running",
+              "reason: steps-start",
+              "host-step preflight-host-storage",
+              "intent confirm-evidence-target",
+              "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+              "intent read-evidence-model",
+              "verified read-evidence-model [\"value\"]",
+              "intent read-evidence-firmware",
+              "verified read-evidence-firmware [\"value\"]",
+              "intent preflight-device-storage",
+              "verified preflight-device-storage [\"availableBytes\"]",
+              "capability consumed before first mutation",
+              "intent capture-screen-sequence",
+              "outcomeUnknown capture-screen-sequence; durable intent left outstanding",
+              "running->waitingForRecovery",
+              "reason: outcomeUnknown: sequence readback did not describe /data/local/tmp/arkdeck-job-84892206b79174192e1fb101138299c5-capture-screen-sequence-owned.tar as a regular file",
+              "recovered: outstanding intents or unknown outcomes; no redispatch",
+              "waitingForRecovery->reconciling",
+              "reason: begin exact typed provider reconciliation",
+              "reconcile started capture-screen-sequence"
+            ],
+            "kind" : "inline"
+          }
+        }
+      },
+      "method" : "job.show",
+      "name" : "missingArchive.job.show",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resultNotReady",
+          "details" : {
+            "jobId" : "job-84892206b79174192e1fb101138299c5",
+            "newDispatchCount" : 0,
+            "nextAction" : {
+              "kind" : "reconcile",
+              "owner" : {
+                "id" : "job-84892206b79174192e1fb101138299c5",
+                "kind" : "job"
+              },
+              "reasonCode" : "recovery.outcomeUnknown",
+              "resource" : {
+                "id" : "job-84892206b79174192e1fb101138299c5",
+                "kind" : "job"
+              }
+            },
+            "phase" : "preAdmission",
+            "state" : "reconciling"
+          },
+          "message" : "the Job has no terminal result yet"
+        },
+        "ok" : false
+      },
+      "method" : "job.result",
+      "name" : "missingArchive.job.result",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "deviceMutation",
+          "actualStepKinds" : [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteFile"
+          ],
+          "artifacts" : [
+
+          ],
+          "authority" : {
+            "admittedAtUtc" : "2026-09-14T00:00:00Z",
+            "artifactDigest" : null,
+            "consumptionFingerprintSha256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+            "kind" : "runtimeCapability",
+            "planDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+            "recoveryEpoch" : null,
+            "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+            "reservationId" : "idem-mutation-missingArchive",
+            "stepSetDigest" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
+            "targetBindingDigest" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+            "useOrdinal" : 2,
+            "validUntilUtc" : "2026-10-14T00:00:00Z"
+          },
+          "bindingRevision" : 1,
+          "blockers" : [
+            "artifactIntegrityFailed",
+            "resultNotReady"
+          ],
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "executionMode" : "execute",
+          "finishedAtUtc" : "2026-09-14T00:00:00Z",
+          "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+          "inventoryAvailable" : true,
+          "jobId" : "job-84892206b79174192e1fb101138299c5",
+          "missingRequiredArtifacts" : [
+            "frames.tar",
+            "sequence.json"
+          ],
+          "observation" : null,
+          "operationReference" : "capture.screen-sequence@1",
+          "outcomeUnknown" : true,
+          "parameters" : {
+            "frameCount" : 3
+          },
+          "providerId" : "hdc",
+          "recoveryEpoch" : null,
+          "schemaVersion" : "arkdeck.job-evidence/1",
+          "startedAtUtc" : "2026-09-14T00:00:00Z",
+          "status" : "resultNotReady",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "terminalState" : "outcomeUnknown",
+          "traceProbeAfter" : null,
+          "traceProbeBefore" : null
+        }
+      },
+      "method" : "job.evidence",
+      "name" : "missingArchive.job.evidence",
+      "params" : {
+        "jobId" : "job-84892206b79174192e1fb101138299c5"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : [
+
+        ]
+      },
+      "method" : "cleanupDebt.list",
+      "name" : "debt.list",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : [
+          {
+            "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+            "consumptionCount" : 2,
+            "effectCeiling" : "deviceMutation",
+            "lineageAllowsNewExecution" : false,
+            "lineageBlocker" : "use 2 is outcomeUnknown",
+            "maximumUses" : 10000,
+            "remainingUses" : 9998
+          }
+        ]
+      },
+      "method" : "capability.list",
+      "name" : "capabilities.list",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "capability" : {
+            "capabilityID" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+            "effectCeiling" : "deviceMutation",
+            "exactBindingRevision" : 1,
+            "exactInputs" : {
+              "frameCount" : 3
+            },
+            "expiresAtUTC" : "2026-10-14T00:00:00Z",
+            "inputConstraints" : {
+              "frameCount" : {
+                "kind" : "integerRange",
+                "maximum" : 3,
+                "minimum" : 3
+              }
+            },
+            "issuedAtUTC" : "2026-09-14T00:00:00Z",
+            "issuer" : {
+              "kind" : "runtimeDefaultPolicy",
+              "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:capture.screen-sequence@1"
+            },
+            "maximumUses" : 10000,
+            "operationScope" : [
+              {
+                "operationID" : "capture.screen-sequence",
+                "version" : 1
+              }
+            ],
+            "revocation" : {
+              "state" : "active"
+            },
+            "targetScope" : {
+              "kind" : "stablePhysicalIdentity",
+              "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+            }
+          },
+          "consumptionCount" : 2,
+          "lineage" : [
+            {
+              "authorizationScopeFingerprintSHA256" : "a1b9d24860c4ffc1a7fbf1f5abd68687fcab980eda2397ec831071c525e9952a",
+              "bindingRevision" : 1,
+              "consumedAtUTC" : "2026-09-14T00:00:00Z",
+              "effect" : "deviceMutation",
+              "jobID" : "job-7dd23f0c724b55c0e2c644de0063493d",
+              "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+              "operationReference" : "capture.screen-sequence@1",
+              "ordinal" : 1,
+              "outcomeHistory" : [
+                {
+                  "jobID" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                  "outcome" : "outcomeUnknown",
+                  "previousRecordSHA256" : "9fec6e90ac4dd8e3b63b5cc49fb6560462a7506b02e2ba071e1e90d51601d375",
+                  "recordSHA256" : "308b1de4ea13d7221a33070604a1e8906ba8999743a2d86b959d6096f16686f9",
+                  "recordedAtUTC" : "2026-09-14T00:00:00Z",
+                  "terminalState" : "waitingForRecovery"
+                },
+                {
+                  "jobID" : "job-7dd23f0c724b55c0e2c644de0063493d",
+                  "outcome" : "safeToReflash",
+                  "previousRecordSHA256" : "308b1de4ea13d7221a33070604a1e8906ba8999743a2d86b959d6096f16686f9",
+                  "recordSHA256" : "07fffb406aceb522f597b13111045b381d3268decc35fbf9ef2c6529751e6fc0",
+                  "recordedAtUTC" : "2026-09-14T00:00:00Z",
+                  "terminalState" : "failed"
+                }
+              ],
+              "queryFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+              "receiptSHA256" : "9fec6e90ac4dd8e3b63b5cc49fb6560462a7506b02e2ba071e1e90d51601d375",
+              "remainingUsesAfter" : 9999,
+              "reservationID" : "idem-mutation-receiveKilled",
+              "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+            },
+            {
+              "authorizationScopeFingerprintSHA256" : "a1b9d24860c4ffc1a7fbf1f5abd68687fcab980eda2397ec831071c525e9952a",
+              "bindingRevision" : 1,
+              "consumedAtUTC" : "2026-09-14T00:00:00Z",
+              "effect" : "deviceMutation",
+              "jobID" : "job-84892206b79174192e1fb101138299c5",
+              "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+              "operationReference" : "capture.screen-sequence@1",
+              "ordinal" : 2,
+              "outcomeHistory" : [
+                {
+                  "jobID" : "job-84892206b79174192e1fb101138299c5",
+                  "outcome" : "outcomeUnknown",
+                  "previousRecordSHA256" : "e74914fa724c7695cb0d23266cf6b6bc2f54fed8fcec2aafcb219b4b9fe52c4d",
+                  "recordSHA256" : "8ef2c5539467e729eeb8a5acaece310a21db5c5971135d2960d52e45d3a5f34b",
+                  "recordedAtUTC" : "2026-09-14T00:00:00Z",
+                  "terminalState" : "waitingForRecovery"
+                }
+              ],
+              "previousLineageSHA256" : "07fffb406aceb522f597b13111045b381d3268decc35fbf9ef2c6529751e6fc0",
+              "queryFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+              "receiptSHA256" : "e74914fa724c7695cb0d23266cf6b6bc2f54fed8fcec2aafcb219b4b9fe52c4d",
+              "remainingUsesAfter" : 9998,
+              "reservationID" : "idem-mutation-missingArchive",
+              "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+            }
+          ],
+          "lineageAllowsNewExecution" : false,
+          "lineageBlocker" : "use 2 is outcomeUnknown",
+          "remainingUses" : 9998
+        }
+      },
+      "method" : "capability.inspect",
+      "name" : "capabilities.inspect0",
+      "params" : {
+        "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+      }
+    }
+  ],
+  "jobs" : {
+    "missingArchive" : "job-84892206b79174192e1fb101138299c5",
+    "receiveKilled" : "job-7dd23f0c724b55c0e2c644de0063493d"
+  },
+  "steps" : [
+    "receiveKilled.run",
+    "restart",
+    "reconcileReceiveKilled",
+    "missingArchive.run",
+    "secondRestart",
+    "reconcileMissingArchive",
+    "reconcileMissingArchiveAgain"
+  ],
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  }
+}

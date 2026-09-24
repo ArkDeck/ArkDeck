@@ -1,0 +1,10 @@
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-1fb84516607560c389260ec25aead6bd-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-1fb84516607560c389260ec25aead6bd-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-1fb84516607560c389260ec25aead6bd-send-hap-owned.hap

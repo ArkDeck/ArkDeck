@@ -723,24 +723,38 @@ source it named. A device-bound Job's Target facts are resolved fresh and
 validated, and its parked action is materialized again from its record
 (`job_reconcile_device.rs`): an action below `deviceMutation` is confirmed not
 executed, a pointer gesture has no dedicated readback and stays unknown, and a
-port rule's create or remove is read back once (`fport ls`, lowered under the
-reconcile's own step identity) and concluded completed, not executed or
-unknown. The decision is journaled as Swift journals it, the correlated step
-outcome carrying `confirmedNotExecuted` for a non-execution; the Job then fails
-and is published as a Session, its capability use resolved `safeToReflash`; or
-waits at its confirmed safe boundary, its use still `outcomeUnknown` until it
-resumes; or stays parked. As in Swift, the Session of a device-bound Job
+mutation Swift reads back is read back once, lowered under the reconcile's own
+step identity, and concluded completed, not executed or unknown — a port
+rule's create or remove by `fport ls`, a debug HAP's staging, package and
+ability by the owned path or directory, `bm dump` and `pidof`, a diagnostic
+capture's owned file by `ls -ld`, and a native deployment's steps by its own
+inspection, whose verdict table never calls a publish (`publish state is not
+safe to replay`) or a rollback not executed. The screen sequence's capture and
+cleanup reconcile as Swift's do: its materialization does not know their kinds,
+so the reconcile, once begun, fails and the Job stays parked. The decision is
+journaled as Swift journals it, the correlated step outcome carrying
+`confirmedNotExecuted` for a non-execution; the Job then fails and is
+published as a Session, its capability use resolved `safeToReflash`; or waits
+at its confirmed safe boundary, its use still `outcomeUnknown` until it
+resumes; or stays parked. A debug HAP's record is durable before its decision,
+and one confirmed not executed stays `finalizing` for its failure
+finalization, which runs at once through the runner (`finalizeDebugHAPFailure`:
+the compensations its succeeded steps declared, under the use it consumed), as
+it does for a debug HAP a restart left `finalizing`, on `job.run` or
+`job.reconcile`. As in Swift, the Session of a device-bound Job
 reconciled before any of its steps confirmed a binding is refused
 (`SessionManifestJournalValidator`: the decision's binding revision is not in
 the Manifest's binding history). A terminal Job's capability outcome that a
 crash lost is repaired from its journal's proof, on reconcile and before the
 next device mutation's submission materializes (`job_lineage_repair.rs`), with
 nothing dispatched; what a failed reconcile journaled stays resident in memory,
-as Swift's engine keeps it. A debug HAP, a native library deployment whose
-outcome is unknown and a Job parked on any other action (an owned remote path,
-a package, staging, a screen sequence, or a read-only action Swift's provider
-has no reconcile source for) are answered only where Swift writes nothing, and
-refused otherwise, with nothing written or dispatched. `tests/job_reconcile.rs`,
+as Swift's engine keeps it. A terminal debug HAP whose lineage a repair would
+write, a debug HAP parked on a declared compensation, on its compensation
+identity proof or on a failure decision its journal already holds, and a Job
+parked on a read-only action Swift's provider has no reconcile source for (a
+presence readback, a crash index or log) are answered only where Swift writes
+nothing, and refused otherwise, with nothing written or dispatched.
+`tests/job_reconcile.rs`,
 `tests/device_reconcile.rs` and `tests/readback_reconcile.rs` replay
 `rust/tests/fixtures/job-reconcile-analyzer/`, `device-reconcile/` and
 `readback-reconcile/` (Swift `testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs`,
@@ -760,9 +774,33 @@ run leaves is Swift's, and so are the two starts over it, the two reconciles,
 the next admission and every read. The one leftover Swift does not share is the
 Session owner's lock and an empty retention catalog, which this Runtime's
 admission creates when its storage-state check reads the Session root and Swift's writes
-only when it first publishes. `job.run`
-still refuses a Job in any resumable state, or whose journal has left
-`preflight`: resumption is a later slice. Also landed: `recovery_manifest.rs`, Swift's
+only when it first publishes. `job.run` resumes a device-bound Job as Swift's
+`runOwned` does (`job_run.rs`, `device_run.rs`): at the confirmed safe
+boundary a reconcile reached (`resumeAtConfirmedSafeBoundary`), from `running`
+once a restart found nothing outstanding, and a debug HAP's failure
+finalization from `finalizing`. The journal must stand exactly at that
+boundary — no torn tail, no outstanding intent, no unknown outcome, a confirmed
+decision — or nothing is dispatched; every step the journal confirmed
+succeeded is skipped (`resume skipped journal-confirmed step …`), host steps
+run again, and a resumed Job continues under the capability use it already
+holds, which the capability store must still hold unsettled for it
+(`mutation_execution.rs`, stricter than Swift, which reads the record alone),
+consuming no second one; a Job resumed before it consumed one consumes it as
+a first run does. An analyzer Job is still run from `preflight` only. In the
+daemon a `job.run` of a Job whose reconcile is under way waits it out, so a run
+and a reconcile never drive one Job at once.
+`tests/device_mutation_reconcile.rs` replays
+`rust/tests/fixtures/device-mutation-reconcile/` (Swift
+`DeviceMutationReconcileOracleContractTests`,
+`ARKDECK_RUST_DEVICE_MUTATION_RECONCILE_RECORD=/private/tmp/<new>`): five
+scenarios over the shared fake whose HDC calls die on SIGKILL before or after
+the device changed — a port rule, three debug HAPs, two native deployments,
+two screen sequences and three component tree captures, reconciled and
+resumed, a cleanup debt continued — and three whose daemon died mid-run,
+reproduced by a child of the test binary exiting at the same window: a tap
+before and after its consume, resumed from `running`, and a debug HAP whose
+failure finalization a restart left for `job.run` to continue; every answer,
+store snapshot and leftover byte for byte. Also landed: `recovery_manifest.rs`, Swift's
 `RecoveryManifestCodec` (the Session manifest's `recovery` member, which the
 Session reader now decodes through it before checking its relations to the
 Session's steps); its unit tests replay `rust/tests/fixtures/recovery-manifest/`

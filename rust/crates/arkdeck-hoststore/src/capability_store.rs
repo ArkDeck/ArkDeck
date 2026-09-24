@@ -354,6 +354,35 @@ impl CapabilityStore {
         })
     }
 
+    /// The use a resumed Job's record says it consumed, as the store holds it:
+    /// the one consumed for exactly this reservation and Job, whose receipt
+    /// is still unsettled (`pending` or `outcomeUnknown`). `None` when the
+    /// store holds no such use. Nothing is reserved or written.
+    pub(crate) fn unsettled_use(
+        &self,
+        capability_id: &str,
+        reservation_id: &str,
+        job_id: &str,
+    ) -> Result<Option<ConsumptionReceipt>, CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            Ok(document
+                .records
+                .iter()
+                .find(|record| same_text(&record.capability.id, capability_id))
+                .and_then(|record| {
+                    record.consumptions.iter().find(|use_| {
+                        same_text(&use_.reservation, reservation_id)
+                            && same_text(&use_.job, job_id)
+                            && matches!(
+                                use_.current(),
+                                UseOutcome::Pending | UseOutcome::OutcomeUnknown
+                            )
+                    })
+                })
+                .map(|use_| use_.to_receipt(capability_id)))
+        })
+    }
+
     /// Swift `inspect(capabilityID:)` as automatic issuance reads a
     /// generation: whether it exists and, if so, its remaining uses, its
     /// expiry and whether it was revoked.

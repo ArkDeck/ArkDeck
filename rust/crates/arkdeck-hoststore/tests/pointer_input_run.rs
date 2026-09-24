@@ -188,8 +188,10 @@ fn unavailable_mutation_owner_never_consumes_or_dispatches_pointer() {
 fn changed_tool_identity_never_consumes_or_dispatches_pointer() {
     replay(Fault::StaleTool);
 }
+/// A use consumed while the Job's record cannot be written stays pending and
+/// blocks the next gesture; a second run resumes the Job under that one use.
 #[test]
-fn consumed_capability_with_unwritable_job_stays_pending_and_blocks_next_job() {
+fn consumed_capability_with_unwritable_job_stays_pending_until_its_run_resumes() {
     replay(Fault::PersistAfterConsume);
 }
 
@@ -421,8 +423,8 @@ fn replay(fault: Fault) {
                 assert_eq!(actual["ok"], false, "{actual}");
                 assert!(ledger.contains("\"consumption\""), "{ledger}");
                 assert!(!ledger.contains("\"outcome\""), "{ledger}");
-                let retry = runner.handle(params);
-                assert!(retry.is_err(), "running Job must never replay");
+                // While its use is pending the lineage refuses every other
+                // gesture on the binding.
                 let next = cases["exchanges"]
                     .as_array()
                     .unwrap()
@@ -432,7 +434,6 @@ fn replay(fault: Fault) {
                     .as_object()
                     .unwrap()
                     .clone();
-
                 let refusal = JobAdmitter {
                     planner: planner(),
                     jobs: &jobs,
@@ -442,6 +443,68 @@ fn replay(fault: Fault) {
                 .handle(&next)
                 .unwrap_err();
                 assert_eq!(refusal.code, "admissionDenied");
+                // A second run resumes the Job from `running`, as Swift's
+                // `runOwned` does: its journal holds no intent, so the gesture
+                // is sent for the first time, under the one use its
+                // reservation already holds (the store answers that receipt
+                // again); nothing is consumed twice.
+                let resumed = runner.handle(params).unwrap();
+                assert_eq!(resumed["state"], "succeeded", "{resumed}");
+                let calls = fs::read_to_string(root.join("hdc-invocations.log")).unwrap();
+                assert_eq!(
+                    calls.lines().filter(|line| line.contains("uinput")).count(),
+                    1,
+                    "{calls}"
+                );
+                let settled =
+                    fs::read_to_string(root.join("store/capabilities/runtime-capabilities.ledger"))
+                        .unwrap();
+                let rows: Vec<Value> = settled
+                    .lines()
+                    .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                    .collect();
+                assert_eq!(
+                    rows.iter().filter(|row| row["kind"] == "consumed").count(),
+                    1,
+                    "{settled}"
+                );
+                let outcomes: Vec<&Value> =
+                    rows.iter().filter(|row| row["kind"] == "outcome").collect();
+                assert_eq!(outcomes.len(), 1, "{settled}");
+                assert_eq!(outcomes[0]["outcome"]["outcome"], "confirmed");
+                // A terminal Job is never run again, in this owner or another.
+                assert!(runner.handle(params).is_err());
+                drop(jobs);
+                let reopened = JobStore::open_owner(&default_root).unwrap();
+                let reopened_runner = JobRunner {
+                    imports: None,
+                    mutation: Some(arkdeck_hoststore::MutationExecution {
+                        authority,
+                        state_root: &root,
+                    }),
+                    jobs: &reopened,
+                    artifacts: &artifacts,
+                    analyzer: None,
+                    quota: provenance["quotaBytes"].as_u64().unwrap(),
+                    home: provenance["home"].as_str().unwrap(),
+                    now: fixed_now,
+                    precise_now: fixed_precise_now,
+                    sessions: None,
+                    cancellation: None,
+                    after_commit: None,
+                    hdc: Some(&hdc),
+                };
+                assert!(reopened_runner.handle(params).is_err());
+                assert_eq!(
+                    calls,
+                    fs::read_to_string(root.join("hdc-invocations.log")).unwrap()
+                );
+                assert_eq!(
+                    settled,
+                    fs::read_to_string(root.join("store/capabilities/runtime-capabilities.ledger"))
+                        .unwrap()
+                );
+                return;
             } else {
                 let cancelled = matches!(
                     fault,
@@ -472,38 +535,6 @@ fn replay(fault: Fault) {
                 invocations,
                 fs::read_to_string(root.join("hdc-invocations.log")).unwrap()
             );
-            if fault == Fault::PersistAfterConsume {
-                drop(jobs);
-                let reopened = JobStore::open_owner(&default_root).unwrap();
-                let reopened_runner = JobRunner {
-                    imports: None,
-                    mutation: Some(arkdeck_hoststore::MutationExecution {
-                        authority,
-                        state_root: &root,
-                    }),
-                    jobs: &reopened,
-                    artifacts: &artifacts,
-                    analyzer: None,
-                    quota: provenance["quotaBytes"].as_u64().unwrap(),
-                    home: provenance["home"].as_str().unwrap(),
-                    now: fixed_now,
-                    precise_now: fixed_precise_now,
-                    sessions: None,
-                    cancellation: None,
-                    after_commit: None,
-                    hdc: Some(&hdc),
-                };
-                assert!(reopened_runner.handle(params).is_err());
-                assert_eq!(
-                    invocations,
-                    fs::read_to_string(root.join("hdc-invocations.log")).unwrap()
-                );
-                assert_eq!(
-                    ledger,
-                    fs::read_to_string(root.join("store/capabilities/runtime-capabilities.ledger"))
-                        .unwrap()
-                );
-            }
             return;
         }
         let actual = support::legacy_plan_answer(actual);
@@ -549,7 +580,7 @@ fn pointer_crash_child() {
 }
 
 #[test]
-fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
+fn restart_after_consumption_resumes_once_and_after_intent_never_replays() {
     let _lock = exclusive();
     for (mode, code) in [("consume", 73), ("intent", 74)] {
         let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -626,14 +657,45 @@ fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
             after_commit: None,
             hdc: Some(&hdc),
         };
-        assert!(
-            runner
-                .handle(&Map::from_iter([(
-                    "jobId".into(),
-                    json!("job-4ac2c3640786ad0e831952ab62bb71bc")
-                )]))
-                .is_err()
-        );
+        let job = Map::from_iter([(
+            "jobId".into(),
+            json!("job-4ac2c3640786ad0e831952ab62bb71bc"),
+        )]);
+        if mode == "consume" {
+            // The run died once the use was consumed and before the record
+            // held its evidence or any gesture intent existed: the journal
+            // stands at a boundary its steps confirmed, and a run resumes it
+            // there (Swift `runOwned` from `running`). The gesture is sent for
+            // the first time, under the one use the reservation already holds.
+            let resumed = runner.handle(&job).unwrap();
+            assert_eq!(resumed["state"], "succeeded", "{resumed}");
+            let now = fs::read_to_string(root.join("hdc-invocations.log")).unwrap();
+            let added = &now[calls.len()..];
+            assert_eq!(
+                added.lines().filter(|line| line.contains("uinput")).count(),
+                1,
+                "{added}"
+            );
+            let settled =
+                fs::read_to_string(root.join("store/capabilities/runtime-capabilities.ledger"))
+                    .unwrap();
+            assert_eq!(
+                settled
+                    .lines()
+                    .filter(|line| line.contains("\"consumption\""))
+                    .count(),
+                1,
+                "{settled}"
+            );
+            assert!(settled.starts_with(std::str::from_utf8(&ledger).unwrap()));
+            assert!(
+                runner.handle(&job).is_err(),
+                "a terminal Job never runs again"
+            );
+            continue;
+        }
+        // An intent whose outcome was never observed is never resent.
+        assert_eq!(runner.handle(&job).unwrap_err().code, "resourceConflict");
         let cases = support::document(&support::fixture("pointer-input"), "cases.json");
         let next = cases["exchanges"]
             .as_array()

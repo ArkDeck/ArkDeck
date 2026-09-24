@@ -13,9 +13,13 @@
 //! the Job is `finalizing`, also proves that use is still this Job's own,
 //! unsettled, for the same query and still authorized (`validateContinuation`),
 //! and correlated as it was consumed. This runner continues only a use it
-//! consumed itself: evidence it finds on a record it did not write is never
-//! continued, which keeps every dispatch of a resumed Job for recovery
-//! (ADR-0009, L.1 item 13).
+//! consumed itself, or — for a Job resumed at its confirmed safe boundary, a
+//! Job a restart left `running` with nothing outstanding, or a debug HAP's
+//! failure finalization continued — the use the Job's record names once the
+//! capability store proves it is that Job's own and still unsettled (a
+//! stricter check than Swift's, which reads the record alone). Evidence on a
+//! record of a Job not resumed is never continued, and no resumed Job
+//! consumes a second use (ADR-0009, L.1 item 13).
 use crate::capability_policy;
 use crate::capability_store::{CapabilityQuery, Effect, UseOutcome};
 use crate::device_facts::{self, DeviceFacts};
@@ -207,6 +211,62 @@ impl JobRunner<'_> {
         }
         run.consumed = Some(evidence);
         Ok(MutationConsumption::Consumed)
+    }
+
+    /// A resumed Job takes over the use its record says it consumed (Swift's
+    /// resident Job owns it): the record's `runtimeCapability` evidence must
+    /// name the capability the request names, and the capability store must
+    /// hold that very use — this reservation, this Job, the receipt the
+    /// evidence correlates — still unsettled. Then the run continues under it
+    /// (Swift's persisted-evidence arm, every fresh check repeated at each
+    /// mutation) and settles it; nothing new is consumed. A record without
+    /// such evidence has consumed nothing, and its run consumes as a first
+    /// run does. The refusal is the reason nothing was dispatched.
+    pub(crate) fn take_over_held_use(&self, run: &mut Run) -> Result<(), String> {
+        let Some(evidence) = run
+            .record
+            .admission_evidence()
+            .filter(|evidence| evidence["kind"] == "runtimeCapability")
+            .cloned()
+        else {
+            return Ok(());
+        };
+        let refused = |detail: &str| {
+            format!(
+                "job {}'s capability use {detail}; the Rust Runtime does not continue it and \
+                 nothing was dispatched",
+                run.record.job_id
+            )
+        };
+        let (Some(capability), Some(reservation)) = (
+            evidence["reference"].as_str().filter(|reference| {
+                run.record.request["authorization"]["capabilityId"] == *reference
+            }),
+            run.record.request["idempotencyKey"].as_str(),
+        ) else {
+            return Err(refused("is not the one its request names"));
+        };
+        let Some(owner) = self.mutation else {
+            return Err(refused(
+                "cannot be proved without the Runtime mutation owner",
+            ));
+        };
+        let held = owner
+            .authority
+            .capabilities
+            .unsettled_use(capability, reservation, &run.record.job_id)
+            .map_err(|error| refused(&format!("cannot be read: {}", error.swift())))?;
+        let correlation = &evidence["runtimeCapabilityCorrelation"];
+        let held = held.is_some_and(|held| {
+            evidence["consumptionFingerprintSHA256"] == held.query_fingerprint_sha256.as_str()
+                && correlation["useOrdinal"].as_i64() == Some(held.ordinal)
+                && correlation["reservationID"] == held.reservation_id.as_str()
+        });
+        if !held {
+            return Err(refused("is not an unsettled use the store holds for it"));
+        };
+        run.consumed = Some(evidence);
+        Ok(())
     }
 
     /// Swift `recordCapabilityOutcome` once the Job is terminal or parked:

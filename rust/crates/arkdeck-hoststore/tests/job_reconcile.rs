@@ -178,6 +178,7 @@ fn rust_recovers_and_reconciles_the_swift_jobs() {
         sessions: Some(&publisher),
         hdc: None,
         capabilities: None,
+        runner: None,
     };
     let mut differences = Vec::new();
     for case in support::document(&fixture, "cases.json")

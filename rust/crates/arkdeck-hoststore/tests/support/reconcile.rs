@@ -8,20 +8,24 @@
 //! afresh, then `recoverActiveJobs`), each recorded request answered by the
 //! Rust owner that serves it, and each recorded store snapshot compared file
 //! by file.
+use super::native_library::code_sign_helper;
 use super::{OracleProbe, assert_store, debug_hap, document, fixed_now, fixed_precise_now};
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
     JobReconciler, JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution,
     RecoveredJobs, RunCancellation, SessionPublisher, SessionStore, StorageClaims, TargetStore,
-    recover_active_jobs,
+    list_cleanup_debt, recover_active_jobs,
 };
 use arkdeck_platform::VerifiedTool;
-use arkdeck_provider_hdc::{HdcDispatch, ProcessDispatch};
+use arkdeck_provider_hdc::{
+    CodeSignHelper, DispatchFailure, HdcDispatch, ProcessDispatch, ProcessPlan, Receipt,
+};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 /// The owners one daemon start opens over the root.
 pub struct Stores {
@@ -34,7 +38,9 @@ pub struct Stores {
     pub claims: StorageClaims,
 }
 
-/// A daemon over the root rebuilt from an oracle's fixture.
+/// A daemon over the root rebuilt from an oracle's fixture, composed as the
+/// oracle composed its engine: with the code-sign helper its cases name, the
+/// host receive root and the fixed child duration its provenance names.
 pub struct Daemon {
     pub fixture: PathBuf,
     pub root: PathBuf,
@@ -43,7 +49,31 @@ pub struct Daemon {
     pub provenance: Value,
     pub dispatch: ProcessDispatch,
     pub probe: OracleProbe,
+    helper: Option<CodeSignHelper>,
+    receive_root: Option<PathBuf>,
     stores: Option<Stores>,
+}
+
+/// Swift's `FixedDurationDispatcher` over the daemon's dispatch, where the
+/// oracle fixed every child's reported duration; the dispatch unchanged
+/// otherwise.
+pub struct Timed<'a> {
+    inner: &'a ProcessDispatch,
+    seconds: Option<f64>,
+}
+
+impl HdcDispatch for Timed<'_> {
+    fn mutation_identity_current(&self) -> bool {
+        self.inner.mutation_identity_current()
+    }
+
+    fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
+        let mut receipt = self.inner.dispatch(plan)?;
+        if let Some(seconds) = self.seconds {
+            receipt.duration = Duration::from_secs_f64(seconds);
+        }
+        Ok(receipt)
+    }
 }
 
 /// A control answer as the oracles record it: a refusal carries details
@@ -78,6 +108,7 @@ impl Daemon {
         let root = debug_hap::rebuild(&fixture);
         let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
         assert_eq!(provenance["hdcSHA256"], digest.as_str());
+        let cases = document(&fixture, "cases.json");
         let mut daemon = Self {
             dispatch: ProcessDispatch::new(
                 VerifiedTool::open(root.join("hdc"), &digest).unwrap(),
@@ -85,6 +116,10 @@ impl Daemon {
             ),
             probe: OracleProbe::new(&provenance),
             default_root: root.join("store"),
+            helper: cases
+                .get("codeSignHelper")
+                .map(|_| code_sign_helper(&cases, &root)),
+            receive_root: provenance["receiveRoot"].as_str().map(PathBuf::from),
             fixture,
             root,
             digest,
@@ -104,6 +139,7 @@ impl Daemon {
         let root = PathBuf::from(debug_hap::ROOT);
         let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
         assert_eq!(provenance["hdcSHA256"], digest.as_str());
+        let cases = document(&fixture, "cases.json");
         Self {
             dispatch: ProcessDispatch::new(
                 VerifiedTool::open(root.join("hdc"), &digest).unwrap(),
@@ -111,6 +147,10 @@ impl Daemon {
             ),
             probe: OracleProbe::new(&provenance),
             default_root: root.join("store"),
+            helper: cases
+                .get("codeSignHelper")
+                .map(|_| code_sign_helper(&cases, &root)),
+            receive_root: provenance["receiveRoot"].as_str().map(PathBuf::from),
             fixture,
             root,
             digest,
@@ -169,16 +209,26 @@ impl Daemon {
         fs::read_to_string(self.root.join("hdc-invocations.log")).unwrap()
     }
 
+    /// The daemon's dispatch as the oracle's engine dispatched: every child at
+    /// the fixed duration the provenance names, if it names one.
+    pub fn timed(&self) -> Timed<'_> {
+        Timed {
+            inner: &self.dispatch,
+            seconds: self.provenance["invocationSeconds"].as_f64(),
+        }
+    }
+
     /// The HDC composition this daemon's owners run and reconcile through,
-    /// dispatching through `dispatch`.
+    /// dispatching through `dispatch`, with the oracle's host receive root
+    /// and code-sign helper.
     fn hdc<'a>(&'a self, dispatch: &'a (dyn HdcDispatch + Sync)) -> HdcComposition<'a> {
         HdcComposition {
             targets: &self.stores().targets,
             dispatch,
-            receive_root: None,
+            receive_root: self.receive_root.as_deref(),
             tool_sha256: &self.digest,
             now: fixed_now,
-            code_sign_helper: None,
+            code_sign_helper: self.helper.as_ref(),
         }
     }
 
@@ -220,10 +270,27 @@ impl Daemon {
         cancellation: Option<&RunCancellation>,
         now: fn() -> Option<String>,
     ) -> Value {
-        let stores = self.stores();
         let hdc = self.hdc(dispatch);
         let publisher = self.publisher();
-        let runner = JobRunner {
+        let runner = self.runner(&hdc, &publisher, cancellation, now);
+        answer(runner.handle(params).map_err(|refusal| WireError {
+            code: refusal.code.into(),
+            message: refusal.message,
+            details: Some(refusal.details),
+        }))
+    }
+
+    /// The runner a run, a reconcile's failure finalization and a cleanup
+    /// debt's continuation go through, with the mutation owner.
+    fn runner<'a>(
+        &'a self,
+        hdc: &'a HdcComposition<'a>,
+        publisher: &'a SessionPublisher<'a>,
+        cancellation: Option<&'a RunCancellation>,
+        now: fn() -> Option<String>,
+    ) -> JobRunner<'a> {
+        let stores = self.stores();
+        JobRunner {
             imports: None,
             mutation: Some(MutationExecution {
                 authority: self.authority(),
@@ -236,20 +303,16 @@ impl Daemon {
             home: self.provenance["home"].as_str().unwrap(),
             now,
             precise_now: fixed_precise_now,
-            sessions: Some(&publisher),
+            sessions: Some(publisher),
             cancellation,
             after_commit: None,
-            hdc: Some(&hdc),
-        };
-        answer(runner.handle(params).map_err(|refusal| WireError {
-            code: refusal.code.into(),
-            message: refusal.message,
-            details: Some(refusal.details),
-        }))
+            hdc: Some(hdc),
+        }
     }
 
     /// `job.reconcile` of the Job `params` names, through an HDC composition
-    /// dispatching through `dispatch`, or with none.
+    /// dispatching through `dispatch` (and a runner over it for a debug HAP's
+    /// failure finalization), or with none.
     pub fn reconcile(
         &self,
         dispatch: Option<&(dyn HdcDispatch + Sync)>,
@@ -258,6 +321,9 @@ impl Daemon {
         let stores = self.stores();
         let hdc = dispatch.map(|dispatch| self.hdc(dispatch));
         let publisher = self.publisher();
+        let runner = hdc
+            .as_ref()
+            .map(|hdc| self.runner(hdc, &publisher, None, fixed_now));
         answer(
             JobReconciler {
                 jobs: &stores.jobs,
@@ -267,8 +333,24 @@ impl Daemon {
                 sessions: Some(&publisher),
                 hdc: hdc.as_ref(),
                 capabilities: Some(&stores.capabilities),
+                runner: runner.as_ref(),
             }
             .handle(params),
+        )
+    }
+
+    /// `cleanupDebt.continue` of the debt `params` names, through the runner
+    /// over an HDC composition dispatching through `dispatch`.
+    pub fn continue_debt(
+        &self,
+        dispatch: &(dyn HdcDispatch + Sync),
+        params: &Map<String, Value>,
+    ) -> Value {
+        let hdc = self.hdc(dispatch);
+        let publisher = self.publisher();
+        answer(
+            self.runner(&hdc, &publisher, None, fixed_now)
+                .continue_cleanup_debt(params),
         )
     }
 
@@ -318,6 +400,16 @@ impl Daemon {
                 }
                 .handle(method, params),
             ),
+            "cleanupDebt.list" => {
+                answer(
+                    list_cleanup_debt(&stores.artifacts).map_err(|message| WireError {
+                        code: "internalError".into(),
+                        message,
+                        details: None,
+                    }),
+                )
+            }
+            "cleanupDebt.continue" => self.continue_debt(dispatch, params),
             "capability.list" | "capability.inspect" => answer(
                 stores
                     .capabilities

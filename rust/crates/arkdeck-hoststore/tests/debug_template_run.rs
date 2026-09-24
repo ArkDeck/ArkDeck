@@ -204,20 +204,33 @@ fn closed_templates_run_as_jobs_and_unknown_results_never_replay() {
                 sessions: Some(&publisher),
                 hdc: Some(&hdc),
                 capabilities: None,
+                runner: None,
             };
-            let _ = reconcile.handle(&serde_json::from_value(json!({"jobId":job})).unwrap());
+            // A template is read-only: Swift's provider confirms its lost
+            // intent not executed without reading anything, and the Job fails.
+            let reconciled = reconcile
+                .handle(&serde_json::from_value(json!({"jobId":job})).unwrap())
+                .unwrap();
+            assert_eq!(
+                (&reconciled["state"], &reconciled["failure"]["code"]),
+                (&json!("failed"), &json!("executionConfirmedNotPerformed")),
+                "{reconciled}"
+            );
             assert_eq!(
                 *dispatch.calls.lock().unwrap(),
                 1,
                 "reconciliation cannot replay an unknown template"
             );
-            let _ = runner.handle(&serde_json::from_value(json!({"jobId":job})).unwrap());
+            let refused = runner
+                .handle(&serde_json::from_value(json!({"jobId":job})).unwrap())
+                .unwrap_err();
+            assert_eq!(refused.code, "resourceConflict", "{}", refused.message);
             assert_eq!(
                 *dispatch.calls.lock().unwrap(),
                 1,
                 "unknown intent must not replay"
             );
-            assert!(owners.record(job)["outcomeUnknown"].as_bool().unwrap());
+            assert!(!owners.record(job)["outcomeUnknown"].as_bool().unwrap());
         }
     }
 }

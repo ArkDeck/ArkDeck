@@ -1,0 +1,16 @@
+{
+  "artifact" : "install-readback.json",
+  "bundleName" : "com.example.demo",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "cpuAbi" : "arm64-v8a",
+  "deployedArtifactSha256" : "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575",
+  "firmware" : "OpenHarmony-4.1-release",
+  "installed" : "true",
+  "jobId" : "job-1fb84516607560c389260ec25aead6bd",
+  "model" : "OpenHarmony Reference Device",
+  "nativeLibraryFileCount" : "1",
+  "nativeLibraryPath" : "libs/arm64",
+  "operation" : "debug.hap@1",
+  "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "transport" : "usb"
+}

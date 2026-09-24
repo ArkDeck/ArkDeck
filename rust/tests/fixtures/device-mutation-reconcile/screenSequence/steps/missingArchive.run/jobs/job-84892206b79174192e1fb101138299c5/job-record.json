@@ -1,0 +1,123 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "captureRemoteFile"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+      "reservationID" : "idem-mutation-missingArchive",
+      "stepSetDigestSHA256" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-84892206b79174192e1fb101138299c5",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "capture.screen-sequence@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-missingArchive",
+    "inputs" : {
+      "frameCount" : 3
+    },
+    "operation" : {
+      "id" : "capture.screen-sequence",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-missingArchive",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "hdc",
+  "recoveryAction" : {
+    "arguments" : {
+      "frameCount" : 3,
+      "framesDirectory" : "\/data\/local\/tmp\/arkdeck-job-84892206b79174192e1fb101138299c5-capture-screen-sequence-owned-frames",
+      "imageType" : "jpeg",
+      "jobId" : "job-84892206b79174192e1fb101138299c5",
+      "nonce" : "owned",
+      "remotePath" : "\/data\/local\/tmp\/arkdeck-job-84892206b79174192e1fb101138299c5-capture-screen-sequence-owned.tar",
+      "stepId" : "capture-screen-sequence"
+    },
+    "kind" : "hdc.captureScreenSequence"
+  },
+  "recoveryIntentEventID" : "intent-capture-screen-sequence",
+  "recoveryStepID" : "capture-screen-sequence",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-mutation-missingArchive",
+    "inputs" : {
+      "frameCount" : 3
+    },
+    "operation" : {
+      "id" : "capture.screen-sequence",
+      "version" : 1
+    },
+    "requestId" : "req-mutation-missingArchive",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "capability consumed before first mutation",
+    "intent capture-screen-sequence",
+    "outcomeUnknown capture-screen-sequence; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: sequence readback did not describe \/data\/local\/tmp\/arkdeck-job-84892206b79174192e1fb101138299c5-capture-screen-sequence-owned.tar as a regular file"
+  ]
+}

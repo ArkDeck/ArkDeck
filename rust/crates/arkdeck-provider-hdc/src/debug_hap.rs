@@ -289,14 +289,41 @@ impl PersistedArguments<'_> {
         }
     }
 
+    /// Swift's `stringArray(_:)`: every item a string.
+    pub(crate) fn string_array(&self, key: &str) -> Result<Vec<String>, FileActionError> {
+        let Some(Value::Array(values)) = self.arguments.get(key) else {
+            return self.refuse(&format!("is missing array {key}"));
+        };
+        values
+            .iter()
+            .map(|value| match value {
+                Value::String(item) => Ok(item.clone()),
+                _ => unsupported(&format!(
+                    "persisted {}.{key} contains a non-string",
+                    self.kind
+                )),
+            })
+            .collect()
+    }
+
     /// Swift's `path()`: the owned path rebuilt from its components, which
     /// must name exactly the recorded path.
     fn path(&self) -> Result<OwnedRemotePath, FileActionError> {
+        self.owned_path(ImageType::Png)
+    }
+
+    /// Swift's `path(imageType:)`: a screenshot's suffix follows its image
+    /// type, so a path rebuilt without it would name a file the device never
+    /// wrote, and is refused.
+    pub(crate) fn owned_path(
+        &self,
+        image_type: ImageType,
+    ) -> Result<OwnedRemotePath, FileActionError> {
         let path = OwnedRemotePath::new(
             self.string("jobId")?,
             self.string("stepId")?,
             self.string("nonce")?,
-            ImageType::Png,
+            image_type,
         )?;
         if path.remote_path != self.string("remotePath")? {
             return self.refuse("remote path does not match its owned components");
