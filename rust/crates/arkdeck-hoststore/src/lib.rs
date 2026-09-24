@@ -19,6 +19,12 @@ pub use workspace_composition::WorkspaceComposition;
 #[cfg(target_os = "macos")]
 mod workspace_isolation;
 #[cfg(target_os = "macos")]
+mod workspace_patch;
+#[cfg(target_os = "macos")]
+pub use workspace_patch::{
+    ToolFailure, ToolInvocation, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
+};
+#[cfg(target_os = "macos")]
 mod workspace_profile;
 #[cfg(target_os = "macos")]
 pub use workspace_profile::{ProfilePresets, WorkspaceCommandPreset, WorkspaceProfile};

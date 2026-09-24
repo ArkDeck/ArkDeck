@@ -8,6 +8,11 @@
 //!   is also named by the entry package's owner-validated Artifact facts.
 //!   Either is checked against its envelope and lineage; no use is reserved
 //!   or consumed.
+//! - A workspace mutation is admitted only against a Runtime-owned isolated
+//!   copy, under the capability the Runtime issues for that copy's tree,
+//!   revision and scopes (or one the caller names). A person's primary tree
+//!   needs a standing capability a person issued, which this Runtime neither
+//!   issues nor honours: its request is refused before admission.
 //! - The Job's journal then starts with `jobCreated` and `queued -> preflight`,
 //!   and its record is published.
 //!
@@ -309,8 +314,9 @@ impl JobAdmitter<'_> {
     /// 4. without one, the Runtime issues its own when the catalog lets it.
     ///
     /// Either capability is checked against its envelope and lineage before
-    /// admission, and nothing is consumed yet. A destructive effect, the
-    /// Runtime-capability policy and a workspace subject are not served yet.
+    /// admission, and nothing is consumed yet. A destructive effect and the
+    /// Runtime-capability policy are not served yet; a workspace subject is
+    /// `preauthorize_workspace`'s.
     fn preauthorize(
         &self,
         request: &OperationRequest,
@@ -328,7 +334,7 @@ impl JobAdmitter<'_> {
             )
         };
         if descriptor.provider == "workspace" {
-            return Err(self.workspace_refusal(request, descriptor, effect, unserved()));
+            return self.preauthorize_workspace(request, descriptor, effect, materialized);
         }
         let (Some(authority), Some(parsed)) = (self.authority, Effect::parse(effect)) else {
             return Err(unserved());
@@ -421,36 +427,123 @@ impl JobAdmitter<'_> {
     }
 
     /// Swift `preauthorize` for a workspace subject above `readOnly`. The
-    /// facts of the tree the request names decide issuance: a Runtime-owned
-    /// isolated copy may be issued a capability; a person's primary tree never
-    /// is, whatever the catalog's default, and needs one a person issued. This
-    /// Runtime neither issues nor validates a workspace capability yet, so
-    /// every such request is refused with zero dispatch — the primary tree by
-    /// Swift's own refusal. No workspace mutation is materialized yet to reach
-    /// this; the rule is fixed here for the one that will be.
-    fn workspace_refusal(
+    /// facts of the tree the request names decide issuance:
+    /// - a Runtime-owned isolated copy is issued the Runtime's own capability
+    ///   when the caller names none (`automatic_issuance_permitted`), and one
+    ///   the caller names is used as named;
+    /// - a person's primary tree needs a standing capability a person issued,
+    ///   and this Runtime holds no path that issues or honours one: a request
+    ///   naming none is refused as Swift refuses it, and one naming any is
+    ///   refused as Swift refuses a capability its store does not hold.
+    ///
+    /// Either capability is then checked against its envelope and lineage;
+    /// nothing is reserved or consumed, and every refusal dispatches nothing.
+    fn preauthorize_workspace(
         &self,
         request: &OperationRequest,
         descriptor: &CatalogOperation,
         effect: &str,
-        unserved: AdmissionRefusal,
-    ) -> AdmissionRefusal {
-        let Some(workspace) = self.planner.workspace else {
-            return unserved;
+        materialized: &Materialized<'_>,
+    ) -> Result<String, AdmissionRefusal> {
+        let reference = descriptor.reference();
+        let unserved = || {
+            refused(
+                "rejected",
+                format!(
+                    "{reference} needs a Runtime capability, which the Rust Runtime does not issue yet"
+                ),
+            )
         };
-        let facts = match workspace.authorization_facts(&request.inputs) {
-            Ok(facts) => facts,
-            Err(error) => return refused("admissionDenied", error),
+        let (Some(authority), Some(workspace), Some(parsed)) = (
+            self.authority,
+            self.planner.workspace,
+            Effect::parse(effect),
+        ) else {
+            return Err(unserved());
         };
-        if request.capability_id.is_none()
-            && !crate::workspace_profile::automatic_issuance_permitted(descriptor, Some(&facts))
-        {
-            return refused(
+        authority
+            .require_state(self.jobs)
+            .map_err(|error| refused("admissionDenied", error.message))?;
+        let Some(policy) = descriptor.authorization.get(effect) else {
+            return Err(refused(
                 "admissionDenied",
-                format!("effect {effect} requires an explicit runtime capability"),
-            );
+                format!("catalog has no authorization policy for effect {effect}"),
+            ));
+        };
+        // The subject is the tree the request names, measured now.
+        let facts = workspace
+            .authorization_facts(&request.inputs)
+            .map_err(|error| refused("admissionDenied", error))?;
+        if parsed == Effect::Destructive || policy == "runtimeCapability" {
+            return Err(unserved());
         }
-        unserved
+        let query = CapabilityQuery {
+            operation_id: descriptor.id().to_owned(),
+            operation_version: descriptor.version(),
+            effect: parsed,
+            target_stable_identity_sha256: None,
+            target_binding_revision: None,
+            plan_digest: Some(materialized.digest.clone()),
+            inputs: request.inputs.clone(),
+            artifact_facts: materialized.artifact_facts.clone(),
+            workspace_identity_sha256: Some(facts.identity_sha256.clone()),
+            workspace_revision: Some(facts.revision.clone()),
+            workspace_file_scopes_digest: Some(facts.file_scopes_digest.clone()),
+        };
+        let capability = match &request.capability_id {
+            // A primary tree is never admitted under a named capability here:
+            // the only one it may run under is a person's, which this Runtime
+            // neither issues nor honours.
+            Some(named) if !facts.isolated_task_copy => {
+                return Err(refused(
+                    "admissionDenied",
+                    format!(
+                        "capability denied [denial:capabilityNotFound]: {}",
+                        CapabilityStoreError::NotFound(named.clone()).swift()
+                    ),
+                ));
+            }
+            Some(named) => named.clone(),
+            None if parsed == Effect::DeviceMutation
+                && policy == "standingCapability"
+                && crate::workspace_profile::automatic_issuance_permitted(
+                    descriptor,
+                    Some(&facts),
+                ) =>
+            {
+                capability_policy::issue(
+                    authority.capabilities,
+                    descriptor,
+                    &query,
+                    false,
+                    &self.clock()?,
+                )
+                .map_err(|failure| match failure {
+                    IssueFailure::Refused(message) => refused("admissionDenied", message),
+                    IssueFailure::Unreadable => uncertain(),
+                })?
+            }
+            None => {
+                return Err(refused(
+                    "admissionDenied",
+                    format!("effect {effect} requires an explicit runtime capability"),
+                ));
+            }
+        };
+        authority
+            .capabilities
+            .validate_new_execution(&capability, &query, &self.clock()?)
+            .map_err(|error| {
+                refused(
+                    "admissionDenied",
+                    format!(
+                        "capability denied [denial:{}]: {}",
+                        denial_code(&error),
+                        error.swift()
+                    ),
+                )
+            })?;
+        Ok(capability)
     }
 
     /// Swift `currentCatalogDuplicate` and the reviewed-plan check of a

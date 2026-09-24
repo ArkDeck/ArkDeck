@@ -71,12 +71,11 @@ const RUNNABLE: [&str; 4] = [
 
 /// Whether this Runtime executes an admitted Job of `operation`: the analyzer
 /// here, a device-bound operation (`debug.hap@1` among them) through its HDC
-/// composition, a Runtime-owned workspace copy through its workspace
-/// composition. Every other Job is refused before its run starts.
+/// composition, a Runtime-owned workspace copy and the patches applied to and
+/// reverted from a workspace through its workspace composition. Every other
+/// Job is refused before its run starts.
 pub(crate) fn executes(operation: &str) -> bool {
-    operation == OPERATION
-        || crate::device_run::runs(operation)
-        || operation == workspace_run::WORKSPACE_OPERATION
+    operation == OPERATION || crate::device_run::runs(operation) || workspace_run::runs(operation)
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -364,7 +363,7 @@ impl JobRunner<'_> {
         let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
         let workspace = self
             .workspace
-            .filter(|_| record.operation() == workspace_run::WORKSPACE_OPERATION);
+            .filter(|_| workspace_run::runs(record.operation()));
         if record.operation() != OPERATION && !device && workspace.is_none() {
             return Err(proven(
                 "rejected",
@@ -435,7 +434,12 @@ impl JobRunner<'_> {
         }
         match (self.hdc.filter(|_| device), workspace) {
             (Some(hdc), _) => self.execute_device(&mut run, hdc)?,
-            (None, Some(workspace)) => self.execute_workspace(&mut run, workspace)?,
+            (None, Some(workspace))
+                if run.record.operation() == workspace_run::WORKSPACE_OPERATION =>
+            {
+                self.execute_workspace(&mut run, workspace)?
+            }
+            (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }
         run.release(self.jobs, self.sessions, &directory)?;

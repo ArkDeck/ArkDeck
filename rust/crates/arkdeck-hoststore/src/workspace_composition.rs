@@ -6,11 +6,17 @@
 //!
 //! At start-up every registered project whose root is still the directory
 //! its registration pinned resolves to the profile of its kind, the
-//! Runtime-owned copies a previous Runtime made are adopted again, and every
-//! registered generation is marked applied. A project registered or changed
-//! afterwards is refused until the Runtime restarts, as Swift refuses it.
+//! Runtime-owned copies a previous Runtime made are adopted again — the base
+//! revision vouching for an unpatched copy, the durable patch lineage for a
+//! patched one — and every registered generation is marked applied. A project
+//! registered or changed afterwards is refused until the Runtime restarts, as
+//! Swift refuses it.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_isolation::{ISOLATION_DIRECTORY, IsolationIntent};
+use crate::workspace_patch::{
+    self as patch, ATTEMPTS_DIRECTORY, AttemptStore, FileSnapshot, PatchAction, PatchAttempt,
+    PatchIntent, RevertIntent, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
+};
 use crate::workspace_profile::{
     ProfileKind, ProfileRegistry, WorkspaceAuthorizationFacts, WorkspaceProfile,
 };
@@ -43,9 +49,41 @@ pub struct WorkspaceComposition {
     /// Present exactly when a primary profile resolved, as Swift creates its
     /// isolation manager.
     pub(crate) isolation: Option<Isolation>,
+    /// Where the Runtime-owned copies live, whether or not a manager was
+    /// composed over them this time.
+    copies: String,
     projects: Option<Arc<WorkspaceProjectStore>>,
     /// The engine clock a materialization reads.
     pub(crate) now: fn() -> Option<String>,
+    /// Swift `WorkspacePatchAttemptStore`: present exactly when a primary
+    /// profile resolved, beside the isolation manager's directory, which
+    /// reads it as the copies' patch lineage.
+    pub(crate) attempts: Option<AttemptStore>,
+    /// The dispatch a patch step runs its pinned tool through.
+    pub(crate) tool: Box<dyn WorkspaceToolDispatch>,
+    /// Swift `DeviceMutationLaneCoordinator` for the host target every
+    /// workspace mutation names: a patch Job's steps hold it from its running
+    /// transition to its last step, so one patch never overlaps another.
+    pub(crate) lane: Mutex<()>,
+}
+
+/// A patch Artifact the engine resolved from its lease for this Job: the
+/// facts the lease names and the payload they describe.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LeasedPatch {
+    pub(crate) artifact_id: String,
+    pub(crate) path: String,
+    pub(crate) sha256: String,
+    pub(crate) byte_count: u64,
+}
+
+/// How a patch step's receipt was judged: Swift's `.verified` summary, its
+/// `.failed` code and detail, or a judgement that could not be completed,
+/// which leaves the step's outcome unknown.
+pub(crate) enum PatchVerdict {
+    Verified(BTreeMap<String, String>),
+    Failed(&'static str, String),
+    Unknown(String),
 }
 
 /// Swift `workspacePresetInputNames`.
@@ -65,6 +103,11 @@ fn isolation_at(root: &Path) -> io::Result<Isolation> {
         root: foundation_standardized(root),
         lock: Mutex::new(()),
     })
+}
+
+/// The copies' root as the isolation manager spells it.
+fn copies_root(root: &Path) -> String {
+    foundation_standardized(&root.to_string_lossy())
 }
 
 fn registry(profiles: &[WorkspaceProfile]) -> io::Result<ProfileRegistry> {
@@ -143,22 +186,34 @@ impl WorkspaceComposition {
                     primaries: Vec::new(),
                     unavailable: Some(reason),
                     isolation: None,
+                    copies: copies_root(&state_root.join(ISOLATION_DIRECTORY)),
                     projects: Some(Arc::clone(&projects)),
                     now,
+                    attempts: None,
+                    tool: Box::new(VerifiedToolDispatch),
+                    lane: Mutex::new(()),
                 },
                 Vec::new(),
             )
         } else {
+            // Swift creates the attempt store first and hands it to the
+            // isolation manager as its patch lineage.
+            let attempts = AttemptStore::open(&state_root.join(ATTEMPTS_DIRECTORY))
+                .map_err(|error| error.to_string())?;
             let composition = Self {
                 registry: registry(&resolved).map_err(|error| error.to_string())?,
                 primaries: resolved.iter().map(|p| p.project_ref.clone()).collect(),
                 unavailable: None,
+                copies: copies_root(&state_root.join(ISOLATION_DIRECTORY)),
                 isolation: Some(
                     isolation_at(&state_root.join(ISOLATION_DIRECTORY))
                         .map_err(|error| error.to_string())?,
                 ),
                 projects: Some(Arc::clone(&projects)),
                 now,
+                attempts: Some(attempts),
+                tool: Box::new(VerifiedToolDispatch),
+                lane: Mutex::new(()),
             };
             let unadopted = composition.adopt_runtime_workspaces();
             (composition, unadopted)
@@ -168,8 +223,9 @@ impl WorkspaceComposition {
     }
 
     /// A composition over the given primary profiles with its copies under
-    /// `isolation_root`, and no registration owner: the Swift oracle's
-    /// Runtime, whose engine has no workspace project store.
+    /// `isolation_root` and its patch attempts beside them, as the daemon lays
+    /// both out below its state root, and no registration owner: the Swift
+    /// oracles' Runtime, whose engine has no workspace project store.
     pub fn with_profiles(
         profiles: Vec<WorkspaceProfile>,
         isolation_root: &Path,
@@ -177,14 +233,28 @@ impl WorkspaceComposition {
     ) -> io::Result<Self> {
         let mut primaries: Vec<String> = profiles.iter().map(|p| p.project_ref.clone()).collect();
         primaries.sort();
+        let attempts = isolation_root
+            .parent()
+            .map(|parent| AttemptStore::open(&parent.join(ATTEMPTS_DIRECTORY)))
+            .transpose()?;
         Ok(Self {
             registry: registry(&profiles)?,
             primaries,
             unavailable: None,
+            copies: copies_root(isolation_root),
             isolation: Some(isolation_at(isolation_root)?),
             projects: None,
             now,
+            attempts,
+            tool: Box::new(VerifiedToolDispatch),
+            lane: Mutex::new(()),
         })
+    }
+
+    /// The same composition, its patch steps dispatched through `tool`.
+    pub fn with_tool_dispatch(mut self, tool: Box<dyn WorkspaceToolDispatch>) -> Self {
+        self.tool = tool;
+        self
     }
 
     /// Swift's registered provider's `runtimeAvailability(for:)`: available
@@ -215,6 +285,16 @@ impl WorkspaceComposition {
             ProfileKind::Primary => Some(profile.project_ref),
             ProfileKind::Evolution => profile.source_project_ref,
         }
+    }
+
+    /// The registration a Job's `projectRef` belongs to, as the census of
+    /// active Jobs reads it before a project may change: the provider's own
+    /// mapping, then — for a Runtime-owned copy this Runtime did not adopt,
+    /// whose Jobs may still be uncertain — the source its manifest names. A
+    /// reference neither knows is its own.
+    pub fn census_registration(&self, project_ref: &str) -> Option<String> {
+        self.registration_project_ref(project_ref)
+            .or_else(|| crate::workspace_isolation::manifest_source(&self.copies, project_ref))
     }
 
     /// Swift `acquireWorkspaceProjectInput`: the registration a per-project
@@ -266,6 +346,46 @@ impl WorkspaceComposition {
             })
     }
 
+    /// Swift `WorkspaceOperationsProvider.action`'s shared preamble: the
+    /// profile the request names, the operation available for it, and the
+    /// revision the caller decided against — when it states one — enforced
+    /// over the whole profile scope.
+    fn preamble(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+    ) -> Result<(String, WorkspaceProfile), String> {
+        let project_ref = inputs
+            .get("projectRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input projectRef is missing")?;
+        let profile = self
+            .registry
+            .profile(project_ref)
+            .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?;
+        if let Some(reason) = profile.unavailability(reference, self.isolation.is_some()) {
+            return Err(reason);
+        }
+        if let Some(declared) = inputs
+            .get("expectedWorkspaceRevision")
+            .and_then(Value::as_str)
+        {
+            let actual = support::workspace_revision(
+                &profile.project_root,
+                &profile.profile_id,
+                &profile.allowed_file_globs,
+            )?;
+            if actual != declared {
+                return Err(format!(
+                    "workspace.revisionConflict:{}!={}",
+                    declared.chars().take(12).collect::<String>(),
+                    &actual[..12]
+                ));
+            }
+        }
+        Ok((project_ref.to_owned(), profile))
+    }
+
     /// Swift `WorkspaceOperationsProvider.action` for
     /// `workspace.prepare-isolated-copy@1`: the profile the request names,
     /// its availability, the revision the caller decided against, the
@@ -284,33 +404,8 @@ impl WorkspaceComposition {
                 .and_then(Value::as_str)
                 .ok_or_else(|| format!("workspace input {key} is missing"))
         };
-        let project_ref = text("projectRef")?;
-        let profile = self
-            .registry
-            .profile(project_ref)
-            .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?;
-        if let Some(reason) = profile.unavailability(reference, self.isolation.is_some()) {
-            return Err(reason);
-        }
-        // A caller that states which tree it decided against gets that
-        // statement enforced over the whole profile scope.
-        if let Some(declared) = inputs
-            .get("expectedWorkspaceRevision")
-            .and_then(Value::as_str)
-        {
-            let actual = support::workspace_revision(
-                &profile.project_root,
-                &profile.profile_id,
-                &profile.allowed_file_globs,
-            )?;
-            if actual != declared {
-                return Err(format!(
-                    "workspace.revisionConflict:{}!={}",
-                    declared.chars().take(12).collect::<String>(),
-                    &actual[..12]
-                ));
-            }
-        }
+        let (project_ref, profile) = self.preamble(reference, inputs)?;
+        let project_ref = project_ref.as_str();
         if profile.kind != ProfileKind::Primary || self.isolation.is_none() {
             return Err("workspace.isolationManagerUnavailable".into());
         }
@@ -363,4 +458,308 @@ impl WorkspaceComposition {
             .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?
             .authorization_facts()
     }
+
+    fn attempt_store(&self) -> Result<&AttemptStore, String> {
+        self.attempts
+            .as_ref()
+            .ok_or_else(|| "workspace patch attempt store is unavailable".to_owned())
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.apply-patch@1`: the preamble, then the leased patch read
+    /// again and checked against its lease, its declared paths inside the
+    /// profile's scopes and the request's, the files it touches as they are
+    /// now, and the attempt it becomes for `job_id`. A refusal is the detail
+    /// Swift's provider error describes itself by.
+    pub(crate) fn apply_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+        job_id: &str,
+        leased: Option<&LeasedPatch>,
+    ) -> Result<PatchIntent, String> {
+        let (project_ref, profile) = self.preamble(reference, inputs)?;
+        let Some(leased) = leased else {
+            return Err(
+                "workspace patch Artifact lease was not resolved before materialization".into(),
+            );
+        };
+        let request_globs = string_array(inputs, "allowedFileGlobs")?;
+        let bytes = std::fs::read(&leased.path)
+            .map_err(|_| "workspace patch Artifact bytes do not match their lease".to_owned())?;
+        if bytes.len() as u64 != leased.byte_count
+            || bytes.len() as u64 > patch::MAXIMUM_PATCH_BYTES
+            || support::sha256(&bytes) != leased.sha256
+        {
+            return Err("workspace patch Artifact bytes do not match their lease".into());
+        }
+        let paths = patch::patch_paths(&bytes)?;
+        patch::validate(
+            &paths,
+            &profile.project_root,
+            &profile.allowed_file_globs,
+            &request_globs,
+        )?;
+        let before = patch::snapshots(&paths, &profile.project_root)?;
+        let digest =
+            support::sha256(format!("{job_id}\n{}\n{project_ref}", leased.sha256).as_bytes());
+        let previous = match profile.kind {
+            ProfileKind::Evolution => Some(
+                inputs
+                    .get("expectedWorkspaceRevision")
+                    .and_then(Value::as_str)
+                    .ok_or("workspace input expectedWorkspaceRevision is missing")?
+                    .to_owned(),
+            ),
+            ProfileKind::Primary => None,
+        };
+        let root = profile.project_root.clone();
+        Ok(PatchIntent {
+            invocation: profile
+                .patch_invocation(reference, &["-f", "-p1", "-d", &root, "-i", &leased.path]),
+            patch_attempt_ref: format!("patch-{}", &digest[..32]),
+            patch_artifact_id: leased.artifact_id.clone(),
+            patch_file_path: leased.path.clone(),
+            patch_sha256: leased.sha256.clone(),
+            allowed_file_globs: request_globs,
+            before,
+            previous_workspace_revision: previous,
+        })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.revert-patch@1`: the preamble, then the exact durable
+    /// attempt, still active in this profile, and its durable bytes unchanged.
+    pub(crate) fn revert_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+    ) -> Result<RevertIntent, String> {
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let attempt_ref = inputs
+            .get("patchAttemptRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input patchAttemptRef is missing")?;
+        let attempt = self.attempt_store()?.load(attempt_ref)?;
+        if attempt.project_ref != profile.project_ref
+            || attempt.project_root != profile.project_root
+            || attempt.reverted_at_utc.is_some()
+        {
+            return Err("workspace patch attempt is not active in this ProjectProfile".into());
+        }
+        let unchanged = std::fs::read(&attempt.patch_file_path)
+            .is_ok_and(|bytes| support::sha256(&bytes) == attempt.patch_sha256);
+        if !unchanged {
+            return Err("workspace original patch bytes are unavailable or changed".into());
+        }
+        let root = profile.project_root.clone();
+        let invocation = profile.patch_invocation(
+            reference,
+            &[
+                "-f",
+                "-R",
+                "-p1",
+                "-d",
+                &root,
+                "-i",
+                &attempt.patch_file_path,
+            ],
+        );
+        Ok(RevertIntent {
+            invocation,
+            attempt,
+        })
+    }
+
+    /// The profile a typed patch action names, as Swift's provider routes
+    /// every later call on it.
+    fn acting_profile(&self, action: &PatchAction) -> Result<WorkspaceProfile, String> {
+        let project_ref = &action.invocation().project_ref;
+        self.registry
+            .profile(project_ref)
+            .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))
+    }
+
+    /// Swift `WorkspaceOperationsProvider.lower(action:context:)` for a patch
+    /// action, right before its dispatch: the executable one the profile
+    /// pinned, and the tree exactly as the action found it — the pre-image
+    /// for an apply, the attempt's post-image for a revert.
+    pub(crate) fn lower(&self, action: &PatchAction) -> Result<(), String> {
+        let profile = self.acting_profile(action)?;
+        let invocation = action.invocation();
+        if !profile.owns_executable(&invocation.executable_path, &invocation.executable_sha256) {
+            return Err("workspace provider received a foreign action or executable".into());
+        }
+        match action {
+            PatchAction::Apply(intent) => patch::require(&intent.before, &profile.project_root),
+            PatchAction::Revert(intent) => {
+                patch::require(&intent.attempt.after, &profile.project_root)
+            }
+        }
+    }
+
+    /// Swift `WorkspaceOperationsProvider.verify` for a patch action: the
+    /// exit status, then the declared files read back from disk; an applied
+    /// patch's bytes and attempt made durable, a reverted attempt closed.
+    pub(crate) fn verify(
+        &self,
+        action: &PatchAction,
+        receipt: &ToolReceipt,
+        now: &str,
+    ) -> PatchVerdict {
+        let unknown = |detail: String| PatchVerdict::Unknown(detail);
+        let profile = match self.acting_profile(action) {
+            Ok(profile) => profile,
+            Err(reason) => return unknown(reason),
+        };
+        if receipt.truncated {
+            return PatchVerdict::Failed(
+                "workspace.outputTruncated",
+                "bounded output was truncated; semantic result is incomplete".into(),
+            );
+        }
+        let mut summary: BTreeMap<String, String> = patch::output_summary(receipt)
+            .into_iter()
+            .filter_map(|(key, value)| Some((key, value.as_str()?.to_owned())))
+            .collect();
+        let attempts = match self.attempt_store() {
+            Ok(attempts) => attempts,
+            Err(reason) => return unknown(reason),
+        };
+        match action {
+            PatchAction::Apply(intent) => {
+                if receipt.exit_status != 0 {
+                    return PatchVerdict::Failed(
+                        "workspace.patchFailed",
+                        patch::failed_detail(receipt),
+                    );
+                }
+                let paths: Vec<String> = intent
+                    .before
+                    .iter()
+                    .map(|snapshot| snapshot.relative_path.clone())
+                    .collect();
+                let after = match patch::snapshots(&paths, &profile.project_root) {
+                    Ok(after) => after,
+                    Err(reason) => return unknown(reason),
+                };
+                if after == intent.before {
+                    return PatchVerdict::Failed(
+                        "workspace.patchReadbackFailed",
+                        "patch reported success but no declared file changed".into(),
+                    );
+                }
+                let durable = match attempts.persist_patch(
+                    &intent.patch_attempt_ref,
+                    &intent.patch_file_path,
+                    &intent.patch_sha256,
+                ) {
+                    Ok(durable) => durable,
+                    Err(reason) => return unknown(reason),
+                };
+                let after_revision = match profile.kind {
+                    ProfileKind::Evolution => match support::workspace_revision(
+                        &profile.project_root,
+                        &profile.profile_id,
+                        &profile.allowed_file_globs,
+                    ) {
+                        Ok(revision) => Some(revision),
+                        Err(reason) => return unknown(reason),
+                    },
+                    ProfileKind::Primary => None,
+                };
+                let attempt = PatchAttempt {
+                    patch_attempt_ref: intent.patch_attempt_ref.clone(),
+                    project_ref: profile.project_ref.clone(),
+                    project_root: profile.project_root.clone(),
+                    patch_artifact_id: intent.patch_artifact_id.clone(),
+                    patch_file_path: durable,
+                    patch_sha256: intent.patch_sha256.clone(),
+                    allowed_file_globs: intent.allowed_file_globs.clone(),
+                    before: intent.before.clone(),
+                    after: after.clone(),
+                    workspace_revision_before: intent.previous_workspace_revision.clone(),
+                    workspace_revision_after: after_revision.clone(),
+                    applied_at_utc: now.into(),
+                    reverted_at_utc: None,
+                };
+                if let Err(reason) = attempts.save(&attempt) {
+                    return unknown(reason);
+                }
+                summary.insert("patchAttemptRef".into(), intent.patch_attempt_ref.clone());
+                summary.insert(
+                    "workspaceRevision".into(),
+                    after_revision.unwrap_or_else(|| patch::revision(&after)),
+                );
+                summary.insert(
+                    "previousWorkspaceRevision".into(),
+                    intent
+                        .previous_workspace_revision
+                        .clone()
+                        .unwrap_or_else(|| patch::revision(&intent.before)),
+                );
+                summary.insert(
+                    "touchedFiles".into(),
+                    after
+                        .iter()
+                        .map(|snapshot: &FileSnapshot| snapshot.relative_path.as_str())
+                        .collect::<Vec<_>>()
+                        .join(","),
+                );
+                PatchVerdict::Verified(summary)
+            }
+            PatchAction::Revert(intent) => {
+                if receipt.exit_status != 0 {
+                    return PatchVerdict::Failed(
+                        "workspace.revertFailed",
+                        patch::failed_detail(receipt),
+                    );
+                }
+                if let Err(error) = patch::require(&intent.attempt.before, &profile.project_root) {
+                    return PatchVerdict::Failed(
+                        "workspace.revertReadbackFailed",
+                        format!("workspace did not return to the exact original revision: {error}"),
+                    );
+                }
+                if let Err(reason) = attempts.save(&intent.attempt.marking_reverted(now)) {
+                    return unknown(reason);
+                }
+                summary.insert(
+                    "patchAttemptRef".into(),
+                    intent.attempt.patch_attempt_ref.clone(),
+                );
+                summary.insert(
+                    "workspaceRevision".into(),
+                    intent
+                        .attempt
+                        .workspace_revision_before
+                        .clone()
+                        .unwrap_or_else(|| patch::revision(&intent.attempt.before)),
+                );
+                PatchVerdict::Verified(summary)
+            }
+        }
+    }
+
+    /// The durable patch lineage of one Runtime-owned copy, or why it cannot
+    /// vouch.
+    pub(crate) fn patch_lineage(&self, project_ref: &str) -> Result<Vec<PatchAttempt>, String> {
+        self.attempt_store()?.attempts_for(project_ref)
+    }
+}
+
+/// Swift `stringArray(_:in:)`.
+fn string_array(inputs: &Map<String, Value>, key: &str) -> Result<Vec<String>, String> {
+    let Some(values) = inputs.get(key).and_then(Value::as_array) else {
+        return Err(format!("workspace input {key} is missing"));
+    };
+    values
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .ok_or_else(|| format!("workspace input {key} contains a non-string"))
+        })
+        .collect()
 }

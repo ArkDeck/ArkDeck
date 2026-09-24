@@ -93,9 +93,12 @@ impl JobStore {
     /// Refuses when an active or uncertain workspace Job references
     /// `project_ref`. A Runtime-owned isolated copy is named by its derived
     /// reference, but its registration belongs to the project it was copied
-    /// from: `registration` is the provider's own mapping, the one admission
-    /// acquired under, and a reference it does not map is compared literally
-    /// (Swift `resolveRegistrationProjectRef`).
+    /// from: `registration` maps a copy to that project — through the
+    /// provider's own profiles and, for a copy this Runtime could not adopt
+    /// (a patched tree its lineage no longer vouches for, a Job parked on
+    /// it), through the copy's manifest — so a copy's uncertain Job keeps its
+    /// source from changing. Only a reference nothing maps is compared
+    /// literally (Swift `resolveRegistrationProjectRef`).
     pub fn require_no_active_workspace_project_reference(
         &self,
         project_ref: &str,

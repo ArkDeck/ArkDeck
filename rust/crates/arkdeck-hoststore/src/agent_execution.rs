@@ -271,7 +271,7 @@ pub(crate) fn base64(bytes: &[u8]) -> String {
     text
 }
 
-fn unbase64(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn unbase64(text: &str) -> Option<Vec<u8>> {
     let bytes = text.as_bytes();
     if !bytes.len().is_multiple_of(4) {
         return None;

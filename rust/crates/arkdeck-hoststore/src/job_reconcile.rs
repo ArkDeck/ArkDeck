@@ -25,6 +25,14 @@
 //! resident, as Swift's engine keeps it in memory, while the record file
 //! keeps its last durable state.
 //!
+//! A workspace patch Job (`workspace.apply-patch@1`, `workspace.revert-patch@1`)
+//! is reconciled as Swift's engine reconciles it: its patch lease resolved
+//! again and its persisted typed action materialized, then — the workspace
+//! provider having no dedicated readback for a mutation — the decision that
+//! the outcome is still unknown, journaled; the Job stays
+//! `waitingForRecovery`, its use unknown, and nothing is read from the tree or
+//! resent.
+//!
 //! A terminal Job is not resident in Swift: a writer's confirmed refusal of
 //! an unbound source starts its Session publication again, and otherwise
 //! the capability outcome a crash lost is repaired from the journal's proof
@@ -67,6 +75,11 @@ mod device;
 const ANALYZER: &str = "analyzer.extract-crash-signature@1";
 const HAP: &str = "debug.hap@1";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
+const APPLY: &str = "workspace.apply-patch@1";
+const REVERT: &str = "workspace.revert-patch@1";
+/// Swift's engine answers a workspace mutation's reconcile from its provider's
+/// dedicated readback, which the workspace provider does not have.
+const NO_READBACK: &str = "mutation has no dedicated readback; original not resent";
 /// Swift's Manifest proposal beside a Job's record.
 const PROPOSAL: &str = "session-manifest.proposal.json";
 
@@ -428,6 +441,7 @@ pub struct JobReconciler<'a> {
 /// HAP, whose own lineage repair is not ported.
 fn reconciled(operation: &str, state: &str) -> bool {
     operation == ANALYZER
+        || [APPLY, REVERT].contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
 }
 
@@ -469,6 +483,17 @@ impl JobReconciler<'_> {
                 record.job_id
             ))
         };
+        // A workspace mutation's reconcile reads its own records only; it
+        // needs no device facts, only the store its use is settled in.
+        if [APPLY, REVERT].contains(&operation) {
+            if lineage::runtime_capability(record) && self.capabilities.is_none() {
+                return Ok(refusal(
+                    "settles a runtime capability use, and this owner holds no capability store"
+                        .into(),
+                ));
+            }
+            return Ok(None);
+        }
         if self.hdc.is_none() {
             return Ok(refusal(format!(
                 "runs {operation}, and this owner holds no HDC composition to reconcile it"
@@ -882,6 +907,18 @@ impl JobReconciler<'_> {
                 Decision::NotExecuted
             }
         });
+        if descriptor.binding() == "none" && [APPLY, REVERT].contains(&operation.as_str()) {
+            // A workspace mutation: its input lease resolved again and its
+            // persisted typed action materialized, then — as Swift's engine
+            // has no dedicated readback for it — the intent stays unknown.
+            // Nothing is read from the tree and nothing is resent.
+            self.resolve_source(&held.run.record)?;
+            crate::workspace_patch::PatchAction::materialize(&action)
+                .map_err(|detail| unsupported(&detail))?;
+            exact(&events)?;
+            let decision = durable.unwrap_or_else(|| Decision::Unknown(NO_READBACK.into()));
+            return self.finish(held, &events, &intent, &step, &attempt, decision, None);
+        }
         if descriptor.binding() == "none" {
             // A host-only reconcile inspects only its Job-owned input: no
             // device facts are resolved.
@@ -939,6 +976,7 @@ impl JobReconciler<'_> {
             ANALYZER => "sourceArtifactRef",
             HAP => "hapArtifactLease",
             NATIVE => "libraryArtifactLease",
+            APPLY => "patchArtifactRef",
             _ => return Ok(None),
         };
         let Some(lease) = record.request["inputs"][input].as_str() else {

@@ -478,6 +478,8 @@ impl WorkspaceProfile {
     pub(crate) fn unavailability(&self, reference: &str, isolation: bool) -> Option<String> {
         let has_preset = match reference {
             "workspace.prepare-isolated-copy@1" => isolation && self.kind == ProfileKind::Primary,
+            // Every profile carries its patch preset.
+            "workspace.apply-patch@1" | "workspace.revert-patch@1" => true,
             _ => return Some("workspace.unsupportedOperation".into()),
         };
         if !has_preset {
@@ -491,6 +493,37 @@ impl WorkspaceProfile {
             }
         }
         None
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over the patch preset:
+    /// the preset's fixed arguments, then `arguments`, run by the executable
+    /// the profile pinned.
+    pub(crate) fn patch_invocation(
+        &self,
+        operation: &str,
+        arguments: &[&str],
+    ) -> crate::workspace_patch::Invocation {
+        let mut argv = self.patch.fixed_arguments.clone();
+        argv.extend(arguments.iter().map(|&argument| argument.to_owned()));
+        crate::workspace_patch::Invocation {
+            operation: operation.into(),
+            project_ref: self.project_ref.clone(),
+            project_root: self.project_root.clone(),
+            preset_id: self.patch.preset_id.clone(),
+            executable_path: self.patch.executable.path.clone(),
+            executable_sha256: self.patch.executable.sha256.clone(),
+            argument_zero: self.patch.argument_zero.clone(),
+            arguments: argv,
+            timeout_seconds: self.patch.timeout_seconds,
+        }
+    }
+
+    /// Swift `profile.executableIdentities.contains(invocation.executable)`:
+    /// whether an invocation's executable is one this profile pinned.
+    pub(crate) fn owns_executable(&self, path: &str, sha256: &str) -> bool {
+        self.executable_identities()
+            .iter()
+            .any(|identity| identity.path == path && identity.sha256 == sha256)
     }
 
     /// Swift `workspaceAuthorizationFacts`: which tree this is, what it holds

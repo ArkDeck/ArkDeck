@@ -184,11 +184,13 @@ pub(crate) enum IssueFailure {
     Unreadable,
 }
 
-/// Swift `automaticRuntimeCapability` for an ordinary device mutation under a
-/// standing capability policy. The Target binding's lineage is checked across
-/// every capability first. The answer is then the first generation of the
-/// policy's identity that is not spent, or that is spent but was revoked.
-/// That generation is installed when it does not exist yet.
+/// Swift `automaticRuntimeCapability` for an ordinary mutation under a
+/// standing capability policy: a device's, or a Runtime-owned workspace
+/// copy's. The Target binding's lineage is checked across every capability
+/// first (a workspace use names no binding, so none blocks it there). The
+/// answer is then the first generation of the policy's identity that is not
+/// spent, or that is spent but was revoked. That generation is installed when
+/// it does not exist yet.
 pub(crate) fn issue(
     store: &CapabilityStore,
     descriptor: &CatalogOperation,
@@ -229,9 +231,21 @@ pub(crate) fn issue(
             }
             return Ok(capability_id);
         }
+        // The envelope is scoped to whatever the plan addresses: a workspace
+        // plan names its tree, its revision now and its writable scopes, and
+        // no device.
+        let target_scope = match &query.workspace_identity_sha256 {
+            Some(workspace) => json!({
+                "kind": "workspaceIdentity", "sha256": workspace,
+                "expectedWorkspaceRevision": query.workspace_revision.as_deref().unwrap_or(""),
+                "allowedFileScopesDigest":
+                    query.workspace_file_scopes_digest.as_deref().unwrap_or(""),
+            }),
+            None => json!({"kind": "stablePhysicalIdentity", "sha256": identity}),
+        };
         let mut envelope = json!({
             "capabilityID": capability_id,
-            "targetScope": {"kind": "stablePhysicalIdentity", "sha256": identity},
+            "targetScope": target_scope,
             "operationScope": [operation_scope(descriptor)],
             "effectCeiling": query.effect.raw(),
             "inputConstraints": constraints(&query.inputs),

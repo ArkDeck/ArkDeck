@@ -19,9 +19,24 @@
 //! admission, the profile is gone), Swift's run escapes and leaves the Job
 //! `running` for a later run to retry; this Runtime resumes no host Job from
 //! `running`, so the refusal fails the Job instead, with zero dispatch.
+//!
+//! `workspace.apply-patch@1` and `workspace.revert-patch@1` run one process
+//! each, as Swift's `runOwned` runs them: the patch lease resolved again for
+//! an apply, the typed action materialized for this Job, lowered against the
+//! tree as it is now, the Job's capability use consumed and made durable,
+//! the exact action persisted before the write-ahead intent, and only then
+//! the pinned tool started; its receipt and the declared files read back
+//! decide the correlated outcome, and the product is published after it. A
+//! child whose outcome cannot be observed, or whose effect cannot be read
+//! back, leaves its intent outstanding and parks the Job: a patch is never
+//! run twice. The use is then settled with the Job's state.
 use super::*;
-use crate::workspace_composition::WorkspaceComposition;
+use crate::capability_store::UseOutcome;
+use crate::mutation_execution::MutationConsumption;
+use crate::operation_catalog::CatalogOperation;
+use crate::workspace_composition::{LeasedPatch, PatchVerdict, WorkspaceComposition};
 use crate::workspace_isolation::{Inspection, IsolationIntent, IsolationResult};
+use crate::workspace_patch::{PatchAction, ToolFailure, ToolInvocation};
 use std::collections::BTreeMap;
 
 pub(crate) const WORKSPACE_OPERATION: &str = "workspace.prepare-isolated-copy@1";
@@ -29,6 +44,42 @@ const WORKSPACE_STEP: &str = "prepare-isolated-copy";
 const WORKSPACE_STEP_KIND: &str = "prepareWorkspaceIsolation";
 const WORKSPACE_INTENT: &str = "intent-prepare-isolated-copy";
 const PRODUCT: &str = "isolated-workspace.json";
+pub(crate) const APPLY: &str = "workspace.apply-patch@1";
+pub(crate) const REVERT: &str = "workspace.revert-patch@1";
+
+/// Whether a Job of this operation runs through the workspace composition.
+pub(crate) fn runs(operation: &str) -> bool {
+    [WORKSPACE_OPERATION, APPLY, REVERT].contains(&operation)
+}
+
+/// One patch step's catalog identity and its product.
+struct PatchStep {
+    operation: &'static str,
+    step: &'static str,
+    kind: &'static str,
+    product: &'static str,
+    retention: &'static str,
+}
+
+fn patch_step(operation: &str) -> Option<PatchStep> {
+    match operation {
+        APPLY => Some(PatchStep {
+            operation: APPLY,
+            step: "apply-patch",
+            kind: "applyWorkspacePatch",
+            product: "applied-patch.json",
+            retention: "pinnedUntilVerified",
+        }),
+        REVERT => Some(PatchStep {
+            operation: REVERT,
+            step: "revert-patch",
+            kind: "revertWorkspacePatch",
+            product: "revert-report.json",
+            retention: "default",
+        }),
+        _ => None,
+    }
+}
 
 /// Swift's interpolation of a `[String]`.
 fn swift_keys(summary: &BTreeMap<String, String>) -> String {
@@ -197,10 +248,7 @@ impl JobRunner<'_> {
         run.persist(self.jobs)
     }
 
-    /// Swift `publishDeclaredArtifacts` for `isolated-workspace.json`, whose
-    /// bytes are the default envelope: the product, its operation, Job and
-    /// catalog, and the verified facts. A failure is recorded and returned
-    /// as the reason the Job fails with.
+    /// Swift `publishDeclaredArtifacts` for `isolated-workspace.json`.
     fn publish_isolation(
         &self,
         run: &mut Run,
@@ -208,11 +256,32 @@ impl JobRunner<'_> {
         summary: &BTreeMap<String, String>,
         window: Option<(String, String)>,
     ) -> Result<(), String> {
+        let product = WorkspaceProduct {
+            name: PRODUCT,
+            operation: WORKSPACE_OPERATION,
+            step: WORKSPACE_STEP,
+            retention: "pinnedUntilVerified",
+        };
+        self.publish_workspace_product(run, &product, target, summary, window)
+    }
+
+    /// Swift `publishDeclaredArtifacts` for a workspace product, whose bytes
+    /// are the default envelope: the product, its operation, Job and catalog,
+    /// and the verified facts. A failure is recorded and returned as the
+    /// reason the Job fails with.
+    fn publish_workspace_product(
+        &self,
+        run: &mut Run,
+        declared: &WorkspaceProduct,
+        target: &str,
+        summary: &BTreeMap<String, String>,
+        window: Option<(String, String)>,
+    ) -> Result<(), String> {
         let job_id = run.record.job_id.clone();
         let session_id = format!("session-{job_id}");
         let mut fields = Map::from_iter([
-            ("artifact".to_owned(), json!(PRODUCT)),
-            ("operation".to_owned(), json!(WORKSPACE_OPERATION)),
+            ("artifact".to_owned(), json!(declared.name)),
+            ("operation".to_owned(), json!(declared.operation)),
             ("jobId".to_owned(), json!(job_id)),
             (
                 "catalogDigest".to_owned(),
@@ -244,12 +313,12 @@ impl JobRunner<'_> {
         let product = Product {
             job_id: &job_id,
             session_id: &session_id,
-            step_id: WORKSPACE_STEP,
-            name: PRODUCT,
+            step_id: declared.step,
+            name: declared.name,
             media_type: "application/json",
             privacy: "standard",
-            retention_class: "pinnedUntilVerified",
-            source_operation: WORKSPACE_OPERATION,
+            retention_class: declared.retention,
+            source_operation: declared.operation,
             provider_id: "workspace",
             binding,
             observation_window: window,
@@ -266,7 +335,8 @@ impl JobRunner<'_> {
         match published {
             Ok(metadata) => {
                 run.record.timeline.push(format!(
-                    "artifact {PRODUCT} -> {}",
+                    "artifact {} -> {}",
+                    declared.name,
                     metadata["artifactID"].as_str().unwrap_or_default()
                 ));
                 Ok(())
@@ -274,9 +344,10 @@ impl JobRunner<'_> {
             Err(error) => {
                 // A publication failure is recorded, never swallowed.
                 let _ = publisher.record_missing(&product, &error);
+                let name = declared.name;
                 run.record
                     .timeline
-                    .push(format!("artifact {PRODUCT} missing: {error}"));
+                    .push(format!("artifact {name} missing: {error}"));
                 run.record.set_operation_failure(Some(failure(
                     "artifactPublicationFailed",
                     "storage",
@@ -284,7 +355,7 @@ impl JobRunner<'_> {
                     "inspectJob",
                 )));
                 Err(format!(
-                    "artifact publication failed: {PRODUCT} could not be published: {error}"
+                    "artifact publication failed: {name} could not be published: {error}"
                 ))
             }
         }
@@ -307,5 +378,283 @@ impl JobRunner<'_> {
         )));
         run.finish()?;
         run.persist(self.jobs)
+    }
+}
+
+/// A workspace operation's declared product.
+struct WorkspaceProduct {
+    name: &'static str,
+    operation: &'static str,
+    step: &'static str,
+    retention: &'static str,
+}
+
+impl JobRunner<'_> {
+    /// Swift `runOwned` for one patch step, then `recordCapabilityOutcome`
+    /// for the use it ran under: unknown while the Job is parked, confirmed
+    /// with the Job's state otherwise.
+    pub(super) fn execute_workspace_patch(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        self.patch_steps(run, workspace)?;
+        let outcome = if run.record.state == "waitingForRecovery" {
+            UseOutcome::OutcomeUnknown
+        } else {
+            UseOutcome::Confirmed
+        };
+        self.settle_mutation(run, outcome)
+    }
+
+    /// Swift `resolvedInputArtifact` for an admitted apply, before its step:
+    /// the lease resolved again and still bound to the request's target. The
+    /// refusal is the reason the Job fails with.
+    fn patch_lease(&self, run: &Run) -> Result<LeasedPatch, String> {
+        let Some(reference) = run.record.request["inputs"]["patchArtifactRef"].as_str() else {
+            return Err("workspace patch Artifact lease is absent".into());
+        };
+        let resolved = match crate::job_owner::import_references::ImportReference::parse(reference)
+        {
+            Ok(Some(reference)) => self
+                .imports
+                .ok_or_else(|| "Import owner is unavailable".to_owned())
+                .and_then(|owner| {
+                    owner
+                        .resolve_input(self.artifacts, &reference)
+                        .map_err(|error| error.message)
+                }),
+            Ok(None) => self.artifacts.lease(reference),
+            Err(error) => Err(error.message),
+        };
+        let leased = resolved.map_err(|error| {
+            format!("input Artifact lease became unreadable before apply-patch: {error}")
+        })?;
+        if let Some(reason) = binding_refusal(&leased, &run.record) {
+            return Err(reason);
+        }
+        let (Some(path), Some(sha256), Some(byte_count)) = (
+            leased.path.to_str(),
+            leased.row["sha256"].as_str(),
+            leased.row["byteCount"].as_u64(),
+        ) else {
+            return Err("input Artifact lease became unreadable before apply-patch".into());
+        };
+        Ok(LeasedPatch {
+            artifact_id: leased.artifact_id.clone(),
+            path: path.to_owned(),
+            sha256: sha256.to_owned(),
+            byte_count,
+        })
+    }
+
+    /// Swift `executeAdmittedSteps` for one patch Job: its one step, run in
+    /// the host target's mutation lane.
+    fn patch_steps(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        let operation = run.record.operation().to_owned();
+        let (Some(declared), Some(descriptor)) = (
+            patch_step(&operation),
+            operation
+                .rsplit_once('@')
+                .and_then(|(id, version)| CatalogOperation::lookup(id, version.parse().ok())),
+        ) else {
+            return Err(uncertain());
+        };
+        let started = run.clock()?;
+        run.record.start(&started);
+        run.transition("preflight", "running", "steps-start")?;
+        // Swift's mutation lane for the Job's target, held through its last
+        // step: a patch that waited for another one sees the tree it left.
+        let Ok(_lane) = workspace.lane.lock() else {
+            return self.fail(run, "workspace mutation lane is unavailable");
+        };
+        // Swift's safe boundary before the step.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        let job_id = run.record.job_id.clone();
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        // The engine resolves an apply's lease again before its step; one
+        // that no longer resolves fails the Job before any intent.
+        let leased = if operation == APPLY {
+            match self.patch_lease(run) {
+                Ok(leased) => Some(leased),
+                Err(reason) => return self.fail(run, &reason),
+            }
+        } else {
+            None
+        };
+        // The provider context's clock, which an applied attempt records.
+        let now = run.clock()?;
+        let action = match leased.as_ref() {
+            Some(leased) => workspace
+                .apply_action(APPLY, &inputs, &job_id, Some(leased))
+                .map(PatchAction::Apply),
+            None => workspace
+                .revert_action(REVERT, &inputs)
+                .map(PatchAction::Revert),
+        };
+        // A provider refusal before any intent fails the Job: the tree moved
+        // since admission, or the attempt is no longer active.
+        let action = match action {
+            Ok(action) => action,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        if let Err(detail) = workspace.lower(&action) {
+            return self.fail(run, &detail);
+        }
+        match self.consume_workspace_authority(run, descriptor, workspace, leased.as_ref()) {
+            Ok(MutationConsumption::Consumed | MutationConsumption::Held) => {}
+            Ok(MutationConsumption::Cancelled) => {
+                self.carry(run)?;
+                return self.close_cancelled(run, false);
+            }
+            Ok(MutationConsumption::PersistenceUncertain) => return Err(uncertain()),
+            Err(reason) => return self.fail(run, &reason),
+        }
+        // Swift `dispatchWithWAL`'s last boundary before an intent.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, false);
+        }
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let arguments = match &action {
+            PatchAction::Apply(intent) => intent.journal_arguments(),
+            PatchAction::Revert(_) => json!({
+                "projectRef": inputs.get("projectRef"),
+                "patchAttemptRef": inputs.get("patchAttemptRef"),
+            }),
+        };
+        let step = json!({
+            "id": declared.step, "kind": declared.kind, "effect": "deviceMutation",
+            "bindingRequirement": "none", "cancellation": "atSafeBoundary",
+            "compensationDescriptors": [], "arguments": arguments,
+        });
+        let intent_id = format!("intent-{}", declared.step);
+        let event = events::step_intent(
+            &run.envelope(intent_id.clone())?,
+            &step,
+            &Target {
+                scope: "host".into(),
+                target_id: target.clone(),
+                connect_key: None,
+                identity_snapshot_hash: None,
+            },
+            1,
+            None,
+        )
+        .map_err(|_| uncertain())?;
+        // The exact typed action is durable before its intent can be.
+        let persisted = action.persisted().map_err(|_| uncertain())?;
+        run.record
+            .set_recovery(Some(declared.step), Some(&intent_id), Some(persisted));
+        run.persist(self.jobs)?;
+        if run.append(event).is_err() {
+            run.record.set_recovery(None, None, None);
+            let _ = run.persist(self.jobs);
+            return Err(uncertain());
+        }
+        run.record
+            .timeline
+            .push(format!("intent {}", declared.step));
+        run.record.add_step_kind(declared.kind);
+        // Only now may the tool start.
+        let invocation = action.invocation();
+        let opened = (self.precise_now)();
+        let dispatched = match opened {
+            Some(_) => workspace.tool.dispatch(&ToolInvocation {
+                executable_path: &invocation.executable_path,
+                executable_sha256: &invocation.executable_sha256,
+                arguments: &invocation.arguments,
+                working_directory: &invocation.project_root,
+                timeout_seconds: invocation.timeout_seconds,
+            }),
+            None => Err(ToolFailure::Failed(
+                "dispatch refused: the Runtime clock is unavailable".into(),
+            )),
+        };
+        let window = opened.zip((self.precise_now)());
+        let receipt = match dispatched {
+            Ok(receipt) => receipt,
+            Err(ToolFailure::OutcomeUnknown(reason)) => {
+                // The intent stays outstanding: no outcome is invented, and
+                // the patch is never started again.
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {}; durable intent left outstanding",
+                    declared.step
+                ));
+                return self.park(run, &reason);
+            }
+            Err(ToolFailure::Failed(reason)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "failed", None, &at)?;
+                run.record
+                    .timeline
+                    .push(format!("failed {}", declared.step));
+                run.record.set_recovery(None, None, None);
+                return self.fail(run, &reason);
+            }
+        };
+        match workspace.verify(&action, &receipt, &now) {
+            PatchVerdict::Verified(summary) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "succeeded", None, &at)?;
+                run.record.timeline.push(format!(
+                    "verified {} {}",
+                    declared.step,
+                    swift_keys(&summary)
+                ));
+                run.record.set_recovery(None, None, None);
+                let product = WorkspaceProduct {
+                    name: declared.product,
+                    operation: declared.operation,
+                    step: declared.step,
+                    retention: declared.retention,
+                };
+                if let Err(reason) =
+                    self.publish_workspace_product(run, &product, &target, &summary, window)
+                {
+                    return self.close(run, &reason);
+                }
+                if self.cancellation.is_some_and(RunCancellation::pending) {
+                    self.carry(run)?;
+                    return self.drain(run);
+                }
+                run.transition("running", "finalizing", "steps-complete")?;
+                run.record.set_operation_failure(None);
+                run.transition("finalizing", "succeeded", "finalized")?;
+                run.finish()?;
+                run.persist(self.jobs)
+            }
+            PatchVerdict::Failed(code, detail) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "failed", None, &at)?;
+                run.record.set_recovery(None, None, None);
+                run.record
+                    .timeline
+                    .push(format!("failed {}: {code}: {detail}", declared.step));
+                self.fail(run, &format!("{code}: {detail}"))
+            }
+            // The child ran but what it left cannot be read back: the intent
+            // stays outstanding for a readback, never for a second run.
+            PatchVerdict::Unknown(reason) => {
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {}; durable intent left outstanding",
+                    declared.step
+                ));
+                self.park(run, &reason)
+            }
+        }
     }
 }

@@ -18,9 +18,9 @@
 //! byte order of their names, so when several would be refused the first in
 //! that order is named; a link is read once, so the target that was admitted
 //! is the one recreated; the manifest is written owner-only and read without
-//! following a link; the patch lineage that vouches for a patched copy is not
-//! read (this Runtime patches nothing), so a copy whose tree moved from its
-//! base revision is not adopted.
+//! following a link. A copy whose tree moved from its base revision is
+//! adopted only where the durable patch lineage (`workspace_patch.rs`)
+//! derives exactly the revision it measures.
 use crate::workspace_composition::{Isolation, WorkspaceComposition};
 use crate::workspace_profile::ProfileKind;
 use crate::workspace_support::{
@@ -635,6 +635,27 @@ impl Isolation {
     }
 }
 
+/// The source project a Runtime-owned copy's manifest names for the copy
+/// `project_ref`, read from disk whether or not the copy was adopted: a copy
+/// that cannot be vouched for is still a copy of that project.
+pub(crate) fn manifest_source(copies: &str, project_ref: &str) -> Option<String> {
+    let mut names: Vec<String> = fs::read_dir(copies)
+        .ok()?
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .take(4_097)
+        .collect();
+    if names.len() > 4_096 {
+        return None;
+    }
+    names.sort();
+    names.into_iter().find_map(|name| {
+        let stored = read_manifest(&format!("{copies}/{name}/{MANIFEST}"))?;
+        let record = stored.workspace;
+        (record.htask_id.starts_with("runtime-") && record.project_ref == project_ref)
+            .then_some(record.source_project_ref)
+    })
+}
+
 impl WorkspaceComposition {
     /// Swift `EvolutionWorkspaceManager.prepare(_:)`: the copy the intent
     /// describes, made or found, then read back as a separate inspection.
@@ -919,10 +940,23 @@ impl WorkspaceComposition {
                 let revision =
                     support::workspace_revision(&workspace_root, &source.profile_id, allowed_paths)
                         .map_err(|_| "profile")?;
-                // The base vouches for an unpatched tree. The patch lineage
-                // that vouches for a patched one is not read here.
+                // The base vouches for an unpatched tree; the durable patch
+                // lineage vouches for every revision it derives from that
+                // base. Anything else — a lineage the store cannot read
+                // included — keeps the named refusal.
                 if revision != record.base_revision {
-                    return Err("revision");
+                    let derived =
+                        self.patch_lineage(&record.project_ref)
+                            .ok()
+                            .and_then(|attempts| {
+                                crate::workspace_patch::lineage_derived_revision(
+                                    &record.base_revision,
+                                    &attempts,
+                                )
+                            });
+                    if derived.as_deref() != Some(revision.as_str()) {
+                        return Err("revision");
+                    }
                 }
                 if allowed_paths_digest(allowed_paths) != record.allowed_paths_digest {
                     return Err("scopes");
