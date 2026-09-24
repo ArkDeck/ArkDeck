@@ -48,6 +48,10 @@ pub struct TargetStore {
     path: PathBuf,
     root: HostDirectory,
     live: std::sync::Mutex<LiveCandidates>,
+    /// Swift's engine `mutationLane`: each Target's device mutation lane,
+    /// which every run, finalization and cleanup retry through a composition
+    /// over this owner shares (`device_lane.rs`).
+    lanes: crate::device_lane::DeviceMutationLanes,
 }
 /// Swift `routeObservationFreshnessSeconds`.
 const ROUTE_OBSERVATION_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(5);
@@ -246,6 +250,7 @@ impl TargetStore {
             path: path.to_owned(),
             root: HostDirectory::open(path)?,
             live: std::sync::Mutex::new(None),
+            lanes: Default::default(),
         };
         owner
             .transaction("targetDisplayNameOwner", |targets, names| {
@@ -570,6 +575,62 @@ impl TargetStore {
         .map_err(|error| error.message)?;
         route
     }
+
+    /// The key of the mutation lane a request naming `target_id` runs in:
+    /// its Target, or the canonical Target a proven post-Flash alias was
+    /// merged into (`TargetDocument::mutation_lane_target`). Swift keys its
+    /// lane by the name alone, so a canonical Target and its alias — one
+    /// device — would not wait for each other there.
+    pub fn mutation_lane_key(&self, target_id: &str) -> Result<String, String> {
+        if !target_identifier(target_id) {
+            return Err("the request names no Target".into());
+        }
+        let mut key = Err("the Target document could not be read".to_owned());
+        self.transaction("", |document, _| {
+            key = document.mutation_lane_target(target_id);
+            Ok((Value::Null, false))
+        })
+        .map_err(|error| error.message)?;
+        key
+    }
+
+    /// Swift `DeviceMutationLaneCoordinator.withMutationLane`'s acquisition
+    /// for `holder` in the lane of the Target `target_id` names: at once, or
+    /// once every earlier request has let go of it, the guard holding it
+    /// until dropped. `abandon`, asked while the request waits, ends the
+    /// wait without the lane (`None`). The refusal says why no lane was
+    /// held or awaited: no Target, an unreadable Target document, or a
+    /// holder that already holds or awaits one.
+    ///
+    /// Lock order: the lane's key is read in a Target transaction of its
+    /// own, which has ended — both Target locks let go of — before the wait
+    /// begins, so no Target lock is ever held while a lane is awaited, and no
+    /// transaction's closure calls this. A holder takes Target transactions
+    /// inside its lane: the lane first, the transactions after.
+    pub fn enter_mutation_lane(
+        &self,
+        target_id: &str,
+        holder: &str,
+        abandon: Option<&dyn Fn() -> bool>,
+    ) -> Result<Option<crate::MutationLane<'_>>, String> {
+        let key = self.mutation_lane_key(target_id)?;
+        self.lanes
+            .enter(&key, holder, abandon)
+            .map_err(|refusal| refusal.to_string())
+    }
+
+    /// Where `holder` stands in the mutation lane `key`
+    /// ([`Self::mutation_lane_key`]): holding it, waiting for it, or neither.
+    /// Only memory is read.
+    pub fn mutation_lane_state(&self, key: &str, holder: &str) -> Option<crate::LaneState> {
+        self.lanes.state(key, holder)
+    }
+
+    /// Who waits for the mutation lane `key`, first in line first. Only
+    /// memory is read.
+    pub fn mutation_lane_queue(&self, key: &str) -> Vec<String> {
+        self.lanes.queue(key)
+    }
     pub fn handle(
         &self,
         method: &str,
@@ -812,6 +873,47 @@ mod tests {
         root
     }
     const CANONICAL: &str = "TGT-8b3d0a34cf32";
+    /// The alias the post-Flash resolution merged into [`CANONICAL`].
+    const ALIAS: &str = "TGT-815c2c2e87c5";
+    /// A Job naming a post-Flash alias waits in its canonical Target's lane:
+    /// one device, whichever name a request uses (Swift keys by the name).
+    #[test]
+    fn a_proven_alias_shares_its_canonical_targets_mutation_lane() {
+        let root = alias_root();
+        let owner = root.open();
+        assert_eq!(owner.mutation_lane_key(ALIAS).as_deref(), Ok(CANONICAL));
+        assert_eq!(owner.mutation_lane_key(CANONICAL).as_deref(), Ok(CANONICAL));
+        // A Target nobody adopted names its own lane.
+        assert_eq!(
+            owner.mutation_lane_key("TGT-000000000000").as_deref(),
+            Ok("TGT-000000000000")
+        );
+        assert!(owner.mutation_lane_key("").is_err());
+        let held = owner
+            .enter_mutation_lane(CANONICAL, "job-canonical", None)
+            .unwrap()
+            .unwrap();
+        std::thread::scope(|scope| {
+            let waiter = scope.spawn(|| {
+                owner
+                    .enter_mutation_lane(ALIAS, "job-alias", None)
+                    .map(|lane| lane.map(|lane| lane.key().to_owned()))
+            });
+            let started = std::time::Instant::now();
+            while owner.mutation_lane_state(CANONICAL, "job-alias")
+                != Some(crate::LaneState::Queued)
+            {
+                assert!(
+                    started.elapsed() < std::time::Duration::from_secs(60),
+                    "the alias's Job never waited for the canonical Target's lane"
+                );
+                std::thread::yield_now();
+            }
+            assert_eq!(owner.mutation_lane_queue(CANONICAL), ["job-alias"]);
+            drop(held);
+            assert_eq!(waiter.join().unwrap(), Ok(Some(CANONICAL.to_owned())));
+        });
+    }
     fn candidate(key: &str, state: &str) -> arkdeck_provider_hdc::DeviceCandidate {
         arkdeck_provider_hdc::DeviceCandidate {
             connect_key: key.into(),

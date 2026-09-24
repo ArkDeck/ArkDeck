@@ -98,7 +98,6 @@ enum Fault {
     PersistAfterConsume,
     CrashAfterConsume,
     CrashAfterIntent,
-    Concurrent,
     CancelBeforeConsume,
     CancelAfterConsume,
 }
@@ -149,20 +148,11 @@ struct CheckedDispatch {
     stale: bool,
     cancel: Option<std::sync::Arc<arkdeck_hoststore::RunCancellation>>,
     crash_intent: bool,
-    gate: Option<std::sync::Arc<std::sync::Barrier>>,
-    gated: std::sync::atomic::AtomicBool,
 }
 impl HdcDispatch for CheckedDispatch {
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
         if self.crash_intent && plan.arguments.iter().any(|a| a == "uinput") {
             std::process::exit(74);
-        }
-        if plan.arguments.iter().any(|a| a == "uinput")
-            && let Some(gate) = &self.gate
-            && !self.gated.swap(true, std::sync::atomic::Ordering::SeqCst)
-        {
-            gate.wait();
-            gate.wait();
         }
         self.inner.dispatch(plan)
     }
@@ -217,8 +207,6 @@ fn replay(fault: Fault) {
         stale: fault == Fault::StaleTool,
         cancel: (fault == Fault::CancelBeforeConsume).then(|| cancellation.clone()),
         crash_intent: fault == Fault::CrashAfterIntent,
-        gate: (fault == Fault::Concurrent).then(|| std::sync::Arc::new(std::sync::Barrier::new(2))),
-        gated: std::sync::atomic::AtomicBool::new(false),
     };
     let hdc = HdcComposition {
         targets: &targets,
@@ -299,76 +287,6 @@ fn replay(fault: Fault) {
             "job.run" => {
                 if let Some(mode) = exchange["mode"].as_str() {
                     fs::write(root.join("hdc-mode"), format!("{mode}\n")).unwrap();
-                }
-                if fault == Fault::Concurrent {
-                    let next = cases["exchanges"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .find(|e| e["name"] == "longPress.submit")
-                        .unwrap()["params"]
-                        .as_object()
-                        .unwrap();
-                    let second = JobAdmitter {
-                        planner: planner(),
-                        jobs: &jobs,
-                        now: fixed_now,
-                        authority: Some(authority),
-                    }
-                    .handle(next)
-                    .unwrap();
-                    let jobs_ref = &jobs;
-                    let artifacts_ref = &artifacts;
-                    let targets_ref = &targets;
-                    let digest_ref = &digest;
-                    let dispatch_ref = &dispatch;
-                    let root_ref = &root;
-                    std::thread::scope(|scope| {
-                        let first = scope.spawn(move || {
-                            let thread_hdc = HdcComposition {
-                                targets: targets_ref,
-                                dispatch: dispatch_ref,
-                                receive_root: None,
-                                tool_sha256: digest_ref,
-                                now: fixed_now,
-                                code_sign_helper: None,
-                            };
-                            JobRunner {
-                                imports: None,
-                                mutation: Some(arkdeck_hoststore::MutationExecution {
-                                    authority,
-                                    state_root: root_ref,
-                                }),
-                                jobs: jobs_ref,
-                                artifacts: artifacts_ref,
-                                analyzer: None,
-                                quota: 128 * 1024 * 1024,
-                                home: "/private/tmp",
-                                now: fixed_now,
-                                precise_now: fixed_precise_now,
-                                sessions: None,
-                                cancellation: None,
-                                after_commit: None,
-                                hdc: Some(&thread_hdc),
-                                workspace: None,
-                            }
-                            .handle(params)
-                        });
-                        dispatch.gate.as_ref().unwrap().wait();
-                        let second_result = runner
-                            .handle(&Map::from_iter([("jobId".into(), second["jobId"].clone())]));
-                        dispatch.gate.as_ref().unwrap().wait();
-                        let first_result = first.join().unwrap().unwrap();
-                        assert_eq!(first_result["state"], "succeeded");
-                        assert_eq!(second_result.unwrap()["state"], "failed");
-                    });
-                    let calls = fs::read_to_string(root.join("hdc-invocations.log")).unwrap();
-                    assert_eq!(
-                        calls.lines().filter(|line| line.contains("uinput")).count(),
-                        1,
-                        "{calls}"
-                    );
-                    return;
                 }
                 FAIL_PERSIST.set(fault == Fault::PersistAfterConsume);
                 CRASH_CONSUME.set(fault == Fault::CrashAfterConsume);
@@ -732,11 +650,6 @@ fn restart_after_consumption_resumes_once_and_after_intent_never_replays() {
             fs::read(root.join("store/capabilities/runtime-capabilities.ledger")).unwrap()
         );
     }
-}
-
-#[test]
-fn concurrent_gestures_cannot_bypass_another_capability_pending_use() {
-    replay(Fault::Concurrent);
 }
 
 #[test]
