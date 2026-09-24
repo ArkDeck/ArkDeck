@@ -1,0 +1,11 @@
+{
+  "applicationSupportRoot" : "/private/tmp/arkdeck-flash-host-facts-oracle",
+  "hdcRoot" : "/private/tmp/arkdeck-hdc-oracle",
+  "nowUTC" : "2026-09-25T00:00:00Z",
+  "owners" : [
+    "ProductRockchipBootloaderStatusObserver",
+    "TargetStoreRockchipRuntimeFactsPort"
+  ],
+  "producer" : "FlashHostFactsOracleContractTests",
+  "stateDirectory" : "/private/tmp/arkdeck-flash-host-facts-oracle/state"
+}

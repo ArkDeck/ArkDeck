@@ -1,0 +1,3 @@
+#!/bin/sh
+# arkforged stand-in; never run.
+exit 0
