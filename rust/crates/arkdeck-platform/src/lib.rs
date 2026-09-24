@@ -158,9 +158,9 @@ mod host_store;
 pub use host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
     HostDirectory, HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource,
-    HostJournal, HostJournalAppender, HostReadLock, HostUploadFile, JournalAppendError,
-    JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, PreparedSessionRemoval,
-    PreparedTraceRemoval, UploadChunkCheckpoint, UploadWritePoint,
+    HostJournal, HostJournalAppender, HostReadLock, HostUploadFile, HostUploadReader,
+    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+    PreparedSessionRemoval, PreparedTraceRemoval, UploadChunkCheckpoint, UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]
@@ -177,6 +177,11 @@ pub use host_text::{host_canonical_text, host_control_character, host_whitespace
 mod host_url_properties;
 #[cfg(target_os = "macos")]
 pub use host_url_properties::{EntryPresentation, host_entry_presentation};
+
+#[cfg(target_os = "macos")]
+mod host_inflate;
+#[cfg(target_os = "macos")]
+pub use host_inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 
 #[cfg(target_os = "macos")]
 mod host_calendar;

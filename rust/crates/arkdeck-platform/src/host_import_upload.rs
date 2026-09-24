@@ -90,6 +90,19 @@ fn range_digest(file: &File, offset: u64, count: u64) -> io::Result<String> {
     Ok(format!("{:x}", hash.finalize()))
 }
 
+/// [`HostUploadFile::validator_reader`].
+pub struct HostUploadReader<'a> {
+    file: &'a File,
+    offset: u64,
+}
+impl Read for HostUploadReader<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let count = self.file.read_at(buffer, self.offset)?;
+        self.offset += count as u64;
+        Ok(count)
+    }
+}
+
 pub struct HostUploadFile {
     directory: HostDirectory,
     name: String,
@@ -201,6 +214,16 @@ impl HostUploadFile {
             return Err(fail());
         }
         Ok(bytes)
+    }
+
+    /// Sequential validator input from the retained staging inode, read by
+    /// offset so no file position moves. As for every validator, the caller
+    /// compares the inode's identity before and after reading.
+    pub fn validator_reader(&self) -> HostUploadReader<'_> {
+        HostUploadReader {
+            file: &self.file,
+            offset: 0,
+        }
     }
 
     /// Stream exact validated bytes to an exclusive, sealed Artifact inode.

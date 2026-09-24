@@ -329,6 +329,8 @@ mod rockchip_startup;
 #[cfg(target_os = "macos")]
 pub use rockchip_startup::{RockchipStartup, reconcile_rockchip_startup};
 #[cfg(target_os = "macos")]
+mod flash_archive;
+#[cfg(target_os = "macos")]
 mod flash_facts;
 #[cfg(target_os = "macos")]
 pub use flash_facts::{
