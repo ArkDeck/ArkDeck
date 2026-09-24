@@ -1187,6 +1187,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 - Byte-equal fixtures; zero-drift export from Rust; Swift CLI deleted; GJ-1..5 headless with the Rust CLI. Must complete before TASK-XPA-017 (r3). Size: L.
 - r11: lane C, continuous — the remaining leaves are ported against the isolated Rust daemon as its methods land; the dashboard row `CLI leaves on Rust` in `evidence/macos-remaining.md` is the progress record; envelope/page/nextAction samples are T0, human-readable text T2. The retirement lands with M5 (see TASK-XPA-017's proposed ruling on design §L.1 item 7).
+- LaunchAgent leaves (2026-09-24, first of two PRs): `runtime service status`, `verify --job` and `restart` answer as Swift's `LaunchAgentService`/`runAgentDaemon` do, over launchd primitives in `arkdeck-platform` (fixed argument arrays, one fixed executable; a relocated home never reaches the account's launchd domain). `verify` without `--job` is refused by name; `install`, `update` and `uninstall`, with the §G.4 cutover preflight and the old-state snapshot, follow in the second PR. Host evidence only: temporary homes, recording launchd, a fake Runtime on the installed socket and the Swift-recorded `observe.device@1` Job; nothing installed, loaded or restarted, no device. See `evidence/runs/TASK-XPA-018/runtime-service-cli-run.md`. Status unchanged.
 
 ## TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows
 

@@ -446,6 +446,85 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
     }
 }
 
+/// The Rust CLI built beside this daemon.
+fn cli(arguments: &[&str]) -> Output {
+    Command::new(Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck"))
+        .args(arguments)
+        .env_remove("ARKDECK_ENDPOINT")
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn the_deep_doctor_reports_the_production_owners_as_they_are() {
+    let _turn = turn();
+    let home = Home::new();
+    let daemon = Daemon::start(&mut production(&home)).serving(&home);
+    let socket = home.socket();
+    let socket = socket.to_str().unwrap();
+    let output = cli(&["doctor", "--deep", "--output", "json", "--socket", socket]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["ok"], true, "{envelope}");
+    let report = &envelope["result"];
+    arkdeck_contract::validate_method_value("doctor", "result", report).unwrap();
+    assert_eq!(report["mode"], "deep");
+    // No HDC is composed here (none is registered), so the deep report says
+    // so rather than claiming a live identity: a blocker, never
+    // `hdc.identityReady`.
+    assert_eq!(
+        report["checks"]["hdc"],
+        json!({"checked": true, "configured": false, "availability": "unavailable",
+            "ownership": "unknown", "serverHealth": "unknown", "reasonCode": "hdc.notConfigured"})
+    );
+    let codes: Vec<&str> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|finding| finding["code"].as_str().unwrap())
+        .collect();
+    assert!(codes.contains(&"hdc.notConfigured"), "{codes:?}");
+    assert!(!codes.contains(&"hdc.identityReady"), "{codes:?}");
+    assert_eq!(report["ready"], false);
+    // Every deep leg read the production owners below the home.
+    let artifacts = &report["checks"]["storage"]["runtimeArtifacts"];
+    assert_eq!(artifacts["checked"], true);
+    assert_eq!(artifacts["configured"], true);
+    assert!(artifacts["totalBytes"].is_u64(), "{artifacts}");
+    assert_eq!(artifacts["usedBytes"], 0);
+    assert_eq!(
+        report["checks"]["recovery"],
+        json!({"checked": true, "outstandingCleanupCount": 0})
+    );
+    assert_eq!(report["checks"]["target"]["configured"], true);
+    assert_eq!(report["checks"]["target"]["adoptedTargetCount"], 0);
+    assert!(codes.contains(&"storage.artifactStoreReady"), "{codes:?}");
+    assert!(codes.contains(&"recovery.noCleanupDebt"), "{codes:?}");
+    assert!(
+        !codes.contains(&"runtime.durableRecordsUnreadable"),
+        "{codes:?}"
+    );
+    // The CLI's gate: a deep report with a blocker is not healthy.
+    let output = cli(&[
+        "doctor",
+        "--deep",
+        "--require-healthy",
+        "--output",
+        "json",
+        "--socket",
+        socket,
+    ]);
+    assert_eq!(output.status.code(), Some(69));
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(envelope["error"]["code"], "healthRequirementFailed");
+    assert!(daemon.stop().success());
+}
+
 #[test]
 fn the_trace_cache_the_app_created_is_composed_where_it_is() {
     let _turn = turn();

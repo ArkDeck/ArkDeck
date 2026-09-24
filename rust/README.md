@@ -390,7 +390,8 @@ and digest functions. It also compiles in the shared Job-state preflight table
 `classify_restart`, `runtime service restart`'s carry-over of current Jobs as
 Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs` decides it (replayed on that
 oracle), and `cutover_preflight`, the M5 preflight over a state root's Jobs, agent
-executions and capability uses. Neither has a caller yet. `arkdeck-control` has transport-free observation and local-resource handlers.
+executions and capability uses. The Rust CLI's `runtime service restart` calls
+the first; the second has no caller yet. `arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
 boundary and holds the HDC typed actions of the device operations, which the
@@ -2287,6 +2288,41 @@ the Artifact sweep run as they do for the isolated owner; then it prints
 daemon in this mode under temporary homes only (environment cleared,
 `CFFIXED_USER_HOME` below `/private/tmp`, so no Mach service is registered);
 see [the run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-017/production-composition-run.md).
+Its deep `doctor` answers from these owners as they are: over a composition
+without an HDC the HDC check is the `hdc.notConfigured` blocker, never a live
+identity it cannot prove, and `doctor --deep --require-healthy` exits 69.
+
+## LaunchAgent service leaves (TASK-XPA-018)
+
+`arkdeck runtime service status|verify --job <id>|restart` manage the one
+user-domain LaunchAgent `com.arkdeck.agentd` in `gui/<uid>` as Swift's
+`LaunchAgentService` and `RuntimeCLI.runAgentDaemon` do
+(`arkdeck-cli/src/runtime_service.rs`). `status` validates the plist (read by
+CoreFoundation, `arkdeck_platform::read_property_list`), the installed helper
+bundle (`validate_production_daemon_bundle`), a signed sibling facade when the
+bundle carries one, the daemon and HDC digests against the install receipt, the
+ArkForge release bundle (its manifest members re-measured) and the ArkTrace
+descriptor (one `openat(O_NOFOLLOW)` walk), then asks launchd whether the
+service is loaded and the daemon for `health`. `verify --job` reopens one
+profiled Job (`observe.device@1`, `flash.full-restore@1`) through `health`,
+`job.status`, `job.evidence` and `artifact.list` only. `restart` refuses unless
+the service is ready and every current Job is a closed unknown-outcome recovery
+lane (`classify_restart`), boots it out and back in (EIO retried, `enable` once
+after three), and proves a new PID speaking the same catalog digest with the same
+closed Jobs. The documents are Swift's; a refusal is a stderr line and Swift's
+exit status with an empty stdout.
+
+launchd is reached only through `arkdeck_platform::launchd`: fixed argument
+arrays (`print`, `bootout`, `bootstrap`, `enable`) run by one fixed executable,
+`/bin/launchctl`, never a shell. A home relocated with `CFFIXED_USER_HOME` never
+drives the account's launchd domain: its launchd calls go only to the absolute
+executable `ARKDECK_LAUNCHCTL_FOR_RELOCATED_HOME` names (never `/bin/launchctl`),
+and without one they are refused before anything runs; that variable is refused
+for the account's own home. Tests use injected runners or that relocated-home
+executable, so no test reaches the account's service. `verify` without `--job`
+(a fresh run through Swift's client-side executor) and `install`, `update` and
+`uninstall` are not served yet
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cli-run.md)).
 
 ## macOS owner lifecycle soak
 

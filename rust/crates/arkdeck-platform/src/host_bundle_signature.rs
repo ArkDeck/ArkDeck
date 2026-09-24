@@ -17,6 +17,10 @@ pub const DAEMON_EXECUTABLE_NAME: &str = "arkdeck-agentd";
 pub const DAEMON_APPLICATION_IDENTIFIER: &str = "8AQTYW5FKR.com.arkdeck.agentd";
 pub const DAEMON_KEYCHAIN_ACCESS_GROUP: &str = "8AQTYW5FKR.com.arkdeck.shared";
 pub const DAEMON_CODE_REQUIREMENT: &str = "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.agentd\"";
+/// The signed sibling facade Swift's `transportExecutable(in:)` accepts.
+pub const FACADE_CODE_REQUIREMENT: &str = "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.agentd.facade\"";
+// kSecCSStrictValidate alone, as Swift checks the facade.
+const FACADE_VALIDATION_FLAGS: u32 = 1 << 4;
 const MAX_INFO_BYTES: usize = 1024 * 1024;
 const MAX_PATH_BYTES: usize = 16_384;
 const MAX_KEYCHAIN_GROUPS: isize = 1024;
@@ -409,10 +413,72 @@ pub fn validate_production_daemon_bundle(candidate: &Path) -> io::Result<PathBuf
     Ok(canonical)
 }
 
+/// Swift `transportExecutable(in:)`'s signature check of a helper bundle's
+/// sibling facade: its static code must strictly validate against
+/// [`FACADE_CODE_REQUIREMENT`]. Nothing is executed.
+pub fn validate_facade_signature(executable: &Path) -> io::Result<()> {
+    let bytes = executable.as_os_str().as_bytes();
+    if !executable.is_absolute() || bytes.len() > MAX_PATH_BYTES || bytes.contains(&0) {
+        return Err(refused("facade path must be bounded and absolute"));
+    }
+    // SAFETY: the path bytes and literals are live for each call, and every
+    // nonnull create-rule result is owned by an `Owned`.
+    unsafe {
+        let url = Owned::new(CFURLCreateFromFileSystemRepresentation(
+            ptr::null(),
+            bytes.as_ptr(),
+            bytes.len() as isize,
+            0,
+        ))?;
+        let mut raw = ptr::null();
+        let status = SecStaticCodeCreateWithPath(url.0, 0, &mut raw);
+        let code = Owned::new(raw).map_err(|_| refused("facade signature is unreadable"))?;
+        if status != 0 {
+            return Err(refused("facade signature is unreadable"));
+        }
+        let requirement_text = string(FACADE_CODE_REQUIREMENT)?;
+        let mut raw = ptr::null();
+        let status = SecRequirementCreateWithString(requirement_text.0, 0, &mut raw);
+        let requirement = Owned::new(raw)?;
+        if status != 0 {
+            return Err(refused("facade requirement is invalid"));
+        }
+        if SecStaticCodeCheckValidity(code.0, FACADE_VALIDATION_FLAGS, requirement.0) != 0 {
+            return Err(refused("facade signature does not match ArkDeck"));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::{fs, os::unix::fs::PermissionsExt};
+
+    #[test]
+    fn an_unsigned_facade_is_refused_without_running_it() {
+        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "arkdeck-facade-signature-{:032x}",
+            u128::from_ne_bytes(crate::random_bytes::<16>().unwrap())
+        ));
+        fs::create_dir(&root).unwrap();
+        let marker = root.join("ran");
+        let facade = root.join("arkdeck-facade");
+        fs::write(
+            &facade,
+            format!("#!/bin/sh\ntouch '{}'\n", marker.display()).as_bytes(),
+        )
+        .unwrap();
+        fs::set_permissions(&facade, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(validate_facade_signature(&facade).is_err());
+        assert!(validate_facade_signature(Path::new("relative/arkdeck-facade")).is_err());
+        // An Apple-signed binary is validly signed, but not by ArkDeck.
+        let error = validate_facade_signature(Path::new("/bin/ls")).unwrap_err();
+        assert!(error.to_string().contains("does not match"), "{error}");
+        assert!(!marker.exists());
+        fs::remove_dir_all(&root).unwrap();
+    }
+
     struct Bundle(PathBuf);
     impl Bundle {
         fn new() -> Self {
