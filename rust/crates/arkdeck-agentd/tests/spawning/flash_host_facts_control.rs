@@ -302,6 +302,7 @@ fn published(method: &str, answer: &Value) -> Value {
 
 #[test]
 fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
+    let _turn = crate::turn();
     let fixtures = fixtures();
     let cases: Value =
         serde_json::from_slice(&fs::read(fixtures.join("cases.json")).unwrap()).unwrap();
@@ -388,6 +389,7 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
 
 #[test]
 fn a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers() {
+    let _turn = crate::turn();
     let control = Control::new(crate::host::Host::from_environment()).unwrap();
     for (method, params, message) in [
         (
@@ -426,6 +428,7 @@ fn a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers() {
 
 #[test]
 fn members_swift_ignores_change_neither_the_reads_nor_the_answers() {
+    let _turn = crate::turn();
     let fixtures = fixtures();
     let hdc = Hdc::install(&fixtures);
     let root = Root::new();

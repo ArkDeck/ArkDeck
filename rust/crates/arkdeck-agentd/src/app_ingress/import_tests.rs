@@ -1,42 +1,21 @@
-//! Real Import, Target, Artifact, storage, Trace cache and Debug owners behind
-//! the App boundary, with a synthetic kernel-origin peer. No signed XPC peer,
-//! device or installed Runtime is represented, and no HDC server is started.
+//! Real Import, Target, Artifact and Job owners behind the App boundary, with
+//! a synthetic kernel-origin peer. No signed XPC peer, device or installed
+//! Runtime is represented, and no HDC server is started. The reads, Trace
+//! maintenance and Debug probe over the production owners, whose probe runs a
+//! fake HDC, are `tests/spawning`'s (see `app_ingress_fake_hdc.rs` there).
 use super::*;
 use arkdeck_contract::{WireError, encode_import_chunk, sha256_hex};
 use arkdeck_hoststore::{
-    ArtifactReadStore, ArtifactUsage, ImportUploadFault, ImportUploadStore, JobStore, SessionStore,
-    TargetStore, TraceCacheStore,
+    ArtifactReadStore, ImportUploadFault, ImportUploadStore, JobStore, TargetStore,
 };
 use std::{
     collections::BTreeMap,
-    os::unix::fs::PermissionsExt,
     sync::{Arc, Mutex},
 };
 
 /// A ZIP-headed HAP, the content the Import owner's HAP validator accepts.
 const HAP: &[u8] = b"PK\x03\x04app-owned upload through the App ingress";
-/// The adopted Target of the checked-in Import fixture.
-const TARGET: &str = "TGT-dddddddddddd";
 
-fn directory(path: &Path) {
-    fs::DirBuilder::new().mode(0o700).create(path).unwrap();
-}
-/// The isolated root's Target, Artifact and Job directories, the Target
-/// adopted at revision 1 with a direct HDC route.
-fn uploads() -> Root {
-    let root = Root::new();
-    for name in ["targets", "artifacts", "jobs"] {
-        directory(&root.0.join(name));
-    }
-    let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/import-target-current/direct");
-    for name in ["targets.json", "target-display-names.json"] {
-        let path = root.0.join("targets").join(name);
-        fs::copy(source.join(name), &path).unwrap();
-        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
-    }
-    root
-}
 type Reached = Arc<Mutex<Vec<ImportUploadFault>>>;
 /// The production Host's Import, Target, Artifact and Job owners over `root`. Every
 /// write step the Import owner reaches is recorded; `fail` loses that step's
@@ -108,12 +87,6 @@ fn tree(path: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
         }
     }
     entries
-}
-fn refusal(bytes: &[u8], method: &str) -> WireError {
-    decode_response(bytes.trim_ascii_end(), "request-1", method)
-        .unwrap()
-        .outcome
-        .unwrap_err()
 }
 
 #[test]
@@ -541,121 +514,4 @@ fn every_admitted_request_reaches_its_one_owner_exactly_once() {
         assert_eq!(calls[index], ((*method).to_owned(), expected));
     }
     assert_eq!(ingress.dispatches.load(Ordering::Relaxed), requests.len());
-}
-
-#[test]
-fn app_reads_and_trace_maintenance_answer_from_the_production_owners() {
-    let root = uploads();
-    for name in ["state", "sessions", "trace-cache"] {
-        directory(&root.0.join(name));
-    }
-    directory(&root.0.join("trace-cache/traces"));
-    // An inert local HDC that logs what it runs and answers only the probe's
-    // three fixed reads of the fixture Target's route.
-    let script = r#"#!/bin/sh
-printf '%s\n' "$*" >> 'ROOT/hdc-calls'
-case "$*" in
-'-t display-name-device shell bm dump -a') printf 'com.example.z\ncom.example.a\n';;
-'-t display-name-device fport ls') printf 'tcp:9000 tcp:8000\n';;
-'-t display-name-device rport ls') printf '[Fail] offline\n' >&2;;
-*) exit 93;;
-esac
-"#
-    .replace("ROOT", root.0.to_str().unwrap());
-    fs::write(root.0.join("hdc"), &script).unwrap();
-    fs::set_permissions(root.0.join("hdc"), fs::Permissions::from_mode(0o700)).unwrap();
-    let artifacts = root.0.join("artifacts");
-    let control = Arc::new(
-        Control::new(
-            crate::host::Host::from_environment()
-                .with_targets(TargetStore::open(&root.0.join("targets")).unwrap())
-                .with_artifacts(ArtifactReadStore::open(&artifacts).unwrap())
-                .with_jobs(JobStore::open_owner(&root.0.join("jobs")).unwrap())
-                .with_trace_cache(
-                    TraceCacheStore::open(&root.0.join("trace-cache/traces")).unwrap(),
-                )
-                .with_storage(
-                    SessionStore::open(&root.0.join("state"), &root.0.join("sessions")).unwrap(),
-                    ArtifactUsage::open(&artifacts, 1024 * 1024).unwrap(),
-                )
-                .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(
-                    arkdeck_platform::VerifiedTool::open(
-                        root.0.join("hdc"),
-                        &sha256_hex(script.as_bytes()),
-                    )
-                    .unwrap(),
-                    None,
-                ))),
-        )
-        .unwrap(),
-    );
-    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
-    // Reads answer exactly as the local socket's Control answers them.
-    for method in ["artifact.quota", "trace.cache.status"] {
-        let request = frame(method, json!({}));
-        let reply = ingress.handle(&request, root.peer());
-        assert_eq!(reply, control.handle_frame(&request), "{method}");
-        result(&reply, method);
-    }
-    let quota = result(
-        &ingress.handle(&frame("artifact.quota", json!({})), root.peer()),
-        "artifact.quota",
-    );
-    assert_eq!(quota["totalBytes"], 1024 * 1024);
-    let purged = result(
-        &ingress.handle(&frame("trace.cache.purge", json!({})), root.peer()),
-        "trace.cache.purge",
-    );
-    assert_eq!(purged["removedEntryCount"], 0);
-    // The owner's root replaced under it: its purge outcome is unknown, and
-    // that answer crosses once, unchanged, without touching the replacement.
-    fs::rename(
-        root.0.join("trace-cache/traces"),
-        root.0.join("trace-cache/moved"),
-    )
-    .unwrap();
-    directory(&root.0.join("trace-cache/traces"));
-    let error = refusal(
-        &ingress.handle(&frame("trace.cache.purge", json!({})), root.peer()),
-        "trace.cache.purge",
-    );
-    assert_eq!(error.code, "outcomeUnknown");
-    assert_eq!(error.details.unwrap()["phase"], "traceCacheOwner");
-    assert_eq!(
-        fs::read_dir(root.0.join("trace-cache/traces"))
-            .unwrap()
-            .count(),
-        0
-    );
-    let probe = result(
-        &ingress.handle(
-            &frame("debug.probe", json!({"targetId":TARGET})),
-            root.peer(),
-        ),
-        "debug.probe",
-    );
-    assert_eq!(
-        (&probe["targetId"], &probe["bindingRevision"]),
-        (&json!(TARGET), &json!(1))
-    );
-    assert_eq!(probe["packages"], json!(["com.example.a", "com.example.z"]));
-    assert_eq!(
-        probe["portRules"],
-        json!([{"direction":"forward","localPort":9000,"remotePort":8000}])
-    );
-    let mut calls: Vec<_> = fs::read_to_string(root.0.join("hdc-calls"))
-        .unwrap()
-        .lines()
-        .map(str::to_owned)
-        .collect();
-    calls.sort();
-    assert_eq!(
-        calls,
-        [
-            "-t display-name-device fport ls",
-            "-t display-name-device rport ls",
-            "-t display-name-device shell bm dump -a",
-        ]
-    );
-    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 6);
 }

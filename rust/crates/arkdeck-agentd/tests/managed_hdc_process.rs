@@ -21,7 +21,19 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
+
+/// One test at a time. Each takes loopback ports in this process, for its
+/// daemon's managed server (`free_port`) or to listen on (`issued_listener`),
+/// while another test spawns compilers, daemons and fake `hdc`s: a child
+/// spawned while this process is still making a socket keeps it, bound and
+/// listening once it is, for the child's whole life, so a port released here
+/// could still be held.
+static TURN: Mutex<()> = Mutex::new(());
+fn turn() -> MutexGuard<'static, ()> {
+    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
 const TARGET: &str = "TGT-3ba3f5f43b92";
@@ -433,6 +445,7 @@ fn frame(method: &str, params: Value) -> Vec<u8> {
 
 #[test]
 fn unexpected_foreground_exit_ends_the_daemon_and_a_successor_rebuilds_the_provider() {
+    let _turn = turn();
     use arkdeck_platform::{LoopbackServerLease, VerifiedTool};
     let mut runtime = Runtime::new();
     runtime.start();
@@ -480,6 +493,7 @@ fn unexpected_foreground_exit_ends_the_daemon_and_a_successor_rebuilds_the_provi
 
 #[test]
 fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon() {
+    let _turn = turn();
     let mut runtime = Runtime::new();
     let digest = sha256_hex(&fs::read(runtime.hdc()).unwrap());
     runtime.start();
@@ -619,6 +633,7 @@ fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon(
 
 #[test]
 fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
+    let _turn = turn();
     let mut runtime = Runtime::new();
     // Another process's listener on the selected endpoint, held from the
     // moment its port is found: no managed server is launched beside it,
@@ -654,6 +669,7 @@ fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
 /// serves with a server of its own and its stop leaves nothing behind.
 #[test]
 fn an_external_restart_leaves_a_server_every_start_refuses_until_it_ends() {
+    let _turn = turn();
     let mut runtime = Runtime::new();
     runtime.start();
     let tool = runtime.tool();
@@ -692,6 +708,7 @@ fn an_external_restart_leaves_a_server_every_start_refuses_until_it_ends() {
 /// serves with a server of its own.
 #[test]
 fn a_killed_daemon_leaves_its_server_and_every_start_refuses_it_until_it_ends() {
+    let _turn = turn();
     let mut runtime = Runtime::new();
     runtime.start();
     let tool = runtime.tool();
@@ -714,6 +731,7 @@ fn a_killed_daemon_leaves_its_server_and_every_start_refuses_it_until_it_ends() 
 
 #[test]
 fn a_managed_server_is_configured_only_as_the_isolated_owner_names_it() {
+    let _turn = turn();
     let runtime = Runtime::new();
     for (environment, message) in [
         (
@@ -759,6 +777,7 @@ fn a_managed_server_is_configured_only_as_the_isolated_owner_names_it() {
 
 #[test]
 fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_named() {
+    let _turn = turn();
     // The acknowledgment (maintainer decision 2026-09-19, option A) lets the
     // isolated owner read a relation file beside a registered HDC it starts
     // as its managed server. The fake is no registered HDC, so every
@@ -848,6 +867,7 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
 
 #[test]
 fn the_development_mutation_authority_is_acknowledged_only_as_named() {
+    let _turn = turn();
     // The acknowledgment (maintainer decision 2026-09-20, as option A of
     // 2026-09-19) lets the isolated owner prove a device mutation's state
     // continuity against its own root. Every composition it does not name
@@ -906,6 +926,7 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
 
 #[test]
 fn the_development_code_sign_helper_is_named_only_where_it_may_be() {
+    let _turn = turn();
     // The helper a native deployment stages is the one this bundle carries;
     // an isolated development root may name another, and every composition
     // that may not, or names one that does not verify, fails startup.

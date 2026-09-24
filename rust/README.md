@@ -31,6 +31,16 @@ present for that step alone (`scripts/ci/arkforge-cargo-fetch.sh`).
 `python scripts/check-arkforge-pin.py --run-vectors` checks that the two pins
 agree and reruns ArkForge's own wire and StepPermit vectors at that revision.
 
+`arkdeck-agentd` is a binary; its unit tests (declared by `src/main.rs`) run in
+parallel and start no child process. macOS has no `SOCK_CLOEXEC`, so a child
+that `std::process::Command` spawns while another test is still making a socket
+keeps it, bound and listening once it is, for as long as the child lives: a
+released port or dropped listener stays held. A test whose path starts a child
+— a compiler, a fake `hdc` run directly or through the daemon's HDC dispatch —
+belongs in `tests/spawning`, which compiles the daemon's modules from their
+sources and runs one test at a time (`turn()`), as do the integration tests
+that listen or take a lock in their own process while spawning.
+
 Clippy and the workspace tests are the only checks that compile this checkout.
 `generate-contract.py --check` regenerates the manifest and bindings from the
 checkout and requires no difference; `check-contracts.py` builds its own
@@ -1487,8 +1497,8 @@ The snapshot, the generations and the receipts live in memory, as in Swift.
 `tests/target_adoption.rs` replays Swift's `TargetAdoptionOracleContractTests`
 (`rust/tests/fixtures/target-adoption`) byte for byte: its answers, the fake's
 calls, `targets.json` and the display names. `target_observation_control.rs`, in
-agentd, replays the same fixture through `Control` with the daemon's own host, on
-the host's clock, so every time there reads as `<time>`.
+agentd's `tests/spawning`, replays the same fixture through `Control` with the
+daemon's own host, on the host's clock, so every time there reads as `<time>`.
 
 `rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
 checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract
@@ -1932,7 +1942,7 @@ probe. A help read that cannot complete is `probeFailed`, a parameter read
 it as `trace.probe` beside the Debug reads, and the standalone App ingress
 admits it with `targetId` alone. `tests/trace_probe.rs` covers the adapter on
 the registered resources and the reads over scripted dispatch;
-`arkdeck-agentd`'s `trace_probe_control` replays the Swift oracle
+`arkdeck-agentd`'s `tests/spawning/trace_probe_control.rs` replays the Swift oracle
 (`tests/fixtures/trace-probe`, recorded by `TraceProbeOracleContractTests`,
 re-recorded with `ARKDECK_RUST_TRACE_PROBE_RECORD=/private/tmp/<new>`) through
 the production Host, answer by answer and call by call.

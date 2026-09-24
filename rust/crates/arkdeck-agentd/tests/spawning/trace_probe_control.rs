@@ -152,6 +152,7 @@ fn published(answer: &Value) -> Value {
 
 #[test]
 fn trace_probe_replays_the_swift_oracle_through_production_host() {
+    let _turn = crate::turn();
     let oracle = Oracle::install();
     let control = oracle.control();
     let cases: Value =
@@ -184,6 +185,7 @@ fn trace_probe_replays_the_swift_oracle_through_production_host() {
 /// `targetId` reaches the device.
 #[test]
 fn only_the_adopted_route_reaches_the_device() {
+    let _turn = crate::turn();
     let oracle = Oracle::install();
     let control = oracle.control();
     let cases: Value =

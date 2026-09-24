@@ -27,7 +27,18 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
+
+/// One test at a time. Each takes a loopback port in this process for its
+/// daemon's managed server (`free_port`) while the other spawns a compiler,
+/// a daemon and a fake `hdc`: a child spawned while this process is still
+/// making a socket keeps it, bound and listening once it is, for the child's
+/// whole life, so a port released here could still be held.
+static TURN: Mutex<()> = Mutex::new(());
+fn turn() -> MutexGuard<'static, ()> {
+    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
 const INTENT_REQUIRED: &str = "an exact restart intent and request identity are required";
@@ -260,6 +271,7 @@ fn refused(answer: &Value, code: &str, message: &str) {
 
 #[test]
 fn the_managed_server_previews_into_durable_actions_that_the_reads_page() {
+    let _turn = turn();
     let mut runtime = Runtime::new(false);
     runtime.start();
     let endpoint = format!("127.0.0.1:{}", runtime.port);
@@ -438,6 +450,7 @@ fn the_managed_server_previews_into_durable_actions_that_the_reads_page() {
 
 #[test]
 fn a_restart_of_a_server_the_runtime_cannot_prove_requests_no_approval() {
+    let _turn = turn();
     let mut runtime = Runtime::new(true);
     runtime.start();
     let endpoint = format!("127.0.0.1:{}", runtime.port);

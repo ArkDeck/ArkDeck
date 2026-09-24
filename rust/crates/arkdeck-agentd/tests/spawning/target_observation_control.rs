@@ -314,6 +314,7 @@ fn replay_oracle(
 
 #[test]
 fn the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_layer() {
+    let _turn = crate::turn();
     let _lock = exclusive();
     let fixture = fixture();
     let root = rebuild(&fixture);
@@ -431,6 +432,7 @@ fn census_listing(relations: &[UsbRelation]) -> Vec<UsbHostDevice> {
 /// relations Swift's coordinator was given.
 #[test]
 fn the_registry_reader_adopts_the_swift_fake_device_as_the_oracle_s_relations_do() {
+    let _turn = crate::turn();
     let _lock = exclusive();
     let fixture = fixture();
     let root = rebuild(&fixture);
@@ -460,6 +462,7 @@ type Census = (Vec<UsbHostDevice>, u64, Option<u64>);
 /// listed unchanged throughout is adopted.
 #[test]
 fn an_uncertain_registry_fails_closed_through_the_control_layer() {
+    let _turn = crate::turn();
     let _lock = exclusive();
     let root = rebuild(&fixture());
     fs::write(root.join("hdc-mode"), "normal\n").unwrap();
