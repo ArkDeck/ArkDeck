@@ -1,5 +1,4 @@
-import ArkDeckRuntime
-import ArkDeckStorage
+import ArkDeckClientKit
 import Darwin
 import XCTest
 
@@ -162,11 +161,10 @@ final class DiagnosticsContractTests: XCTestCase {
       level: .error, category: .workflow, eventName: .jobFailed,
       correlationID: DiagnosticCorrelationID(),
       fields: [.code: .publicCode(.fixtureFailure)])
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let destination = base.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
       destination: destination,
-      logs: DiagnosticsFixtures.redactedLogFiles(store.snapshot()), session: session)
+      logs: DiagnosticsFixtures.redactedLogFiles(store.snapshot()))
     let exporter = try LocalDiagnosticBundleExporter()
     let preview = try exporter.preview(request)
 
@@ -187,82 +185,9 @@ final class DiagnosticsContractTests: XCTestCase {
     XCTAssertTrue(manifest.contains(Data("\"automaticUploadEnabled\":false".utf8)))
   }
 
-  func testTEST_AC_DIAG_002_01_exportUsesThePreparedBytesApprovedForPublication() async throws {
-    let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-preview-binding")
-    defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
-    let sourceManifest = session.materialized.root.appending(path: "manifest.json")
-    let originalManifest = try Data(contentsOf: sourceManifest)
-    let originalSHA256 = try SessionManifestDocument(data: originalManifest).sha256
-    let changedManifest = try SessionStorageFixtures.manifest(
-      sessionID: "session-diagnostics", jobID: "job-diagnostics",
-      warnings: ["changed-after-approved-bytes-were-prepared"])
-    let changedSHA256 = try SessionManifestDocument(data: changedManifest).sha256
-    XCTAssertNotEqual(originalSHA256, changedSHA256)
-
-    let destination = base.appending(path: "diagnostic-bundle")
-    let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
-    let exporter = try LocalDiagnosticBundleExporter(
-      faultInjector: LocalDiagnosticBundleFaultInjector { point in
-        guard point == .afterPreparedForExport else { return }
-        try changedManifest.write(to: sourceManifest)
-      })
-    let preview = try exporter.preview(request)
-    _ = try exporter.export(request, trigger: .userInitiated, approvedPreview: preview)
-
-    let summary = try Data(
-      contentsOf: destination.appending(
-        path: "sessions/recent-0000/manifest-summary.json"))
-    XCTAssertTrue(summary.contains(Data(originalSHA256.utf8)))
-    XCTAssertFalse(summary.contains(Data(changedSHA256.utf8)))
-  }
-
-  func testTEST_AC_DIAG_002_01_rejectsMismatchedJournalSummaryIdentity() async throws {
-    let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-journal-identity")
-    defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
-    let variants = [
-      (sessionID: "other-session", jobID: "job-diagnostics", executionMode: "simulated"),
-      (sessionID: "session-diagnostics", jobID: "other-job", executionMode: "simulated"),
-      (sessionID: "session-diagnostics", jobID: "job-diagnostics", executionMode: "execute"),
-    ]
-
-    for (index, variant) in variants.enumerated() {
-      let journalURL = base.appending(path: "mismatched-journal-\(index).jsonl")
-      do {
-        let journal = try FileDurableJournal(url: journalURL)
-        try journal.appendAndSynchronize(
-          JournalEvent.jobCreated(
-            eventID: "mismatched-created-\(index)", sequence: 0,
-            sessionID: variant.sessionID, jobID: variant.jobID,
-            timestamp: SessionStorageFixtures.timestamp,
-            executionMode: variant.executionMode))
-      }
-      let replay = try DurableJournalRecovery.inspect(url: journalURL)
-      let destination = base.appending(path: "diagnostic-bundle-\(index)")
-      let baseline = try DiagnosticsFixtures.bundleRequest(
-        destination: destination, logs: [], session: session)
-      let request = LocalDiagnosticBundleRequest(
-        destination: destination, metadata: baseline.metadata, tool: baseline.tool, logs: [],
-        recentSessions: [
-          RecentSessionDiagnosticSource(export: session.materialized, journalReplay: replay)
-        ])
-
-      XCTAssertThrowsError(try LocalDiagnosticBundleExporter().preview(request)) { error in
-        guard case .invalidInput(let message) = error as? LocalDiagnosticBundleError else {
-          return XCTFail("unexpected journal identity error: \(error)")
-        }
-        XCTAssertTrue(message.contains("identity does not match"))
-      }
-      XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
-    }
-  }
-
   func testTEST_AC_DIAG_002_01_parentReplacementCannotRedirectPublishOrCleanup() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-parent-binding")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let exportParent = base.appending(path: "approved-parent", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: exportParent, withIntermediateDirectories: false,
@@ -272,7 +197,7 @@ final class DiagnosticsContractTests: XCTestCase {
     let replacementMarkerURL = exportParent.appending(path: "marker")
     let destination = exportParent.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let exporter = try LocalDiagnosticBundleExporter(
       faultInjector: LocalDiagnosticBundleFaultInjector { point in
         guard point == .afterStagingOpened else { return }
@@ -304,7 +229,6 @@ final class DiagnosticsContractTests: XCTestCase {
   func testTEST_AC_DIAG_002_01_previewRejectsParentReplacementBeforeExport() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-preview-parent")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let exportParent = base.appending(path: "approved-parent", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: exportParent, withIntermediateDirectories: false,
@@ -312,7 +236,7 @@ final class DiagnosticsContractTests: XCTestCase {
     let displacedParent = base.appending(path: "displaced-approved-parent")
     let destination = exportParent.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let exporter = try LocalDiagnosticBundleExporter()
     let approvedPreview = try exporter.preview(request)
 
@@ -338,10 +262,9 @@ final class DiagnosticsContractTests: XCTestCase {
   func testTEST_AC_DIAG_002_01_previewEstimateIncludesManifestAtQuotaBoundary() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-quota-boundary")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let destination = base.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let referencePreview = try LocalDiagnosticBundleExporter().preview(request)
     let insufficient = try LocalDiagnosticBundleExporter(
       maximumBundleBytes: referencePreview.estimatedBytes - 1)
@@ -360,10 +283,9 @@ final class DiagnosticsContractTests: XCTestCase {
   func testTEST_AC_DIAG_002_01_postRenameFailureCleansDestinationAndAllowsRetry() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-rename-cleanup")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let destination = base.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let failing = try LocalDiagnosticBundleExporter(
       faultInjector: LocalDiagnosticBundleFaultInjector { point in
         guard point == .afterRenameBeforeCommit else { return }
@@ -385,11 +307,10 @@ final class DiagnosticsContractTests: XCTestCase {
   func testTEST_AC_DIAG_002_01_postRenameMoveAwayReturnsOutcomeUnknown() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-rename-move-away")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let destination = base.appending(path: "diagnostic-bundle")
     let movedDestination = base.appending(path: "moved-diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let failing = try LocalDiagnosticBundleExporter(
       faultInjector: LocalDiagnosticBundleFaultInjector { point in
         guard point == .afterRenameBeforeCommit else { return }
@@ -410,10 +331,9 @@ final class DiagnosticsContractTests: XCTestCase {
   func testTEST_AC_DIAG_002_01_fifoReplacementFailsWithoutBlockingAndCleansUp() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-fifo-replacement")
     defer { try? FileManager.default.removeItem(at: base) }
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
     let destination = base.appending(path: "diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination, logs: [], session: session)
+      destination: destination, logs: [])
     let exporter = try LocalDiagnosticBundleExporter(
       faultInjector: LocalDiagnosticBundleFaultInjector { point in
         guard point == .beforePublish else { return }
@@ -537,17 +457,20 @@ final class DiagnosticsContractTests: XCTestCase {
         ])
     }
     let snapshot = try store.snapshot()
-    let session = try await DiagnosticsFixtures.makeSessionExport(base: base)
-    XCTAssertEqual(session.materialized.plan.excludedDeviceDataRelativePaths.count, 1)
     let destination = base.appending(path: "platform-diagnostic-bundle")
     let request = try DiagnosticsFixtures.bundleRequest(
-      destination: destination,
-      logs: DiagnosticsFixtures.redactedLogFiles(snapshot), session: session)
+      destination: destination, logs: DiagnosticsFixtures.redactedLogFiles(snapshot))
     let exporter = try LocalDiagnosticBundleExporter()
     let preview = try exporter.preview(request)
     XCTAssertTrue(preview.deviceRawExcluded)
-    XCTAssertTrue(preview.includedEntries.contains("sessions/recent-0000/manifest-summary.json"))
-    XCTAssertTrue(preview.includedEntries.contains("sessions/recent-0000/journal-summary.json"))
+    // Device data has no way in: a request carries App values and App log
+    // snapshots only, and the preview names exactly those entries.
+    XCTAssertEqual(
+      preview.includedEntries,
+      [
+        "bundle.json", "hdc/tool-placeholder.json",
+        "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
+      ])
     _ = try exporter.export(request, trigger: .userInitiated, approvedPreview: preview)
 
     let bundleBytes = try bundleData(destination)
@@ -556,8 +479,6 @@ final class DiagnosticsContractTests: XCTestCase {
     unified.records.forEach(productionUnifiedLogger.log)
     XCTAssertEqual(Set(unified.records.map(\.category)), Set(SystemLogCategory.allCases))
     XCTAssertLessThanOrEqual(snapshot.totalBytes, configuration.quotaBytes)
-    XCTAssertFalse(bundleBytes.contains(session.rawBytes))
-    XCTAssertFalse(bundleBytes.contains(Data("device-1".utf8)))
     for sensitive in [
       DiagnosticsFixtures.deviceIdentifier, DiagnosticsFixtures.userPath,
       DiagnosticsFixtures.businessString,
@@ -571,9 +492,7 @@ final class DiagnosticsContractTests: XCTestCase {
       paths,
       [
         "bundle.json", "hdc", "hdc/tool-placeholder.json", "logs",
-        "logs/diagnostics-00000000000000000000.jsonl", "metadata.json", "sessions",
-        "sessions/recent-0000", "sessions/recent-0000/journal-summary.json",
-        "sessions/recent-0000/manifest-summary.json",
+        "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
       ])
     try assertOwnerOnlyTree(destination)
     print(

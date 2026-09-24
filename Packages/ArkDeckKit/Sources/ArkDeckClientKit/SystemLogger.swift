@@ -3,6 +3,22 @@ import Darwin
 import Foundation
 import OSLog
 
+// `PORT-LOGGING-001`: the App's own bounded, redacted diagnostics. The App and
+// the Swift CLI are its only writers — the auto-updater logs through it — and
+// no daemon code uses it, so it lives in the App's client library rather than
+// in ArkDeckRuntime, which the App may not import (docs/ArchitectureRules.md).
+
+/// The wall clock a diagnostic record's timestamp comes from.
+public protocol DiagnosticAuditClock: Sendable {
+  var nowUTC: Date { get }
+}
+
+public struct SystemDiagnosticAuditClock: DiagnosticAuditClock {
+  public init() {}
+
+  public var nowUTC: Date { Date() }
+}
+
 public enum SystemLogCategory: String, Codable, CaseIterable, Sendable {
   case app
   case hdcServer
@@ -687,13 +703,13 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
 public final class SystemLogger: @unchecked Sendable {
   private let structuredStore: StructuredDiagnosticLogStore
   private let unifiedLogger: any UnifiedDiagnosticLogging
-  private let auditClock: any AuditClock
+  private let auditClock: any DiagnosticAuditClock
   private let redactionPolicy: DiagnosticRedactionPolicy
 
   public init(
     structuredStore: StructuredDiagnosticLogStore,
     unifiedLogger: any UnifiedDiagnosticLogging = UnifiedSystemDiagnosticLogger(),
-    auditClock: any AuditClock = SystemAuditClock(),
+    auditClock: any DiagnosticAuditClock = SystemDiagnosticAuditClock(),
     redactionPolicy: DiagnosticRedactionPolicy = .init()
   ) {
     self.structuredStore = structuredStore

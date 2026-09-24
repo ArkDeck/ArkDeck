@@ -3,6 +3,14 @@ import CryptoKit
 import Darwin
 import Foundation
 
+// `REQ-DIAG-002`: the local support bundle's writer. It writes only into the
+// directory the user chose, from values it is handed — App metadata, the
+// redacted HDC/tool placeholder and, when supplied, App diagnostic log
+// snapshots — and reads no Runtime storage: no Session, journal or Artifact is
+// an input it accepts, so device raw cannot reach a bundle. It moved here from
+// ArkDeckStorage so the App and the Swift CLI export without Workflows or
+// Storage (CHG-2026-074, docs/ArchitectureRules.md).
+
 package enum DiagnosticExportTrigger: String, Sendable {
   case userInitiated
   case appCrash
@@ -19,7 +27,6 @@ package enum LocalDiagnosticBundleError: Error, Equatable, Sendable {
   case explicitUserInitiationRequired
   case previewScopeMismatch
   case invalidInput(String)
-  case deviceRawNotExcluded
   case bundleQuotaExceeded
   case destinationAlreadyExists
   case exportOutcomeUnknown
@@ -94,10 +101,10 @@ package struct DiagnosticToolPlaceholder: Codable, Equatable, Sendable {
 }
 
 /// A JSONL snapshot produced by `StructuredDiagnosticLogStore.snapshot()` at the composition
-/// boundary. ArkDeckStorage intentionally does not import ArkDeckRuntime, so this initializer
-/// treats the input as untrusted: it accepts only the writer's closed event/field catalog,
-/// generated correlation shape, and privacy-specific value grammar before retaining canonical
-/// export bytes.
+/// boundary. The bytes come back from disk, so this initializer treats them as untrusted even
+/// though the writer lives in this module: it accepts only the writer's closed event/field
+/// catalog, generated correlation shape, and privacy-specific value grammar before retaining
+/// canonical export bytes.
 package struct RedactedDiagnosticLogFile: Equatable, Sendable {
   public static let maximumBytes = 16 * 1_024 * 1_024
   public let name: String
@@ -157,7 +164,7 @@ private enum DiagnosticLogExportSanitizer {
             "diagnostic correlation identifier was not writer-generated")
         }
         do {
-          try SessionStorageValidation.timestamp(timestamp, field: "timestamp")
+          try DiagnosticBundleValidation.timestamp(timestamp)
         } catch {
           throw LocalDiagnosticBundleError.invalidInput("diagnostic log timestamp is invalid")
         }
@@ -210,38 +217,24 @@ private enum DiagnosticLogExportSanitizer {
   }
 }
 
-/// The Session source must be an M1-005 `SessionDiagnosticExporter` result created with its
-/// default device-data exclusion and redaction policy. Only bounded structural summaries are
-/// copied into this bundle; journal payload and Artifact bytes are never copied.
-package struct RecentSessionDiagnosticSource: Equatable, Sendable {
-  public let export: MaterializedSessionExport
-  package let journalReplay: JournalReplay?
-
-  public init(export: MaterializedSessionExport, journalReplay: JournalReplay? = nil) {
-    self.export = export
-    self.journalReplay = journalReplay
-  }
-}
-
+/// Everything a bundle can hold. There is no Session, journal or Artifact input: the writer
+/// reads no Runtime storage, which is what keeps device raw out of every bundle.
 package struct LocalDiagnosticBundleRequest: Equatable, Sendable {
   public let destination: URL
   public let metadata: DiagnosticBundleMetadata
   public let tool: DiagnosticToolPlaceholder
   public let logs: [RedactedDiagnosticLogFile]
-  package let recentSessions: [RecentSessionDiagnosticSource]
 
   public init(
     destination: URL,
     metadata: DiagnosticBundleMetadata,
     tool: DiagnosticToolPlaceholder = .init(),
-    logs: [RedactedDiagnosticLogFile],
-    recentSessions: [RecentSessionDiagnosticSource]
+    logs: [RedactedDiagnosticLogFile]
   ) {
     self.destination = destination
     self.metadata = metadata
     self.tool = tool
     self.logs = logs
-    self.recentSessions = recentSessions
   }
 }
 
@@ -298,7 +291,7 @@ private final class AnchoredDiagnosticBundleStaging {
     destinationURL = destination.standardizedFileURL
     parentURL = destinationURL.deletingLastPathComponent()
     destinationName = destinationURL.lastPathComponent
-    try SessionStorageValidation.relativePath(destinationName)
+    try DiagnosticBundleValidation.relativePath(destinationName)
     guard !destinationName.contains("/") else {
       throw LocalDiagnosticBundleError.invalidInput("invalid diagnostic export destination")
     }
@@ -380,7 +373,7 @@ private final class AnchoredDiagnosticBundleStaging {
   }
 
   func write(_ data: Data, relativePath: String) throws {
-    try SessionStorageValidation.relativePath(relativePath)
+    try DiagnosticBundleValidation.relativePath(relativePath)
     let components = relativePath.split(separator: "/").map(String.init)
     guard let name = components.last else {
       throw LocalDiagnosticBundleError.invalidInput("invalid diagnostic bundle entry")
@@ -857,26 +850,6 @@ package struct LocalDiagnosticBundleExporter: Sendable {
     let parentIdentity: DiagnosticExportParentIdentity
   }
 
-  private struct ManifestSummary: Codable {
-    let opaqueSessionReference: String
-    let manifestSHA256: String
-    let status: String
-    let executionMode: String
-    let artifactCounts: [String: Int]
-    let confirmationCount: Int
-  }
-
-  private struct JournalSummary: Codable {
-    let eventCount: Int
-    let lastDurableSequence: Int?
-    let currentState: String?
-    let hasTornTail: Bool
-    let requiresRecovery: Bool
-    let finalized: Bool
-    let outstandingIntentCount: Int
-    let unknownOutcomeCount: Int
-  }
-
   private struct DiagnosticBundleManifest: Codable {
     let schemaVersion: String
     let generatedAt: String
@@ -889,7 +862,7 @@ package struct LocalDiagnosticBundleExporter: Sendable {
     _ request: LocalDiagnosticBundleRequest,
     parentIdentity: DiagnosticExportParentIdentity
   ) throws -> PreparedBundle {
-    guard request.logs.count <= 256, request.recentSessions.count <= 64 else {
+    guard request.logs.count <= 256 else {
       throw LocalDiagnosticBundleError.invalidInput("diagnostic source count exceeds bound")
     }
     var logNames: Set<String> = []
@@ -903,58 +876,6 @@ package struct LocalDiagnosticBundleExporter: Sendable {
         throw LocalDiagnosticBundleError.invalidInput("duplicate diagnostic log name")
       }
       entries.append(PreparedEntry(path: path, data: log.data))
-    }
-    for (index, source) in request.recentSessions.enumerated() {
-      guard source.export.plan.deviceIdentifierPolicy == .redact else {
-        throw LocalDiagnosticBundleError.deviceRawNotExcluded
-      }
-      let manifestURL = source.export.root.appending(path: "manifest.json")
-      let manifestData = try readBoundedRegularFile(
-        manifestURL, maximumBytes: SessionManifestDocument.maximumCanonicalBytes)
-      let manifest = try SessionManifestDocument(data: manifestData)
-      guard !manifest.artifacts.contains(where: { $0.role == .raw || $0.role == .partial }) else {
-        throw LocalDiagnosticBundleError.deviceRawNotExcluded
-      }
-      let opaqueReference = Self.sha256(Data("\(manifest.sessionID):\(manifest.jobID)".utf8))
-      let artifactCounts = Dictionary(grouping: manifest.artifacts, by: { $0.role.rawValue })
-        .mapValues(\.count)
-      let manifestSummary = ManifestSummary(
-        opaqueSessionReference: String(opaqueReference.prefix(24)),
-        manifestSHA256: manifest.sha256,
-        status: manifest.status,
-        executionMode: manifest.executionMode,
-        artifactCounts: artifactCounts,
-        confirmationCount: manifest.confirmations.count)
-      let prefix = String(format: "sessions/recent-%04d", index)
-      entries.append(
-        PreparedEntry(
-          path: "\(prefix)/manifest-summary.json",
-          data: try Self.canonicalData(manifestSummary)))
-      if let replay = source.journalReplay {
-        guard !replay.events.isEmpty,
-          replay.events.allSatisfy({
-            $0.sessionID == manifest.sessionID && $0.jobID == manifest.jobID
-          }),
-          let journalExecutionMode = replay.executionMode,
-          journalExecutionMode == manifest.executionMode
-        else {
-          throw LocalDiagnosticBundleError.invalidInput(
-            "journal summary identity does not match its Session manifest")
-        }
-        let journalSummary = JournalSummary(
-          eventCount: replay.events.count,
-          lastDurableSequence: replay.lastDurableSequence,
-          currentState: replay.currentState?.rawValue,
-          hasTornTail: replay.hasTornTail,
-          requiresRecovery: replay.requiresRecovery,
-          finalized: replay.finalized,
-          outstandingIntentCount: replay.outstandingIntents.count,
-          unknownOutcomeCount: replay.unknownOutcomes.count)
-        entries.append(
-          PreparedEntry(
-            path: "\(prefix)/journal-summary.json",
-            data: try Self.canonicalData(journalSummary)))
-      }
     }
     var entryPaths: Set<String> = []
     for entry in entries {
@@ -1011,34 +932,6 @@ package struct LocalDiagnosticBundleExporter: Sendable {
     return DiagnosticExportParentIdentity(device: opened.st_dev, inode: opened.st_ino)
   }
 
-  private func readBoundedRegularFile(_ url: URL, maximumBytes: Int) throws -> Data {
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw LocalDiagnosticBundleError.fileOperationFailed(path: url.path, errno: errno)
-    }
-    defer { Darwin.close(descriptor) }
-    var metadata = stat()
-    guard fstat(descriptor, &metadata) == 0, metadata.st_mode & S_IFMT == S_IFREG,
-      metadata.st_nlink == 1, metadata.st_size >= 0, metadata.st_size <= maximumBytes
-    else { throw LocalDiagnosticBundleError.invalidInput("invalid bounded manifest source") }
-    var data = Data(count: Int(metadata.st_size))
-    let byteCount = data.count
-    var offset = 0
-    while offset < byteCount {
-      let count = data.withUnsafeMutableBytes { buffer in
-        Darwin.pread(
-          descriptor, buffer.baseAddress!.advanced(by: offset), byteCount - offset,
-          off_t(offset))
-      }
-      if count < 0, errno == EINTR { continue }
-      guard count > 0 else {
-        throw LocalDiagnosticBundleError.fileOperationFailed(path: url.path, errno: errno)
-      }
-      offset += count
-    }
-    return data
-  }
-
   private static func canonicalData<T: Encodable>(_ value: T) throws -> Data {
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(value)
@@ -1052,4 +945,83 @@ package struct LocalDiagnosticBundleExporter: Sendable {
     ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
   }
 
+}
+
+/// The two name and time checks this writer carried over from ArkDeckStorage's Session
+/// validation when it moved here: a bundle entry or destination name is a plain relative path,
+/// and a log record's timestamp is a real RFC 3339 instant. The failures are not
+/// `LocalDiagnosticBundleError`s, as the Session validator's were not, so a caller keeps
+/// mapping a name the staging directory refuses the way it always has.
+private enum DiagnosticBundleValidation {
+  struct InvalidRelativePath: Error, Equatable {
+    let value: String
+  }
+
+  struct InvalidTimestamp: Error, Equatable {
+    let value: String
+  }
+
+  static func relativePath(_ value: String) throws {
+    guard !value.isEmpty, value.utf8.count <= 1_024, !value.hasPrefix("/"),
+      value.range(of: #"^[A-Za-z]:"#, options: .regularExpression) == nil
+    else { throw InvalidRelativePath(value: value) }
+
+    for component in value.split(separator: "/", omittingEmptySubsequences: false) {
+      let string = String(component)
+      guard !string.isEmpty, string != ".", string != "..",
+        !string.hasSuffix("."), !string.hasSuffix(" "),
+        string.unicodeScalars.allSatisfy({ scalar in
+          scalar.value > 0x1F && scalar.value != 0x7F
+            && !#"<>:"/\|?*"#.unicodeScalars.contains(scalar)
+        })
+      else { throw InvalidRelativePath(value: value) }
+    }
+  }
+
+  static func timestamp(_ value: String) throws {
+    let pattern =
+      #"^[0-9]{4}-[0-9]{2}-[0-9]{2}[Tt][0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?([Zz]|[+-][0-9]{2}:[0-9]{2})$"#
+    guard
+      value.range(of: pattern, options: .regularExpression)
+        == value.startIndex..<value.endIndex
+    else { throw InvalidTimestamp(value: value) }
+
+    let localDateTime: Substring
+    if value.last == "Z" || value.last == "z" {
+      localDateTime = value.dropLast()
+    } else {
+      let offsetStart = value.index(value.endIndex, offsetBy: -6)
+      let offset = value[offsetStart...]
+      let offsetHour = Int(offset.dropFirst().prefix(2))
+      let offsetMinute = Int(offset.suffix(2))
+      guard let offsetHour, let offsetMinute, offsetHour <= 23, offsetMinute <= 59 else {
+        throw InvalidTimestamp(value: value)
+      }
+      localDateTime = value[..<offsetStart]
+    }
+
+    let dateAndTime = localDateTime.split(whereSeparator: { $0 == "T" || $0 == "t" })
+    guard dateAndTime.count == 2 else { throw InvalidTimestamp(value: value) }
+    let dateParts = dateAndTime[0].split(separator: "-")
+    let timeParts = dateAndTime[1].split(separator: ":")
+    let secondText = timeParts.count == 3 ? timeParts[2].split(separator: ".")[0] : ""
+    guard dateParts.count == 3, timeParts.count == 3,
+      let year = Int(dateParts[0]), let month = Int(dateParts[1]),
+      let day = Int(dateParts[2]), let hour = Int(timeParts[0]),
+      let minute = Int(timeParts[1]), let second = Int(secondText),
+      (1...9_999).contains(year), (1...12).contains(month),
+      (0...23).contains(hour), (0...59).contains(minute), (0...60).contains(second)
+    else { throw InvalidTimestamp(value: value) }
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    var firstOfMonth = DateComponents()
+    firstOfMonth.calendar = calendar
+    firstOfMonth.timeZone = calendar.timeZone
+    firstOfMonth.year = year
+    firstOfMonth.month = month
+    firstOfMonth.day = 1
+    guard let monthDate = calendar.date(from: firstOfMonth),
+      let days = calendar.range(of: .day, in: .month, for: monthDate), days.contains(day)
+    else { throw InvalidTimestamp(value: value) }
+  }
 }

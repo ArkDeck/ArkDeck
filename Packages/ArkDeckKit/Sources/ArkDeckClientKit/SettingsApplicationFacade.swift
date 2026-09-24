@@ -180,10 +180,9 @@ public protocol SettingsApplicationProviding: Sendable {
 
 /// Previews and exports the local support bundle the Settings pane offers.
 ///
-/// The exporter reads this host's files through ArkDeckStorage, which
-/// ClientKit does not import, so it stays in ArkDeckWorkflows beside the CLI's
-/// use of the same support-bundle contract, and the App composes its adapter
-/// into this facade. The facade never writes a bundle itself.
+/// The App composes `RuntimeSupportBundleSettingsExporter`, the adapter over
+/// the support-bundle provider the CLI also uses; tests compose their own.
+/// The facade never writes a bundle itself.
 public protocol SettingsDiagnosticBundleExporting: Sendable {
   /// The exact scope an export to `destination` would write. Writes nothing.
   func preview(at destination: URL) async throws -> SettingsDiagnosticBundlePreview

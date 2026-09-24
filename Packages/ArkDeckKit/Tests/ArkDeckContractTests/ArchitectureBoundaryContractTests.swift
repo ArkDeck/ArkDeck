@@ -875,6 +875,158 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       try declared(under: "Sources/ArkDeckRuntime"), [],
       "the v2 request contract moved back into ArkDeckRuntime, which ClientKit may not import")
   }
+
+  // MARK: - 10. The App stands on ClientKit, not on Workflows
+
+  /// The ArkDeckKit products each target of `ArkDeck.xcodeproj` may link, and
+  /// so import. The App reaches the Runtime through ClientKit alone
+  /// (CHG-2026-074, TASK-XPA-019): no Swift Runtime layer — Workflows,
+  /// AgentComposition, Runtime, Storage, OpenHarmony, Process — is linked into
+  /// it or into its UI-test bundle, so an App build cannot reach an engine,
+  /// provider or store, and deleting the Swift Runtime at M5 does not touch the
+  /// App. External packages (ArkTrace) are not ArkDeck edges and are not listed.
+  private static let xcodeTargetProducts: [String: Set<String>] = [
+    "ArkDeck": ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckTraceAdapter"],
+    "ArkDeckHDCUITests": ["ArkDeckClientKit", "ArkDeckCore"],
+  ]
+
+  /// Each Xcode target's own sources, relative to the repository root.
+  private static let xcodeTargetSources: [String: String] = [
+    "ArkDeck": "ArkDeckApp",
+    "ArkDeckHDCUITests": "ArkDeckAppUITests",
+  ]
+
+  func testTheAppNeitherLinksNorImportsArkDeckWorkflows() throws {
+    let project = try String(
+      contentsOf: repositoryRoot().appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+    // The load-bearing absence, asserted by name: no target of the project can
+    // link a Workflows product the project does not declare.
+    XCTAssertFalse(
+      project.contains("productName = ArkDeckWorkflows;"),
+      "ArkDeck.xcodeproj declares the ArkDeckWorkflows product; the App reaches the Runtime "
+        + "through ArkDeckClientKit only (docs/ArchitectureRules.md)")
+    let linked = try Self.arkDeckKitProductsByXcodeTarget(project: project)
+    XCTAssertEqual(
+      Set(linked.keys), Set(Self.xcodeTargetProducts.keys),
+      "ArkDeck.xcodeproj's targets drifted from xcodeTargetProducts")
+    for (target, products) in linked.sorted(by: { $0.key < $1.key }) {
+      let allowed = Self.xcodeTargetProducts[target] ?? []
+      XCTAssertTrue(
+        products.isSubset(of: allowed),
+        "Xcode target \(target) links \(products.subtracting(allowed).sorted()) but may link "
+          + "only \(allowed.sorted()) from ArkDeckKit (docs/ArchitectureRules.md)")
+    }
+
+    var checkedFiles = 0
+    for (target, directory) in Self.xcodeTargetSources.sorted(by: { $0.key < $1.key }) {
+      let allowed = Self.xcodeTargetProducts[target] ?? []
+      for file in try repositorySwiftFiles(under: directory) {
+        checkedFiles += 1
+        let imports = try arkdeckImports(of: file)
+        XCTAssertFalse(
+          imports.contains("ArkDeckWorkflows"),
+          "\(file.lastPathComponent) imports ArkDeckWorkflows; the App reaches the Runtime "
+            + "through ArkDeckClientKit only")
+        XCTAssertTrue(
+          imports.isSubset(of: allowed),
+          "\(file.lastPathComponent) imports \(imports.subtracting(allowed).sorted()), which "
+            + "Xcode target \(target) does not link")
+      }
+    }
+    XCTAssertGreaterThan(checkedFiles, 30, "App layout drifted: too few files scanned")
+  }
+
+  /// Each native target's ArkDeckKit package products, read from its
+  /// `packageProductDependencies` and the project's product declarations.
+  private static func arkDeckKitProductsByXcodeTarget(
+    project: String
+  ) throws -> [String: Set<String>] {
+    let identifier = "[0-9A-Za-z]+"
+    let localPackage = try NSRegularExpression(
+      pattern: "(\(identifier)) /\\* XCLocalSwiftPackageReference \"Packages/ArkDeckKit\" \\*/ = \\{")
+    let fullRange = NSRange(project.startIndex..., in: project)
+    guard let packageMatch = localPackage.firstMatch(in: project, range: fullRange),
+      let packageRange = Range(packageMatch.range(at: 1), in: project)
+    else {
+      XCTFail("ArkDeck.xcodeproj no longer references Packages/ArkDeckKit")
+      return [:]
+    }
+    let packageID = String(project[packageRange])
+
+    var productsByID: [String: String] = [:]
+    let productDeclaration = try NSRegularExpression(
+      pattern: "(\(identifier)) /\\*[^*]*\\*/ = \\{\\s*isa = XCSwiftPackageProductDependency;"
+        + "\\s*package = (\(identifier)) /\\*[^*]*\\*/;\\s*productName = ([A-Za-z0-9_]+);")
+    for match in productDeclaration.matches(in: project, range: fullRange) {
+      guard let id = Range(match.range(at: 1), in: project),
+        let package = Range(match.range(at: 2), in: project),
+        let name = Range(match.range(at: 3), in: project),
+        String(project[package]) == packageID
+      else { continue }
+      productsByID[String(project[id])] = String(project[name])
+    }
+
+    var result: [String: Set<String>] = [:]
+    let nativeTarget = try NSRegularExpression(
+      pattern: "= \\{\\s*isa = PBXNativeTarget;(.*?)\\n\\t\\t\\};",
+      options: [.dotMatchesLineSeparators])
+    let targetName = try NSRegularExpression(pattern: "\\n\\t\\t\\tname = ([^;]+);")
+    let dependencies = try NSRegularExpression(
+      pattern: "packageProductDependencies = \\((.*?)\\);", options: [.dotMatchesLineSeparators])
+    let reference = try NSRegularExpression(pattern: "(\(identifier)) /\\*")
+    for match in nativeTarget.matches(in: project, range: fullRange) {
+      guard let bodyRange = Range(match.range(at: 1), in: project) else { continue }
+      let body = String(project[bodyRange])
+      let bodyRangeNS = NSRange(body.startIndex..., in: body)
+      guard let nameMatch = targetName.firstMatch(in: body, range: bodyRangeNS),
+        let nameRange = Range(nameMatch.range(at: 1), in: body)
+      else {
+        XCTFail("a PBXNativeTarget has no name")
+        continue
+      }
+      var products: Set<String> = []
+      if let list = dependencies.firstMatch(in: body, range: bodyRangeNS),
+        let listRange = Range(list.range(at: 1), in: body)
+      {
+        let entries = String(body[listRange])
+        for entry in reference.matches(
+          in: entries, range: NSRange(entries.startIndex..., in: entries))
+        {
+          guard let idRange = Range(entry.range(at: 1), in: entries),
+            let product = productsByID[String(entries[idRange])]
+          else { continue }
+          products.insert(product)
+        }
+      }
+      result[String(body[nameRange]).trimmingCharacters(in: CharacterSet(charactersIn: "\""))] =
+        products
+    }
+    return result
+  }
+
+  private func repositoryRoot() -> URL {
+    packageRoot()
+      .deletingLastPathComponent()  // Packages
+      .deletingLastPathComponent()  // repository root
+  }
+
+  private func repositorySwiftFiles(under directory: String) throws -> [URL] {
+    let root = repositoryRoot().appending(path: directory, directoryHint: .isDirectory)
+    guard
+      let enumerator = FileManager.default.enumerator(
+        at: root, includingPropertiesForKeys: nil)
+    else {
+      XCTFail("cannot enumerate \(directory)")
+      return []
+    }
+    let files = enumerator.compactMap { entry -> URL? in
+      guard let url = entry as? URL, url.pathExtension == "swift" else { return nil }
+      return url.standardizedFileURL
+    }
+    XCTAssertFalse(files.isEmpty, "no Swift sources under \(directory) — layout drifted")
+    return files.sorted { $0.path < $1.path }
+  }
 }
 
 /// `AFA-AC-1`: the Rockchip lowering is gone from product code.

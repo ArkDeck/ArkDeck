@@ -823,7 +823,6 @@ final class AutoUpdateContractTests: XCTestCase {
       "ArkDeckApp/App/ArkDeckApp.swift",
       "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift",
       "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate",
-      "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate",
     ] {
       XCTAssertFalse(
         try sourceTree(at: repository.appending(path: relativePath)).contains(privateMarker),

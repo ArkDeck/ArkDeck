@@ -1,10 +1,8 @@
-import ArkDeckClientKit
-import ArkDeckRuntime
 import Foundation
 
-// The updater's production assembly. The updater itself lives in
-// ArkDeckClientKit; these two need ArkDeckRuntime's SystemLogger, which
-// ClientKit may not import (docs/ArchitectureRules.md).
+// The updater's production assembly, shared by the App and the Swift CLI. Its
+// events go to the App's own bounded, redacted diagnostics (`SystemLogger`,
+// PORT-LOGGING-001), which live in this module (docs/ArchitectureRules.md).
 
 extension AutoUpdateApplicationFacade {
   public static func make() throws -> RuntimeUpdateApplicationFacade {

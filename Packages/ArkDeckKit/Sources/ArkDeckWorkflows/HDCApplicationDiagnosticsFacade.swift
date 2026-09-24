@@ -4,8 +4,10 @@ import ArkDeckOpenHarmony
 import CryptoKit
 import Foundation
 
-/// App-facing aliases keep OpenHarmony implementation types behind the
-/// Workflows product boundary. The App links and imports Workflows only.
+/// Aliases that keep OpenHarmony implementation types behind the Workflows
+/// product boundary. The App no longer links Workflows: it reads HDC
+/// diagnostics through ClientKit's `HDCClientDiagnosticsApplicationFacade`,
+/// and only the contract tests still compose the facade below.
 public typealias HDCDiagnosticsPresentation = ArkDeckOpenHarmony.HDCDiagnosticsPresentation
 package typealias HDCDeviceObservationPresentationKind =
   ArkDeckOpenHarmony.HDCDeviceObservationPresentationKind

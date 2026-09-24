@@ -1,7 +1,6 @@
 import ArkDeckClientKit
 import AppKit
 import ArkDeckTraceAdapter
-import ArkDeckWorkflows
 import ArkTraceAppSupport
 import Observation
 import SwiftUI
@@ -118,8 +117,8 @@ private final class ArkDeckAppModelStore {
     provider: TraceApplicationFacade.make(),
     documentController: traceDocument)
   // Settings reads Runtime storage through ClientKit. UI automation supplies
-  // only in-memory replies; Settings' remaining Workflows dependency is the
-  // local support-bundle exporter until its Runtime resource interface exists.
+  // only in-memory replies. The support bundle is written by ClientKit into
+  // the directory the user picks and reads no Runtime storage.
   @ObservationIgnored lazy var settingsWorkspace = SettingsWorkspaceViewModel(
     provider: SettingsApplicationFacade.make(
       diagnosticBundles: RuntimeSupportBundleSettingsExporter(),

@@ -119,6 +119,107 @@ final class DeviceListApplicationContractTests: XCTestCase {
       })?.isAuthorized == true)
   }
 
+  /// S7's timeline, through the same fixture reads the App makes: a wait times
+  /// out on the Unauthorized device, the owner then trusts it and the live
+  /// observation reads Connected, and later the device reads Unauthorized
+  /// again. The Connected read ends the verdict. The later Unauthorized read
+  /// alone could not tell — it matches the state the verdict was drawn from —
+  /// which is why the App applies the rule to every read it publishes.
+  func testALaterReadInAnotherStateEndsATimedOutVerdict() async throws {
+    try FileManager.default.createDirectory(
+      at: stateDirectory, withIntermediateDirectories: true)
+    let state = stateDirectory.appending(path: "device-authorization-state.txt")
+    try Data().write(to: state)
+    let provider = DeviceListApplicationFacade.make(arguments: [
+      "ArkDeck", "--ui-test-devices", "--ui-test-device-poll-fast",
+      "--ui-test-fixture-state", state.path,
+    ])
+    let device = "7f2c091a445e21"
+
+    let timedOut = await provider.waitForAuthorization(connectKey: device)
+    XCTAssertEqual(timedOut.authorization, .timedOut)
+    let unchanged = await provider.refreshCandidates()
+    XCTAssertFalse(
+      unchanged.endsTrustWaitVerdict(on: device, concludedFrom: timedOut.presentation),
+      "a read that still shows the device Unauthorized keeps the verdict it describes")
+
+    try Data("--ui-test-device-authorized".utf8).write(to: state)
+    let trusted = await provider.refreshCandidates()
+    XCTAssertTrue(
+      trusted.endsTrustWaitVerdict(on: device, concludedFrom: timedOut.presentation),
+      "the device read Connected after the wait timed out; that episode is over")
+
+    try Data().write(to: state)
+    let unauthorizedAgain = await provider.refreshCandidates()
+    XCTAssertFalse(
+      unauthorizedAgain.endsTrustWaitVerdict(on: device, concludedFrom: timedOut.presentation),
+      "the Unauthorized read alone matches the verdict's own; only the read in between ends it")
+
+    // The App's device model applies the rule to every read it publishes —
+    // startup, the live ticks and Re-check all finish through one place —
+    // against the observation the verdict was drawn from.
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let app = try String(
+      contentsOf: repository.appending(path: "ArkDeckApp/Features/Devices/DeviceWorkspace.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(app.contains("    presentation = current\n    endVerdictIfTheDeviceMoved(current)\n"))
+    XCTAssertTrue(
+      app.contains("current.endsTrustWaitVerdict(on: waited, concludedFrom: concluded)"))
+    XCTAssertEqual(app.components(separatedBy: "presentation = current").count - 1, 1)
+  }
+
+  func testOnlyASuccessfulReadInAnotherStateEndsAWaitVerdict() {
+    func observation(
+      _ states: [String: String],
+      health: DeviceCandidatePresentation.StateObservationHealth = .current
+    ) -> DeviceListPresentation {
+      DeviceListPresentation(
+        availability: .available,
+        candidates: states.sorted(by: { $0.key < $1.key }).map {
+          DeviceCandidatePresentation(
+            connectKey: $0.key, state: $0.value, adoptedTargetID: nil, bindingRevision: nil,
+            stateObservationHealth: health)
+        })
+    }
+    let device = "7f2c091a445e21"
+    let other = "150100469346864"
+    let unreadable = DeviceListPresentation(
+      availability: .unavailable(reason: "Runtime unreachable"), candidates: [])
+    let waitedOnUnauthorized = observation([device: "Unauthorized", other: "Connected"])
+
+    let later: [(String, DeviceListPresentation, Bool)] = [
+      ("same state", observation([device: "Unauthorized", other: "Connected"]), false),
+      ("same state, stale", observation([device: "Unauthorized"], health: .stale), false),
+      ("another device moved", observation([device: "Unauthorized", other: "Offline"]), false),
+      ("authorized", observation([device: "Connected"]), true),
+      ("authorized, stale", observation([device: "Connected"], health: .stale), true),
+      ("offline", observation([device: "Offline"]), true),
+      ("gone", observation([other: "Connected"]), true),
+      ("unreadable", unreadable, false),
+      ("checking", .loading, false),
+    ]
+    for (name, read, ends) in later {
+      XCTAssertEqual(
+        read.endsTrustWaitVerdict(on: device, concludedFrom: waitedOnUnauthorized), ends, name)
+    }
+
+    // A verdict drawn while the device was out of sight, or while the
+    // observation could not be read, ends at the first successful read that
+    // shows something else.
+    let waitedOnGone = observation([other: "Connected"])
+    XCTAssertTrue(
+      observation([device: "Unauthorized"]).endsTrustWaitVerdict(
+        on: device, concludedFrom: waitedOnGone))
+    XCTAssertFalse(
+      observation([other: "Offline"]).endsTrustWaitVerdict(
+        on: device, concludedFrom: waitedOnGone))
+    XCTAssertTrue(
+      observation([device: "Unauthorized"]).endsTrustWaitVerdict(
+        on: device, concludedFrom: unreadable))
+    XCTAssertFalse(unreadable.endsTrustWaitVerdict(on: device, concludedFrom: unreadable))
+  }
+
   // The facade's provider protocol carries the joined candidate projection
   // and authorization reads only; no method can name a Runtime write.
   func testApplicationSurfaceCannotNameAWriteMethod() throws {

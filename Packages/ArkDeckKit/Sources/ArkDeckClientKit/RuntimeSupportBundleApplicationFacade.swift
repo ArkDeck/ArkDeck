@@ -1,11 +1,10 @@
-import ArkDeckClientKit
-import ArkDeckStorage
 import Foundation
 
-// The support bundle's production provider. Its contract (the preview, the
-// receipt, the errors and `RuntimeSupportBundleProviding`) lives in
-// ArkDeckClientKit; the provider reads this Mac's files through
-// ArkDeckStorage, which ClientKit may not import (docs/ArchitectureRules.md).
+// The support bundle's production provider, shared by the App's Settings pane
+// and the Swift CLI's `runtime support-bundle`. It writes App metadata and the
+// redacted tool placeholder into the directory the user chose, through
+// `LocalDiagnosticBundleExporter`, and reads no Runtime storage
+// (docs/ArchitectureRules.md).
 
 public enum RuntimeSupportBundleApplicationFacade {
   public static func make() -> any RuntimeSupportBundleProviding {
@@ -72,8 +71,7 @@ private actor ProductionRuntimeSupportBundleProvider: RuntimeSupportBundleProvid
         version: .unverified,
         serverEndpoint: .redacted,
         serverOwnership: .unverified),
-      logs: [],
-      recentSessions: [])
+      logs: [])
   }
 
   private static func presentation(
@@ -98,7 +96,7 @@ private actor ProductionRuntimeSupportBundleProvider: RuntimeSupportBundleProvid
       return .quotaExceeded
     case .exportOutcomeUnknown:
       return .outcomeUnknown
-    case .invalidInput, .deviceRawNotExcluded, .explicitUserInitiationRequired:
+    case .invalidInput, .explicitUserInitiationRequired:
       return .invalidDestination
     case .fileOperationFailed:
       return .ioFailure
