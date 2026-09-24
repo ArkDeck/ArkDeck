@@ -685,7 +685,7 @@ fn replay(
 
 /// Swift `RuntimeDebugHAPFailureFinalization.originalFailure(record:replay:)`:
 /// the failure a debug HAP keeps through its failure finalization.
-fn hap_original_failure(record: &JobRecord, events: &[Value]) -> Option<Value> {
+pub(crate) fn hap_original_failure(record: &JobRecord, events: &[Value]) -> Option<Value> {
     if record.operation() != "debug.hap@1" {
         return None;
     }

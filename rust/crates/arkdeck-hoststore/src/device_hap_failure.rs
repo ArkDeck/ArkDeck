@@ -14,9 +14,12 @@
 //! cleanup is owed in the Artifact root's ledger with the exact action that
 //! failed, and the Job counts its outstanding residue; a process left running
 //! is named on the timeline alone. The Job then fails with its original
-//! failure. A lane that cannot conclude parks the Job for recovery, which
-//! nothing here resumes (ADR-0009, L.1 item 13); what Swift throws past the
-//! lane is this run's refusal, and the Job stays `finalizing`.
+//! failure. A lane that cannot conclude parks the Job for recovery; what
+//! Swift throws past the lane is this run's refusal, and the Job stays
+//! `finalizing`. The same lane concludes a Job a reconcile confirmed not
+//! executed and one a restart left `finalizing` for its explicit continuation
+//! (`job.run` or `job.reconcile`); an attempt already made is never made
+//! again.
 use super::{HAP, Journaled, Stop, inputs_of};
 use crate::artifact_read_owner::swift_string;
 use crate::cleanup_debt;
@@ -181,11 +184,29 @@ impl JobRunner<'_> {
     ) -> Result<(), RunRefusal> {
         run.persist(self.jobs)?;
         run.transition("running", "finalizing", reason)?;
-        let failure = run
-            .record
-            .operation_failure()
-            .cloned()
-            .ok_or_else(uncertain)?;
+        self.perform_hap_failure_finalization(run, hdc, descriptor)
+    }
+
+    /// Swift `performDebugHAPFailureFinalization` for a debug HAP already
+    /// `finalizing`: its run's failure lane, a reconcile that confirmed its
+    /// parked intent not executed, or a finalization a restart left for its
+    /// explicit continuation. The original failure — the record's, or the one
+    /// its journal proves — is made durable with the Job open again, then
+    /// every owed compensation concludes and the Job fails with it.
+    pub(crate) fn perform_hap_failure_finalization(
+        &self,
+        run: &mut Run,
+        hdc: &HdcComposition<'_>,
+        descriptor: &CatalogOperation,
+    ) -> Result<(), RunRefusal> {
+        if run.record.state != "finalizing" || descriptor.reference() != HAP {
+            return Err(uncertain());
+        }
+        let failure =
+            crate::job_recovery::hap_original_failure(&run.record, &self.journal_events(run)?)
+                .ok_or_else(uncertain)?;
+        run.record.set_operation_failure(Some(failure.clone()));
+        run.record.clear_finished();
         run.persist(self.jobs)?;
         if !concludable(run) {
             return self.park_hap(run, "unresolved durable intent");
@@ -616,6 +637,44 @@ impl JobRunner<'_> {
             .timeline
             .push(format!("compensation needsAttention: {reason}"));
         run.persist(self.jobs)
+    }
+
+    /// Swift `resumeConfirmedOptionalDebugHAPCleanupDebt`'s own question: is
+    /// this optional debug HAP cleanup one whose last attempt the journal
+    /// already confirms failed? Only a resumed run can find one.
+    pub(super) fn hap_cleanup_failed(&self, run: &Run, step: &CatalogStep) -> Result<bool, Stop> {
+        if device_steps::hap_source_of(&step.step_id).is_none() || step.step_id == "stop-ability" {
+            return Ok(false);
+        }
+        let events = self.journal_events(run)?;
+        let Some(intent) = events
+            .iter()
+            .rev()
+            .find(|event| kind(event) == "stepIntent" && step_of(event) == step.step_id)
+        else {
+            return Ok(false);
+        };
+        Ok(events.iter().any(|event| {
+            kind(event) == "stepOutcome"
+                && correlates(event, intent)
+                && event["payload"]["outcomeCertainty"] == "confirmed"
+                && event["payload"]["result"] == "failed"
+        }))
+    }
+
+    /// Swift `confirmedSucceededStepIDs`: every step whose confirmed outcome
+    /// in the journal is a success.
+    pub(super) fn confirmed_steps(&self, run: &Run) -> Result<BTreeSet<String>, Stop> {
+        Ok(self
+            .journal_events(run)?
+            .iter()
+            .filter(|event| {
+                kind(event) == "stepOutcome"
+                    && event["payload"]["outcomeCertainty"] == "confirmed"
+                    && succeeded(event)
+            })
+            .map(|event| step_of(event).to_owned())
+            .collect())
     }
 
     /// The Job's journal as it stands, every durable event in order (Swift

@@ -7,25 +7,38 @@
 //! identity and judged by `verifyReconciliationReadback`. The original action
 //! is never resent.
 //!
-//! Only the families below are ported. Every other persisted action is
-//! refused by the reconciler before anything is written: the other mutations
-//! Swift reads back (owned remote paths, packages, abilities, staging, native
-//! libraries), the screen sequence's, and the read-only actions Swift's
-//! provider has no reconcile source for, whose answer journals Swift's debug
-//! rendering of the action.
+//! The families ported: the read-only ones Swift's provider confirms not
+//! executed (the observations, the bounded captures, a received file, a debug
+//! template, a debug HAP's package and process readbacks, application
+//! liveness, a native inspection); the pointer gesture, which has no
+//! readback; and every mutation Swift reads back — the port rules (`fport
+//! ls`), a debug HAP's staging, packages and ability (the owned path or
+//! directory, `bm dump`, `pidof`), a diagnostic capture's owned file (`ls
+//! -ld`), and a native library deployment's steps (its own inspection, whose
+//! verdict table never calls a publish or a rollback not executed). The
+//! screen sequence's capture and cleanup are ported as Swift runs them: its
+//! materialization does not know their kinds, so the reconcile, once begun,
+//! fails. Every other persisted action is refused by the reconciler before
+//! anything is written: the read-only actions Swift's provider has no
+//! reconcile source for, whose answer journals Swift's debug rendering of the
+//! action.
 use super::{Decision, other};
 use crate::artifact_read_owner::swift_string;
 use crate::device_facts::{DeviceFacts, HdcComposition};
+use crate::device_steps::{StepAction, StepContext, refusal_detail};
 use arkdeck_contract::{WireError, sha256_hex};
 use arkdeck_provider_hdc::{
-    Direction, DispatchFailure, Outcome, PointerInput, PortAction, PortRule,
+    DebugReadTemplate, Direction, DispatchFailure, Expected, FileAction, FileActionError,
+    HapAction, NativeAction, Outcome, OwnedRemotePath, PointerInput, PortAction, PortRule,
+    Reconcile,
 };
 use serde_json::{Map, Value};
 
-/// The persisted kinds whose reconcile is ported: Swift's read-only
-/// families that its provider confirms not executed, the pointer gesture,
-/// which has no readback, and the two port-rule changes, which are read back.
-const PORTED: [&str; 11] = [
+/// The persisted kinds whose reconcile is ported: Swift's read-only families
+/// that its provider confirms not executed, the pointer gesture, which has no
+/// readback, every mutation Swift reads back, and the two kinds Swift's
+/// materialization does not know.
+const PORTED: [&str; 38] = [
     "hdc.observeTool",
     "hdc.observeServer",
     "hdc.listDeviceCandidates",
@@ -34,9 +47,36 @@ const PORTED: [&str; 11] = [
     "hdc.observeStorage",
     "hdc.captureHilog",
     "hdc.captureUIDump",
+    "hdc.receiveOwnedArtifact",
+    "hdc.runDebugTemplate",
+    "hdc.queryPackageReadback",
+    "hdc.verifyProcessState",
+    "hdc.observeApplicationLiveness",
+    "hdc.inspectNativeLibrary",
     "hdc.injectPointerInput",
     "hdc.createPortForward",
     "hdc.removePortForward",
+    "hdc.sendArtifactToStaging",
+    "hdc.sendPackageSetToStaging",
+    "hdc.installPackage",
+    "hdc.installPackageSet",
+    "hdc.startAbility",
+    "hdc.stopAbility",
+    "hdc.uninstallPackage",
+    "hdc.cleanupStagedPackageSet",
+    "hdc.cleanupOwnedRemotePath",
+    "hdc.captureTrace",
+    "hdc.captureComponentTree",
+    "hdc.captureScreenshot",
+    "hdc.sendNativeLibraryToStaging",
+    "hdc.backupNativeLibrary",
+    "hdc.publishNativeLibrary",
+    "hdc.stopNativeTarget",
+    "hdc.startNativeTarget",
+    "hdc.cleanupNativeLibrary",
+    "hdc.rollbackNativeLibrary",
+    "hdc.captureScreenSequence",
+    "hdc.cleanupScreenSequence",
 ];
 
 /// Swift `HDCAllowlistedProperty`.
@@ -48,6 +88,9 @@ const PROPERTIES: [&str; 6] = [
     "const.ohos.apiversion",
     "const.ohos.fullname",
 ];
+
+/// Swift's answer for a mutation `reconciliationReadback` gives no probe.
+const NO_READBACK: &str = "mutation has no dedicated readback; original not resent";
 
 /// Whether this Runtime reconciles a Job parked on a persisted action of
 /// this kind.
@@ -64,11 +107,20 @@ pub(super) enum DeviceAction {
     Pointer,
     /// `createPortForward` or `removePortForward`, read back by `fport ls`.
     Port(PortAction),
+    /// A debug HAP's staging, package or ability mutation, or a cleanup of
+    /// an owned path, read back by the presence it leaves.
+    Hap(HapAction),
+    /// A diagnostic capture that writes the provider-owned file named here,
+    /// read back by that file's presence.
+    Written(OwnedRemotePath),
+    /// A native library deployment's mutation, read back by its inspection.
+    Native(Box<NativeAction>),
 }
 
-/// Swift's interpolation of `DeviceProviderError.unsupportedAction`.
+/// Swift's interpolation of `DeviceProviderError.unsupportedAction`, which
+/// describes itself by its detail alone.
 fn unsupported(detail: &str) -> WireError {
-    other(format!("unsupportedAction({})", swift_string(detail)))
+    other(detail)
 }
 
 /// Swift's interpolation of an `HDCE0RequestError`.
@@ -88,10 +140,16 @@ fn malformed(field: &str, detail: &str) -> WireError {
     ))
 }
 
+/// A provider's refusal of a persisted action, as Swift interpolates it.
+fn refused(error: FileActionError) -> WireError {
+    other(refusal_detail(error))
+}
+
 /// Swift `PersistedTypedProviderAction.materialize()` for the ported kinds:
 /// the same members required, in the same order, and the same typed
 /// requests' bounds checked again. Its refusal is Swift's error, which the
-/// handler answers `internalError`.
+/// handler answers `internalError`. A kind Swift's materialization does not
+/// know is refused as Swift refuses it.
 pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
     let kind = action["kind"].as_str().unwrap_or_default();
     let empty = Map::new();
@@ -127,6 +185,9 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
             Ok(DeviceAction::ReadOnly)
         }
         "hdc.observeDevice" => string("connectKey").map(|_| DeviceAction::ReadOnly),
+        "hdc.runDebugTemplate" => DebugReadTemplate::parse(string("templateId")?)
+            .map(|_| DeviceAction::ReadOnly)
+            .ok_or_else(|| unsupported("persisted debug template is not in the closed set")),
         "hdc.queryProperty" => {
             if PROPERTIES.contains(&string("property")?) {
                 Ok(DeviceAction::ReadOnly)
@@ -227,7 +288,7 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
             optional_string("screenEpochUtc")?;
             PointerInput::from_persisted(arguments)
                 .map(|_| DeviceAction::Pointer)
-                .map_err(|error| other(error.to_string()))
+                .map_err(refused)
         }
         "hdc.createPortForward" | "hdc.removePortForward" => {
             // A record without a direction predates it: a forward rule.
@@ -247,10 +308,38 @@ pub(super) fn materialize(action: &Value) -> Result<DeviceAction, WireError> {
                 PortAction::Remove(rule)
             }))
         }
-        _ => Err(unsupported(&format!(
-            "persisted typed provider action kind {kind} is unknown"
-        ))),
+        _ => family_action(kind, arguments),
     }
+}
+
+/// The kinds each of a debug HAP's, a native deployment's and a diagnostic
+/// capture's families rebuilds (a cleanup of an owned path as the debug
+/// HAP's family rebuilds it: the one action both run), or Swift's refusal of
+/// a kind no family knows.
+fn family_action(kind: &str, arguments: &Map<String, Value>) -> Result<DeviceAction, WireError> {
+    if let Some(action) = HapAction::from_persisted(kind, arguments).map_err(refused)? {
+        return Ok(if action.effect() == "readOnly" {
+            DeviceAction::ReadOnly
+        } else {
+            DeviceAction::Hap(action)
+        });
+    }
+    if let Some(action) = NativeAction::from_persisted(kind, arguments).map_err(refused)? {
+        return Ok(if action.effect() == "readOnly" {
+            DeviceAction::ReadOnly
+        } else {
+            DeviceAction::Native(Box::new(action))
+        });
+    }
+    if let Some(action) = FileAction::from_persisted(kind, arguments).map_err(refused)? {
+        return Ok(match action.written_path() {
+            Some(path) => DeviceAction::Written(path.clone()),
+            None => DeviceAction::ReadOnly,
+        });
+    }
+    Err(unsupported(&format!(
+        "persisted typed provider action kind {kind} is unknown"
+    )))
 }
 
 /// Swift `RuntimeJobEngine.reconciliationStepID`: the reconcile's own step
@@ -270,63 +359,103 @@ fn dispatch_failure(failure: &DispatchFailure) -> String {
     }
 }
 
+/// Swift's answer for a readback that could not be lowered or dispatched.
+fn failed(error: String) -> Decision {
+    Decision::Unknown(format!(
+        "dedicated readback failed: {error}; original not resent"
+    ))
+}
+
 /// The provider's decision on a parked HDC action, against the fresh facts
 /// the reconcile resolved (Swift `reconcileOwned` from `action.effect`): a
 /// family below `deviceMutation` is confirmed not executed; a mutation with
-/// no dedicated readback stays unknown; a port rule is read back once.
+/// no dedicated readback stays unknown; any other is read back once.
 pub(super) fn decide(
     action: &DeviceAction,
     hdc: &HdcComposition<'_>,
     facts: &DeviceFacts,
+    job_id: &str,
     step: &str,
     attempt: &str,
 ) -> Decision {
-    let original = match action {
-        DeviceAction::ReadOnly => return Decision::NotExecuted,
-        DeviceAction::Pointer => {
-            return Decision::Unknown(
-                "mutation has no dedicated readback; original not resent".into(),
-            );
+    // Swift `reconciliationReadback` lowers the probe, which must be at most
+    // read-only; one dispatch, then its verdict.
+    let read = |readback: &StepAction| -> Result<Outcome, Decision> {
+        let context = StepContext {
+            job_id,
+            resolved: &[],
+            library: None,
+            helper: hdc.code_sign_helper,
+        };
+        let plan = readback
+            .plan(
+                &reconciliation_step_id(step, attempt),
+                Some(&facts.connect_key),
+                &context,
+            )
+            .map_err(failed)?;
+        if !matches!(readback.effect(), "hostOnly" | "readOnly") {
+            return Err(failed(format!(
+                "internalFailure({})",
+                swift_string("mutation reconciliation produced a non-read-only plan")
+            )));
         }
-        DeviceAction::Port(original) => original,
+        let receipt = arkdeck_provider_hdc::run(&plan, hdc.dispatch)
+            .map_err(|failure| failed(dispatch_failure(&failure)))?;
+        let unbound = Expected {
+            connect_key: None,
+            identity_sha256: None,
+            tool_version: None,
+        };
+        Ok(readback.verify(&receipt, unbound, None))
     };
-    let failed = |error: String| {
-        Decision::Unknown(format!(
-            "dedicated readback failed: {error}; original not resent"
-        ))
+    let presence = |readback: Option<StepAction>, desired: Option<bool>| match readback {
+        None => Decision::Unknown(NO_READBACK.into()),
+        Some(readback) => match read(&readback) {
+            Ok(outcome) => verify_presence(desired, &outcome),
+            Err(decision) => decision,
+        },
     };
-    let Some(readback) = original.readback() else {
-        return Decision::Unknown("mutation has no dedicated readback; original not resent".into());
-    };
-    let plan = match readback.lower(
-        &reconciliation_step_id(step, attempt),
-        Some(&facts.connect_key),
-    ) {
-        Ok(plan) => plan,
-        Err(error) => return failed(error),
-    };
-    if !matches!(readback.effect(), "hostOnly" | "readOnly") {
-        return failed(format!(
-            "internalFailure({})",
-            swift_string("mutation reconciliation produced a non-read-only plan")
-        ));
+    match action {
+        DeviceAction::ReadOnly => Decision::NotExecuted,
+        DeviceAction::Pointer => Decision::Unknown(NO_READBACK.into()),
+        DeviceAction::Port(original) => presence(
+            original.readback().map(StepAction::Port),
+            original.desired_presence(),
+        ),
+        DeviceAction::Hap(original) => presence(
+            original.readback().map(StepAction::Hap),
+            original.desired_presence(),
+        ),
+        DeviceAction::Written(path) => presence(
+            Some(StepAction::Hap(HapAction::ReadOwnedPathPresence {
+                path: path.clone(),
+            })),
+            Some(true),
+        ),
+        DeviceAction::Native(original) => {
+            let Some(readback) = original.readback() else {
+                return Decision::Unknown(NO_READBACK.into());
+            };
+            match read(&StepAction::Native(Box::new(readback))) {
+                Ok(outcome) => match original.reconcile(outcome) {
+                    Reconcile::ConfirmedCompleted(summary) => {
+                        Decision::Completed(summary.into_keys().collect())
+                    }
+                    Reconcile::ConfirmedNotExecuted => Decision::NotExecuted,
+                    Reconcile::StillUnknown(reason) => Decision::Unknown(reason),
+                },
+                Err(decision) => decision,
+            }
+        }
     }
-    let receipt = match arkdeck_provider_hdc::run(&plan, hdc.dispatch) {
-        Ok(receipt) => receipt,
-        Err(failure) => return failed(dispatch_failure(&failure)),
-    };
-    let outcome = match receipt.subprocesses.first() {
-        Some(sole) => readback.verify(sole),
-        None => Outcome::Unknown("dispatch produced no process result".into()),
-    };
-    verify_readback(original, &outcome)
 }
 
 /// Swift `HDCObservationProviderAdapter.verifyReconciliationReadback` for a
-/// port rule: a definite presence equal to the one the change wanted
-/// concludes it completed, the other one not executed; anything else stays
-/// unknown.
-fn verify_readback(original: &PortAction, outcome: &Outcome) -> Decision {
+/// presence readback: a definite presence equal to the one the mutation
+/// wanted concludes it completed, the other one not executed; anything else
+/// stays unknown.
+fn verify_presence(desired: Option<bool>, outcome: &Outcome) -> Decision {
     let present = match outcome {
         Outcome::Verified(summary) => match summary.get("present").map(String::as_str) {
             Some("true") => Some(true),
@@ -338,7 +467,7 @@ fn verify_readback(original: &PortAction, outcome: &Outcome) -> Decision {
     let Some(present) = present else {
         return Decision::Unknown("dedicated readback did not produce a definite presence".into());
     };
-    let Some(desired) = original.desired_presence() else {
+    let Some(desired) = desired else {
         return Decision::Unknown("readback was not paired with a mutation".into());
     };
     if present == desired {
@@ -383,6 +512,17 @@ mod tests {
 
     #[test]
     fn a_persisted_action_is_materialized_as_swift_materializes_it() {
+        let job = "job-0123456789abcdef0123456789abcdef";
+        let owned = |step: &str, suffix: &str| {
+            json!({"jobId": job, "stepId": step, "nonce": "owned",
+                "remotePath": format!("/data/local/tmp/arkdeck-{job}-{step}-owned{suffix}")})
+        };
+        let with = |mut arguments: Value, extra: Value| {
+            for (key, value) in extra.as_object().unwrap() {
+                arguments[key] = value.clone();
+            }
+            arguments
+        };
         for action in [
             json!({"kind": "hdc.observeTool", "arguments": {}}),
             json!({"kind": "hdc.observeServer", "arguments": {"ignored": 1}}),
@@ -395,6 +535,15 @@ mod tests {
                 "byteBudget": 8388608}}),
             json!({"kind": "hdc.captureUIDump", "arguments": {"scope": "componentDetail",
                 "byteBudget": 8388608, "windowId": "12", "componentId": "3"}}),
+            json!({"kind": "hdc.runDebugTemplate", "arguments": {"templateId": "device.uptime"}}),
+            json!({"kind": "hdc.queryPackageReadback",
+                "arguments": {"bundleName": "com.example.demo"}}),
+            json!({"kind": "hdc.verifyProcessState",
+                "arguments": {"bundleName": "com.example.demo"}}),
+            json!({"kind": "hdc.observeApplicationLiveness", "arguments": {
+                "bundleName": "com.example.demo", "processName": "com.example.demo"}}),
+            json!({"kind": "hdc.receiveOwnedArtifact", "arguments": with(
+                owned("capture-ui-tree", ".json"), json!({"maximumBytes": 16777216}))}),
         ] {
             assert!(
                 matches!(materialize(&action), Ok(DeviceAction::ReadOnly)),
@@ -419,14 +568,63 @@ mod tests {
                 "localPort": 23461, "remotePort": 34571}})),
             Ok(DeviceAction::Port(PortAction::Remove(read))) if read == rule
         ));
+        // A debug HAP's mutations and a cleanup of an owned path, whichever
+        // operation ran it, are read back through the debug HAP's family.
+        for (action, readback) in [
+            (
+                json!({"kind": "hdc.installPackage", "arguments": with(owned("send-hap", ".hap"),
+                    json!({"artifactLeaseId": "lease-v1:job-input-hap:ART-1",
+                        "bundleName": "com.example.demo"}))}),
+                "hdc.readPackagePresence",
+            ),
+            (
+                json!({"kind": "hdc.startAbility", "arguments": {
+                    "bundleName": "com.example.demo", "abilityName": "EntryAbility"}}),
+                "hdc.readProcessPresence",
+            ),
+            (
+                json!({"kind": "hdc.cleanupOwnedRemotePath",
+                    "arguments": owned("capture-ui-tree", ".json")}),
+                "hdc.readOwnedPathPresence",
+            ),
+        ] {
+            let Ok(DeviceAction::Hap(original)) = materialize(&action) else {
+                panic!("{action}");
+            };
+            assert_eq!(original.readback().unwrap().persisted().0, readback);
+        }
+        // A capture's owned file, whose suffix follows its step and type.
+        for (action, path) in [
+            (
+                json!({"kind": "hdc.captureComponentTree",
+                    "arguments": owned("capture-ui-tree", ".json")}),
+                format!("/data/local/tmp/arkdeck-{job}-capture-ui-tree-owned.json"),
+            ),
+            (
+                json!({"kind": "hdc.captureScreenshot", "arguments": with(
+                    owned("capture-screenshot", ".jpeg"), json!({"imageType": "jpeg"}))}),
+                format!("/data/local/tmp/arkdeck-{job}-capture-screenshot-owned.jpeg"),
+            ),
+            (
+                json!({"kind": "hdc.captureTrace", "arguments": with(
+                    owned("capture-trace", ".htrace"), json!({"durationSeconds": 5,
+                        "categories": ["ability"], "bufferKB": 4096}))}),
+                format!("/data/local/tmp/arkdeck-{job}-capture-trace-owned.htrace"),
+            ),
+        ] {
+            let Ok(DeviceAction::Written(written)) = materialize(&action) else {
+                panic!("{action}");
+            };
+            assert_eq!(written.remote_path, path);
+        }
         for (action, message) in [
             (
                 json!({"kind": "hdc.observeDevice", "arguments": {}}),
-                "unsupportedAction(\"persisted hdc.observeDevice is missing string connectKey\")",
+                "persisted hdc.observeDevice is missing string connectKey",
             ),
             (
                 json!({"kind": "hdc.queryProperty", "arguments": {"property": "persist.sys"}}),
-                "unsupportedAction(\"persisted query property is not allowlisted\")",
+                "persisted query property is not allowlisted",
             ),
             (
                 json!({"kind": "hdc.observeStorage", "arguments": {"requiredBytes": 0}}),
@@ -445,55 +643,89 @@ mod tests {
             (
                 json!({"kind": "hdc.captureUIDump", "arguments": {"scope": "windowList",
                     "byteBudget": 8388608, "windowId": null}}),
-                "unsupportedAction(\"persisted hdc.captureUIDump.windowId is not a string\")",
+                "persisted hdc.captureUIDump.windowId is not a string",
             ),
             (
                 json!({"kind": "hdc.injectPointerInput", "arguments": {"gesture": "tap",
                     "pointerY": 1500, "displayWidth": 1280, "displayHeight": 2832}}),
-                "unsupportedAction(\"persisted hdc.injectPointerInput is missing integer pointerX\")",
+                "persisted hdc.injectPointerInput is missing integer pointerX",
             ),
             (
                 json!({"kind": "hdc.createPortForward", "arguments": {"direction": "sideways",
                     "localPort": 23461, "remotePort": 34571}}),
-                "unsupportedAction(\"persisted hdc.createPortForward.direction is not a closed port direction\")",
+                "persisted hdc.createPortForward.direction is not a closed port direction",
             ),
             (
                 json!({"kind": "hdc.createPortForward", "arguments": {"direction": "forward",
                     "localPort": 80, "remotePort": 34571}}),
                 "outOfBounds(field: \"localPort\", detail: \"1024...65535\")",
             ),
+            (
+                json!({"kind": "hdc.runDebugTemplate", "arguments": {"templateId": "shell"}}),
+                "persisted debug template is not in the closed set",
+            ),
+            (
+                json!({"kind": "hdc.captureComponentTree", "arguments": with(
+                    owned("capture-ui-tree", ".json"),
+                    json!({"remotePath": "/data/local/tmp/elsewhere.json"}))}),
+                "persisted hdc.captureComponentTree remote path does not match its owned components",
+            ),
+            // Swift's materialization does not know the screen sequence's
+            // kinds: a reconcile of either fails once it has begun.
+            (
+                json!({"kind": "hdc.captureScreenSequence", "arguments": owned(
+                    "capture-screen-sequence", ".tar")}),
+                "persisted typed provider action kind hdc.captureScreenSequence is unknown",
+            ),
+            (
+                json!({"kind": "hdc.cleanupScreenSequence", "arguments": owned(
+                    "capture-screen-sequence", ".tar")}),
+                "persisted typed provider action kind hdc.cleanupScreenSequence is unknown",
+            ),
         ] {
             assert_eq!(refusal(action), message);
         }
-        assert!(!ported("hdc.readPortForwardPresence"));
-        assert!(!ported("hdc.captureCrashIndex"));
-        assert!(!ported("hdc.captureTrace"));
-        assert!(!ported("hdc.receiveOwnedArtifact"));
-        assert!(ported("hdc.createPortForward"));
+        for kind in [
+            "hdc.readPortForwardPresence",
+            "hdc.readPackagePresence",
+            "hdc.readProcessPresence",
+            "hdc.readOwnedPathPresence",
+            "hdc.readOwnedDirectoryPresence",
+            "hdc.captureCrashIndex",
+            "hdc.captureCrashLog",
+        ] {
+            assert!(!ported(kind), "{kind}");
+        }
+        for kind in [
+            "hdc.createPortForward",
+            "hdc.installPackage",
+            "hdc.publishNativeLibrary",
+            "hdc.captureComponentTree",
+            "hdc.captureScreenSequence",
+        ] {
+            assert!(ported(kind), "{kind}");
+        }
     }
 
     #[test]
-    fn a_port_rule_readback_concludes_as_swift_verifies_it() {
-        let rule = PortRule::new(Direction::Forward, 23461, 34571).unwrap();
+    fn a_presence_readback_concludes_as_swift_verifies_it() {
         let present = |value: &str| {
             Outcome::Verified(BTreeMap::from([("present".to_owned(), value.to_owned())]))
         };
-        let create = PortAction::Create(rule.clone());
-        let remove = PortAction::Remove(rule.clone());
         assert!(matches!(
-            verify_readback(&create, &present("true")),
+            verify_presence(Some(true), &present("true")),
             Decision::Completed(keys) if keys == ["postconditionPresent"]
         ));
         assert!(matches!(
-            verify_readback(&create, &present("false")),
+            verify_presence(Some(true), &present("false")),
             Decision::NotExecuted
         ));
         assert!(matches!(
-            verify_readback(&remove, &present("false")),
+            verify_presence(Some(false), &present("false")),
             Decision::Completed(_)
         ));
         assert!(matches!(
-            verify_readback(&remove, &present("true")),
+            verify_presence(Some(false), &present("true")),
             Decision::NotExecuted
         ));
         for indefinite in [
@@ -502,13 +734,13 @@ mod tests {
             Outcome::Verified(BTreeMap::new()),
         ] {
             assert!(matches!(
-                verify_readback(&create, &indefinite),
+                verify_presence(Some(true), &indefinite),
                 Decision::Unknown(reason)
                     if reason == "dedicated readback did not produce a definite presence"
             ));
         }
         assert!(matches!(
-            verify_readback(&PortAction::ReadPresence(rule), &present("true")),
+            verify_presence(None, &present("true")),
             Decision::Unknown(reason) if reason == "readback was not paired with a mutation"
         ));
         assert_eq!(

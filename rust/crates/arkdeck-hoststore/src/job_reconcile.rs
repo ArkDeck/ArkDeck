@@ -30,11 +30,21 @@
 //! the capability outcome a crash lost is repaired from the journal's proof
 //! (`job_lineage_repair.rs`); nothing is dispatched.
 //!
+//! A debug HAP's reconcile keeps its failure: its record is durable before
+//! the decision is, and an intent confirmed not executed leaves it
+//! `finalizing`, whose failure finalization (`finalizeDebugHAPFailure`) runs
+//! at once through the runner — the compensations its succeeded steps
+//! declared, under the use the Job consumed — as it does for a debug HAP a
+//! restart left `finalizing`. A Job the readback confirms completed waits at
+//! its confirmed safe boundary, where `job.run` resumes it.
+//!
 //! What is not ported is refused with nothing written or dispatched, and
-//! answered with its status only where Swift writes nothing: a `debug.hap@1`
-//! Job, a native library deployment whose outcome is unknown, a Job parked on
-//! an action `job_reconcile_device.rs` does not reconcile, and any other
-//! operation. No answer carries details.
+//! answered with its status only where Swift writes nothing: a terminal
+//! debug HAP whose lineage a repair would write, a debug HAP parked on a
+//! declared compensation, on its compensation identity proof or on a
+//! failure decision its journal already holds, a Job parked on an action
+//! `job_reconcile_device.rs` does not reconcile, and any other operation. No
+//! answer carries details.
 use crate::artifact_read_owner::{ArtifactReadStore, swift_string};
 use crate::capability_store::{CapabilityStore, UseOutcome};
 use crate::device_facts::{self, HdcComposition};
@@ -44,7 +54,7 @@ use crate::job_lineage_repair::{self as lineage, CONFIRMED_NOT_EXECUTED, RepairE
 use crate::job_owner::JobStore;
 use crate::job_owner::import_references::ImportReference;
 use crate::job_record::{JobRecord, STATES, terminal};
-use crate::job_run::{Run, RunRefusal, binding_refusal, failure};
+use crate::job_run::{JobRunner, Run, RunRefusal, binding_refusal, failure};
 use crate::operation_catalog::CatalogOperation;
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::WireError;
@@ -158,9 +168,10 @@ fn unbound_source_failure(marker: &Value) -> bool {
         && marker["policyGeneration"] == "0"
 }
 
-/// Swift's `DeviceProviderError.unsupportedAction`.
+/// Swift's `DeviceProviderError.unsupportedAction`, which describes itself
+/// by its detail alone.
 fn unsupported(detail: &str) -> WireError {
-    other(format!("unsupportedAction({})", swift_string(detail)))
+    other(detail)
 }
 
 /// Swift `PersistedTypedProviderAction.materialize()` for `analyzer.analyze`,
@@ -405,13 +416,19 @@ pub struct JobReconciler<'a> {
     /// `recordCapabilityOutcome`) and repairs. Without one no Job admitted
     /// under a runtime capability is reconciled where Swift would write it.
     pub capabilities: Option<&'a CapabilityStore>,
+    /// The runner a debug HAP's failure finalization runs through, composed
+    /// over the same owners and HDC composition (Swift
+    /// `finalizeDebugHAPFailure`). Without one no debug HAP is reconciled
+    /// where Swift would finalize it.
+    pub runner: Option<&'a JobRunner<'a>>,
 }
 
-/// Whether this Runtime reconciles a Job of `operation`: the analyzer, and
-/// the device-bound operations it runs but a debug HAP, whose failure
-/// finalization and compensation reconcile are not ported.
-fn reconciled(operation: &str) -> bool {
-    operation == ANALYZER || (crate::device_run::runs(operation) && operation != HAP)
+/// Whether this Runtime reconciles a Job of `operation` in `state`: the
+/// analyzer, and the device-bound operations it runs — but a terminal debug
+/// HAP, whose own lineage repair is not ported.
+fn reconciled(operation: &str, state: &str) -> bool {
+    operation == ANALYZER
+        || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
 }
 
 impl JobReconciler<'_> {
@@ -421,27 +438,30 @@ impl JobReconciler<'_> {
             return Err(refused("invalidParams", "jobId is required"));
         };
         let record = self.read(id)?;
-        if !reconciled(record.operation()) {
+        if !reconciled(record.operation(), &record.state) {
             return unported(record);
         }
         if terminal(&record.state) {
             return self.released(record);
         }
-        if let Some(refusal) = self.device_refusal(&record) {
+        if let Some(refusal) = self.device_refusal(&record)? {
             return Err(refused("rejected", refusal));
         }
         self.resident(record)
     }
 
     /// Why this owner does not reconcile a device-bound Job whose outcome is
-    /// unknown, refused before anything is written: a native library
-    /// deployment, no HDC composition to resolve the Target's facts through
-    /// or no capability store for a use the reconcile settles, or a parked
-    /// action whose reconcile is not ported.
-    fn device_refusal(&self, record: &JobRecord) -> Option<String> {
+    /// unknown (or a debug HAP left `finalizing`), refused before anything is
+    /// written: no HDC composition to resolve the Target's facts through, no
+    /// capability store for a use the reconcile settles, no runner for a
+    /// debug HAP's failure finalization, a debug HAP lane this Runtime does
+    /// not port, or a parked action whose reconcile is not ported.
+    fn device_refusal(&self, record: &JobRecord) -> Result<Option<String>, WireError> {
         let operation = record.operation();
-        if operation == ANALYZER || !record.outcome_unknown() {
-            return None;
+        let hap_finalizing =
+            operation == HAP && record.state == "finalizing" && !record.outcome_unknown();
+        if operation == ANALYZER || (!record.outcome_unknown() && !hap_finalizing) {
+            return Ok(None);
         }
         let refusal = |what: String| {
             Some(format!(
@@ -449,30 +469,69 @@ impl JobReconciler<'_> {
                 record.job_id
             ))
         };
-        if operation == NATIVE {
-            return refusal(format!(
-                "runs {operation}, which the Rust Runtime does not reconcile yet"
-            ));
-        }
         if self.hdc.is_none() {
-            return refusal(format!(
+            return Ok(refusal(format!(
                 "runs {operation}, and this owner holds no HDC composition to reconcile it"
-            ));
+            )));
         }
         if lineage::runtime_capability(record) && self.capabilities.is_none() {
-            return refusal(
+            return Ok(refusal(
                 "settles a runtime capability use, and this owner holds no capability store".into(),
-            );
+            ));
+        }
+        if operation == HAP {
+            if self.runner.is_none() {
+                return Ok(refusal(format!(
+                    "runs {operation}, and this owner holds no runner to finalize its failure"
+                )));
+            }
+            if hap_finalizing {
+                return Ok(None);
+            }
+            if let Some(lane) = self.unported_hap_lane(record)? {
+                return Ok(refusal(format!(
+                    "waits on {lane}, which the Rust Runtime does not reconcile yet"
+                )));
+            }
         }
         let kind = record
             .recovery_action()
             .map(|action| action["kind"].as_str().unwrap_or_default());
-        match kind {
+        Ok(match kind {
             Some(kind) if !device::ported(kind) => refusal(format!(
                 "waits on {kind}, which the Rust Runtime does not reconcile yet"
             )),
             _ => None,
+        })
+    }
+
+    /// The debug HAP recovery lanes Swift's `reconcileOwned` runs that this
+    /// Runtime does not port, read from the record and the journal alone: a
+    /// reconcile of a declared compensation's own intent, the identity proof
+    /// of a compensation that never had one, and the completion of a failure
+    /// decision the journal already holds.
+    fn unported_hap_lane(&self, record: &JobRecord) -> Result<Option<&'static str>, WireError> {
+        let Some(intent) = record.recovery_intent() else {
+            return Ok(Some("its declared compensation's identity proof"));
+        };
+        let events = journal_events(self.jobs, &record.job_id)?;
+        if events
+            .iter()
+            .any(|event| event["eventId"] == intent && event["kind"] == "compensationIntent")
+        {
+            return Ok(Some("a declared compensation"));
         }
+        let directory = self
+            .jobs
+            .job_directory(&record.job_id)
+            .map_err(|error| other(format!("{error:?}")))?;
+        let facts = inspect_journal(&directory).map_err(|error| other(format!("{error}")))?;
+        let decided = events
+            .last()
+            .is_some_and(|last| last["kind"] == "reconcileOutcome")
+            || (facts.current_state.as_deref() == Some("finalizing")
+                && facts.last_reconcile_outcome_certainty.as_deref() == Some("confirmed"));
+        Ok(decided.then_some("the failure decision its journal holds"))
     }
 
     /// The answer to `job.reconcile` while a run of the Job holds it: that
@@ -561,6 +620,16 @@ impl JobReconciler<'_> {
     /// outcome is known and that is no stuck cancellation is answered as it
     /// is: the lineage repair Swift calls there needs a failed Job.
     fn resident(&self, record: JobRecord) -> Result<Value, WireError> {
+        // Swift continues a debug HAP's failure finalization first.
+        if record.operation() == HAP && record.state == "finalizing" && !record.outcome_unknown() {
+            let directory = self
+                .jobs
+                .job_directory(&record.job_id)
+                .map_err(|error| other(format!("{error:?}")))?;
+            let mut held = Held::open(record, directory, self.now)?;
+            self.finalize_hap_failure(&mut held)?;
+            return held.release(self.jobs, self.sessions);
+        }
         let settles = matches!(
             record.state.as_str(),
             "cancelRequested" | "cancellingAtSafeBoundary"
@@ -588,6 +657,26 @@ impl JobReconciler<'_> {
                 Err(error)
             }
         }
+    }
+
+    /// Swift `finalizeDebugHAPFailure` for a debug HAP the reconcile holds
+    /// `finalizing`: it takes over the use the Job consumed, then its failure
+    /// finalization concludes through the runner, which settles that use.
+    fn finalize_hap_failure(&self, held: &mut Held) -> Result<(), WireError> {
+        let (Some(runner), Some(hdc)) = (self.runner, self.hdc) else {
+            return Err(other(
+                "the Runtime runner is unavailable for a debug HAP's finalization",
+            ));
+        };
+        runner
+            .take_over_held_use(&mut held.run)
+            .map_err(|message| refused("rejected", message))?;
+        runner
+            .conclude_hap_failure(&mut held.run, hdc)
+            .map_err(from_run)?;
+        held.ahead = false;
+        held.store();
+        Ok(())
     }
 
     /// Swift's settlement of a cancellation whose executor no longer exists:
@@ -823,11 +912,13 @@ impl JobReconciler<'_> {
             }
             Err(error) => return Err(error),
         };
-        // None of these operations names an input Artifact to resolve again.
+        // Swift `resolvedInputArtifact`: a debug HAP's entry package or a
+        // native deployment's library, resolved again and still bound.
+        self.resolve_source(&held.run.record)?;
         let parked = device::materialize(&action)?;
         exact(&events)?;
         let decision =
-            durable.unwrap_or_else(|| device::decide(&parked, hdc, &facts, &step, &attempt));
+            durable.unwrap_or_else(|| device::decide(&parked, hdc, &facts, &id, &step, &attempt));
         self.finish(
             held,
             &events,
@@ -839,10 +930,18 @@ impl JobReconciler<'_> {
         )
     }
 
-    /// Swift `resolvedInputArtifact(jobID:)` for an analyzer: its source
-    /// lease resolved again, then checked against the materialized request.
+    /// Swift `resolvedInputArtifact(jobID:)`: the lease the operation's input
+    /// names (an analyzer's source, a debug HAP's entry package, a native
+    /// deployment's library) resolved again, then checked against the
+    /// materialized request.
     fn resolve_source(&self, record: &JobRecord) -> Result<Option<Source>, WireError> {
-        let Some(lease) = record.request["inputs"]["sourceArtifactRef"].as_str() else {
+        let input = match record.operation() {
+            ANALYZER => "sourceArtifactRef",
+            HAP => "hapArtifactLease",
+            NATIVE => "libraryArtifactLease",
+            _ => return Ok(None),
+        };
+        let Some(lease) = record.request["inputs"][input].as_str() else {
             return Ok(None);
         };
         let leased = match ImportReference::parse(lease) {
@@ -894,6 +993,26 @@ impl JobReconciler<'_> {
             ) && event["payload"]["correlatesToIntentEventId"] == intent
                 && event["payload"]["outcomeCertainty"] == "confirmed"
         });
+        let confirmed_not_performed = || {
+            failure(
+                "executionConfirmedNotPerformed",
+                "externalTool",
+                "runtimeDecisionRequired",
+                "submitNewTypedRequestAfterRuntimeProof",
+            )
+        };
+        // A debug HAP's record is durable before its decision is, carrying
+        // the failure an intent confirmed not executed leaves it with: its
+        // failure finalization keeps that failure whatever happens after.
+        let hap = held.run.record.operation() == HAP;
+        if hap {
+            if matches!(decision, Decision::NotExecuted) {
+                held.run
+                    .record
+                    .set_operation_failure(Some(confirmed_not_performed()));
+            }
+            held.persist(self.jobs)?;
+        }
         // The correlated outcome, unless the journal already holds one.
         let outcome =
             |held: &mut Held, result: &str, code: Option<&str>| -> Result<(), WireError> {
@@ -997,23 +1116,24 @@ impl JobReconciler<'_> {
             }
             Decision::NotExecuted => {
                 held.run.record.clear_outcome_unknown();
-                held.run.record.set_operation_failure(Some(failure(
-                    "executionConfirmedNotPerformed",
-                    "externalTool",
-                    "runtimeDecisionRequired",
-                    "submitNewTypedRequestAfterRuntimeProof",
-                )));
-                held.transition(
-                    "finalizing",
-                    "failed",
-                    &format!("reconciliation confirmed {step} did not complete"),
-                    None,
-                )?;
-                let now = self.clock()?;
-                let record = &mut held.run.record;
-                record.set_recovery(None, None, None);
-                record.finish(&now);
-                record
+                held.run
+                    .record
+                    .set_operation_failure(Some(confirmed_not_performed()));
+                // A debug HAP stays `finalizing` for its failure finalization.
+                if !hap {
+                    held.transition(
+                        "finalizing",
+                        "failed",
+                        &format!("reconciliation confirmed {step} did not complete"),
+                        None,
+                    )?;
+                    let now = self.clock()?;
+                    let record = &mut held.run.record;
+                    record.set_recovery(None, None, None);
+                    record.finish(&now);
+                }
+                held.run
+                    .record
                     .timeline
                     .push(format!("reconciled: confirmed not executed {step}"));
             }
@@ -1026,6 +1146,11 @@ impl JobReconciler<'_> {
             }
         }
         held.persist(self.jobs)?;
+        // Swift `finalizeDebugHAPFailure`, which settles the use itself.
+        if hap && next == "finalizing" {
+            self.finalize_hap_failure(held)?;
+            return Ok(None);
+        }
         if let Some((outcome, state)) = settled {
             lineage::record_capability_outcome(
                 &held.run.record,
@@ -1043,11 +1168,10 @@ impl JobReconciler<'_> {
     }
 }
 
-/// A Job of an operation this Runtime does not reconcile yet (a debug HAP,
-/// whose failure finalization, compensation reconcile and lineage repair
-/// are not ported, or an operation it does not run): its status where
-/// Swift's reconcile writes nothing for it, and otherwise a refusal with
-/// nothing written.
+/// A Job this Runtime does not reconcile yet (a terminal debug HAP, whose
+/// own lineage repair is not ported, or a Job of an operation it does not
+/// run): its status where Swift's reconcile writes nothing for it, and
+/// otherwise a refusal with nothing written.
 fn unported(record: JobRecord) -> Result<Value, WireError> {
     let state = record.state.as_str();
     let writes = if terminal(state) {
@@ -1149,19 +1273,19 @@ mod tests {
         for (refused, message) in [
             (
                 extra,
-                "unsupportedAction(\"persisted analyzer.analyze has a non-closed recovery identity\")",
+                "persisted analyzer.analyze has a non-closed recovery identity",
             ),
             (
                 uppercase,
-                "unsupportedAction(\"persisted analyzer.analyze has an invalid recovery identity\")",
+                "persisted analyzer.analyze has an invalid recovery identity",
             ),
             (
                 empty,
-                "unsupportedAction(\"persisted analyzer.analyze has an invalid recovery identity\")",
+                "persisted analyzer.analyze has an invalid recovery identity",
             ),
             (
                 foreign,
-                "unsupportedAction(\"persisted typed provider action kind hdc.shell is unknown\")",
+                "persisted typed provider action kind hdc.shell is unknown",
             ),
         ] {
             let Err(error) = materialize(&refused) else {

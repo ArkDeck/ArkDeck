@@ -232,23 +232,27 @@ fn a_compensation_through_an_unproven_tool_is_never_dispatched() {
         (&json!([]), &json!("use 1 is pending")),
         "{inspected}"
     );
-    // Swift would continue the lane from here; this Runtime resumes nothing
-    // before recovery is ported, and dispatches nothing to say so.
+    // A second run continues the lane as Swift's does, under the use the Job
+    // holds; the tool still cannot be proved, so again nothing is
+    // dispatched, the refusal is thrown past the lane and the Job stays
+    // `finalizing` with its use pending.
     let calls = owners.calls();
     let again = owners
         .runner(&hdc, &publisher, true)
         .handle(&Map::from_iter([("jobId".into(), json!(job))]))
         .unwrap_err();
     assert_eq!(
-        (again.code, again.message),
+        (again.code, again.message.as_str()),
         (
-            "resourceConflict",
-            format!(
-                "job {job} is finalizing; the Rust Runtime resumes no Job before recovery is ported"
-            )
+            "internalError",
+            "the Runtime could not complete the Job lifecycle request"
         )
     );
     assert_eq!(owners.calls(), calls);
+    assert_eq!(owners.record(&job)["state"], "finalizing");
+    let journal = fs::read_to_string(owners.job_file(&job, "journal.jsonl")).unwrap();
+    assert!(!journal.contains("compensationIntent"), "{journal}");
+    assert_eq!(uses(&owners), 1, "no second use is consumed");
 }
 
 /// What the device does to the first `uninstall` a compensation sends.

@@ -15,11 +15,17 @@
 //! prove, and every later device step waits for it. An optional step that
 //! fails is skipped with its reason and the Job goes on; a step whose outcome
 //! cannot be observed, optional or not, leaves its intent outstanding and
-//! parks the Job. Nothing is dispatched twice and no Job is resumed. A
-//! cancellation is honoured at the next step boundary, where Swift's step
-//! loop honours it. A step at or above `deviceMutation` consumes the Job's
-//! capability use before its intent can exist; a later one continues under
-//! that use once every fresh check has passed again. A port rule's readback is
+//! parks the Job. Nothing is dispatched twice. A Job is resumed as Swift's
+//! `runOwned` resumes it — at the confirmed safe boundary a reconcile
+//! reached, or from `running` once a restart found nothing outstanding —
+//! and every step its journal confirmed succeeded is skipped, never run
+//! again; a debug HAP whose optional cleanup already failed owes its debt
+//! without a second attempt, and a debug HAP left `finalizing` has its
+//! failure finalization continued. A cancellation is honoured at the next
+//! step boundary, where Swift's step loop honours it. A step at or above
+//! `deviceMutation` consumes the Job's capability use before its intent can
+//! exist, unless the Job already holds one; a later one continues under that
+//! use once every fresh check has passed again. A port rule's readback is
 //! judged against the operation it serves, and a confirmed failure after the
 //! rule changed restores it before the Job fails.
 //!
@@ -305,7 +311,32 @@ impl JobRunner<'_> {
         run: &mut Run,
         hdc: &HdcComposition<'_>,
     ) -> Result<(), RunRefusal> {
+        // Swift `runOwned` continues a debug HAP's failure finalization
+        // before anything else.
+        if run.record.state == "finalizing" {
+            return self.conclude_hap_failure(run, hdc);
+        }
         self.execute_device_inner(run, hdc)?;
+        self.settle_run(run)
+    }
+
+    /// Swift `finalizeDebugHAPFailure` for a debug HAP already `finalizing`,
+    /// then the outcome of the use it ran under.
+    pub(crate) fn conclude_hap_failure(
+        &self,
+        run: &mut Run,
+        hdc: &HdcComposition<'_>,
+    ) -> Result<(), RunRefusal> {
+        let Some(descriptor) = descriptor(run.record.operation()) else {
+            return Err(uncertain());
+        };
+        self.perform_hap_failure_finalization(run, hdc, descriptor)?;
+        self.settle_run(run)
+    }
+
+    /// Swift `recordCapabilityOutcome` for the Job as its run left it:
+    /// parked, its whole use proved not executed, or concluded.
+    fn settle_run(&self, run: &Run) -> Result<(), RunRefusal> {
         let outcome = if run.record.state == "waitingForRecovery" {
             crate::capability_store::UseOutcome::OutcomeUnknown
         } else if self.hap_non_execution_proven(run)? {
@@ -316,7 +347,9 @@ impl JobRunner<'_> {
         self.settle_mutation(run, outcome)
     }
 
-    /// Swift `runOwned` for a device-bound HDC operation.
+    /// Swift `runOwned` for a device-bound HDC operation: from its admitted
+    /// boundary, from the confirmed safe boundary a reconcile reached, or
+    /// from `running` once a restart found nothing outstanding.
     fn execute_device_inner(
         &self,
         run: &mut Run,
@@ -324,7 +357,19 @@ impl JobRunner<'_> {
     ) -> Result<(), RunRefusal> {
         let started = run.clock()?;
         run.record.start(&started);
-        run.transition("preflight", "running", "steps-start")?;
+        match run.record.state.as_str() {
+            "preflight" => run.transition("preflight", "running", "steps-start")?,
+            "resumeAtConfirmedSafeBoundary" => run.transition(
+                "resumeAtConfirmedSafeBoundary",
+                "running",
+                "resume confirmed durable provider boundary",
+            )?,
+            "running" => run
+                .record
+                .timeline
+                .push("resumed: journal-confirmed provider boundary".into()),
+            _ => return Err(uncertain()),
+        }
         let Some(descriptor) = descriptor(run.record.operation()) else {
             return Err(uncertain());
         };
@@ -421,13 +466,31 @@ impl JobRunner<'_> {
             .unwrap_or_default()
             .to_owned();
         let revision = run.record.request["target"]["expectedBindingRevision"].as_i64();
-        let (mut skipped, mut completed) = (BTreeSet::new(), BTreeSet::new());
+        // Swift `completedStepIDs`: the steps whose success the journal
+        // confirms, which a resumed Job never runs again. A Job run from its
+        // admitted boundary has none.
+        let mut skipped = BTreeSet::new();
+        let mut completed = self.confirmed_steps(run)?;
         for step in &descriptor.steps {
             // The safe boundary between steps; the canceller's intent becomes
             // durable here and the run then drains.
             if self.cancellation.is_some_and(RunCancellation::pending) {
                 self.carry(run)?;
                 return Err(Stop::Cancelled);
+            }
+            if completed.contains(&step.step_id) {
+                run.record.timeline.push(format!(
+                    "resume skipped journal-confirmed step {}",
+                    step.step_id
+                ));
+                continue;
+            }
+            // Swift `resumeConfirmedOptionalDebugHAPCleanupDebt`: a debug
+            // HAP's optional cleanup whose failure its journal already
+            // confirms owes its debt and is skipped, never sent again.
+            if reference == HAP && step.optional && self.hap_cleanup_failed(run, step)? {
+                self.owe_optional_hap_cleanup(run, descriptor, step, &mut skipped)?;
+                continue;
             }
             if device_steps::engine_step(&step.kind) {
                 match step.kind.as_str() {
