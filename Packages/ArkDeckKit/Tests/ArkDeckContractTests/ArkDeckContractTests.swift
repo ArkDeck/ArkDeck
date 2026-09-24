@@ -102,8 +102,11 @@ final class ArkDeckContractTests: XCTestCase {
   }
 
   func testAppTargetImportsOnlyApprovedCompositionModulesFromArkDeckKit() throws {
+    // ArkDeckWorkflows left this list with CHG-2026-074 (TASK-XPA-019); the
+    // App-level boundary test in ArchitectureBoundaryContractTests also pins
+    // the Xcode link graph.
     let allowed = Set([
-      "ArkDeckCore", "ArkDeckClientKit", "ArkDeckWorkflows", "ArkDeckTraceAdapter",
+      "ArkDeckCore", "ArkDeckClientKit", "ArkDeckTraceAdapter",
     ])
     for (file, modules) in try importsByFile(under: repoRoot.appending(path: "ArkDeckApp")) {
       for module in modules where module.hasPrefix("ArkDeck") {

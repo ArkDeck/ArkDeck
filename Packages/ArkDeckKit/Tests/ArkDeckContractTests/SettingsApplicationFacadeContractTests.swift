@@ -84,7 +84,11 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     let supportFacade = try String(
       contentsOf: repository.appending(
         path:
-          "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/RuntimeSupportBundleApplicationFacade.swift"),
+          "Packages/ArkDeckKit/Sources/ArkDeckClientKit/RuntimeSupportBundleApplicationFacade.swift"),
+      encoding: .utf8)
+    let writer = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/LocalDiagnosticBundle.swift"),
       encoding: .utf8)
     let facade = settingsFacade + supportFacade
     let view = try String(
@@ -93,7 +97,13 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
       encoding: .utf8)
 
     XCTAssertTrue(facade.contains("trigger: .userInitiated"))
-    XCTAssertTrue(facade.contains("recentSessions: []"))
+    // The production request adds no App log, and the writer has no Session,
+    // journal or Artifact input to fill: nothing from Runtime storage, device
+    // raw included, can reach a bundle.
+    XCTAssertTrue(facade.contains("logs: [])"))
+    for sessionInput in ["recentSessions", "MaterializedSessionExport", "JournalReplay"] {
+      XCTAssertFalse(writer.contains(sessionInput), sessionInput)
+    }
     XCTAssertTrue(facade.contains("path: .redacted"))
     XCTAssertTrue(facade.contains("serverEndpoint: .redacted"))
     XCTAssertTrue(view.contains("!preview.deviceRawExcluded"))

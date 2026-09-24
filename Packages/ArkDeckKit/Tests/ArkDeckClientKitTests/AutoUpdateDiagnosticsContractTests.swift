@@ -1,13 +1,9 @@
 import ArkDeckClientKit
-import ArkDeckRuntime
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
-
-/// The updater logs through the SystemLogger adapter, which stays in Workflows
-/// with the rest of its production assembly. The updater's other contract tests
-/// are in ArkDeckClientKitTests.
+/// The updater logs through the SystemLogger adapter of its production
+/// assembly; both live in ClientKit beside the updater.
 final class AutoUpdateDiagnosticsContractTests: XCTestCase {
   func testTEST_AU_CONTRACT_001_updateDiagnosticsUseClosedPublicEventsOnly() throws {
     let root = FileManager.default.temporaryDirectory.appending(

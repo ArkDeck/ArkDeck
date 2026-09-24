@@ -1,10 +1,7 @@
-import ArkDeckClientKit
 import Foundation
 
-/// The Settings pane's diagnostic bundle: the support-bundle contract the CLI
-/// shares, adapted to the ClientKit Settings facade the App composes it into.
-/// The exporter stays here because it reads this host's files through
-/// ArkDeckStorage, which ClientKit does not import.
+/// The Settings pane's diagnostic bundle: the support-bundle provider the CLI
+/// shares, adapted to the Settings facade the App composes it into.
 public struct RuntimeSupportBundleSettingsExporter: SettingsDiagnosticBundleExporting {
   private let provider: any RuntimeSupportBundleProviding
 

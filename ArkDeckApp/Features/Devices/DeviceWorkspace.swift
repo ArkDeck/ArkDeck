@@ -35,6 +35,9 @@ final class DeviceListViewModel {
   private let provider: any DeviceListApplicationProviding
   private let displayNamesDefaults: UserDefaults
   private let waitWindow: TimeInterval
+  /// The observation a timed-out or unavailable verdict was drawn from, kept
+  /// only while that verdict stands.
+  @ObservationIgnored private var verdictObservation: DeviceListPresentation?
   @ObservationIgnored private var waitTask: Task<Void, Never>?
   @ObservationIgnored private var liveTask: Task<Void, Never>?
   @ObservationIgnored private var refreshGeneration: UInt64 = 0
@@ -152,6 +155,7 @@ final class DeviceListViewModel {
     // One main-actor assignment makes the complete row visible without a
     // second XPC request or render pass.
     presentation = current
+    endVerdictIfTheDeviceMoved(current)
     if isStartup {
       AppStartupPerformance.deviceCandidatesPublished()
       startupInformationReady = true
@@ -218,6 +222,7 @@ final class DeviceListViewModel {
     waitTask?.cancel()
     let deadline = Date.now.addingTimeInterval(waitWindow)
     authorizationWait = .polling(connectKey: connectKey, deadline: deadline)
+    verdictObservation = nil
     let provider = provider
     waitTask = Task { [weak self] in
       let result = await provider.waitForAuthorization(connectKey: connectKey)
@@ -240,6 +245,8 @@ final class DeviceListViewModel {
           connectKey: connectKey,
           reason: "Authorization wait ended without a terminal classification")
       }
+      self.verdictObservation =
+        self.authorizationWait == .idle ? nil : result.presentation
     }
   }
 
@@ -249,6 +256,26 @@ final class DeviceListViewModel {
     waitTask?.cancel()
     waitTask = nil
     authorizationWait = .idle
+    verdictObservation = nil
+  }
+
+  /// A finished wait's verdict describes the device as that wait left it.
+  /// The live observation keeps reading the device afterwards — ten-second
+  /// ticks, Re-check — and once a read shows it in another state the verdict
+  /// ends, so a device that was authorized in between never shows the old
+  /// timed-out banner when it reads Unauthorized again. ClientKit decides
+  /// what counts as another state; a failed read ends nothing.
+  private func endVerdictIfTheDeviceMoved(_ current: DeviceListPresentation) {
+    let waited: String
+    switch authorizationWait {
+    case .timedOut(let connectKey), .unavailable(let connectKey, _): waited = connectKey
+    case .idle, .polling: return
+    }
+    guard let concluded = verdictObservation,
+      current.endsTrustWaitVerdict(on: waited, concludedFrom: concluded)
+    else { return }
+    authorizationWait = .idle
+    verdictObservation = nil
   }
 
   func authorizationWaitState(forConnectKey connectKey: String) -> AuthorizationWait {

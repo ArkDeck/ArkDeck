@@ -112,6 +112,27 @@ public struct DeviceListPresentation: Sendable, Equatable {
   }
 
   public static let loading = DeviceListPresentation(availability: .checking, candidates: [])
+
+  /// Whether this later observation ends the verdict a finished trust wait
+  /// on `connectKey` left — the timed-out or unavailable conclusion it drew
+  /// from `concluded`, its own last observation.
+  ///
+  /// A verdict describes the device as its wait left it. A successful read
+  /// that shows the device in any other state — authorized, offline, gone, or
+  /// visible again after the concluding read could not see it — means that
+  /// episode is over; showing the verdict again, say when the device later
+  /// reads Unauthorized once more, would report a wait that never ran. A
+  /// read that failed says nothing about the device and ends nothing, and a
+  /// read in the same state leaves the verdict with the device it describes.
+  public func endsTrustWaitVerdict(
+    on connectKey: String, concludedFrom concluded: DeviceListPresentation
+  ) -> Bool {
+    guard availability == .available else { return false }
+    guard concluded.availability == .available else { return true }
+    let current = candidates.first { $0.connectKey == connectKey }?.state
+    let waitedOn = concluded.candidates.first { $0.connectKey == connectKey }?.state
+    return current != waitedOn
+  }
 }
 
 /// Result of the domain-owned bounded physical-trust wait. The App may show
