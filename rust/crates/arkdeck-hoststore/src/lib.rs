@@ -112,6 +112,10 @@ pub use hdc_impact_source::{CurrentJob, DeviceReading, DeviceRow, ManagedServerI
 #[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]
+mod crash_ledger;
+#[cfg(target_os = "macos")]
+pub use crash_ledger::{analyze_crash_ledger, crash_ledger_source};
+#[cfg(target_os = "macos")]
 mod artifact_publication;
 #[cfg(target_os = "macos")]
 pub use artifact_publication::collect_expired_artifacts;

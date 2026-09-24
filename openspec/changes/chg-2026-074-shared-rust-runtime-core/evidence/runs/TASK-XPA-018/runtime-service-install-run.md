@@ -236,4 +236,19 @@ a signed helper, an installed service or a device.
 
 ## CI
 
-Pending.
+PR #2143, head `8ff039cb9`, merged as `527459240` (2026-09-24 08:46 UTC).
+
+- Swift CI run 35976142607: success. `plan` selected the Rust lanes only;
+  `rust-checks` passed on host-independent checks, `ubuntu-latest`,
+  `windows-latest` and `macos-26` (job 107557046823, whose log shows
+  `runtime_service` (32), `cutover_preflight` and the
+  `runtime_service_install` unit tests run and pass,
+  `/private/tmp/arkdeck-s19-ci-2143-macos26.log`); `swift-tests`, `app-build`
+  and `ds-interactions` were skipped as not selected; the `swift` aggregate
+  passed.
+- SDD Guard run 35976142425: `guard` and `ds-tokens` passed.
+- Agent PR run 35976142433: `open-pr` passed.
+
+The analyzer gate this record leaves closed is opened by the Rust daemon's
+`--analyze-crash-ledger` mode
+(`evidence/runs/TASK-XPA-015/rust-crash-ledger-analyzer-run.md`).

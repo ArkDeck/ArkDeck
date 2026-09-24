@@ -601,11 +601,6 @@ pub struct ServiceHost<'a> {
     /// Whether the home is relocated with `CFFIXED_USER_HOME`, which the
     /// cutover preflight is then run with too.
     pub relocated_home: bool,
-    /// Whether the Rust daemon answers `--analyze-crash-ledger`, which the
-    /// plist's `ARKDECK_ANALYZER_PATH` names. Until that mode is ported an
-    /// update to the Rust daemon is refused by name (协调会话受托裁定
-    /// 2026-09-24, ruling 2); production passes `false`.
-    pub rust_daemon_analyzes_crash_ledgers: bool,
     /// How long one cutover preflight pass may run.
     pub preflight_timeout: Duration,
 }
@@ -1728,8 +1723,6 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         poll_interval: Duration::from_millis(100),
         default_daemon_bundle: default_daemon_bundle(),
         relocated_home: std::env::var_os("CFFIXED_USER_HOME").is_some_and(|home| !home.is_empty()),
-        // `--analyze-crash-ledger` is not ported to the Rust daemon yet.
-        rust_daemon_analyzes_crash_ledgers: false,
         preflight_timeout: Duration::from_secs(600),
     };
     let empty = Map::new();

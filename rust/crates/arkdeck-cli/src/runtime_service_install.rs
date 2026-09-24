@@ -20,15 +20,18 @@
 //! - The new helper's daemon is asked for the cutover preflight
 //!   (`arkdeck-agentd --cutover-preflight`, read-only): Swift's daemon refuses
 //!   the argument as unknown, the Rust daemon answers. An update to the Rust
-//!   daemon is the M5 cutover. Its plist's `ARKDECK_ANALYZER_PATH` must name a
-//!   daemon with `--analyze-crash-ledger`, which the Rust daemon does not have
-//!   yet, so it is refused by name before anything changes (ruling 2). Past
-//!   that gate (`ServiceHost::rust_daemon_analyzes_crash_ledgers`), the first
-//!   preflight pass must be clear, the service is booted out, a second pass
-//!   holding the Runtime's instance lock must be clear too — else the old
-//!   plist is bootstrapped back unchanged — its snapshot summary of the old
-//!   state directory is written to `LaunchAgent/cutover-snapshots/`, and the
-//!   plist asks for the production composition (ruling 1).
+//!   daemon is the M5 cutover. Its plist's `ARKDECK_ANALYZER_PATH` names that
+//!   daemon, so it must answer `--analyze-crash-ledger` as the Runtime runs it
+//!   (ruling 2): it is asked to analyze a probe listing as the Runtime's
+//!   analyzer child — through the Runtime's own runner, no environment, the
+//!   listing's `/.vol` alias — and must print Swift's recorded answer
+//!   byte for byte, else the update is refused by name before anything
+//!   changes. Past that gate the first preflight pass must be clear, the
+//!   service is booted out, a second pass holding the Runtime's instance lock
+//!   must be clear too — else the old plist is bootstrapped back unchanged —
+//!   its snapshot summary of the old state directory is written to
+//!   `LaunchAgent/cutover-snapshots/`, and the plist asks for the production
+//!   composition (ruling 1).
 //!
 //! `install` is Swift's zero-Runtime bootstrap path over the bootstrap
 //! registries' installation references, which have no Rust owner; it is
@@ -72,6 +75,16 @@ const BUNDLE_INDEX_SCHEMA: &str = "arkdeck.bootstrap-bundles/1";
 /// How many times the held pass is asked while another Runtime still holds
 /// the instance lock, one poll interval apart.
 const HELD_PASS_ATTEMPTS: u32 = 50;
+const ANALYZER_FLAG: &str = "--analyze-crash-ledger";
+/// The listing a Rust daemon is asked to analyze before a plist names it as
+/// `ARKDECK_ANALYZER_PATH`, and Swift's answer to it: the
+/// `runtime-service-probe` case of the recorded Swift oracle
+/// (`rust/tests/fixtures/crash-ledger-analyzer/oracle.json`).
+pub const ANALYZER_PROBE_LISTING: &[u8] =
+    b"Fault log list:\r\n******\r\njscrash-com.example.my-app-20010039-20260924000000\r\n******\r\n";
+pub const ANALYZER_PROBE_ANSWER: &[u8] = br#"{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"bundle":"com.example.my-app","kind":"jscrash","name":"jscrash-com.example.my-app-20010039-20260924000000","timestamp":"20260924000000","uid":"20010039"}],"schemaVersion":"1.0.0","status":"answered"}"#;
+/// The Runtime's own budget for the analyzer (`AnalyzerProfile::crash_signature`).
+const ANALYZER_PROBE_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn usage(message: impl Into<String>) -> PlainFailure {
     PlainFailure::new(64, message)
@@ -287,14 +300,17 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
     let first = match probe(host, &source, false)? {
         Runtime::Swift => None,
         Runtime::Rust(first) => {
-            if !host.rust_daemon_analyzes_crash_ledgers {
+            // Ruling 2: the plist names this daemon as its analyzer.
+            let daemon = source.join("Contents/MacOS").join(DAEMON_EXECUTABLE_NAME);
+            if let Err(reason) = analyzes_crash_ledgers(&daemon) {
                 return Err(PlainFailure::new(
                     69,
                     format!(
                         "runtime service update would point the LaunchAgent at the Rust daemon \
-                         in {}, whose plist names it as ARKDECK_ANALYZER_PATH: the Rust daemon \
-                         has no --analyze-crash-ledger mode yet, and the analyzer is never \
-                         pointed at the Swift daemon or left out; nothing was changed",
+                         in {}, whose plist names it as ARKDECK_ANALYZER_PATH, but it does not \
+                         answer --analyze-crash-ledger as the Runtime runs its analyzer ({reason}); \
+                         the analyzer is never pointed at the Swift daemon or left out; nothing \
+                         was changed",
                         text(&source)
                     ),
                 ));
@@ -587,6 +603,87 @@ fn probe(host: &ServiceHost, bundle: &Path, hold: bool) -> Result<Runtime, Plain
                 )
             ),
         )),
+    }
+}
+
+/// Whether `daemon` answers `--analyze-crash-ledger` as the Runtime's analyzer
+/// child: run through the Runtime's own runner (the pinned executable, no
+/// environment, the source's `/.vol` alias, the Runtime's budget), it must
+/// exit 0 and print Swift's answer to the probe listing byte for byte. The
+/// listing is written to a private directory of the account's temporary
+/// directory and removed with it; nothing else is written.
+fn analyzes_crash_ledgers(daemon: &Path) -> Result<(), String> {
+    use arkdeck_platform::{AnalyzerLimits, AnalyzerTermination, VerifiedSource, VerifiedTool};
+    let tool = sha256_file(daemon)
+        .and_then(|sha256| VerifiedTool::open(daemon, &sha256))
+        .map_err(|error| format!("its daemon cannot be pinned: {error}"))?;
+    let directory = ProbeDirectory::create()
+        .map_err(|error| format!("the probe listing cannot be written: {error}"))?;
+    let listing = directory.0.join("crash-index.txt");
+    let source = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&listing)
+        .and_then(|mut file| file.write_all(ANALYZER_PROBE_LISTING))
+        .and_then(|()| {
+            VerifiedSource::open(
+                &listing,
+                &arkdeck_contract::sha256_hex(ANALYZER_PROBE_LISTING),
+                ANALYZER_PROBE_LISTING.len() as u64,
+            )
+        })
+        .map_err(|error| format!("the probe listing cannot be written: {error}"))?;
+    let arguments = [OsString::from(ANALYZER_FLAG), source.inode_path().into()];
+    let limits = AnalyzerLimits {
+        timeout: ANALYZER_PROBE_TIMEOUT,
+        capture_bytes: 64 * 1024,
+    };
+    let execution = tool
+        .run_analyzer(&arguments, &source, limits, &|| false)
+        .map_err(|error| format!("it could not run: {error:?}"))?;
+    match execution.termination {
+        AnalyzerTermination::Exited(0)
+            if !execution.truncated && execution.stdout == ANALYZER_PROBE_ANSWER =>
+        {
+            Ok(())
+        }
+        AnalyzerTermination::Exited(0) => Err("it answered other than Swift's analyzer".into()),
+        AnalyzerTermination::Exited(status) => Err(format!(
+            "exit {status}: {}",
+            String::from_utf8_lossy(&execution.stderr)
+                .lines()
+                .next()
+                .unwrap_or_default()
+                .trim()
+        )),
+        AnalyzerTermination::Signalled(signal) => Err(format!("it ended by signal {signal}")),
+        AnalyzerTermination::TimedOut => Err(format!(
+            "it did not finish within {}s",
+            ANALYZER_PROBE_TIMEOUT.as_secs()
+        )),
+        AnalyzerTermination::Cancelled { .. } => Err("it was cancelled".into()),
+    }
+}
+
+/// The probe listing's private directory, removed with what it holds.
+struct ProbeDirectory(PathBuf);
+
+impl ProbeDirectory {
+    fn create() -> io::Result<Self> {
+        let name = format!(
+            "arkdeck-analyzer-probe-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>()?)
+        );
+        let path = arkdeck_platform::foundation_temporary_directory().join(name);
+        fs::DirBuilder::new().mode(0o700).create(&path)?;
+        Ok(Self(path))
+    }
+}
+
+impl Drop for ProbeDirectory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
     }
 }
 

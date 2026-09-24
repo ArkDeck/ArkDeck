@@ -2190,6 +2190,35 @@ the real signer, the real DevEco material and Hvigor through a registered
 DevEco toolchain. The Job composition of the 13 `workspace.*` operations is M3
 work.
 
+## Crash-ledger analyzer mode (TASK-XPA-015)
+
+`arkdeck-agentd --analyze-crash-ledger <absolute path>` is Swift's one-shot
+analyzer mode (`ArkDeckAgentDaemonMain`): the executable a service's plist names
+as `ARKDECK_ANALYZER_PATH`, which the Runtime runs as the analyzer child of
+`analyzer.extract-crash-signature@1` (no environment, the source Artifact's
+`/.vol` alias). It is answered before anything else the daemon does, under any
+executable name: no environment is read and no store, socket or device is
+touched. It reads the one file it is named and prints the canonical
+`HarnessCrashLedgerAnalysis` (`arkdeck_hoststore::analyze_crash_ledger`): the
+Faultlogger listing's entries, or `unreadable` with Swift's reason
+(`invalidEncoding`, `ledgerHeaderAbsent`, `ledgerFenceAbsent`,
+`entryNameUnparseable`), never an empty ledger for bytes that are no listing.
+Other arguments get Swift's line and exit 64 before anything is read; a file that
+cannot be read, or an answer that cannot be written, is exit 1 and one line
+naming the error, never the path or the bytes.
+
+The listing is read over Swift Characters: grapheme clusters as the pinned Swift
+runtime draws them, each judged by its first scalar, with Swift's `Numeric_Type`
+and `Alphabetic` where they hold scalars the standard library's tables do not.
+`rust/tests/fixtures/crash-ledger-analyzer/oracle.json` is what the Swift daemon
+answered to 78 cases and the four Character properties the parser reads, for
+every scalar (recorded by `CrashLedgerAnalyzerOracleContractTests`).
+`cargo test -p arkdeck-hoststore --lib crash_ledger` compares the analysis and
+the properties; `cargo test -p arkdeck-agentd --test crash_ledger_analyzer`
+replays every case through the built daemon, byte for byte, and runs the daemon
+as its own analyzer through an isolated Runtime
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/rust-crash-ledger-analyzer-run.md)).
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.
@@ -2359,13 +2388,16 @@ lock refuses the held pass
 
 `runtime service update` asks the new helper's daemon for it: Swift's daemon
 refuses the argument as unknown (exit 64) and is installed as above; the Rust
-daemon answers, and installing it is the cutover. Its plist would name the Rust
-daemon as `ARKDECK_ANALYZER_PATH`, which has no `--analyze-crash-ledger` mode yet,
-so that update is refused by name before anything changes. Past that gate
-(`ServiceHost::rust_daemon_analyzes_crash_ledgers`, closed in production) the
-lock-free pass must be clear, the old service is booted out, the held pass must
-be clear too — else the old plist is bootstrapped back unchanged — its snapshot
-summary is written to `LaunchAgent/cutover-snapshots/`, and the plist asks for
+daemon answers, and installing it is the cutover. Its plist names the Rust daemon
+as `ARKDECK_ANALYZER_PATH`, so that daemon is first asked to analyze a probe
+listing as the Runtime runs its analyzer child (the Runtime's own runner, no
+environment, the listing's `/.vol` alias) and must print Swift's recorded answer
+byte for byte ("Crash-ledger analyzer mode" above, the oracle's
+`runtime-service-probe` case); a daemon that does not is refused by name before
+anything changes. Past that gate the lock-free pass must be clear, the old
+service is booted out, the held pass must be clear too — else the old plist is
+bootstrapped back unchanged — its snapshot summary is written to
+`LaunchAgent/cutover-snapshots/`, and the plist asks for
 `ARKDECK_RUNTIME_COMPOSITION=production`.
 
 ## macOS owner lifecycle soak
