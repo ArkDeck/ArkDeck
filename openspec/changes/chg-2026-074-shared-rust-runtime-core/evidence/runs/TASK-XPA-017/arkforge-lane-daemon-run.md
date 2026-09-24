@@ -173,7 +173,23 @@ Not run locally: `check-contracts.py`'s views, and the Linux and Windows jobs
 (the lane is macOS-only; the provider's public-socket code builds everywhere).
 CI runs them.
 
-**CI.** Pending.
+**CI.**
+
+- *First push* (`4f60f6e9`, #2152, run 36049602838): red on macOS only, in
+  `a_daemon_that_is_not_ready_is_stopped_and_refused`.
+  - The case waited for the stand-in's end-of-input marker. Only a stand-in
+    that reads its end of input before TERM reaches it writes one, and the
+    stop sends TERM right after closing the input, as Swift's
+    `Handle.terminate` does. On the runner, TERM won.
+  - The fix is in the test, not the stop. The stand-in now holds a lock for its
+    whole life, and the cases check that it is free once the refusal returns:
+    the generation has ended. That the input is closed first stays the
+    platform's paired-launch test's proof, with a stand-in ignoring TERM.
+  - The fix is checked both ways. With a stand-in pausing 300 ms after its end
+    of input, TERM always wins: the old check fails and the new one passes.
+    With a refused generation leaked instead of stopped, the new check fails.
+    Five plain runs pass (`/private/tmp/arkdeck-m4-lanefix-*.log`).
+- *Second push*: pending.
 
 No device, installed service, real `arkforged` or App was used, and nothing
 here is device evidence.

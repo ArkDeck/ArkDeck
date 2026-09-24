@@ -54,6 +54,10 @@ mod lane {
         if std::io::stdin().read_exact(&mut secret).is_err() {
             std::process::exit(12);
         }
+        // Held for its whole life: the kernel lets go of it only when this
+        // process ends, which is what the cases observe.
+        let alive = std::fs::File::create(runtime.join("alive")).unwrap();
+        alive.lock().unwrap();
         std::fs::write(runtime.join("paired"), sha256_hex(&secret)).unwrap();
         std::fs::write(runtime.join("arguments"), arguments[1..].join("\n")).unwrap();
         if mode == "exit-at-once" {
@@ -236,15 +240,12 @@ mod lane {
             UnixStream::connect(self.runtime.join(name)).is_ok()
         }
 
-        fn wait_for(&self, name: &str) -> bool {
-            let deadline = Instant::now() + Duration::from_secs(10);
-            while Instant::now() < deadline {
-                if self.runtime.join(name).exists() {
-                    return true;
-                }
-                std::thread::sleep(Duration::from_millis(20));
-            }
-            false
+        /// Whether the stand-in this scene launched has ended: the lock it
+        /// holds on `alive` for its whole life is free again.
+        fn ended(&self) -> bool {
+            let alive =
+                std::fs::File::open(self.runtime.join("alive")).expect("the stand-in was launched");
+            alive.try_lock().is_ok()
         }
     }
 
@@ -300,6 +301,7 @@ mod lane {
             stopped.exit
         );
         assert!(!scene.serving("controller.sock"));
+        assert!(scene.ended());
         assert!(lane.stop().is_none(), "one generation stops once");
     }
 
@@ -320,7 +322,12 @@ mod lane {
             "arkforged is not ready to execute: NO_DISPATCHER. Nothing was dispatched — this \
              is a standing fact about the daemon, not a fault of this job"
         );
-        assert!(scene.wait_for("eof"), "the generation was stopped");
+        // The refusal returns only once the generation has ended. Whether the
+        // stand-in read its end of input before TERM reached it is a race
+        // Swift's stop leaves open too, as the stop sends TERM right after
+        // closing the input; the platform's paired-launch test proves the
+        // input is closed first.
+        assert!(scene.ended(), "the generation was stopped");
         assert!(!scene.serving("public.sock"));
 
         let scene = Scene::new("org.openharmony.dayu200", "replay");
@@ -328,6 +335,7 @@ mod lane {
             "the daemon bound toolchain replay, while this lane expects \
                  arkforged-native-rockusb"
         ));
+        assert!(scene.ended(), "the generation was stopped");
         assert!(!scene.serving("public.sock"));
     }
 
