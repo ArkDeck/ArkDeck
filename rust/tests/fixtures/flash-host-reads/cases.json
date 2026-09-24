@@ -1,0 +1,2199 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 1,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.noParameters",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 2,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.noRevision",
+      "params" : {
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and expectedBindingRevision are required"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 3,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.zeroRevision",
+      "params" : {
+        "expectedBindingRevision" : 0,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 4,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.noTarget",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 5,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.staleRevision",
+      "params" : {
+        "expectedBindingRevision" : 3,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-revision-2.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"selected target or binding revision is stale\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 6,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.emptyTarget",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : ""
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"exactly one registered DAYU200 in hdc-normal mode is required to reconcile its alias\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 7,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.nothingAttached",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"exactly one registered DAYU200 in hdc-normal mode is required to reconcile its alias\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 8,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.loaderOnly",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "1501ffff000000000000000000000003",
+              "topology" : "17",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"exactly one registered DAYU200 in hdc-normal mode is required to reconcile its alias\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 9,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.twoBoards",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff00000000000000000000cafe",
+              "topology" : "42",
+              "vendorId" : 8711
+            },
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff000000000000000000000003",
+              "topology" : "43",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"USB registry unavailable\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+
+      ],
+      "index" : 10,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.registryUnavailable",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : null
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"the stored post-flash alias is not a reissued lineage of the attached device; its target, Loader identity, HDC identity, connect key and USB topology must all match fresh facts and its revision must be ahead of the live target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        }
+      ],
+      "index" : 11,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.nothingStored",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 4776,
+              "productName" : "iPhone",
+              "registryEntryId" : null,
+              "serial" : "unrelated-serial",
+              "topology" : "99",
+              "vendorId" : 1452
+            },
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff00000000000000000000cafe",
+              "topology" : "42",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"the stored post-flash alias is not a reissued lineage of the attached device; its target, Loader identity, HDC identity, connect key and USB topology must all match fresh facts and its revision must be ahead of the live target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 12,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.notAhead",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-2.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"the stored post-flash alias is not a reissued lineage of the attached device; its target, Loader identity, HDC identity, connect key and USB topology must all match fresh facts and its revision must be ahead of the live target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 13,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.otherTopology",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-4-topology-43.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"the stored post-flash alias is not a reissued lineage of the attached device; its target, Loader identity, HDC identity, connect key and USB topology must all match fresh facts and its revision must be ahead of the live target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 14,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.otherLoader",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-4-other-loader.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: productionConfigurationUnavailable(\"superseded post-flash binding archive post-flash-superseded-20260920T000000Z.json already holds a different entry\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 15,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.archiveTaken",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-4.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-3.json",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "archivedBindingRevision" : 4,
+          "bindingRevision" : 2,
+          "hdcIdentitySha256" : "2122a724df1a871e05fabfcb5562ad01edcf8108ab201003b3afbc64f8f3f89c",
+          "reconciled" : true,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 16,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.reconciled",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: admissionRejected(\"the stored post-flash alias is not a reissued lineage of the attached device; its target, Loader identity, HDC identity, connect key and USB topology must all match fresh facts and its revision must be ahead of the live target\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 17,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.repeated",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: productionConfigurationUnavailable(\"post-flash binding must be an owner-only regular file\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "644",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 18,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.sharedMode",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "chmod",
+          "mode" : "644",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: productionConfigurationUnavailable(\"post-flash binding cannot be decoded\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 9,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 19,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.undecodable",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-not-json.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: productionConfigurationUnavailable(\"post-flash binding document is invalid\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 20,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.otherSchema",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-schema-2.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "post-flash alias reconciliation was refused: productionConfigurationUnavailable(\"post-flash binding size is invalid\")"
+        },
+        "ok" : false
+      },
+      "files" : [
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : ".rockchip-post-flash-hdc-binding.lock"
+        },
+        {
+          "bytes" : 543,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "post-flash-superseded-20260920T000000Z.json"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ],
+      "index" : 21,
+      "method" : "flash.reconcile-alias",
+      "name" : "alias.empty",
+      "params" : {
+        "expectedBindingRevision" : 2,
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/empty",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 22,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.empty",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:07:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:07:00Z",
+              "invocationId" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "expired",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.full-restore@1",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:05:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:05:00Z",
+              "invocationId" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "blocked",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:04:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:04:00Z",
+              "invocationId" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "succeeded",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:03:00Z",
+              "destructiveEpochsUsed" : 2,
+              "expiresAtUtc" : "2026-09-25T04:03:00Z",
+              "invocationId" : "debug-546c5231-b1a7-4df5-b426-860a29830865",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:02:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:02:00Z",
+              "invocationId" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "stopped",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:01:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:01:00Z",
+              "invocationId" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:00:00Z",
+              "invocationId" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 23,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.all",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-24fad57a-7465-43fd-83ed-60afdf18c51a.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-24fad57a-7465-43fd-83ed-60afdf18c51a.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-546c5231-b1a7-4df5-b426-860a29830865.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-546c5231-b1a7-4df5-b426-860a29830865.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-4120ede6-5bab-4830-bae3-248b0f1ede88.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-4120ede6-5bab-4830-bae3-248b0f1ede88.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-36e85192-400b-41b2-8c61-7824ca4deda4.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-36e85192-400b-41b2-8c61-7824ca4deda4.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-69447321-78c9-4f5a-92e9-c636c8e9c939.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-69447321-78c9-4f5a-92e9-c636c8e9c939.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/debug-d9ac9492-32a6-4f4f-8c57-a69133c43831.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-d9ac9492-32a6-4f4f-8c57-a69133c43831.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : true,
+          "items" : [
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:07:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:07:00Z",
+              "invocationId" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "expired",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.full-restore@1",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:05:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:05:00Z",
+              "invocationId" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "blocked",
+              "targetId" : "TGT-HOST"
+            }
+          ],
+          "nextCursor" : "<nextCursor-24>",
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 24,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.firstPage",
+      "params" : {
+        "pageSize" : 4
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : true,
+          "items" : [
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:04:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:04:00Z",
+              "invocationId" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "succeeded",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:03:00Z",
+              "destructiveEpochsUsed" : 2,
+              "expiresAtUtc" : "2026-09-25T04:03:00Z",
+              "invocationId" : "debug-546c5231-b1a7-4df5-b426-860a29830865",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:02:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:02:00Z",
+              "invocationId" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "stopped",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:01:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:01:00Z",
+              "invocationId" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            }
+          ],
+          "nextCursor" : "<nextCursor-25>",
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 25,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.secondPage",
+      "params" : {
+        "cursor" : "<nextCursor-24>",
+        "pageSize" : 4
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:00:00Z",
+              "invocationId" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 26,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.lastPage",
+      "params" : {
+        "cursor" : "<nextCursor-25>",
+        "pageSize" : 4
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidCursor",
+          "details" : {
+
+          },
+          "message" : "cursor is invalid, belongs to another query or its snapshot was reclaimed"
+        },
+        "ok" : false
+      },
+      "index" : 27,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.cursorOfAnotherQuery",
+      "params" : {
+        "cursor" : "<nextCursor-24>",
+        "pageSize" : 3
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "pageSize must be between 1 and 1000"
+        },
+        "ok" : false
+      },
+      "index" : 28,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.zeroPageSize",
+      "params" : {
+        "pageSize" : 0
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "pageSize must be between 1 and 1000"
+        },
+        "ok" : false
+      },
+      "index" : 29,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.pageSizeOverBound",
+      "params" : {
+        "pageSize" : 1001
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidCursor",
+          "details" : {
+
+          },
+          "message" : "cursor must be a bounded opaque string"
+        },
+        "ok" : false
+      },
+      "index" : 30,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.cursorOverBound",
+      "params" : {
+        "cursor" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidCursor",
+          "details" : {
+
+          },
+          "message" : "cursor is invalid, belongs to another query or its snapshot was reclaimed"
+        },
+        "ok" : false
+      },
+      "index" : 31,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.malformedCursor",
+      "params" : {
+        "cursor" : "not-a-cursor"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "fa98d3cb2c9b897de217ad3ad0fc727069e2347c23835406fd4332d2f6e2c17e",
+          "state" : "active",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 32,
+      "method" : "debug.status",
+      "name" : "status.active",
+      "params" : {
+        "invocationId" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:01:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:01:30Z",
+              "observation" : {
+                "bindingRevision" : 2,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "targetID" : "TGT-HOST"
+              },
+              "ordinal" : 1
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:01:00Z",
+          "invocationID" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "6175fabffd83cff62227f5f3129916b8cbaca61339d0068fd27037cf605e1793",
+          "state" : "active",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 33,
+      "method" : "debug.status",
+      "name" : "status.observed",
+      "params" : {
+        "invocationId" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:02:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "stop",
+              "candidateActionSHA256" : "39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000066",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000002",
+              "detail" : "operator.cancelled",
+              "disposition" : "stopped",
+              "evaluatedAtUTC" : "2026-09-25T00:02:30Z",
+              "ordinal" : 1
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:02:00Z",
+          "invocationID" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "e5c3147dc147c4bf05727646808d14ec4d68e769b7e0f5e10411bd2e057ef265",
+          "state" : "stopped",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 34,
+      "method" : "debug.status",
+      "name" : "status.stopped",
+      "params" : {
+        "invocationId" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:03:00Z",
+          "destructiveEpochsUsed" : 2,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000067",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000003",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-25T00:03:10Z",
+              "idempotencyKey" : "runtime-debug-860a29830865-e1-c87418821e00",
+              "jobID" : "job-oracle-1",
+              "ordinal" : 1,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-860a29830865-e1"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000068",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000004",
+              "destructiveEpoch" : 2,
+              "detail" : "oracle driver outcome outcomeUnknown",
+              "disposition" : "awaitingRuntimeRecoveryProof",
+              "evaluatedAtUTC" : "2026-09-25T00:03:20Z",
+              "idempotencyKey" : "runtime-debug-860a29830865-e2-4a38125fbc75",
+              "jobID" : "job-oracle-2",
+              "ordinal" : 2,
+              "outcome" : "outcomeUnknown",
+              "requestID" : "debug-860a29830865-e2"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:03:00Z",
+          "invocationID" : "debug-546c5231-b1a7-4df5-b426-860a29830865",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "211245acc76260e943ea48f318a1abb82558e6ec54eb0f67e1f0cdd06bac1b3d",
+          "state" : "active",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 35,
+      "method" : "debug.status",
+      "name" : "status.recovering",
+      "params" : {
+        "invocationId" : "debug-546c5231-b1a7-4df5-b426-860a29830865"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:04:00Z",
+          "destructiveEpochsUsed" : 1,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000069",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000005",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome succeeded",
+              "disposition" : "succeeded",
+              "evaluatedAtUTC" : "2026-09-25T00:04:10Z",
+              "idempotencyKey" : "runtime-debug-248b0f1ede88-e1-41640eeb9c39",
+              "jobID" : "job-oracle-3",
+              "ordinal" : 1,
+              "outcome" : "succeeded",
+              "requestID" : "debug-248b0f1ede88-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:04:00Z",
+          "invocationID" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "5d21d079999fe022305d0aed265d1aeb9037bfdaf3d19bc06a12089b1f7531b5",
+          "state" : "succeeded",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 36,
+      "method" : "debug.status",
+      "name" : "status.succeeded",
+      "params" : {
+        "invocationId" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:05:00Z",
+          "destructiveEpochsUsed" : 1,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000069",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000005",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome failedKnown",
+              "disposition" : "blockedKnownFailure",
+              "evaluatedAtUTC" : "2026-09-25T00:05:10Z",
+              "idempotencyKey" : "runtime-debug-7824ca4deda4-e1-41640eeb9c39",
+              "jobID" : "job-oracle-4",
+              "ordinal" : 1,
+              "outcome" : "failedKnown",
+              "requestID" : "debug-7824ca4deda4-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:05:00Z",
+          "invocationID" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "5f9a7689966f6a188d04d310fc39614e379cd7788291bf0270795e539180b832",
+          "state" : "blocked",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 37,
+      "method" : "debug.status",
+      "name" : "status.blocked",
+      "params" : {
+        "invocationId" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:06:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000069",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000005",
+              "detail" : "oracle driver outcome refused",
+              "disposition" : "refusedBeforeDispatch",
+              "evaluatedAtUTC" : "2026-09-25T00:06:10Z",
+              "idempotencyKey" : "runtime-debug-c636c8e9c939-e1-41640eeb9c39",
+              "ordinal" : 1,
+              "outcome" : "refused",
+              "requestID" : "debug-c636c8e9c939-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:06:00Z",
+          "invocationID" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "b41d02483a6073848845c1129ce660ea5be807487d4df3ef6f54b2136f6165cc",
+          "state" : "active",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 38,
+      "method" : "debug.status",
+      "name" : "status.refused",
+      "params" : {
+        "invocationId" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:06:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:06:00Z",
+          "invocationID" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "95bfca568b2256009ec7c7a8fcb5eb1b96431bfaa29c24a4ca693f375196e9a4",
+          "state" : "active",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 39,
+      "method" : "debug.status",
+      "name" : "status.fullRestore",
+      "params" : {
+        "invocationId" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 2,
+          "createdAtUTC" : "2026-09-25T00:07:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:07:00Z",
+          "invocationID" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "a1b175a0b7c3dfbb490250ec3418c269e1dcc9ca17c1ea71f827e159f5d4e1f8",
+          "state" : "expired",
+          "targetID" : "TGT-HOST"
+        }
+      },
+      "index" : 40,
+      "method" : "debug.status",
+      "name" : "status.expired",
+      "params" : {
+        "invocationId" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "debug.status accepts exactly invocationId"
+        },
+        "ok" : false
+      },
+      "index" : 41,
+      "method" : "debug.status",
+      "name" : "status.noParameters",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"debug-00000000-0000-4000-8000-000000000000\")"
+        },
+        "ok" : false
+      },
+      "index" : 42,
+      "method" : "debug.status",
+      "name" : "status.unknown",
+      "params" : {
+        "invocationId" : "debug-00000000-0000-4000-8000-000000000000"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"Debug-00000000\")"
+        },
+        "ok" : false
+      },
+      "index" : 43,
+      "method" : "debug.status",
+      "name" : "status.invalidIdentity",
+      "params" : {
+        "invocationId" : "Debug-00000000"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"daaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\")"
+        },
+        "ok" : false
+      },
+      "index" : 44,
+      "method" : "debug.status",
+      "name" : "status.identityOverBound",
+      "params" : {
+        "invocationId" : "daaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"debug-corrupt-unknownkey\")"
+        },
+        "ok" : false
+      },
+      "index" : 45,
+      "method" : "debug.status",
+      "name" : "status.unknownKey",
+      "params" : {
+        "invocationId" : "debug-corrupt-unknownkey"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-unknownKey.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-unknownkey.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"debug-corrupt-unknownkey\")"
+        },
+        "ok" : false
+      },
+      "index" : 46,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.unknownKey",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"debug-corrupt-duplicatemember\")"
+        },
+        "ok" : false
+      },
+      "index" : 47,
+      "method" : "debug.status",
+      "name" : "status.duplicateMember",
+      "params" : {
+        "invocationId" : "debug-corrupt-duplicatemember"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-unknownkey.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-duplicateMember.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-duplicatemember.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "invocationNotFound(\"debug-corrupt-explicitnull\")"
+        },
+        "ok" : false
+      },
+      "index" : 48,
+      "method" : "debug.status",
+      "name" : "status.explicitNull",
+      "params" : {
+        "invocationId" : "debug-corrupt-explicitnull"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-duplicatemember.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-explicitNull.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-explicitnull.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"invalid invocation document\")"
+        },
+        "ok" : false
+      },
+      "index" : 49,
+      "method" : "debug.status",
+      "name" : "status.otherSchema",
+      "params" : {
+        "invocationId" : "debug-corrupt-otherschema"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-explicitnull.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-otherSchema.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-otherschema.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"invalid invocation document\")"
+        },
+        "ok" : false
+      },
+      "index" : 50,
+      "method" : "debug.status",
+      "name" : "status.otherIdentity",
+      "params" : {
+        "invocationId" : "debug-corrupt-otheridentity"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-otherschema.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-otherIdentity.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-otheridentity.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"invalid invocation document\")"
+        },
+        "ok" : false
+      },
+      "index" : 51,
+      "method" : "debug.status",
+      "name" : "status.epochsOverBudget",
+      "params" : {
+        "invocationId" : "debug-corrupt-epochsoverbudget"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-otheridentity.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-epochsOverBudget.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-epochsoverbudget.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation document failed identity or size validation\")"
+        },
+        "ok" : false
+      },
+      "index" : 52,
+      "method" : "debug.status",
+      "name" : "status.sharedMode",
+      "params" : {
+        "invocationId" : "debug-corrupt-sharedmode"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-epochsoverbudget.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-sharedMode.json",
+          "mode" : "644",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-sharedmode.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation document failed identity or size validation\")"
+        },
+        "ok" : false
+      },
+      "index" : 53,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.sharedMode",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation document failed identity or size validation\")"
+        },
+        "ok" : false
+      },
+      "index" : 54,
+      "method" : "debug.status",
+      "name" : "status.empty",
+      "params" : {
+        "invocationId" : "debug-corrupt-empty"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-sharedmode.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/empty",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-empty.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation document cannot be opened\")"
+        },
+        "ok" : false
+      },
+      "index" : 55,
+      "method" : "debug.status",
+      "name" : "status.link",
+      "params" : {
+        "invocationId" : "debug-corrupt-link"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-empty.json"
+        },
+        {
+          "action" : "symlink",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-link.json",
+          "to" : "/etc/hosts"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation document cannot be opened\")"
+        },
+        "ok" : false
+      },
+      "index" : 56,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.link",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation directory contains an unknown entry\")"
+        },
+        "ok" : false
+      },
+      "index" : 57,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.unknownEntry",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/debug-corrupt-link.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/ds-store",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/.DS_Store"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation directory contains an invalid identity\")"
+        },
+        "ok" : false
+      },
+      "index" : 58,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.invalidIdentity",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/.DS_Store"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/invocations/corrupt-invalidIdentity.json",
+          "mode" : "600",
+          "path" : "state/runtime-debug-invocations/Bad.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation store is not a private Runtime directory\")"
+        },
+        "ok" : false
+      },
+      "index" : 59,
+      "method" : "debug.status",
+      "name" : "status.sharedDirectory",
+      "params" : {
+        "invocationId" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad"
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "state/runtime-debug-invocations/Bad.json"
+        },
+        {
+          "action" : "chmod",
+          "mode" : "755",
+          "path" : "state/runtime-debug-invocations"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "recordUnreadable",
+          "message" : "persistenceFailure(\"Flash invocation store is not a private Runtime directory\")"
+        },
+        "ok" : false
+      },
+      "index" : 60,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.sharedDirectory",
+      "params" : {
+
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:07:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:07:00Z",
+              "invocationId" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "expired",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:06:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:06:00Z",
+              "invocationId" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.full-restore@1",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:05:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:05:00Z",
+              "invocationId" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "blocked",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:04:00Z",
+              "destructiveEpochsUsed" : 1,
+              "expiresAtUtc" : "2026-09-25T04:04:00Z",
+              "invocationId" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "succeeded",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:03:00Z",
+              "destructiveEpochsUsed" : 2,
+              "expiresAtUtc" : "2026-09-25T04:03:00Z",
+              "invocationId" : "debug-546c5231-b1a7-4df5-b426-860a29830865",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:02:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:02:00Z",
+              "invocationId" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "stopped",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:01:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:01:00Z",
+              "invocationId" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            },
+            {
+              "bindingRevision" : 2,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "destructiveEpochsUsed" : 0,
+              "expiresAtUtc" : "2026-09-25T04:00:00Z",
+              "invocationId" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad",
+              "maximumDestructiveEpochs" : 16,
+              "operationReference" : "flash.dayu200",
+              "schemaVersion" : "arkdeck.recovery.flash-invocation-summary/1",
+              "state" : "active",
+              "targetId" : "TGT-HOST"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescInvocationIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "index" : 61,
+      "method" : "recovery.flash-invocation.list",
+      "name" : "list.restored",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "chmod",
+          "mode" : "700",
+          "path" : "state/runtime-debug-invocations"
+        }
+      ]
+    }
+  ]
+}

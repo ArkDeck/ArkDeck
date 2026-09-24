@@ -1,0 +1,10 @@
+{
+  "applicationSupportRoot" : "/private/tmp/arkdeck-flash-host-reads-oracle",
+  "nowUTC" : "2026-09-25T00:00:00Z",
+  "owners" : [
+    "ProductRockchipPostFlashAliasReconciler",
+    "RuntimeDebugInvocationController"
+  ],
+  "producer" : "FlashHostReadsOracleContractTests",
+  "stateDirectory" : "/private/tmp/arkdeck-flash-host-reads-oracle/state"
+}
