@@ -9,7 +9,9 @@ use crate::post_flash_alias::{
     LiveTarget, ObservedHdc, PostFlashAliasError, PostFlashBinding, Publication, Reconciliation,
     admit, reissue, resolve,
 };
-use arkdeck_platform::{DocumentPublishError, ExclusiveOutcome, HostDirectory};
+use arkdeck_platform::{
+    DocumentPublishError, ExclusiveOutcome, HostDirectory, OwnerOnlyReadFailure,
+};
 use std::path::{Path, PathBuf};
 
 /// The store at one root. Reads take no lock, as Swift's do not; `publish`
@@ -118,11 +120,20 @@ impl PostFlashAliasStore {
 
     /// Swift `load(rootDescriptor:)`: absence is `None`; a present document
     /// must be the owner's 0600 single-link regular file within the limit,
-    /// decode, and validate.
+    /// decode, and validate — each refusal in Swift's words.
     fn load(root: &HostDirectory) -> Result<Option<PostFlashBinding>, PostFlashAliasError> {
         let Some(bytes) = root
-            .read_owner_only(Self::FILE_NAME, Self::MAXIMUM_BYTES)
-            .map_err(|_| failure("post-flash binding cannot be opened"))?
+            .read_owner_only_detailed(Self::FILE_NAME, Self::MAXIMUM_BYTES)
+            .map_err(|refused| {
+                failure(match refused {
+                    OwnerOnlyReadFailure::Open(_) => "post-flash binding cannot be opened",
+                    OwnerOnlyReadFailure::Identity => {
+                        "post-flash binding must be an owner-only regular file"
+                    }
+                    OwnerOnlyReadFailure::Size => "post-flash binding size is invalid",
+                    OwnerOnlyReadFailure::Truncated => "post-flash binding is truncated",
+                })
+            })?
         else {
             return Ok(None);
         };

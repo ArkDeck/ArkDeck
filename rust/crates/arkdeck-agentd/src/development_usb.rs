@@ -107,6 +107,27 @@ pub(crate) fn relation_source(registered: bool, managed: bool, relations: bool) 
     }
 }
 
+/// The census the isolated owner's Flash owners read the attached board
+/// from, by the Target observations' own [`RelationSource`]: the host's I/O
+/// Registry, the harness's file, or no device at all.
+pub(crate) fn flash_census(
+    source: RelationSource,
+    file: Option<std::sync::Arc<DevelopmentUsbRelations>>,
+) -> Box<
+    dyn Fn() -> Result<Vec<arkdeck_platform::UsbHostDevice>, arkdeck_platform::RegistryUnavailable>
+        + Send
+        + Sync,
+> {
+    match (source, file) {
+        (RelationSource::Registry, _) => Box::new(arkdeck_platform::usb_host_devices),
+        (RelationSource::File, Some(file)) => Box::new(move || {
+            file.host_devices()
+                .map_err(|_| arkdeck_platform::RegistryUnavailable::Matching)
+        }),
+        (RelationSource::File | RelationSource::Nothing, _) => Box::new(|| Ok(Vec::new())),
+    }
+}
+
 pub(crate) struct DevelopmentUsbRelations {
     path: PathBuf,
     /// The bytes last read, and how many reads they have had.
@@ -134,6 +155,31 @@ impl DevelopmentUsbRelations {
             path,
             reads: Mutex::new((Vec::new(), 0)),
         }
+    }
+}
+
+impl DevelopmentUsbRelations {
+    /// The file's relations as the host devices a Flash census reads. The
+    /// file stands for Swift's `registeredDAYU200()` relations, which are
+    /// HDC-normal DAYU200s: a relation of the normal product is that
+    /// personality, named as the board names it, and one of the Loader
+    /// product is the Loader. Each read counts as the Target observations'
+    /// reads do.
+    pub(crate) fn host_devices(&self) -> Result<Vec<arkdeck_platform::UsbHostDevice>, String> {
+        Ok(self
+            .relations()?
+            .into_iter()
+            .map(|relation| arkdeck_platform::UsbHostDevice {
+                product_name: (relation.product_id
+                    == arkdeck_provider_hdc::DAYU200_NORMAL_PRODUCT_ID)
+                    .then(|| "\"HDC Device\"".to_owned()),
+                serial: relation.serial,
+                vendor_id: relation.vendor_id,
+                product_id: relation.product_id,
+                topology: relation.location,
+                registry_entry_id: Some(relation.attachment_id),
+            })
+            .collect())
     }
 }
 

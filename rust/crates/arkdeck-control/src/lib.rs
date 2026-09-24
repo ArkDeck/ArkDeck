@@ -365,6 +365,40 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `flash.reconcile-alias` once its two parameters were read: the
+    /// Target's post-flash alias reconciled against the one attached board. A
+    /// host without the reconciler answers as Swift's daemon without it does.
+    fn flash_reconcile_alias(
+        &self,
+        _target_id: &str,
+        _expected_binding_revision: i64,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Rockchip post-flash alias reconciliation is not configured".into(),
+            details: None,
+        })
+    }
+    /// `debug.status` and `recovery.flash-invocation.list`: the reads of the
+    /// Runtime Flash invocation owner, which checks their parameters itself
+    /// once it is composed, as Swift's handler does. A host without the owner
+    /// answers as Swift's daemon without it does, whatever the parameters.
+    fn flash_invocation(
+        &self,
+        method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: if method == "debug.status" {
+                "Runtime debug invocation is not configured"
+            } else {
+                "Runtime Flash invocation owner is not configured"
+            }
+            .into(),
+            details: None,
+        })
+    }
     /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
     /// without it keeps the foundation's refusal.
     fn runtime_hdc_status(&self) -> Result<Value, WireError> {
@@ -1282,6 +1316,30 @@ impl<H: HostServices> Control<H> {
                 },
                 None => Response::failure(&request.id, "invalidParams", "targetId is required"),
             },
+            // As Swift's handler: its two parameters, a string and a positive
+            // integer (Foundation's reading of a JSON number), before its owner.
+            "flash.reconcile-alias" => match (
+                params.get("targetId").and_then(Value::as_str),
+                params
+                    .get("expectedBindingRevision")
+                    .and_then(foundation_integer),
+            ) {
+                (Some(target), Some(revision)) if revision > 0 => Response {
+                    id: request.id.clone(),
+                    outcome: self.host.flash_reconcile_alias(target, revision),
+                },
+                _ => Response::failure(
+                    &request.id,
+                    "invalidParams",
+                    "targetId and expectedBindingRevision are required",
+                ),
+            },
+            // As Swift's handler: the owner before the parameters, which the
+            // owner checks itself.
+            "debug.status" | "recovery.flash-invocation.list" => Response {
+                id: request.id.clone(),
+                outcome: self.host.flash_invocation(&request.method, &params),
+            },
             // As Swift's handler: a caller's facts are refused before any observation.
             "runtime.hdc.status" if params.is_empty() => Response {
                 id: request.id.clone(),
@@ -1925,4 +1983,18 @@ fn workspace_params_refusal(
         ]) && generation()))
         .then_some("workspace preset remove requires identity and exact generation"),
     }
+}
+
+/// Foundation's `Int64` of a JSON number, as Swift's `JSONValue.integer`
+/// holds a request parameter: an integer, or a number with no fraction
+/// inside the range.
+fn foundation_integer(value: &Value) -> Option<i64> {
+    value.as_i64().or_else(|| {
+        value
+            .as_f64()
+            .filter(|float| {
+                float.fract() == 0.0 && *float >= i64::MIN as f64 && *float < i64::MAX as f64
+            })
+            .map(|float| float as i64)
+    })
 }

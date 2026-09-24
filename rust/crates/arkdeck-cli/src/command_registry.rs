@@ -200,6 +200,25 @@ fn pad(text: &str, width: usize) -> String {
     )
 }
 
+/// A leaf's lifecycle when the registry publishes it as a compatibility
+/// surface, legacy or deprecated: its status and the argv pattern that
+/// replaces it, if one does. A removed leaf answers by name with its own
+/// lifecycle details instead (`answer_by_name`).
+pub(crate) fn lifecycle(command: &str) -> Option<(String, Option<String>)> {
+    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let entry = registry["commands"]
+        .as_array()?
+        .iter()
+        .find(|entry| entry["command"] == command)?;
+    let status = entry["lifecycleStatus"].as_str()?;
+    matches!(status, "legacy" | "deprecated").then(|| {
+        (
+            status.to_owned(),
+            entry["replacementArgvPattern"].as_str().map(str::to_owned),
+        )
+    })
+}
+
 /// The output modes one leaf publishes, as the registry declares them. A leaf
 /// the registry does not name takes the two every Runtime leaf takes.
 pub fn output_modes(command: &str) -> Vec<String> {

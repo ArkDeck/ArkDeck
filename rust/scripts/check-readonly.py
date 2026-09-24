@@ -355,6 +355,13 @@ def main() -> None:
                         expected = "invalidInput"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
+                    # No composition here holds the Flash recovery broker's invocations or the
+                    # post-flash alias: as Swift's daemon without them, the two reads answer that
+                    # their owner is not configured, and the reconciler reads its parameters first.
+                    if method in {"debug.status", "recovery.flash-invocation.list"}:
+                        expected = "internalError"
+                    if method == "flash.reconcile-alias":
+                        expected = "invalidParams"
                     # Without parameters, as Swift's handler, every workspace method but the
                     # project list is refused before its owner is asked.
                     if method in {"workspace.project.register", "workspace.project.show",
@@ -384,6 +391,7 @@ def main() -> None:
                     ("trace-probe-missing-owner", "trace.probe", {"targetId": "target-fixture"}, "internalError"),
                     ("trace-probe-bad-type", "trace.probe", {"targetId": 1}, "invalidParams"),
                     ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
+                    ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
                     ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),

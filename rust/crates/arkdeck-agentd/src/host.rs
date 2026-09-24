@@ -177,6 +177,15 @@ pub struct Host {
     /// tool-selection owner.
     #[cfg(target_os = "macos")]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
+    /// Swift `ProductRockchipPostFlashAliasReconciler`: the post-flash alias
+    /// of the Application Support root, repaired against the one board the
+    /// Runtime's USB census reads, over this host's Target store.
+    #[cfg(target_os = "macos")]
+    flash_alias: Option<arkdeck_hoststore::FlashAliasReconciler>,
+    /// The reads of Swift's `RuntimeDebugInvocationController`, over the
+    /// invocation documents of the Job owner's state directory.
+    #[cfg(target_os = "macos")]
+    flash_invocations: Option<arkdeck_hoststore::FlashInvocations>,
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
@@ -702,6 +711,23 @@ impl Host {
         self.history = Some(history);
         self
     }
+    /// `flash.reconcile-alias` repairs the post-flash alias this reconciler
+    /// keeps, against this host's Target store.
+    #[cfg(target_os = "macos")]
+    pub fn with_flash_alias_reconciler(
+        mut self,
+        reconciler: arkdeck_hoststore::FlashAliasReconciler,
+    ) -> Self {
+        self.flash_alias = Some(reconciler);
+        self
+    }
+    /// `debug.status` and `recovery.flash-invocation.list` read this owner's
+    /// invocation documents.
+    #[cfg(target_os = "macos")]
+    pub fn with_flash_invocations(mut self, owner: arkdeck_hoststore::FlashInvocations) -> Self {
+        self.flash_invocations = Some(owner);
+        self
+    }
 
     /// The owners this composition holds, by name, in a fixed order: what the
     /// production composition reports at its start and its tests compare.
@@ -734,6 +760,8 @@ impl Host {
             ("managedHdc", self.managed_hdc().is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("codeSignHelper", self.code_sign_helper.is_some()),
+            ("flashAliasReconciler", self.flash_alias.is_some()),
+            ("flashInvocations", self.flash_invocations.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -819,6 +847,10 @@ impl Host {
             human_actions: None,
             #[cfg(target_os = "macos")]
             control_actions: None,
+            #[cfg(target_os = "macos")]
+            flash_alias: None,
+            #[cfg(target_os = "macos")]
+            flash_invocations: None,
             #[cfg(all(test, target_os = "macos"))]
             test_hdc_impact: None,
         }
@@ -2218,6 +2250,45 @@ impl HostServices for Host {
                 details: None,
             })?
             .trace_probe(target_id)
+    }
+    /// Swift composes the reconciler over its Target store; a host without
+    /// either answers as Swift's daemon without the reconciler does.
+    #[cfg(target_os = "macos")]
+    fn flash_reconcile_alias(
+        &self,
+        target_id: &str,
+        expected_binding_revision: i64,
+    ) -> Result<serde_json::Value, WireError> {
+        match (&self.flash_alias, &self.targets) {
+            (Some(reconciler), Some(targets)) => {
+                reconciler.reconcile(targets, target_id, expected_binding_revision)
+            }
+            _ => Err(WireError {
+                code: "internalError".into(),
+                message: "Rockchip post-flash alias reconciliation is not configured".into(),
+                details: None,
+            }),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn flash_invocation(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        match &self.flash_invocations {
+            Some(owner) => owner.handle(method, params),
+            None => Err(WireError {
+                code: "internalError".into(),
+                message: if method == "debug.status" {
+                    "Runtime debug invocation is not configured"
+                } else {
+                    "Runtime Flash invocation owner is not configured"
+                }
+                .into(),
+                details: None,
+            }),
+        }
     }
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when

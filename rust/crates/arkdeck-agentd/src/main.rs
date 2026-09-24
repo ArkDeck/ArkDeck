@@ -399,6 +399,12 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
                 &root.join("jobs-state").join("capabilities"),
             )?)
+            // Swift's Flash invocation owner keeps its documents beside the
+            // Job state it runs through, and creates their directories at its
+            // start.
+            .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(
+                &root.join("jobs-state"),
+            )?)
             // As the Swift daemon: an analyzer is configured only by naming its
             // executable, and a named path that is not one fails startup.
             .with_planning(
@@ -435,15 +441,29 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // owner started as its managed server, the Runtime's own census of the
         // host's I/O Registry, Swift's source (the maintainer's decision Q1=B
         // of 2026-09-24); otherwise none.
-        let file = development_usb::DevelopmentUsbRelations::from_environment()?;
-        let host = match development_usb::relation_source(registered, managed, file.is_some()) {
-            development_usb::RelationSource::File => host.with_usb_relations(Arc::new(
-                file.ok_or("development USB relations are unavailable")?,
-            )),
+        let file = development_usb::DevelopmentUsbRelations::from_environment()?.map(Arc::new);
+        let source = development_usb::relation_source(registered, managed, file.is_some());
+        let host = match source {
+            development_usb::RelationSource::File => host.with_usb_relations(
+                file.clone()
+                    .ok_or("development USB relations are unavailable")?,
+            ),
             development_usb::RelationSource::Registry => host
                 .with_usb_registry_relations(arkdeck_provider_hdc::UsbRegistryRelations::system()),
             development_usb::RelationSource::Nothing => host,
         };
+        // Swift's post-flash alias reconciler over the Application Support
+        // root, which the isolated owner's root stands for (the parent of its
+        // Job state, as Swift's is its state directory's parent). It reads the
+        // board from the same source as the Target observations, so a
+        // fixture's board is never proved by the host's devices: the census of
+        // the host's I/O Registry beside the managed registered HDC, the
+        // harness's file where one is named, and no device otherwise.
+        let host = host.with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+            &root,
+            development_usb::flash_census(source, file),
+            host::utc_now,
+        ));
         // Acknowledged, and with the development HDC started as the managed
         // server, this owner proves a device mutation's state continuity
         // against its own Job state instead of the installed Runtime's root,
@@ -755,5 +775,7 @@ fn main() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod debug_read_control;
+#[cfg(all(test, target_os = "macos"))]
+mod flash_host_reads_control;
 #[cfg(all(test, target_os = "macos"))]
 mod trace_probe_control;

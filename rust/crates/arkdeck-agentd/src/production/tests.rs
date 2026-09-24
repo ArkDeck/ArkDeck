@@ -56,6 +56,7 @@ fn every_root_is_swifts_below_the_one_home() {
     ] {
         assert_eq!(root, &state.join(name));
     }
+    assert_eq!(layout.application_support, support);
     assert_eq!(layout.sessions, support.join("Sessions"));
     assert_eq!(layout.bootstrap, support.join("Bootstrap/v1"));
     assert_eq!(
@@ -380,8 +381,24 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             "agentExecutions",
             "humanActions",
             "controlActions",
+            "flashAliasReconciler",
+            "flashInvocations",
         ]
     );
+    // The Flash invocation owner's directories, created owner-only beside
+    // the Job state as Swift's controller creates them.
+    for name in [
+        "runtime-debug-invocations",
+        "runtime-debug-invocation-snapshots",
+    ] {
+        let metadata = std::fs::symlink_metadata(layout.state.join(name)).unwrap();
+        assert!(metadata.is_dir(), "{name}");
+        assert_eq!(
+            std::os::unix::fs::PermissionsExt::mode(&metadata.permissions()) & 0o777,
+            0o700,
+            "{name}"
+        );
+    }
     assert_eq!(
         composition.host.mutation_root(),
         Some(layout.state.as_path())

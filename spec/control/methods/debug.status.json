@@ -59,6 +59,9 @@
               "candidateSourceSHA256": {
                 "type": "string"
               },
+              "destructiveEpoch": {
+                "type": "integer"
+              },
               "detail": {
                 "type": "string"
               },
@@ -66,6 +69,12 @@
                 "type": "string"
               },
               "evaluatedAtUTC": {
+                "type": "string"
+              },
+              "idempotencyKey": {
+                "type": "string"
+              },
+              "jobID": {
                 "type": "string"
               },
               "observation": {
@@ -102,6 +111,12 @@
               },
               "ordinal": {
                 "type": "integer"
+              },
+              "outcome": {
+                "type": "string"
+              },
+              "requestID": {
+                "type": "string"
               }
             },
             "required": [
@@ -112,7 +127,6 @@
               "detail",
               "disposition",
               "evaluatedAtUTC",
-              "observation",
               "ordinal"
             ],
             "type": "object"
@@ -166,8 +180,8 @@
   "x-arkdeck-method": "debug.status",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 4,
+    "request": 9,
+    "result": 5
   }
 }

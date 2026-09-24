@@ -4,6 +4,7 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidCursor",
         "invalidParams",
         "malformedFrame",
         "notFound",
@@ -22,6 +23,9 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "cursor": {
+          "type": "string"
+        },
         "pageSize": {
           "type": "integer"
         }
@@ -86,7 +90,10 @@
           "type": "array"
         },
         "nextCursor": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "order": {
           "type": "string"
@@ -121,8 +128,8 @@
   "x-arkdeck-method": "recovery.flash-invocation.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 6,
+    "request": 12,
+    "result": 6
   }
 }

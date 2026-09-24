@@ -1,0 +1,11 @@
+{
+  "active" : "debug-9032f031-f98a-4b4e-a2e3-bb3c53e180ad",
+  "blocked" : "debug-36e85192-400b-41b2-8c61-7824ca4deda4",
+  "expired" : "debug-d9ac9492-32a6-4f4f-8c57-a69133c43831",
+  "fullRestore" : "debug-a1b64287-5c8c-4a87-831f-5c1d8bd5e244",
+  "observed" : "debug-24fad57a-7465-43fd-83ed-60afdf18c51a",
+  "recovering" : "debug-546c5231-b1a7-4df5-b426-860a29830865",
+  "refused" : "debug-69447321-78c9-4f5a-92e9-c636c8e9c939",
+  "stopped" : "debug-0dd2a364-ffe0-4dfa-895d-60dc3d45cf1e",
+  "succeeded" : "debug-4120ede6-5bab-4830-bae3-248b0f1ede88"
+}
