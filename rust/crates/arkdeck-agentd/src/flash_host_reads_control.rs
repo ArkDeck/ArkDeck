@@ -7,7 +7,9 @@
 //! controller wrote. Every answer must be Swift's, byte for byte once the
 //! pager's random revision and cursors are named, and every file the
 //! reconciler leaves in the Application Support root must be Swift's.
-use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
+use arkdeck_contract::{
+    CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, strict_json, validate_method_value,
+};
 use arkdeck_control::Control;
 use arkdeck_hoststore::{FlashAliasReconciler, FlashInvocations, TargetStore};
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
@@ -181,6 +183,39 @@ fn application_support_files(root: &Path) -> (Vec<Value>, BTreeMap<String, Vec<u
     (listing, bytes)
 }
 
+/// The published contract view runs this checkout's tests against the merge
+/// base's inputs, which name their commit and may predate the widened
+/// `debug.status` and list shapes. The checkout and candidate views carry
+/// them.
+fn published_view() -> bool {
+    let inputs = strict_json(CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// What the control layer answers in place of Swift's recorded answer under
+/// this build's schema: the answer when the schema publishes it, else
+/// `internalError`. The checkout and candidate views must publish all of them.
+fn published(method: &str, answer: &Value) -> Value {
+    let conforms = if answer["ok"] == true {
+        validate_method_value(method, "result", &answer["result"]).is_ok()
+    } else {
+        validate_method_value(method, "errorCode", &answer["error"]["code"]).is_ok()
+            && answer["error"].get("details").is_none_or(|details| {
+                validate_method_value(method, "errorDetails", details).is_ok()
+            })
+    };
+    assert!(
+        conforms || published_view(),
+        "the current contract must publish Swift's answer {answer}"
+    );
+    if conforms {
+        answer.clone()
+    } else {
+        json!({"ok": false, "error": {"code": "internalError",
+            "message": "the result does not conform to the current contract"}})
+    }
+}
+
 #[test]
 fn the_rust_daemon_replays_the_swift_flash_host_reads_oracle() {
     let fixtures = fixtures();
@@ -197,19 +232,28 @@ fn the_rust_daemon_replays_the_swift_flash_host_reads_oracle() {
         for action in exchange["setup"].as_array().unwrap() {
             perform(&root.0, &fixtures, &census, action);
         }
-        // A request naming an earlier answer's cursor sends this replay's.
+        // A request naming an earlier answer's cursor sends this replay's. The
+        // published view's schema refuses the answer that carried it, so
+        // there is none to send there.
         let mut params = exchange["params"].clone();
+        let mut unresolved = false;
         for value in params.as_object_mut().unwrap().values_mut() {
-            if let Some(cursor) = value.as_str().and_then(|label| cursors.get(label)) {
-                *value = json!(cursor);
+            if let Some(label) = value
+                .as_str()
+                .filter(|text| text.starts_with("<nextCursor-"))
+            {
+                match cursors.get(label) {
+                    Some(cursor) => *value = json!(cursor),
+                    None => unresolved = true,
+                }
             }
         }
-        let mut answer = call(
-            &control,
-            index as usize,
-            exchange["method"].as_str().unwrap(),
-            params,
-        );
+        if unresolved {
+            assert!(published_view(), "{index} {name}: no cursor to send");
+            continue;
+        }
+        let method = exchange["method"].as_str().unwrap();
+        let mut answer = call(&control, index as usize, method, params);
         if let Some(result) = answer.get_mut("result").and_then(Value::as_object_mut) {
             if result.get("snapshotRevision").is_some_and(Value::is_string) {
                 result.insert("snapshotRevision".into(), json!("<snapshotRevision>"));
@@ -220,7 +264,11 @@ fn the_rust_daemon_replays_the_swift_flash_host_reads_oracle() {
                 result.insert("nextCursor".into(), json!(label));
             }
         }
-        assert_eq!(answer, exchange["answer"], "{index} {name}");
+        assert_eq!(
+            answer,
+            published(method, &exchange["answer"]),
+            "{index} {name}"
+        );
         if let Some(recorded) = exchange.get("files") {
             let (listing, bytes) = application_support_files(&root.0);
             assert_eq!(&json!(listing), recorded, "{index} {name}: files");
@@ -232,7 +280,10 @@ fn the_rust_daemon_replays_the_swift_flash_host_reads_oracle() {
         }
         compared += 1;
     }
-    assert!(compared >= 61, "every recorded exchange replays");
+    assert!(
+        compared >= 61 || published_view(),
+        "every recorded exchange replays"
+    );
 }
 
 #[test]

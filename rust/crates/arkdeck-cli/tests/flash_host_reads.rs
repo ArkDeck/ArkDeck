@@ -149,7 +149,9 @@ mod runtime {
 
     #[test]
     fn both_status_spellings_read_debug_status_and_the_legacy_one_says_what_replaces_it() {
-        let status = recorded("status.recovering");
+        // An observed evaluation: a shape the published view's schema
+        // admits as well as this checkout's.
+        let status = recorded("status.observed");
         let identity = status["result"]["invocationID"]
             .as_str()
             .unwrap()

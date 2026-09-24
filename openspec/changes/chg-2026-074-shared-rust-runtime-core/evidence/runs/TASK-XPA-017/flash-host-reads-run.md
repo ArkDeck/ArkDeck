@@ -288,6 +288,9 @@ the 256 feature entries as follows:
 | Swift schema contract | `ARKDECK_CONTROL_FRAME_LOG=<the 61 frames> run-swiftpm.sh test --filter 'ControlMethodSchemaContractTests\|FlashHostReadsOracleContractTests'` | exit 0; 6 tests (`fhr-swift-schema.log`) |
 | Records | `ARKDECK_PYTHON=<validation venv> sh scripts/check-sdd.sh` | exit 0; 0 errors, 0 warnings (`fhr-sdd.log`) |
 | Contract | `python3 rust/scripts/generate-contract.py --write`, then `--check` | exit 0 |
+| Read-only host check | `rust/scripts/check-readonly.py --bin-dir <this build>` (validation venv): every method against the standalone daemon without the new owners, plus the reconciler's missing owner | PASS on macOS (`fhr-readonly.log`); the first push of this PR was red here, the three routes' answers not yet registered |
+| Published view | main's `debug.status` and list schemas compiled in and `published_view()` forced, the agentd replay and the CLI leaf tests run, the sources restored by digest | 3 and 4 passed (`fhr-pubsim.log`) |
+| Check scripts | `rust/scripts/test_contract_checks.py` | 42 tests OK |
 
 **CI.** Pending.
 
