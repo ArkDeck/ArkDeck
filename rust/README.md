@@ -1395,10 +1395,12 @@ The explicitly isolated development composition owns `targets-state/` and serves
 `device display-name set|clear`. Target bindings and alias history are validated
 and read. Only an adoption of a new Target (below) writes `targets.json`. Local
 names use the current Swift `target-display-names.json` format, private
-descriptor-anchored locks and atomic publication. Target names survive restart;
-candidate names require the current Runtime observation reference and expire on
-refresh or restart. A lost or invalid name-write reply is `outcomeUnknown`; the
-CLI never replays it.
+descriptor-anchored locks and atomic publication. Every transaction waits for
+both locks, as Swift's blocking `flock` does, so a concurrent one (another
+thread, owner or process) delays it rather than refusing it. Target names
+survive restart; candidate names require the current Runtime observation
+reference and expire on refresh or restart. A lost or invalid name-write reply
+is `outcomeUnknown`; the CLI never replays it.
 
 With the development HDC, the daemon answers `device.observations` (following a
 reference too) and `target.adopt` through the owner below. Beside the registered

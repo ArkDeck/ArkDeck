@@ -279,7 +279,11 @@ impl TargetStore {
     }
     /// Both documents read under both locks, `action` run over them, then
     /// each publication it names made in its order, the namespace checked
-    /// before and after each.
+    /// before and after each. Each lock is waited for, as Swift's `persist`
+    /// and display-name owner block in `flock(LOCK_EX)`: another thread's
+    /// transaction, or another owner's of this directory, delays this one
+    /// rather than refusing it. So `action` never starts another transaction
+    /// here; it would wait for itself.
     fn publishing(
         &self,
         phase: &str,
@@ -291,36 +295,14 @@ impl TargetStore {
         self.root
             .validate_path(&self.path)
             .map_err(|_| unreadable(phase))?;
-        let target_lock = self.root.lock_document(".targets.lock").map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                failure(
-                    if phase.is_empty() {
-                        "internalError"
-                    } else {
-                        "resourceConflict"
-                    },
-                    "Target storage is being updated",
-                    phase,
-                )
-            } else {
-                unreadable(phase)
-            }
-        })?;
-        let names_lock = self.root.lock_document(LOCK).map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                failure(
-                    if phase.is_empty() {
-                        "internalError"
-                    } else {
-                        "resourceConflict"
-                    },
-                    "Display names are being updated",
-                    phase,
-                )
-            } else {
-                unreadable(phase)
-            }
-        })?;
+        let target_lock = self
+            .root
+            .wait_lock(".targets.lock", false)
+            .map_err(|_| unreadable(phase))?;
+        let names_lock = self
+            .root
+            .wait_lock(LOCK, false)
+            .map_err(|_| unreadable(phase))?;
         let mut targets = match self.root.read(TARGETS, TARGETS_MAX) {
             Ok(bytes) => TargetDocument::decode(&bytes).map_err(|_| unreadable(phase))?,
             Err(e) if e.kind() == io::ErrorKind::NotFound => TargetDocument::empty(),
@@ -1059,6 +1041,57 @@ mod tests {
                 .filter_map(|r| r.as_ref().err())
                 .all(|e| e.code == "resourceConflict")
         );
+    }
+    /// Each round lets two threads go together: one reads the HDC route while
+    /// the other publishes the Target's next name — over one owner, then over
+    /// two owners of one directory, as another process would hold it. Each
+    /// waits for the other's locks, as Swift's blocking `flock` waits, so
+    /// neither is ever refused.
+    #[test]
+    fn overlapping_transactions_wait_for_each_other() {
+        const ROUNDS: u64 = 64;
+        for owners in [1, 2] {
+            let root = alias_root();
+            let reader = root.open();
+            let other = (owners == 2).then(|| root.open());
+            let writer = other.as_ref().unwrap_or(&reader);
+            let barrier = Barrier::new(2);
+            let (routes, names) = std::thread::scope(|scope| {
+                let routes = scope.spawn(|| {
+                    (0..ROUNDS)
+                        .map(|_| {
+                            barrier.wait();
+                            reader.hdc_route(CANONICAL).map(|route| {
+                                route.map(|route| (route.binding_revision, route.connect_key))
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                });
+                let names = scope.spawn(|| {
+                    (1..=ROUNDS)
+                        .map(|generation| {
+                            barrier.wait();
+                            let params = json!({"targetId":CANONICAL,
+                                "expectedGeneration":generation.to_string(),"name":format!("Bench {generation}")});
+                            writer
+                                .handle("target.display-name.set", params.as_object().unwrap(), NOW)
+                                .map(|name| name["generation"].clone())
+                        })
+                        .collect::<Vec<_>>()
+                });
+                (routes.join().unwrap(), names.join().unwrap())
+            });
+            for route in routes {
+                assert_eq!(
+                    route,
+                    Ok(Some((2, "post-flash-hdc-address".into()))),
+                    "{owners} owner(s)"
+                );
+            }
+            for (generation, name) in (2u64..).zip(names) {
+                assert_eq!(name, Ok(json!(generation.to_string())), "{owners} owner(s)");
+            }
+        }
     }
     #[test]
     fn candidate_names_advance_all_active_generations_and_expire_on_restart() {
