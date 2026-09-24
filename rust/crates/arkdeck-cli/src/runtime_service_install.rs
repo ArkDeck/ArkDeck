@@ -1,0 +1,1083 @@
+//! `runtime service update|install|uninstall`: Swift's
+//! `LaunchAgentService.install`/`uninstall` and `RuntimeCLI.runAgentDaemon`'s
+//! `update`, `install` and `uninstall` (the `runtime.service` spelling), with
+//! the coordinator's rulings for the M5 cutover (协调会话受托裁定
+//! 2026-09-24).
+//!
+//! `update` checks its options as Swift does, validates the helper bundle,
+//! HDC, workspace pair, ArkTrace descriptor and ArkForge lane, boots the
+//! service out, replaces the helper through a staged copy, renders the plist
+//! from Swift's template with CoreFoundation's writer, writes the receipt as
+//! Swift's `JSONEncoder` writes it, and bootstraps the service. In addition:
+//!
+//! - The helper it replaces is kept one generation in
+//!   `Helpers/.rollback/ArkDeckAgent.app` (ruling 4); the exchange is one
+//!   `renamex_np(RENAME_SWAP)`, so the installed path always holds a bundle.
+//! - While an OpenHarmony signing preset is installed it is refused before
+//!   anything changes: Swift re-records the replacement daemon's identity in
+//!   that receipt before launchd starts it, and this CLI has no signing owner
+//!   yet (ruling 3, Q8).
+//! - The new helper's daemon is asked for the cutover preflight
+//!   (`arkdeck-agentd --cutover-preflight`, read-only): Swift's daemon refuses
+//!   the argument as unknown, the Rust daemon answers. An update to the Rust
+//!   daemon is the M5 cutover. Its plist's `ARKDECK_ANALYZER_PATH` must name a
+//!   daemon with `--analyze-crash-ledger`, which the Rust daemon does not have
+//!   yet, so it is refused by name before anything changes (ruling 2). Past
+//!   that gate (`ServiceHost::rust_daemon_analyzes_crash_ledgers`), the first
+//!   preflight pass must be clear, the service is booted out, a second pass
+//!   holding the Runtime's instance lock must be clear too — else the old
+//!   plist is bootstrapped back unchanged — its snapshot summary of the old
+//!   state directory is written to `LaunchAgent/cutover-snapshots/`, and the
+//!   plist asks for the production composition (ruling 1).
+//!
+//! `install` is Swift's zero-Runtime bootstrap path over the bootstrap
+//! registries' installation references, which have no Rust owner; it is
+//! refused by name. `uninstall` removes the service as Swift does, and is
+//! refused before anything changes while the bundle registry still pins a
+//! bundle for the service installation, which this CLI cannot release.
+use crate::runtime_service::{
+    ANALYZER_KEY, ARKFORGE_BUNDLE_KEY, ARKFORGE_CAMPAIGN_KEY, ARKTRACE_DESCRIPTOR_KEY,
+    ArkForgeLaneStatus, DAEMON_EXECUTABLE_NAME, DEVECO_SDK_KEY, HDC_KEY, LABEL, PlainFailure,
+    RECEIPT_SCHEMA, SWIFT_SHA256_KEY, ServiceAnswer, ServiceError, ServiceHost,
+    ValidatedDescriptor, WATERFLOW_PROJECT_REF, WORKSPACE_ACTIVE_PROJECT_KEY, WORKSPACE_INSPECTOR,
+    WORKSPACE_INSPECTOR_KEY, WORKSPACE_PROJECTS_KEY, Workspace, sha256_file, text,
+};
+use arkdeck_platform::PropertyListValue;
+use arkdeck_platform::launchd;
+use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
+use std::ffi::OsString;
+use std::fs;
+use std::io::{self, Read, Write};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+const PREFLIGHT_FLAG: &str = "--cutover-preflight";
+const HOLD_FLAG: &str = "--hold-instance-lock";
+const PREFLIGHT_SCHEMA: &str = "arkdeck.cutover-preflight/1";
+const SNAPSHOT_SCHEMA: &str = "arkdeck.cutover-snapshot/1";
+/// What Swift's daemon prints before it exits 64 for an argument it does not
+/// take (`ArkDeckAgentDaemonMain`).
+const SWIFT_UNKNOWN_ARGUMENT: &str = "unknown argument --cutover-preflight";
+const COMPOSITION: &str = "ARKDECK_RUNTIME_COMPOSITION";
+/// A preflight answer larger than this is not read: a snapshot lists every
+/// file of the state directory.
+const PREFLIGHT_OUTPUT_MAXIMUM: u64 = 256 * 1024 * 1024;
+const PREFLIGHT_ERROR_MAXIMUM: u64 = 64 * 1024;
+const INSTALLATION_OWNER_KIND: &str = "installation";
+const INSTALLATION_OWNER_ID: &str = "runtime-service-installation";
+const BUNDLE_INDEX_SCHEMA: &str = "arkdeck.bootstrap-bundles/1";
+/// How many times the held pass is asked while another Runtime still holds
+/// the instance lock, one poll interval apart.
+const HELD_PASS_ATTEMPTS: u32 = 50;
+
+fn usage(message: impl Into<String>) -> PlainFailure {
+    PlainFailure::new(64, message)
+}
+
+fn failed(error: impl Into<ServiceError>) -> PlainFailure {
+    PlainFailure::from(error.into())
+}
+
+// MARK: - The leaves
+
+/// `runtime service update`: Swift's options and `install`, with the
+/// rulings' retention, signing refusal and cutover.
+pub fn update_leaf(host: &ServiceHost, options: &Map<String, Value>) -> ServiceAnswer {
+    match update_request(host, options).and_then(|request| install(host, request)) {
+        Ok(document) => ServiceAnswer::emit(document),
+        Err(failure) => ServiceAnswer::fail(failure),
+    }
+}
+
+/// `runtime service install`: Swift's typed zero-Runtime install acquires the
+/// exact bundle generation and initializes the HDC selection through the
+/// bootstrap registries' installation references before it installs, and
+/// commits them after. Neither owner is Rust's yet, and this CLI does not
+/// link the store, so it is refused by name before anything is read.
+pub fn install_leaf(_host: &ServiceHost, _options: &Map<String, Value>) -> ServiceAnswer {
+    ServiceAnswer::fail(PlainFailure::new(
+        69,
+        "runtime service install pins its bundle and HDC tool generations as the bootstrap \
+         registries' installation references, which have no Rust owner yet; install with \
+         `arkdeck runtime service update --daemon <verified ArkDeckAgent.app> --hdc <absolute \
+         hdc>` or with the Swift CLI",
+    ))
+}
+
+/// `runtime service uninstall`: Swift's `uninstall()`, refused before
+/// anything changes while the bundle registry pins a bundle for the service
+/// installation (Swift then releases those references; this CLI cannot).
+pub fn uninstall_leaf(host: &ServiceHost) -> ServiceAnswer {
+    match uninstall(host) {
+        Ok(document) => ServiceAnswer::emit(document),
+        Err(failure) => ServiceAnswer::fail(failure),
+    }
+}
+
+// MARK: - update's options, as Swift's `runAgentDaemon` reads them
+
+/// What one `update` installs, as the caller named it.
+struct InstallRequest {
+    bundle: String,
+    hdc: String,
+    workspace: Option<(String, String)>,
+    descriptor: Option<String>,
+    lane: Option<ArkForgeLaneStatus>,
+}
+
+fn update_request(
+    host: &ServiceHost,
+    options: &Map<String, Value>,
+) -> Result<InstallRequest, PlainFailure> {
+    let option = |key: &str| options.get(key).and_then(Value::as_str);
+    let bundle = match option("daemon") {
+        Some(bundle) => bundle.to_owned(),
+        None => host
+            .default_daemon_bundle
+            .as_deref()
+            .map(text)
+            .unwrap_or_else(|| crate::runtime_service::DAEMON_BUNDLE_NAME.to_owned()),
+    };
+    let previous = host.status().ok();
+    let hdc = option("hdc")
+        .map(str::to_owned)
+        .or_else(|| previous.and_then(|status| status.hdc_path))
+        .filter(|hdc| hdc.starts_with('/'))
+        .ok_or_else(|| {
+            usage("runtime service update requires --hdc with an absolute executable path")
+        })?;
+    if !bundle.starts_with('/') {
+        return Err(usage(
+            "runtime service update requires an absolute ArkDeckAgent.app path",
+        ));
+    }
+    // The `runtime service` spelling never keeps the legacy pair it omits.
+    let (project, sdk) = (option("workspaceProject"), option("devecoSdk"));
+    if project.is_some() != sdk.is_some() {
+        return Err(usage(
+            "runtime service update requires --workspace-project and --deveco-sdk together",
+        ));
+    }
+    if project.is_some_and(|project| !project.starts_with('/')) {
+        return Err(usage("--workspace-project must be an absolute path"));
+    }
+    if sdk.is_some_and(|sdk| !sdk.starts_with('/')) {
+        return Err(usage("--deveco-sdk must be an absolute path"));
+    }
+    for (key, flag) in [
+        ("sensitiveEvidence", "--sensitive-evidence"),
+        ("harnessModelProvider", "--harness-model-provider"),
+        ("harnessModelName", "--harness-model-name"),
+        ("harnessCli", "--harness-cli"),
+        ("harnessCliTimeoutSeconds", "--harness-cli-timeout-seconds"),
+    ] {
+        if options.contains_key(key) {
+            return Err(usage(format!(
+                "{flag} was removed by CHG-2026-064: decisions come from external agents \
+                 through the published caller surface; re-run without it"
+            )));
+        }
+    }
+    let descriptor = match option("arktraceDescriptor") {
+        Some("none") => None,
+        Some(path) if path.starts_with('/') => Some(path.to_owned()),
+        Some(_) => {
+            return Err(usage(
+                "--arktrace-descriptor must be an absolute path or none",
+            ));
+        }
+        None => host
+            .ark_trace_descriptor_for_preserving_update()
+            .map_err(failed)?,
+    };
+    for (key, flag) in [
+        ("arkforged", "--arkforged"),
+        ("arkforgedSha256", "--arkforged-sha256"),
+        ("arkforgeProfile", "--arkforge-profile"),
+    ] {
+        if options.contains_key(key) {
+            return Err(usage(format!(
+                "{flag} is retired; pass one validated ArkForge.bundle to --arkforge-bundle"
+            )));
+        }
+    }
+    let campaign = option("arkforgeCampaign");
+    let lane = match option("arkforgeBundle") {
+        Some("none") => {
+            if campaign.is_some() {
+                return Err(usage(
+                    "--arkforge-bundle none cannot authorize an ArkForge campaign",
+                ));
+            }
+            None
+        }
+        Some(bundle) if bundle.starts_with('/') => Some(
+            ArkForgeLaneStatus::measuring(bundle, campaign.unwrap_or(""))
+                .map_err(|refusal| usage(refusal.to_string()))?,
+        ),
+        Some(_) => {
+            return Err(usage(
+                "--arkforge-bundle must be an absolute ArkForge.bundle path or none",
+            ));
+        }
+        None if campaign.is_some() => {
+            return Err(usage(
+                "--arkforge-campaign requires an explicit --arkforge-bundle",
+            ));
+        }
+        None => host
+            .ark_forge_lane_for_preserving_update()
+            .map_err(|refusal| PlainFailure::new(1, refusal.to_string()))?,
+    };
+    // Ruling 3: Swift re-records the replacement daemon's identity in the
+    // signing receipt before launchd starts it (`refreshSigningAccessIfInstalled`).
+    if host.paths.signing_receipt.exists() {
+        return Err(PlainFailure::new(
+            69,
+            format!(
+                "runtime service update is refused while an OpenHarmony signing preset is \
+                 installed ({}): the replacement daemon's identity must be re-recorded in that \
+                 receipt before launchd starts it, and the Rust CLI has no signing-credential \
+                 owner yet (Q8); nothing was changed",
+                text(&host.paths.signing_receipt)
+            ),
+        ));
+    }
+    Ok(InstallRequest {
+        bundle,
+        hdc,
+        workspace: project.zip(sdk).map(|(p, s)| (p.to_owned(), s.to_owned())),
+        descriptor,
+        lane,
+    })
+}
+
+// MARK: - install, as Swift's `LaunchAgentService.install`
+
+/// Which Runtime a helper bundle's daemon is.
+enum Runtime {
+    Swift,
+    /// The Rust daemon, with its lock-free cutover preflight.
+    Rust(Value),
+}
+
+fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFailure> {
+    let source = (host.validate_daemon_bundle)(Path::new(&request.bundle))
+        .map_err(|detail| PlainFailure::new(1, detail))?;
+    let hdc = host
+        .validated_executable(&request.hdc, "HDC")
+        .map_err(failed)?;
+    let workspace = request
+        .workspace
+        .map(|(project, sdk)| host.validated_workspace(&project, &sdk))
+        .transpose()
+        .map_err(failed)?;
+    let descriptor = request
+        .descriptor
+        .map(|path| host.validated_descriptor(&path))
+        .transpose()
+        .map_err(failed)?;
+    let launch_source = host.transport_executable(&source).map_err(failed)?;
+    let daemon_sha256 = sha256_file(&launch_source).map_err(failed)?;
+    let hdc_sha256 = sha256_file(&hdc).map_err(failed)?;
+
+    let first = match probe(host, &source, false)? {
+        Runtime::Swift => None,
+        Runtime::Rust(first) => {
+            if !host.rust_daemon_analyzes_crash_ledgers {
+                return Err(PlainFailure::new(
+                    69,
+                    format!(
+                        "runtime service update would point the LaunchAgent at the Rust daemon \
+                         in {}, whose plist names it as ARKDECK_ANALYZER_PATH: the Rust daemon \
+                         has no --analyze-crash-ledger mode yet, and the analyzer is never \
+                         pointed at the Swift daemon or left out; nothing was changed",
+                        text(&source)
+                    ),
+                ));
+            }
+            if launch_source.file_name() != Some(std::ffi::OsStr::new(DAEMON_EXECUTABLE_NAME)) {
+                return Err(PlainFailure::new(
+                    69,
+                    "a Rust daemon bundle carries no facade; nothing was changed",
+                ));
+            }
+            refuse_unless_clear(&first, "nothing was changed")?;
+            Some(first)
+        }
+    };
+
+    for directory in [
+        host.paths.plist.parent(),
+        host.paths.installed_daemon_bundle.parent(),
+        host.paths.receipt.parent(),
+        Some(host.paths.log_directory.as_path()),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        create_owned_directory(directory).map_err(failed)?;
+    }
+    let loaded = host.is_loaded().map_err(failed)?;
+    if loaded {
+        let output = host
+            .run_launchctl(&launchd::bootout_arguments(&host.launch_domain()))
+            .map_err(failed)?;
+        ServiceHost::require_success(&output, "bootout").map_err(failed)?;
+    }
+    let cutover = match first {
+        None => None,
+        Some(_) => Some(cutover(host, &source, loaded)?),
+    };
+
+    let rollback = replace_bundle(host, &source).map_err(failed)?;
+    (host.validate_daemon_bundle)(&host.paths.installed_daemon_bundle)
+        .map_err(|detail| PlainFailure::new(1, detail))?;
+    fs::set_permissions(
+        &host.paths.installed_daemon,
+        fs::Permissions::from_mode(0o700),
+    )
+    .map_err(failed)?;
+    let launch = host
+        .transport_executable(&host.paths.installed_daemon_bundle)
+        .map_err(failed)?;
+    let plist = plist_document(
+        host,
+        &launch,
+        &hdc,
+        workspace.as_ref(),
+        descriptor.as_ref(),
+        request.lane.as_ref(),
+        cutover.is_some(),
+    )
+    .map_err(failed)?;
+    let bytes = arkdeck_platform::write_property_list_xml(&plist).map_err(failed)?;
+    write_owned_atomically(&host.paths.plist, &bytes).map_err(failed)?;
+
+    let receipt = receipt(
+        host,
+        &launch,
+        &daemon_sha256,
+        &hdc,
+        &hdc_sha256,
+        workspace.as_ref(),
+        descriptor.as_ref(),
+        request.lane.as_ref(),
+    );
+    write_owned_atomically(&host.paths.receipt, &foundation_pretty_json(&receipt))
+        .map_err(failed)?;
+    host.bootstrap().map_err(failed)?;
+    let mut document = receipt;
+    if let Some(mut cutover) = cutover {
+        cutover["rollbackBundlePath"] = json!(rollback.as_deref().map(text));
+        document["cutover"] = cutover;
+    }
+    Ok(document)
+}
+
+/// The held pass, after the old service is booted out: its instance lock
+/// taken, the state measured and the facts read again. A refusal starts the
+/// old service again from its unchanged plist. The snapshot summary is then
+/// written, and the answer's `cutover` member returned.
+fn cutover(host: &ServiceHost, source: &Path, loaded: bool) -> Result<Value, PlainFailure> {
+    let restore = |failure: PlainFailure| -> PlainFailure {
+        if !loaded {
+            return PlainFailure::new(
+                failure.exit_code,
+                format!(
+                    "{}; the service was not running and is left stopped",
+                    failure.message
+                ),
+            );
+        }
+        match host.bootstrap() {
+            Ok(()) => PlainFailure::new(
+                failure.exit_code,
+                format!(
+                    "{}; the previous service was started again from its unchanged plist",
+                    failure.message
+                ),
+            ),
+            Err(error) => PlainFailure::new(
+                failure.exit_code,
+                format!(
+                    "{}; starting the previous service again failed: {error}",
+                    failure.message
+                ),
+            ),
+        }
+    };
+    // `bootout` can answer before the old daemon has let its instance lock
+    // go; a pass refused only for that is asked again for a bounded while.
+    let mut attempts = 0;
+    let held = loop {
+        let held = match probe(host, source, true) {
+            Ok(Runtime::Rust(held)) => held,
+            Ok(Runtime::Swift) => {
+                return Err(restore(PlainFailure::new(
+                    69,
+                    "the helper's daemon stopped answering the cutover preflight",
+                )));
+            }
+            Err(failure) => return Err(restore(failure)),
+        };
+        let only_running = held["blocks"].as_array().is_some_and(|blocks| {
+            !blocks.is_empty() && blocks.iter().all(|block| block["kind"] == "runtimeRunning")
+        });
+        attempts += 1;
+        if !only_running || attempts >= HELD_PASS_ATTEMPTS {
+            break held;
+        }
+        std::thread::sleep(host.poll_interval);
+    };
+    refuse_unless_clear(&held, "the state was left as it is").map_err(&restore)?;
+    let snapshot = &held["snapshot"];
+    let present = snapshot["stateDirectoryPresent"].as_bool();
+    if snapshot["schemaVersion"] != SNAPSHOT_SCHEMA
+        || present.is_none()
+        || (present == Some(true) && held["instanceLockHeld"] != true)
+        || !snapshot["rootSha256"]
+            .as_str()
+            .is_some_and(lowercase_sha256)
+    {
+        return Err(restore(PlainFailure::new(
+            69,
+            "the held cutover preflight answered no snapshot taken under the instance lock",
+        )));
+    }
+    let path = write_snapshot(host, snapshot).map_err(|error| restore(failed(error)))?;
+    Ok(json!({
+        "snapshotPath": text(&path),
+        "snapshotRootSha256": snapshot["rootSha256"],
+        "carriedOver": held["carriedOver"],
+    }))
+}
+
+/// Refuses unless the preflight document is clear, naming each block.
+fn refuse_unless_clear(document: &Value, unchanged: &str) -> Result<(), PlainFailure> {
+    if document["clear"] == true {
+        return Ok(());
+    }
+    let blocks: Vec<String> = document["blocks"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(block_text)
+        .collect();
+    Err(PlainFailure::new(
+        75,
+        format!(
+            "runtime service update refused: the Runtime state cannot be carried over as it is \
+             ({}); {unchanged}",
+            blocks.join("; ")
+        ),
+    ))
+}
+
+fn block_text(block: &Value) -> String {
+    let field = |key: &str| block[key].as_str().unwrap_or_default().to_owned();
+    match block["kind"].as_str().unwrap_or_default() {
+        "jobState" => format!("Job {} is {}", field("jobId"), field("state")),
+        "unresolvedJournal" => format!("Job {} has an unresolved journal", field("jobId")),
+        "activeAgentExecution" => format!(
+            "agent execution {} is {}",
+            field("executionId"),
+            field("state")
+        ),
+        "unsettledCapabilityUse" => format!(
+            "capability {} use {} of Job {} is unsettled",
+            field("capabilityId"),
+            block["useOrdinal"],
+            field("jobId")
+        ),
+        "pendingToolSelection" => {
+            format!("HDC tool selection {} is pending", field("controlActionId"))
+        }
+        "runtimeRunning" => field("reason"),
+        "unreadable" => format!("{} is unreadable: {}", field("source"), field("reason")),
+        other => format!("{other}: {block}"),
+    }
+}
+
+fn lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+/// What `<bundle>/Contents/MacOS/arkdeck-agentd --cutover-preflight` answers:
+/// the Rust daemon a canonical document for this home's state directory,
+/// Swift's daemon exit 64 for an argument it does not take. Anything else
+/// cannot be told apart and is refused.
+fn probe(host: &ServiceHost, bundle: &Path, hold: bool) -> Result<Runtime, PlainFailure> {
+    let executable = bundle.join("Contents/MacOS").join(DAEMON_EXECUTABLE_NAME);
+    let mut arguments = vec![PREFLIGHT_FLAG];
+    if hold {
+        arguments.push(HOLD_FLAG);
+    }
+    let mut environment = vec![
+        (
+            OsString::from("HOME"),
+            host.paths.home.clone().into_os_string(),
+        ),
+        (OsString::from(COMPOSITION), OsString::from("production")),
+    ];
+    if host.relocated_home {
+        environment.push((
+            OsString::from("CFFIXED_USER_HOME"),
+            host.paths.home.clone().into_os_string(),
+        ));
+    }
+    let finished = run_bounded(
+        &executable,
+        &arguments,
+        &environment,
+        host.preflight_timeout,
+    )
+    .map_err(|error| {
+        PlainFailure::new(
+            69,
+            format!(
+                "the cutover preflight of {} could not run: {error}",
+                text(&executable)
+            ),
+        )
+    })?;
+    let stderr = String::from_utf8_lossy(&finished.stderr).trim().to_owned();
+    match finished.status {
+        Some(0) => {
+            let document = arkdeck_contract::strict_json(&finished.stdout)
+                .ok()
+                .filter(|document| {
+                    document["schemaVersion"] == PREFLIGHT_SCHEMA
+                        && document["clear"].is_boolean()
+                        && document["blocks"].is_array()
+                        && document["instanceLockHeld"].is_boolean()
+                })
+                .ok_or_else(|| {
+                    PlainFailure::new(
+                        69,
+                        "the cutover preflight answered no arkdeck.cutover-preflight/1 document",
+                    )
+                })?;
+            if document["stateDirectory"] != text(&host.paths.state_directory).as_str() {
+                return Err(PlainFailure::new(
+                    69,
+                    format!(
+                        "the cutover preflight read {} instead of this home's state directory",
+                        document["stateDirectory"]
+                    ),
+                ));
+            }
+            Ok(Runtime::Rust(document))
+        }
+        Some(64) if stderr.contains(SWIFT_UNKNOWN_ARGUMENT) => Ok(Runtime::Swift),
+        status => Err(PlainFailure::new(
+            69,
+            format!(
+                "the helper's daemon neither answers the cutover preflight nor refuses it as \
+                 Swift's daemon does ({}): {stderr}",
+                status.map_or_else(
+                    || "no exit status".to_owned(),
+                    |code| format!("exit {code}")
+                )
+            ),
+        )),
+    }
+}
+
+struct Finished {
+    status: Option<i32>,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+/// Runs `executable` with exactly `environment`, no stdin and both outputs
+/// bounded, killing it when `timeout` ends.
+fn run_bounded(
+    executable: &Path,
+    arguments: &[&str],
+    environment: &[(OsString, OsString)],
+    timeout: Duration,
+) -> io::Result<Finished> {
+    let mut child = Command::new(executable)
+        .args(arguments)
+        .env_clear()
+        .envs(environment.iter().map(|(key, value)| (key, value)))
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let read = |pipe: Option<Box<dyn Read + Send>>, maximum: u64| {
+        std::thread::spawn(move || -> io::Result<Vec<u8>> {
+            let mut bytes = Vec::new();
+            if let Some(pipe) = pipe {
+                pipe.take(maximum + 1).read_to_end(&mut bytes)?;
+            }
+            Ok(bytes)
+        })
+    };
+    let stdout = read(
+        child
+            .stdout
+            .take()
+            .map(|pipe| Box::new(pipe) as Box<dyn Read + Send>),
+        PREFLIGHT_OUTPUT_MAXIMUM,
+    );
+    let stderr = read(
+        child
+            .stderr
+            .take()
+            .map(|pipe| Box::new(pipe) as Box<dyn Read + Send>),
+        PREFLIGHT_ERROR_MAXIMUM,
+    );
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        if let Some(status) = child.try_wait()? {
+            break Some(status);
+        }
+        if Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            break None;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    let joined = |reader: std::thread::JoinHandle<io::Result<Vec<u8>>>| {
+        reader
+            .join()
+            .map_err(|_| io::Error::other("an output reader stopped"))?
+    };
+    let (stdout, stderr) = (joined(stdout)?, joined(stderr)?);
+    let Some(status) = status else {
+        return Err(io::Error::new(
+            io::ErrorKind::TimedOut,
+            format!("it did not finish within {}s", timeout.as_secs()),
+        ));
+    };
+    if stdout.len() as u64 > PREFLIGHT_OUTPUT_MAXIMUM {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "its answer exceeds its byte bound",
+        ));
+    }
+    Ok(Finished {
+        status: status.code(),
+        stdout,
+        stderr,
+    })
+}
+
+/// Writes the held pass's snapshot summary, owner-only, named by the time it
+/// was taken and its root digest. The same summary already there is kept.
+fn write_snapshot(host: &ServiceHost, snapshot: &Value) -> Result<PathBuf, ServiceError> {
+    create_owned_directory(&host.paths.cutover_snapshots)?;
+    let taken: String = snapshot["takenAtUtc"]
+        .as_str()
+        .unwrap_or_default()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .collect();
+    let root = snapshot["rootSha256"].as_str().unwrap_or_default();
+    let path = host
+        .paths
+        .cutover_snapshots
+        .join(format!("cutover-{taken}-{}.json", &root[..12]));
+    let mut bytes = arkdeck_contract::canonical_json(snapshot)
+        .map_err(|error| ServiceError::Other(format!("{error:?}")))?;
+    bytes.push(b'\n');
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+    {
+        Ok(mut file) => {
+            file.write_all(&bytes)?;
+            file.sync_all()?;
+        }
+        Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {
+            if fs::read(&path)? != bytes {
+                return Err(ServiceError::Other(format!(
+                    "another cutover snapshot already holds {}",
+                    text(&path)
+                )));
+            }
+        }
+        Err(error) => return Err(error.into()),
+    }
+    Ok(path)
+}
+
+/// Swift `copyItem` into a staging name beside the installed helper, then
+/// `replaceItemAt`: one exchange, so the installed path always holds a bundle.
+/// The helper replaced is kept one generation in `Helpers/.rollback`, and its
+/// path answered; there is none when nothing was installed or the source is
+/// the installed helper itself.
+fn replace_bundle(host: &ServiceHost, source: &Path) -> Result<Option<PathBuf>, ServiceError> {
+    let installed = &host.paths.installed_daemon_bundle;
+    if text(source) == text(installed) {
+        return Ok(None);
+    }
+    let helpers = installed
+        .parent()
+        .ok_or_else(|| ServiceError::Other("the helper bundle has no parent".into()))?;
+    let identity = crate::job_plan::uuid()
+        .map_err(|error| ServiceError::Other(error.message))?
+        .to_uppercase();
+    let staging = helpers.join(format!(".arkdeck-agentd-{identity}.app"));
+    let discard = |error: io::Error| {
+        let _ = fs::remove_dir_all(&staging);
+        ServiceError::from(error)
+    };
+    arkdeck_platform::clone_tree(source, &staging).map_err(discard)?;
+    if fs::symlink_metadata(installed).is_err() {
+        fs::rename(&staging, installed).map_err(discard)?;
+        return Ok(None);
+    }
+    arkdeck_platform::exchange_paths(&staging, installed).map_err(discard)?;
+    // `staging` now holds the helper that was installed.
+    let rollback = &host.paths.rollback_bundle;
+    if let Some(parent) = rollback.parent() {
+        create_owned_directory(parent)?;
+    }
+    remove_if_present(rollback)?;
+    fs::rename(&staging, rollback)?;
+    Ok(Some(rollback.clone()))
+}
+
+/// Swift `renderTemplate`: the bundled template's fixed keys, the three
+/// placeholders replaced, and the environment Swift writes. The production
+/// composition is asked for only on the Rust daemon's cutover.
+fn plist_document(
+    host: &ServiceHost,
+    launch: &Path,
+    hdc: &Path,
+    workspace: Option<&Workspace>,
+    descriptor: Option<&ValidatedDescriptor>,
+    lane: Option<&ArkForgeLaneStatus>,
+    production: bool,
+) -> Result<PropertyListValue, ServiceError> {
+    let string = |value: &str| PropertyListValue::String(value.to_owned());
+    let installed = &host.paths.installed_daemon;
+    let mut environment = BTreeMap::new();
+    environment.insert(HDC_KEY.to_owned(), string(&text(hdc)));
+    // The analyzer is this daemon in one-shot mode; the inspector a fixed host
+    // tool. Neither depends on the retired project/SDK pair.
+    environment.insert(ANALYZER_KEY.to_owned(), string(&text(installed)));
+    if text(launch) != text(installed) {
+        environment.insert(
+            SWIFT_SHA256_KEY.to_owned(),
+            string(&sha256_file(installed)?),
+        );
+    }
+    environment.insert(
+        WORKSPACE_INSPECTOR_KEY.to_owned(),
+        string(WORKSPACE_INSPECTOR),
+    );
+    if let Some(workspace) = workspace {
+        environment.insert(
+            WORKSPACE_PROJECTS_KEY.to_owned(),
+            string(&format!(
+                "{WATERFLOW_PROJECT_REF}={}",
+                workspace.project_root
+            )),
+        );
+        environment.insert(
+            WORKSPACE_ACTIVE_PROJECT_KEY.to_owned(),
+            string(WATERFLOW_PROJECT_REF),
+        );
+        environment.insert(
+            DEVECO_SDK_KEY.to_owned(),
+            string(&workspace.deveco_sdk_root),
+        );
+    }
+    if let Some(descriptor) = descriptor {
+        environment.insert(
+            ARKTRACE_DESCRIPTOR_KEY.to_owned(),
+            string(&descriptor.status.descriptor_path),
+        );
+    }
+    if let Some(lane) = lane {
+        environment.insert(ARKFORGE_BUNDLE_KEY.to_owned(), string(&lane.bundle_path));
+        // Written only when authorized: an empty value would read as an
+        // unnamed campaign.
+        if !lane.campaign.is_empty() {
+            environment.insert(ARKFORGE_CAMPAIGN_KEY.to_owned(), string(&lane.campaign));
+        }
+    }
+    if production {
+        environment.insert(COMPOSITION.to_owned(), string("production"));
+    }
+    let document = BTreeMap::from([
+        ("Label".to_owned(), string(LABEL)),
+        (
+            "ProgramArguments".to_owned(),
+            PropertyListValue::Array(vec![string(&text(launch))]),
+        ),
+        (
+            "EnvironmentVariables".to_owned(),
+            PropertyListValue::Dictionary(environment),
+        ),
+        (
+            "MachServices".to_owned(),
+            PropertyListValue::Dictionary(BTreeMap::from([(
+                LABEL.to_owned(),
+                PropertyListValue::Boolean(true),
+            )])),
+        ),
+        ("RunAtLoad".to_owned(), PropertyListValue::Boolean(true)),
+        ("KeepAlive".to_owned(), PropertyListValue::Boolean(true)),
+        ("LimitLoadToSessionType".to_owned(), string("Aqua")),
+        ("ProcessType".to_owned(), string("Standard")),
+        ("ThrottleInterval".to_owned(), PropertyListValue::Integer(5)),
+        ("Umask".to_owned(), PropertyListValue::Integer(63)),
+        (
+            "StandardOutPath".to_owned(),
+            string(&text(&host.paths.standard_output)),
+        ),
+        (
+            "StandardErrorPath".to_owned(),
+            string(&text(&host.paths.standard_error)),
+        ),
+    ]);
+    Ok(PropertyListValue::Dictionary(document))
+}
+
+/// Swift `LaunchAgentInstallReceipt`, an absent optional omitted.
+#[allow(clippy::too_many_arguments)]
+fn receipt(
+    host: &ServiceHost,
+    launch: &Path,
+    daemon_sha256: &str,
+    hdc: &Path,
+    hdc_sha256: &str,
+    workspace: Option<&Workspace>,
+    descriptor: Option<&ValidatedDescriptor>,
+    lane: Option<&ArkForgeLaneStatus>,
+) -> Value {
+    let mut fields = Map::new();
+    fields.insert("schemaVersion".into(), json!(RECEIPT_SCHEMA));
+    fields.insert("installedAtUTC".into(), json!((host.now_utc)()));
+    fields.insert("daemonPath".into(), json!(text(launch)));
+    fields.insert("daemonSHA256".into(), json!(daemon_sha256));
+    fields.insert("hdcPath".into(), json!(text(hdc)));
+    fields.insert("hdcSHA256".into(), json!(hdc_sha256));
+    if let Some(workspace) = workspace {
+        fields.insert("workspaceProjectPath".into(), json!(workspace.project_root));
+        fields.insert("devecoSDKPath".into(), json!(workspace.deveco_sdk_root));
+    }
+    if let Some(descriptor) = descriptor {
+        fields.insert("arkTraceDescriptor".into(), descriptor.status.json());
+    }
+    if let Some(lane) = lane {
+        fields.insert("arkForgeLane".into(), lane.json());
+    }
+    Value::Object(fields)
+}
+
+/// Foundation `JSONEncoder` with `[.sortedKeys, .prettyPrinted,
+/// .withoutEscapingSlashes]`: two-space indentation, `" : "` between a key and
+/// its value, no final newline. serde escapes what Foundation escapes here
+/// and leaves the solidus alone.
+pub(crate) fn foundation_pretty_json(value: &Value) -> Vec<u8> {
+    fn line(output: &mut Vec<u8>, depth: usize) {
+        output.push(b'\n');
+        output.resize(output.len() + 2 * depth, b' ');
+    }
+    fn write(value: &Value, depth: usize, output: &mut Vec<u8>) {
+        match value {
+            Value::Object(fields) => {
+                let mut keys: Vec<&String> = fields.keys().collect();
+                keys.sort_unstable();
+                output.push(b'{');
+                for (index, key) in keys.iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    line(output, depth + 1);
+                    output.extend(serde_json::to_vec(key).expect("a JSON string"));
+                    output.extend_from_slice(b" : ");
+                    write(&fields[key.as_str()], depth + 1, output);
+                }
+                if fields.is_empty() {
+                    output.push(b'\n');
+                }
+                line(output, depth);
+                output.push(b'}');
+            }
+            Value::Array(values) => {
+                output.push(b'[');
+                for (index, value) in values.iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    line(output, depth + 1);
+                    write(value, depth + 1, output);
+                }
+                if values.is_empty() {
+                    output.push(b'\n');
+                }
+                line(output, depth);
+                output.push(b']');
+            }
+            other => output.extend(serde_json::to_vec(other).expect("a JSON value")),
+        }
+    }
+    let mut output = Vec::new();
+    write(value, 0, &mut output);
+    output
+}
+
+/// Swift `createOwnedDirectory`: created owner-only with its missing parents;
+/// an existing directory is left as it is.
+fn create_owned_directory(path: &Path) -> io::Result<()> {
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)
+}
+
+/// Swift's `.atomic` write followed by its `chmod 0600`.
+fn write_owned_atomically(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| io::Error::other("the document has no parent"))?;
+    let name = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("the document has no name"))?
+        .to_string_lossy();
+    let identity = crate::job_plan::uuid().map_err(|error| io::Error::other(error.message))?;
+    let temporary = parent.join(format!(".{name}.{identity}"));
+    let written = (|| {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)?;
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        fs::rename(&temporary, path)
+    })();
+    if written.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    written?;
+    fs::set_permissions(path, fs::Permissions::from_mode(0o600))
+}
+
+/// Swift `removeIfPresent`: whether anything was there to remove.
+fn remove_if_present(path: &Path) -> io::Result<bool> {
+    let Ok(metadata) = fs::symlink_metadata(path) else {
+        return Ok(false);
+    };
+    if metadata.is_dir() {
+        fs::remove_dir_all(path)?;
+    } else {
+        fs::remove_file(path)?;
+    }
+    Ok(true)
+}
+
+// MARK: - uninstall
+
+fn uninstall(host: &ServiceHost) -> Result<Value, PlainFailure> {
+    let pinned = installation_references(&host.paths.bootstrap_bundle_index).map_err(|reason| {
+        PlainFailure::new(
+            69,
+            format!(
+                "runtime service uninstall is refused: the bootstrap bundle index cannot be read \
+                 to prove it pins nothing for the service installation ({reason}); nothing was \
+                 changed"
+            ),
+        )
+    })?;
+    if !pinned.is_empty() {
+        return Err(PlainFailure::new(
+            69,
+            format!(
+                "runtime service uninstall is refused: the bootstrap bundle registry pins {} for \
+                 the service installation, and the Rust CLI has no owner to release those \
+                 references yet; uninstall with the Swift CLI; nothing was changed",
+                pinned.join(", ")
+            ),
+        ));
+    }
+    if host.is_loaded().map_err(failed)? {
+        let output = host
+            .run_launchctl(&launchd::bootout_arguments(&host.launch_domain()))
+            .map_err(failed)?;
+        ServiceHost::require_success(&output, "bootout").map_err(failed)?;
+    }
+    let removed_plist = remove_if_present(&host.paths.plist).map_err(failed)?;
+    let removed_daemon = remove_if_present(&host.paths.installed_daemon_bundle).map_err(failed)?;
+    let removed_receipt = remove_if_present(&host.paths.receipt).map_err(failed)?;
+    Ok(json!({
+        "removedPlist": removed_plist,
+        "removedDaemon": removed_daemon,
+        "removedReceipt": removed_receipt,
+        "preservedStateDirectory": text(&host.paths.state_directory),
+        "preservedLogDirectory": text(&host.paths.log_directory),
+    }))
+}
+
+/// The bundle references the registry index holds for the service
+/// installation, read without its owner. An absent index holds none.
+fn installation_references(index: &Path) -> Result<Vec<String>, String> {
+    let bytes = match ServiceHost::read_bounded(index) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error.to_string()),
+    };
+    let document = arkdeck_contract::strict_json(&bytes)
+        .map_err(|_| "the index is not one JSON document".to_owned())?;
+    let records = document["records"]
+        .as_array()
+        .filter(|_| document["schemaVersion"] == BUNDLE_INDEX_SCHEMA)
+        .ok_or("the index is not arkdeck.bootstrap-bundles/1")?;
+    let mut pinned = Vec::new();
+    for record in records {
+        let (Some(reference), Some(owners)) = (
+            record["reference"].as_str(),
+            record["references"].as_array(),
+        ) else {
+            return Err("a bundle record names no reference owners".into());
+        };
+        if owners.iter().any(|owner| {
+            owner["kind"] == INSTALLATION_OWNER_KIND && owner["id"] == INSTALLATION_OWNER_ID
+        }) {
+            pinned.push(reference.to_owned());
+        }
+    }
+    Ok(pinned)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Printed by Foundation `JSONEncoder([.sortedKeys, .prettyPrinted,
+    /// .withoutEscapingSlashes])` for a receipt of this shape.
+    #[test]
+    fn a_receipt_is_written_as_foundation_writes_it() {
+        let value = json!({
+            "schemaVersion": "arkdeck-launchagent-install/v1",
+            "installedAtUTC": "2026-09-24T00:00:00Z",
+            "daemonPath": "/a/b",
+            "daemonSHA256": "00",
+            "arkTraceDescriptor": {"descriptorPath": "/d", "descriptorByteCount": 3},
+        });
+        assert_eq!(
+            String::from_utf8(foundation_pretty_json(&value)).unwrap(),
+            "{\n  \"arkTraceDescriptor\" : {\n    \"descriptorByteCount\" : 3,\n    \
+             \"descriptorPath\" : \"/d\"\n  },\n  \"daemonPath\" : \"/a/b\",\n  \
+             \"daemonSHA256\" : \"00\",\n  \
+             \"installedAtUTC\" : \"2026-09-24T00:00:00Z\",\n  \
+             \"schemaVersion\" : \"arkdeck-launchagent-install/v1\"\n}"
+        );
+    }
+}

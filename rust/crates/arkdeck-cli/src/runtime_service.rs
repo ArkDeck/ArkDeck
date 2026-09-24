@@ -1,6 +1,7 @@
 //! `runtime service status|verify|restart`: the one production Runtime as a
 //! user-domain LaunchAgent, read and restarted as Swift's `LaunchAgentService`
-//! and `RuntimeCLI.runAgentDaemon` read and restart it.
+//! and `RuntimeCLI.runAgentDaemon` read and restart it. `install`, `update`
+//! and `uninstall` are `runtime_service_install.rs`.
 //!
 //! The service is `com.arkdeck.agentd` in `gui/<uid>`: its plist under
 //! `~/Library/LaunchAgents`, the helper bundle, install receipt, logs and
@@ -22,13 +23,17 @@
 //!   under `/tmp`) spell differently; the account's home never does.
 //! - A home relocated with `CFFIXED_USER_HOME` never drives the account's
 //!   launchd domain (`launchd.rs`).
-//! - `verify` without `--job` runs a fresh `observe.device@1` through Swift's
-//!   client-side executor (`AgentRuntimeExecutor`), which this CLI does not
-//!   carry; it is refused by name, pointing at `agent run` and `verify --job`.
+//! - `verify` without `--job` runs its fresh `observe.device@1` as a
+//!   Runtime-owned `agent run` through the daemon and then reopens the Job it
+//!   produced as `verify --job` does, where Swift ran it through its
+//!   client-side executor (`AgentRuntimeExecutor`, 协调会话受托裁定
+//!   2026-09-24); `runtime` is the reopen report and `agentExecution` the
+//!   settled execution.
 //! - Human output is the JSON document, as every other leaf of this CLI.
 use crate::Invocation;
 use crate::arkforge_bundle;
-use crate::runtime_service_verify::{self, ReopenOutcome};
+use crate::runtime_service_install;
+use crate::runtime_service_verify::{self, FreshOutcome, ReopenOutcome};
 use arkdeck_client::{Client, ClientError};
 use arkdeck_platform::launchd::{self, LaunchctlOutput, LaunchctlRunner};
 use arkdeck_platform::{LocalEndpoint, PropertyListValue, ServerIdentity};
@@ -39,33 +44,33 @@ use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(crate) const LABEL: &str = launchd::AGENT_LABEL;
-const HDC_KEY: &str = "ARKDECK_HDC_PATH";
-const WORKSPACE_PROJECTS_KEY: &str = "ARKDECK_WORKSPACE_PROJECTS";
-const WORKSPACE_ACTIVE_PROJECT_KEY: &str = "ARKDECK_WORKSPACE_ACTIVE_PROJECT";
-const DEVECO_SDK_KEY: &str = "ARKDECK_DEVECO_SDK_HOME";
-const ANALYZER_KEY: &str = "ARKDECK_ANALYZER_PATH";
-const WORKSPACE_INSPECTOR_KEY: &str = "ARKDECK_WORKSPACE_INSPECTOR";
-const WORKSPACE_INSPECTOR: &str = "/usr/bin/grep";
-const ARKTRACE_DESCRIPTOR_KEY: &str = "ARKDECK_ARKTRACE_DESCRIPTOR";
-const ARKFORGE_BUNDLE_KEY: &str = "ARKDECK_ARKFORGE_BUNDLE_PATH";
-const ARKFORGE_CAMPAIGN_KEY: &str = "ARKDECK_ARKFORGE_CAMPAIGN";
+pub(crate) const HDC_KEY: &str = "ARKDECK_HDC_PATH";
+pub(crate) const WORKSPACE_PROJECTS_KEY: &str = "ARKDECK_WORKSPACE_PROJECTS";
+pub(crate) const WORKSPACE_ACTIVE_PROJECT_KEY: &str = "ARKDECK_WORKSPACE_ACTIVE_PROJECT";
+pub(crate) const DEVECO_SDK_KEY: &str = "ARKDECK_DEVECO_SDK_HOME";
+pub(crate) const ANALYZER_KEY: &str = "ARKDECK_ANALYZER_PATH";
+pub(crate) const WORKSPACE_INSPECTOR_KEY: &str = "ARKDECK_WORKSPACE_INSPECTOR";
+pub(crate) const WORKSPACE_INSPECTOR: &str = "/usr/bin/grep";
+pub(crate) const ARKTRACE_DESCRIPTOR_KEY: &str = "ARKDECK_ARKTRACE_DESCRIPTOR";
+pub(crate) const ARKFORGE_BUNDLE_KEY: &str = "ARKDECK_ARKFORGE_BUNDLE_PATH";
+pub(crate) const ARKFORGE_CAMPAIGN_KEY: &str = "ARKDECK_ARKFORGE_CAMPAIGN";
 const RETIRED_ARKFORGE_KEYS: [&str; 3] = [
     "ARKDECK_ARKFORGED_PATH",
     "ARKDECK_ARKFORGED_SHA256",
     "ARKDECK_ARKFORGE_PROFILE_PATH",
 ];
-const SWIFT_SHA256_KEY: &str = "ARKDECK_SWIFT_SHA256";
-const WATERFLOW_PROJECT_REF: &str = "demo-app";
+pub(crate) const SWIFT_SHA256_KEY: &str = "ARKDECK_SWIFT_SHA256";
+pub(crate) const WATERFLOW_PROJECT_REF: &str = "demo-app";
 const ARKFORGE_DEVICE_PROFILE: &str = "org.openharmony.dayu200";
-const DAEMON_BUNDLE_NAME: &str = "ArkDeckAgent.app";
-const DAEMON_EXECUTABLE_NAME: &str = "arkdeck-agentd";
+pub(crate) const DAEMON_BUNDLE_NAME: &str = "ArkDeckAgent.app";
+pub(crate) const DAEMON_EXECUTABLE_NAME: &str = "arkdeck-agentd";
 const FACADE_EXECUTABLE_NAME: &str = "arkdeck-facade";
-const RECEIPT_SCHEMA: &str = "arkdeck-launchagent-install/v1";
+pub(crate) const RECEIPT_SCHEMA: &str = "arkdeck-launchagent-install/v1";
 const RESTART_SCHEMA: &str = "arkdeck-launchagent-restart/v1";
 const RESTART_PROOF_SCHEMA: &str = "arkdeck-launchagent-restart-proof/v1";
 const ARKTRACE_DESCRIPTOR_MAXIMUM: u64 = 16 * 1024;
 /// A plist, receipt or instance document larger than this is not read.
-const DOCUMENT_MAXIMUM: u64 = 1024 * 1024;
+pub(crate) const DOCUMENT_MAXIMUM: u64 = 1024 * 1024;
 const EIO: i32 = 5;
 
 // MARK: - Paths
@@ -116,7 +121,7 @@ pub(crate) fn sha256_file(path: &Path) -> io::Result<String> {
     Ok(arkdeck_contract::sha256_hex(&std::fs::read(path)?))
 }
 
-fn text(path: &Path) -> String {
+pub(crate) fn text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
@@ -159,6 +164,17 @@ pub struct LaunchAgentPaths {
     pub standard_error: PathBuf,
     pub state_directory: PathBuf,
     pub socket: PathBuf,
+    /// `Helpers/.rollback/ArkDeckAgent.app`: the helper an `update` replaced,
+    /// kept one generation (协调会话受托裁定 2026-09-24).
+    pub rollback_bundle: PathBuf,
+    /// `LaunchAgent/cutover-snapshots`: one snapshot summary of the old state
+    /// directory per M5 cutover.
+    pub cutover_snapshots: PathBuf,
+    /// Swift `OpenHarmonySigningPresetStore.receiptPath`.
+    pub signing_receipt: PathBuf,
+    /// The bootstrap bundle registry's index, whose installation references
+    /// a typed install pins.
+    pub bootstrap_bundle_index: PathBuf,
 }
 
 impl LaunchAgentPaths {
@@ -170,6 +186,10 @@ impl LaunchAgentPaths {
         let log_directory = library.join("Logs/ArkDeck");
         let state_directory = support.join("Agentd");
         Self {
+            rollback_bundle: support.join("Helpers/.rollback").join(DAEMON_BUNDLE_NAME),
+            cutover_snapshots: support.join("LaunchAgent/cutover-snapshots"),
+            signing_receipt: support.join("Signing/OpenHarmony/preset-v1.json"),
+            bootstrap_bundle_index: support.join("Bootstrap/v1/bundles.json"),
             plist: library.join(format!("LaunchAgents/{LABEL}.plist")),
             installed_daemon: installed_daemon_bundle
                 .join(format!("Contents/MacOS/{DAEMON_EXECUTABLE_NAME}")),
@@ -225,7 +245,7 @@ pub struct PlainFailure {
 }
 
 impl PlainFailure {
-    fn new(exit_code: u8, message: impl Into<String>) -> Self {
+    pub(crate) fn new(exit_code: u8, message: impl Into<String>) -> Self {
         Self {
             exit_code,
             message: message.into(),
@@ -250,21 +270,21 @@ pub struct ServiceAnswer {
 }
 
 impl ServiceAnswer {
-    fn emit(document: Value) -> Self {
+    pub(crate) fn emit(document: Value) -> Self {
         Self {
             document: Some(document),
             failure: None,
         }
     }
 
-    fn fail(failure: PlainFailure) -> Self {
+    pub(crate) fn fail(failure: PlainFailure) -> Self {
         Self {
             document: None,
             failure: Some(failure),
         }
     }
 
-    fn emit_then_fail(document: Value, failure: PlainFailure) -> Self {
+    pub(crate) fn emit_then_fail(document: Value, failure: PlainFailure) -> Self {
         Self {
             document: Some(document),
             failure: Some(failure),
@@ -283,7 +303,7 @@ pub struct ArkTraceDescriptorStatus {
 }
 
 impl ArkTraceDescriptorStatus {
-    fn json(&self) -> Value {
+    pub(crate) fn json(&self) -> Value {
         json!({"descriptorPath": self.descriptor_path,
             "descriptorSHA256": self.descriptor_sha256,
             "descriptorByteCount": self.descriptor_byte_count})
@@ -311,7 +331,7 @@ pub struct ArkForgeLaneStatus {
 }
 
 impl ArkForgeLaneStatus {
-    fn json(&self) -> Value {
+    pub(crate) fn json(&self) -> Value {
         json!({"bundlePath": self.bundle_path, "manifestSHA256": self.manifest_sha256,
             "daemonPath": self.daemon_path, "daemonSHA256": self.daemon_sha256,
             "deviceProfilePath": self.device_profile_path, "campaign": self.campaign})
@@ -532,17 +552,18 @@ impl DaemonInstance {
     }
 }
 
-/// Swift's `ValidatedArkTraceDescriptor`.
+/// Swift's `ValidatedArkTraceDescriptor`: its `url` is the status's physical
+/// path.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct ValidatedDescriptor {
-    status: ArkTraceDescriptorStatus,
+pub(crate) struct ValidatedDescriptor {
+    pub(crate) status: ArkTraceDescriptorStatus,
 }
 
 /// Swift `LaunchAgentWorkspaceConfiguration`, validated.
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct Workspace {
-    project_root: String,
-    deveco_sdk_root: String,
+pub(crate) struct Workspace {
+    pub(crate) project_root: String,
+    pub(crate) deveco_sdk_root: String,
 }
 
 /// Swift `ConfiguredPaths`: what the live plist configures. The lane is
@@ -574,6 +595,19 @@ pub struct ServiceHost<'a> {
     pub connection_timeout: Duration,
     /// The pause between polls (Swift `usleep(100_000)`).
     pub poll_interval: Duration,
+    /// Swift `defaultAgentDaemonBundlePath()`: the helper an `update` without
+    /// `--daemon` installs.
+    pub default_daemon_bundle: Option<PathBuf>,
+    /// Whether the home is relocated with `CFFIXED_USER_HOME`, which the
+    /// cutover preflight is then run with too.
+    pub relocated_home: bool,
+    /// Whether the Rust daemon answers `--analyze-crash-ledger`, which the
+    /// plist's `ARKDECK_ANALYZER_PATH` names. Until that mode is ported an
+    /// update to the Rust daemon is refused by name (协调会话受托裁定
+    /// 2026-09-24, ruling 2); production passes `false`.
+    pub rust_daemon_analyzes_crash_ledgers: bool,
+    /// How long one cutover preflight pass may run.
+    pub preflight_timeout: Duration,
 }
 
 impl ServiceHost<'_> {
@@ -581,7 +615,7 @@ impl ServiceHost<'_> {
         launchd::user_domain(self.uid)
     }
 
-    fn is_loaded(&self) -> Result<bool, ServiceError> {
+    pub(crate) fn is_loaded(&self) -> Result<bool, ServiceError> {
         Ok(self
             .launchctl
             .run(&launchd::print_arguments(&self.launch_domain()))
@@ -590,14 +624,20 @@ impl ServiceHost<'_> {
             == 0)
     }
 
-    fn run_launchctl(&self, arguments: &[String]) -> Result<LaunchctlOutput, ServiceError> {
+    pub(crate) fn run_launchctl(
+        &self,
+        arguments: &[String],
+    ) -> Result<LaunchctlOutput, ServiceError> {
         self.launchctl
             .run(arguments)
             .map_err(|error| ServiceError::Other(format!("launchctl could not run: {error}")))
     }
 
     /// Swift `requireSuccess`.
-    fn require_success(output: &LaunchctlOutput, operation: &str) -> Result<(), ServiceError> {
+    pub(crate) fn require_success(
+        output: &LaunchctlOutput,
+        operation: &str,
+    ) -> Result<(), ServiceError> {
         if output.status == 0 {
             return Ok(());
         }
@@ -618,7 +658,7 @@ impl ServiceHost<'_> {
     /// with EIO; a persistently disabled service reports the same, so after
     /// three consecutive EIO answers the service is enabled once. Only that
     /// exact status is retried, for a bounded twenty attempts.
-    fn bootstrap(&self) -> Result<(), ServiceError> {
+    pub(crate) fn bootstrap(&self) -> Result<(), ServiceError> {
         let arguments = launchd::bootstrap_arguments(&self.launch_domain(), &self.paths.plist);
         let (maximum, enable_after) = (20, 3);
         let mut enabled = false;
@@ -643,7 +683,11 @@ impl ServiceHost<'_> {
 
     /// Swift `validatedExecutable`: an absolute path whose resolved form is an
     /// existing, executable, non-directory file.
-    fn validated_executable(&self, candidate: &str, name: &str) -> Result<PathBuf, ServiceError> {
+    pub(crate) fn validated_executable(
+        &self,
+        candidate: &str,
+        name: &str,
+    ) -> Result<PathBuf, ServiceError> {
         if !candidate.starts_with('/') {
             return Err(ServiceError::InvalidExecutable(format!(
                 "{name} path must be absolute"
@@ -663,7 +707,7 @@ impl ServiceHost<'_> {
 
     /// Swift `transportExecutable(in:)`: the signed sibling facade when the
     /// bundle carries one, else the daemon executable.
-    fn transport_executable(&self, bundle: &Path) -> Result<PathBuf, ServiceError> {
+    pub(crate) fn transport_executable(&self, bundle: &Path) -> Result<PathBuf, ServiceError> {
         let facade = bundle.join(format!("Contents/MacOS/{FACADE_EXECUTABLE_NAME}"));
         if !facade.exists() {
             return Ok(bundle.join(format!("Contents/MacOS/{DAEMON_EXECUTABLE_NAME}")));
@@ -678,7 +722,11 @@ impl ServiceHost<'_> {
     }
 
     /// Swift `validatedWorkspace`.
-    fn validated_workspace(&self, project: &str, sdk: &str) -> Result<Workspace, ServiceError> {
+    pub(crate) fn validated_workspace(
+        &self,
+        project: &str,
+        sdk: &str,
+    ) -> Result<Workspace, ServiceError> {
         let directory = |candidate: &str, name: &str| -> Result<PathBuf, ServiceError> {
             if !candidate.starts_with('/') {
                 return Err(ServiceError::Configuration(format!(
@@ -734,7 +782,10 @@ impl ServiceHost<'_> {
     /// Swift `validatedArkTraceDescriptor`: one bounded, owner-controlled
     /// descriptor read through a single `openat(O_NOFOLLOW)` walk, with the
     /// closed three-member schema.
-    fn validated_descriptor(&self, candidate: &str) -> Result<ValidatedDescriptor, ServiceError> {
+    pub(crate) fn validated_descriptor(
+        &self,
+        candidate: &str,
+    ) -> Result<ValidatedDescriptor, ServiceError> {
         use arkdeck_platform::OwnerFileRefusal as Refusal;
         let configuration = |detail: &str| {
             ServiceError::Configuration(format!("ArkTrace distribution descriptor {detail}"))
@@ -827,7 +878,7 @@ impl ServiceHost<'_> {
         .map(Some)
     }
 
-    fn read_bounded(path: &Path) -> io::Result<Vec<u8>> {
+    pub(crate) fn read_bounded(path: &Path) -> io::Result<Vec<u8>> {
         use std::io::Read;
         let mut bytes = Vec::new();
         std::fs::File::open(path)?
@@ -944,6 +995,53 @@ impl ServiceHost<'_> {
             descriptor,
             lane: Self::configured_lane(&environment),
         })
+    }
+
+    /// Swift `arkTraceDescriptorForPreservingUpdate()`: the descriptor an
+    /// `update` keeps when `--arktrace-descriptor` is not restated, only while
+    /// the live plist and descriptor bytes still match the receipt. An
+    /// uninstalled service has no plist to read, which fails as in Swift.
+    pub(crate) fn ark_trace_descriptor_for_preserving_update(
+        &self,
+    ) -> Result<Option<String>, ServiceError> {
+        let configuration = self.configured_paths()?;
+        let receipt =
+            InstallReceipt::decode(&Self::read_bounded(&self.paths.receipt)?).map_err(|error| {
+                ServiceError::Other(format!("the install receipt is unreadable: {error}"))
+            })?;
+        let live = configuration
+            .descriptor
+            .as_ref()
+            .map(|descriptor| descriptor.status.clone());
+        if receipt.ark_trace_descriptor != live {
+            return Err(ServiceError::Configuration(
+                "ArkTrace distribution descriptor drifted since installation; pass \
+                 --arktrace-descriptor explicitly to select reviewed bytes"
+                    .into(),
+            ));
+        }
+        Ok(live.map(|status| status.descriptor_path))
+    }
+
+    /// Swift `arkForgeLaneForPreservingUpdate()`: the lane read back from the
+    /// live plist, none when there is no readable plist or environment.
+    pub(crate) fn ark_forge_lane_for_preserving_update(
+        &self,
+    ) -> Result<Option<ArkForgeLaneStatus>, LaneRefusal> {
+        let Ok(bytes) = Self::read_bounded(&self.paths.plist) else {
+            return Ok(None);
+        };
+        let Ok(document) = arkdeck_platform::read_property_list(&bytes) else {
+            return Ok(None);
+        };
+        let Some(environment) = document
+            .as_dictionary()
+            .and_then(|fields| fields.get("EnvironmentVariables"))
+            .and_then(PropertyListValue::as_string_dictionary)
+        else {
+            return Ok(None);
+        };
+        Self::configured_lane(&environment)
     }
 
     /// Swift `LaunchAgentService.status()`.
@@ -1479,15 +1577,6 @@ pub fn verify_leaf(host: &ServiceHost, id: &str, options: &Map<String, Value>) -
             ));
         }
     }
-    let Some(job) = job else {
-        return ServiceAnswer::fail(PlainFailure::new(
-            69,
-            "runtime service verify without --job runs a fresh observe.device@1 through Swift's \
-             client-side executor, which the Rust CLI does not carry; run `arkdeck agent run \
-             --operation observe.device@1 --target <id>` and then `arkdeck runtime service \
-             verify --job <job-id>`",
-        ));
-    };
     let status = match host.status() {
         Ok(status) => status,
         Err(error) => return ServiceAnswer::fail(error.into()),
@@ -1508,6 +1597,9 @@ pub fn verify_leaf(host: &ServiceHost, id: &str, options: &Map<String, Value>) -
         host.request(&status.socket_path, id, method, params)
             .map_err(|error| error.to_string())
     };
+    let Some(job) = job else {
+        return verify_fresh(host, &status, options, &request);
+    };
     match runtime_service_verify::verify_persisted_job(job, &request) {
         Err(message) => ServiceAnswer::fail(PlainFailure::new(1, message)),
         Ok(ReopenOutcome::Verified(report)) => ServiceAnswer::emit(json!({
@@ -1518,6 +1610,96 @@ pub fn verify_leaf(host: &ServiceHost, id: &str, options: &Map<String, Value>) -
             PlainFailure::new(1, reason),
         ),
     }
+}
+
+/// `runtime service verify` without `--job`: a fresh `observe.device@1` run
+/// by the daemon as an agent execution, then the reopen of its Job. The
+/// document keeps Swift's members (`launchAgent`, `runtime`,
+/// `runtimeVerified`; `humanAction` and `runtimeReceipt` while a person is
+/// needed) and adds the settled `agentExecution`.
+fn verify_fresh<F>(
+    host: &ServiceHost,
+    status: &LaunchAgentStatus,
+    options: &Map<String, Value>,
+    request: &F,
+) -> ServiceAnswer
+where
+    F: Fn(&str, Option<Map<String, Value>>) -> Result<Value, String>,
+{
+    let text = |key: &str| options.get(key).and_then(Value::as_str);
+    let seconds = text("maximumWaitSeconds")
+        .and_then(|raw| raw.parse().ok())
+        .unwrap_or(90);
+    let execution = match text("executionId") {
+        Some(id) => id.to_owned(),
+        None => match crate::job_plan::uuid() {
+            Ok(id) => id,
+            Err(error) => return ServiceAnswer::fail(PlainFailure::new(1, error.message)),
+        },
+    };
+    let outcome = runtime_service_verify::verify_observe_device(
+        text("targetId"),
+        seconds,
+        &execution,
+        host.poll_interval,
+        request,
+    );
+    match outcome {
+        Err(message) => ServiceAnswer::fail(PlainFailure::new(1, message)),
+        Ok(FreshOutcome::Reopened {
+            execution,
+            outcome: ReopenOutcome::Verified(report),
+        }) => ServiceAnswer::emit(json!({
+            "launchAgent": status.json(), "agentExecution": execution,
+            "runtime": report, "runtimeVerified": true,
+        })),
+        Ok(FreshOutcome::Reopened {
+            execution,
+            outcome: ReopenOutcome::Failed { reason, report },
+        }) => ServiceAnswer::emit_then_fail(
+            json!({"launchAgent": status.json(), "agentExecution": execution,
+                "runtime": report, "runtimeVerified": false}),
+            PlainFailure::new(1, reason),
+        ),
+        Ok(FreshOutcome::AwaitingHuman { execution }) => {
+            let reference = execution["humanAction"]["resumeReference"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned();
+            ServiceAnswer::emit_then_fail(
+                json!({"humanAction": execution["humanAction"], "launchAgent": status.json(),
+                    "runtimeReceipt": execution, "runtimeVerified": false}),
+                PlainFailure::new(
+                    75,
+                    format!(
+                        "paused for physical assistance; resume with: arkdeck agent resume \
+                         --resume-reference {reference}"
+                    ),
+                ),
+            )
+        }
+        Ok(FreshOutcome::Failed { reason, execution }) => ServiceAnswer::emit_then_fail(
+            json!({"launchAgent": status.json(), "agentExecution": execution,
+                "runtime": null, "runtimeVerified": false}),
+            PlainFailure::new(1, reason),
+        ),
+    }
+}
+
+/// Swift `defaultAgentDaemonBundlePath()`: the helper inside the app that
+/// holds this executable, else the one beside it.
+fn default_daemon_bundle() -> Option<PathBuf> {
+    let executable = std::env::current_exe().ok()?;
+    let directory = executable.parent()?;
+    let contents = directory.parent().filter(|_| directory.ends_with("MacOS"));
+    if let Some(contents) = contents.filter(|contents| contents.ends_with("Contents"))
+        && contents
+            .parent()
+            .is_some_and(|app| app.extension().is_some_and(|extension| extension == "app"))
+    {
+        return Some(contents.join("Helpers").join(DAEMON_BUNDLE_NAME));
+    }
+    Some(directory.join(DAEMON_BUNDLE_NAME))
 }
 
 /// The account's own service manager: its home, its user, `/bin/launchctl`
@@ -1544,10 +1726,18 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         now_utc: &utc_now,
         connection_timeout: Duration::from_secs(20),
         poll_interval: Duration::from_millis(100),
+        default_daemon_bundle: default_daemon_bundle(),
+        relocated_home: std::env::var_os("CFFIXED_USER_HOME").is_some_and(|home| !home.is_empty()),
+        // `--analyze-crash-ledger` is not ported to the Rust daemon yet.
+        rust_daemon_analyzes_crash_ledgers: false,
+        preflight_timeout: Duration::from_secs(600),
     };
     let empty = Map::new();
     let options = invocation.params.as_ref().unwrap_or(&empty);
     match invocation.command {
+        "runtime.service.update" => runtime_service_install::update_leaf(&host, options),
+        "runtime.service.install" => runtime_service_install::install_leaf(&host, options),
+        "runtime.service.uninstall" => runtime_service_install::uninstall_leaf(&host),
         "runtime.service.status" => status_leaf(&host, id),
         "runtime.service.verify" => verify_leaf(&host, id, options),
         "runtime.service.restart" => restart_leaf(

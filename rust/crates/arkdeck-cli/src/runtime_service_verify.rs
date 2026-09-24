@@ -5,6 +5,12 @@
 //! `artifact.list`); it never submits, runs, cancels or reconciles a Job, so it
 //! proves persistence after a restart without causing device work.
 //!
+//! `runtime service verify` without `--job` first runs `observe.device@1` as a
+//! Runtime-owned agent execution (`agent.run`, then `agent.status` until it
+//! settles) and reopens the Job it produced the same way. Swift ran that
+//! fresh observation through its client-side executor (`verifyObserveDevice`);
+//! the daemon owns it here (协调会话受托裁定 2026-09-24).
+//!
 //! Every document here is encoded as Swift's `JSONEncoder` encodes the typed
 //! value it decoded: members it does not model are dropped and an absent
 //! optional is omitted, never `null`.
@@ -50,6 +56,116 @@ const TRANSPORTS: [&str; 3] = ["usb", "tcp", "uart"];
 pub enum ReopenOutcome {
     Verified(Value),
     Failed { reason: String, report: Value },
+}
+
+/// Where a fresh verification ended.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FreshOutcome {
+    /// The run completed its Job, which was reopened as `verify --job`
+    /// reopens it; `execution` is the settled execution.
+    Reopened {
+        execution: Value,
+        outcome: ReopenOutcome,
+    },
+    /// The run waits for the published physical action its execution names.
+    AwaitingHuman { execution: Value },
+    /// The run settled with no completed Job to reopen, or was refused after
+    /// it was admitted: why, and the execution when one was answered.
+    Failed {
+        reason: String,
+        execution: Option<Value>,
+    },
+}
+
+/// A fresh `observe.device@1` through the daemon's agent executions, then the
+/// reopen of its Job. `request` makes one Runtime request; a request that
+/// fails ends the whole call, as a daemon fact that cannot be read ends
+/// `verify --job`. The client waits for the execution's own budget and 30 s
+/// more, polling from `poll` up to 2 s; it never cancels the execution.
+pub fn verify_observe_device<F>(
+    target: Option<&str>,
+    maximum_wait_seconds: u64,
+    execution_id: &str,
+    poll: Duration,
+    request: &F,
+) -> Result<FreshOutcome, String>
+where
+    F: Fn(&str, Option<Map<String, Value>>) -> Result<Value, String>,
+{
+    let mut intent = Map::new();
+    intent.insert(
+        "schemaVersion".into(),
+        json!("arkdeck.agent-execution-request/1"),
+    );
+    intent.insert("executionId".into(), json!(execution_id));
+    intent.insert("operation".into(), json!(OBSERVE));
+    intent.insert("inputs".into(), json!({}));
+    intent.insert(
+        "maximumWaitMilliseconds".into(),
+        json!((maximum_wait_seconds * 1000).to_string()),
+    );
+    if let Some(target) = target {
+        intent.insert("target".into(), json!({"targetId": target}));
+    }
+    crate::agent_executions::validate_intent(&intent).map_err(|error| error.message)?;
+    let deadline = Instant::now() + Duration::from_secs(maximum_wait_seconds + 30);
+    let mut answer = request("agent.run", Some(intent))?;
+    let mut interval = poll;
+    loop {
+        let fields = crate::validate_execution(&answer).map_err(|error| error.message)?;
+        match crate::settle_execution(&fields) {
+            Ok(crate::Settlement::Settled(execution)) => {
+                if execution["state"] == "completed"
+                    && let Some(job) = execution["jobId"].as_str()
+                {
+                    let outcome = verify_persisted_job(job, request)?;
+                    return Ok(FreshOutcome::Reopened { execution, outcome });
+                }
+                let reason = crate::agent_exit(&execution)
+                    .map(|(_, reason)| reason)
+                    .unwrap_or_else(|| "the execution settled without a completed Job".into());
+                return Ok(FreshOutcome::Failed {
+                    reason,
+                    execution: Some(execution),
+                });
+            }
+            Ok(crate::Settlement::Pending) => (),
+            Err(error) => {
+                let execution = error.details.get("execution").cloned();
+                if error.code == "humanActionRequired"
+                    && let Some(execution) = execution
+                        .clone()
+                        .filter(|execution| execution["state"] == "waitingForHuman")
+                {
+                    return Ok(FreshOutcome::AwaitingHuman { execution });
+                }
+                return Ok(FreshOutcome::Failed {
+                    reason: error.message,
+                    execution,
+                });
+            }
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            return Ok(FreshOutcome::Failed {
+                reason: format!(
+                    "{OBSERVE} did not settle within {maximum_wait_seconds}s; inspect it with \
+                     `arkdeck agent status --execution-id {}`",
+                    fields["executionId"].as_str().unwrap_or(execution_id)
+                ),
+                execution: Some(Value::Object(fields)),
+            });
+        }
+        std::thread::sleep(interval.min(deadline - now));
+        interval = (interval * 2).min(Duration::from_secs(2));
+        answer = request(
+            "agent.status",
+            Some(Map::from_iter([(
+                "executionId".to_owned(),
+                fields["executionId"].clone(),
+            )])),
+        )?;
+    }
 }
 
 /// Swift `validSHA256`.

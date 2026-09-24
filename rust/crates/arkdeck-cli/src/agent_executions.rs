@@ -543,7 +543,7 @@ pub fn execution_intent(invocation: &Invocation) -> Result<Map<String, Value>, C
 }
 
 /// Swift `AgentExecutionIntent.init`, in its order and with its refusals.
-fn validate_intent(fields: &Map<String, Value>) -> Result<(), CliError> {
+pub(crate) fn validate_intent(fields: &Map<String, Value>) -> Result<(), CliError> {
     let text = |key: &str| fields.get(key).and_then(Value::as_str);
     let budget = text("maximumWaitMilliseconds").and_then(|budget| {
         budget

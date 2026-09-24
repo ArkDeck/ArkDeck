@@ -202,4 +202,14 @@ service or device.
 
 ## CI
 
-Pending.
+PR #2142, head `a83d930ec`, merged as `d41cc1fb1` (2026-09-24 08:14 UTC).
+
+- Swift CI run 35971101684: success. `plan` selected the Rust lanes only;
+  `rust-checks` passed on host-independent checks, `ubuntu-latest`,
+  `windows-latest` and `macos-26` (job 107540851824, whose log shows
+  `cutover_preflight` (9) and the platform's `tree_snapshot` test run and
+  pass, `/private/tmp/arkdeck-s18-2a-ci-macos26.log`); `swift-tests`,
+  `app-build` and `ds-interactions` were skipped as not selected; the `swift`
+  aggregate passed.
+- SDD Guard run 35971101297: `guard` and `ds-tokens` passed.
+- Agent PR run 35971101369: `open-pr` passed.

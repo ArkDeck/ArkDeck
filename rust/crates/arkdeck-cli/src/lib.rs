@@ -62,6 +62,8 @@ mod arkforge_bundle;
 #[cfg(target_os = "macos")]
 pub mod runtime_service;
 #[cfg(target_os = "macos")]
+pub mod runtime_service_install;
+#[cfg(target_os = "macos")]
 pub mod runtime_service_verify;
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
@@ -572,6 +574,23 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--maximum-wait"
                 | "--maximum-wait-seconds"
                 | "--reviewed-plan-digest"
+                | "--daemon"
+                | "--hdc"
+                | "--workspace-project"
+                | "--deveco-sdk"
+                | "--arktrace-descriptor"
+                | "--arkforge-bundle"
+                | "--arkforge-campaign"
+                | "--sensitive-evidence"
+                | "--harness-model-provider"
+                | "--harness-model-name"
+                | "--harness-cli"
+                | "--harness-cli-timeout-seconds"
+                | "--arkforged"
+                | "--arkforged-sha256"
+                | "--arkforge-profile"
+                | "--bundle-generation"
+                | "--tool-generation"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -632,6 +651,20 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--timeout-seconds" => "timeoutSeconds",
                         "--build-mode" => "buildMode",
                         "--relative-source-map" => "relativeSourceMap",
+                        "--workspace-project" => "workspaceProject",
+                        "--deveco-sdk" => "devecoSdk",
+                        "--arktrace-descriptor" => "arktraceDescriptor",
+                        "--arkforge-bundle" => "arkforgeBundle",
+                        "--arkforge-campaign" => "arkforgeCampaign",
+                        "--sensitive-evidence" => "sensitiveEvidence",
+                        "--harness-model-provider" => "harnessModelProvider",
+                        "--harness-model-name" => "harnessModelName",
+                        "--harness-cli" => "harnessCli",
+                        "--harness-cli-timeout-seconds" => "harnessCliTimeoutSeconds",
+                        "--arkforged-sha256" => "arkforgedSha256",
+                        "--arkforge-profile" => "arkforgeProfile",
+                        "--bundle-generation" => "bundleGeneration",
+                        "--tool-generation" => "toolGeneration",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -768,9 +801,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "hdc", "status"] => "runtime.hdc.status",
         ["runtime", "hdc", "impact-preview"] => "runtime.hdc.impact-preview",
         ["runtime", "hdc", "restart"] => "runtime.hdc.restart",
+        ["runtime", "service", "install"] => "runtime.service.install",
+        ["runtime", "service", "update"] => "runtime.service.update",
+        ["runtime", "service", "restart"] => "runtime.service.restart",
         ["runtime", "service", "status"] => "runtime.service.status",
         ["runtime", "service", "verify"] => "runtime.service.verify",
-        ["runtime", "service", "restart"] => "runtime.service.restart",
+        ["runtime", "service", "uninstall"] => "runtime.service.uninstall",
         ["control-action", "list"] => "control-action.list",
         ["control-action", "show"] => "control-action.show",
         ["control-action", "reconcile"] => "control-action.reconcile",
@@ -1143,6 +1179,25 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
         "runtime.service.verify" => &["targetId", "maximumWaitSeconds", "executionId", "jobId"],
         "runtime.service.restart" => &["maximumWaitSeconds"],
+        "runtime.service.install" => &["bundle", "bundleGeneration", "tool", "toolGeneration"],
+        "runtime.service.update" => &[
+            "daemon",
+            "hdc",
+            "workspaceProject",
+            "devecoSdk",
+            "arktraceDescriptor",
+            "arkforgeBundle",
+            "arkforgeCampaign",
+            // Refused by name when the command runs, as Swift reads them.
+            "sensitiveEvidence",
+            "harnessModelProvider",
+            "harnessModelName",
+            "harnessCli",
+            "harnessCliTimeoutSeconds",
+            "arkforged",
+            "arkforgedSha256",
+            "arkforgeProfile",
+        ],
         _ => &[],
     };
     if method_options
@@ -1182,6 +1237,31 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             return Err(refuse(
                 "--job excludes --target, --maximum-wait-seconds and --execution-id",
             ));
+        }
+        // The typed install names four exact registry values, its two
+        // generations canonical positive integers.
+        if command == "runtime.service.install" {
+            if ["bundle", "bundleGeneration", "tool", "toolGeneration"]
+                .iter()
+                .any(|key| !method_options.contains_key(*key))
+            {
+                return Err(refuse(
+                    "runtime service install requires --bundle, --bundle-generation, --tool \
+                     and --tool-generation",
+                ));
+            }
+            for key in ["bundleGeneration", "toolGeneration"] {
+                let text = method_options[key].as_str().expect("option text");
+                if !text
+                    .parse::<u64>()
+                    .is_ok_and(|n| n > 0 && n <= i64::MAX as u64 && n.to_string() == text)
+                {
+                    return Err(refuse(
+                        "--bundle-generation and --tool-generation must be canonical positive \
+                         integers",
+                    ));
+                }
+            }
         }
     }
     if !help
