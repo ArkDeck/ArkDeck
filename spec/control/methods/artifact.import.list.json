@@ -85,7 +85,10 @@
                     "type": "string"
                   },
                   "deviceProfile": {
-                    "type": "null"
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "importRequestId": {
                     "type": "string"
@@ -126,115 +129,127 @@
                 "type": "string"
               },
               "receipt": {
-                "additionalProperties": false,
-                "properties": {
-                  "artifactDigest": {
-                    "type": "string"
-                  },
-                  "artifactId": {
-                    "type": "string"
-                  },
-                  "bindingRevision": {
-                    "type": "string"
-                  },
-                  "byteCount": {
-                    "type": "string"
-                  },
-                  "generation": {
-                    "type": "string"
-                  },
-                  "importId": {
-                    "type": "string"
-                  },
-                  "importRequestId": {
-                    "type": "string"
-                  },
-                  "lease": {
-                    "type": "string"
-                  },
-                  "mediaType": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "owner": {
+                "anyOf": [
+                  {
                     "additionalProperties": false,
                     "properties": {
-                      "id": {
+                      "artifactDigest": {
                         "type": "string"
                       },
-                      "kind": {
-                        "type": "string"
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "kind"
-                    ],
-                    "type": "object"
-                  },
-                  "privacy": {
-                    "type": "string"
-                  },
-                  "schemaVersion": {
-                    "type": "string"
-                  },
-                  "targetId": {
-                    "type": "string"
-                  },
-                  "validation": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "abi": {
+                      "artifactId": {
                         "type": "string"
                       },
-                      "buildId": {
+                      "bindingRevision": {
                         "type": "string"
                       },
-                      "container": {
+                      "byteCount": {
                         "type": "string"
                       },
-                      "elfClassBits": {
-                        "type": "integer"
-                      },
-                      "kind": {
+                      "generation": {
                         "type": "string"
                       },
-                      "machine": {
-                        "type": "integer"
+                      "importId": {
+                        "type": "string"
                       },
-                      "touchedFiles": {
-                        "items": {
-                          "type": "string"
+                      "importRequestId": {
+                        "type": "string"
+                      },
+                      "lease": {
+                        "type": "string"
+                      },
+                      "mediaType": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "owner": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string"
+                          }
                         },
-                        "type": "array"
+                        "required": [
+                          "id",
+                          "kind"
+                        ],
+                        "type": "object"
+                      },
+                      "privacy": {
+                        "type": "string"
+                      },
+                      "schemaVersion": {
+                        "type": "string"
+                      },
+                      "targetId": {
+                        "type": "string"
+                      },
+                      "validation": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "abi": {
+                            "type": "string"
+                          },
+                          "buildId": {
+                            "type": "string"
+                          },
+                          "container": {
+                            "type": "string"
+                          },
+                          "deviceProfile": {
+                            "type": "string"
+                          },
+                          "elfClassBits": {
+                            "type": "integer"
+                          },
+                          "kind": {
+                            "type": "string"
+                          },
+                          "machine": {
+                            "type": "integer"
+                          },
+                          "touchedFiles": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "type": "object"
                       }
                     },
                     "required": [
-                      "kind"
+                      "artifactDigest",
+                      "artifactId",
+                      "bindingRevision",
+                      "byteCount",
+                      "generation",
+                      "importId",
+                      "importRequestId",
+                      "lease",
+                      "mediaType",
+                      "name",
+                      "owner",
+                      "privacy",
+                      "schemaVersion",
+                      "targetId",
+                      "validation"
                     ],
                     "type": "object"
+                  },
+                  {
+                    "type": [
+                      "null"
+                    ]
                   }
-                },
-                "required": [
-                  "artifactDigest",
-                  "artifactId",
-                  "bindingRevision",
-                  "byteCount",
-                  "generation",
-                  "importId",
-                  "importRequestId",
-                  "lease",
-                  "mediaType",
-                  "name",
-                  "owner",
-                  "privacy",
-                  "schemaVersion",
-                  "targetId",
-                  "validation"
-                ],
-                "type": "object"
+                ]
               },
               "schemaVersion": {
                 "type": "string"
@@ -304,7 +319,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 3,
-    "request": 13,
-    "result": 10
+    "request": 16,
+    "result": 13
   }
 }

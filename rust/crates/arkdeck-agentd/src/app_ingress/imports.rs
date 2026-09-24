@@ -74,15 +74,15 @@ pub(super) fn closed(method: &str, params: &Map<String, Value>) -> bool {
     shape && validate_method_value(method, "request", &Value::Object(params.clone())).is_ok()
 }
 
-/// As Swift's App transport, a kind outside the App's uploads is refused
-/// before the owner. The App's Flash bundle upload is not admitted by this
-/// ingress yet; it arrives with the Flash (M4) composition.
+/// As Swift's App transport (`AgentXPCListener`), a kind outside the App's
+/// uploads — a HAP, a native library and a Flash bundle, which the owner
+/// validates as Swift's production policy does — is refused before the owner.
 pub(super) fn out_of_scope(request: &Request) -> Option<Vec<u8>> {
     if request.method != "artifact.import.begin" {
         return None;
     }
     let kind = request.params.as_ref()?.get("kind")?.as_str()?;
-    if matches!(kind, "hap" | "native-library") {
+    if matches!(kind, "hap" | "native-library" | "flash-bundle") {
         return None;
     }
     let response = Response {
