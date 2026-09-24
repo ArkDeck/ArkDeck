@@ -14,8 +14,13 @@ use arkdeck_platform::{HostDirectory, PeerOrigin, listen_mach};
 use serde_json::Value;
 use std::{ffi::OsStr, io, os::unix::fs::MetadataExt, path::Path, sync::Arc};
 
+// Named by path, so that each resolves the same when `tests/spawning` compiles
+// this module from its source (a `#[path]` module's children are its
+// siblings).
+#[path = "app_ingress/imports.rs"]
 mod imports;
-mod jobs;
+#[path = "app_ingress/jobs.rs"]
+pub(crate) mod jobs;
 
 const SERVICE: &str = "com.arkdeck.agentd";
 // Same policy as AgentXPCContract and the production facade. No caller override.
@@ -45,7 +50,7 @@ impl Configuration {
         Self::isolated(Path::new(root), Path::new(&home)).map(Some)
     }
 
-    fn isolated(root: &Path, home: &Path) -> io::Result<Self> {
+    pub(crate) fn isolated(root: &Path, home: &Path) -> io::Result<Self> {
         if !root.is_absolute() || std::fs::symlink_metadata(root)?.file_type().is_symlink() {
             return Err(invalid(
                 "App ingress requires an existing physical absolute state root",
@@ -96,7 +101,7 @@ impl Configuration {
 
     /// What `listen` registers through `listen`: the fixed service, the fixed
     /// requirement, and the handler libxpc's authenticated callback enters.
-    fn listen_with<H: HostServices + 'static>(
+    pub(crate) fn listen_with<H: HostServices + 'static>(
         self,
         control: Arc<Control<H>>,
         listen: impl FnOnce(&str, &str, Handler) -> io::Result<()>,
@@ -113,20 +118,20 @@ impl Configuration {
     }
 }
 /// The authenticated callback `listen_mach` enters for each frame.
-type Handler = Box<dyn Fn(&[u8], PeerOrigin) -> Vec<u8> + Send + Sync>;
+pub(crate) type Handler = Box<dyn Fn(&[u8], PeerOrigin) -> Vec<u8> + Send + Sync>;
 fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
 
-struct AppIngress<H: HostServices> {
-    control: Arc<Control<H>>,
+pub(crate) struct AppIngress<H: HostServices> {
+    pub(crate) control: Arc<Control<H>>,
     owner_uid: u32,
     jobs: jobs::Gate,
     #[cfg(test)]
-    dispatches: std::sync::atomic::AtomicUsize,
+    pub(crate) dispatches: std::sync::atomic::AtomicUsize,
 }
 impl<H: HostServices> AppIngress<H> {
-    fn new(control: Arc<Control<H>>, owner_uid: u32) -> Self {
+    pub(crate) fn new(control: Arc<Control<H>>, owner_uid: u32) -> Self {
         Self {
             control,
             owner_uid,
@@ -135,7 +140,7 @@ impl<H: HostServices> AppIngress<H> {
             dispatches: Default::default(),
         }
     }
-    fn handle(&self, frame: &[u8], peer: PeerOrigin) -> Vec<u8> {
+    pub(crate) fn handle(&self, frame: &[u8], peer: PeerOrigin) -> Vec<u8> {
         // Defense in depth for transport composition. The signature decision
         // stays inside libxpc; a UID/PID supplied in JSON grants no authority.
         if peer.euid != self.owner_uid || peer.pid <= 1 || peer.foreground_console {
@@ -395,6 +400,3 @@ fn refusal(id: &str, code: &str, message: &str) -> Vec<u8> {
     let response = Response::failure(id, code, message).value();
     encode_frame(&response, MAX_RESPONSE_BYTES).expect("bounded App ingress refusal")
 }
-
-#[cfg(test)]
-mod tests;

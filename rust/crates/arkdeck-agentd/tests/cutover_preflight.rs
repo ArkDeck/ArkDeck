@@ -16,6 +16,16 @@ use std::fs;
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::{Mutex, MutexGuard, PoisonError};
+
+/// One test at a time. One takes Swift's instance lock in this process while
+/// the others spawn the daemon, and a child shares every descriptor of this
+/// process until its exec, so a lock let go of here could still read as
+/// held.
+static TURN: Mutex<()> = Mutex::new(());
+fn turn() -> MutexGuard<'static, ()> {
+    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// Swift `RuntimeJobRepository.schemaStatements`, as the Job owner keeps them.
 const SCHEMA: [&str; 4] = [
@@ -294,6 +304,7 @@ fn blocking_states() -> Vec<String> {
 
 #[test]
 fn a_swift_state_root_is_refused_by_every_fact_that_blocks_and_carries_the_rest() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     let before = home.tree();
@@ -361,6 +372,7 @@ fn a_swift_state_root_is_refused_by_every_fact_that_blocks_and_carries_the_rest(
 
 #[test]
 fn each_of_the_tables_thirteen_blocking_states_refuses_whichever_source_gives_it() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     let states = blocking_states();
@@ -394,6 +406,7 @@ fn each_of_the_tables_thirteen_blocking_states_refuses_whichever_source_gives_it
 
 #[test]
 fn an_unresolved_journal_refuses_unless_the_job_is_parked() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     // A terminal Job whose journal ends in a torn record.
@@ -443,6 +456,7 @@ fn an_unresolved_journal_refuses_unless_the_job_is_parked() {
 
 #[test]
 fn a_job_is_read_from_whichever_source_names_it() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     // A crash window can leave a Job in `jobs/` with no index row yet ...
@@ -487,6 +501,7 @@ fn a_job_is_read_from_whichever_source_names_it() {
 
 #[test]
 fn an_unsettled_use_and_an_unreadable_source_refuse() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     // A capability store whose last use is only reserved.
@@ -540,6 +555,7 @@ fn an_unsettled_use_and_an_unreadable_source_refuse() {
 
 #[test]
 fn a_state_with_nothing_in_flight_is_clear_and_the_held_pass_records_its_snapshot() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     // Only the terminal and parked Jobs, the settled executions and uses, and
@@ -636,6 +652,7 @@ fn a_state_with_nothing_in_flight_is_clear_and_the_held_pass_records_its_snapsho
 
 #[test]
 fn the_held_pass_refuses_while_another_runtime_holds_the_instance_lock() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     // This test process holds the lock, as a running Swift daemon does.
@@ -668,6 +685,7 @@ fn the_held_pass_refuses_while_another_runtime_holds_the_instance_lock() {
 
 #[test]
 fn the_preflight_runs_only_as_the_production_layouts_one_shot_read() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     let before = home.tree();
@@ -714,6 +732,7 @@ fn the_preflight_runs_only_as_the_production_layouts_one_shot_read() {
 
 #[test]
 fn the_job_index_is_read_the_way_swift_inspects_it() {
+    let _turn = turn();
     let home = Home::new();
     home.seed();
     let state = home.state();

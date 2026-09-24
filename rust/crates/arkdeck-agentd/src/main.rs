@@ -1,5 +1,15 @@
+// The unit tests run in this binary's test build, in parallel, and none of
+// them starts a child process: a test that does runs in `tests/spawning`, one
+// at a time, because a child keeps descriptors of this process that another
+// test's listener or lock needs gone (see there). The modules that binary
+// compiles from these sources (`app_ingress`, `bootstrap_readers`, `facade`,
+// `facade_owners`, `host`, `managed_hdc`) keep no test module beside them;
+// their unit tests are declared here.
 #[cfg(target_os = "macos")]
 mod app_ingress;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "app_ingress/tests.rs"]
+mod app_ingress_tests;
 #[cfg(target_os = "macos")]
 mod arkforge_lane;
 #[cfg(target_os = "macos")]
@@ -27,16 +37,18 @@ mod facade;
 #[cfg(target_os = "macos")]
 mod facade_owners;
 #[cfg(all(test, target_os = "macos"))]
+mod facade_owners_tests;
+#[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
 mod host;
+#[cfg(test)]
+mod host_tests;
 #[cfg(target_os = "macos")]
 mod managed_hdc;
 #[cfg(all(test, target_os = "macos"))]
 mod operation_availability_control;
 #[cfg(target_os = "macos")]
 mod production;
-#[cfg(all(test, target_os = "macos"))]
-mod target_observation_control;
 #[cfg(all(test, target_os = "macos"))]
 mod workspace_project_control;
 
@@ -830,14 +842,8 @@ fn main() {
 }
 
 #[cfg(all(test, target_os = "macos"))]
-mod debug_read_control;
-#[cfg(all(test, target_os = "macos"))]
 mod device_access_control;
-#[cfg(all(test, target_os = "macos"))]
-mod flash_host_facts_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_reads_control;
 #[cfg(all(test, target_os = "macos"))]
 mod loader_binding_control;
-#[cfg(all(test, target_os = "macos"))]
-mod trace_probe_control;

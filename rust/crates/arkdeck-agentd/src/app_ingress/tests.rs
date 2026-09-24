@@ -1,73 +1,27 @@
-use super::*;
-use arkdeck_contract::{MAX_REQUEST_BYTES, METHODS, decode_response};
-use arkdeck_hoststore::HistoryStore;
-use serde_json::json;
+//! The App ingress's unit tests, declared by the binary's root rather than
+//! beside `app_ingress`: `tests/spawning` compiles `app_ingress` from its
+//! source as well, and must not also run these. Its own App ingress tests,
+//! which drive a production Host over a fake HDC, share `fixtures.rs`.
+use crate::app_ingress::*;
+use arkdeck_contract::{
+    MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, METHODS, Request, decode_response, encode_frame,
+};
+use arkdeck_control::{Control, HostServices};
+use arkdeck_platform::PeerOrigin;
+use serde_json::{Value, json};
 use std::{
     fs,
     os::unix::fs::{DirBuilderExt, symlink},
-    path::PathBuf,
-    sync::atomic::Ordering,
+    path::{Path, PathBuf},
+    sync::{Arc, atomic::Ordering},
 };
 
-struct Root(PathBuf);
-impl Root {
-    fn new() -> Self {
-        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-        let root = std::env::temp_dir()
-            .canonicalize()
-            .unwrap()
-            .join(format!("app-history-{nonce:x}"));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
-        Self(root)
-    }
-    fn control(&self) -> Arc<Control<crate::host::Host>> {
-        Arc::new(
-            Control::new(
-                crate::host::Host::from_environment()
-                    .with_history(HistoryStore::open(&self.0).unwrap()),
-            )
-            .unwrap(),
-        )
-    }
-    fn ingress(&self) -> AppIngress<crate::host::Host> {
-        AppIngress::new(self.control(), fs::metadata(&self.0).unwrap().uid())
-    }
-    // Synthetic kernel-origin fixture, not evidence of a live signed XPC peer.
-    fn peer(&self) -> PeerOrigin {
-        PeerOrigin {
-            euid: fs::metadata(&self.0).unwrap().uid(),
-            pid: 123,
-            foreground_console: false,
-        }
-    }
-}
-impl Drop for Root {
-    fn drop(&mut self) {
-        fs::remove_dir_all(&self.0).unwrap();
-    }
-}
-fn frame(method: &str, params: Value) -> Vec<u8> {
-    serde_json::to_vec(&Request::new(
-        "request-1",
-        method,
-        params.as_object().cloned(),
-    ))
-    .unwrap()
-}
+#[path = "fixtures.rs"]
+mod fixtures;
+use fixtures::*;
+
 fn save(generation: &str) -> Value {
     json!({"expectedGeneration":generation,"search":"build","status":"failed","mode":"all","sessionId":null,"targetId":null,"timeRange":"lastDay","activity":"all"})
-}
-fn result(bytes: &[u8], method: &str) -> Value {
-    decode_response(bytes.trim_ascii_end(), "request-1", method)
-        .unwrap()
-        .outcome
-        .unwrap_or_else(|error| panic!("{method}: {error:?}"))
-}
-fn code(bytes: &[u8]) -> String {
-    serde_json::from_slice::<Value>(bytes).unwrap()["error"]["code"]
-        .as_str()
-        .unwrap()
-        .to_owned()
 }
 
 #[test]

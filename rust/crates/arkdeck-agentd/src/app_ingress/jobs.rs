@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::{collections::BTreeMap, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum Kind {
+pub(crate) enum Kind {
     Continuation,
     Flash,
     Trace,
@@ -20,7 +20,7 @@ pub(super) enum Kind {
     Input,
 }
 #[derive(Debug, Eq, PartialEq)]
-pub(super) enum Action {
+pub(crate) enum Action {
     Plan,
     Submit(Kind),
     Run(String),
@@ -94,7 +94,7 @@ fn bounded_id(id: &str) -> bool {
 }
 impl Action {
     /// None means not a Job lifecycle method; Err means a refused Job request.
-    pub(super) fn parse(request: &Request) -> Result<Option<Self>, ()> {
+    pub(crate) fn parse(request: &Request) -> Result<Option<Self>, ()> {
         if !matches!(
             request.method.as_str(),
             "job.plan" | "job.submit" | "job.run" | "job.cancel"
@@ -141,9 +141,9 @@ struct State {
     running: BTreeMap<String, Kind>,
 }
 #[derive(Default)]
-pub(super) struct Gate(Mutex<State>);
+pub(crate) struct Gate(Mutex<State>);
 impl Gate {
-    pub(super) fn record_reply(&self, reply: &[u8], request_id: &str, kind: Kind) -> bool {
+    pub(crate) fn record_reply(&self, reply: &[u8], request_id: &str, kind: Kind) -> bool {
         let Ok(response) = decode_response(reply.trim_ascii_end(), request_id, "job.submit") else {
             return false;
         };
@@ -175,7 +175,7 @@ impl Gate {
             id: id.to_owned(),
         })
     }
-    pub(super) fn owns(&self, id: &str) -> bool {
+    pub(crate) fn owns(&self, id: &str) -> bool {
         self.0
             .lock()
             .is_ok_and(|state| state.runnable.contains_key(id) || state.running.contains_key(id))

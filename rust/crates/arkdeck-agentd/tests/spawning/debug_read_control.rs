@@ -119,6 +119,7 @@ fn call(control: &Control<crate::host::Host>, method: &str, params: Value) -> Va
 }
 #[test]
 fn debug_reads_execute_only_closed_commands_on_an_adopted_route() {
+    let _turn = crate::turn();
     let fixture = Fixture::new();
     let target = fixture.adopt();
     let script = r#"#!/bin/sh
@@ -205,6 +206,7 @@ esac
 
 #[test]
 fn debug_reads_replay_the_existing_swift_oracle_through_production_host() {
+    let _turn = crate::turn();
     // The checked-in fake names this fixed root; share its lock with all other
     // oracle replays, including Swift. This never names an installed Runtime.
     let lock = fs::OpenOptions::new()
