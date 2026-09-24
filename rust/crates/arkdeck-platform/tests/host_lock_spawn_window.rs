@@ -2,15 +2,17 @@
 //! this process until its exec closes the close-on-exec descriptors, so a
 //! lock released only by closing its descriptor stays held through that
 //! child for the window. `HostReadLock` unlocks before it closes, which
-//! releases the lock for every reference at once. These tests spawn
+//! releases the lock for every reference at once, and so does the facade's
+//! lock on its transport directory, its refusals included. These tests spawn
 //! children, so they have this test binary to themselves: every other test's
 //! locks would be shared too.
 #![cfg(target_os = "macos")]
-use arkdeck_platform::{HostDirectory, HostReadLock, random_bytes};
+use arkdeck_platform::{HostDirectory, HostReadLock, LocalEndpoint, LocalListener, random_bytes};
 use std::fs::{self, File, TryLockError};
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::net::UnixListener;
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
@@ -27,10 +29,19 @@ static SERIAL: Mutex<()> = Mutex::new(());
 struct Fixture(PathBuf);
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        Self::at(std::env::temp_dir().canonicalize().unwrap().join(format!(
             "arkdeck-lock-spawn-{:032x}",
             u128::from_le_bytes(random_bytes().unwrap())
-        ));
+        )))
+    }
+    /// A root short enough for a socket's name to fit `sun_path`.
+    fn transport() -> Self {
+        Self::at(PathBuf::from(format!(
+            "/private/tmp/adfl-{:016x}",
+            u64::from_le_bytes(random_bytes().unwrap())
+        )))
+    }
+    fn at(root: PathBuf) -> Self {
         fs::create_dir(&root).unwrap();
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         Self(root)
@@ -126,6 +137,34 @@ impl Drop for HeldChild {
     }
 }
 
+/// Another thread spawning children one after another until the flag is
+/// set, each delaying its exec by 2 ms as a loaded host would; how many it
+/// spawned.
+fn spawn_in_a_loop() -> (Arc<AtomicBool>, JoinHandle<u32>) {
+    let stop = Arc::new(AtomicBool::new(false));
+    let spawner = {
+        let stop = Arc::clone(&stop);
+        thread::spawn(move || {
+            let mut spawned = 0_u32;
+            while !stop.load(Ordering::Relaxed) {
+                let mut command = Command::new("/usr/bin/true");
+                // SAFETY: poll is async-signal-safe; the forked child only
+                // delays its exec by 2 ms.
+                unsafe {
+                    command.pre_exec(|| {
+                        libc::poll(std::ptr::null_mut(), 0, 2);
+                        Ok(())
+                    });
+                }
+                assert!(command.status().unwrap().success());
+                spawned += 1;
+            }
+            spawned
+        })
+    };
+    (stop, spawner)
+}
+
 /// Every entry point that takes an existing owner lock; `None` is its
 /// refusal.
 fn reacquire(root: &HostDirectory, entry: usize) -> Option<HostReadLock> {
@@ -203,27 +242,7 @@ fn drop_and_reopen_survive_children_another_thread_spawns_in_a_loop() {
     let fixture = Fixture::new();
     let root = HostDirectory::open(&fixture.0).unwrap();
     drop(root.lock_document(NAME).unwrap());
-    let stop = Arc::new(AtomicBool::new(false));
-    let spawner = {
-        let stop = Arc::clone(&stop);
-        thread::spawn(move || {
-            let mut spawned = 0_u32;
-            while !stop.load(Ordering::Relaxed) {
-                let mut command = Command::new("/usr/bin/true");
-                // SAFETY: poll is async-signal-safe; the forked child only
-                // delays its exec by 2 ms, as a loaded host would.
-                unsafe {
-                    command.pre_exec(|| {
-                        libc::poll(std::ptr::null_mut(), 0, 2);
-                        Ok(())
-                    });
-                }
-                assert!(command.status().unwrap().success());
-                spawned += 1;
-            }
-            spawned
-        })
-    };
+    let (stop, spawner) = spawn_in_a_loop();
     let mut refused = 0;
     for iteration in 0..20_000 {
         if reacquire(&root, iteration % 3).is_none() {
@@ -236,5 +255,52 @@ fn drop_and_reopen_survive_children_another_thread_spawns_in_a_loop() {
     assert_eq!(
         refused, 0,
         "{refused} of 20000 reacquisitions refused while {spawned} children were spawned"
+    );
+}
+
+/// The facade refuses a live transport after taking its directory's lock,
+/// and lets go of that lock with the refusal even while a child another
+/// thread spawns shares the descriptor: the next facade, or the next claim
+/// of the daemon's own transport, is never refused because of it.
+#[test]
+fn a_refused_facade_bind_lets_go_of_its_transport_directory_while_children_are_spawned() {
+    let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
+    let fixture = Fixture::transport();
+    let endpoint = LocalEndpoint::new(fixture.0.join("agentd.sock"));
+    // A live listener at the transport's name, which every bind refuses.
+    let live = UnixListener::bind(endpoint.as_path()).unwrap();
+    fs::set_permissions(endpoint.as_path(), fs::Permissions::from_mode(0o600)).unwrap();
+    live.set_nonblocking(true).unwrap();
+    let (stop, spawner) = spawn_in_a_loop();
+    let mut held = 0;
+    for _ in 0..20_000 {
+        let refusal = LocalListener::bind_facade(&endpoint)
+            .err()
+            .expect("the transport is live");
+        if refusal.to_string() == "another facade owns the public transport directory" {
+            held += 1;
+        } else {
+            assert_eq!(
+                refusal.to_string(),
+                "public transport endpoint is already occupied"
+            );
+        }
+        // Each refusal's probe waits in the accept queue; none may fill it.
+        while live.accept().is_ok() {}
+        let probe = File::open(&fixture.0).unwrap();
+        match probe.try_lock() {
+            // The probe lets go the same way, or it would hold the lock itself.
+            Ok(()) => probe.unlock().unwrap(),
+            Err(TryLockError::WouldBlock) => held += 1,
+            Err(error) => panic!("{error:?}"),
+        }
+    }
+    stop.store(true, Ordering::Relaxed);
+    let spawned = spawner.join().unwrap();
+    assert!(spawned > 0);
+    assert_eq!(
+        held, 0,
+        "the transport directory stayed locked {held} times after 20000 refusals while \
+         {spawned} children were spawned"
     );
 }

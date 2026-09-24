@@ -180,9 +180,23 @@ fn a_held_transport_or_a_live_listener_refuses_the_claim_and_lets_go_of_the_lock
     assert!(refused.contains("already occupied"), "{refused}");
     assert!(layout.socket.exists());
     drop(state.lock_document("instance.lock").unwrap());
-    // Dropped, it leaves a stale socket, which the claim reclaims.
+    // Dropped, it leaves a stale socket, which the claim reclaims. A child
+    // another test spawns shares every descriptor of this process until its
+    // exec, this listener's included, so the socket is stale once the last
+    // of them is gone: a refused connection is that proof.
     drop(foreign);
     assert!(layout.socket.exists());
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    while !matches!(
+        std::os::unix::net::UnixStream::connect(&layout.socket),
+        Err(error) if error.kind() == std::io::ErrorKind::ConnectionRefused
+    ) {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "the dropped listener was never let go of"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(1));
+    }
     assert!(matches!(claim(&layout, "now").unwrap(), Claim::Owned(_)));
 }
 

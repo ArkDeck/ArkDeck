@@ -189,7 +189,43 @@ CI runs them.
     of input, TERM always wins: the old check fails and the new one passes.
     With a refused generation leaked instead of stopped, the new check fails.
     Five plain runs pass (`/private/tmp/arkdeck-m4-lanefix-*.log`).
-- *Second push*: pending.
+- *Second push* (`d86b24a1`, run 36051721274): the lane passed. The macOS job
+  went red in agentd's
+  `a_held_transport_or_a_live_listener_refuses_the_claim_and_lets_go_of_the_lock`
+  (#2136's claim test, unchanged here). The claim found the socket still
+  "already occupied" right after the test had dropped its listener.
+  - *Reproduced locally.* The test passes alone. Run beside the managed-HDC
+    unit tests, it failed 3 runs out of 3, in two ways: the directory "owned
+    by another facade", or the socket "already occupied". Both were gone on
+    the next attempt. Each time, clang children of the test process were
+    starting: the managed-HDC tests compile their fake HDC.
+  - *The mechanism* is the one #1899/#1903 settled for host-store locks. A
+    child shares every open file description of its parent until its exec
+    closes the close-on-exec ones; `POSIX_SPAWN_CLOEXEC_DEFAULT` does not
+    close that window. A lock released only by closing stays held through
+    the child. `flock(LOCK_UN)` releases it for every reference at once.
+  - *Product fix* (`arkdeck-platform` `LocalListener::bind_facade`). The
+    transport directory's lock is now wrapped in `DirectoryLock` as soon as
+    it is taken. Before, that happened only once the socket checks had
+    passed, so each refusal (occupied, not a socket) closed the lock without
+    unlocking it. That was why a refused claim could leave the directory
+    owned for the next one. The new platform test runs 20,000 refused binds
+    while another thread spawns children that delay their exec by 2 ms. The
+    directory must be free after each one. With the old order it stayed
+    locked 15,718–18,795 times in three runs; with the fix, never.
+  - *Test fix* (the agentd claim test). A dropped listener has no unlock: its
+    socket stays live until the last shared reference is gone. The test now
+    waits for a refused connection before it proves the reclaim, bounded at
+    10 s. Only the precondition changed; the claim is asserted as before.
+    With the product fix but no wait, it still failed 3 runs out of 5.
+  - *Checked.* With both fixes, the concurrent set passes 15 runs out of 15
+    (`/private/tmp/arkdeck-m4-claimfix-*.log`). `arkdeck-platform` 182 and
+    `arkdeck-agentd` 143 pass; fmt and clippy (`-D warnings`) exit 0.
+  - *Also seen locally.* One managed-HDC test was refused once, in the same
+    concurrent run: "a listener that is not the configured HDC executable
+    holds" its endpoint. That is not this slice's code, and CI has not shown
+    it; it is left as it is.
+- *Third push*: pending.
 
 No device, installed service, real `arkforged` or App was used, and nothing
 here is device evidence.
