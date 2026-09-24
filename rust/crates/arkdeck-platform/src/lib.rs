@@ -174,6 +174,11 @@ mod host_text;
 pub use host_text::{host_canonical_text, host_control_character, host_whitespace_or_newline};
 
 #[cfg(target_os = "macos")]
+mod host_url_properties;
+#[cfg(target_os = "macos")]
+pub use host_url_properties::{EntryPresentation, host_entry_presentation};
+
+#[cfg(target_os = "macos")]
 mod host_calendar;
 #[cfg(target_os = "macos")]
 pub use host_calendar::{

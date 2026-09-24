@@ -7,7 +7,7 @@ use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::{
-    collections::HashSet,
+    collections::{BTreeMap, HashMap, HashSet},
     fs::OpenOptions,
     io,
     os::unix::fs::{MetadataExt, OpenOptionsExt},
@@ -65,6 +65,52 @@ pub struct WorkspaceProjectStore {
     transaction: Mutex<()>,
     toolchain_pinning: Option<WorkspaceToolchainPinning>,
     credential_pinning: Option<WorkspaceCredentialPinning>,
+    /// Swift `appliedGenerations`: the generation of every project the
+    /// Runtime composed when it started. A Job acquires only those.
+    applied: Mutex<BTreeMap<String, u64>>,
+    /// Swift `uses` and `presetUses`: the Jobs materializing against a
+    /// project or preset right now, which its update and removal wait out.
+    uses: Mutex<(HashMap<String, usize>, HashMap<String, usize>)>,
+}
+
+/// Swift `RuntimeWorkspaceProjectUseToken`: while a Job materializes, its
+/// project and presets can be neither updated nor removed. Dropping the use
+/// ends it (Swift `endUse`).
+pub struct WorkspaceUse<'a> {
+    store: &'a WorkspaceProjectStore,
+    project: String,
+    presets: Vec<String>,
+}
+
+impl Drop for WorkspaceUse<'_> {
+    fn drop(&mut self) {
+        let Ok(mut uses) = self.store.uses.lock() else {
+            return;
+        };
+        fn end(table: &mut HashMap<String, usize>, key: &str) {
+            if let Some(count) = table.get_mut(key) {
+                *count -= 1;
+                if *count == 0 {
+                    table.remove(key);
+                }
+            }
+        }
+        let (projects, presets) = &mut *uses;
+        end(projects, &self.project);
+        for preset in &self.presets {
+            end(presets, preset);
+        }
+    }
+}
+
+/// Swift `RuntimeWorkspaceProjectStartupRecord`, private half included: a
+/// registered project, and its root when that still is the directory the
+/// registration pinned.
+pub struct WorkspaceStartupRecord {
+    pub project_ref: String,
+    pub generation: u64,
+    pub kind: String,
+    pub root: Result<String, WireError>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -249,7 +295,153 @@ impl WorkspaceProjectStore {
             transaction: Mutex::new(()),
             toolchain_pinning: None,
             credential_pinning: None,
+            applied: Mutex::new(BTreeMap::new()),
+            uses: Mutex::new((HashMap::new(), HashMap::new())),
         })
+    }
+
+    /// Swift `startupRecords`: every registered project, sorted, with its
+    /// root only when the directory the registration pinned is still there.
+    /// A moved root is an unavailable project, not an unreadable store.
+    pub fn startup_records(&self) -> Result<Vec<WorkspaceStartupRecord>, WireError> {
+        self.with_document(
+            || Ok(()),
+            |_, document| {
+                let mut records: Vec<WorkspaceStartupRecord> = document
+                    .records
+                    .iter()
+                    .map(|record| WorkspaceStartupRecord {
+                        project_ref: record.project_ref.clone(),
+                        generation: record.generation,
+                        kind: record.kind.clone(),
+                        root: inspect_root(&record.root.path).and_then(|current| {
+                            if current == record.root {
+                                Ok(record.root.path.clone())
+                            } else {
+                                Err(failure(
+                                    "factsDrifted",
+                                    "workspace root identity changed after registration",
+                                ))
+                            }
+                        }),
+                    })
+                    .collect();
+                records.sort_by(|a, b| a.project_ref.cmp(&b.project_ref));
+                Ok(records)
+            },
+        )
+    }
+
+    /// Swift `markApplied(projects:presets:)` for the projects: the
+    /// generations this Runtime composed when it started.
+    pub fn mark_applied(&self, projects: BTreeMap<String, u64>) {
+        if let Ok(mut applied) = self.applied.lock() {
+            *applied = projects;
+        }
+    }
+
+    /// Swift `acquireUse(projectRef:presetRefs:)`: the registration a Job
+    /// materializes against, checked and held until the use is dropped.
+    pub fn acquire_use(
+        &self,
+        project_ref: &str,
+        preset_refs: &[String],
+    ) -> Result<WorkspaceUse<'_>, WireError> {
+        preset_mutations::validate_project_ref(project_ref)?;
+        for preset in preset_refs {
+            preset_mutations::validate_preset_ref(preset)?;
+        }
+        if preset_refs.iter().collect::<HashSet<_>>().len() != preset_refs.len() {
+            return Err(failure(
+                "invalidInput",
+                "workspace Job repeats a preset reference",
+            ));
+        }
+        self.with_document(
+            || Ok(()),
+            |_, document| {
+                let record = document
+                    .records
+                    .iter()
+                    .find(|record| record.project_ref == project_ref)
+                    .ok_or_else(|| {
+                        failure(
+                            "workspaceReferenceNotFound",
+                            "workspace project is not registered",
+                        )
+                    })?;
+                if inspect_root(&record.root.path)? != record.root {
+                    return Err(failure(
+                        "factsDrifted",
+                        "workspace root identity changed after registration",
+                    ));
+                }
+                let applied = self.applied.lock().map_err(unreadable)?;
+                if applied.get(project_ref) != Some(&record.generation) {
+                    return Err(failure(
+                        "operationUnavailable",
+                        "workspace project configuration changed; restart the Runtime before \
+                         submitting a Job",
+                    ));
+                }
+                // Swift reads the presets in order; the first decides, because
+                // this Runtime composes no registered preset, so none is
+                // applied.
+                if let Some(preset) = preset_refs.first() {
+                    if !document.presets.iter().any(|candidate| {
+                        candidate.project_ref == project_ref
+                            && candidate.available()
+                            && &candidate.preset_ref == preset
+                    }) {
+                        return Err(failure(
+                            "workspaceReferenceNotFound",
+                            "workspace preset is not registered for this project",
+                        ));
+                    }
+                    return Err(failure(
+                        "operationUnavailable",
+                        "workspace preset configuration changed; restart the Runtime before \
+                         submitting a Job",
+                    ));
+                }
+                let mut uses = self.uses.lock().map_err(unreadable)?;
+                *uses.0.entry(project_ref.to_owned()).or_default() += 1;
+                let mut presets = preset_refs.to_vec();
+                presets.sort();
+                for preset in &presets {
+                    *uses.1.entry(preset.clone()).or_default() += 1;
+                }
+                Ok(WorkspaceUse {
+                    store: self,
+                    project: project_ref.to_owned(),
+                    presets,
+                })
+            },
+        )
+    }
+
+    /// Swift `requireNoUse`.
+    pub(super) fn require_no_use(&self, project_ref: &str) -> Result<(), WireError> {
+        let uses = self.uses.lock().map_err(unreadable)?;
+        if uses.0.contains_key(project_ref) {
+            return Err(failure(
+                "resourceConflict",
+                "workspace project is being materialized by a Job",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Swift `requireNoPresetUse`.
+    pub(super) fn require_no_preset_use(&self, preset_ref: &str) -> Result<(), WireError> {
+        let uses = self.uses.lock().map_err(unreadable)?;
+        if uses.1.contains_key(preset_ref) {
+            return Err(failure(
+                "resourceConflict",
+                "workspace preset is being materialized by a Job",
+            ));
+        }
+        Ok(())
     }
 
     /// The dependency owners Swift's composition root passes to its store.

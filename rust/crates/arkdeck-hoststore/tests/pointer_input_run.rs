@@ -241,6 +241,7 @@ fn replay(fault: Fault) {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let authority = arkdeck_hoststore::MutationAuthority {
         capabilities: &capabilities,
@@ -265,6 +266,7 @@ fn replay(fault: Fault) {
         cancellation: Some(&cancellation),
         after_commit: None,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let reader = JobResultReader {
         jobs: &jobs,
@@ -348,6 +350,7 @@ fn replay(fault: Fault) {
                                 cancellation: None,
                                 after_commit: None,
                                 hdc: Some(&thread_hdc),
+                                workspace: None,
                             }
                             .handle(params)
                         });
@@ -493,6 +496,7 @@ fn replay(fault: Fault) {
                     cancellation: None,
                     after_commit: None,
                     hdc: Some(&hdc),
+                    workspace: None,
                 };
                 assert!(reopened_runner.handle(params).is_err());
                 assert_eq!(
@@ -656,6 +660,7 @@ fn restart_after_consumption_resumes_once_and_after_intent_never_replays() {
             cancellation: None,
             after_commit: None,
             hdc: Some(&hdc),
+            workspace: None,
         };
         let job = Map::from_iter([(
             "jobId".into(),
@@ -712,6 +717,7 @@ fn restart_after_consumption_resumes_once_and_after_intent_never_replays() {
                 analyzer: None,
                 state_root: &root,
                 hdc: Some(&hdc),
+                workspace: None,
             },
             jobs: &jobs,
             now: fixed_now,

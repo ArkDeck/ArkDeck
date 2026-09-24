@@ -57,6 +57,7 @@ fn rust_cancels_the_swift_jobs() {
                 analyzer: Some(&profile),
                 state_root: &root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: fixed_now,
@@ -87,6 +88,7 @@ fn rust_cancels_the_swift_jobs() {
         cancellation: None,
         after_commit: None,
         hdc: None,
+        workspace: None,
     };
     let canceller = JobCanceller {
         jobs: &jobs,

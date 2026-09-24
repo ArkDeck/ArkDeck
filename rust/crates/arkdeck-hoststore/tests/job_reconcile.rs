@@ -93,6 +93,7 @@ fn rust_recovers_and_reconciles_the_swift_jobs() {
                     analyzer: Some(&profile),
                     state_root: &root,
                     hdc: None,
+                    workspace: None,
                 },
                 jobs: &jobs,
                 now: fixed_now,
@@ -122,6 +123,7 @@ fn rust_recovers_and_reconciles_the_swift_jobs() {
             cancellation: None,
             after_commit: None,
             hdc: None,
+            workspace: None,
         };
         let runs = support::document(&fixture, "runs.json");
         let mut ran = runs.as_array().unwrap().iter();

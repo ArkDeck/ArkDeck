@@ -24,6 +24,8 @@ mod debug_hap_plan;
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
+#[path = "workspace_plan.rs"]
+mod workspace_plan;
 pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
@@ -32,7 +34,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 12] = [
+const MATERIALIZED: [&str; 13] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "debug.template@1",
@@ -45,6 +47,7 @@ const MATERIALIZED: [&str; 12] = [
     "debug.hap@1",
     device_steps::NATIVE,
     "capture.screen-sequence@1",
+    "workspace.prepare-isolated-copy@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -145,12 +148,18 @@ pub struct JobPlanner<'a> {
     /// The HDC composition a device-bound operation materializes against;
     /// without one no HDC provider is registered.
     pub hdc: Option<&'a HdcComposition<'a>>,
+    /// The workspace provider a workspace operation materializes against;
+    /// without one no workspace provider is registered.
+    pub workspace: Option<&'a crate::WorkspaceComposition>,
 }
 
 /// A materialized plan: its digest and, for a device-bound plan, the Target
 /// identity and binding revision it binds.
 pub(crate) struct Materialized<'a> {
     _import_use: Option<crate::import_upload::ImportUse<'a>>,
+    /// The registration a workspace Job materializes against, held until the
+    /// plan or admission is done with it.
+    _workspace_use: Option<crate::WorkspaceUse<'a>>,
     pub(crate) digest: String,
     pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,
@@ -301,14 +310,28 @@ impl<'a> JobPlanner<'a> {
                 .acquire_inputs(artifacts, &references)
                 .map_err(|error| refusal("invalidInput", error.message))?
         };
+        // Swift `acquireWorkspaceProjectInput`, after the Import holds and
+        // before anything is materialized.
+        let workspace_use = match self.workspace {
+            Some(workspace) => workspace
+                .acquire(descriptor, &request.inputs)
+                .map_err(|(code, message)| refusal(code, message))?,
+            None => None,
+        };
         if descriptor.provider == "hdc" {
             let mut materialized = self.materialize_device(request, descriptor)?;
             materialized._import_use = hold;
             return Ok(materialized);
         }
+        let digest = if descriptor.provider == "workspace" {
+            self.materialize_workspace(request, descriptor)?
+        } else {
+            self.materialize(request, descriptor)?
+        };
         Ok(Materialized {
             _import_use: hold,
-            digest: self.materialize(request, descriptor)?,
+            _workspace_use: workspace_use,
+            digest,
             artifact_facts: BTreeMap::new(),
             identity: None,
             binding_revision: None,
@@ -473,6 +496,7 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
             _import_use: None,
+            _workspace_use: None,
             artifact_facts: BTreeMap::new(),
             digest: sha256_hex(&bytes),
             identity: Some(facts.identity),

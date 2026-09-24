@@ -81,6 +81,7 @@ fn hdc_lifecycle_freezes_submission_and_releases_without_dispatch() {
             analyzer: None,
             state_root: &root.0,
             hdc: None,
+            workspace: None,
         },
         jobs: &jobs,
         now: arkdeck_hoststore::runtime_now,

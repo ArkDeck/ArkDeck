@@ -307,6 +307,7 @@ impl Daemon {
             cancellation,
             after_commit: None,
             hdc: Some(hdc),
+            workspace: None,
         }
     }
 
@@ -372,6 +373,7 @@ impl Daemon {
                         analyzer: None,
                         state_root: &self.root,
                         hdc: Some(&hdc),
+                        workspace: None,
                     },
                     jobs: &stores.jobs,
                     now: fixed_now,

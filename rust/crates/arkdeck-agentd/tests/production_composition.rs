@@ -305,8 +305,8 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
             ))
     );
     assert_eq!(
-        daemon.line("arkdeck-agentd composes no workspace operations provider"),
-        "arkdeck-agentd composes no workspace operations provider: ARKDECK_WORKSPACE_INSPECTOR is \
+        daemon.line("arkdeck-agentd composes no workspace source inspector"),
+        "arkdeck-agentd composes no workspace source inspector: ARKDECK_WORKSPACE_INSPECTOR is \
          set, but this Runtime has not ported that owner yet"
     );
     assert_eq!(
@@ -317,8 +317,8 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
     assert_eq!(
         daemon.line("arkdeck-agentd owners: "),
         "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, \
-         imports, storage, history, workspaceProjects, bootstrap, planning, agentExecutions, \
-         humanActions, controlActions"
+         imports, storage, history, workspaceProjects, workspaceOperations, bootstrap, planning, \
+         agentExecutions, humanActions, controlActions"
     );
     let daemon = daemon.serving(&home);
     assert!(
@@ -869,6 +869,7 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
                 analyzer: Some(&profile),
                 state_root: &state,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: arkdeck_hoststore::runtime_now,
@@ -891,6 +892,7 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
             cancellation: None,
             after_commit: None,
             hdc: None,
+            workspace: None,
         }
         .handle(&Map::from_iter([("jobId".into(), json!(job))]))
         .unwrap();

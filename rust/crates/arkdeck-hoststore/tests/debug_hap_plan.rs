@@ -33,6 +33,7 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let mut count = 0;
     let mut positive = 0;
@@ -205,6 +206,7 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
                 analyzer: None,
                 state_root: &root,
                 hdc: Some(&hdc),
+                workspace: None,
             };
             let worker = scope.spawn(move || planner.plan(&request));
             entered

@@ -84,4 +84,14 @@ silently re-recording.
 ## CI
 
 The PR's `guard` and `swift` aggregate are the unified gate. The Swift lane
-runs because a Swift test changed. Their result is added by the Rust port.
+ran because a Swift test changed. Both were green at head `25ae8556`, and #2094
+merged as `64ff5380`; the Rust port (`workspace-isolation-run.md`) records it.
+
+| Workflow run | Job | Result |
+|---|---|---|
+| Swift CI 35500055858 | `swift` aggregate | pass |
+| Swift CI 35500055858 | `swift-tests` | pass (4m) |
+| Swift CI 35500055858 | Rust workspace on macos-26, ubuntu-latest and windows-latest; host-independent checks | pass (9m20s, 1m45s, 3m56s, 28s) |
+| Swift CI 35500055858 | `app-build` | skipped by the plan: no App source changed |
+| SDD Guard 35500055733 | `guard` | pass |
+| Agent PR 35500055724 | `open-pr` | pass |

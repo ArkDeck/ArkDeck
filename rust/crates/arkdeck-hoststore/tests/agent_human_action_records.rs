@@ -142,6 +142,7 @@ fn owner<T>(root: &Root, now: Clock, body: impl FnOnce(&dyn Fn(&str, Value) -> A
             analyzer: None,
             state_root: &root.0,
             hdc: None,
+            workspace: None,
         },
         jobs: &jobs,
         now: fixed_now,

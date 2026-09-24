@@ -151,6 +151,7 @@ impl Owners {
             analyzer: None,
             state_root: &self.root,
             hdc: Some(hdc),
+            workspace: None,
         }
     }
 
@@ -200,6 +201,7 @@ impl Owners {
             cancellation: None,
             after_commit: None,
             hdc: Some(hdc),
+            workspace: None,
         }
     }
 

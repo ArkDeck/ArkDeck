@@ -1502,6 +1502,7 @@ fn materialization_hold_blocks_release_and_failed_planning_drops_it() {
             analyzer: None,
             state_root: &fixture.root,
             hdc: None,
+            workspace: None,
         };
         let thread = scope.spawn(move || planner.plan(&request));
         entered.wait();
@@ -1554,6 +1555,7 @@ fn materialization_hold_blocks_release_and_failed_planning_drops_it() {
         analyzer: None,
         state_root: &fixture.root,
         hdc: None,
+        workspace: None,
     };
     assert!(
         planner
@@ -1591,6 +1593,7 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
             analyzer: Some(&profile),
             state_root: &fixture.root,
             hdc: None,
+            workspace: None,
         },
         jobs: &jobs,
         now: || Some(NOW.into()),
@@ -1714,6 +1717,7 @@ fn missing_terminal_job_directory_cannot_clear_import_references() {
             analyzer: Some(&profile),
             state_root: &fixture.root,
             hdc: None,
+            workspace: None,
         },
         jobs: &jobs,
         now: || Some(NOW.into()),
@@ -1962,6 +1966,7 @@ fn unfinished_or_wrong_artifact_identity_never_acquires_an_input_hold() {
         analyzer: None,
         state_root: &fixture.root,
         hdc: None,
+        workspace: None,
     };
     assert!(
         planner
@@ -2044,6 +2049,7 @@ fn release_recovery_refuses_retention_drift_and_keeps_the_closed_lease() {
         analyzer: None,
         state_root: &fixture.root,
         hdc: None,
+        workspace: None,
     };
     assert!(
         planner
@@ -2249,6 +2255,7 @@ fn successful_admission_hands_the_hold_to_the_durable_job_without_release_cleara
                 analyzer: Some(&profile),
                 state_root: &fixture.root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: || Some(NOW.into()),
@@ -2359,6 +2366,7 @@ fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() 
                 analyzer: Some(&profile),
                 state_root: &fixture.root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: || Some(NOW.into()),
@@ -2397,6 +2405,7 @@ fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() 
             cancellation: None,
             after_commit: None,
             hdc: None,
+            workspace: None,
         }
         .handle(json!({"jobId":jid}).as_object().unwrap())
         .unwrap();

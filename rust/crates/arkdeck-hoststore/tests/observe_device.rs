@@ -135,6 +135,7 @@ fn rust_observes_the_swift_fake_device() {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let runner = JobRunner {
         imports: None,
@@ -150,6 +151,7 @@ fn rust_observes_the_swift_fake_device() {
         cancellation: None,
         after_commit: None,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let reader = JobResultReader {
         jobs: &jobs,

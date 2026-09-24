@@ -186,6 +186,7 @@ fn rust_runs_the_swift_agent_executions() {
             analyzer: None,
             state_root: &root,
             hdc: Some(&hdc),
+            workspace: None,
         },
         jobs: &jobs,
         now: fixed_now,
@@ -234,6 +235,7 @@ fn rust_runs_the_swift_agent_executions() {
             cancellation: None,
             after_commit: None,
             hdc: Some(&hdc),
+            workspace: None,
         }
         .handle(&Map::from_iter([("jobId".into(), json!(start.job))]));
         agents.finish(start, &jobs);

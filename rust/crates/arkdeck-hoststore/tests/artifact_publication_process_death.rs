@@ -87,6 +87,7 @@ impl Fixture {
                 analyzer: Some(&profile),
                 state_root: &self.root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: || Some(NOW.into()),
@@ -150,6 +151,7 @@ fn publication_kill_helper() {
         cancellation: None,
         after_commit: None,
         hdc: None,
+        workspace: None,
     }
     .handle(json!({"jobId": job}).as_object().unwrap());
     panic!("the kill step was not reached: {answer:?}");

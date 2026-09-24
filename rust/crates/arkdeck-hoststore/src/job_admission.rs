@@ -327,6 +327,9 @@ impl JobAdmitter<'_> {
                 ),
             )
         };
+        if descriptor.provider == "workspace" {
+            return Err(self.workspace_refusal(request, descriptor, effect, unserved()));
+        }
         let (Some(authority), Some(parsed)) = (self.authority, Effect::parse(effect)) else {
             return Err(unserved());
         };
@@ -415,6 +418,39 @@ impl JobAdmitter<'_> {
                 )
             })?;
         Ok(capability)
+    }
+
+    /// Swift `preauthorize` for a workspace subject above `readOnly`. The
+    /// facts of the tree the request names decide issuance: a Runtime-owned
+    /// isolated copy may be issued a capability; a person's primary tree never
+    /// is, whatever the catalog's default, and needs one a person issued. This
+    /// Runtime neither issues nor validates a workspace capability yet, so
+    /// every such request is refused with zero dispatch — the primary tree by
+    /// Swift's own refusal. No workspace mutation is materialized yet to reach
+    /// this; the rule is fixed here for the one that will be.
+    fn workspace_refusal(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+        effect: &str,
+        unserved: AdmissionRefusal,
+    ) -> AdmissionRefusal {
+        let Some(workspace) = self.planner.workspace else {
+            return unserved;
+        };
+        let facts = match workspace.authorization_facts(&request.inputs) {
+            Ok(facts) => facts,
+            Err(error) => return refused("admissionDenied", error),
+        };
+        if request.capability_id.is_none()
+            && !crate::workspace_profile::automatic_issuance_permitted(descriptor, Some(&facts))
+        {
+            return refused(
+                "admissionDenied",
+                format!("effect {effect} requires an explicit runtime capability"),
+            );
+        }
+        unserved
     }
 
     /// Swift `currentCatalogDuplicate` and the reviewed-plan check of a

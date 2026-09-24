@@ -94,6 +94,7 @@ impl Owners {
             analyzer: None,
             state_root: &self.root,
             hdc: Some(hdc),
+            workspace: None,
         }
     }
 

@@ -49,6 +49,9 @@ use std::ffi::OsString;
 use std::path::Path;
 use std::time::Duration;
 
+#[path = "workspace_run.rs"]
+mod workspace_run;
+
 const OPERATION: &str = "analyzer.extract-crash-signature@1";
 const STEP: &str = "extract-crash-signature";
 const STEP_KIND: &str = "runDeterministicAnalyzer";
@@ -68,9 +71,12 @@ const RUNNABLE: [&str; 4] = [
 
 /// Whether this Runtime executes an admitted Job of `operation`: the analyzer
 /// here, a device-bound operation (`debug.hap@1` among them) through its HDC
+/// composition, a Runtime-owned workspace copy through its workspace
 /// composition. Every other Job is refused before its run starts.
 pub(crate) fn executes(operation: &str) -> bool {
-    operation == OPERATION || crate::device_run::runs(operation)
+    operation == OPERATION
+        || crate::device_run::runs(operation)
+        || operation == workspace_run::WORKSPACE_OPERATION
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -175,6 +181,9 @@ pub struct JobRunner<'a> {
     /// The HDC composition a device-bound Job runs through; without one no
     /// such Job runs.
     pub hdc: Option<&'a HdcComposition<'a>>,
+    /// The workspace composition a workspace Job runs through; without one no
+    /// such Job runs.
+    pub workspace: Option<&'a crate::WorkspaceComposition>,
 }
 
 /// One run's durable state: the record as the run advances it and the
@@ -353,7 +362,10 @@ impl JobRunner<'_> {
             ));
         }
         let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
-        if record.operation() != OPERATION && !device {
+        let workspace = self
+            .workspace
+            .filter(|_| record.operation() == workspace_run::WORKSPACE_OPERATION);
+        if record.operation() != OPERATION && !device && workspace.is_none() {
             return Err(proven(
                 "rejected",
                 format!(
@@ -363,8 +375,9 @@ impl JobRunner<'_> {
                 None,
             ));
         }
-        // An analyzer Job is never resumed here, and a complete-overwrite
-        // recovery belongs to the flash lane this Runtime does not hold.
+        // An analyzer or workspace Job is never resumed here, and a
+        // complete-overwrite recovery belongs to the flash lane this Runtime
+        // does not hold.
         if state != "preflight" && (!device || state == "recoveringByCompleteOverwrite") {
             return Err(proven(
                 "resourceConflict",
@@ -420,9 +433,10 @@ impl JobRunner<'_> {
             self.take_over_held_use(&mut run)
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
-        match self.hdc.filter(|_| device) {
-            Some(hdc) => self.execute_device(&mut run, hdc)?,
-            None => self.execute(&mut run)?,
+        match (self.hdc.filter(|_| device), workspace) {
+            (Some(hdc), _) => self.execute_device(&mut run, hdc)?,
+            (None, Some(workspace)) => self.execute_workspace(&mut run, workspace)?,
+            (None, None) => self.execute(&mut run)?,
         }
         run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())

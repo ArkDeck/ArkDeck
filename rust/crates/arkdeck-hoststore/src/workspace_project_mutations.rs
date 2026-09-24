@@ -91,7 +91,10 @@ impl WorkspaceProjectStore {
                     None
                 };
                 self.with_document(
-                    || census(WorkspaceReference::Project(project)),
+                    || {
+                        self.require_no_use(project)?;
+                        census(WorkspaceReference::Project(project))
+                    },
                     |transaction, document| {
                         let mut next = document;
                         let index = next

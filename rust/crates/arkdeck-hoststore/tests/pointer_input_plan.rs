@@ -85,6 +85,7 @@ fn rust_plans_the_swift_pointer_gestures() {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let mut differences = Vec::new();
     let mut plans = 0;

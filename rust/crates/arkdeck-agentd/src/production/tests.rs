@@ -374,6 +374,7 @@ fn compose_opens_every_owner_in_swifts_layout_below_the_home() {
             "storage",
             "history",
             "workspaceProjects",
+            "workspaceOperations",
             "bootstrap",
             "planning",
             "agentExecutions",

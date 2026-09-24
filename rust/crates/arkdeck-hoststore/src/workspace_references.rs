@@ -91,12 +91,15 @@ impl JobStore {
     }
 
     /// Refuses when an active or uncertain workspace Job references
-    /// `project_ref`. The Rust Runtime composes no isolated task copies, so a
-    /// Job's reference is compared literally, as Swift compares a reference
-    /// its provider does not map to a source registration.
+    /// `project_ref`. A Runtime-owned isolated copy is named by its derived
+    /// reference, but its registration belongs to the project it was copied
+    /// from: `registration` is the provider's own mapping, the one admission
+    /// acquired under, and a reference it does not map is compared literally
+    /// (Swift `resolveRegistrationProjectRef`).
     pub fn require_no_active_workspace_project_reference(
         &self,
         project_ref: &str,
+        registration: &dyn Fn(&str) -> Option<String>,
     ) -> Result<(), WireError> {
         let phase = "workspaceProjectOwner";
         self.for_each_active_workspace_job(phase, |inputs, descriptor| {
@@ -134,7 +137,7 @@ impl JobStore {
                         )
                     })?,
             };
-            if referenced == project_ref {
+            if registration(referenced).as_deref().unwrap_or(referenced) == project_ref {
                 return Err(workspace_failure(
                     phase,
                     "resourceConflict",

@@ -666,10 +666,12 @@ impl WorkspaceProjectStore {
         let mutation_digest =
             update_digest(project, preset, expected, &definition.digest(project)?);
         // Swift's process lock covers the in-process use tokens and the
-        // durable Job census; no Rust Job materializes a preset yet, so only
-        // the census has anything to find.
+        // durable Job census.
         self.with_document(
-            || census(WorkspaceReference::Preset(preset)),
+            || {
+                self.require_no_preset_use(preset)?;
+                census(WorkspaceReference::Preset(preset))
+            },
             |transaction, document| {
                 let mut next = document;
                 let index = next
@@ -794,7 +796,10 @@ impl WorkspaceProjectStore {
         validate_generation(expected)?;
         let mutation_digest = removal_digest(request, project, preset, expected);
         self.with_document(
-            || census(WorkspaceReference::Preset(preset)),
+            || {
+                self.require_no_preset_use(preset)?;
+                census(WorkspaceReference::Preset(preset))
+            },
             |transaction, document| {
                 let mut next = document;
                 let index = next
