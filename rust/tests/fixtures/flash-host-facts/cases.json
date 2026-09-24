@@ -1,0 +1,1491 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "absent",
+          "mode" : null,
+          "observationCount" : 0,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 1,
+      "method" : "flash.bootloader-status",
+      "name" : "status.absent",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/arkforged",
+          "mode" : "700",
+          "path" : "arkforged"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "absent",
+          "mode" : null,
+          "observationCount" : 0,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 2,
+      "method" : "flash.bootloader-status",
+      "name" : "status.unrelatedOnly",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 4776,
+              "productName" : "iPhone",
+              "registryEntryId" : null,
+              "serial" : "unrelated-serial",
+              "topology" : "99",
+              "vendorId" : 1452
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "ambiguous",
+          "mode" : null,
+          "observationCount" : 2,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 3,
+      "method" : "flash.bootloader-status",
+      "name" : "status.twoBoards",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            },
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff000000000000000000000003",
+              "topology" : "19791872",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip bootloader status could not be observed: admissionRejected(\"USB registry unavailable\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 4,
+      "method" : "flash.bootloader-status",
+      "name" : "status.registryUnavailable",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : null
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "unbound",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 5,
+      "method" : "flash.bootloader-status",
+      "name" : "status.loaderUnbound",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "unbound",
+          "mode" : "hdcNormal",
+          "observationCount" : 1,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 6,
+      "method" : "flash.bootloader-status",
+      "name" : "status.hdcNormalUnbound",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : " HDC Device ",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff00000000000000000000cafe",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "disposition" : "targetBindingUnprepared",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 7,
+      "method" : "flash.bootloader-status",
+      "name" : "status.targetBindingUnprepared",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "disposition" : "exactBoundTarget",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 8,
+      "method" : "flash.bootloader-status",
+      "name" : "status.exactBoundLoader",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "disposition" : "targetBindingUnprepared",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 9,
+      "method" : "flash.bootloader-status",
+      "name" : "status.loaderAtAnotherPort",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "20000000",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "ambiguous",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 10,
+      "method" : "flash.bootloader-status",
+      "name" : "status.twoTargets",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host-twice.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "disposition" : "targetBindingUnprepared",
+          "mode" : "loader",
+          "observationCount" : 1,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 11,
+      "method" : "flash.bootloader-status",
+      "name" : "status.lineageInvalid",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/binding-lineage-without-previous.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "disposition" : "exactBoundTarget",
+          "mode" : "hdcNormal",
+          "observationCount" : 1,
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 12,
+      "method" : "flash.bootloader-status",
+      "name" : "status.exactBoundAlias",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-2.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "disposition" : "ambiguous",
+          "mode" : "hdcNormal",
+          "observationCount" : 1,
+          "targetId" : null
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 13,
+      "method" : "flash.bootloader-status",
+      "name" : "status.aliasOwnedElsewhere",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host-and-alias-owner.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip bootloader status could not be observed: productionConfigurationUnavailable(\"durable binding previous identity lineage is invalid or ambiguous\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 14,
+      "method" : "flash.bootloader-status",
+      "name" : "status.aliasRouteLineageInvalid",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/binding-lineage-without-previous.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Rockchip bootloader status could not be observed: productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 15,
+      "method" : "flash.bootloader-status",
+      "name" : "status.bindingSharedMode",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "644",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "a supported targetId and profileReference are required"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 16,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.noParameters",
+      "params" : {
+
+      },
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "a supported targetId and profileReference are required"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 17,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.unsupportedProfile",
+      "params" : {
+        "profileReference" : "dayu600",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "target is not adopted"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 18,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.notAdopted",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 19,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.laneNotConfigured",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: ArkForge native RockUSB identity is unavailable: failed(\"provider executable path must be explicit and absolute\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 20,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.relativeDaemon",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "rockusb",
+          "daemon" : "arkforged",
+          "declared" : "0388d7803277a0b5cb351803cb4af1a2fc77dd377b92db03834a9c9ed7eacad8",
+          "underRoot" : false
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: ArkForge native RockUSB identity is unavailable: failed(\"arkforged executable digest changed after LaunchAgent installation\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 21,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.digestChanged",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "rockusb",
+          "daemon" : "arkforged",
+          "declared" : "0000000000000000000000000000000000000000000000000000000000000000",
+          "underRoot" : true
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 22,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.unprobed",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "rockusb",
+          "daemon" : "arkforged",
+          "declared" : "0388d7803277a0b5cb351803cb4af1a2fc77dd377b92db03834a9c9ed7eacad8",
+          "underRoot" : true
+        },
+        {
+          "action" : "probe",
+          "probe" : false
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unsatisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ],
+        [
+          "-t",
+          "1501ffff00000000000000000000cafe",
+          "shell",
+          "param",
+          "get",
+          "const.ohos.fullname"
+        ]
+      ],
+      "index" : 23,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.hdcUnprepared",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "probe",
+          "probe" : true
+        },
+        {
+          "action" : "hdcMode",
+          "mode" : "hdcKey"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ],
+        [
+          "-t",
+          "1501ffff00000000000000000000cafe",
+          "shell",
+          "param",
+          "get",
+          "const.ohos.fullname"
+        ]
+      ],
+      "index" : 24,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.hdcReady",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ]
+      ],
+      "index" : 25,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.loaderReady",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "offline"
+        },
+        {
+          "action" : "loader",
+          "refusal" : null,
+          "topology" : "17956864"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ]
+      ],
+      "index" : 26,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.absent",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "empty"
+        },
+        {
+          "action" : "loader",
+          "refusal" : "DAYU200 target unavailable",
+          "topology" : null
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ]
+      ],
+      "index" : 27,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.listMalformed",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "malformed"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ]
+      ],
+      "index" : 28,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.listFailing",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "failing"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "unsatisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "unknown"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ]
+      ],
+      "index" : 29,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.loaderUnprepared",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "empty"
+        },
+        {
+          "action" : "loader",
+          "refusal" : null,
+          "topology" : "17956864"
+        },
+        {
+          "action" : "remove",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 30,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.bindingSharedMode",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "644",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: productionConfigurationUnavailable(\"durable binding schema is invalid\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 31,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.bindingSchema",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-extra-key.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: productionConfigurationUnavailable(\"durable binding snapshot is invalid\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 32,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.bindingSnapshot",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-evidence-names-serial.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: productionConfigurationUnavailable(\"durable binding previous identity lineage is invalid or ambiguous\")"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 33,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.lineageInvalid",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-lineage-without-previous.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: flash.postFlashHDCBindingConflict: the stored alias belongs to another target"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 34,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasOfAnotherTarget",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/binding-loader-lineage.json",
+          "mode" : "600",
+          "path" : "rockchip-binding.json"
+        },
+        {
+          "action" : "hdcMode",
+          "mode" : "newKey"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/alias-other-target.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: flash.postFlashHDCAliasLineageReissued: the stored alias names this target and Loader identity at revision 4 while the live target is at revision 2. The revision counter was reissued, so the two are not comparable. Reconcile the stored alias against fresh device facts with `arkdeck flash reconcile-alias --target TGT-HOST --expected-binding-revision 2`, with the board attached in hdc-normal mode"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 35,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasReissued",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-4.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: flash.postFlashHDCBindingConflict: stored alias revision 4 is newer than target revision 2"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 36,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasNewer",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-4-other-loader.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: flash.postFlashHDCBindingConflict: the stored alias has a different Loader identity at the current target revision"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 37,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasOtherLoader",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-2-other-loader.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Flash prerequisites could not be observed: verified post-flash HDC alias is owned by another adopted target"
+        },
+        "ok" : false
+      },
+      "hdcCalls" : [
+
+      ],
+      "index" : 38,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasOwnedElsewhere",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-2.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host-and-alias-owner.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ],
+        [
+          "-t",
+          "1501ffff0000000000000000000beef1",
+          "shell",
+          "param",
+          "get",
+          "const.ohos.fullname"
+        ]
+      ],
+      "index" : 39,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasRouted",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/targets-host.json",
+          "mode" : "600",
+          "path" : "state/targets/targets.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 2,
+          "observations" : [
+            {
+              "identifier" : "loader",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "recoveryPath",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "unlocked",
+              "status" : "satisfied"
+            },
+            {
+              "identifier" : "stablePower",
+              "status" : "unknown"
+            }
+          ],
+          "profileReference" : "dayu200",
+          "targetId" : "TGT-HOST"
+        }
+      },
+      "hdcCalls" : [
+        [
+          "list",
+          "targets",
+          "-v"
+        ],
+        [
+          "-t",
+          "1501ffff00000000000000000000cafe",
+          "shell",
+          "param",
+          "get",
+          "const.ohos.fullname"
+        ]
+      ],
+      "index" : 40,
+      "method" : "flash.prerequisites",
+      "name" : "prerequisites.aliasOlder",
+      "params" : {
+        "profileReference" : "dayu200",
+        "targetId" : "TGT-HOST"
+      },
+      "setup" : [
+        {
+          "action" : "hdcMode",
+          "mode" : "hdcKey"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/alias-revision-1.json",
+          "mode" : "600",
+          "path" : "rockchip-post-flash-hdc-binding.json"
+        }
+      ]
+    }
+  ]
+}

@@ -459,11 +459,19 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // fixture's board is never proved by the host's devices: the census of
         // the host's I/O Registry beside the managed registered HDC, the
         // harness's file where one is named, and no device otherwise.
-        let host = host.with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
-            &root,
-            development_usb::flash_census(source, file),
-            host::utc_now,
-        ));
+        let host = host
+            .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+                &root,
+                development_usb::flash_census(source, file.clone()),
+                host::utc_now,
+            ))
+            // Swift's bootloader status observer and Rockchip facts over the
+            // same root and census. No ArkForge lane is composed, so the native
+            // RockUSB identity answers that none is configured.
+            .with_flash_host_facts(arkdeck_hoststore::FlashHostFacts::new(
+                &root,
+                development_usb::flash_census(source, file),
+            ));
         // Acknowledged, and with the development HDC started as the managed
         // server, this owner proves a device mutation's state continuity
         // against its own Job state instead of the installed Runtime's root,
@@ -775,6 +783,8 @@ fn main() {
 
 #[cfg(all(test, target_os = "macos"))]
 mod debug_read_control;
+#[cfg(all(test, target_os = "macos"))]
+mod flash_host_facts_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_reads_control;
 #[cfg(all(test, target_os = "macos"))]

@@ -186,6 +186,11 @@ pub struct Host {
     /// invocation documents of the Job owner's state directory.
     #[cfg(target_os = "macos")]
     flash_invocations: Option<arkdeck_hoststore::FlashInvocations>,
+    /// Swift's bootloader status observer and Rockchip facts port: the
+    /// binding and the alias of the Application Support root, the census,
+    /// the native RockUSB identity and the live probe over this host's HDC.
+    #[cfg(target_os = "macos")]
+    flash_facts: Option<arkdeck_hoststore::FlashHostFacts>,
     #[cfg(all(test, target_os = "macos"))]
     pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
@@ -728,6 +733,13 @@ impl Host {
         self.flash_invocations = Some(owner);
         self
     }
+    /// `flash.bootloader-status` and `flash.prerequisites` read these facts,
+    /// against this host's Target store and, for the live probe, its HDC.
+    #[cfg(target_os = "macos")]
+    pub fn with_flash_host_facts(mut self, facts: arkdeck_hoststore::FlashHostFacts) -> Self {
+        self.flash_facts = Some(facts);
+        self
+    }
 
     /// The owners this composition holds, by name, in a fixed order: what the
     /// production composition reports at its start and its tests compare.
@@ -762,6 +774,7 @@ impl Host {
             ("codeSignHelper", self.code_sign_helper.is_some()),
             ("flashAliasReconciler", self.flash_alias.is_some()),
             ("flashInvocations", self.flash_invocations.is_some()),
+            ("flashHostFacts", self.flash_facts.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -851,6 +864,8 @@ impl Host {
             flash_alias: None,
             #[cfg(target_os = "macos")]
             flash_invocations: None,
+            #[cfg(target_os = "macos")]
+            flash_facts: None,
             #[cfg(all(test, target_os = "macos"))]
             test_hdc_impact: None,
         }
@@ -2266,6 +2281,41 @@ impl HostServices for Host {
             _ => Err(WireError {
                 code: "internalError".into(),
                 message: "Rockchip post-flash alias reconciliation is not configured".into(),
+                details: None,
+            }),
+        }
+    }
+    /// Swift composes the prerequisite observer with the Target store, and
+    /// its probe only with an HDC.
+    #[cfg(target_os = "macos")]
+    fn flash_prerequisites(
+        &self,
+        target_id: &str,
+        profile_reference: &str,
+    ) -> Result<serde_json::Value, WireError> {
+        match (&self.flash_facts, &self.targets) {
+            (Some(facts), Some(targets)) => facts.prerequisites(
+                targets,
+                self.hdc
+                    .as_deref()
+                    .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+                target_id,
+                profile_reference,
+            ),
+            _ => Err(WireError {
+                code: "internalError".into(),
+                message: "Flash prerequisite observation is not configured".into(),
+                details: None,
+            }),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn flash_bootloader_status(&self) -> Result<serde_json::Value, WireError> {
+        match (&self.flash_facts, &self.targets) {
+            (Some(facts), Some(targets)) => facts.bootloader_status(targets),
+            _ => Err(WireError {
+                code: "internalError".into(),
+                message: "Rockchip bootloader status observation is not configured".into(),
                 details: None,
             }),
         }

@@ -182,6 +182,8 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "trace.cache.purge",
             "debug.probe",
             "trace.probe",
+            "flash.bootloader-status",
+            "flash.prerequisites",
         ]
         .contains(method)
         {
@@ -457,6 +459,9 @@ mod import_tests;
 
 #[path = "trace_probe_tests.rs"]
 mod trace_probe_tests;
+
+#[path = "flash_facts_tests.rs"]
+mod flash_facts_tests;
 
 #[path = "production_tests.rs"]
 mod production_tests;

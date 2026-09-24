@@ -379,6 +379,29 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `flash.prerequisites` once its target and a supported profile were
+    /// read. A host without the prerequisite observer answers as Swift's
+    /// daemon without it does.
+    fn flash_prerequisites(
+        &self,
+        _target_id: &str,
+        _profile_reference: &str,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Flash prerequisite observation is not configured".into(),
+            details: None,
+        })
+    }
+    /// `flash.bootloader-status`, which reads no parameter. A host without
+    /// the bootloader status observer answers as Swift's daemon without it.
+    fn flash_bootloader_status(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Rockchip bootloader status observation is not configured".into(),
+            details: None,
+        })
+    }
     /// `debug.status` and `recovery.flash-invocation.list`: the reads of the
     /// Runtime Flash invocation owner, which checks their parameters itself
     /// once it is composed, as Swift's handler does. A host without the owner
@@ -1333,6 +1356,28 @@ impl<H: HostServices> Control<H> {
                     "invalidParams",
                     "targetId and expectedBindingRevision are required",
                 ),
+            },
+            // As Swift's handler: a string target and a supported profile
+            // (`RockchipFlashProfile.board(reference:)` knows only `dayu200`)
+            // before its owners.
+            "flash.prerequisites" => match (
+                params.get("targetId").and_then(Value::as_str),
+                params.get("profileReference").and_then(Value::as_str),
+            ) {
+                (Some(target), Some(profile @ "dayu200")) => Response {
+                    id: request.id.clone(),
+                    outcome: self.host.flash_prerequisites(target, profile),
+                },
+                _ => Response::failure(
+                    &request.id,
+                    "invalidParams",
+                    "a supported targetId and profileReference are required",
+                ),
+            },
+            // As Swift's handler: no parameter is read.
+            "flash.bootloader-status" => Response {
+                id: request.id.clone(),
+                outcome: self.host.flash_bootloader_status(),
             },
             // As Swift's handler: the owner before the parameters, which the
             // owner checks itself.

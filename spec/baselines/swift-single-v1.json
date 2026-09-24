@@ -179,9 +179,9 @@
       "successes": 1
     },
     "flash.bootloader-status": {
-      "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "errors": 2,
+      "requests": 5,
+      "successes": 3
     },
     "flash.device-access": {
       "errors": 2,
@@ -194,8 +194,8 @@
       "successes": 3
     },
     "flash.prerequisites": {
-      "errors": 2,
-      "requests": 3,
+      "errors": 3,
+      "requests": 4,
       "successes": 1
     },
     "flash.reconcile-alias": {
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 444,
-    "requests": 976,
-    "successes": 532
+    "errors": 446,
+    "requests": 980,
+    "successes": 534
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "425805a2ec3465be7a55365d4245c0caa51a6bc9cf453cb1317724407442f90a",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "3908e9345d3cc264e960747256d72b2d61fa3a6c38ce4737eb59902870b5b28d",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "12f964a1c87f77e84b75a0a0002701dd8899a0e12a75de8a6382e6bc177b0240"
+    "spec/control/methods": "5b777a8bca385306b11cb66f79b71699889d68d4960fd145db1ad3b62aea3c9c"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -855,8 +855,8 @@
       "sha256": "eaec5f034c2684ab78eca567bf54daab9cfae6d54b4762512dbdb995c28d31e0"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.bootloader-status.jsonl": {
-      "blob": "a3e8c39296c3ee33bf8f0ef5503244558eb5c860",
-      "sha256": "9ac5ce1f13221e006e0235a557e729449da3ae03f288394ebfdb1c5f0f5d3cbe"
+      "blob": "9190ac0098e8fec0eadfe1784b1b59ccddf4b67d",
+      "sha256": "6b2930a7c5bb348890a75af762469a587e708f768f934223708874762908fd4c"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.device-access.jsonl": {
       "blob": "050f6136b3c52c6fb5c4580d13f38b7bc46bab67",
@@ -867,8 +867,8 @@
       "sha256": "4588961f67e992df86f205beada1e0d01c053ec03f516cf1a4dadc442a7377e9"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.prerequisites.jsonl": {
-      "blob": "b3421dfe20d76bf26289806bb561bdb24fc42d7f",
-      "sha256": "1c2bbdae5459cda0c52f6136f72c0ca2acb913a073ede662a0565f7ab86257d2"
+      "blob": "781daefb05d167c964525b143478e4db83d6fa16",
+      "sha256": "5ed048d6d30ac9847a97da626479e91a814b1bcaf767b60d7b193445d934873a"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/flash.reconcile-alias.jsonl": {
       "blob": "0086ff3c25a57616dd3c5603e0facef089b3af33",
@@ -1451,8 +1451,8 @@
       "sha256": "289eec465fe8e3a2bb70b030ae4be05d6a2ce6dfa233bfd3e9bc3e4648f09ad3"
     },
     "spec/control/methods/flash.bootloader-status.json": {
-      "blob": "a52c2d419772762741ec0ffe00ae1b594b17d516",
-      "sha256": "207c15bd71a9142dfa6755ccdd0a50bd8e9c144a298d24630e8dd6fba5655a8f"
+      "blob": "302a53571526ec12c9608afde1295427de9ade75",
+      "sha256": "f493dee741d8000c0b5246b7b55b7942faa920ad7d3375f43e2e715a6c48f362"
     },
     "spec/control/methods/flash.device-access.json": {
       "blob": "d8af5dd7db9e24d7c426a221e9fae775bb39f1f3",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "9c61270714329f50e84962fc837d4898461a11857bf972be6742954cc121997b",
+  "inputDigest": "fa9a7bcd6b8887d616023bfbfae3d89286d0aa5056ccd4867a55943a529d0c2b",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

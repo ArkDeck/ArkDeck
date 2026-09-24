@@ -299,6 +299,18 @@ pub use flash_alias_reconcile::{FlashAliasReconciler, UsbCensus};
 mod flash_invocations;
 #[cfg(target_os = "macos")]
 pub use flash_invocations::{FlashInvocations, MAXIMUM_DESTRUCTIVE_EPOCHS};
+#[cfg(target_os = "macos")]
+mod rockchip_binding;
+#[cfg(target_os = "macos")]
+pub use rockchip_binding::{
+    BindingError, BindingSnapshot, BoundTarget, LineageAdvance, RockchipBindingStore,
+};
+#[cfg(target_os = "macos")]
+mod flash_facts;
+#[cfg(target_os = "macos")]
+pub use flash_facts::{
+    FlashHostFacts, NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity, NoArkForgeLane, RockchipFacts,
+};
 mod display_names;
 mod format_time;
 pub use display_names::decode_display_names;

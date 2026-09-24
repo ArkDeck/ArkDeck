@@ -91,6 +91,47 @@ impl TargetDocument {
             resolutions: None,
         }
     }
+    /// Swift `RuntimeTargetStore.hasConflictingHDCAliasOwner`'s decision over
+    /// this document: whether a Target other than `canonical` holds the
+    /// post-flash alias's connect key or identity without the proven alias
+    /// resolution that names exactly it, the canonical Target at their
+    /// revisions and that identity. `None` when the canonical Target is
+    /// missing or not one of a kind.
+    pub fn has_conflicting_hdc_alias_owner(
+        &self,
+        canonical: &str,
+        connect_key: &str,
+        identity: &str,
+    ) -> Option<bool> {
+        let canonicals: Vec<&TargetRecord> = self
+            .targets
+            .iter()
+            .filter(|target| target.target_id == canonical)
+            .collect();
+        let [owner] = canonicals.as_slice() else {
+            return None;
+        };
+        let resolutions = self.resolutions.as_deref().unwrap_or_default();
+        Some(
+            self.targets
+                .iter()
+                .filter(|target| {
+                    target.target_id != canonical
+                        && (target.connect_key == connect_key || target.identity == identity)
+                })
+                .any(|conflict| {
+                    !resolutions.iter().any(|resolution| {
+                        resolution.alias == conflict.target_id
+                            && resolution.alias_identity == conflict.identity
+                            && resolution.alias_revision == conflict.binding_revision
+                            && resolution.canonical == canonical
+                            && resolution.canonical_identity == owner.identity
+                            && resolution.canonical_revision == owner.binding_revision
+                            && resolution.routed_identity == identity
+                    })
+                }),
+        )
+    }
     pub fn active_ids(&self) -> BTreeSet<String> {
         self.targets
             .iter()

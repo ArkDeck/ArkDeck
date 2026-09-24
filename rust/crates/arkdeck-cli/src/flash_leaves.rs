@@ -1,9 +1,10 @@
 //! The Flash leaves that read or repair what the Runtime keeps about a board
-//! without reaching it: `flash reconcile-alias` and `recovery flash-invocation
+//! without changing the board: `flash bootloader-status`, `flash
+//! prerequisites`, `flash reconcile-alias` and `recovery flash-invocation
 //! list|status`, with `debug status`, the legacy spelling of the last. Each is
 //! one request, answered as the Runtime answers it (Swift
 //! `runFlashObservation` and `emitFlashInvocation`); every judgement of the
-//! alias and of the invocation documents is the Runtime's.
+//! board, the alias and the invocation documents is the Runtime's.
 use crate::CliError;
 use serde_json::{Map, Value, json};
 
@@ -23,6 +24,17 @@ pub(crate) fn configure(
         return Ok(());
     }
     match command {
+        // Swift sends the profile as the Runtime's `profileReference`; which
+        // profiles are supported is the Runtime's to judge.
+        "flash.prerequisites" => {
+            if !fields.contains_key("targetId") {
+                return Err(invalid("flash prerequisites requires --target"));
+            }
+            let profile = fields
+                .remove("deviceProfile")
+                .ok_or_else(|| invalid("flash prerequisites requires --device-profile"))?;
+            fields.insert("profileReference".into(), profile);
+        }
         "flash.reconcile-alias" => {
             if !fields.contains_key("targetId") {
                 return Err(invalid("flash reconcile-alias requires --target"));

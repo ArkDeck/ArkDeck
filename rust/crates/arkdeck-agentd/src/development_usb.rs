@@ -81,7 +81,7 @@ pub(crate) fn admit(
 }
 
 /// The USB relations the isolated owner's Target observations read.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum RelationSource {
     /// The development file the caller names, as `admit` allowed it.
     File,
