@@ -1,6 +1,7 @@
-//! Property lists read by CoreFoundation, the reader Swift's
-//! `PropertyListSerialization` uses, so a document is accepted or refused as
-//! Swift accepts or refuses it whatever its format (XML or binary).
+//! Property lists read and written by CoreFoundation, the reader and writer
+//! Swift's `PropertyListSerialization` uses, so a document is accepted or
+//! refused as Swift accepts or refuses it whatever its format (XML or binary),
+//! and a document is written with the bytes Swift writes.
 //!
 //! The document is bounded before it is parsed and every value is copied out
 //! of CoreFoundation into [`PropertyListValue`] before the parsed objects are
@@ -17,6 +18,8 @@ const MAX_NODES: usize = 100_000;
 const UTF8: u32 = 0x0800_0100;
 const NUMBER_SINT64: isize = 4;
 const NUMBER_FLOAT64: isize = 6;
+/// `kCFPropertyListXMLFormat_v1_0`.
+const XML_FORMAT: isize = 100;
 
 /// One property-list value, as CoreFoundation parsed it.
 #[derive(Clone, Debug, PartialEq)]
@@ -95,6 +98,37 @@ struct CFRange {
     length: isize,
 }
 
+/// `CFArrayCallBacks`, only ever referenced as `kCFTypeArrayCallBacks`.
+#[repr(C)]
+struct CFArrayCallBacks {
+    version: isize,
+    retain: *const c_void,
+    release: *const c_void,
+    copy_description: *const c_void,
+    equal: *const c_void,
+}
+
+/// `CFDictionaryKeyCallBacks`, only ever `kCFTypeDictionaryKeyCallBacks`.
+#[repr(C)]
+struct CFDictionaryKeyCallBacks {
+    version: isize,
+    retain: *const c_void,
+    release: *const c_void,
+    copy_description: *const c_void,
+    equal: *const c_void,
+    hash: *const c_void,
+}
+
+/// `CFDictionaryValueCallBacks`, only ever `kCFTypeDictionaryValueCallBacks`.
+#[repr(C)]
+struct CFDictionaryValueCallBacks {
+    version: isize,
+    retain: *const c_void,
+    release: *const c_void,
+    copy_description: *const c_void,
+    equal: *const c_void,
+}
+
 #[link(name = "CoreFoundation", kind = "framework")]
 unsafe extern "C" {
     fn CFRelease(value: *const c_void);
@@ -139,6 +173,43 @@ unsafe extern "C" {
         keys: *mut *const c_void,
         values: *mut *const c_void,
     );
+    fn CFRetain(value: *const c_void) -> *const c_void;
+    fn CFStringCreateWithBytes(
+        allocator: *const c_void,
+        bytes: *const u8,
+        length: isize,
+        encoding: u32,
+        external: u8,
+    ) -> *const c_void;
+    fn CFNumberCreate(allocator: *const c_void, kind: isize, value: *const c_void)
+    -> *const c_void;
+    fn CFDateCreate(allocator: *const c_void, at: f64) -> *const c_void;
+    fn CFArrayCreate(
+        allocator: *const c_void,
+        values: *const *const c_void,
+        count: isize,
+        callbacks: *const CFArrayCallBacks,
+    ) -> *const c_void;
+    fn CFDictionaryCreate(
+        allocator: *const c_void,
+        keys: *const *const c_void,
+        values: *const *const c_void,
+        count: isize,
+        key_callbacks: *const CFDictionaryKeyCallBacks,
+        value_callbacks: *const CFDictionaryValueCallBacks,
+    ) -> *const c_void;
+    fn CFPropertyListCreateData(
+        allocator: *const c_void,
+        plist: *const c_void,
+        format: isize,
+        options: usize,
+        error: *mut *const c_void,
+    ) -> *const c_void;
+    static kCFBooleanTrue: *const c_void;
+    static kCFBooleanFalse: *const c_void;
+    static kCFTypeArrayCallBacks: CFArrayCallBacks;
+    static kCFTypeDictionaryKeyCallBacks: CFDictionaryKeyCallBacks;
+    static kCFTypeDictionaryValueCallBacks: CFDictionaryValueCallBacks;
 }
 
 struct Owned(*const c_void);
@@ -177,6 +248,125 @@ pub fn read_property_list(bytes: &[u8]) -> io::Result<PropertyListValue> {
         let plist = Owned(plist);
         let mut nodes = 0;
         convert(plist.0, 0, &mut nodes)
+    }
+}
+
+/// Serializes `value` as CoreFoundation's XML property list: the bytes
+/// Swift's `PropertyListSerialization.data(fromPropertyList:format: .xml,
+/// options: 0)` writes for the same value (dictionary keys sorted, tab
+/// indentation, a final newline).
+pub fn write_property_list_xml(value: &PropertyListValue) -> io::Result<Vec<u8>> {
+    let mut nodes = 0;
+    // SAFETY: every object is created under the create rule and owned by an
+    // `Owned` until the serialized data has been copied out.
+    unsafe {
+        let plist = create(value, 0, &mut nodes)?;
+        let mut error = ptr::null();
+        let data = CFPropertyListCreateData(ptr::null(), plist.0, XML_FORMAT, 0, &mut error);
+        if !error.is_null() {
+            CFRelease(error);
+        }
+        if data.is_null() {
+            return Err(unreadable("the property list could not be serialized"));
+        }
+        let data = Owned(data);
+        let length = CFDataGetLength(data.0);
+        let start = CFDataGetBytePtr(data.0);
+        if length <= 0 || start.is_null() {
+            return Err(unreadable("the property list could not be serialized"));
+        }
+        Ok(std::slice::from_raw_parts(start, length as usize).to_vec())
+    }
+}
+
+/// Creates the CoreFoundation object for one value.
+///
+/// # Safety
+///
+/// Calls CoreFoundation's create functions only; the result is owned.
+unsafe fn create(value: &PropertyListValue, depth: usize, nodes: &mut usize) -> io::Result<Owned> {
+    *nodes += 1;
+    if depth > MAX_DEPTH || *nodes > MAX_NODES {
+        return Err(unreadable(
+            "the property list exceeds its depth or size bound",
+        ));
+    }
+    let owned = |object: *const c_void| {
+        if object.is_null() {
+            Err(unreadable("a property-list value could not be created"))
+        } else {
+            Ok(Owned(object))
+        }
+    };
+    // SAFETY: each buffer is live for its call; containers retain their
+    // elements through the CFType callbacks, so the element owners below may
+    // release theirs when they leave scope.
+    unsafe {
+        match value {
+            PropertyListValue::String(text) => owned(CFStringCreateWithBytes(
+                ptr::null(),
+                text.as_ptr(),
+                text.len() as isize,
+                UTF8,
+                0,
+            )),
+            PropertyListValue::Boolean(flag) => owned(CFRetain(if *flag {
+                kCFBooleanTrue
+            } else {
+                kCFBooleanFalse
+            })),
+            PropertyListValue::Integer(integer) => owned(CFNumberCreate(
+                ptr::null(),
+                NUMBER_SINT64,
+                (integer as *const i64).cast(),
+            )),
+            PropertyListValue::Real(real) => owned(CFNumberCreate(
+                ptr::null(),
+                NUMBER_FLOAT64,
+                (real as *const f64).cast(),
+            )),
+            PropertyListValue::Date(seconds) => owned(CFDateCreate(ptr::null(), *seconds)),
+            PropertyListValue::Data(bytes) => owned(CFDataCreate(
+                ptr::null(),
+                bytes.as_ptr(),
+                bytes.len() as isize,
+            )),
+            PropertyListValue::Array(items) => {
+                let children = items
+                    .iter()
+                    .map(|item| create(item, depth + 1, nodes))
+                    .collect::<io::Result<Vec<Owned>>>()?;
+                let raw: Vec<*const c_void> = children.iter().map(|child| child.0).collect();
+                owned(CFArrayCreate(
+                    ptr::null(),
+                    raw.as_ptr(),
+                    raw.len() as isize,
+                    &raw const kCFTypeArrayCallBacks,
+                ))
+            }
+            PropertyListValue::Dictionary(fields) => {
+                let mut keys = Vec::with_capacity(fields.len());
+                let mut values = Vec::with_capacity(fields.len());
+                for (key, item) in fields {
+                    keys.push(create(
+                        &PropertyListValue::String(key.clone()),
+                        depth + 1,
+                        nodes,
+                    )?);
+                    values.push(create(item, depth + 1, nodes)?);
+                }
+                let raw_keys: Vec<*const c_void> = keys.iter().map(|key| key.0).collect();
+                let raw_values: Vec<*const c_void> = values.iter().map(|item| item.0).collect();
+                owned(CFDictionaryCreate(
+                    ptr::null(),
+                    raw_keys.as_ptr(),
+                    raw_values.as_ptr(),
+                    raw_keys.len() as isize,
+                    &raw const kCFTypeDictionaryKeyCallBacks,
+                    &raw const kCFTypeDictionaryValueCallBacks,
+                ))
+            }
+        }
     }
 }
 
@@ -383,6 +573,68 @@ mod tests {
         assert_eq!(fields["Ratio"], PropertyListValue::Real(0.5));
         assert_eq!(fields["Blob"], PropertyListValue::Data(vec![0, 1, 2]));
         assert!(fields["Label"].as_strings().is_none());
+    }
+
+    /// `/usr/bin/plutil -convert xml1` of `XML` above: CoreFoundation's own
+    /// XML writer, which Swift's `PropertyListSerialization` calls.
+    const WRITTEN: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\">
+<dict>
+\t<key>Blob</key>
+\t<data>
+\tAAEC
+\t</data>
+\t<key>EnvironmentVariables</key>
+\t<dict>
+\t\t<key>ARKDECK_HDC_PATH</key>
+\t\t<string>/opt/å/hdc</string>
+\t</dict>
+\t<key>KeepAlive</key>
+\t<integer>1</integer>
+\t<key>Label</key>
+\t<string>com.arkdeck.agentd</string>
+\t<key>MachServices</key>
+\t<dict>
+\t\t<key>com.arkdeck.agentd</key>
+\t\t<true/>
+\t</dict>
+\t<key>ProgramArguments</key>
+\t<array>
+\t\t<string>/Users/a b/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd</string>
+\t</array>
+\t<key>Ratio</key>
+\t<real>0.5</real>
+\t<key>ThrottleInterval</key>
+\t<integer>5</integer>
+</dict>
+</plist>
+";
+
+    #[test]
+    fn a_document_is_written_as_corefoundation_writes_it() {
+        let document = read_property_list(XML.as_bytes()).unwrap();
+        let written = write_property_list_xml(&document).unwrap();
+        assert_eq!(String::from_utf8(written.clone()).unwrap(), WRITTEN);
+        assert_eq!(read_property_list(&written).unwrap(), document);
+        // Characters XML reserves are escaped, and a date and `false` survive.
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "Path".to_owned(),
+            PropertyListValue::String("/a <b> & \"c\"".into()),
+        );
+        fields.insert("Off".to_owned(), PropertyListValue::Boolean(false));
+        fields.insert("At".to_owned(), PropertyListValue::Date(0.0));
+        let value = PropertyListValue::Dictionary(fields);
+        let written = String::from_utf8(write_property_list_xml(&value).unwrap()).unwrap();
+        assert!(
+            written.contains("<string>/a &lt;b&gt; &amp; \"c\"</string>"),
+            "{written}"
+        );
+        assert!(
+            written.contains("<false/>") && written.contains("<date>2001-01-01T00:00:00Z</date>")
+        );
+        assert_eq!(read_property_list(written.as_bytes()).unwrap(), value);
     }
 
     #[test]

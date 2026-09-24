@@ -213,12 +213,19 @@ pub mod launchd;
 #[cfg(target_os = "macos")]
 mod property_list;
 #[cfg(target_os = "macos")]
-pub use property_list::{MAX_PROPERTY_LIST_BYTES, PropertyListValue, read_property_list};
+pub use property_list::{
+    MAX_PROPERTY_LIST_BYTES, PropertyListValue, read_property_list, write_property_list_xml,
+};
 
 #[cfg(target_os = "macos")]
 mod owner_file;
 #[cfg(target_os = "macos")]
 pub use owner_file::{OwnerFileRefusal, read_owner_controlled_file};
+
+#[cfg(target_os = "macos")]
+mod helper_replace;
+#[cfg(target_os = "macos")]
+pub use helper_replace::{clone_tree, exchange_paths};
 
 #[cfg(target_os = "macos")]
 mod tree_snapshot;

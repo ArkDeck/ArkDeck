@@ -2295,10 +2295,10 @@ identity it cannot prove, and `doctor --deep --require-healthy` exits 69.
 
 ## LaunchAgent service leaves (TASK-XPA-018)
 
-`arkdeck runtime service status|verify --job <id>|restart` manage the one
+`arkdeck runtime service status|verify|restart|update|uninstall` manage the one
 user-domain LaunchAgent `com.arkdeck.agentd` in `gui/<uid>` as Swift's
 `LaunchAgentService` and `RuntimeCLI.runAgentDaemon` do
-(`arkdeck-cli/src/runtime_service.rs`). `status` validates the plist (read by
+(`arkdeck-cli/src/runtime_service.rs`, `runtime_service_install.rs`). `status` validates the plist (read by
 CoreFoundation, `arkdeck_platform::read_property_list`), the installed helper
 bundle (`validate_production_daemon_bundle`), a signed sibling facade when the
 bundle carries one, the daemon and HDC digests against the install receipt, the
@@ -2310,8 +2310,23 @@ profiled Job (`observe.device@1`, `flash.full-restore@1`) through `health`,
 the service is ready and every current Job is a closed unknown-outcome recovery
 lane (`classify_restart`), boots it out and back in (EIO retried, `enable` once
 after three), and proves a new PID speaking the same catalog digest with the same
-closed Jobs. The documents are Swift's; a refusal is a stderr line and Swift's
-exit status with an empty stdout.
+closed Jobs. `verify` without `--job` runs `observe.device@1` as a Runtime-owned
+`agent run` through the daemon and reopens the Job it produced the same way
+(where Swift ran it through its client-side executor), answering Swift's members
+plus the settled `agentExecution`. `update` installs a helper bundle as Swift's
+`install` does — options, validations, a staged copy exchanged into place with
+`renamex_np(RENAME_SWAP)`, the plist rendered from Swift's template by
+CoreFoundation's writer (`arkdeck_platform::write_property_list_xml`), the
+receipt as Swift's `JSONEncoder` writes it, bootout and bootstrap — and keeps the
+helper it replaced one generation in `Helpers/.rollback/ArkDeckAgent.app`. It is
+refused before anything changes while an OpenHarmony signing preset is installed,
+since the replacement daemon's identity would have to be re-recorded in its
+receipt and there is no Rust signing owner yet. `uninstall` removes the plist,
+helper and receipt as Swift does, and is refused while the bootstrap bundle
+registry still pins a bundle for the service installation, which this CLI cannot
+release; the typed zero-Runtime `install` (bundle and tool generations pinned
+through the bootstrap registries) is refused by name. The documents are Swift's;
+a refusal is a stderr line and Swift's exit status with an empty stdout.
 
 launchd is reached only through `arkdeck_platform::launchd`: fixed argument
 arrays (`print`, `bootout`, `bootstrap`, `enable`) run by one fixed executable,
@@ -2320,10 +2335,9 @@ drives the account's launchd domain: its launchd calls go only to the absolute
 executable `ARKDECK_LAUNCHCTL_FOR_RELOCATED_HOME` names (never `/bin/launchctl`),
 and without one they are refused before anything runs; that variable is refused
 for the account's own home. Tests use injected runners or that relocated-home
-executable, so no test reaches the account's service. `verify` without `--job`
-(a fresh run through Swift's client-side executor) and `install`, `update` and
-`uninstall` are not served yet
-([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cli-run.md)).
+executable, so no test reaches the account's service
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cli-run.md),
+[install and update](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-install-run.md)).
 
 The M5 cutover preflight (design §G.4) is `arkdeck-agentd --cutover-preflight
 [--hold-instance-lock]` with `ARKDECK_RUNTIME_COMPOSITION=production`
@@ -2340,9 +2354,19 @@ tool selection, a source it could not read), what is carried over as it is
 `--hold-instance-lock`, the snapshot of the old state directory (relative path,
 byte count and SHA-256 of every file, and a root digest), taken under the
 Runtime's instance lock before the facts are read; a Runtime still holding that
-lock refuses the held pass. `runtime service update` is to run it lock-free
-before booting the old service out and held after
+lock refuses the held pass
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cutover-preflight-run.md)).
+
+`runtime service update` asks the new helper's daemon for it: Swift's daemon
+refuses the argument as unknown (exit 64) and is installed as above; the Rust
+daemon answers, and installing it is the cutover. Its plist would name the Rust
+daemon as `ARKDECK_ANALYZER_PATH`, which has no `--analyze-crash-ledger` mode yet,
+so that update is refused by name before anything changes. Past that gate
+(`ServiceHost::rust_daemon_analyzes_crash_ledgers`, closed in production) the
+lock-free pass must be clear, the old service is booted out, the held pass must
+be clear too — else the old plist is bootstrapped back unchanged — its snapshot
+summary is written to `LaunchAgent/cutover-snapshots/`, and the plist asks for
+`ARKDECK_RUNTIME_COMPOSITION=production`.
 
 ## macOS owner lifecycle soak
 

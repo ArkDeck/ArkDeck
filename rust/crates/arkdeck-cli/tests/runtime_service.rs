@@ -15,6 +15,7 @@ use arkdeck_cli::runtime_service::{
     LaunchAgentPaths, PlainFailure, ServiceAnswer, ServiceHost, restart_leaf, status_leaf,
     verify_leaf,
 };
+use arkdeck_cli::runtime_service_install::{install_leaf, uninstall_leaf, update_leaf};
 use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, validate_method_value};
 use arkdeck_platform::launchd::{LaunchctlOutput, LaunchctlRunner};
 use serde_json::{Map, Value, json};
@@ -492,6 +493,10 @@ fn host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
         now_utc: &fixed_now,
         connection_timeout: Duration::from_secs(5),
         poll_interval: Duration::from_millis(20),
+        default_daemon_bundle: None,
+        relocated_home: true,
+        rust_daemon_analyzes_crash_ledgers: false,
+        preflight_timeout: Duration::from_secs(30),
     }
 }
 
@@ -1170,17 +1175,132 @@ fn verify_of_an_unready_service_emits_its_state_and_opens_no_socket() {
     );
 }
 
+/// The requests a fake Runtime received, the per-connection `health`
+/// preflights left out.
+fn runtime_requests(runtime: &Runtime) -> Vec<(String, Value)> {
+    runtime
+        .state
+        .lock()
+        .unwrap()
+        .requests
+        .iter()
+        .filter(|(method, _)| method != "health")
+        .cloned()
+        .collect()
+}
+
+fn fresh_options() -> Map<String, Value> {
+    Map::from_iter([
+        ("targetId".to_owned(), json!("TGT-3ba3f5f43b92")),
+        ("executionId".to_owned(), json!("gj1-observe")),
+    ])
+}
+
 #[test]
-fn verify_without_a_job_is_refused_by_name_before_anything_is_read() {
+fn verify_without_a_job_runs_observe_through_the_daemon_and_reopens_its_job() {
     let home = Home::new();
-    home.install();
-    let launchd = Launchd::loaded();
-    let answer = verify_leaf(&host(&home, &launchd), "ctl-1", &Map::new());
+    let (launchd, runtime) = ready_for_verify(&home);
+    // The run is answered while its Job still runs; its status once it
+    // completed, as the Swift-recorded GJ-1 execution.
+    runtime.answer("agent.run", oracle_exchange("observed.running"));
+    runtime.answer("agent.status", oracle_exchange("observed.status"));
+    let answer = verify_leaf(&host(&home, &launchd), "ctl-1", &fresh_options());
+    assert_eq!(answer.failure, None, "{:?}", answer.document);
+    let document = answer.document.unwrap();
+    assert_eq!(document["runtimeVerified"], true);
+    assert_eq!(document["runtime"]["status"]["jobId"], JOB);
+    assert_eq!(
+        document["runtime"]["schemaVersion"],
+        "arkdeck-headless-runtime-reopen/v1"
+    );
+    assert_eq!(document["agentExecution"]["state"], "completed");
+    assert_eq!(document["launchAgent"]["ready"], true);
+    let requests = runtime_requests(&runtime);
+    let methods: Vec<&str> = requests.iter().map(|(method, _)| method.as_str()).collect();
+    assert_eq!(
+        methods,
+        [
+            "agent.run",
+            "agent.status",
+            "job.status",
+            "job.evidence",
+            "artifact.list"
+        ]
+    );
+    // The intent Swift's executor sends for the fresh observation.
+    assert_eq!(
+        requests[0].1,
+        json!({"schemaVersion": "arkdeck.agent-execution-request/1",
+            "executionId": "gj1-observe", "operation": "observe.device@1", "inputs": {},
+            "maximumWaitMilliseconds": "90000", "target": {"targetId": "TGT-3ba3f5f43b92"}})
+    );
+    assert_eq!(requests[1].1, json!({"executionId": "gj1-observe"}));
+}
+
+#[test]
+fn a_fresh_verify_that_needs_a_person_or_is_refused_answers_as_swift_does() {
+    let home = Home::new();
+    let (launchd, runtime) = ready_for_verify(&home);
+    // An execution waiting for its published physical action.
+    let mut waiting = oracle_exchange("observed.running");
+    let result = waiting["result"].as_object_mut().unwrap();
+    for key in ["jobId", "jobState", "targetId", "bindingRevision"] {
+        result.insert(key.into(), Value::Null);
+    }
+    result.remove("job");
+    let owner = json!({"kind": "agentExecution", "id": "gj1-observe"});
+    result.insert("state".into(), json!("waitingForHuman"));
+    result.insert("failureCode".into(), Value::Null);
+    result.insert(
+        "humanAction".into(),
+        json!({"schemaVersion": "arkdeck.human-action/1", "actionId": "har-1", "owner": owner,
+            "status": "waiting", "resumeReference": "resume-1", "category": "physicalAssistance",
+            "choices": [], "createdAt": "2026-09-14T00:00:00Z",
+            "minimumAction": "enter recovery mode", "newDispatchCount": 0,
+            "selectionSchema": null, "expiresAt": "2026-09-14T00:05:00Z",
+            "reasonCode": "device.recoveryModeRequired"}),
+    );
+    result.insert(
+        "nextAction".into(),
+        json!({"kind": "humanAction", "owner": owner,
+            "resource": {"kind": "humanAction", "id": "har-1"},
+            "reasonCode": "device.recoveryModeRequired", "resumeReference": "resume-1",
+            "expiresAt": "2026-09-14T00:05:00Z"}),
+    );
+    runtime.answer("agent.run", waiting.clone());
+    let answer = verify_leaf(&host(&home, &launchd), "ctl-1", &fresh_options());
+    let document = answer
+        .document
+        .unwrap_or_else(|| panic!("{:?}", answer.failure));
+    assert_eq!(document["runtimeVerified"], false);
+    assert_eq!(document["humanAction"]["resumeReference"], "resume-1");
+    assert_eq!(document["runtimeReceipt"], waiting["result"]);
+    assert_eq!(
+        answer.failure,
+        Some(PlainFailure {
+            exit_code: 75,
+            message: "paused for physical assistance; resume with: arkdeck agent resume \
+                      --resume-reference resume-1"
+                .into()
+        })
+    );
+    // A run the daemon refuses before admission is a plain failure.
+    runtime.answer("agent.run", oracle_exchange("unadopted.run"));
+    let answer = verify_leaf(&host(&home, &launchd), "ctl-1", &fresh_options());
     assert_eq!(answer.document, None);
     let failure = answer.failure.unwrap();
-    assert_eq!(failure.exit_code, 69);
-    assert!(failure.message.contains("agent run"), "{}", failure.message);
-    assert!(launchd.calls().is_empty());
+    assert_eq!(failure.exit_code, 1);
+    assert!(
+        failure.message.contains("not registered"),
+        "{}",
+        failure.message
+    );
+    // An unready service answers its state and runs nothing.
+    let unready = Home::new();
+    let launchd = Launchd::default();
+    let answer = verify_leaf(&host(&unready, &launchd), "ctl-1", &fresh_options());
+    assert_eq!(answer.document.unwrap()["runtime"], Value::Null);
+    assert_eq!(answer.failure.unwrap().exit_code, 69);
 }
 
 // MARK: - restart
@@ -1508,6 +1628,698 @@ fn restart_fails_when_the_current_job_closure_changes_across_it() {
     );
 }
 
+// MARK: - update, install and uninstall
+
+/// How a helper's daemon answers `--cutover-preflight`: Swift's refuses the
+/// argument, the Rust daemon answers its lock-free and held documents.
+enum Daemon {
+    Swift,
+    /// Neither: it fails the argument some other way.
+    Other,
+    /// `busy`, when given, answers the first held pass only.
+    Rust {
+        first: Value,
+        held: Value,
+        busy: Option<Value>,
+    },
+}
+
+/// A helper bundle below the test root (outside the home) whose daemon logs
+/// every run's arguments and environment to `log` (`USER`, which every
+/// session sets, shows the environment was cleared).
+struct Helper {
+    bundle: PathBuf,
+    log: PathBuf,
+}
+
+impl Helper {
+    fn new(home: &Home, name: &str, daemon: &Daemon) -> Self {
+        let root = home.root.join(name);
+        let bundle = root.join("ArkDeckAgent.app");
+        directory(&bundle.join("Contents/MacOS"));
+        fs::write(bundle.join("Contents/Info.plist"), INFO_PLIST).unwrap();
+        let log = root.join("daemon.log");
+        let record = format!(
+            "printf '%s|%s|%s|%s|%s\\n' \"$*\" \"$HOME\" \"$CFFIXED_USER_HOME\" \
+             \"$ARKDECK_RUNTIME_COMPOSITION\" \"$USER\" >> '{}'\n",
+            log.display()
+        );
+        let answer = match daemon {
+            Daemon::Swift => "if [ \"$1\" = --cutover-preflight ]; then\n\
+                 printf 'unknown argument %s\\n' \"$1\" >&2\nexit 64\nfi\nexit 0\n"
+                .to_owned(),
+            Daemon::Other => "printf 'usage: another daemon\\n' >&2\nexit 64\n".to_owned(),
+            Daemon::Rust { first, held, busy } => {
+                let (first_path, held_path) = (root.join("first.json"), root.join("held.json"));
+                fs::write(&first_path, serde_json::to_vec(first).unwrap()).unwrap();
+                fs::write(&held_path, serde_json::to_vec(held).unwrap()).unwrap();
+                let busy = busy.as_ref().map_or_else(String::new, |busy| {
+                    let (busy_path, marker) = (root.join("busy.json"), root.join("busy.done"));
+                    fs::write(&busy_path, serde_json::to_vec(busy).unwrap()).unwrap();
+                    format!(
+                        "if [ \"$2\" = --hold-instance-lock ] && [ ! -e '{marker}' ]; then \
+                         : > '{marker}'; /bin/cat '{busy}'; exit 0; fi\n",
+                        marker = marker.display(),
+                        busy = busy_path.display()
+                    )
+                });
+                format!(
+                    "{busy}if [ \"$2\" = --hold-instance-lock ]; then /bin/cat '{}'; \
+                     else /bin/cat '{}'; fi\nexit 0\n",
+                    held_path.display(),
+                    first_path.display()
+                )
+            }
+        };
+        write_executable(
+            &bundle.join("Contents/MacOS/arkdeck-agentd"),
+            format!("#!/bin/sh\n{record}{answer}").as_bytes(),
+        );
+        Self { bundle, log }
+    }
+
+    fn runs(&self) -> Vec<String> {
+        fs::read_to_string(&self.log)
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    }
+}
+
+/// A preflight answer of the Rust daemon for `home`.
+fn preflight_document(home: &Home, blocks: Value, held: bool) -> Value {
+    let state = text(&home.paths.state_directory);
+    let snapshot = held.then(|| {
+        json!({"schemaVersion": "arkdeck.cutover-snapshot/1", "stateDirectory": state,
+            "stateDirectoryPresent": true, "takenAtUtc": "2026-09-24T00:00:00Z",
+            "entries": [{"path": "instance.lock", "kind": "file", "byteCount": 0,
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}],
+            "fileCount": 1, "byteCount": 0,
+            "rootSha256": "9a2e3f2bb5e2b1b10a7f1f5d0d7c5a4e2b6f8e1c3d5a7b9c0e2f4a6b8c0d2e4f"})
+    });
+    json!({"schemaVersion": "arkdeck.cutover-preflight/1", "stateDirectory": state,
+        "instanceLockHeld": held, "clear": blocks.as_array().unwrap().is_empty(),
+        "blocks": blocks,
+        "carriedOver": {"parkedJobIds": [], "terminalJobCount": 2, "outcomeUnknownUseCount": 0},
+        "counts": {"jobs": 2, "agentExecutions": 0, "capabilityUses": 0},
+        "snapshot": snapshot})
+}
+
+fn update_options(helper: &Helper, home: &Home) -> Map<String, Value> {
+    Map::from_iter([
+        ("daemon".to_owned(), json!(text(&helper.bundle))),
+        ("hdc".to_owned(), json!(text(&home.hdc()))),
+    ])
+}
+
+/// Every entry below the home: its path, and a file's bytes.
+fn tree(root: &Path) -> Vec<(String, Option<Vec<u8>>)> {
+    let mut entries = Vec::new();
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(directory) = pending.pop() {
+        for entry in fs::read_dir(&directory).unwrap() {
+            let path = entry.unwrap().path();
+            let metadata = fs::symlink_metadata(&path).unwrap();
+            if metadata.is_dir() {
+                pending.push(path.clone());
+            }
+            entries.push((
+                text(&path),
+                metadata.is_file().then(|| fs::read(&path).unwrap()),
+            ));
+        }
+    }
+    entries.sort();
+    entries
+}
+
+fn mode(path: &Path) -> u32 {
+    fs::metadata(path).unwrap().permissions().mode() & 0o777
+}
+
+fn swift_environment(home: &Home) -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("ARKDECK_HDC_PATH".to_owned(), text(&home.hdc())),
+        (
+            "ARKDECK_ANALYZER_PATH".to_owned(),
+            text(&home.paths.installed_daemon),
+        ),
+        (
+            "ARKDECK_WORKSPACE_INSPECTOR".to_owned(),
+            "/usr/bin/grep".to_owned(),
+        ),
+    ])
+}
+
+#[test]
+fn update_installs_a_swift_helper_as_swift_does_and_keeps_the_one_it_replaces() {
+    let home = Home::new();
+    home.install();
+    let replaced = fs::read(&home.paths.installed_daemon).unwrap();
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+    assert_eq!(answer.failure, None);
+    // launchd: Swift's status read, the loaded check, bootout and bootstrap.
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootout {domain}/com.arkdeck.agentd"),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    // The helper is the source's, the one it replaced kept one generation.
+    let installed = &home.paths.installed_daemon;
+    let source_daemon = helper.bundle.join("Contents/MacOS/arkdeck-agentd");
+    assert_eq!(
+        fs::read(installed).unwrap(),
+        fs::read(&source_daemon).unwrap()
+    );
+    assert_eq!(mode(installed), 0o700);
+    assert_eq!(
+        fs::read(
+            home.paths
+                .rollback_bundle
+                .join("Contents/MacOS/arkdeck-agentd")
+        )
+        .unwrap(),
+        replaced
+    );
+    // The plist is Swift's rendering byte for byte, owner-only.
+    assert_eq!(
+        fs::read_to_string(&home.paths.plist).unwrap(),
+        plist(
+            &text(installed),
+            &swift_environment(&home),
+            &text(&home.paths.standard_output),
+            &text(&home.paths.standard_error),
+        )
+    );
+    assert_eq!(mode(&home.paths.plist), 0o600);
+    // The receipt is Swift's `JSONEncoder` output, and the answer.
+    let daemon_sha256 = digest(&source_daemon);
+    assert_eq!(
+        fs::read_to_string(&home.paths.receipt).unwrap(),
+        format!(
+            "{{\n  \"daemonPath\" : \"{}\",\n  \"daemonSHA256\" : \"{daemon_sha256}\",\n  \
+             \"hdcPath\" : \"{}\",\n  \"hdcSHA256\" : \"{}\",\n  \
+             \"installedAtUTC\" : \"2026-09-24T00:00:00Z\",\n  \
+             \"schemaVersion\" : \"arkdeck-launchagent-install/v1\"\n}}",
+            text(installed),
+            text(&home.hdc()),
+            digest(&home.hdc())
+        )
+    );
+    assert_eq!(mode(&home.paths.receipt), 0o600);
+    assert_eq!(
+        answer.document.unwrap(),
+        serde_json::from_slice::<Value>(&fs::read(&home.paths.receipt).unwrap()).unwrap()
+    );
+    // What was written reads back as a consistent installation.
+    let status = host(&home, &launchd).status().unwrap();
+    assert_eq!(
+        status.daemon_sha256.as_deref(),
+        Some(daemon_sha256.as_str())
+    );
+    assert!(
+        status
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.contains("drift") && !diagnostic.contains("plist")),
+        "{:?}",
+        status.diagnostics
+    );
+    // The daemon was asked the preflight once, with only the home and the
+    // composition, and refused it as Swift's daemon does.
+    assert_eq!(
+        helper.runs(),
+        [format!(
+            "--cutover-preflight|{home}|{home}|production|",
+            home = text(&home.paths.home)
+        )]
+    );
+    // Nothing is left staged beside the helper.
+    let helpers = home.paths.installed_daemon_bundle.parent().unwrap();
+    let mut names: Vec<String> = fs::read_dir(helpers)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort();
+    assert_eq!(names, [".rollback", "ArkDeckAgent.app"]);
+}
+
+#[test]
+fn update_refuses_its_options_and_a_signing_preset_before_anything_changes() {
+    let home = Home::new();
+    home.install();
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let before = tree(&home.paths.home);
+    let base = update_options(&helper, &home);
+    let with = |pairs: &[(&str, &str)]| {
+        let mut options = base.clone();
+        for (key, value) in pairs {
+            options.insert((*key).to_owned(), json!(value));
+        }
+        options
+    };
+    let cases: Vec<(Map<String, Value>, u8, &str)> = vec![
+        (
+            with(&[("daemon", "ArkDeckAgent.app")]),
+            64,
+            "runtime service update requires an absolute ArkDeckAgent.app path",
+        ),
+        (
+            with(&[("hdc", "hdc")]),
+            64,
+            "runtime service update requires --hdc with an absolute executable path",
+        ),
+        (
+            with(&[("workspaceProject", "/p")]),
+            64,
+            "runtime service update requires --workspace-project and --deveco-sdk together",
+        ),
+        (
+            with(&[("harnessCli", "x")]),
+            64,
+            "--harness-cli was removed by CHG-2026-064: decisions come from external agents \
+             through the published caller surface; re-run without it",
+        ),
+        (
+            with(&[("arktraceDescriptor", "descriptor.json")]),
+            64,
+            "--arktrace-descriptor must be an absolute path or none",
+        ),
+        (
+            with(&[("arkforgedSha256", "x")]),
+            64,
+            "--arkforged-sha256 is retired; pass one validated ArkForge.bundle to --arkforge-bundle",
+        ),
+        (
+            with(&[("arkforgeBundle", "none"), ("arkforgeCampaign", "c")]),
+            64,
+            "--arkforge-bundle none cannot authorize an ArkForge campaign",
+        ),
+        (
+            with(&[("arkforgeCampaign", "c")]),
+            64,
+            "--arkforge-campaign requires an explicit --arkforge-bundle",
+        ),
+    ];
+    for (options, exit_code, message) in cases {
+        let launchd = Launchd::loaded();
+        let answer = update_leaf(&host(&home, &launchd), &options);
+        assert_eq!(answer.document, None);
+        assert_eq!(
+            answer.failure,
+            Some(PlainFailure {
+                exit_code,
+                message: message.into()
+            })
+        );
+        assert!(
+            launchd
+                .calls()
+                .iter()
+                .all(|call| call.starts_with("print "))
+        );
+    }
+    // An installed signing preset: its receipt pins the daemon identity this
+    // CLI cannot re-record (ruling 3).
+    directory(home.paths.signing_receipt.parent().unwrap());
+    fs::write(&home.paths.signing_receipt, b"{}").unwrap();
+    let before_signing = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &base);
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 69);
+    assert!(
+        failure.message.contains("signing preset") && failure.message.contains("Q8"),
+        "{}",
+        failure.message
+    );
+    assert!(
+        launchd
+            .calls()
+            .iter()
+            .all(|call| call.starts_with("print "))
+    );
+    assert_eq!(tree(&home.paths.home), before_signing);
+    fs::remove_file(&home.paths.signing_receipt).unwrap();
+    fs::remove_dir_all(
+        home.paths
+            .home
+            .join("Library/Application Support/ArkDeck/Signing"),
+    )
+    .unwrap();
+    assert_eq!(tree(&home.paths.home), before);
+    // No daemon was ever asked anything.
+    assert!(helper.runs().is_empty());
+}
+
+#[test]
+fn update_refuses_a_helper_whose_daemon_is_neither_runtime() {
+    let home = Home::new();
+    home.install();
+    let helper = Helper::new(&home, "src", &Daemon::Other);
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+    assert_eq!(
+        answer.failure,
+        Some(PlainFailure {
+            exit_code: 69,
+            message: "the helper's daemon neither answers the cutover preflight nor refuses it \
+                      as Swift's daemon does (exit 64): usage: another daemon"
+                .into()
+        })
+    );
+    assert_eq!(launchd.calls(), [print_call()]);
+    assert_eq!(tree(&home.paths.home), before);
+}
+
+#[test]
+fn update_to_the_rust_daemon_is_refused_by_name_until_it_analyzes_crash_ledgers() {
+    let home = Home::new();
+    home.install();
+    let helper = Helper::new(
+        &home,
+        "src",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+        },
+    );
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 69);
+    assert!(
+        failure.message.contains("ARKDECK_ANALYZER_PATH")
+            && failure.message.contains("--analyze-crash-ledger")
+            && failure.message.ends_with("nothing was changed"),
+        "{}",
+        failure.message
+    );
+    assert_eq!(launchd.calls(), [print_call()]);
+    assert_eq!(tree(&home.paths.home), before);
+    // Only the lock-free pass ran.
+    let runs = helper.runs();
+    assert_eq!(runs.len(), 1);
+    assert!(runs[0].starts_with("--cutover-preflight|"), "{runs:?}");
+}
+
+/// The held pass while the old daemon still holds its instance lock.
+fn running(home: &Home) -> Value {
+    let mut held = preflight_document(
+        home,
+        json!([{"kind": "runtimeRunning",
+            "reason": "another Runtime holds the instance lock of the state directory"}]),
+        true,
+    );
+    held["instanceLockHeld"] = json!(false);
+    held["snapshot"] = Value::Null;
+    held
+}
+
+/// The service manager with the analyzer gate open, as it will be once the
+/// Rust daemon answers `--analyze-crash-ledger`.
+fn cutover_host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
+    let mut host = host(home, launchd);
+    host.rust_daemon_analyzes_crash_ledgers = true;
+    host
+}
+
+#[test]
+fn the_cutover_takes_both_preflight_passes_and_records_the_old_state() {
+    let home = Home::new();
+    home.install();
+    let replaced = fs::read(&home.paths.installed_daemon).unwrap();
+    let held = preflight_document(&home, json!([]), true);
+    let helper = Helper::new(
+        &home,
+        "src",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held: held.clone(),
+            busy: Some(running(&home)),
+        },
+    );
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(
+        &cutover_host(&home, &launchd),
+        &update_options(&helper, &home),
+    );
+    assert_eq!(answer.failure, None);
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootout {domain}/com.arkdeck.agentd"),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    // First lock-free, then holding the instance lock once the old service
+    // is out, asked again while the old daemon still held it.
+    let runs: Vec<String> = helper
+        .runs()
+        .iter()
+        .map(|run| run.split('|').next().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        runs,
+        [
+            "--cutover-preflight",
+            "--cutover-preflight --hold-instance-lock",
+            "--cutover-preflight --hold-instance-lock"
+        ]
+    );
+    // The snapshot summary, owner-only, as the held pass answered it.
+    let snapshot = home
+        .paths
+        .cutover_snapshots
+        .join("cutover-20260924T000000Z-9a2e3f2bb5e2.json");
+    let mut expected = arkdeck_contract::canonical_json(&held["snapshot"]).unwrap();
+    expected.push(b'\n');
+    assert_eq!(fs::read(&snapshot).unwrap(), expected);
+    assert_eq!(mode(&snapshot), 0o600);
+    let document = answer.document.unwrap();
+    assert_eq!(
+        document["cutover"],
+        json!({"snapshotPath": text(&snapshot),
+            "snapshotRootSha256": held["snapshot"]["rootSha256"],
+            "carriedOver": held["carriedOver"],
+            "rollbackBundlePath": text(&home.paths.rollback_bundle)})
+    );
+    assert_eq!(
+        fs::read(
+            home.paths
+                .rollback_bundle
+                .join("Contents/MacOS/arkdeck-agentd")
+        )
+        .unwrap(),
+        replaced
+    );
+    // The plist asks for the production composition.
+    let mut environment = swift_environment(&home);
+    environment.insert(
+        "ARKDECK_RUNTIME_COMPOSITION".to_owned(),
+        "production".to_owned(),
+    );
+    assert_eq!(
+        fs::read_to_string(&home.paths.plist).unwrap(),
+        plist(
+            &text(&home.paths.installed_daemon),
+            &environment,
+            &text(&home.paths.standard_output),
+            &text(&home.paths.standard_error),
+        )
+    );
+}
+
+#[test]
+fn a_cutover_the_first_pass_refuses_changes_nothing() {
+    let home = Home::new();
+    home.install();
+    let blocks = json!([{"kind": "jobState", "jobId": "job-a", "state": "preflight"},
+        {"kind": "pendingToolSelection", "controlActionId": "select-b"}]);
+    let helper = Helper::new(
+        &home,
+        "src",
+        &Daemon::Rust {
+            first: preflight_document(&home, blocks, false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+        },
+    );
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(
+        &cutover_host(&home, &launchd),
+        &update_options(&helper, &home),
+    );
+    assert_eq!(
+        answer.failure,
+        Some(PlainFailure {
+            exit_code: 75,
+            message: "runtime service update refused: the Runtime state cannot be carried over \
+                      as it is (Job job-a is preflight; HDC tool selection select-b is pending); \
+                      nothing was changed"
+                .into()
+        })
+    );
+    assert_eq!(launchd.calls(), [print_call()]);
+    assert_eq!(tree(&home.paths.home), before);
+    assert_eq!(helper.runs().len(), 1);
+}
+
+#[test]
+fn a_cutover_the_held_pass_refuses_starts_the_old_service_again() {
+    let home = Home::new();
+    home.install();
+    let held = running(&home);
+    let helper = Helper::new(
+        &home,
+        "src",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held,
+            busy: None,
+        },
+    );
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(
+        &cutover_host(&home, &launchd),
+        &update_options(&helper, &home),
+    );
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 75);
+    // Asked again while the old daemon may still be letting its lock go.
+    let held_runs = helper
+        .runs()
+        .iter()
+        .filter(|run| run.starts_with("--cutover-preflight --hold-instance-lock|"))
+        .count();
+    assert_eq!(held_runs, 50);
+    assert!(
+        failure
+            .message
+            .contains("another Runtime holds the instance lock")
+            && failure
+                .message
+                .ends_with("the previous service was started again from its unchanged plist"),
+        "{}",
+        failure.message
+    );
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootout {domain}/com.arkdeck.agentd"),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    // The owned directories exist; nothing installed changed.
+    let after: Vec<_> = tree(&home.paths.home)
+        .into_iter()
+        .filter(|(path, bytes)| bytes.is_some() || before.iter().any(|(old, _)| old == path))
+        .collect();
+    assert_eq!(after, before);
+    assert!(!home.paths.cutover_snapshots.exists());
+}
+
+#[test]
+fn uninstall_removes_the_service_as_swift_does_unless_the_registry_pins_it() {
+    let home = Home::new();
+    home.install();
+    // The registry pins a bundle for the service installation.
+    let index = &home.paths.bootstrap_bundle_index;
+    directory(index.parent().unwrap());
+    let pinned = json!({"schemaVersion": "arkdeck.bootstrap-bundles/1", "records": [
+        {"reference": "bundle:sha256:aa", "references": [
+            {"kind": "installation", "id": "runtime-service-installation"}]},
+        {"reference": "bundle:sha256:bb", "references": []}]});
+    fs::write(index, serde_json::to_vec(&pinned).unwrap()).unwrap();
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = uninstall_leaf(&host(&home, &launchd));
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 69);
+    assert!(
+        failure.message.contains("bundle:sha256:aa"),
+        "{}",
+        failure.message
+    );
+    assert!(launchd.calls().is_empty());
+    assert_eq!(tree(&home.paths.home), before);
+    // An index that cannot be read proves nothing either.
+    fs::write(index, b"{").unwrap();
+    let answer = uninstall_leaf(&host(&home, &launchd));
+    assert_eq!(answer.failure.unwrap().exit_code, 69);
+    assert!(launchd.calls().is_empty());
+
+    // With nothing pinned, the service is booted out and removed; the state
+    // and logs stay.
+    fs::write(
+        index,
+        serde_json::to_vec(&json!({"schemaVersion": "arkdeck.bootstrap-bundles/1",
+            "records": [{"reference": "bundle:sha256:bb", "references": []}]}))
+        .unwrap(),
+    )
+    .unwrap();
+    let answer = uninstall_leaf(&host(&home, &launchd));
+    assert_eq!(answer.failure, None);
+    assert_eq!(
+        answer.document.unwrap(),
+        json!({"removedPlist": true, "removedDaemon": true, "removedReceipt": true,
+            "preservedStateDirectory": text(&home.paths.state_directory),
+            "preservedLogDirectory": text(&home.paths.log_directory)})
+    );
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [print_call(), format!("bootout {domain}/com.arkdeck.agentd")]
+    );
+    assert!(!home.paths.plist.exists() && !home.paths.receipt.exists());
+    assert!(!home.paths.installed_daemon_bundle.exists());
+    assert!(home.paths.state_directory.exists() && home.paths.log_directory.exists());
+    // Again: nothing to remove, nothing loaded.
+    let answer = uninstall_leaf(&host(&home, &launchd));
+    assert_eq!(answer.document.unwrap()["removedDaemon"], false);
+}
+
+#[test]
+fn the_typed_install_is_refused_by_name_before_anything_is_read() {
+    let home = Home::new();
+    let launchd = Launchd::default();
+    let options = Map::from_iter([
+        ("bundle".to_owned(), json!("bundle:sha256:aa")),
+        ("bundleGeneration".to_owned(), json!("1")),
+        ("tool".to_owned(), json!("tool:sha256:bb")),
+        ("toolGeneration".to_owned(), json!("1")),
+    ]);
+    let answer = install_leaf(&host(&home, &launchd), &options);
+    assert_eq!(answer.document, None);
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 69);
+    assert!(
+        failure.message.contains("installation references"),
+        "{}",
+        failure.message
+    );
+    assert!(launchd.calls().is_empty());
+}
+
 // MARK: - The CLI process over a relocated home
 
 /// The CLI with its home relocated to `home`; `launchctl`, when given, is the
@@ -1637,38 +2449,160 @@ fn the_cli_answers_status_in_swifts_envelope_and_never_reaches_the_accounts_laun
 }
 
 #[test]
-fn the_cli_refuses_restart_and_a_fresh_verify_with_an_empty_stdout() {
+fn the_cli_refuses_restart_with_an_empty_stdout_and_verify_answers_an_absent_service() {
     let home = Home::new();
     let (script, log) = recording_launchctl(&home);
-    for (argv, code) in [
-        (
-            &["runtime", "service", "restart", "--output", "json"][..],
-            69,
-        ),
-        (
-            &["runtime", "service", "verify", "--output", "json"][..],
-            69,
-        ),
-    ] {
-        let output = cli(&home, Some(&script), argv);
-        assert_eq!(output.status.code(), Some(code), "{argv:?}");
-        assert!(output.stdout.is_empty(), "{argv:?}");
-    }
-    // `verify --job` of an absent service emits its state, then exits 69.
     let output = cli(
         &home,
         Some(&script),
+        &["runtime", "service", "restart", "--output", "json"],
+    );
+    assert_eq!(output.status.code(), Some(69));
+    assert!(output.stdout.is_empty());
+    // `verify`, with or without `--job`, of an absent service emits its
+    // state, then exits 69.
+    for argv in [
+        &["runtime", "service", "verify", "--output", "json"][..],
         &[
             "runtime", "service", "verify", "--job", JOB, "--output", "json",
+        ][..],
+    ] {
+        let output = cli(&home, Some(&script), argv);
+        assert_eq!(output.status.code(), Some(69), "{argv:?}");
+        let envelope = stdout_json(&output);
+        assert_eq!(envelope["ok"], true);
+        assert_eq!(envelope["result"]["runtime"], Value::Null);
+        assert_eq!(envelope["result"]["runtimeVerified"], false);
+    }
+    // Nothing was installed, so launchd was never asked anything.
+    assert!(!log.exists());
+}
+
+#[test]
+fn the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service() {
+    let home = Home::new();
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    write_executable(&home.hdc(), b"hdc-v1");
+    // The production validation refuses the unsigned test helper before
+    // anything is changed or anyone is asked.
+    let output = cli(
+        &home,
+        None,
+        &[
+            "runtime",
+            "service",
+            "update",
+            "--daemon",
+            &text(&helper.bundle),
+            "--hdc",
+            &text(&home.hdc()),
+            "--arktrace-descriptor",
+            "none",
+            "--output",
+            "json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    assert!(helper.runs().is_empty());
+    assert!(!home.paths.plist.exists() && !home.paths.installed_daemon_bundle.exists());
+    // An installed signing preset refuses first (ruling 3).
+    directory(home.paths.signing_receipt.parent().unwrap());
+    fs::write(&home.paths.signing_receipt, b"{}").unwrap();
+    let output = cli(
+        &home,
+        None,
+        &[
+            "runtime",
+            "service",
+            "update",
+            "--daemon",
+            &text(&helper.bundle),
+            "--hdc",
+            &text(&home.hdc()),
+            "--arktrace-descriptor",
+            "none",
         ],
     );
     assert_eq!(output.status.code(), Some(69));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("signing preset"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    // The typed install is refused by name.
+    let output = cli(
+        &home,
+        None,
+        &[
+            "runtime",
+            "service",
+            "install",
+            "--bundle",
+            "bundle:sha256:aa",
+            "--bundle-generation",
+            "1",
+            "--tool",
+            "tool:sha256:bb",
+            "--tool-generation",
+            "1",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(69));
+    assert!(output.stdout.is_empty());
+    // Uninstall asks launchd only through the relocated home's own recording
+    // executable, and removes nothing that is not there.
+    let output = cli(
+        &home,
+        None,
+        &["runtime", "service", "uninstall", "--output", "json"],
+    );
+    assert_eq!(output.status.code(), Some(1));
+    assert!(output.stdout.is_empty());
+    let (script, log) = recording_launchctl(&home);
+    let output = cli(
+        &home,
+        Some(&script),
+        &["runtime", "service", "uninstall", "--output", "json"],
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
     let envelope = stdout_json(&output);
-    assert_eq!(envelope["ok"], true);
-    assert_eq!(envelope["result"]["runtime"], Value::Null);
-    assert_eq!(envelope["result"]["runtimeVerified"], false);
-    // Nothing was installed, so launchd was never asked anything.
-    assert!(!log.exists());
+    assert_eq!(envelope["command"], "runtime.service.uninstall");
+    assert_eq!(
+        envelope["result"],
+        json!({"removedPlist": false, "removedDaemon": false, "removedReceipt": false,
+            "preservedStateDirectory": text(&home.paths.state_directory),
+            "preservedLogDirectory": text(&home.paths.log_directory)})
+    );
+    assert_eq!(
+        fs::read_to_string(&log).unwrap(),
+        format!("print {}/com.arkdeck.agentd\n", domain())
+    );
+    // The leaves are listed.
+    let output = cli(&home, None, &["commands", "--output", "json"]);
+    let listed: Vec<String> = stdout_json(&output)["result"]["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["command"].as_str().unwrap().to_owned())
+        .filter(|command| command.starts_with("runtime.service."))
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            "runtime.service.install",
+            "runtime.service.update",
+            "runtime.service.restart",
+            "runtime.service.status",
+            "runtime.service.verify",
+            "runtime.service.uninstall"
+        ]
+    );
 }
 
 #[test]
@@ -1716,6 +2650,22 @@ fn the_cli_refuses_the_options_these_leaves_do_not_take() {
             "5",
         ][..],
         &["runtime", "service", "status", "--timeout", "5s"][..],
+        &["runtime", "service", "uninstall", "--hdc", "/h"][..],
+        &["runtime", "service", "update", "--bundle", "b"][..],
+        &[
+            "runtime",
+            "service",
+            "install",
+            "--bundle",
+            "b",
+            "--bundle-generation",
+            "01",
+            "--tool",
+            "t",
+            "--tool-generation",
+            "1",
+        ][..],
+        &["runtime", "service", "install", "--bundle", "b"][..],
     ] {
         let output = cli(&home, None, argv);
         assert_eq!(output.status.code(), Some(64), "{argv:?}");
