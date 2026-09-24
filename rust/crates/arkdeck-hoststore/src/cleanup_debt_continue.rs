@@ -73,13 +73,19 @@ fn descriptor(reference: &str) -> Option<&'static CatalogOperation> {
 
 /// Swift `PersistedTypedProviderAction.materialize()` for the HDC families
 /// whose cleanups the ledger can owe. A kind of any other family names no
-/// residue here.
+/// residue here. Its refusal escapes Swift's `continueCleanupDebt` untouched
+/// and the daemon answers it `internalError`, interpolated: a
+/// `DeviceProviderError` by its detail alone (its `description`), an
+/// `HDCE0RequestError` by its case — never the Rust error's own rendering.
+/// A cleanup of a JPEG still is read with the still's own suffix, a declared
+/// difference (Swift refuses the record, so the debt can never be continued).
 fn materialize(persisted: &Value) -> Result<Option<StepAction>, Refusal> {
     let kind = persisted["kind"].as_str().unwrap_or_default();
     let empty = Map::new();
     let arguments = persisted["arguments"].as_object().unwrap_or(&empty);
-    let internal =
-        |error: arkdeck_provider_hdc::FileActionError| Refusal::Internal(error.to_string());
+    let internal = |error: arkdeck_provider_hdc::FileActionError| {
+        Refusal::Internal(device_steps::refusal_detail(error))
+    };
     if let Some(action) = HapAction::from_persisted(kind, arguments).map_err(internal)? {
         return Ok(Some(StepAction::Hap(action)));
     }
@@ -381,5 +387,61 @@ impl JobRunner<'_> {
 
     fn continuation_clock(&self) -> Result<String, Refusal> {
         (self.now)().ok_or_else(|| engine("internalFailure", "the Runtime clock is unavailable"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn refusal(persisted: Value) -> String {
+        match materialize(&persisted) {
+            Err(Refusal::Internal(message)) => message,
+            Err(Refusal::Engine(message)) => panic!("an engine refusal: {message}"),
+            Ok(_) => panic!("{persisted} materialized"),
+        }
+    }
+
+    /// Swift's `continueCleanupDebt` lets `materialize()`'s error escape, and
+    /// its daemon answers any error that is not the engine's `internalError`
+    /// with `"\(error)"`: a `DeviceProviderError` is its `description`, the
+    /// detail alone, and an `HDCE0RequestError` its case with its fields.
+    #[test]
+    fn a_refused_debt_action_is_answered_as_swift_interpolates_it() {
+        let job = "job-dc1692ef72c638e3e97ef1344f891ab4";
+        assert_eq!(
+            refusal(json!({"kind": "hdc.cleanupOwnedRemotePath", "arguments": {
+                "jobId": job, "stepId": "capture-ui-tree", "nonce": "owned",
+                "remotePath": "/data/local/tmp/elsewhere.json"}})),
+            "persisted hdc.cleanupOwnedRemotePath remote path does not match its owned components"
+        );
+        assert_eq!(
+            refusal(json!({"kind": "hdc.cleanupOwnedRemotePath", "arguments": {
+                "jobId": job, "stepId": "capture-ui-tree", "nonce": "owned"}})),
+            "persisted hdc.cleanupOwnedRemotePath is missing string remotePath"
+        );
+        assert_eq!(
+            refusal(json!({"kind": "hdc.uninstallPackage", "arguments": {"bundleName": "demo"}})),
+            "malformed(field: \"bundleName\", detail: \"reverse-DNS identifier expected\")"
+        );
+    }
+
+    /// A declared difference from Swift, which rebuilds a JPEG still's path
+    /// with the PNG suffix and refuses the debt: the still's cleanup is read
+    /// with its own suffix, and names the very residue the ledger owes.
+    #[test]
+    fn a_jpeg_still_cleanup_debt_names_its_own_residue() {
+        let job = "job-02ff97a6ccf8d97ce49e6fecaa197f6f";
+        let path = format!("/data/local/tmp/arkdeck-{job}-capture-screenshot-owned.jpeg");
+        let action = materialize(&json!({"kind": "hdc.cleanupOwnedRemotePath", "arguments": {
+            "jobId": job, "stepId": "capture-screenshot", "nonce": "owned",
+            "remotePath": path}}))
+        .ok()
+        .flatten()
+        .expect("a JPEG still's cleanup");
+        assert_eq!(
+            device_steps::cleanup_residue(&action).map(|residue| residue.identity()),
+            Some(path)
+        );
     }
 }

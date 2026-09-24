@@ -729,9 +729,18 @@ rule's create or remove by `fport ls`, a debug HAP's staging, package and
 ability by the owned path or directory, `bm dump` and `pidof`, a diagnostic
 capture's owned file by `ls -ld`, and a native deployment's steps by its own
 inspection, whose verdict table never calls a publish (`publish state is not
-safe to replay`) or a rollback not executed. The screen sequence's capture and
-cleanup reconcile as Swift's do: its materialization does not know their kinds,
-so the reconcile, once begun, fails and the Job stays parked. The decision is
+safe to replay`) or a rollback not executed. Two declared differences fix
+Swift defects (the maintainer's rule of 2026-09-20: a Swift defect is fixed in
+Rust and declared). Swift's materialization does not know the screen
+sequence's capture and cleanup, so there a reconcile of either, once begun,
+fails and the Job can never be concluded; here each is read back as a capture
+file leg is, by `ls -ld` of what it owns (`ParkedScreenSequence`): the capture
+completed when its archive is there, not executed when neither the archive nor
+its frames directory is, and unknown — still parked, never resent — when its
+frames remain without their archive; the cleanup completed when the frames
+directory is gone and not executed when it is not. And a receive or cleanup of
+a JPEG still is rebuilt with the still's own suffix, where Swift rebuilds the
+`.png` the device never wrote and refuses the record. The decision is
 journaled as Swift journals it, the correlated step outcome carrying
 `confirmedNotExecuted` for a non-execution; the Job then fails and is
 published as a Session, its capability use resolved `safeToReflash`; or waits
@@ -800,7 +809,12 @@ resumed, a cleanup debt continued — and three whose daemon died mid-run,
 reproduced by a child of the test binary exiting at the same window: a tap
 before and after its consume, resumed from `running`, and a debug HAP whose
 failure finalization a restart left for `job.run` to continue; every answer,
-store snapshot and leftover byte for byte. Also landed: `recovery_manifest.rs`, Swift's
+store snapshot and leftover byte for byte, but the frames of the parked screen
+sequence capture, which the test marks as declared differences (Swift's
+reconcile fails `internalError` and leaves the Job `reconciling`; the Rust one
+reads it back and keeps it `waitingForRecovery`). Rust-only scenarios there
+conclude a screen sequence capture and cleanup the probes do settle, and a
+JPEG still's receive, cleanup and cleanup debt, which Swift refuses. Also landed: `recovery_manifest.rs`, Swift's
 `RecoveryManifestCodec` (the Session manifest's `recovery` member, which the
 Session reader now decodes through it before checking its relations to the
 Session's steps); its unit tests replay `rust/tests/fixtures/recovery-manifest/`
@@ -884,7 +898,10 @@ fails the whole list with Swift's store error, and nothing is written.
 holds, is loaded through `recover_jobs` (its record marked `recovered: journal
 clean`); a Job whose outcome is unknown is answered without a write. The debt's
 persisted action is materialized again (`HapAction::from_persisted`,
-`NativeAction::from_persisted`) and must name its residue. A read-only readback
+`NativeAction::from_persisted`; a JPEG still's cleanup with the still's own
+suffix, a declared difference) and must name its residue; a refusal is answered
+`internalError` with Swift's interpolation of the provider error, its detail
+alone. A read-only readback
 judges the residue first: gone settles the debt, inconclusive leaves it owed.
 Only a residue still present is retried, once: the retry is made durable in the
 ledger before it is sent, dispatches under the use the Job consumed (the

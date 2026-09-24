@@ -18,7 +18,8 @@
 //! inventory), the storage preflight and the observe steps are
 //! [`crate::Action`]'s; the Job's products, index and summary are the store
 //! owner's.
-use crate::debug_hap::PersistedArguments;
+use crate::debug_hap::{HapAction, PersistedArguments};
+use crate::native_library::Reconcile;
 use crate::{DispatchFailure, HdcDispatch, Outcome, Persisted, ProcessPlan, Receipt, RequestError};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
@@ -849,10 +850,13 @@ impl FileAction {
     /// Swift `PersistedTypedProviderAction.materialize()` for the persisted
     /// kinds of these legs Swift knows: the action a kind and its arguments
     /// name, rebuilt through the same constructors, in Swift's order, and
-    /// refused as Swift refuses it. `None` is a kind of another family — or
-    /// one of the screen sequence's two, which Swift's materialization does
-    /// not know. A cleanup of an owned path is the one kind the debug HAP's
-    /// family shares; it is rebuilt here as this leg's.
+    /// refused as Swift refuses it — but that a receive or a cleanup of a
+    /// JPEG still is rebuilt with the still's own suffix, a declared
+    /// difference (`PersistedArguments::recorded_path`). `None` is a kind of
+    /// another family — or one of the screen sequence's two, which Swift's
+    /// materialization does not know and [`ParkedScreenSequence`] reads. A
+    /// cleanup of an owned path is the one kind the debug HAP's family
+    /// shares; it is rebuilt here as this leg's.
     pub fn from_persisted(
         kind: &str,
         arguments: &Map<String, Value>,
@@ -895,7 +899,7 @@ impl FileAction {
                 }
             }
             "hdc.receiveOwnedArtifact" => {
-                let path = persisted.owned_path(ImageType::Png)?;
+                let path = persisted.recorded_path()?;
                 let expected_sha256 = persisted.optional_string("expectedSha256")?;
                 let maximum_bytes = persisted.integer("maximumBytes")?;
                 let leading = persisted.optional_string("expectedLeadingBytes")?;
@@ -916,7 +920,7 @@ impl FileAction {
                 )?)
             }
             "hdc.cleanupOwnedRemotePath" => Self::CleanupOwnedRemotePath {
-                path: persisted.owned_path(ImageType::Png)?,
+                path: persisted.recorded_path()?,
             },
             _ => return Ok(None),
         }))
@@ -1663,6 +1667,133 @@ impl FileAction {
                 }
                 verified([("cleaned", path.remote_path.clone())])
             }
+        }
+    }
+}
+
+/// Swift's answer for a readback that saw nothing definite.
+const INDEFINITE: &str = "dedicated readback did not produce a definite presence";
+
+/// A screen sequence's capture or cleanup that a Job parked on, as its
+/// reconcile reads it back: the provider-owned archive and frames directory
+/// the persisted action names. Rust only, a declared difference from Swift
+/// (the maintainer's rule of 2026-09-20, applied by the coordinating session
+/// on 2026-09-24): Swift's `materialize()` has no case for either kind, so a
+/// reconcile of such a Job begins and then fails, forever. Here the parked
+/// step is concluded the way a capture file leg is (`ls -ld` of what it
+/// wrote) and never resent: the capture by its archive, which it writes
+/// last, and its frames directory, which it writes first; the cleanup by the
+/// frames directory, whose absence is what it proves.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParkedScreenSequence {
+    /// The cleanup rather than the capture.
+    pub cleanup: bool,
+    pub frames: OwnedRemoteDirectory,
+    pub archive: OwnedRemotePath,
+}
+
+impl ParkedScreenSequence {
+    /// The owned paths a persisted `hdc.captureScreenSequence` or
+    /// `hdc.cleanupScreenSequence` names, rebuilt through their constructors
+    /// as Swift's materialization rebuilds every owned path, each required to
+    /// be exactly the recorded one; the capture's request checked again as a
+    /// capture checks it, and the cleanup's frame count, all it persists of
+    /// the request, within the same bound. `None` is any other kind.
+    pub fn from_persisted(
+        kind: &str,
+        arguments: &Map<String, Value>,
+    ) -> Result<Option<Self>, FileActionError> {
+        let cleanup = match kind {
+            "hdc.captureScreenSequence" => false,
+            "hdc.cleanupScreenSequence" => true,
+            _ => return Ok(None),
+        };
+        let persisted = PersistedArguments { kind, arguments };
+        let archive = persisted.owned_path(ImageType::Png)?;
+        if archive.step_id != "capture-screen-sequence" {
+            return persisted.refuse("does not name a screen sequence archive");
+        }
+        let frames = OwnedRemoteDirectory::new(
+            &archive.job_id,
+            &archive.step_id,
+            &archive.nonce,
+            DirectoryPurpose::Frames,
+        )?;
+        if persisted.string("framesDirectory")? != frames.remote_path {
+            return persisted.refuse("frames directory does not match its owned components");
+        }
+        let frame_count = persisted.integer("frameCount")?;
+        if cleanup {
+            if !(2..=MAXIMUM_FRAMES).contains(&frame_count) {
+                return Err(RequestError::OutOfBounds {
+                    field: "frameCount",
+                    detail: format!("2...{MAXIMUM_FRAMES}"),
+                }
+                .into());
+            }
+        } else {
+            let requested = persisted.string("imageType")?;
+            let Some(image_type) = ImageType::parse(requested) else {
+                return persisted.refuse("carries an unregistered image type");
+            };
+            ScreenSequenceRequest::new(
+                frame_count,
+                image_type,
+                persisted.optional_integer("width")?,
+                persisted.optional_integer("height")?,
+                persisted.optional_integer("displayId")?,
+            )?;
+        }
+        Ok(Some(Self {
+            cleanup,
+            frames,
+            archive,
+        }))
+    }
+
+    /// The read-only probes that conclude it, in the order they are
+    /// dispatched, each once: the capture's archive, then its frames
+    /// directory; the cleanup's frames directory.
+    pub fn readbacks(&self) -> Vec<HapAction> {
+        let frames = HapAction::ReadOwnedDirectoryPresence(self.frames.clone());
+        if self.cleanup {
+            vec![frames]
+        } else {
+            vec![
+                HapAction::ReadOwnedPathPresence {
+                    path: self.archive.clone(),
+                },
+                frames,
+            ]
+        }
+    }
+
+    /// The verdict on what the probes read, one presence per probe in
+    /// [`Self::readbacks`] order, each definite or not. Nothing is concluded
+    /// unless every probe answered definitely. A capture whose archive is
+    /// there completed; one that left neither its archive nor its frames
+    /// directory was not executed; one that left its frames without their
+    /// archive ran in part — the state its own verdict leaves unknown — so it
+    /// stays unknown. A cleanup whose frames directory is gone completed; one
+    /// whose directory remains was not executed, as a capture leg's cleanup
+    /// is read.
+    pub fn reconcile(&self, presences: &[Option<bool>]) -> Reconcile {
+        let completed = |present: bool| {
+            Reconcile::ConfirmedCompleted(BTreeMap::from([(
+                "postconditionPresent".to_owned(),
+                present.to_string(),
+            )]))
+        };
+        match (self.cleanup, presences) {
+            (true, [Some(false)]) => completed(false),
+            (true, [Some(true)]) => Reconcile::ConfirmedNotExecuted,
+            (false, [Some(true), Some(_)]) => completed(true),
+            (false, [Some(false), Some(false)]) => Reconcile::ConfirmedNotExecuted,
+            (false, [Some(false), Some(true)]) => Reconcile::StillUnknown(format!(
+                "frames directory {} remains without its archive {}; original not resent",
+                self.frames.remote_path, self.archive.remote_path
+            )),
+            _ => Reconcile::StillUnknown(INDEFINITE.into()),
         }
     }
 }
@@ -3378,9 +3509,11 @@ mod tests {
     /// Swift's materialization reads every persisted form of these legs back
     /// as the action that persisted it; a pair of characters that is not
     /// hexadecimal is skipped and an odd last one dropped, as Swift reads
-    /// `expectedLeadingBytes`; a receive or cleanup is rebuilt with Swift's
-    /// default PNG suffix, so a JPEG still's path is refused as Swift refuses
-    /// it; the screen sequence's kinds are unknown to it.
+    /// `expectedLeadingBytes`. A receive or cleanup of a JPEG still is read
+    /// with the still's own suffix — a declared difference: Swift rebuilds it
+    /// with its default PNG suffix and refuses the record — and a path that
+    /// neither suffix rebuilds is still refused. The screen sequence's kinds
+    /// are not this action's ([`ParkedScreenSequence`] reads them).
     #[test]
     fn persisted_forms_materialize_back_as_swift_reads_them() {
         let as_map = |arguments: Vec<(&str, Persisted)>| -> Map<String, Value> {
@@ -3433,15 +3566,284 @@ mod tests {
         }
         assert_eq!(lenient_hex("ffd8ffe0"), JFIF_MAGIC);
         assert_eq!(lenient_hex("zzff0"), [0xff]);
-        let (kind, arguments) = FileAction::CleanupOwnedRemotePath { path: jpeg }.persisted();
-        assert!(
-            FileAction::from_persisted(kind, &as_map(arguments))
-                .unwrap_err()
-                .to_string()
-                .contains("remote path does not match its owned components")
-        );
+        // The declared difference: a JPEG still's receive and cleanup.
+        let still = [
+            FileAction::ReceiveOwnedArtifact(ReceiveArtifact {
+                path: jpeg.clone(),
+                expected_sha256: None,
+                maximum_bytes: RECEIVE_MAXIMUM_BYTES,
+                expected_leading_bytes: Some(JFIF_MAGIC.to_vec()),
+            }),
+            FileAction::CleanupOwnedRemotePath { path: jpeg.clone() },
+        ];
+        for action in still {
+            let (kind, arguments) = action.persisted();
+            assert_eq!(
+                FileAction::from_persisted(kind, &as_map(arguments)),
+                Ok(Some(action))
+            );
+        }
+        // A suffix neither format writes, or a JPEG suffix on a leg whose
+        // suffix is fixed, names no owned path.
+        for (step, remote) in [
+            (
+                "capture-screenshot",
+                "/data/local/tmp/arkdeck-job-1-capture-screenshot-n2.gif",
+            ),
+            (
+                "capture-ui-tree",
+                "/data/local/tmp/arkdeck-job-1-capture-ui-tree-n2.jpeg",
+            ),
+        ] {
+            for kind in ["hdc.receiveOwnedArtifact", "hdc.cleanupOwnedRemotePath"] {
+                let mut arguments = as_map(vec![
+                    ("jobId", Persisted::Text("job-1".into())),
+                    ("stepId", Persisted::Text(step.into())),
+                    ("nonce", Persisted::Text("n2".into())),
+                    ("remotePath", Persisted::Text(remote.into())),
+                ]);
+                arguments.insert("maximumBytes".into(), Value::from(RECEIVE_MAXIMUM_BYTES));
+                assert_eq!(
+                    FileAction::from_persisted(kind, &arguments),
+                    Err(FileActionError::Unsupported(format!(
+                        "persisted {kind} remote path does not match its owned components"
+                    )))
+                );
+            }
+        }
         for kind in ["hdc.captureScreenSequence", "hdc.cleanupScreenSequence"] {
             assert_eq!(FileAction::from_persisted(kind, &Map::new()), Ok(None));
+        }
+    }
+
+    /// A parked screen sequence step is read back from the paths its
+    /// persisted form names (a declared difference: Swift's materialization
+    /// does not know either kind): the forms a capture and its cleanup
+    /// persist are read back, the recorded paths must be exactly the owned
+    /// ones, and the capture's request is checked again.
+    #[test]
+    fn a_parked_screen_sequence_is_read_from_its_persisted_paths() {
+        let as_map = |arguments: Vec<(&str, Persisted)>| -> Map<String, Value> {
+            arguments
+                .into_iter()
+                .map(|(key, value)| {
+                    let value = match value {
+                        Persisted::Text(text) => Value::from(text),
+                        Persisted::Integer(number) => Value::from(number),
+                        Persisted::Texts(texts) => Value::from(texts),
+                    };
+                    (key.to_owned(), value)
+                })
+                .collect()
+        };
+        let job = "job-7dd23f0c724b55c0e2c644de0063493d";
+        let request =
+            ScreenSequenceRequest::new(3, ImageType::Png, Some(360), Some(640), Some(0)).unwrap();
+        let frames = OwnedRemoteDirectory::stable_frames(job, "capture-screen-sequence").unwrap();
+        let archive =
+            OwnedRemotePath::stable(job, "capture-screen-sequence", ImageType::Png).unwrap();
+        let capture = FileAction::CaptureScreenSequence {
+            request: request.clone(),
+            frames: frames.clone(),
+            archive: archive.clone(),
+        };
+        let cleanup = FileAction::CleanupScreenSequence {
+            request,
+            frames: frames.clone(),
+            archive: archive.clone(),
+        };
+        let read = |action: &FileAction| {
+            let (kind, arguments) = action.persisted();
+            ParkedScreenSequence::from_persisted(kind, &as_map(arguments))
+        };
+        assert_eq!(
+            read(&capture),
+            Ok(Some(ParkedScreenSequence {
+                cleanup: false,
+                frames: frames.clone(),
+                archive: archive.clone(),
+            }))
+        );
+        assert_eq!(
+            read(&cleanup),
+            Ok(Some(ParkedScreenSequence {
+                cleanup: true,
+                frames: frames.clone(),
+                archive: archive.clone(),
+            }))
+        );
+        // The capture probes its archive, then its frames directory; the
+        // cleanup its frames directory: `ls -ld`, read-only, each once.
+        let parked = read(&capture).unwrap().unwrap();
+        let probes = parked.readbacks();
+        assert_eq!(
+            probes,
+            [
+                HapAction::ReadOwnedPathPresence {
+                    path: archive.clone()
+                },
+                HapAction::ReadOwnedDirectoryPresence(frames.clone()),
+            ]
+        );
+        for probe in &probes {
+            assert_eq!(probe.effect(), "readOnly");
+            let FilePlan::Process(plan) = probe
+                .lower("reconcile-capture-screen-sequence-0", Some(KEY), &[])
+                .unwrap()
+            else {
+                panic!("a presence probe is one process")
+            };
+            assert_eq!(plan.arguments[..4], ["-t", KEY, "shell", "ls"]);
+            assert_eq!(plan.arguments[4], "-ld");
+        }
+        assert_eq!(
+            read(&cleanup).unwrap().unwrap().readbacks(),
+            [HapAction::ReadOwnedDirectoryPresence(frames.clone())]
+        );
+        // Refused before anything is dispatched.
+        let (kind, arguments) = capture.persisted();
+        let arguments = as_map(arguments);
+        let refused = |change: &dyn Fn(&mut Map<String, Value>)| {
+            let mut changed = arguments.clone();
+            change(&mut changed);
+            ParkedScreenSequence::from_persisted(kind, &changed)
+                .unwrap_err()
+                .to_string()
+        };
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert(
+                    "framesDirectory".into(),
+                    Value::from("/data/local/tmp/elsewhere-frames"),
+                );
+            }),
+            "unsupportedAction(\"persisted hdc.captureScreenSequence frames directory does not \
+             match its owned components\")"
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert(
+                    "remotePath".into(),
+                    Value::from("/data/local/tmp/other.tar"),
+                );
+            }),
+            "unsupportedAction(\"persisted hdc.captureScreenSequence remote path does not match \
+             its owned components\")"
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert("imageType".into(), Value::from("gif"));
+            }),
+            "unsupportedAction(\"persisted hdc.captureScreenSequence carries an unregistered \
+             image type\")"
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.remove("height");
+            }),
+            "malformed(field: \"width/height\", detail: \"a scaled sequence needs both \
+             dimensions\")"
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.remove("framesDirectory");
+            }),
+            "unsupportedAction(\"persisted hdc.captureScreenSequence is missing string \
+             framesDirectory\")"
+        );
+        let (kind, arguments) = cleanup.persisted();
+        let mut many = as_map(arguments);
+        many.insert("frameCount".into(), Value::from(301));
+        assert_eq!(
+            ParkedScreenSequence::from_persisted(kind, &many)
+                .unwrap_err()
+                .to_string(),
+            "outOfBounds(field: \"frameCount\", detail: \"2...300\")"
+        );
+        // An owned path of another step names no archive of a sequence.
+        let trace = OwnedRemotePath::stable(job, "capture-trace", ImageType::Png).unwrap();
+        let mut other = as_map(cleanup.persisted().1);
+        other.insert("stepId".into(), Value::from("capture-trace"));
+        other.insert("remotePath".into(), Value::from(trace.remote_path));
+        assert_eq!(
+            ParkedScreenSequence::from_persisted(kind, &other)
+                .unwrap_err()
+                .to_string(),
+            "unsupportedAction(\"persisted hdc.cleanupScreenSequence does not name a screen \
+             sequence archive\")"
+        );
+        assert_eq!(
+            ParkedScreenSequence::from_persisted("hdc.cleanupOwnedRemotePath", &Map::new()),
+            Ok(None)
+        );
+    }
+
+    /// Nothing is concluded unless every probe answered: a capture whose
+    /// archive is there completed, one that left nothing was not executed,
+    /// one whose frames remain without their archive stays unknown; a
+    /// cleanup whose frames directory is gone completed, one whose directory
+    /// remains was not executed.
+    #[test]
+    fn a_parked_screen_sequence_concludes_only_on_definite_presences() {
+        let job = "job-7dd23f0c724b55c0e2c644de0063493d";
+        let frames = OwnedRemoteDirectory::stable_frames(job, "capture-screen-sequence").unwrap();
+        let archive =
+            OwnedRemotePath::stable(job, "capture-screen-sequence", ImageType::Png).unwrap();
+        let capture = ParkedScreenSequence {
+            cleanup: false,
+            frames: frames.clone(),
+            archive: archive.clone(),
+        };
+        let cleanup = ParkedScreenSequence {
+            cleanup: true,
+            frames,
+            archive,
+        };
+        let completed = |present: &str| {
+            Reconcile::ConfirmedCompleted(BTreeMap::from([(
+                "postconditionPresent".to_owned(),
+                present.to_owned(),
+            )]))
+        };
+        let indefinite = Reconcile::StillUnknown(INDEFINITE.into());
+        assert_eq!(
+            capture.reconcile(&[Some(true), Some(true)]),
+            completed("true")
+        );
+        assert_eq!(
+            capture.reconcile(&[Some(true), Some(false)]),
+            completed("true")
+        );
+        assert_eq!(
+            capture.reconcile(&[Some(false), Some(false)]),
+            Reconcile::ConfirmedNotExecuted
+        );
+        assert_eq!(
+            capture.reconcile(&[Some(false), Some(true)]),
+            Reconcile::StillUnknown(
+                "frames directory /data/local/tmp/arkdeck-job-7dd23f0c724b55c0e2c644de0063493d-\
+                 capture-screen-sequence-owned-frames remains without its archive \
+                 /data/local/tmp/arkdeck-job-7dd23f0c724b55c0e2c644de0063493d-capture-screen-\
+                 sequence-owned.tar; original not resent"
+                    .into()
+            )
+        );
+        for unanswered in [
+            vec![None, Some(true)],
+            vec![Some(true), None],
+            vec![Some(false), None],
+            vec![Some(true)],
+            vec![],
+        ] {
+            assert_eq!(capture.reconcile(&unanswered), indefinite, "{unanswered:?}");
+        }
+        assert_eq!(cleanup.reconcile(&[Some(false)]), completed("false"));
+        assert_eq!(
+            cleanup.reconcile(&[Some(true)]),
+            Reconcile::ConfirmedNotExecuted
+        );
+        for unanswered in [vec![None], vec![Some(false), Some(false)], vec![]] {
+            assert_eq!(cleanup.reconcile(&unanswered), indefinite, "{unanswered:?}");
         }
     }
 

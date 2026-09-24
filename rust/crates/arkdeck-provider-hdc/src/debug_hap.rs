@@ -331,6 +331,34 @@ impl PersistedArguments<'_> {
         Ok(path)
     }
 
+    /// The owned path of a receive or a cleanup, whose persisted form does
+    /// not carry the image type of the file it names: Swift's `path()`, which
+    /// rebuilds it with the PNG suffix, and otherwise the JPEG still's own
+    /// suffix, the one other format a still is written in. A declared
+    /// difference from Swift (the maintainer's rule of 2026-09-20: a Swift
+    /// defect is fixed in Rust and declared): Swift rebuilds a JPEG still's
+    /// path as the `.png` the device never wrote and refuses the record, so
+    /// its receive can never be reconciled and its cleanup never continued as
+    /// a cleanup debt. Every record Swift reads, and every refusal, stays
+    /// Swift's: the second suffix can only differ from the first for a still,
+    /// and it too must name exactly the recorded path.
+    pub(crate) fn recorded_path(&self) -> Result<OwnedRemotePath, FileActionError> {
+        let (job, step, nonce) = (
+            self.string("jobId")?,
+            self.string("stepId")?,
+            self.string("nonce")?,
+        );
+        let path = OwnedRemotePath::new(job, step, nonce, ImageType::Png)?;
+        let recorded = self.string("remotePath")?;
+        if path.remote_path == recorded {
+            return Ok(path);
+        }
+        match OwnedRemotePath::new(job, step, nonce, ImageType::Jpeg) {
+            Ok(still) if still.remote_path == recorded => Ok(still),
+            _ => self.refuse("remote path does not match its owned components"),
+        }
+    }
+
     pub(crate) fn bundle(&self) -> Result<BundleReference, FileActionError> {
         Ok(BundleReference::new(self.string("bundleName")?)?)
     }
@@ -633,8 +661,10 @@ impl HapAction {
     ) -> Result<Option<Self>, FileActionError> {
         let persisted = PersistedArguments { kind, arguments };
         Ok(Some(match kind {
+            // A cleanup of a JPEG still is read with its own suffix (a
+            // declared difference, see `recorded_path`).
             "hdc.cleanupOwnedRemotePath" => Self::CleanupOwnedRemotePath {
-                path: persisted.path()?,
+                path: persisted.recorded_path()?,
             },
             "hdc.sendArtifactToStaging" => Self::SendArtifactToStaging(persisted.staged()?),
             "hdc.installPackage" => Self::InstallPackage {
@@ -2362,6 +2392,46 @@ mod tests {
         assert_eq!(
             HapAction::from_persisted("hdc.injectPointerInput", &Map::new()).unwrap(),
             None
+        );
+    }
+
+    /// A declared difference from Swift: a cleanup of a JPEG still is read
+    /// with the still's own suffix, and its readback probes that very file,
+    /// where Swift's `path()` rebuilds the `.png` the device never wrote and
+    /// refuses the record. A PNG still reads as before, and a path neither
+    /// suffix rebuilds is refused as Swift refuses it.
+    #[test]
+    fn a_jpeg_still_cleanup_is_read_with_its_own_suffix() {
+        let job = "job-02ff97a6ccf8d97ce49e6fecaa197f6f";
+        for image_type in [ImageType::Jpeg, ImageType::Png] {
+            let path = OwnedRemotePath::stable(job, "capture-screenshot", image_type).unwrap();
+            let cleanup = HapAction::CleanupOwnedRemotePath { path: path.clone() };
+            let (kind, arguments) = cleanup.persisted();
+            let read = HapAction::from_persisted(kind, &arguments)
+                .unwrap()
+                .unwrap();
+            assert_eq!(read, cleanup);
+            assert_eq!(
+                read.readback(),
+                Some(HapAction::ReadOwnedPathPresence { path })
+            );
+        }
+        let (kind, mut arguments) = HapAction::CleanupOwnedRemotePath {
+            path: OwnedRemotePath::stable(job, "capture-screenshot", ImageType::Jpeg).unwrap(),
+        }
+        .persisted();
+        arguments.insert(
+            "remotePath".into(),
+            json!(format!(
+                "/data/local/tmp/arkdeck-{job}-capture-screenshot-owned.gif"
+            )),
+        );
+        assert_eq!(
+            HapAction::from_persisted(kind, &arguments)
+                .unwrap_err()
+                .to_string(),
+            "unsupportedAction(\"persisted hdc.cleanupOwnedRemotePath remote path does not \
+             match its owned components\")"
         );
     }
 
