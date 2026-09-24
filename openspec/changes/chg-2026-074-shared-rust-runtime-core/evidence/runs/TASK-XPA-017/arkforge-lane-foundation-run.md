@@ -198,7 +198,23 @@ Linux and Windows workspace jobs. CI runs them, and they are the first runs of
 the deploy-key fetch on hosted runners. The wrapper has never run on Windows'
 Git Bash.
 
-**CI.** Pending.
+**CI.** PR #2151 (recorded in the next slice, M4-2b):
+
+- head `d00111de`: SDD Guard run 36044539871 success; Performance lanes run
+  36044539656 success (the harness tests; the nightly and soak jobs are not
+  push-triggered); Swift CI run 36044540324 failed in one job, the Rust
+  workspace on windows-latest, at the locked fetch: Git Bash could not set the
+  mode of the key's directory (`install: cannot change permissions of
+  'D:\\a/_temp/arkforge-ssh': Permission denied`). The policy job's fetch with
+  the deploy key, the pin check with ArkForge's vectors, deny and vet, and the
+  ubuntu-latest and macos-26 workspace jobs (their contract views included)
+  were green on that first run;
+- head `5c37914d`, with the Windows path above: SDD Guard run 36046415910
+  success; Swift CI run 36046416500 success — the `swift` aggregate,
+  `swift-tests`, `app-build`, the Rust host-independent checks and the Rust
+  workspace on all three hosts;
+- squash-merged by the coordinating session as `main` `cc5b5670`
+  (2026-09-24T19:23:16Z).
 
 No device, installed service, ArkForge daemon or App was used, and nothing
 here is device evidence.

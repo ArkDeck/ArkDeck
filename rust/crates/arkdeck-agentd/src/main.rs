@@ -62,6 +62,8 @@ const CONNECTION_IDLE: Duration = Duration::from_secs(20);
 #[cfg(target_os = "macos")]
 struct DevelopmentHdc {
     dispatch: arkdeck_provider_hdc::ProcessDispatch,
+    /// Its measured digest: the managed-control tool an ArkForge lane binds.
+    sha256: String,
     managed: Option<Arc<managed_hdc::ManagedHdc>>,
     /// Whether its digest is a registered HDC's, which it then is only as
     /// the managed server this owner started.
@@ -150,6 +152,7 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
             arkdeck_platform::VerifiedTool::open(&path, &digest)?,
             arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
         ),
+        sha256: digest,
         managed,
         registered,
     }))
@@ -251,6 +254,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // The managed server the isolated owner starts, which it stops last.
     #[cfg(target_os = "macos")]
     let mut managed_hdc = None;
+    // The ArkForge lane either owner composes, whose daemon it stops after
+    // its drain and before the managed server.
+    #[cfg(target_os = "macos")]
+    let mut arkforge = None;
     let endpoint = match std::env::var_os("ARKDECK_ENDPOINT") {
         Some(path) => LocalEndpoint::new(path),
         None => default_user_endpoint()?,
@@ -407,11 +414,6 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(
                 &root.join("jobs-state"),
             )?)
-            // Swift's device access observer: ArkForge's public socket in the
-            // lane's runtime directory beside the Job state.
-            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
-                arkforge_lane::runtime_directory(&root.join("jobs-state")),
-            ))
             // As the Swift daemon: an analyzer is configured only by naming its
             // executable, and a named path that is not one fails startup.
             .with_planning(
@@ -428,6 +430,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         let (registered, managed) = development_hdc.as_ref().map_or((false, false), |hdc| {
             (hdc.registered, hdc.managed.is_some())
         });
+        let hdc_sha256 = development_hdc.as_ref().map(|hdc| hdc.sha256.clone());
         let host = match development_hdc {
             Some(DevelopmentHdc {
                 dispatch,
@@ -466,19 +469,37 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // fixture's board is never proved by the host's devices: the census of
         // the host's I/O Registry beside the managed registered HDC, the
         // harness's file where one is named, and no device otherwise.
+        let host = host.with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+            &root,
+            development_usb::flash_census(source, file.clone()),
+            host::utc_now,
+        ));
+        // Swift's ArkForge lane beside the Job state, `root/jobs-state/arkforge`:
+        // the one `arkforged` generation a validated bundle names, paired and
+        // proved ready, or why there is none. Its device access observer and
+        // the facts' Loader observation read that directory's public socket
+        // whether or not a lane runs; the facts measure the bundle's daemon.
+        let composed = arkforge_lane::compose(
+            &root.join("jobs-state"),
+            |key| std::env::var(key).ok(),
+            hdc_sha256.as_deref(),
+        );
+        composed.report();
         let host = host
-            .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
-                &root,
-                development_usb::flash_census(source, file.clone()),
-                host::utc_now,
-            ))
             // Swift's bootloader status observer and Rockchip facts over the
-            // same root and census. No ArkForge lane is composed, so the native
-            // RockUSB identity answers that none is configured.
-            .with_flash_host_facts(arkdeck_hoststore::FlashHostFacts::new(
-                &root,
-                development_usb::flash_census(source, file),
+            // same root and census.
+            .with_flash_host_facts(
+                arkdeck_hoststore::FlashHostFacts::new(
+                    &root,
+                    development_usb::flash_census(source, file),
+                )
+                .with_rockusb(composed.rockusb())
+                .with_arkforge_loader(&composed.runtime_directory),
+            )
+            .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+                &composed.runtime_directory,
             ));
+        arkforge = Some(composed);
         // Acknowledged, and with the development HDC started as the managed
         // server, this owner proves a device mutation's state continuity
         // against its own Job state instead of the installed Runtime's root,
@@ -543,6 +564,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(managed) = composition.managed {
             managed_hdc = Some(managed);
         }
+        composition.arkforge.report();
+        arkforge = Some(composition.arkforge);
         (
             composition.host,
             composition.ingress,
@@ -731,6 +754,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     {
         let _lock = listener.stop_listening();
         serving.drain(std::time::Instant::now() + DRAIN_DEADLINE);
+        // Swift stops its ArkForge daemon next (`main.swift` 1624-1627).
+        #[cfg(target_os = "macos")]
+        if let Some(arkforge) = &arkforge {
+            arkforge.stop();
+        }
         // Swift stops its HDC host next. Unlike Swift, which lets go of its
         // instance lock at the end of the drain, the transport directory and
         // every store stay owned until the process ends, so a successor never

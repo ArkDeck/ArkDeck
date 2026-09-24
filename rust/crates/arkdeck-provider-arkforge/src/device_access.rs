@@ -8,7 +8,7 @@
 //! provider diagnostic or a USB identity: Swift answers every failure with
 //! the same words, and the Runtime does too.
 
-use arkforge_client::PublicClient;
+use arkforge_client::{DeviceObservationView, PublicClient};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
@@ -86,35 +86,53 @@ impl DeviceAccessObserver {
     /// The handshake, then `discoverDevices`: the flashing modes seen, in
     /// ArkForge's order, repeats kept.
     pub fn observe(&self) -> Result<Vec<DeviceMode>, DeviceAccessFailure> {
-        let directory = self.runtime_directory.clone();
-        let (sender, receiver) = mpsc::channel();
-        // `PublicClient` bounds only its handshake; once acknowledged it waits
-        // for an answer as long as it takes. The session therefore runs on a
-        // thread of its own and the answer is bounded here. A daemon that
-        // never answers keeps that thread until it answers or closes, but no
-        // caller waits for it.
-        std::thread::Builder::new()
-            .name("arkforge-device-access".into())
-            .spawn(move || {
-                let observed =
-                    PublicClient::connect(&directory).and_then(|mut client| client.device_list());
-                let _ = sender.send(observed);
-            })
-            .map_err(|error| DeviceAccessFailure::Client {
-                code: "SESSION_UNAVAILABLE".into(),
-                message: error.to_string(),
-            })?;
-        match receiver.recv_timeout(self.timeout) {
-            Ok(Ok(observations)) => Ok(observations
-                .iter()
-                .filter_map(|observation| DeviceMode::from_arkforge(&observation.mode))
-                .collect()),
-            Ok(Err(error)) => Err(DeviceAccessFailure::Client {
-                code: error.code,
-                message: error.message,
-            }),
-            Err(_) => Err(DeviceAccessFailure::TimedOut),
+        Ok(discover(&self.runtime_directory, self.timeout)?
+            .iter()
+            .filter_map(|observation| DeviceMode::from_arkforge(&observation.mode))
+            .collect())
+    }
+}
+
+impl std::fmt::Display for DeviceAccessFailure {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Client { code, message } => write!(f, "{code}: {message}"),
+            Self::TimedOut => f.write_str("the public session did not answer in time"),
         }
+    }
+}
+
+/// One fresh public session to the lane daemon in `runtime_directory`: the
+/// handshake, then `discoverDevices`, every observation as ArkForge reports it.
+pub(crate) fn discover(
+    runtime_directory: &Path,
+    timeout: Duration,
+) -> Result<Vec<DeviceObservationView>, DeviceAccessFailure> {
+    let directory = runtime_directory.to_path_buf();
+    let (sender, receiver) = mpsc::channel();
+    // `PublicClient` bounds only its handshake; once acknowledged it waits
+    // for an answer as long as it takes. The session therefore runs on a
+    // thread of its own and the answer is bounded here. A daemon that never
+    // answers keeps that thread until it answers or closes, but no caller
+    // waits for it.
+    std::thread::Builder::new()
+        .name("arkforge-discover".into())
+        .spawn(move || {
+            let observed =
+                PublicClient::connect(&directory).and_then(|mut client| client.device_list());
+            let _ = sender.send(observed);
+        })
+        .map_err(|error| DeviceAccessFailure::Client {
+            code: "SESSION_UNAVAILABLE".into(),
+            message: error.to_string(),
+        })?;
+    match receiver.recv_timeout(timeout) {
+        Ok(Ok(observations)) => Ok(observations),
+        Ok(Err(error)) => Err(DeviceAccessFailure::Client {
+            code: error.code,
+            message: error.message,
+        }),
+        Err(_) => Err(DeviceAccessFailure::TimedOut),
     }
 }
 

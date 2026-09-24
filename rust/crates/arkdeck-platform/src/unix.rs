@@ -160,6 +160,11 @@ impl LocalListener {
         if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             return Err(denied("another facade owns the public transport directory"));
         }
+        // Unlocked explicitly on every path from here, each refusal included:
+        // a child another thread is spawning shares this descriptor until its
+        // exec, and closing it alone would leave the directory owned through
+        // that child.
+        let lock = DirectoryLock(lock);
         match fs::symlink_metadata(endpoint.as_path()) {
             Ok(_) => {
                 validate_socket(endpoint.as_path())?;
@@ -173,7 +178,6 @@ impl LocalListener {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
-        let lock = DirectoryLock(lock);
         let mut listener = Self::bind(endpoint)?;
         listener._directory_lock = Some(lock);
         Ok(listener)

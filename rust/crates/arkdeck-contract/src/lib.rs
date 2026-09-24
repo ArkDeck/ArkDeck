@@ -1,11 +1,15 @@
 //! Pure current-contract types and encodings. No I/O or Runtime authority.
 
+/// ArkForge's release unit, as Swift's ArkForge SDK reads and verifies it.
+pub mod arkforge_bundle;
 mod canonical;
 mod debug_templates;
 pub use debug_templates::{DEBUG_TEMPLATES, DebugTemplateDefinition};
 mod catalog_generated;
 mod cbor;
 mod control_generated;
+/// Foundation's path arithmetic for inputs read from disk.
+pub mod foundation_path;
 mod framing;
 mod imports;
 mod job_state_preflight;

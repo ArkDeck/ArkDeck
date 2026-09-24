@@ -411,8 +411,10 @@ their single source, which `arkdeck debug template list` also discloses.
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 `arkdeck-provider-workspace` is the workspace provider's signing and credential
 layer and depends only on `arkdeck-platform`. `arkdeck-provider-arkforge` is the
-ArkForge lane: it reaches `arkforged` only through ArkForge's own
-`arkforge-client`, and no other crate depends on an ArkForge crate.
+ArkForge lane: it launches and pairs `arkforged` through the platform crate,
+reads its release bundle through `arkdeck-contract`, and reaches it only
+through ArkForge's own `arkforge-client`; no other crate depends on an ArkForge
+crate.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while

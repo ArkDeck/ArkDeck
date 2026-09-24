@@ -316,9 +316,7 @@ pub(crate) fn claim(layout: &Layout, started_at_utc: &str) -> Result<Claim, Stri
 /// What Swift's LaunchAgent may hand its daemon for an owner this Runtime
 /// does not compose yet (`LaunchAgentService.renderTemplate`): each one set
 /// is named at the start rather than quietly ignored.
-const UNREAD: [(&str, &str); 7] = [
-    ("ARKDECK_ARKFORGE_BUNDLE_PATH", "ArkForge lane"),
-    ("ARKDECK_ARKFORGE_CAMPAIGN", "ArkForge lane"),
+const UNREAD: [(&str, &str); 5] = [
     ("ARKDECK_ARKTRACE_DESCRIPTOR", "ArkTrace profile loader"),
     // The workspace provider is composed over the registered projects; the
     // inspector tool and the legacy environment roots are not read.
@@ -343,6 +341,9 @@ pub(crate) struct Inputs {
     pub(crate) analyzer: Option<PathBuf>,
     pub(crate) server_port: Option<String>,
     pub(crate) unread: Vec<(&'static str, &'static str)>,
+    /// The ArkForge lane's environment: its bundle, its campaign and the
+    /// retired names it refuses.
+    pub(crate) arkforge: Vec<(&'static str, String)>,
 }
 
 impl Inputs {
@@ -362,6 +363,16 @@ impl Inputs {
                 .into_iter()
                 .filter(|(name, _)| std::env::var_os(name).is_some())
                 .collect(),
+            arkforge: [
+                arkdeck_provider_arkforge::BUNDLE_PATH_KEY,
+                arkdeck_provider_arkforge::CAMPAIGN_KEY,
+            ]
+            .into_iter()
+            .chain(arkdeck_provider_arkforge::RETIRED_KEYS)
+            .filter_map(|name| {
+                std::env::var_os(name).map(|value| (name, value.to_string_lossy().into_owned()))
+            })
+            .collect(),
         })
     }
 }
@@ -433,6 +444,9 @@ pub(crate) struct Composition {
     pub(crate) host: Host,
     /// The managed HDC server it started, which the daemon stops last.
     pub(crate) managed: Option<Arc<crate::managed_hdc::ManagedHdc>>,
+    /// The ArkForge lane, or why there is none; its daemon is stopped after
+    /// the drain, before the managed HDC server.
+    pub(crate) arkforge: crate::arkforge_lane::Composed,
     /// The App ingress over the account's state root, unless its home is
     /// overridden.
     pub(crate) ingress: Option<crate::app_ingress::Configuration>,
@@ -536,19 +550,6 @@ pub(crate) fn compose(
             &layout.application_support,
             arkdeck_platform::usb_host_devices,
             crate::host::utc_now,
-        ))
-        // Swift's bootloader status observer and Rockchip facts port over the
-        // same root and census. The ArkForge lane is not ported yet, so its
-        // native RockUSB identity answers that none is configured, as Swift's
-        // does without `ARKDECK_ARKFORGE_BUNDLE_PATH`.
-        .with_flash_host_facts(arkdeck_hoststore::FlashHostFacts::new(
-            &layout.application_support,
-            arkdeck_platform::usb_host_devices,
-        ))
-        // Swift's device access observer, composed whether or not a lane is:
-        // ArkForge's public socket in `…/Agentd/arkforge`.
-        .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
-            crate::arkforge_lane::runtime_directory(&layout.state),
         ));
     // The App creates its Trace cache in its container; this Runtime reads it
     // where it is and never creates it.
@@ -566,6 +567,7 @@ pub(crate) fn compose(
     // `ARKDECK_HDC_PATH` dispatch stays refused, as Swift's does, and no
     // HDC control action is composed.
     let controls = arkdeck_hoststore::ControlActionResources::open(&layout.control_actions)?;
+    let mut hdc_sha256 = None;
     let (host, managed) = match &inputs.hdc {
         None => {
             omitted.push(
@@ -578,6 +580,7 @@ pub(crate) fn compose(
         Some(configured) => {
             let registry = arkdeck_hoststore::ToolRegistryStore::open_existing(&layout.bootstrap)?;
             let selection = registered_hdc(&registry, configured, now)?;
+            hdc_sha256 = Some(selection.executable_sha256.clone());
             let tool = || {
                 arkdeck_platform::VerifiedTool::open(
                     &selection.executable,
@@ -611,6 +614,35 @@ pub(crate) fn compose(
     // The host's I/O Registry beside the managed server started above; no
     // reader without one.
     let host = with_trusted_usb(host, managed.is_some(), UsbRegistryRelations::system());
+    // Swift's ArkForge lane beside it, over `…/Agentd/arkforge`: the one
+    // generation of `arkforged` a validated bundle names, paired and proved
+    // ready, or why there is none (`main.swift` 1118-1200). Its device access
+    // observer and the facts' Loader observation read that directory's public
+    // socket whether or not a lane runs; the facts measure the bundle's
+    // daemon as Swift's `rockchipResolver` does.
+    let arkforge = crate::arkforge_lane::compose(
+        &layout.state,
+        |key| {
+            inputs
+                .arkforge
+                .iter()
+                .find(|(name, _)| *name == key)
+                .map(|(_, value)| value.clone())
+        },
+        hdc_sha256.as_deref(),
+    );
+    let host = host
+        .with_flash_host_facts(
+            arkdeck_hoststore::FlashHostFacts::new(
+                &layout.application_support,
+                arkdeck_platform::usb_host_devices,
+            )
+            .with_rockusb(arkforge.rockusb())
+            .with_arkforge_loader(&arkforge.runtime_directory),
+        )
+        .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
+            &arkforge.runtime_directory,
+        ));
     for (name, owner) in &inputs.unread {
         omitted.push(format!(
             "{owner}: {name} is set, but this Runtime has not ported that owner yet"
@@ -631,6 +663,7 @@ pub(crate) fn compose(
     Ok(Composition {
         host,
         managed,
+        arkforge,
         ingress,
         omitted,
     })

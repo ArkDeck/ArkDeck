@@ -309,7 +309,8 @@ pub use rockchip_binding::{
 mod flash_facts;
 #[cfg(target_os = "macos")]
 pub use flash_facts::{
-    FlashHostFacts, NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity, NoArkForgeLane, RockchipFacts,
+    ArkForgeLoader, FlashHostFacts, NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity,
+    NoArkForgeLane, RockchipFacts,
 };
 mod display_names;
 mod format_time;

@@ -7,12 +7,21 @@ license.workspace = true
 publish.workspace = true
 
 [dependencies]
+arkdeck-contract.workspace = true
+arkdeck-platform.workspace = true
 arkforge-client.workspace = true
 
 [dev-dependencies]
 arkforge-authority-api.workspace = true
 arkforge-core.workspace = true
 arkforge-ipc.workspace = true
+serde_json.workspace = true
+
+# The lane launches this test binary as its stand-in `arkforged`, which must
+# take the daemon role before any test framework reads the arguments.
+[[test]]
+name = "lane"
+harness = false
 
 [lints]
 workspace = true

@@ -182,7 +182,20 @@ fn posix(result: libc::c_int) -> io::Result<()> {
     }
 }
 
-fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
+pub(super) fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
+    let (read, write) = input_pipe()?;
+    // SAFETY: nonblocking read permits bounded cancellation even if a child
+    // deliberately leaves an inherited descriptor open in a detached descendant.
+    if unsafe { libc::fcntl(read.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) } < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok((read, write))
+}
+
+/// A pipe whose read end a child reads as its stdin: both ends close on exec,
+/// and the read end blocks, as a child reading its input expects — a
+/// nonblocking flag would be shared with the child through the open file.
+pub(super) fn input_pipe() -> io::Result<(OwnedFd, OwnedFd)> {
     let mut descriptors = [-1; 2];
     // SAFETY: two valid integer output slots.
     if unsafe { libc::pipe(descriptors.as_mut_ptr()) } != 0 {
@@ -200,11 +213,6 @@ fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
         if unsafe { libc::fcntl(descriptor.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
             return Err(io::Error::last_os_error());
         }
-    }
-    // SAFETY: nonblocking read permits bounded cancellation even if a child
-    // deliberately leaves an inherited descriptor open in a detached descendant.
-    if unsafe { libc::fcntl(read.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) } < 0 {
-        return Err(io::Error::last_os_error());
     }
     Ok((read, write))
 }
@@ -225,7 +233,7 @@ pub(super) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&CStr>,
 ) -> io::Result<RunningChild> {
-    spawn_suspended(tool, args, environment, working_directory)?.resume()
+    spawn_suspended(tool, args, environment, working_directory, None)?.resume()
 }
 
 /// A child spawned on the retained inode and not yet running: it has the PID
@@ -252,11 +260,14 @@ impl SuspendedChild {
 
 /// `spawn_in` up to the moment the child would run: created suspended on the
 /// retained inode, the tool re-proved, the child returned still suspended.
+/// `stdin` is the read end of a pipe the caller keeps writing, or `/dev/null`
+/// when `None`.
 pub(super) fn spawn_suspended(
     tool: &VerifiedTool,
     args: &[OsString],
     environment: &[(OsString, OsString)],
     working_directory: Option<&CStr>,
+    stdin: Option<&OwnedFd>,
 ) -> io::Result<SuspendedChild> {
     let inode_path = inode_launch_path(tool)?;
     let (out_read, out_write) = pipe()?;
@@ -268,13 +279,23 @@ pub(super) fn spawn_suspended(
             &mut settings.actions,
             working_directory.unwrap_or(c"/").as_ptr(),
         ))?;
-        posix(libc::posix_spawn_file_actions_addopen(
-            &mut settings.actions,
-            libc::STDIN_FILENO,
-            c"/dev/null".as_ptr(),
-            libc::O_RDONLY,
-            0,
-        ))?;
+        match stdin {
+            // Only the read end crosses: every other descriptor, the write end
+            // included, closes on exec (`POSIX_SPAWN_CLOEXEC_DEFAULT`), so the
+            // caller's close is the child's end of input.
+            Some(read) => posix(libc::posix_spawn_file_actions_adddup2(
+                &mut settings.actions,
+                read.as_raw_fd(),
+                libc::STDIN_FILENO,
+            ))?,
+            None => posix(libc::posix_spawn_file_actions_addopen(
+                &mut settings.actions,
+                libc::STDIN_FILENO,
+                c"/dev/null".as_ptr(),
+                libc::O_RDONLY,
+                0,
+            ))?,
+        }
         posix(libc::posix_spawn_file_actions_adddup2(
             &mut settings.actions,
             out_write.as_raw_fd(),

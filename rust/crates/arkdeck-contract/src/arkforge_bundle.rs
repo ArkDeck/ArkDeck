@@ -7,8 +7,9 @@
 //!
 //! Paths are physical: a root is resolved with `realpath`, where Foundation's
 //! `resolvingSymlinksInPath` also drops a leading `/private` whose remainder
-//! exists (see `runtime_service.rs`).
-use crate::runtime_service::{lexical, resolved, sha256_file};
+//! exists. The CLI's `runtime service` leaves and the daemon's ArkForge lane
+//! read a bundle through this one reader.
+use crate::foundation_path::{lexical, resolved};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -19,7 +20,7 @@ const MANIFEST_SCHEMA: &str = "arkforge.release-bundle/v1";
 
 /// Swift `ArkForgeReleaseBundleError`, whose descriptions name what to fix.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) enum BundleError {
+pub enum BundleError {
     Filesystem(String),
     MalformedManifest(String),
     UnsupportedSchema(String),
@@ -165,7 +166,7 @@ fn manifest(bytes: &[u8]) -> Result<Manifest, String> {
 
 /// Swift `ArkForgeReleaseBundle`.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ReleaseBundle {
+pub struct ReleaseBundle {
     pub root: PathBuf,
     pub manifest_sha256: String,
     pub daemon: PathBuf,
@@ -191,9 +192,11 @@ fn regular_file_facts(path: &Path, relative: &str) -> Result<(u64, String), Bund
             BundleError::MissingMember(relative.to_owned())
         });
     }
-    let digest = sha256_file(path).map_err(|error| {
-        BundleError::Filesystem(format!("cannot read {}: {error}", path.display()))
-    })?;
+    let digest = fs::read(path)
+        .map(|bytes| crate::sha256_hex(&bytes))
+        .map_err(|error| {
+            BundleError::Filesystem(format!("cannot read {}: {error}", path.display()))
+        })?;
     Ok((metadata.len(), digest))
 }
 
@@ -267,7 +270,7 @@ fn reject_undeclared(
 }
 
 /// Swift `ArkForgeReleaseBundleReader.load`.
-pub(crate) fn load(bundle: &Path) -> Result<ReleaseBundle, BundleError> {
+pub fn load(bundle: &Path) -> Result<ReleaseBundle, BundleError> {
     let requested = lexical(bundle);
     let metadata = inspect(&requested)?;
     if metadata.file_type().is_symlink() {
