@@ -790,15 +790,32 @@ def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
         'rm -f "$transport"',
         "trap remove EXIT",
         'GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup',
+        # Git Bash on Windows cannot set an NTFS mode: the key goes into a
+        # directory mktemp creates for that user, pinned and checked as the
+        # auth script does, and removed on exit.
+        "MINGW* | MSYS* | CYGWIN*) windows=true ;;",
+        "credentials=$(mktemp -d)",
+        'ssh-keygen -y -f "$credentials/id_ed25519" </dev/null >/dev/null 2>&1',
+        "-o StrictHostKeyChecking=yes",
+        'rm -f "$credentials/id_ed25519" "$credentials/known_hosts"',
         "CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked",
     )
     for token in required:
         if token not in fetch_text:
             raise WorkflowContractError(f"ArkForge cargo fetch missing contract token: {token}")
-    if fetch_text.index("trap remove EXIT") > fetch_text.index(
-        'GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup'
+    if fetch_text.index("trap remove EXIT") > min(
+        fetch_text.index('GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup'),
+        fetch_text.index("credentials=$(mktemp -d)"),
     ):
         raise WorkflowContractError("ArkForge cargo fetch must arm its cleanup before setup")
+    pinned = re.search(r"readonly github_ed25519_host_key='([^']+)'", fetch_text)
+    if pinned is None or pinned.group(1) != (
+        "github.com ssh-ed25519 "
+        "AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+    ):
+        raise WorkflowContractError(
+            "ArkForge cargo fetch must pin the host key the auth script pins"
+        )
     # Nothing is built or run while the key exists, and nothing it configures
     # reaches a later step.
     for token in (
@@ -1031,6 +1048,10 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 'GITHUB_ENV="$transport" sh "$here/arkforge-package-auth.sh" setup',
                 'sh "$here/arkforge-package-auth.sh" setup',
             ),
+            # The Windows key without its host pin, or kept after the fetch.
+            fetch.replace("-o StrictHostKeyChecking=yes", "-o StrictHostKeyChecking=no"),
+            fetch.replace("AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl", "AAAA"),
+            fetch.replace('rm -f "$credentials/id_ed25519" "$credentials/known_hosts"', ":"),
             # No cleanup on exit, or cleanup armed after the key is written.
             fetch.replace("trap remove EXIT\n", ""),
             fetch.replace("trap remove EXIT\n", "").replace(

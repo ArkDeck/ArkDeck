@@ -141,6 +141,13 @@ Each is either fail-closed or T2 prose:
   - `CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked` runs with it.
   - The key is removed on exit, before any step builds or runs checked-out code.
   - `cargo fetch` itself builds nothing; every later step reads Cargo's cache.
+  - On Windows (Git Bash) the auth script cannot run: it sets modes with
+    `install -d -m 0700` and `chmod`, and NTFS refuses them there (the first CI
+    run of this PR failed so). The wrapper then writes the key itself, under
+    `umask 077`, into a directory `mktemp -d` creates for the runner's user. It
+    checks the key with `ssh-keygen -y`, pins the same GitHub host key and
+    exports the same transport, and removes both files and the directory on
+    exit. The contract test pins that the two host keys are equal.
 
 **The perf lane.** `rust-perf.yml`'s nightly and soak jobs, which build the
 daemon on schedule or dispatch, fetch the same way.
@@ -179,6 +186,7 @@ daemon on schedule or dispatch, fetch the same way.
 | Crate tests | `cargo test --no-fail-fast -p <crate>` | exit 0: `arkdeck-provider-arkforge` 7 (five against a stand-in public socket, the mode mapping, the permit vectors through ArkForge's authority API), `arkdeck-control` 29, `arkdeck-cli` 251, `arkdeck-agentd` 142; then the agentd corpus replay, 1 (`afl-test-<crate>.log`) |
 | Workflow contract | `python3 scripts/test_agent_pr_workflow.py` | exit 0; 13 tests, one of them new (`afl-workflow-tests.log`) |
 | Fetch wrapper | `scripts/ci/arkforge-cargo-fetch.sh` with a throwaway key: once over Cargo's cache, once with an empty `CARGO_HOME` | exit 0 over the cache; the cold fetch went over SSH with the throwaway key, was refused, and exited non-zero. Both runs removed the key and the transport file. The real deploy key is used only in CI |
+| Fetch wrapper, Windows path | the same over Cargo's cache with a stand-in `uname` answering `MINGW64_NT-10.0-20348`, then with an empty key | exit 0; the key and host key were written to a `mktemp -d` directory, and files and directory were removed on exit; the empty key was refused with the auth script's error. Real Git Bash is exercised only in CI |
 | Read-only host check | `rust/scripts/check-readonly.py --bin-dir <this build>` (validation venv), with the refused-parameter exchange added | PASS on macOS; 134 control responses (`afl-readonly.log`) |
 | Contract | `python3 rust/scripts/generate-contract.py --check` | exit 0; 105 methods, 980 shapes, unchanged |
 | Contract check scripts | `rust/scripts/test_contract_checks.py` | 42 tests OK (`afl-contract-checks.log`) |
