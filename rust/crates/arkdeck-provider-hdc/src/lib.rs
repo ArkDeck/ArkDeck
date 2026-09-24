@@ -110,9 +110,10 @@ pub use status::{
     published_client_version, server_endpoint_ref, unconfigured_status,
 };
 pub use target_observation::{
-    BootstrapFailure, DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations, ObservedCandidate,
-    ROCKUSB_VENDOR_ID, Reading, UsbRegistryRelations, UsbRelation, UsbRelations, adoption_holds,
-    is_dayu200_hdc_normal, list_candidates, observe_device_identity, observe_tool_version,
+    BootstrapFailure, DAYU200_LOADER_PRODUCT_ID, DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations,
+    ObservedCandidate, REGISTRY_UNAVAILABLE, ROCKUSB_VENDOR_ID, Reading, UsbRegistryRelations,
+    UsbRelation, UsbRelations, adoption_holds, is_dayu200_hdc_normal, is_dayu200_loader,
+    list_candidates, observe_device_identity, observe_tool_version, registered_dayu200_devices,
     registered_dayu200_relations, stable_identity_sha256_for_serial, usable_relations,
 };
 pub use trace_probe::{

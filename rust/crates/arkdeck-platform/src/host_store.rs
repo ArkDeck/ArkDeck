@@ -183,6 +183,20 @@ fn owner_only(file: &File, ownership: Ownership) -> io::Result<std::fs::Metadata
     Ok(metadata)
 }
 
+/// Which check of [`HostDirectory::read_owner_only_detailed`] refused a
+/// present document.
+#[derive(Debug)]
+pub enum OwnerOnlyReadFailure {
+    /// The name could not be opened: a link, a directory, any other error.
+    Open(io::Error),
+    /// Not the owner's single-link regular file of exactly mode 0600.
+    Identity,
+    /// Empty, or larger than the maximum.
+    Size,
+    /// The read failed or ended before the size the file reported.
+    Truncated,
+}
+
 /// What [`HostDirectory::create_exclusive_or_match`] found at the name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ExclusiveOutcome {
@@ -483,19 +497,39 @@ impl HostDirectory {
     /// single-link regular file of exactly owner read/write mode, opened
     /// through no link, of 1..=`maximum` bytes.
     pub fn read_owner_only(&self, name: &str, maximum: usize) -> io::Result<Option<Vec<u8>>> {
+        self.read_owner_only_detailed(name, maximum)
+            .map_err(|failure| match failure {
+                OwnerOnlyReadFailure::Open(error) => error,
+                OwnerOnlyReadFailure::Identity
+                | OwnerOnlyReadFailure::Size
+                | OwnerOnlyReadFailure::Truncated => fail(),
+            })
+    }
+
+    /// [`Self::read_owner_only`], naming which of Swift's checks refused,
+    /// in the order Swift makes them: the open, the file's identity and
+    /// mode, its size, then the read.
+    pub fn read_owner_only_detailed(
+        &self,
+        name: &str,
+        maximum: usize,
+    ) -> Result<Option<Vec<u8>>, OwnerOnlyReadFailure> {
         let file = match self.open_at(name, 0) {
             Ok(file) => file,
             Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(error),
+            Err(error) => return Err(OwnerOnlyReadFailure::Open(error)),
         };
-        let metadata = owner_only(&file, self.1)?;
+        let metadata = owner_only(&file, self.1).map_err(|_| OwnerOnlyReadFailure::Identity)?;
         if metadata.len() == 0 || metadata.len() > maximum as u64 {
-            return Err(fail());
+            return Err(OwnerOnlyReadFailure::Size);
         }
         let mut bytes = Vec::with_capacity(metadata.len() as usize);
-        (&file).take(maximum as u64 + 1).read_to_end(&mut bytes)?;
+        (&file)
+            .take(maximum as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| OwnerOnlyReadFailure::Truncated)?;
         if bytes.len() as u64 != metadata.len() {
-            return Err(fail());
+            return Err(OwnerOnlyReadFailure::Truncated);
         }
         Ok(Some(bytes))
     }

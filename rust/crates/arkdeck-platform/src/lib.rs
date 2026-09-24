@@ -159,8 +159,8 @@ pub use host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
     HostDirectory, HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource,
     HostJournal, HostJournalAppender, HostReadLock, HostUploadFile, JournalAppendError,
-    JournalWritePoint, PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval,
-    UploadChunkCheckpoint, UploadWritePoint,
+    JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, PreparedSessionRemoval,
+    PreparedTraceRemoval, UploadChunkCheckpoint, UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]

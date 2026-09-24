@@ -12,6 +12,7 @@ pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod debug_probe;
 mod debug_templates;
+mod flash_leaves;
 pub use debug_templates::debug_template_list;
 mod device_wait;
 pub use debug_probe::validate_debug_probe;
@@ -567,6 +568,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--resume-reference"
                 | "--resume-token"
                 | "--human-action"
+                | "--invocation"
                 | "--selection"
                 | "--selection-file"
                 | "--owner-kind"
@@ -635,6 +637,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--resume-reference" => "resumeReference",
                         "--resume-token" => "resumeToken",
                         "--human-action" => "humanAction",
+                        "--invocation" => "invocationId",
                         "--selection-file" => "selectionFile",
                         "--owner-kind" => "ownerKind",
                         "--maximum-wait" => "maximumWait",
@@ -767,6 +770,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["debug", "probe"] => "debug.probe",
+        ["debug", "status"] => "debug.status",
+        ["flash", "reconcile-alias"] => "flash.reconcile-alias",
+        ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
+        ["recovery", "flash-invocation", "status"] => "recovery.flash-invocation.status",
         ["debug", "template", "list"] => "debug.template.list",
         ["job", "watch"] => "job.watch",
         ["job", "plan"] => "job.plan",
@@ -934,6 +941,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     }
     let allowed: &[&str] = match command {
         "debug.probe" => &["targetId"],
+        "flash.reconcile-alias" => &["targetId", "expectedBindingRevision"],
+        "recovery.flash-invocation.list" => &["pageSize", "cursor"],
+        "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
         "artifact.import.hap"
         | "artifact.import.native-library"
         | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
@@ -1465,6 +1475,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         None
     };
     debug_probe::configure(command, &method_options, help)?;
+    // Swift's parser names the leaf a refused option belongs to.
+    flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
+        error.command = Some(command);
+        error
+    })?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(device_wait_timeout)
         .or(watch_timeout)
@@ -1500,6 +1515,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "device.observations"
         } else if command == "job.watch" {
             "job.events"
+        } else if command == "recovery.flash-invocation.status" {
+            // Swift's handler reads the invocation through `debug.status`, the
+            // wire method `debug status` also sends.
+            "debug.status"
         } else {
             command
         },
@@ -1574,6 +1593,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "control-action.list"
                     | "control-action.show"
                     | "control-action.reconcile"
+                    | "flash.reconcile-alias"
+                    | "recovery.flash-invocation.list"
+                    | "recovery.flash-invocation.status"
+                    | "debug.status"
             )
         {
             Some(method_options)
@@ -1590,6 +1613,31 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         socket,
         timeout_ms,
     })
+}
+
+/// Swift `CLIResultEnvelope.withLifecycle`: a leaf the registry does not
+/// publish as current says so in `meta.lifecycle` of every machine answer, so
+/// a caller can tell it is driving a compatibility surface.
+pub fn with_lifecycle(mut envelope: Value, command: &str) -> Value {
+    if let Some((status, replacement)) = command_registry::lifecycle(command) {
+        envelope["meta"]["lifecycle"] = json!({
+            "status": status,
+            "replacementArgvPattern": replacement,
+            "removalVersion": null,
+        });
+    }
+    envelope
+}
+
+/// Swift `CLIRuntimeSession.warnIfLegacy`: the human rendering's warning for
+/// a leaf the registry does not publish as current, on stderr.
+pub fn legacy_warning(command: &str) -> Option<String> {
+    let (status, replacement) = command_registry::lifecycle(command)?;
+    let mut text = format!("warning: `{}` is {status}", command.replace('.', " "));
+    if let Some(replacement) = replacement {
+        text.push_str(&format!("; use `{replacement}`"));
+    }
+    Some(text)
 }
 
 /// A result no Runtime answered (Swift `CLIResultEnvelope.success`): its

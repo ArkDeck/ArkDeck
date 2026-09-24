@@ -160,8 +160,14 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
                 | "target.display-name.clear"
                 | "device.display-name.set"
                 | "device.display-name.clear"
+                // Swift's daemon without its Flash invocation owner.
+                | "debug.status"
+                | "recovery.flash-invocation.list"
         ) {
             "internalError"
+        } else if *method == "flash.reconcile-alias" {
+            // Swift reads the reconciler's parameters before its owner.
+            "invalidParams"
         } else {
             "rejected"
         };

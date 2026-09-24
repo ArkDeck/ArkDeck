@@ -140,6 +140,9 @@ pub(crate) struct Layout {
     pub(crate) control_actions: PathBuf,
     pub(crate) hdc_control_actions: PathBuf,
     pub(crate) workspace_projects: PathBuf,
+    /// `…/Application Support/ArkDeck`, the state directory's parent: where
+    /// Swift keeps the Rockchip bindings, the post-flash alias among them.
+    pub(crate) application_support: PathBuf,
     /// `…/ArkDeck/Sessions`, the default Session root.
     pub(crate) sessions: PathBuf,
     /// `…/ArkDeck/Bootstrap/v1`: the tool, bundle and DevEco registries.
@@ -172,6 +175,7 @@ impl Layout {
             workspace_projects: state.join("workspace-projects"),
             sessions: product.join("Sessions"),
             bootstrap: product.join("Bootstrap/v1"),
+            application_support: product,
             trace_cache: home
                 .join("Library/Containers")
                 .join(APP_BUNDLE)
@@ -190,7 +194,7 @@ impl Layout {
 
     /// Every root below the home, by name.
     #[cfg(test)]
-    pub(crate) fn roots(&self) -> [(&'static str, &Path); 13] {
+    pub(crate) fn roots(&self) -> [(&'static str, &Path); 14] {
         [
             ("state", &self.state),
             ("socket", &self.socket),
@@ -202,6 +206,7 @@ impl Layout {
             ("controlActions", &self.control_actions),
             ("hdcControlActions", &self.hdc_control_actions),
             ("workspaceProjects", &self.workspace_projects),
+            ("applicationSupport", &self.application_support),
             ("sessions", &self.sessions),
             ("bootstrap", &self.bootstrap),
             ("traceCache", &self.trace_cache),
@@ -519,7 +524,19 @@ pub(crate) fn compose(
                 .as_deref()
                 .map(arkdeck_hoststore::AnalyzerProfile::crash_signature)
                 .transpose()?,
-        );
+        )
+        // Swift's Flash invocation owner keeps its documents beside the Job
+        // state it runs through, and creates their directories at its start;
+        // its post-flash alias reconciler repairs the alias of the
+        // Application Support root against the host's I/O Registry, as
+        // Swift's `RockchipProductUSBProbe` reads it (the maintainer's
+        // decision Q1=B of 2026-09-24).
+        .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(&layout.state)?)
+        .with_flash_alias_reconciler(arkdeck_hoststore::FlashAliasReconciler::new(
+            &layout.application_support,
+            arkdeck_platform::usb_host_devices,
+            crate::host::utc_now,
+        ));
     // The App creates its Trace cache in its container; this Runtime reads it
     // where it is and never creates it.
     let host = match arkdeck_hoststore::TraceCacheStore::open(&layout.trace_cache) {

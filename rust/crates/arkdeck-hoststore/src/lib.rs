@@ -287,6 +287,14 @@ pub use post_flash_alias::{
 };
 #[cfg(target_os = "macos")]
 pub use post_flash_alias_store::PostFlashAliasStore;
+#[cfg(target_os = "macos")]
+mod flash_alias_reconcile;
+#[cfg(target_os = "macos")]
+pub use flash_alias_reconcile::{FlashAliasReconciler, UsbCensus};
+#[cfg(target_os = "macos")]
+mod flash_invocations;
+#[cfg(target_os = "macos")]
+pub use flash_invocations::{FlashInvocations, MAXIMUM_DESTRUCTIVE_EPOCHS};
 mod display_names;
 mod format_time;
 pub use display_names::decode_display_names;

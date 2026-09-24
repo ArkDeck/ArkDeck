@@ -781,7 +781,12 @@ fn main() -> std::process::ExitCode {
         Err(error) => {
             if machine {
                 let command = error.command.unwrap_or("registry.parse");
-                if write_document(&failure_envelope(command, &error, parse_id, false)).is_err() {
+                if write_document(&arkdeck_cli::with_lifecycle(
+                    failure_envelope(command, &error, parse_id, false),
+                    command,
+                ))
+                .is_err()
+                {
                     return 74.into();
                 }
             } else {
@@ -867,6 +872,15 @@ fn main() -> std::process::ExitCode {
     if invocation.command.starts_with("runtime.service.") {
         return serve_runtime_service(&invocation, id);
     }
+    // Swift `warnIfLegacy`: a compatibility leaf says so on stderr before
+    // its request, in the human rendering only.
+    if !invocation.json
+        && !invocation.jsonl
+        && !invocation.legacy_json
+        && let Some(warning) = arkdeck_cli::legacy_warning(invocation.command)
+    {
+        eprintln!("{warning}");
+    }
     match execute(&invocation, id) {
         Ok(result) => {
             // Evidence and a result are successful queries even when their
@@ -906,7 +920,12 @@ fn main() -> std::process::ExitCode {
                     return 74.into();
                 }
             } else if invocation.json {
-                if write_document(&success_envelope(invocation.command, result, id)).is_err() {
+                if write_document(&arkdeck_cli::with_lifecycle(
+                    success_envelope(invocation.command, result, id),
+                    invocation.command,
+                ))
+                .is_err()
+                {
                     return 74.into();
                 }
             } else {
@@ -922,7 +941,11 @@ fn main() -> std::process::ExitCode {
         }
         Err(error) => {
             if invocation.json {
-                if write_document(&failure_envelope(invocation.command, &error, id, true)).is_err()
+                if write_document(&arkdeck_cli::with_lifecycle(
+                    failure_envelope(invocation.command, &error, id, true),
+                    invocation.command,
+                ))
+                .is_err()
                 {
                     return 74.into();
                 }
