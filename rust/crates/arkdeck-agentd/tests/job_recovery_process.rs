@@ -132,6 +132,7 @@ fn the_isolated_daemon_recovers_a_parked_job_at_start_and_reconciles_it() {
                 analyzer: Some(&profile),
                 state_root: &root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: arkdeck_hoststore::runtime_now,
@@ -154,6 +155,7 @@ fn the_isolated_daemon_recovers_a_parked_job_at_start_and_reconciles_it() {
             cancellation: None,
             after_commit: None,
             hdc: None,
+            workspace: None,
         }
         .handle(&Map::from_iter([("jobId".into(), json!(job))]))
         .unwrap();

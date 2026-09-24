@@ -157,6 +157,7 @@ impl Owners {
                 analyzer: Some(&self.profile),
                 state_root: &fixture.root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &self.jobs,
             now: || Some(NOW.into()),

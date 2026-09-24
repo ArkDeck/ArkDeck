@@ -49,6 +49,7 @@ impl<'a> JobPlanner<'a> {
             "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
             _import_use: None,
+            _workspace_use: None,
             artifact_facts: BTreeMap::new(),
             digest: sha256_hex(&session_json::encode(&document).map_err(|_| internal_failure())?),
             identity: Some(facts.identity.clone()),

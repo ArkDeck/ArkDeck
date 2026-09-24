@@ -340,6 +340,7 @@ impl<'a> JobRunner<'a> {
             analyzer: self.analyzer,
             state_root: owner.state_root,
             hdc: self.hdc,
+            workspace: None,
         };
         let fresh = planner
             .materialized(&request, descriptor)

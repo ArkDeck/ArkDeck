@@ -330,6 +330,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("agent-executions"),
                 root.join("human-action-snapshots"),
                 root.join("control-action-snapshots"),
+                root.join("evolution-workspaces"),
             ]
             .into_iter()
             .chain(managed_server.then(|| root.join("hdc-control-actions")))
@@ -348,6 +349,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 arkdeck_hoststore::WorkspaceProjectStore::open(&root.join("workspace-projects"))?
                     .with_dependency_pinning(Some(host::toolchain_pinning(&bootstrap)?), None),
             )
+            // Swift composes the registered projects over its state directory,
+            // whose `evolution-workspaces` holds the Runtime-owned copies.
+            .with_workspace_operations(&root)?
             .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
             .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
             .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)

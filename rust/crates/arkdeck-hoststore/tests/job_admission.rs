@@ -157,6 +157,7 @@ fn rust_admissions_reproduce_the_swift_oracle() {
                 analyzer: (case["engine"] != "unconfigured").then_some(&profile),
                 state_root: &root,
                 hdc: None,
+                workspace: None,
             },
             jobs: &jobs,
             now: fixed_now,

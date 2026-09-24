@@ -218,6 +218,15 @@ impl CatalogOperation {
         self.default_policy_issuance
     }
 
+    /// Swift's `minimumEffect == .destructive || permittedEffects.contains(.destructive)`.
+    pub(crate) fn permits_destructive(&self) -> bool {
+        self.minimum_effect == "destructive"
+            || self
+                .permitted_effects
+                .iter()
+                .any(|effect| effect == "destructive")
+    }
+
     /// Swift `CatalogOperationDescriptor.binding`: `none` for an operation
     /// that binds no device, otherwise the binding its steps require.
     pub(crate) fn binding(&self) -> &str {

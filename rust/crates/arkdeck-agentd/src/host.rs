@@ -103,7 +103,11 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
     #[cfg(target_os = "macos")]
-    workspace_projects: Option<arkdeck_hoststore::WorkspaceProjectStore>,
+    workspace_projects: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceProjectStore>>,
+    /// The workspace provider composed over the registered projects, which a
+    /// workspace Job plans, admits and runs through.
+    #[cfg(target_os = "macos")]
+    workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
     #[cfg(target_os = "macos")]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
     #[cfg(target_os = "macos")]
@@ -538,6 +542,7 @@ impl Host {
         let default_mutation_root = self.default_mutation_root.clone();
         let capabilities = self.capabilities.clone();
         let holds = self.holds.clone();
+        let workspace = self.workspace.clone();
         let state_root = self.planning.as_ref().map(|(root, _)| root.clone());
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
@@ -597,6 +602,7 @@ impl Host {
                     cancellation: Some(&slot.cancellation),
                     after_commit: None,
                     hdc: hdc.as_ref(),
+                    workspace: workspace.as_deref(),
                 }
                 .handle(&params)
                 .map_err(|refusal| WireError {
@@ -659,8 +665,37 @@ impl Host {
         mut self,
         store: arkdeck_hoststore::WorkspaceProjectStore,
     ) -> Self {
-        self.workspace_projects = Some(store);
+        self.workspace_projects = Some(std::sync::Arc::new(store));
         self
+    }
+    /// Swift's composition root over the registered workspace projects: each
+    /// resolved to its profile, the Runtime-owned copies under `state_root`
+    /// adopted again, the registered generations marked applied. A copy that
+    /// cannot be vouched for is reported, as Swift reports it, and stays
+    /// unresolvable. Without the project owner nothing is composed.
+    #[cfg(target_os = "macos")]
+    pub fn with_workspace_operations(
+        mut self,
+        state_root: &std::path::Path,
+    ) -> Result<Self, String> {
+        let Some(projects) = self.workspace_projects.clone() else {
+            return Ok(self);
+        };
+        let (composition, unadopted) = arkdeck_hoststore::WorkspaceComposition::compose(
+            projects,
+            state_root,
+            &self.home,
+            arkdeck_hoststore::runtime_now,
+        )?;
+        for failure in &unadopted {
+            println!("runtime workspace not adopted for {failure}");
+        }
+        if !unadopted.is_empty() {
+            use std::io::Write;
+            let _ = std::io::stdout().flush();
+        }
+        self.workspace = Some(std::sync::Arc::new(composition));
+        Ok(self)
     }
     #[cfg(target_os = "macos")]
     pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
@@ -682,6 +717,7 @@ impl Host {
             ("storage", self.storage.is_some()),
             ("history", self.history.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("workspaceOperations", self.workspace.is_some()),
             ("bootstrap", self.bootstrap.is_some()),
             ("planning", self.planning.is_some()),
             (
@@ -741,6 +777,8 @@ impl Host {
             history: None,
             #[cfg(target_os = "macos")]
             workspace_projects: None,
+            #[cfg(target_os = "macos")]
+            workspace: None,
             #[cfg(target_os = "macos")]
             trace_cache: None,
             #[cfg(target_os = "macos")]
@@ -1103,6 +1141,7 @@ impl HostServices for Host {
                 analyzer: analyzer.as_ref(),
                 state_root,
                 hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
             },
             jobs,
             now: arkdeck_hoststore::runtime_now,
@@ -1314,6 +1353,7 @@ impl HostServices for Host {
             analyzer: analyzer.as_ref(),
             state_root,
             hdc: hdc.as_ref(),
+            workspace: self.workspace.as_deref(),
         }
         .handle(params)
         // Planning never admits: every refusal is pre-admission with zero dispatch.
@@ -1347,6 +1387,7 @@ impl HostServices for Host {
                 analyzer: analyzer.as_ref(),
                 state_root,
                 hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
             },
             jobs,
             now: arkdeck_hoststore::runtime_now,
@@ -1434,6 +1475,7 @@ impl HostServices for Host {
                 cancellation,
                 after_commit: None,
                 hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
             }
             .handle(params)
             .map_err(|refusal| WireError {
@@ -1580,6 +1622,7 @@ impl HostServices for Host {
             cancellation: None,
             after_commit: None,
             hdc: hdc.as_ref(),
+            workspace: self.workspace.as_deref(),
         }
         .continue_cleanup_debt(params)
     }
@@ -1717,6 +1760,7 @@ impl HostServices for Host {
                     cancellation: None,
                     after_commit: None,
                     hdc: hdc.as_ref(),
+                    workspace: self.workspace.as_deref(),
                 });
         let reconciler = arkdeck_hoststore::JobReconciler {
             jobs,
@@ -2094,9 +2138,12 @@ impl HostServices for Host {
             // uncertain workspace Job names it; without the Job owner nothing
             // proves that none does.
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
-                (Some(jobs), WorkspaceReference::Project(project)) => {
-                    jobs.require_no_active_workspace_project_reference(project)
-                }
+                (Some(jobs), WorkspaceReference::Project(project)) => jobs
+                    .require_no_active_workspace_project_reference(project, &|reference| {
+                        self.workspace
+                            .as_ref()
+                            .and_then(|workspace| workspace.registration_project_ref(reference))
+                    }),
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)
                 }

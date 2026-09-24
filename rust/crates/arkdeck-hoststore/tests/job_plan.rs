@@ -176,6 +176,7 @@ fn rust_plans_reproduce_the_swift_oracle() {
             analyzer: (case["engine"] != "unconfigured").then_some(&profile),
             state_root: &root,
             hdc: None,
+            workspace: None,
         }
         .handle(&params);
         restore();
@@ -228,6 +229,7 @@ fn a_request_json_that_is_not_text_is_refused_as_an_empty_one() {
         analyzer: None,
         state_root: Path::new(ROOT),
         hdc: None,
+        workspace: None,
     };
     for value in [json!(7), json!(null), json!(["{}"]), json!("")] {
         let refusal = planner
@@ -258,6 +260,7 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         analyzer: Some(&profile),
         state_root: &root,
         hdc: None,
+        workspace: None,
     };
     let device_request = |operation: &str, key: &str| {
         let request = json!({

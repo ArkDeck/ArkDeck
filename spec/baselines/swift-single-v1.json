@@ -265,28 +265,28 @@
     },
     "job.reconcile": {
       "errors": 3,
-      "requests": 9,
-      "successes": 6
+      "requests": 10,
+      "successes": 7
     },
     "job.result": {
       "errors": 5,
-      "requests": 31,
-      "successes": 26
+      "requests": 32,
+      "successes": 27
     },
     "job.run": {
       "errors": 3,
-      "requests": 9,
-      "successes": 6
+      "requests": 10,
+      "successes": 7
     },
     "job.show": {
       "errors": 2,
-      "requests": 25,
-      "successes": 23
+      "requests": 26,
+      "successes": 24
     },
     "job.status": {
       "errors": 2,
-      "requests": 13,
-      "successes": 11
+      "requests": 14,
+      "successes": 12
     },
     "job.submit": {
       "errors": 7,
@@ -531,15 +531,15 @@
   },
   "corpusRecordCounts": {
     "errors": 435,
-    "requests": 953,
-    "successes": 518
+    "requests": 958,
+    "successes": 523
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "c36e25df017b306efa074865fa0fda1822cd71f5b3f3c8733dd12fc451614a8d",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "867e91404ae098d6fe353e59e311bfa39f88450d3e692fb917818fd5cdc50398",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "e04cefe84b22b78760cfb79c02a63c810a24f7f4450f60490aadaad233a7d774"
+    "spec/control/methods": "008e150af2e024ea80205ed3dc86d7089ced72607b02fd2a09681584a864b4a9"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -923,24 +923,24 @@
       "sha256": "268d55472b0d9a630f14c31f36204ebf7ea911228c4a500dd674d3535258dc55"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.reconcile.jsonl": {
-      "blob": "7477956b83040d02029e8f2a98d96f97db8323b1",
-      "sha256": "1e47fd532f029af8e13bbfcf5fb8b8bf86a9d84ac8b600844552f93d6091bd87"
+      "blob": "bf731c8afb85e73cf117c6e2cabc1934faf2af07",
+      "sha256": "a24046fe0acd5a319ec750ac87aa21867e4670b7304dec4437a39e5e45cc404f"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl": {
-      "blob": "538a43c593fe6bfd1bc3ba71aaec974c1b997bc0",
-      "sha256": "b951c0903788f7d202ca59b75111eceb037467873084a3355a971bd2914ba675"
+      "blob": "4dc703d95db5023b6cb6c5f202a975ad008c90f2",
+      "sha256": "268f11223f83578b6819ff6239da8d6ae8ef3d96b7fd1ad5537f750982c8a9ae"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl": {
-      "blob": "2f49d25760c03428d9d0d1743e54bb5bd460e963",
-      "sha256": "8b7ae038393ff97740319b8f0665288066304e43075fdd132822c3464856ebc6"
+      "blob": "aa9cc13d7cb290b72ff2c9c9f96454c08c175986",
+      "sha256": "065562471c299d8920b1482fd60b5b4e610586f17cb9dc896e97771d6b4a905e"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl": {
-      "blob": "6095fe484a0ba97310253551a792e70d38befd96",
-      "sha256": "6c16422084312659d2be071fe29e1df6c26a981aadb2d4b2e270bfcd08dd06b5"
+      "blob": "68da3bded9646accf620206f3bde0af8aace2691",
+      "sha256": "5b4cda4de44ccab64c58e1aa20e50e899f36ffebf781d32ad5fbb207d93edfb9"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl": {
-      "blob": "21a9e24318fb370995bfc359f613a94c14e6a88d",
-      "sha256": "c85368037f1e60caa6ab1cef4023e25fe18541de295aca9ffd59496fde437206"
+      "blob": "832ee6867c19fd9cde72649cba5014b75fe924dd",
+      "sha256": "481702de75b6acc374a2099d98103741ee5b1d1b56034097e133c160688db938"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.submit.jsonl": {
       "blob": "bbd6eb2d00139025df83c886c80a6e4ad7c5df55",
@@ -1519,24 +1519,24 @@
       "sha256": "52619ff1529ec167fa96ff57742ce371350a006b8a13d45deb43f66a597519c5"
     },
     "spec/control/methods/job.reconcile.json": {
-      "blob": "fa80e0a42e6d84abd1186fe014fbb3323006e766",
-      "sha256": "e0ce15254b9944c181112f70e5b2f06f191d91f85bc0c95df29e7365ad7632ef"
+      "blob": "1431fac480f4ff8947086633c20593f53c94a7b7",
+      "sha256": "ec454c42abe2de913848aab367c64c1fe99a091f1b50f6511db736897a75a57b"
     },
     "spec/control/methods/job.result.json": {
-      "blob": "c0eee8200088a353e54a4991ab10d27ffb33c68f",
-      "sha256": "f48869899adabba084bc17f18e559de3d199df53d56077c18510b09e1c34be64"
+      "blob": "2443a5e8ca37f46259a2f98735883f03aa224ac0",
+      "sha256": "665106d5b67313782b687897b92995ee68d0b052f794f4a696a63dea8aae48eb"
     },
     "spec/control/methods/job.run.json": {
-      "blob": "42e732c1afb983365f957ac1346ca44557db31e8",
-      "sha256": "5d7be98aa38e0104f77cc74a3a7900f6b4633545201856efcf8c2f4526c4e89b"
+      "blob": "59a29bca2ca5524d609aed4d52643051884a5572",
+      "sha256": "9e19d30b1b7409d627e87b05ab9dafd8df6d2b691956f166e862d7f7829676af"
     },
     "spec/control/methods/job.show.json": {
-      "blob": "7cb0e64108dcdb2f6c9a1b1a519b7b2198b6e428",
-      "sha256": "0803164e7e73db56538f874a48d9b2a45fc0a8318fd6e4607f4c42de6cf74bbb"
+      "blob": "83eba07c3c6e33f79c0a8df781b10094d2e1ff30",
+      "sha256": "b0863b3c645cbdc93b9ca7feb3a57b6ad0e0f28110a723b6ef01f3e5eeaf67bf"
     },
     "spec/control/methods/job.status.json": {
-      "blob": "cae6815dc3ea89c184b7b2991d2e8b03c27c0754",
-      "sha256": "de4c33279c50caef4de91282eb7ccf415cca5cceabe94d97aeb6c6e8faba32e7"
+      "blob": "75b9160ee15e57e8e09fcf2f0fddedcb9912f72b",
+      "sha256": "d9ce775e3de6f98c76040a8d6b6e2891ab4101cf6d78d6fc230e61f8efad72da"
     },
     "spec/control/methods/job.submit.json": {
       "blob": "9262eb4565c8b7f25f3d97c7e0e2390804ff3cf1",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "a93c75bddd4486a590021d3549579efae90e9b240d87c2fa7018d0d0aa53afb2",
+  "inputDigest": "490801d7055ed6d4e179f48bed67454271627c40e7e84dbbe5956bdf05416782",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

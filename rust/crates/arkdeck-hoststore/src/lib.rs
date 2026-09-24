@@ -9,8 +9,21 @@ mod workspace_project;
 #[cfg(target_os = "macos")]
 pub use workspace_project::{
     CredentialAcquire, PinPair, PinningResult, ToolchainAcquire, WorkspaceCredentialPinning,
-    WorkspaceProjectStore, WorkspaceReference, WorkspaceToolchainPinning,
+    WorkspaceProjectStore, WorkspaceReference, WorkspaceStartupRecord, WorkspaceToolchainPinning,
+    WorkspaceUse,
 };
+#[cfg(target_os = "macos")]
+mod workspace_composition;
+#[cfg(target_os = "macos")]
+pub use workspace_composition::WorkspaceComposition;
+#[cfg(target_os = "macos")]
+mod workspace_isolation;
+#[cfg(target_os = "macos")]
+mod workspace_profile;
+#[cfg(target_os = "macos")]
+pub use workspace_profile::{ProfilePresets, WorkspaceCommandPreset, WorkspaceProfile};
+#[cfg(target_os = "macos")]
+mod workspace_support;
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 

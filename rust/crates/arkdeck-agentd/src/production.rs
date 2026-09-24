@@ -315,19 +315,18 @@ const UNREAD: [(&str, &str); 7] = [
     ("ARKDECK_ARKFORGE_BUNDLE_PATH", "ArkForge lane"),
     ("ARKDECK_ARKFORGE_CAMPAIGN", "ArkForge lane"),
     ("ARKDECK_ARKTRACE_DESCRIPTOR", "ArkTrace profile loader"),
-    (
-        "ARKDECK_WORKSPACE_INSPECTOR",
-        "workspace operations provider",
-    ),
+    // The workspace provider is composed over the registered projects; the
+    // inspector tool and the legacy environment roots are not read.
+    ("ARKDECK_WORKSPACE_INSPECTOR", "workspace source inspector"),
     (
         "ARKDECK_WORKSPACE_PROJECTS",
-        "workspace operations provider",
+        "legacy workspace project roots",
     ),
     (
         "ARKDECK_WORKSPACE_ACTIVE_PROJECT",
-        "workspace operations provider",
+        "legacy workspace project roots",
     ),
-    ("ARKDECK_DEVECO_SDK_HOME", "workspace operations provider"),
+    ("ARKDECK_DEVECO_SDK_HOME", "legacy workspace project roots"),
 ];
 
 /// What Swift's LaunchAgent hands its daemon that this composition reads —
@@ -484,6 +483,9 @@ pub(crate) fn compose(
                     None,
                 ),
         )
+        // Swift's registered projects over its state directory, whose
+        // `evolution-workspaces` holds the Runtime-owned copies.
+        .with_workspace_operations(&layout.state)?
         .with_imports(arkdeck_hoststore::ImportUploadStore::open(
             &layout.artifacts,
         )?)

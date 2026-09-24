@@ -186,6 +186,7 @@ fn replay(name: &str, after: impl FnOnce(Plan<'_>)) {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let runner = JobRunner {
         imports: None,
@@ -201,6 +202,7 @@ fn replay(name: &str, after: impl FnOnce(Plan<'_>)) {
         cancellation: None,
         after_commit: None,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let reader = JobResultReader {
         jobs: &jobs,
@@ -409,6 +411,7 @@ fn replay_under_mutation_authority(name: &str) {
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let runner = JobRunner {
         imports: None,
@@ -427,6 +430,7 @@ fn replay_under_mutation_authority(name: &str) {
         cancellation: None,
         after_commit: None,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let reader = JobResultReader {
         jobs: &jobs,

@@ -279,6 +279,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         cancellation: None,
         after_commit: None,
         hdc: Some(&hdc),
+        workspace: None,
     };
     let mut recovered = 0;
     for (id, state) in rows(&owners.jobs)? {
@@ -337,6 +338,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
                 analyzer: None,
                 state_root: root,
                 hdc: Some(&hdc),
+                workspace: None,
             },
             jobs: &owners.jobs,
             now: runtime_now,

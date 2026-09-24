@@ -32,25 +32,26 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
   private static let oracle = repository.appending(
     path: "rust/tests/fixtures/workspace-isolation-oracle", directoryHint: .isDirectory)
   private static let recordVariable = "ARKDECK_RUST_WORKSPACE_ISOLATION_RECORD"
-  /// A fixed root: the profile pins the source tree by path.
-  private static let root = URL(
+  /// The recording's fixed root: the profile pins the source tree by path.
+  private static let oracleRoot = URL(
     filePath: "/private/tmp/arkdeck-workspace-isolation-oracle", directoryHint: .isDirectory)
+  /// The read-back's own fixed root. SwiftPM's parallel runner may run this
+  /// class's tests at the same time, each in its own process, so no two tests
+  /// share a root, and none is emptied or removed except by the test naming it.
+  private static let statusRoot = URL(
+    filePath: "/private/tmp/arkdeck-workspace-isolation-status", directoryHint: .isDirectory)
   private static let timestamp = "2026-09-20T00:00:00.000Z"
-
-  override func setUpWithError() throws {
-    try? FileManager.default.removeItem(at: Self.root)
-    try FileManager.default.createDirectory(
-      at: Self.root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-  }
+  /// The running test's root, emptied by `stack(in:)` and removed after it.
+  private var root: URL?
 
   override func tearDownWithError() throws {
-    try? FileManager.default.removeItem(at: Self.root)
+    if let root { try? FileManager.default.removeItem(at: root) }
   }
 
   // MARK: The source project and the Runtime around it
 
-  private func sourceTree() throws -> URL {
-    let source = Self.root.appending(path: "source", directoryHint: .isDirectory)
+  private func sourceTree(in root: URL) throws -> URL {
+    let source = root.appending(path: "source", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: source.appending(path: "Sources", directoryHint: .isDirectory),
       withIntermediateDirectories: true)
@@ -76,30 +77,36 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
       buildPresets: [:], testPresets: [:], symbolPresets: [:])
   }
 
-  private func stack() throws -> (RuntimeControlPlaneHandler, EvolutionWorkspaceManager, URL) {
-    let source = try sourceTree()
+  private func stack(in root: URL) throws -> (
+    RuntimeControlPlaneHandler, EvolutionWorkspaceManager, URL
+  ) {
+    self.root = root
+    try? FileManager.default.removeItem(at: root)
+    try FileManager.default.createDirectory(
+      at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    let source = try sourceTree(in: root)
     let profile = try profile(root: source)
     let registry = WorkspaceProjectProfileRegistry(profile: profile)
-    let evolution = Self.root.appending(path: "evolution-workspaces", directoryHint: .isDirectory)
+    let evolution = root.appending(path: "evolution-workspaces", directoryHint: .isDirectory)
     let manager = try EvolutionWorkspaceManager(rootURL: evolution, profileRegistry: registry)
     let provider = WorkspaceOperationsProvider(
       profile: profile, profileRegistry: registry,
       attemptStore: try WorkspacePatchAttemptStore(
-        rootURL: Self.root.appending(path: "workspace-patch-attempts", directoryHint: .isDirectory)),
+        rootURL: root.appending(path: "workspace-patch-attempts", directoryHint: .isDirectory)),
       isolationManager: manager, nowUTC: { Self.timestamp })
     let dispatcher = RuntimeOwnedWorkspaceDispatcher(
       fallback: DescriptorBoundProcessDispatcher(
         resolver: WorkspaceActionExecutableResolver(profile: profile)),
       manager: manager)
     let capabilities = try RuntimeCapabilityStore(
-      directoryURL: Self.root.appending(path: "capabilities", directoryHint: .isDirectory))
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
     let artifacts = try RuntimeArtifactStore(
-      rootURL: Self.root.appending(path: "artifacts", directoryHint: .isDirectory),
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { Self.timestamp })
     let providers = DeviceProviderRegistry(providers: [provider])
     let engine = try RuntimeJobEngine(
       configuration: .init(
-        stateDirectory: Self.root.appending(path: "engine", directoryHint: .isDirectory)),
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
       providers: providers,
       dispatcher: RuntimeProcessDispatcherRouter(
         hdc: dispatcher, rockchip: dispatcher, workspace: dispatcher),
@@ -110,7 +117,7 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
       providerIDs: providers.registeredProviderIDs, nowUTC: { Self.timestamp },
       targetStore: nil, bootstrap: nil, targetObservations: nil,
       hdcRuntimeDiagnostics: nil, artifactStore: artifacts, historyFilterStore: nil,
-      flashBundleImportDirectory: Self.root.appending(
+      flashBundleImportDirectory: root.appending(
         path: "flash-bundle-imports", directoryHint: .isDirectory),
       flashBundleImportPolicy: .production,
       flashPrerequisiteObserver: nil, flashLanePlanPreviewer: nil,
@@ -131,7 +138,7 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
   // MARK: The recording
 
   func testTheControlPlanePreparesOneIsolatedCopyAsRecorded() async throws {
-    let (handler, manager, source) = try stack()
+    let (handler, manager, source) = try stack(in: Self.oracleRoot)
     let profile = try profile(root: source)
     let revision = try WorkspaceProviderSupport.workspaceRevision(
       root: profile.projectRoot, profileVersion: profile.profileID,
@@ -168,11 +175,11 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
 
     // The copy the Runtime owns afterwards.
     let workspaces = try FileManager.default.contentsOfDirectory(
-      atPath: Self.root.appending(path: "evolution-workspaces").path
+      atPath: Self.oracleRoot.appending(path: "evolution-workspaces").path
     ).filter { $0.hasPrefix("evo-") }.sorted()
     XCTAssertEqual(workspaces.count, 1, "one isolated copy")
     guard let workspaceID = workspaces.first else { return }
-    let copy = Self.root.appending(path: "evolution-workspaces/\(workspaceID)")
+    let copy = Self.oracleRoot.appending(path: "evolution-workspaces/\(workspaceID)")
     let manifest = try Data(contentsOf: copy.appending(path: "workspace.json"))
     let tree = try Self.tree(at: copy.appending(path: "workspace", directoryHint: .isDirectory))
     // The copy holds the whole profile scope; the request's narrower globs
@@ -236,6 +243,49 @@ final class WorkspaceIsolationOracleContractTests: XCTestCase {
     XCTAssertEqual(
       recordedTree["entries"],
       .array(tree.map { .object(["path": .string($0.0), "sha256": .string($0.1)]) }))
+  }
+
+  /// The same Job read back through the Job status surfaces. A workspace
+  /// operation belongs to no App workspace, so every projection of its Job
+  /// carries a null `workspaceKind` — a value the committed `job.status`,
+  /// `job.show` and `job.reconcile` corpora had never sampled, so their
+  /// published schemas refused it. Run with `ARKDECK_CONTROL_FRAME_LOG` to
+  /// record these frames for the corpora (TASK-XPA-015, the Rust port of this
+  /// operation); without it the test states the Swift answer.
+  func testTheIsolationJobReadsBackThroughTheStatusSurfaces() async throws {
+    let (handler, _, source) = try stack(in: Self.statusRoot)
+    let profile = try profile(root: source)
+    let revision = try WorkspaceProviderSupport.workspaceRevision(
+      root: profile.projectRoot, profileVersion: profile.profileID,
+      globs: profile.allowedFileGlobs)
+    let document = try RuntimeOperationRequest(
+      requestID: "isolation-read-request", idempotencyKey: "isolation-read-idempotency",
+      target: DurableTargetReference(targetID: "workspace-host"),
+      operation: RuntimeOperationReference(id: "workspace.prepare-isolated-copy", version: 1),
+      inputs: [
+        "projectRef": .string(profile.projectRef),
+        "allowedFileGlobs": .array([.string("Sources/App.txt")]),
+        "expectedWorkspaceRevision": .string(revision),
+      ])
+    let requestJson = String(decoding: try JSONEncoder().encode(document), as: UTF8.self)
+    let submitted = try await request(
+      handler, method: "job.submit", params: ["requestJson": .string(requestJson)])
+    guard case .object(let accepted)? = submitted.result,
+      case .string(let jobID)? = accepted["jobId"]
+    else { return XCTFail("job.submit must name its Job") }
+    let ran = try await request(handler, method: "job.run", params: ["jobId": .string(jobID)])
+    XCTAssertTrue(ran.ok, "job.run: \(String(describing: ran.error))")
+    for method in ["job.status", "job.show", "job.reconcile"] {
+      let answer = try await request(handler, method: method, params: ["jobId": .string(jobID)])
+      XCTAssertTrue(answer.ok, "\(method): \(String(describing: answer.error))")
+      guard case .object(let fields)? = answer.result else {
+        return XCTFail("\(method) answers an object")
+      }
+      let projection: [String: JSONValue]
+      if case .object(let job)? = fields["job"] { projection = job } else { projection = fields }
+      XCTAssertEqual(projection["state"], .string("succeeded"), method)
+      XCTAssertEqual(projection["workspaceKind"], .null, method)
+    }
   }
 
   /// Every regular file under `root`, tree-relative, with its digest.
