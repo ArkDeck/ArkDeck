@@ -582,6 +582,13 @@ impl Host {
         let holds = self.holds.clone();
         let workspace = self.workspace.clone();
         let state_root = self.planning.as_ref().map(|(root, _)| root.clone());
+        // Swift's `startJob` runs the owned Job with the engine that admitted
+        // it: the analyzer the admission materialized the plan against is the
+        // one the run dispatches, or an admitted analyzer Job could never run.
+        let analyzer = self
+            .planning
+            .as_ref()
+            .and_then(|(_, analyzer)| analyzer.clone());
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -631,7 +638,7 @@ impl Host {
                         }),
                     jobs: &jobs,
                     artifacts: &artifacts,
-                    analyzer: None,
+                    analyzer: analyzer.as_ref(),
                     quota: ARTIFACT_QUOTA,
                     home: &home,
                     now: arkdeck_hoststore::runtime_now,
