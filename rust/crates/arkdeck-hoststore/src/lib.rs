@@ -171,7 +171,13 @@ pub use capability_store::{
 };
 
 #[cfg(target_os = "macos")]
+mod cutover_facts;
+#[cfg(target_os = "macos")]
 mod job_events;
+#[cfg(target_os = "macos")]
+pub use cutover_facts::{
+    CutoverFacts, CutoverRoots, MISSING_RECORD, UNREADABLE_RECORD, UnreadableSource, cutover_facts,
+};
 #[cfg(target_os = "macos")]
 mod job_journal;
 #[cfg(target_os = "macos")]

@@ -142,6 +142,31 @@ struct Ledger<'a> {
     index: ToolIndex,
 }
 
+/// The control action of the HDC tool selection pending in the bootstrap
+/// store at `path`, as the cutover preflight reads it (the production
+/// composition refuses to start beside one it has no owner to settle): the
+/// tool index read whole — it is published atomically — without the store's
+/// lock, without creating an absent index and without verifying any tool. An
+/// absent store or index holds no selection.
+pub(crate) fn cutover_pending_selection(path: &Path) -> Result<Option<String>, String> {
+    let root = match arkdeck_platform::HostDirectory::open(path) {
+        Ok(root) => root,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("the bootstrap store is unreadable: {error}")),
+    };
+    let bytes = match root.read(TOOLS, MAX_INDEX) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(format!("the tool index is unreadable: {error}")),
+    };
+    let (index, _) =
+        read_tools(&bytes).map_err(|_| "the tool index failed its bounded schema".to_owned())?;
+    Ok(index
+        .selection
+        .and_then(|selection| selection.pending)
+        .map(|pending| pending.action_id))
+}
+
 impl ToolRegistryStore {
     fn binding(&self, lock: &HostReadLock) -> Result<(), WireError> {
         lock.validate_link(&self.root, ".lock")

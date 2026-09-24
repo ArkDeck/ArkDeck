@@ -460,6 +460,47 @@ impl CapabilityStore {
         })
     }
 
+    /// Every use of every capability as the cutover preflight reads it: the
+    /// capability, the use's ordinal, where it stands and its Job, in store
+    /// order. Read without the store's lock and without creating anything:
+    /// the checkpoint is replaced atomically and the ledger only appended, and
+    /// a torn last event is dropped as Swift's reader drops it. Only a read
+    /// while no owner runs is exact — beside a running one a fold into a new
+    /// checkpoint can fall between the two reads. An absent store holds no
+    /// use.
+    pub(crate) fn cutover_uses(
+        directory: &Path,
+    ) -> Result<Vec<(String, i64, String, String)>, CapabilityStoreError> {
+        if !directory.exists() {
+            return Ok(Vec::new());
+        }
+        let store = Self {
+            directory: directory.to_path_buf(),
+        };
+        let mut document = store.checkpoint()?;
+        let events = store.ledger()?;
+        for event in &events {
+            apply(event, &mut document)?;
+        }
+        if !events.is_empty() {
+            validate(&document)?;
+        }
+        Ok(document
+            .records
+            .iter()
+            .flat_map(|record| {
+                record.consumptions.iter().map(|use_| {
+                    (
+                        record.capability.id.clone(),
+                        use_.ordinal,
+                        use_.current().raw().to_owned(),
+                        use_.job.clone(),
+                    )
+                })
+            })
+            .collect())
+    }
+
     /// Swift `consume`: one use reserved for an exact Job execution, the Job
     /// defaulting to the reservation. Retrying a reservation answers its
     /// receipt and writes nothing; a new one must pass `validateNewExecution`

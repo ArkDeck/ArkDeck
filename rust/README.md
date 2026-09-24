@@ -391,7 +391,8 @@ and digest functions. It also compiles in the shared Job-state preflight table
 Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs` decides it (replayed on that
 oracle), and `cutover_preflight`, the M5 preflight over a state root's Jobs, agent
 executions and capability uses. The Rust CLI's `runtime service restart` calls
-the first; the second has no caller yet. `arkdeck-control` has transport-free observation and local-resource handlers.
+the first; `arkdeck-agentd --cutover-preflight` decides with the second.
+`arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
 boundary and holds the HDC typed actions of the device operations, which the
@@ -2323,6 +2324,25 @@ executable, so no test reaches the account's service. `verify` without `--job`
 (a fresh run through Swift's client-side executor) and `install`, `update` and
 `uninstall` are not served yet
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cli-run.md)).
+
+The M5 cutover preflight (design §G.4) is `arkdeck-agentd --cutover-preflight
+[--hold-instance-lock]` with `ARKDECK_RUNTIME_COMPOSITION=production`
+(`arkdeck-agentd/src/cutover_preflight.rs`): a one-shot read of the production
+layout that composes nothing, refused under the facade's name and beside another
+composition's input. Without any owner it reads every Job the index or `jobs/`
+names (index row, record and journal), the agent executions, the capability uses
+and the bootstrap tool index (`arkdeck_hoststore::cutover_facts`), decides with
+`cutover_preflight`, and prints one `arkdeck.cutover-preflight/1` document: the
+blocks (a blocking or unlisted Job state, the unresolved journal of a Job that is
+not parked, an active agent execution, an unsettled capability use, a pending
+tool selection, a source it could not read), what is carried over as it is
+(parked and terminal Jobs, outcome-unknown uses) and, with
+`--hold-instance-lock`, the snapshot of the old state directory (relative path,
+byte count and SHA-256 of every file, and a root digest), taken under the
+Runtime's instance lock before the facts are read; a Runtime still holding that
+lock refuses the held pass. `runtime service update` is to run it lock-free
+before booting the old service out and held after
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cutover-preflight-run.md)).
 
 ## macOS owner lifecycle soak
 
