@@ -49,18 +49,46 @@
 //! required step is compensated inside the step loop before the Job fails
 //! (`device_native.rs`), and an optional cleanup that fails owes a debt for
 //! what it left behind.
+//!
+//! A Job whose exact inputs select a step at or above `deviceMutation` runs
+//! in its Target's mutation lane (Swift `executeAdmittedSteps` over
+//! `DeviceMutationLaneCoordinator.withMutationLane(deviceID: targetID)`),
+//! behind every such Job that asked for the device first, with no deadline;
+//! read-only and host-only Jobs take none. The lane is entered before the
+//! running transition, so a Job writes nothing while it waits, and it is held
+//! through the step loop, a debug HAP's failure finalization, finalization,
+//! the terminal state and the settling of the Job's capability use: the next
+//! Job on the device neither overlaps it nor meets its use still pending
+//! (declared differences: Swift enters after the transition, releases after
+//! the step loop and enters again for the failure finalization). A request to
+//! cancel that reaches a waiting Job closes it at its first step boundary
+//! without the lane and without touching the device. A debug HAP finalizing
+//! from `finalizing`, for its run or a reconcile, holds the lane for its
+//! compensations and is not ended by a request to cancel, as in Swift.
+//!
+//! Lock order: a run holds its Job's slot (the daemon's run and reconcile
+//! maps, released before the run starts) → its Target's lane, awaited here
+//! holding no Target lock (its key is read in a Target transaction that has
+//! ended before the wait) → the capability reservation guard while it
+//! consumes → each store's own locks inside a call, the Target owner's
+//! transaction locks among them (every read of the Target's facts). Nothing
+//! waits for a lane inside a Target transaction, and nothing holding a lane
+//! waits for another Job's run or reconcile, another lane or the HDC lifecycle
+//! interlock, which is only ever tried; so no wait for a lane closes a
+//! cycle.
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::capture_documents;
 use crate::cleanup_debt::{self, Residue};
 use crate::device_facts::{self, DeviceFacts, HdcComposition};
+use crate::device_lane::MutationLane;
 use crate::device_steps::{
     self, ActionRefusal, LeasedLibrary, StepAction, StepContext, StepInputs,
 };
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Target};
 use crate::job_record::JobRecord;
-use crate::job_run::{JobRunner, Run, RunRefusal, failure, uncertain};
+use crate::job_run::{JobRunner, Run, RunRefusal, failure, proven, uncertain};
 use crate::mutation_execution::MutationConsumption;
 use crate::operation_catalog::{CatalogArtifact, CatalogOperation, CatalogStep};
 use crate::session_json;
@@ -191,6 +219,30 @@ fn mutates(step: &CatalogStep) -> bool {
     !matches!(step.effect.as_str(), "hostOnly" | "readOnly")
 }
 
+/// Swift `runOwned`'s `isMutation`: the effect the Job's exact inputs select
+/// (`CatalogOperationEffectResolver.effectiveEffect`) is at or above
+/// `deviceMutation`. An effect this Runtime cannot read counts as one.
+fn mutation_job(descriptor: &CatalogOperation, record: &JobRecord) -> bool {
+    let inputs = record.request["inputs"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    !matches!(
+        descriptor.effective_effect(&inputs).as_str(),
+        "hostOnly" | "readOnly"
+    )
+}
+
+/// Where a Job stands once it asked for its Target's mutation lane.
+enum Laned<'a> {
+    /// Its steps change nothing on a device: it runs in no lane.
+    Unlaned,
+    /// It holds the lane until the guard is dropped.
+    Held(MutationLane<'a>),
+    /// A request to cancel reached it while it waited: it never entered.
+    Abandoned,
+}
+
 /// Swift's engine judges a port rule's readback against the operation it
 /// serves: a create must find the rule, a remove must not. The provider only
 /// reports what it read.
@@ -316,12 +368,32 @@ impl JobRunner<'_> {
         if run.record.state == "finalizing" {
             return self.conclude_hap_failure(run, hdc);
         }
+        let Some(descriptor) = descriptor(run.record.operation()) else {
+            return Err(uncertain());
+        };
+        // Swift `executeAdmittedSteps`: a mutation Job's steps run in its
+        // Target's lane. It is held until this returns — past the failure
+        // finalization, the terminal state and the settled use — and let go
+        // of on every way out, a panic included. A run a canceller can reach
+        // stops waiting once asked to.
+        let requested = || self.cancellation.is_some_and(RunCancellation::pending);
+        let abandon: Option<&dyn Fn() -> bool> = self.cancellation.is_some().then_some(&requested);
+        let lane = match self.mutation_lane(run, hdc, descriptor, abandon)? {
+            Laned::Held(lane) => Some(lane),
+            Laned::Unlaned => None,
+            Laned::Abandoned => return self.close_waiting(run),
+        };
         self.execute_device_inner(run, hdc)?;
-        self.settle_run(run)
+        let settled = self.settle_run(run);
+        drop(lane);
+        settled
     }
 
     /// Swift `finalizeDebugHAPFailure` for a debug HAP already `finalizing`,
-    /// then the outcome of the use it ran under.
+    /// then the outcome of the use it ran under: every compensation runs in
+    /// the Job's Target lane (`withMutationLane`), whether its run or a
+    /// reconcile continues it, and no request to cancel ends its wait. A run
+    /// whose step failed finalizes in the lane it already holds.
     pub(crate) fn conclude_hap_failure(
         &self,
         run: &mut Run,
@@ -330,8 +402,81 @@ impl JobRunner<'_> {
         let Some(descriptor) = descriptor(run.record.operation()) else {
             return Err(uncertain());
         };
+        let Laned::Held(lane) = self.mutation_lane(run, hdc, descriptor, None)? else {
+            return Err(uncertain());
+        };
         self.perform_hap_failure_finalization(run, hdc, descriptor)?;
+        let settled = self.settle_run(run);
+        drop(lane);
+        settled
+    }
+
+    /// The Job's Target mutation lane, entered for it (holder: its identity)
+    /// when its exact inputs select a device mutation, else none. `abandon`
+    /// ends the wait without the lane. A lane that cannot be entered — the
+    /// Target document unreadable, or the Job already holding or awaiting
+    /// one — refuses the run before anything is written or dispatched.
+    fn mutation_lane<'h>(
+        &self,
+        run: &Run,
+        hdc: &HdcComposition<'h>,
+        descriptor: &CatalogOperation,
+        abandon: Option<&dyn Fn() -> bool>,
+    ) -> Result<Laned<'h>, RunRefusal> {
+        if !mutation_job(descriptor, &run.record) {
+            return Ok(Laned::Unlaned);
+        }
+        let job = run.record.job_id.as_str();
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default();
+        match hdc.targets.enter_mutation_lane(target, job, abandon) {
+            Ok(Some(lane)) => Ok(Laned::Held(lane)),
+            Ok(None) => Ok(Laned::Abandoned),
+            Err(refusal) => Err(proven(
+                "resourceConflict",
+                format!(
+                    "job {job} cannot enter its Target's mutation lane: {refusal}; nothing was \
+                     dispatched"
+                ),
+                Some(job),
+            )),
+        }
+    }
+
+    /// A Job a request to cancel reached while it waited for its lane: it
+    /// enters `running` as its steps would have, and the request is made
+    /// durable and drained there, at its first step boundary, as Swift's step
+    /// loop drains it — no step, no device, no lane — then the use a resumed
+    /// Job holds is settled as the drained Job's.
+    fn close_waiting(&self, run: &mut Run) -> Result<(), RunRefusal> {
+        self.begin_steps(run)?;
+        self.carry(run)?;
+        self.drain(run)?;
         self.settle_run(run)
+    }
+
+    /// Swift `runOwned`'s running transition: from the admitted boundary,
+    /// from the confirmed safe boundary a reconcile reached, or noted when a
+    /// restart left the Job `running` with nothing outstanding.
+    fn begin_steps(&self, run: &mut Run) -> Result<(), RunRefusal> {
+        let started = run.clock()?;
+        run.record.start(&started);
+        match run.record.state.as_str() {
+            "preflight" => run.transition("preflight", "running", "steps-start"),
+            "resumeAtConfirmedSafeBoundary" => run.transition(
+                "resumeAtConfirmedSafeBoundary",
+                "running",
+                "resume confirmed durable provider boundary",
+            ),
+            "running" => {
+                run.record
+                    .timeline
+                    .push("resumed: journal-confirmed provider boundary".into());
+                Ok(())
+            }
+            _ => Err(uncertain()),
+        }
     }
 
     /// Swift `recordCapabilityOutcome` for the Job as its run left it:
@@ -355,21 +500,7 @@ impl JobRunner<'_> {
         run: &mut Run,
         hdc: &HdcComposition<'_>,
     ) -> Result<(), RunRefusal> {
-        let started = run.clock()?;
-        run.record.start(&started);
-        match run.record.state.as_str() {
-            "preflight" => run.transition("preflight", "running", "steps-start")?,
-            "resumeAtConfirmedSafeBoundary" => run.transition(
-                "resumeAtConfirmedSafeBoundary",
-                "running",
-                "resume confirmed durable provider boundary",
-            )?,
-            "running" => run
-                .record
-                .timeline
-                .push("resumed: journal-confirmed provider boundary".into()),
-            _ => return Err(uncertain()),
-        }
+        self.begin_steps(run)?;
         let Some(descriptor) = descriptor(run.record.operation()) else {
             return Err(uncertain());
         };
@@ -402,22 +533,7 @@ impl JobRunner<'_> {
                 return self.close(run, &reason);
             }
             // Swift's step loop stops at the boundary and `runOwned` drains.
-            Err(Stop::Cancelled) => {
-                run.transition(
-                    "cancelRequested",
-                    "cancellingAtSafeBoundary",
-                    "safe-boundary",
-                )?;
-                run.transition("cancellingAtSafeBoundary", "cancelled", "steps-drained")?;
-                run.record.set_operation_failure(Some(failure(
-                    "cancelled",
-                    "cancelled",
-                    "notAutomatic",
-                    "none",
-                )));
-                run.finish()?;
-                return run.persist(self.jobs);
-            }
+            Err(Stop::Cancelled) => return self.drain(run),
             Err(Stop::Refused(refusal)) => return Err(refusal),
         }
         run.transition("running", "finalizing", "steps-complete")?;

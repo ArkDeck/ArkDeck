@@ -105,6 +105,25 @@ impl TargetDocument {
             .map(|t| t.target_id.clone())
             .collect()
     }
+    /// The Target whose mutation lane a request naming `target_id` runs in:
+    /// the canonical Target a proven alias resolution merged it into — the
+    /// same device, whose own route may use the alias's key — else the named
+    /// Target itself, adopted or not. A chain of resolutions is followed to
+    /// its end; one that comes back on itself names no lane.
+    pub fn mutation_lane_target(&self, target_id: &str) -> Result<String, String> {
+        let resolutions = self.resolutions.as_deref().unwrap_or_default();
+        let mut current = target_id;
+        let mut followed = BTreeSet::new();
+        while let Some(resolution) = resolutions.iter().find(|r| r.alias == current) {
+            if !followed.insert(current) {
+                return Err(format!(
+                    "the alias resolutions of target {target_id} form a cycle"
+                ));
+            }
+            current = &resolution.canonical;
+        }
+        Ok(current.to_owned())
+    }
     /// Swift `RuntimeTargetStore.hdcExecutionRoute`: the Target and the
     /// connect key its HDC commands use, or none for a Target never adopted.
     /// A Target without a proven alias uses its adopted key. With one, the

@@ -244,4 +244,11 @@ which this change touches.
 
 ## CI
 
-Pending.
+PR #2146, head `fdbddeed`, all green; merged as `72fd46b6` on 2026-09-24.
+
+- Swift CI run 36011982444: `plan`, `ds-interactions`, `swift-tests`,
+  `rust-checks / Rust host-independent checks`, `rust-checks / Rust
+  workspace` on ubuntu-latest, windows-latest and macos-26, and the `swift`
+  aggregate all succeeded; `app-build` was skipped by the plan.
+- SDD Guard run 36011980564: `guard` and `ds-tokens` succeeded.
+- Agent PR run 36011980720: `open-pr` succeeded.

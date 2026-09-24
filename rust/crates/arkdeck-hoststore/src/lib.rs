@@ -263,6 +263,10 @@ mod session_export_redaction;
 pub use session_export_redaction::SessionExportRedactor;
 
 #[cfg(target_os = "macos")]
+mod device_lane;
+#[cfg(target_os = "macos")]
+pub use device_lane::{LaneState, MutationLane};
+#[cfg(target_os = "macos")]
 mod target_document;
 #[cfg(target_os = "macos")]
 mod target_owner;

@@ -1147,3 +1147,207 @@ fn a_tap_that_died_after_its_consume_is_resumed_under_the_use_it_holds() {
 fn a_debug_hap_failure_finalization_a_restart_left_is_continued_by_its_run() {
     replay_crash("hapFinalizing");
 }
+
+// --- the Target's mutation lane ----------------------------------------------
+
+/// The fake's calls, as many as it had received when a lane-held exchange was
+/// seen waiting in the lane, and once it was answered.
+struct Waited {
+    name: String,
+    before: String,
+    waiting: String,
+    after: String,
+}
+
+impl Waited {
+    /// The calls made before the exchange was seen waiting.
+    fn outside(&self) -> &str {
+        &self.waiting[self.before.len()..]
+    }
+    /// The calls made once the lane was let go of.
+    fn inside(&self) -> &str {
+        &self.after[self.waiting.len()..]
+    }
+}
+
+/// `exchange` answered while a holder of this test's holds the lane of its
+/// Job's Target (`device_lane.rs`): the holder lets go of it once the
+/// exchange is seen waiting in its queue — as the Job's own request, or as a
+/// cleanup debt continuation of the Job — and the fake's calls are read
+/// then. The bound only keeps a broken lane from hanging the suite.
+fn answer_behind_the_lane(daemon: &Daemon, exchange: &Value) -> (Value, Waited) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+    let until = |what: &str, condition: &dyn Fn() -> bool| {
+        let started = Instant::now();
+        while !condition() {
+            assert!(
+                started.elapsed() < Duration::from_secs(60),
+                "never reached: {what}"
+            );
+            std::thread::yield_now();
+        }
+    };
+    let name = exchange["name"].as_str().unwrap().to_owned();
+    let job = exchange["params"]["jobId"].as_str().unwrap();
+    let targets = &daemon.stores().targets;
+    let target = daemon.stores().jobs.read_snapshot(job).unwrap().request["target"]["targetId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let key = targets.mutation_lane_key(&target).unwrap();
+    let continuation = format!("cleanup-debt:{job}:");
+    let log = daemon.root.join("hdc-invocations.log");
+    let before = daemon.calls();
+    let (entered, answered) = (AtomicBool::new(false), AtomicBool::new(false));
+    let (answer, waiting) = std::thread::scope(|scope| {
+        let holder = scope.spawn(|| {
+            let lane = targets
+                .enter_mutation_lane(&target, "lane-test-holder", None)
+                .unwrap()
+                .unwrap();
+            entered.store(true, Ordering::SeqCst);
+            let queued = || {
+                targets
+                    .mutation_lane_queue(&key)
+                    .iter()
+                    .any(|waiter| waiter == job || waiter.starts_with(&continuation))
+            };
+            // Answered without waiting is a lane not taken: seen, not hung on.
+            until(&format!("{name} waiting in the lane"), &|| {
+                queued() || answered.load(Ordering::SeqCst)
+            });
+            let waiting = queued().then(|| fs::read_to_string(&log).unwrap());
+            drop(lane);
+            waiting
+        });
+        until("the test's holder in the lane", &|| {
+            entered.load(Ordering::SeqCst)
+        });
+        for state in exchange["cleared"].as_array().into_iter().flatten() {
+            let _ = fs::remove_file(daemon.root.join(state.as_str().unwrap()));
+        }
+        let answer = daemon.answer(&daemon.timed(), exchange);
+        answered.store(true, Ordering::SeqCst);
+        (answer, holder.join().unwrap())
+    });
+    let waiting = waiting.unwrap_or_else(|| panic!("{name} never waited for its Target's lane"));
+    let after = daemon.calls();
+    (
+        answer,
+        Waited {
+            name,
+            before,
+            waiting,
+            after,
+        },
+    )
+}
+
+/// The scenario replayed as [`replay`] replays it — every answer and every
+/// snapshot Swift's — with each exchange in `held` answered behind the lane.
+fn replay_behind_the_lane(scenario: &str, held: &[&str]) -> Vec<Waited> {
+    let _lock = debug_hap::exclusive();
+    let mut daemon = Daemon::open(&format!("{FIXTURE}/{scenario}"));
+    let cases = support::document(&daemon.fixture, "cases.json");
+    let mut steps = cases["steps"].as_array().unwrap().iter().peekable();
+    let (mut differences, mut waited) = (Vec::new(), Vec::new());
+    for exchange in cases["exchanges"].as_array().unwrap() {
+        let name = exchange["name"].as_str().unwrap();
+        let actual = if held.contains(&name) {
+            let (actual, calls) = answer_behind_the_lane(&daemon, exchange);
+            waited.push(calls);
+            actual
+        } else {
+            answer(&mut daemon, exchange)
+        };
+        if actual != exchange["answer"] {
+            differences.push(format!(
+                "{scenario} {name}:\n  swift {}\n  rust  {actual}",
+                exchange["answer"]
+            ));
+        }
+        if steps.peek().is_some_and(|step| *step == name) {
+            daemon.assert_snapshot(&format!("steps/{name}"));
+            steps.next();
+        }
+    }
+    assert!(
+        steps.next().is_none(),
+        "{scenario}: every recorded step was replayed"
+    );
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    daemon.assert_leftovers();
+    assert_eq!(waited.len(), held.len(), "every held exchange was answered");
+    waited
+}
+
+/// A resumed Job's run waits for its Target's lane before its first step,
+/// touching nothing, and a reconcile's read-only readback does not wait for
+/// it, while the debug HAP failure finalization the reconcile then runs
+/// does: its compensation is sent only once the holder lets go. Every answer
+/// and snapshot is still Swift's.
+#[test]
+fn a_reconciles_compensation_and_a_resumed_run_wait_for_the_lane() {
+    let waited = replay_behind_the_lane("debugHap", &["reconcileNotInstalled", "installed.resume"]);
+    let [reconcile, resume] = &waited[..] else {
+        panic!("two held exchanges")
+    };
+    assert_eq!(reconcile.name, "reconcileNotInstalled");
+    // The readback ran outside the lane (Swift reconciles unlaned); the
+    // compensation removing the staged package waited for it.
+    let call = |parts: &[&str]| {
+        ["-t", "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "shell"]
+            .iter()
+            .chain(parts)
+            .map(|part| format!("{part}\u{1f}"))
+            .collect::<String>()
+            + "\n"
+    };
+    assert_eq!(
+        reconcile.outside(),
+        call(&["bm", "dump", "-n", "com.example.demo"])
+    );
+    assert_eq!(
+        reconcile.inside(),
+        call(&[
+            "rm",
+            "-f",
+            "/data/local/tmp/arkdeck-job-6d4855163348f6395cbab028f2d0471e-send-hap-owned.hap"
+        ])
+    );
+    assert_eq!(resume.name, "installed.resume");
+    assert_eq!(
+        resume.outside(),
+        "",
+        "the resumed run dispatched before its lane"
+    );
+    assert!(!resume.inside().is_empty());
+}
+
+/// A port rule resumed at the boundary its reconcile confirmed waits for its
+/// Target's lane before anything, then resumes as Swift resumes it.
+#[test]
+fn a_resumed_port_rule_waits_for_the_lane() {
+    let waited = replay_behind_the_lane("portRule", &["create.resume"]);
+    assert_eq!(
+        waited[0].outside(),
+        "",
+        "the resumed run dispatched before its lane"
+    );
+    assert!(!waited[0].inside().is_empty());
+}
+
+/// A cleanup debt's continuation reads back and retries only in its Job's
+/// Target lane (a declared difference: Swift's takes none), then settles the
+/// debt as Swift does.
+#[test]
+fn a_cleanup_debt_continuation_waits_for_the_lane() {
+    let waited = replay_behind_the_lane("captureFileLegs", &["debt.continue"]);
+    assert_eq!(
+        waited[0].outside(),
+        "",
+        "the continuation touched the device before its lane"
+    );
+    assert!(!waited[0].inside().is_empty());
+}

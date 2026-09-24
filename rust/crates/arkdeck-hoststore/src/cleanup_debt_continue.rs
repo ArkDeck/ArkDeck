@@ -17,6 +17,12 @@
 //! and is made durable before it is sent; its verdict settles the debt,
 //! leaves it owed, or keeps its outcome unknown. A settled debt refreshes the
 //! Job's residue count. Nothing is written to the Job's journal.
+//!
+//! The whole continuation runs in the mutation lane of the Job's Target
+//! (`device_lane.rs`), entered before the ledger is read and held until it
+//! answers, behind any Job — its own run included — or continuation that
+//! asked for the device first; no device is touched without it. Swift's
+//! continuation takes no lane; this is a declared difference.
 use crate::cleanup_debt;
 use crate::device_facts;
 use crate::device_steps::{self, StepAction, StepContext};
@@ -30,6 +36,7 @@ use arkdeck_provider_hdc::{
     DispatchFailure, FileReceipt, HapAction, NativeAction, Outcome, Reconcile,
 };
 use serde_json::{Map, Value, json};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Swift `RuntimeCleanupDebtContinuation.State`.
 const SETTLED: &str = "settled";
@@ -184,6 +191,12 @@ impl JobRunner<'_> {
         job_id: &str,
         identity: &str,
     ) -> Result<(&'static str, String), Refusal> {
+        // The readback and the one retry are device work on the Job's
+        // Target: they wait their turn in its mutation lane, as a request of
+        // their own, before the ledger and the Job are read, so what they
+        // decide on cannot change under them (a declared difference: Swift's
+        // continuation takes no lane).
+        let lane = self.debt_lane(job_id, identity);
         let debt = cleanup_debt::outstanding_record(self.artifacts, job_id, identity)
             .map_err(Refusal::Internal)?
             .ok_or_else(|| engine("jobNotFound", &format!("cleanup-debt:{job_id}:{identity}")))?;
@@ -230,6 +243,16 @@ impl JobRunner<'_> {
             .as_str()
             .unwrap_or_default();
         let revision = record.request["target"]["expectedBindingRevision"].as_i64();
+        // No device is touched outside the lane.
+        let _lane = match lane {
+            Ok(Some(lane)) => lane,
+            Ok(None) => {
+                return Err(Refusal::Internal(
+                    "the Job's Target mutation lane was not entered".into(),
+                ));
+            }
+            Err(refusal) => return Err(Refusal::Internal(refusal)),
+        };
         let facts = hdc.facts(target_id).map_err(Refusal::Internal)?;
         device_facts::validate(&facts, target_id, revision)
             .map_err(|reason| Refusal::Internal(failed(reason)))?;
@@ -387,6 +410,38 @@ impl JobRunner<'_> {
 
     fn continuation_clock(&self) -> Result<String, Refusal> {
         (self.now)().ok_or_else(|| engine("internalFailure", "the Runtime clock is unavailable"))
+    }
+}
+
+/// Tells one continuation's lane request from every other of this process.
+static CONTINUATIONS: AtomicU64 = AtomicU64::new(0);
+
+impl<'a> JobRunner<'a> {
+    /// The mutation lane of the Target the debt's Job names, entered for this
+    /// continuation alone, waiting behind whoever asked first, before any
+    /// Target transaction of the continuation (lane first, transactions
+    /// after); none when the Job cannot be read or is not an HDC Job run
+    /// through this composition, which the continuation then refuses before
+    /// any device work. The refusal is why a lane could not be entered.
+    fn debt_lane(
+        &self,
+        job_id: &str,
+        identity: &str,
+    ) -> Result<Option<crate::MutationLane<'a>>, String> {
+        let (Ok(record), Some(hdc)) = (self.jobs.read_snapshot(job_id), self.hdc) else {
+            return Ok(None);
+        };
+        if record.provider() != "hdc" {
+            return Ok(None);
+        }
+        let holder = format!(
+            "cleanup-debt:{job_id}:{identity}:{}",
+            CONTINUATIONS.fetch_add(1, Ordering::Relaxed)
+        );
+        let target = record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default();
+        hdc.targets.enter_mutation_lane(target, &holder, None)
     }
 }
 

@@ -826,6 +826,30 @@ canonical byte, and one member more or less written by Rust at each level as the
 document Swift refused. Nothing writes a non-null member, in Swift or here.
 Concurrent runs of one Job join its one run, as Swift's callers do.
 
+A device-bound Job whose exact inputs select a step at or above
+`deviceMutation` runs in its Target's mutation lane (`device_lane.rs`, Swift
+`DeviceMutationLaneCoordinator.withMutationLane`), which the Target owner keeps
+in memory for every composition over it: one such Job per Target at a time, the
+others waiting in arrival order with no deadline; other Targets are not held
+up, and read-only and host-only Jobs take no lane. The lane is keyed by the
+request's Target, a proven post-Flash alias folded into its canonical Target
+(Swift keys by the name alone). A Job enters it before its running transition,
+so nothing is written while it waits, and holds it through its step loop, a
+debug HAP's failure finalization, finalization, its terminal state and the
+settling of its capability use (Swift enters after the transition, lets go
+after the step loop and enters again for the failure finalization). A debug
+HAP finalizing on `job.run` or `job.reconcile` holds it for its compensations
+(a reconcile's read-only readback takes none), and a cleanup debt's
+continuation holds it for its readback and retry (Swift's takes none). A
+request to cancel a waiting Job closes it at its first step boundary with
+nothing dispatched and nothing consumed; the lane's guard lets go of it on
+every exit, a panic included. `tests/device_mutation_lane.rs` runs gestures on
+the shared fake with two adopted Targets (one after another on one Target, at
+once on two, cancelled while waiting, the lane let go of after a failure, a
+park and a panic), and `tests/device_mutation_reconcile.rs` replays its
+scenarios with the Target's lane held around a reconcile, two resumed runs and
+a cleanup debt continuation, every answer and snapshot still Swift's.
+
 `arkdeck job run --job <id>` prints the Job's status and exits as Swift's CLI
 does: 1 for a failed, cancelled or interrupted Job and 75 for an unknown outcome.
 A connect failure stays `runtimeUnavailable`; a reply that cannot prove zero

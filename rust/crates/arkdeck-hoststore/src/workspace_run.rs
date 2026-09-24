@@ -363,7 +363,8 @@ impl JobRunner<'_> {
 
     /// Swift `runOwned`'s drain of a cancellation at a safe boundary between
     /// steps: the durable request already carried, the Job closed cancelled.
-    fn drain(&self, run: &mut Run) -> Result<(), RunRefusal> {
+    /// A device Job drains the same way (`device_run.rs`).
+    pub(crate) fn drain(&self, run: &mut Run) -> Result<(), RunRefusal> {
         run.transition(
             "cancelRequested",
             "cancellingAtSafeBoundary",

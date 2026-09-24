@@ -88,7 +88,11 @@ pub struct RunRefusal {
     pub details: Map<String, Value>,
 }
 
-fn proven(code: &'static str, message: impl Into<String>, job: Option<&str>) -> RunRefusal {
+pub(crate) fn proven(
+    code: &'static str,
+    message: impl Into<String>,
+    job: Option<&str>,
+) -> RunRefusal {
     let mut details = Map::from_iter([
         ("phase".into(), json!("preAdmission")),
         ("newDispatchCount".into(), json!(0)),
