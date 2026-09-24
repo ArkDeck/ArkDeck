@@ -189,6 +189,42 @@ fn current_layout(db: &mut HostSqlite) -> io::Result<()> {
     }
     Ok(())
 }
+/// Every Job's identity and state as the index at `path` holds them, for the
+/// cutover preflight: read through the connection Swift's repository inspects
+/// with (`inspection`), so no owner lock is taken or marked and no log is
+/// recovered or checkpointed; the database bytes are left as they are. An
+/// absent index holds no Job.
+pub(crate) fn cutover_index_states(path: &Path) -> io::Result<Vec<(String, String)>> {
+    let root = HostDirectory::open(path)?;
+    match root.owned_kind_and_size(DATABASE) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(error),
+        Ok(_) => (),
+    }
+    validate_files(&root)?;
+    let (mut db, _) = inspection(&root, path)?;
+    current_layout(&mut db)?;
+    let mut rows = Vec::new();
+    let mut after = String::new();
+    loop {
+        let page = db.query(
+            "SELECT job_id, state FROM runtime_job WHERE job_id COLLATE BINARY > ? ORDER BY job_id COLLATE BINARY LIMIT 256",
+            &[SqliteValue::Text(after.clone())],
+            1024 * 1024,
+        )?;
+        if page.is_empty() {
+            return Ok(rows);
+        }
+        for row in page {
+            let [SqliteValue::Text(id), SqliteValue::Text(state)] = row.as_slice() else {
+                return Err(corrupt());
+            };
+            after.clone_from(id);
+            rows.push((id.clone(), state.clone()));
+        }
+    }
+}
+
 /// Swift requireCurrentLayout's row pass: logical ordering is part of the
 /// durable contract, not a migration.
 fn validate_rows(db: &mut HostSqlite) -> io::Result<()> {

@@ -241,4 +241,17 @@ signed-helper or installed-service acceptance, any device.
 
 ## CI
 
-Pending.
+PR #2141, head `4a9b2d7f3`, merged as `5b1df34ee` (2026-09-24 06:48 UTC).
+
+- Swift CI run 35965403965: success. `plan` selected the Rust lanes only;
+  `rust-checks` passed on host-independent checks, `ubuntu-latest`,
+  `windows-latest` and `macos-26` (job 107522805706, which ran
+  `runtime_service` (21), the deep doctor test and the new platform tests);
+  `swift-tests`, `app-build` and `ds-interactions` were skipped as not selected;
+  the `swift` aggregate passed.
+- SDD Guard run 35965403661: `guard` and `ds-tokens` passed.
+- Agent PR run 35965403673: `open-pr` passed.
+
+The maintainer questions above were ruled on by the coordinator
+(协调会话受托裁定 2026-09-24); the second PR carries them, starting with
+`runtime-service-cutover-preflight-run.md`.

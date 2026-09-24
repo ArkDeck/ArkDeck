@@ -1183,6 +1183,43 @@ impl AgentExecutionStore {
         Ok(files)
     }
 
+    /// Every execution's identity, state and Job as the cutover preflight
+    /// reads them: each record validated under the name its identity gives,
+    /// read without the owner (whose open makes its pager directory) and
+    /// without writing anything. Records are published whole, so a read beside
+    /// a running owner sees each one before or after a change. An absent store
+    /// holds no execution.
+    pub(crate) fn cutover_executions(
+        path: &Path,
+    ) -> Result<Vec<(String, String, Option<String>)>, String> {
+        let root = match HostDirectory::open(path) {
+            Ok(root) => root,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(format!("the execution store is unreadable: {error}")),
+        };
+        let mut files: Vec<String> = root
+            .names(MAX_RECORDS + 64)
+            .map_err(|error| format!("the execution store is unreadable: {error}"))?
+            .into_iter()
+            .filter(|name| name.starts_with("execution-") && name.ends_with(".json"))
+            .collect();
+        if files.len() > MAX_RECORDS {
+            return Err("the execution store exceeds its record bound".into());
+        }
+        files.sort();
+        let mut rows = Vec::with_capacity(files.len());
+        for file in files {
+            let bytes = root
+                .read(&file, MAX_RECORD)
+                .map_err(|error| format!("execution record {file} is unreadable: {error}"))?;
+            let record = Record::decode(&bytes)
+                .filter(|record| Self::file(&record.intent.execution) == file)
+                .ok_or_else(|| format!("execution record {file} cannot be validated"))?;
+            rows.push((record.intent.execution, record.state, record.job));
+        }
+        Ok(rows)
+    }
+
     /// Swift `save`: a complete record, generation by generation, whose
     /// identity never changes.
     fn save(&self, record: &Record, expected: Option<i64>) -> Result<(), WireError> {

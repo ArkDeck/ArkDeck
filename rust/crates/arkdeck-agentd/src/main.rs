@@ -11,6 +11,8 @@ mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;
 #[cfg(target_os = "macos")]
+mod cutover_preflight;
+#[cfg(target_os = "macos")]
 mod development_mutation;
 #[cfg(target_os = "macos")]
 mod development_usb;
@@ -724,6 +726,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    // The M5 cutover preflight is a one-shot read of the production layout,
+    // answered before any composition is considered (`cutover_preflight.rs`).
+    #[cfg(target_os = "macos")]
+    {
+        let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
+        if arguments
+            .first()
+            .is_some_and(|argument| argument == cutover_preflight::FLAG)
+        {
+            std::process::exit(cutover_preflight::run(&arguments));
+        }
+    }
     if let Err(error) = serve() {
         eprintln!("arkdeck-agentd: {error}");
         std::process::exit(69);

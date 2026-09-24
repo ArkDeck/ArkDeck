@@ -221,6 +221,11 @@ mod owner_file;
 pub use owner_file::{OwnerFileRefusal, read_owner_controlled_file};
 
 #[cfg(target_os = "macos")]
+mod tree_snapshot;
+#[cfg(target_os = "macos")]
+pub use tree_snapshot::{TreeEntry, TreeEntryKind, snapshot_tree};
+
+#[cfg(target_os = "macos")]
 mod bootstrap_bundle_capture;
 #[cfg(target_os = "macos")]
 pub use bootstrap_bundle_capture::{
