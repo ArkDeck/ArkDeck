@@ -28,8 +28,8 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 mod account;
 #[cfg(unix)]
 pub use account::{
-    application_support_directory, arkdeck_application_support_root, effective_user_id,
-    executable_by_caller, runtime_home,
+    FileMeasureError, application_support_directory, arkdeck_application_support_root,
+    effective_user_id, executable_by_caller, measure_unchanged_file, runtime_home,
 };
 #[cfg(unix)]
 mod temporary_directory;

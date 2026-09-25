@@ -1,0 +1,9 @@
+{
+  "owners" : [
+    "RuntimeCLI.prepareUpdateFeed",
+    "RuntimeCLI.assembleUpdateFeed",
+    "UpdateFeedCodec",
+    "UpdateFeedVerifier"
+  ],
+  "producer" : "CLIUpdateFeedOracleContractTests"
+}

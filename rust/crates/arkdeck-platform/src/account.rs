@@ -55,6 +55,85 @@ pub fn effective_user_id() -> u32 {
     unsafe { libc::geteuid() }
 }
 
+/// Why a file could not be measured (Swift `RuntimeCLI.measureArtifact`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FileMeasureError {
+    /// `open(2)` without following a link failed with this errno.
+    Open(i32),
+    /// Not a regular file, or empty.
+    NotRegularOrEmpty,
+    /// A read failed with this errno.
+    Read(i32),
+    /// Its identity, size or times changed while it was read.
+    Changed,
+}
+
+/// Swift `RuntimeCLI.measureArtifact`: the byte count and lowercase SHA-256
+/// of a non-empty regular file, opened without following a link at its last
+/// component and read to its end, refused if it changed while read.
+pub fn measure_unchanged_file(path: &std::path::Path) -> Result<(u64, String), FileMeasureError> {
+    use sha2::{Digest, Sha256};
+    use std::io::Read;
+    use std::os::fd::FromRawFd;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::fs::MetadataExt;
+    let native = std::ffi::CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| FileMeasureError::Open(libc::EINVAL))?;
+    // SAFETY: `native` is a live NUL-terminated string for the call.
+    let descriptor = unsafe {
+        libc::open(
+            native.as_ptr(),
+            libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+        )
+    };
+    if descriptor < 0 {
+        return Err(FileMeasureError::Open(
+            std::io::Error::last_os_error().raw_os_error().unwrap_or(0),
+        ));
+    }
+    // SAFETY: a new descriptor nothing else owns.
+    let mut file = unsafe { std::fs::File::from_raw_fd(descriptor) };
+    let before = file
+        .metadata()
+        .ok()
+        .filter(|metadata| metadata.is_file() && metadata.len() > 0)
+        .ok_or(FileMeasureError::NotRegularOrEmpty)?;
+    let mut hasher = Sha256::new();
+    let mut measured = 0_u64;
+    let mut buffer = vec![0_u8; 1024 * 1024];
+    loop {
+        let count = match file.read(&mut buffer) {
+            Ok(count) => count,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(FileMeasureError::Read(error.raw_os_error().unwrap_or(0))),
+        };
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+        measured += count as u64;
+    }
+    let unchanged = file.metadata().is_ok_and(|after| {
+        measured == before.len()
+            && after.dev() == before.dev()
+            && after.ino() == before.ino()
+            && after.len() == before.len()
+            && after.mtime() == before.mtime()
+            && after.mtime_nsec() == before.mtime_nsec()
+            && after.ctime() == before.ctime()
+            && after.ctime_nsec() == before.ctime_nsec()
+    });
+    if !unchanged {
+        return Err(FileMeasureError::Changed);
+    }
+    let digest = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
+    Ok((measured, digest))
+}
+
 /// Whether this process may execute `path` now (`access(2)` with `X_OK`,
 /// evaluated with the real user and group IDs as Swift's `access` is).
 pub fn executable_by_caller(path: &std::path::Path) -> bool {

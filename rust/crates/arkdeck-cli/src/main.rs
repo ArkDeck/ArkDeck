@@ -1278,6 +1278,65 @@ fn render_agent_answer(
     }
 }
 
+/// `maintainer update-feed prepare` and its deprecated spelling: the prepared
+/// payload's facts, as the runbook's lines in the human rendering; a refusal
+/// as Swift's session makes it, or a plain diagnostic where Swift's handler
+/// throws its plain error.
+fn serve_update_feed_prepare(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    use arkdeck_cli::update_feed::{self, Answer};
+    if !invocation.json
+        && let Some(warning) = arkdeck_cli::legacy_warning(invocation.command)
+    {
+        eprintln!("{warning}");
+    }
+    let options = invocation
+        .params
+        .as_ref()
+        .map(|params| {
+            params
+                .iter()
+                .filter_map(|(flag, value)| Some((flag.clone(), value.as_str()?.to_owned())))
+                .collect()
+        })
+        .unwrap_or_default();
+    let root = invocation.command.split('.').next().unwrap_or_default();
+    match update_feed::prepare(&options) {
+        Answer::Prepared { document, lines } => {
+            let written = if invocation.json {
+                write_document(&arkdeck_cli::with_lifecycle(
+                    success_envelope(invocation.command, document, id),
+                    invocation.command,
+                ))
+            } else {
+                writeln!(io::stdout().lock(), "{}", lines.join("\n"))
+            };
+            if written.is_err() {
+                return 74.into();
+            }
+            0.into()
+        }
+        Answer::Refused(error) => {
+            if invocation.json {
+                if write_document(&arkdeck_cli::with_lifecycle(
+                    failure_envelope(invocation.command, &error, id, true),
+                    invocation.command,
+                ))
+                .is_err()
+                {
+                    return 74.into();
+                }
+            } else {
+                eprintln!("arkdeck: {}", error.message);
+            }
+            error.exit_code().into()
+        }
+        Answer::Plain { exit_code, message } => {
+            eprintln!("arkdeck {root}: {message}");
+            exit_code.into()
+        }
+    }
+}
+
 /// A registry leaf whose subsystem the Rust CLI has not ported: answered
 /// `blockedByProductDefect` in the caller's rendering, and nothing dispatched
 /// (`blocked_leaves`). A deprecated spelling still says so.
@@ -1517,6 +1576,12 @@ fn main() -> std::process::ExitCode {
     }
     if invocation.command.starts_with("runtime.support-bundle.") {
         return serve_support_bundle(&invocation, id);
+    }
+    if matches!(
+        invocation.command,
+        "maintainer.update-feed.prepare" | "update-feed.prepare"
+    ) {
+        return serve_update_feed_prepare(&invocation, id);
     }
     if arkdeck_cli::domain_leaves::serves(invocation.command) {
         return serve_domain_leaf(&invocation, id);
