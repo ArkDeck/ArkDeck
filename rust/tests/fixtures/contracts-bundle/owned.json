@@ -1,0 +1,12 @@
+{
+  "contracts/cli-next-action.schema.json": "cf510c69aa8247660b7200ddbbd58ae165b3b5b7906165d6a7ce7c0108b9e9b8",
+  "contracts/cli-page.schema.json": "63cd97965aa946981faecb207ad2a7a7ad46153ec0e75fb6cbaf7cf35fcd6ca2",
+  "fixtures/next-action/cleanup.json": "2f1e97baf13f0a5d88a4e9f75ffa22f5ce985fd3d2ffd756a70a914ea7e8e63c",
+  "fixtures/next-action/humanAction.json": "07063fa7a975a0213d6cecfd32dff49bba084fb9dc09e7dd4f889222bed62c7d",
+  "fixtures/next-action/null.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+  "fixtures/next-action/readResult.json": "88348e53c01c5071c0b13c48b378748380d15819b0f4cf5dd19a750d61be187b",
+  "fixtures/next-action/reconcile.json": "ffed060830b1ef2dcd2c8f56a2e363e2e89b4eaff22b09b066608d028c4afe3a",
+  "fixtures/next-action/wait.json": "d29fa1a7c408f19ec457535d7b63b7341cfeeb56f1f30a1641389f5d2ed84ba9",
+  "fixtures/page/event-stream.json": "aa3c627ca10f71ca5aa79bd3e511e0318192406d41ba3034beb473191a071f39",
+  "fixtures/page/snapshot.json": "ac68ad3f3cd9b6099f7ede375571395f687dabd8108961e67b0bdf2d4aa3dbcf"
+}

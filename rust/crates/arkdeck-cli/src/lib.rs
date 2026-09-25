@@ -31,6 +31,7 @@ mod job_events;
 mod job_plan;
 mod job_resources;
 mod job_wait;
+pub mod machine_contracts;
 pub use job_plan::{
     announces_generated_identity, generates_identity, job_plan_params, job_submit_params, run_exit,
     validate_acceptance, validate_cancellation, validate_plan,

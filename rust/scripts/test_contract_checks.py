@@ -706,6 +706,46 @@ class SchemaVocabularyTests(unittest.TestCase):
         self.assert_pattern_matches("nonnegativeInt64Decimal", values, expected)
 
 
+class ContractBundleDigestTests(unittest.TestCase):
+    """The Rust export's digest table is held to the committed bundle."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-bundle-digest-tests-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        replacement = patch.object(runner, "ROOT", self.root)
+        replacement.start()
+        self.addCleanup(replacement.stop)
+        self.contracts = self.root / "openspec/contracts"
+        self.contracts.mkdir(parents=True)
+        (self.contracts / "cli-page.schema.json").write_bytes(b"{}\n")
+        self.table = self.root / "rust/tests/fixtures/contracts-bundle/owned.json"
+
+    def own(self, table):
+        self.table.parent.mkdir(parents=True, exist_ok=True)
+        self.table.write_text(json.dumps(table))
+
+    def test_a_checkout_without_the_table_owns_nothing(self):
+        runner.verify_contract_bundle_digests()
+
+    def test_matching_digests_pass(self):
+        digest = runner.hashlib.sha256(b"{}\n").hexdigest()
+        self.own({"contracts/cli-page.schema.json": digest})
+        runner.verify_contract_bundle_digests()
+
+    def test_a_drifted_missing_or_unrooted_product_is_refused(self):
+        digest = runner.hashlib.sha256(b"{}\n").hexdigest()
+        for path, value in [
+            ("contracts/cli-page.schema.json", "0" * 64),
+            ("contracts/cli-next-action.schema.json", digest),
+            ("elsewhere/cli-page.schema.json", digest),
+        ]:
+            with self.subTest(path=path):
+                self.own({path: value})
+                with self.assertRaisesRegex(ValueError, f"contract bundle digest drift: {path}"):
+                    runner.verify_contract_bundle_digests()
+
+
 class RunDirectoryTests(unittest.TestCase):
     """An isolated host check's run directory outlives only a failed run, or a kept one."""
 

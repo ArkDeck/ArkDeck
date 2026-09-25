@@ -10,6 +10,7 @@ tests, never installed Runtime or device acceptance.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import importlib.util
 import json
 import os
@@ -197,8 +198,29 @@ def verify_current_cli_argv() -> None:
             raise ValueError(f"current CLI argv fixture drift: {sample.name}")
 
 
+def verify_contract_bundle_digests() -> None:
+    """Hold the digests the Rust contract export is tested against to the
+    committed machine-contract bundle, which the contract views do not carry.
+    A checkout without the table owns no products yet (the Rust test embeds
+    the table, so a real checkout cannot lose it)."""
+    table = ROOT / "rust/tests/fixtures/contracts-bundle/owned.json"
+    if not table.exists():
+        return
+    roots = {
+        "contracts": ROOT / "openspec/contracts",
+        "fixtures": ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI",
+    }
+    for path, digest in sorted(json.loads(table.read_text()).items()):
+        root, _, relative = path.partition("/")
+        committed = roots[root] / relative if root in roots else None
+        if (committed is None or not committed.is_file()
+                or hashlib.sha256(committed.read_bytes()).hexdigest() != digest):
+            raise ValueError(f"contract bundle digest drift: {path}")
+
+
 def check(output_root: Path) -> Path:
     verify_current_cli_argv()
+    verify_contract_bundle_digests()
     contract.verify_checkout()
     published_commit = contract.published_base()
     published = contract.published_inputs(published_commit)
