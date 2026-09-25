@@ -5,8 +5,6 @@
 //! the Runtime, not this CLI, validates the request.
 use crate::read_only_resources::{duration, keys};
 use crate::{CliError, Invocation};
-use arkdeck_client::ClientError;
-use arkdeck_contract::ContractError;
 use serde_json::{Map, Value, json};
 
 /// Every flag-form field is exclusive with a complete request document.
@@ -276,97 +274,6 @@ pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {
         ));
     }
     Ok(())
-}
-
-/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit`,
-/// `job.run` and `job.cancel`: a refusal keeps its code only with the
-/// pre-admission zero-dispatch proof; any reply that cannot prove nothing was
-/// admitted or dispatched is an unknown outcome.
-pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
-    let wire = match error {
-        ClientError::Remote(wire) => wire,
-        ClientError::Contract(
-            ContractError::UnsupportedVersion | ContractError::ContractMismatch,
-        ) => {
-            return CliError::new(
-                "protocolVersionUnsupported",
-                "client and Runtime must use the same current control contract",
-            );
-        }
-        _ => {
-            let mut result = CliError::new(
-                "outcomeUnknown",
-                match method {
-                    "job.submit" => {
-                        "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
-                    }
-                    "agent.run" => {
-                        "the agent run reply is unconfirmed; read the execution with agent status, or run the same execution again, instead of starting a new one"
-                    }
-                    "agent.abandon" => {
-                        "the agent abandon reply is unconfirmed; read the execution with agent status to learn whether it was abandoned"
-                    }
-                    "job.cancel" => {
-                        "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
-                    }
-                    "job.reconcile" => {
-                        "the Job reconcile reply is unconfirmed; read the Job with job status to learn what it settled; the original effect is never replayed"
-                    }
-                    "target.adopt" => {
-                        "the target adoption reply is unconfirmed; read the device candidates and the target list to learn whether it was adopted"
-                    }
-                    "runtime.hdc.impact-preview"
-                    | "runtime.hdc.restart"
-                    | "control-action.list"
-                    | "control-action.show"
-                    | "control-action.reconcile" => {
-                        "the HDC control-action reply is unconfirmed; no request was replayed"
-                    }
-                    "runtime.tool.select" => {
-                        "the tool-selection reply is unconfirmed; select again with the same action request ID to read the same control action, never a new one"
-                    }
-                    _ => {
-                        "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
-                    }
-                },
-            );
-            result.details.insert("method".into(), json!(method));
-            return result;
-        }
-    };
-    let proof = wire.details.as_ref().is_some_and(|details| {
-        details.get("phase") == Some(&json!("preAdmission"))
-            && details.get("newDispatchCount") == Some(&json!(0))
-    });
-    let code = match (wire.code.as_str(), proof) {
-        ("invalidInput", true) | ("invalidParams", _) => "invalidInput",
-        ("inputTooLarge", true) => "inputTooLarge",
-        ("operationUnavailable", true) => "operationUnavailable",
-        ("idempotencyConflict", true) => "idempotencyConflict",
-        ("reviewedPlanMismatch", true) => "reviewedPlanMismatch",
-        ("admissionDenied" | "rejected", true) => "admissionDenied",
-        ("resourceConflict", true) | ("conflict", _) => "resourceConflict",
-        ("resourceNotFound", true) | ("notFound", _) => "resourceNotFound",
-        ("bindingRevisionStale", true) => "bindingRevisionStale",
-        ("orchestrationBudgetExpired", true) => "orchestrationBudgetExpired",
-        ("orchestrationClockUntrusted", true) => "orchestrationClockUntrusted",
-        ("humanActionExpired", true) => "humanActionExpired",
-        ("factsDrifted", true) => "factsDrifted",
-        ("targetTrustPending", true) => "targetTrustPending",
-        ("invalidCursor", true) => "invalidCursor",
-        ("recordUnreadable", _) => "recordUnreadable",
-        ("workspaceReferenceNotFound", _) => "workspaceReferenceNotFound",
-        ("unsupportedProtocolVersion", _) => "protocolVersionUnsupported",
-        ("malformedFrame", _) => "protocolMalformed",
-        ("unknownMethod", _) => "controlMethodUnavailable",
-        (_, true) => "internalError",
-        (_, false) => "outcomeUnknown",
-    };
-    let mut result = CliError::new(code, wire.message);
-    result.details = wire.details.unwrap_or_default();
-    result.details.insert("wireCode".into(), json!(wire.code));
-    result.details.insert("method".into(), json!(method));
-    result
 }
 
 /// Swift `RuntimeCLI.terminalJobExit`: once a run's status is emitted, an

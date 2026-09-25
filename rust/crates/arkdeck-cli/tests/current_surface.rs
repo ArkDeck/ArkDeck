@@ -103,7 +103,9 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
         // Another owner's proof proves nothing about a run: `job.run` is
         // mutation-capable, so without its own proof the outcome is unknown.
         ("job.run", "historyFilterOwner", "outcomeUnknown"),
-        ("history.filter.save", "other", "internalError"),
+        // Without its own owner's proof, a refusal of a mutation-capable
+        // method leaves the outcome unknown (Swift `CLIControlFailureMapper`).
+        ("history.filter.save", "other", "outcomeUnknown"),
         (
             "runtime.storage.root",
             "runtimeStorageOwner",
@@ -112,7 +114,7 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
         (
             "runtime.storage.policy",
             "historyFilterOwner",
-            "internalError",
+            "outcomeUnknown",
         ),
         ("job.run", "runtimeStorageOwner", "outcomeUnknown"),
     ] {

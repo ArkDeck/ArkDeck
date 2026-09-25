@@ -129,10 +129,25 @@ fn bundle_list_options_use_typed_bounded_pages_and_keep_cursor_opaque() {
 
 #[test]
 fn bundle_list_maps_only_bounded_bootstrap_owner_errors() {
+    // Swift's owner list for `runtime.bundle.list` has no `ioFailure`, so
+    // that one is an internal error even with the owner's proof.
+    let error = arkdeck_client::ClientError::Remote(arkdeck_contract::WireError {
+        code: "ioFailure".into(),
+        message: "owner refused".into(),
+        details: Some(
+            json!({"phase":"bootstrapRegistryOwner","newDispatchCount":0})
+                .as_object()
+                .unwrap()
+                .clone(),
+        ),
+    });
+    assert_eq!(
+        arkdeck_cli::CliError::from_client(error, "runtime.bundle.list").code,
+        "internalError"
+    );
     for code in [
         "invalidCursor",
         "admissionDenied",
-        "ioFailure",
         "inputTooLarge",
         "operationUnavailable",
     ] {
@@ -326,7 +341,13 @@ fn retirement_preserves_only_proven_owner_failures_and_existing_protocol_refusal
             }),
             "runtime.bundle.remove",
         );
-        assert_eq!(missing_proof.code, "outcomeUnknown");
+        // §8.4's fixed fallback keeps `recordUnreadable` whatever the
+        // evidence, as Swift's mapper does.
+        let kept = code == "recordUnreadable";
+        assert_eq!(
+            missing_proof.code,
+            if kept { code } else { "outcomeUnknown" }
+        );
         assert!(!missing_proof.details.contains_key("newDispatchCount"));
         for (phase, count) in [
             ("bootstrapRegistryOwner", 0),
@@ -348,7 +369,7 @@ fn retirement_preserves_only_proven_owner_failures_and_existing_protocol_refusal
             );
             assert_eq!(
                 mapped.code,
-                if phase == "bootstrapRegistryOwner" && count == 0 {
+                if kept || (phase == "bootstrapRegistryOwner" && count == 0) {
                     code
                 } else {
                     "outcomeUnknown"
@@ -605,8 +626,11 @@ fn tool_retirement_owner_errors_require_exact_proof_and_match_the_schema() {
                 }),
                 "runtime.tool.remove",
             );
-            assert_eq!(mapped.code, if proven { code } else { "outcomeUnknown" });
-            let expected_exit = if !proven {
+            // §8.4's fixed fallback keeps `recordUnreadable` whatever the
+            // evidence, as Swift's mapper does.
+            let kept = proven || code == "recordUnreadable";
+            assert_eq!(mapped.code, if kept { code } else { "outcomeUnknown" });
+            let expected_exit = if !kept {
                 75
             } else {
                 match code {
@@ -873,7 +897,9 @@ fn tool_list_keeps_readonly_connection_and_owner_error_policy() {
                 }),
                 "runtime.tool.list",
             );
-            assert_eq!(result.code, if proof { code } else { "internalError" });
+            // Swift's mapper keeps `recordUnreadable` whatever the evidence.
+            let kept = proof || code == "recordUnreadable";
+            assert_eq!(result.code, if kept { code } else { "internalError" });
             if proof && code == "fileIdentityChanged" {
                 assert_eq!(result.exit_code(), 77);
             }

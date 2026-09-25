@@ -1,0 +1,3997 @@
+{
+  "methods" : {
+    "agent.abandon" : "p01",
+    "agent.list" : "p02",
+    "agent.resume" : "p01",
+    "agent.run" : "p01",
+    "agent.status" : "p02",
+    "artifact.export" : "p03",
+    "artifact.import.abort" : "p04",
+    "artifact.import.append" : "p04",
+    "artifact.import.begin" : "p04",
+    "artifact.import.commit" : "p04",
+    "artifact.import.inspect" : "p05",
+    "artifact.import.inspection" : "p05",
+    "artifact.import.list" : "p05",
+    "artifact.import.release" : "p04",
+    "artifact.inspect" : "p06",
+    "artifact.list" : "p06",
+    "artifact.quota" : "p02",
+    "artifact.read" : "p06",
+    "capability.inspect" : "p02",
+    "capability.list" : "p02",
+    "cleanupDebt.continue" : "p01",
+    "cleanupDebt.list" : "p02",
+    "control-action.list" : "p01",
+    "control-action.reconcile" : "p01",
+    "control-action.show" : "p01",
+    "debug.evaluate" : "p01",
+    "debug.probe" : "p02",
+    "debug.start" : "p01",
+    "debug.status" : "p02",
+    "debug.template.run" : "p01",
+    "device.display-name.clear" : "p07",
+    "device.display-name.set" : "p07",
+    "device.observations" : "p02",
+    "doctor" : "p02",
+    "flash.bind-current-loader" : "p01",
+    "flash.bootloader-status" : "p02",
+    "flash.device-access" : "p02",
+    "flash.lanePlanPreview" : "p02",
+    "flash.prerequisites" : "p02",
+    "flash.reconcile-alias" : "p01",
+    "health" : "p02",
+    "history.filter.delete" : "p08",
+    "history.filter.list" : "p09",
+    "history.filter.save" : "p08",
+    "human-action.list" : "p02",
+    "human-action.resume" : "p01",
+    "human-action.show" : "p02",
+    "job.cancel" : "p01",
+    "job.events" : "p02",
+    "job.evidence" : "p02",
+    "job.list" : "p02",
+    "job.plan" : "p02",
+    "job.reconcile" : "p01",
+    "job.result" : "p02",
+    "job.run" : "p01",
+    "job.show" : "p02",
+    "job.status" : "p02",
+    "job.submit" : "p01",
+    "job.timeline" : "p02",
+    "operation.describe" : "p02",
+    "operation.list" : "p02",
+    "recovery.flash-invocation.list" : "p02",
+    "runtime.bundle.inspect" : "p02",
+    "runtime.bundle.list" : "p10",
+    "runtime.bundle.register" : "p11",
+    "runtime.bundle.remove" : "p12",
+    "runtime.hdc.impact-preview" : "p01",
+    "runtime.hdc.restart" : "p01",
+    "runtime.hdc.status" : "p02",
+    "runtime.storage.policy" : "p13",
+    "runtime.storage.root" : "p13",
+    "runtime.storage.status" : "p14",
+    "runtime.tool.inspect" : "p02",
+    "runtime.tool.list" : "p15",
+    "runtime.tool.register" : "p11",
+    "runtime.tool.remove" : "p16",
+    "runtime.tool.select" : "p01",
+    "session.cleanup.apply" : "p17",
+    "session.cleanup.preview" : "p17",
+    "session.export.apply" : "p17",
+    "session.export.preview" : "p17",
+    "session.list" : "p18",
+    "session.pin" : "p17",
+    "session.show" : "p18",
+    "session.unpin" : "p17",
+    "target.adopt" : "p01",
+    "target.availability" : "p02",
+    "target.display-name.clear" : "p19",
+    "target.display-name.set" : "p19",
+    "target.list" : "p02",
+    "target.show" : "p02",
+    "trace.cache.purge" : "p01",
+    "trace.cache.status" : "p20",
+    "trace.inspect" : "p21",
+    "trace.probe" : "p02",
+    "workspace.preset.list" : "p22",
+    "workspace.preset.register" : "p23",
+    "workspace.preset.remove" : "p23",
+    "workspace.preset.show" : "p22",
+    "workspace.preset.update" : "p23",
+    "workspace.project.list" : "p24",
+    "workspace.project.register" : "p25",
+    "workspace.project.remove" : "p25",
+    "workspace.project.show" : "p24",
+    "workspace.project.update" : "p25"
+  },
+  "ownerPhases" : [
+    "artifactOwner",
+    "importOwner",
+    "bootstrapRegistryOwner",
+    "targetDisplayNameOwner",
+    "candidateDisplayNameOwner",
+    "historyFilterOwner",
+    "runtimeStorageOwner",
+    "sessionOwner",
+    "workspaceProjectOwner",
+    "workspacePresetOwner",
+    "traceCacheOwner",
+    "traceInspectionOwner"
+  ],
+  "profiles" : {
+    "p01" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p02" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p03" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "artifactOwner" : "artifactIntegrityFailed",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "artifactOwner" : "inputTooLarge",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "artifactOwner" : "invalidCursor",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "artifactOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "artifactOwner" : "operationFailed",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "artifactOwner" : "operationUnavailable",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "artifactOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "artifactOwner" : "resourceNotFound",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "artifactOwner" : "sensitiveAccessDenied",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p04" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "importOwner" : "artifactIntegrityFailed",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "importOwner" : "idempotencyConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "importOwner" : "inputTooLarge",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "importOwner" : "invalidCursor",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "importOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "importOwner" : "operationUnavailable",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "importOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "importOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "importOwner" : "resourceNotFound",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p05" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "importOwner" : "artifactIntegrityFailed",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "importOwner" : "idempotencyConflict",
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "importOwner" : "inputTooLarge",
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "importOwner" : "invalidCursor",
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "importOwner" : "invalidInput",
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "importOwner" : "operationUnavailable",
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "importOwner" : "quotaExceeded",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "importOwner" : "resourceConflict",
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "importOwner" : "resourceNotFound",
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p06" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "artifactOwner" : "artifactIntegrityFailed",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "artifactOwner" : "inputTooLarge",
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "artifactOwner" : "invalidCursor",
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "artifactOwner" : "invalidInput",
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "artifactOwner" : "operationFailed",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "artifactOwner" : "operationUnavailable",
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "artifactOwner" : "resourceConflict",
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "artifactOwner" : "resourceNotFound",
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "artifactOwner" : "sensitiveAccessDenied",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p07" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "candidateDisplayNameOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "candidateDisplayNameOwner" : "ioFailure",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "candidateDisplayNameOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "candidateDisplayNameOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p08" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "historyFilterOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "historyFilterOwner" : "ioFailure",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "historyFilterOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "historyFilterOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "historyFilterOwner" : "resourceNotFound",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p09" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "historyFilterOwner" : "invalidInput",
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "historyFilterOwner" : "ioFailure",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "historyFilterOwner" : "outcomeUnknown",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "historyFilterOwner" : "quotaExceeded",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "historyFilterOwner" : "resourceConflict",
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "historyFilterOwner" : "resourceNotFound",
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p10" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "bootstrapRegistryOwner" : "admissionDenied",
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "bootstrapRegistryOwner" : "inputTooLarge",
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "bootstrapRegistryOwner" : "invalidCursor",
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "bootstrapRegistryOwner" : "invalidInput",
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "bootstrapRegistryOwner" : "operationUnavailable",
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "bootstrapRegistryOwner" : "resourceConflict",
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p11" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "bootstrapRegistryOwner" : "admissionDenied",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "bootstrapRegistryOwner" : "fileIdentityChanged",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "bootstrapRegistryOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "bootstrapRegistryOwner" : "ioFailure",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "bootstrapRegistryOwner" : "operationUnavailable",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "bootstrapRegistryOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "bootstrapRegistryOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p12" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "bootstrapRegistryOwner" : "admissionDenied",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "bootstrapRegistryOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "bootstrapRegistryOwner" : "operationUnavailable",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "bootstrapRegistryOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "bootstrapRegistryOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "bootstrapRegistryOwner" : "resourceNotFound",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p13" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput",
+          "runtimeStorageOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "runtimeStorageOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable",
+          "runtimeStorageOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "runtimeStorageOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict",
+          "runtimeStorageOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p14" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput",
+          "runtimeStorageOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "runtimeStorageOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable",
+          "runtimeStorageOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "runtimeStorageOwner" : "outcomeUnknown"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "runtimeStorageOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict",
+          "runtimeStorageOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p15" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "bootstrapRegistryOwner" : "admissionDenied",
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "bootstrapRegistryOwner" : "fileIdentityChanged",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "bootstrapRegistryOwner" : "inputTooLarge",
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "bootstrapRegistryOwner" : "invalidCursor",
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "bootstrapRegistryOwner" : "invalidInput",
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "bootstrapRegistryOwner" : "ioFailure",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "bootstrapRegistryOwner" : "operationUnavailable",
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "bootstrapRegistryOwner" : "outcomeUnknown",
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "bootstrapRegistryOwner" : "resourceConflict",
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p16" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "bootstrapRegistryOwner" : "admissionDenied",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "bootstrapRegistryOwner" : "fileIdentityChanged",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "bootstrapRegistryOwner" : "inputTooLarge",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "bootstrapRegistryOwner" : "invalidInput",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "bootstrapRegistryOwner" : "ioFailure",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "bootstrapRegistryOwner" : "operationUnavailable",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "bootstrapRegistryOwner" : "quotaExceeded",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "bootstrapRegistryOwner" : "resourceConflict",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "bootstrapRegistryOwner" : "resourceNotFound",
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p17" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge",
+          "sessionOwner" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor",
+          "sessionOwner" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput",
+          "sessionOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "sessionOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable",
+          "sessionOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "sessionOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict",
+          "sessionOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound",
+          "sessionOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p18" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge",
+          "sessionOwner" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor",
+          "sessionOwner" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput",
+          "sessionOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "sessionOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable",
+          "sessionOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "sessionOwner" : "outcomeUnknown"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "sessionOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict",
+          "sessionOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound",
+          "sessionOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p19" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput",
+          "targetDisplayNameOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "targetDisplayNameOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "targetDisplayNameOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict",
+          "targetDisplayNameOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound",
+          "targetDisplayNameOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p20" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "traceCacheOwner" : "outcomeUnknown"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p21" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "traceInspectionOwner" : "artifactIntegrityFailed"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput",
+          "traceInspectionOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "traceInspectionOwner" : "operationFailed"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable",
+          "traceInspectionOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound",
+          "traceInspectionOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p22" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied",
+          "workspacePresetOwner" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted",
+          "workspacePresetOwner" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict",
+          "workspacePresetOwner" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput",
+          "workspacePresetOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspacePresetOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable",
+          "workspacePresetOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspacePresetOwner" : "outcomeUnknown"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspacePresetOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict",
+          "workspacePresetOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound",
+          "workspacePresetOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p23" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied",
+          "workspacePresetOwner" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted",
+          "workspacePresetOwner" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict",
+          "workspacePresetOwner" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput",
+          "workspacePresetOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "workspacePresetOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable",
+          "workspacePresetOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "workspacePresetOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict",
+          "workspacePresetOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound",
+          "workspacePresetOwner" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    },
+    "p24" : {
+      "effect" : "boundedReadOnly",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "internalError",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "internalError",
+          "preAdmission" : "factsDrifted",
+          "workspaceProjectOwner" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "idempotencyConflict",
+          "workspaceProjectOwner" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "internalError",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "internalError",
+          "preAdmission" : "invalidInput",
+          "workspaceProjectOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspaceProjectOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "internalError",
+          "preAdmission" : "operationUnavailable",
+          "workspaceProjectOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "internalError",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspaceProjectOwner" : "outcomeUnknown"
+        },
+        "quotaExceeded" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError",
+          "workspaceProjectOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "operationFailed",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceConflict",
+          "workspaceProjectOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "internalError",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "internalError",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "internalError",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "internalError",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "clientTimeout",
+        "lostResponse" : "runtimeUnavailable",
+        "malformedResponse" : "protocolMalformed"
+      }
+    },
+    "p25" : {
+      "effect" : "mutationCapable",
+      "refusals" : {
+        "admissionDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "artifactIntegrityFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "bindingRevisionStale" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "bindingRevisionStale"
+        },
+        "conflict" : {
+          "none" : "resourceConflict",
+          "preAdmission" : "resourceConflict"
+        },
+        "factsDrifted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "factsDrifted",
+          "workspaceProjectOwner" : "factsDrifted"
+        },
+        "fileIdentityChanged" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "humanActionExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "humanActionExpired"
+        },
+        "idempotencyConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "idempotencyConflict",
+          "workspaceProjectOwner" : "idempotencyConflict"
+        },
+        "inputTooLarge" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "inputTooLarge"
+        },
+        "internalError" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "invalidCursor" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidCursor"
+        },
+        "invalidInput" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "invalidInput",
+          "workspaceProjectOwner" : "invalidInput"
+        },
+        "invalidParams" : {
+          "none" : "invalidInput",
+          "preAdmission" : "invalidInput"
+        },
+        "ioFailure" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "workspaceProjectOwner" : "ioFailure"
+        },
+        "malformedFrame" : {
+          "none" : "protocolMalformed",
+          "preAdmission" : "protocolMalformed"
+        },
+        "notFound" : {
+          "none" : "resourceNotFound",
+          "preAdmission" : "resourceNotFound"
+        },
+        "operationFailed" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "operationUnavailable" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "operationUnavailable",
+          "workspaceProjectOwner" : "operationUnavailable"
+        },
+        "orchestrationBudgetExpired" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationBudgetExpired"
+        },
+        "orchestrationClockUntrusted" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "orchestrationClockUntrusted"
+        },
+        "outcomeUnknown" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "quotaExceeded" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError",
+          "workspaceProjectOwner" : "quotaExceeded"
+        },
+        "recordUnreadable" : {
+          "none" : "recordUnreadable",
+          "preAdmission" : "recordUnreadable"
+        },
+        "rejected" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "admissionDenied"
+        },
+        "resourceConflict" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceConflict",
+          "workspaceProjectOwner" : "resourceConflict"
+        },
+        "resourceNotFound" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "resourceNotFound"
+        },
+        "resultNotReady" : {
+          "none" : "resultNotReady",
+          "preAdmission" : "resultNotReady"
+        },
+        "reviewedPlanMismatch" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "reviewedPlanMismatch"
+        },
+        "sensitiveAccessDenied" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "targetTrustPending" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "targetTrustPending"
+        },
+        "unclassifiedWireCode" : {
+          "none" : "outcomeUnknown",
+          "preAdmission" : "internalError"
+        },
+        "unknownMethod" : {
+          "none" : "controlMethodUnavailable",
+          "preAdmission" : "controlMethodUnavailable"
+        },
+        "unsupportedProtocolVersion" : {
+          "none" : "protocolVersionUnsupported",
+          "preAdmission" : "protocolVersionUnsupported"
+        },
+        "workspaceReferenceNotFound" : {
+          "none" : "workspaceReferenceNotFound",
+          "preAdmission" : "workspaceReferenceNotFound"
+        }
+      },
+      "transport" : {
+        "connectFailed" : "runtimeUnavailable",
+        "deadlineExceeded" : "outcomeUnknown",
+        "lostResponse" : "outcomeUnknown",
+        "malformedResponse" : "outcomeUnknown"
+      }
+    }
+  },
+  "wireCodes" : [
+    "resourceConflict",
+    "factsDrifted",
+    "admissionDenied",
+    "targetTrustPending",
+    "invalidInput",
+    "operationUnavailable",
+    "inputTooLarge",
+    "invalidCursor",
+    "idempotencyConflict",
+    "reviewedPlanMismatch",
+    "resourceNotFound",
+    "humanActionExpired",
+    "orchestrationBudgetExpired",
+    "orchestrationClockUntrusted",
+    "bindingRevisionStale",
+    "unsupportedProtocolVersion",
+    "malformedFrame",
+    "unknownMethod",
+    "invalidParams",
+    "conflict",
+    "notFound",
+    "resultNotReady",
+    "workspaceReferenceNotFound",
+    "recordUnreadable",
+    "rejected",
+    "internalError",
+    "artifactIntegrityFailed",
+    "sensitiveAccessDenied",
+    "operationFailed",
+    "quotaExceeded",
+    "fileIdentityChanged",
+    "ioFailure",
+    "outcomeUnknown",
+    "unclassifiedWireCode"
+  ]
+}

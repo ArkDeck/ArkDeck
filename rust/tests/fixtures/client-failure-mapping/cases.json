@@ -1,0 +1,604 @@
+{
+  "cases" : [
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "human-action.resume",
+      "details" : {
+        "method" : "human-action.resume",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "human-action.resume"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "agent.run",
+      "details" : {
+        "method" : "agent.run",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "agent.run"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "agent.resume",
+      "details" : {
+        "method" : "agent.resume",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "agent.resume"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "protocolMalformed",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "clientTimeout",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "agent.status",
+      "details" : {
+        "method" : "agent.status",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "agent.status"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "job.status"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "job.status"
+    },
+    {
+      "code" : "protocolMalformed",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "job.status"
+    },
+    {
+      "code" : "clientTimeout",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "job.status"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "job.status"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "job.status"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "job.status",
+      "details" : {
+        "method" : "job.status",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "job.status"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "job.submit",
+      "details" : {
+        "method" : "job.submit",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "job.submit"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "job.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "job.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "job.run"
+    },
+    {
+      "code" : "outcomeUnknown",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "job.run"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "job.run"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "job.run"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "job.run",
+      "details" : {
+        "method" : "job.run",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "job.run"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "health",
+      "details" : {
+        "method" : "health"
+      },
+      "failure" : "connectFailed",
+      "message" : "connection refused",
+      "method" : "health"
+    },
+    {
+      "code" : "runtimeUnavailable",
+      "command" : "health",
+      "details" : {
+        "method" : "health"
+      },
+      "failure" : "lostResponse",
+      "message" : "the peer closed the connection",
+      "method" : "health"
+    },
+    {
+      "code" : "protocolMalformed",
+      "command" : "health",
+      "details" : {
+        "method" : "health"
+      },
+      "failure" : "malformedResponse",
+      "message" : "the frame is not a response",
+      "method" : "health"
+    },
+    {
+      "code" : "clientTimeout",
+      "command" : "health",
+      "details" : {
+        "method" : "health"
+      },
+      "failure" : "deadlineExceeded",
+      "message" : "the client wait deadline expired; no cancellation was requested",
+      "method" : "health"
+    },
+    {
+      "code" : "resourceNotFound",
+      "command" : "health",
+      "details" : {
+        "method" : "health",
+        "wireCode" : "notFound"
+      },
+      "failure" : "daemonError",
+      "message" : "no such resource",
+      "method" : "health"
+    },
+    {
+      "code" : "invalidInput",
+      "command" : "health",
+      "details" : {
+        "method" : "health",
+        "newDispatchCount" : 0,
+        "phase" : "preAdmission",
+        "wireCode" : "invalidParams"
+      },
+      "failure" : "refusedBeforeAdmission",
+      "message" : "the parameters are invalid",
+      "method" : "health"
+    },
+    {
+      "code" : "resourceConflict",
+      "command" : "health",
+      "details" : {
+        "method" : "health",
+        "wireCode" : "conflict"
+      },
+      "failure" : "refusedWithoutProof",
+      "message" : "the target is busy",
+      "method" : "health"
+    }
+  ]
+}

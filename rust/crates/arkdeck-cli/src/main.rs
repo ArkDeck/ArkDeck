@@ -74,14 +74,13 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
                 "note: no --idempotency-key was given, so this submit generated one and cannot be retried safely; pass one to make a repeat return the same job"
             );
         }
-        // Nothing is sent before the connection is made, so a connect
-        // failure maps as it does for a read.
+        // Nothing is sent before the connection is made.
         let mut client = Client::connect_bounded(
             &endpoint,
             &identity,
             Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
         )
-        .map_err(|error| CliError::from_client(error, "job.plan"))?;
+        .map_err(|error| CliError::from_connect(error, invocation.method))?;
         let result = client
             .request(id, invocation.method, Some(params))
             .map_err(|error| CliError::from_client(error, invocation.method))?;
@@ -108,7 +107,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
                 .expect("parsed inspection parameters"),
         )?;
         let mut client = Client::connect_bounded(&endpoint, &identity, Duration::from_millis(wait))
-            .map_err(|error| CliError::from_client(error, "trace.inspect"))?;
+            .map_err(|error| CliError::from_connect(error, "trace.inspect"))?;
         let result = client
             .request(id, "trace.inspect", Some(request.clone()))
             .map_err(|error| CliError::from_client(error, "trace.inspect"))?;
@@ -120,7 +119,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         // health document off the contract is this read's own malformed answer
         // and not a refusal to admit a business request that was never sent.
         let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(20))
-            .map_err(|error| CliError::from_client(error, "health"))?;
+            .map_err(|error| CliError::from_connect(error, "health"))?;
         return client.health(id).map_err(|error| match error {
             arkdeck_client::ClientError::Contract(_) => CliError::new(
                 "protocolMalformed",
@@ -166,7 +165,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             &identity,
             Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
         )
-        .map_err(|error| CliError::from_client(error, invocation.method))?;
+        .map_err(|error| CliError::from_connect(error, invocation.method))?;
         let result = client
             .request(id, invocation.method, invocation.params.clone())
             .map_err(|error| CliError::from_client(error, invocation.method))?;
@@ -191,15 +190,14 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         return Ok(result);
     }
     if invocation.command == "job.run" {
-        // Nothing is sent before the connection is made, so a connect failure
-        // maps as it does for a read; a reply lost after the request went out
-        // leaves the run's outcome unknown.
+        // Nothing is sent before the connection is made; a reply lost after
+        // the request went out leaves the run's outcome unknown.
         let mut client = Client::connect_bounded(
             &endpoint,
             &identity,
             Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
         )
-        .map_err(|error| CliError::from_client(error, "job.status"))?;
+        .map_err(|error| CliError::from_connect(error, "job.run"))?;
         let result = client
             .request(id, "job.run", invocation.params.clone())
             .map_err(|error| CliError::from_client(error, "job.run"))?;
@@ -210,7 +208,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         // As for a run: a connect failure proves nothing was sent, and a reply
         // lost after the request went out leaves the cancellation unknown.
         let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(20))
-            .map_err(|error| CliError::from_client(error, "job.status"))?;
+            .map_err(|error| CliError::from_connect(error, "job.cancel"))?;
         let result = client
             .request(id, "job.cancel", invocation.params.clone())
             .map_err(|error| CliError::from_client(error, "job.cancel"))?;
@@ -224,7 +222,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         // lost after the request went out leaves the reconcile unknown. The
         // original effect is never resent either way.
         let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(20))
-            .map_err(|error| CliError::from_client(error, "job.status"))?;
+            .map_err(|error| CliError::from_connect(error, "job.reconcile"))?;
         return client
             .request(id, "job.reconcile", invocation.params.clone())
             .map_err(|error| CliError::from_client(error, "job.reconcile"));
@@ -233,7 +231,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         return arkdeck_cli::execute_import(invocation, |method, params, remaining| {
             let mut client =
                 Client::connect_bounded(&endpoint, &identity, Duration::from_millis(remaining))
-                    .map_err(|error| CliError::from_client(error, "artifact.import.inspect"))?;
+                    .map_err(|error| CliError::from_connect(error, method))?;
             client
                 .request(id, method, Some(params))
                 .map_err(|error| CliError::from_client(error, method))
@@ -248,7 +246,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             &identity,
             Duration::from_millis(invocation.timeout_ms.unwrap_or(3_600_000)),
         )
-        .map_err(|error| CliError::from_client(error, "artifact.inspect"))?;
+        .map_err(|error| CliError::from_connect(error, "artifact.inspect"))?;
         let params = invocation
             .params
             .as_ref()
@@ -292,15 +290,14 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     ) {
         // Swift's handler checks the intent, the preview tuple or the control
         // action's identity first.
-        // Nothing is sent before the connection is made, so a connect
-        // failure maps as it does for a read.
+        // Nothing is sent before the connection is made.
         let params = arkdeck_cli::hdc_control_action_params(invocation)?;
         let mut client = Client::connect_bounded(
             &endpoint,
             &identity,
             Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
         )
-        .map_err(|error| CliError::from_client(error, "runtime.hdc.status"))?;
+        .map_err(|error| CliError::from_connect(error, invocation.method))?;
         return client
             .request(id, invocation.method, Some(params))
             .map_err(|error| CliError::from_client(error, invocation.method));
@@ -317,37 +314,26 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         let request = match invocation.timeout_ms {
             Some(timeout_ms) => {
                 Client::connect_bounded(&endpoint, &identity, Duration::from_millis(timeout_ms))
-                    .and_then(|mut client| client.request(id, invocation.method, params))
+                    .map_err(|error| CliError::from_connect(error, invocation.method))?
+                    .request(id, invocation.method, params)
             }
             None => Client::connect(&endpoint, &identity, Duration::from_secs(20))
-                .and_then(|mut client| client.request(id, invocation.method, params)),
+                .map_err(|error| CliError::from_connect(error, invocation.method))?
+                .request(id, invocation.method, params),
         };
         return request.map_err(|error| CliError::from_client(error, invocation.method));
     }
+    // Nothing is sent before the connection is made.
     let request = if let Some(timeout_ms) = invocation.timeout_ms {
         Client::connect_bounded(&endpoint, &identity, Duration::from_millis(timeout_ms))
-            .and_then(|mut client| client.request(id, invocation.method, invocation.params.clone()))
+            .map_err(|error| CliError::from_connect(error, invocation.method))?
+            .request(id, invocation.method, invocation.params.clone())
     } else {
         Client::connect(&endpoint, &identity, Duration::from_secs(20))
-            .and_then(|mut client| client.request(id, invocation.method, invocation.params.clone()))
+            .map_err(|error| CliError::from_connect(error, invocation.method))?
+            .request(id, invocation.method, invocation.params.clone())
     };
-    let result = request.map_err(|error| {
-        if matches!(
-            invocation.command,
-            "runtime.tool.register" | "runtime.bundle.register"
-        ) && matches!(
-            error,
-            arkdeck_client::ClientError::Contract(_)
-                | arkdeck_client::ClientError::ConnectionUnusable
-        ) {
-            CliError::new(
-                "outcomeUnknown",
-                "Runtime mutation response is unconfirmed; no request was replayed",
-            )
-        } else {
-            CliError::from_client(error, invocation.method)
-        }
-    })?;
+    let result = request.map_err(|error| CliError::from_client(error, invocation.method))?;
     arkdeck_cli::validate_workspace_project_response(invocation, &result)?;
     arkdeck_cli::validate_target_response(invocation, &result)?;
     arkdeck_cli::validate_debug_probe(invocation, &result)?;
@@ -443,12 +429,16 @@ fn observe_job(
         let mut attempt = 0;
         loop {
             let left = check(stop)?;
-            match Client::connect_bounded(endpoint, identity, left)
-                .and_then(|mut client| client.request(id, method, Some(params.clone())))
-            {
+            let answer = Client::connect_bounded(endpoint, identity, left)
+                .map_err(|error| CliError::from_connect(error, method))
+                .and_then(|mut client| {
+                    client
+                        .request(id, method, Some(params.clone()))
+                        .map_err(|error| CliError::from_client(error, method))
+                });
+            match answer {
                 Ok(answer) => return Ok(answer),
                 Err(error) => {
-                    let error = CliError::from_client(error, method);
                     if error.code != "runtimeUnavailable" || attempt >= 2 {
                         return Err(if error.code == "clientTimeout" {
                             timed_out()
@@ -586,16 +576,15 @@ fn poll_job(
         // own 30 s budget: Swift judges the caller's deadline only between
         // reads, so a read that began before it still answers.
         let status = Client::connect_bounded(endpoint, identity, Duration::from_secs(30))
-            .and_then(|mut client| {
-                client.request(
-                    id,
-                    "job.status",
-                    Some(Map::from_iter([(
-                        "jobId".to_owned(),
-                        Value::String(job.clone()),
-                    )])),
-                )
-            })
+            .map_err(|error| CliError::from_connect(error, "job.status"))?
+            .request(
+                id,
+                "job.status",
+                Some(Map::from_iter([(
+                    "jobId".to_owned(),
+                    Value::String(job.clone()),
+                )])),
+            )
             .map_err(|error| CliError::from_client(error, "job.status"))?;
         let arkdeck_cli::Poll::Pending(state) = arkdeck_cli::poll(&job, &status)? else {
             return Ok(status);
@@ -691,9 +680,13 @@ fn wait_for_device(
             return Err(arkdeck_cli::wait_timeout(&following, &state, last));
         }
         let snapshot = Client::connect_bounded(endpoint, identity, left)
-            .and_then(|mut client| client.request(id, "device.observations", Some(request.clone())))
+            .map_err(|error| CliError::from_connect(error, "device.observations"))
+            .and_then(|mut client| {
+                client
+                    .request(id, "device.observations", Some(request.clone()))
+                    .map_err(|error| CliError::from_client(error, "device.observations"))
+            })
             .map_err(|error| {
-                let error = CliError::from_client(error, "device.observations");
                 if error.code == "clientTimeout" {
                     arkdeck_cli::wait_timeout(&following, &state, last)
                 } else {
@@ -740,7 +733,7 @@ fn validate_operation(
     let reference = params["reference"].as_str().unwrap_or_default().to_owned();
     let inputs_file = params["inputsFile"].as_str().unwrap_or_default().to_owned();
     let mut client = Client::connect(endpoint, identity, Duration::from_secs(20))
-        .map_err(|error| CliError::from_client(error, "operation.describe"))?;
+        .map_err(|error| CliError::from_connect(error, "operation.describe"))?;
     let descriptor = client
         .request(
             id,
@@ -796,10 +789,9 @@ fn run_agent(
     };
     let request = |method: &str, body: serde_json::Map<String, Value>| {
         let wait = remaining()?;
-        // Nothing is sent before the connection is made, so a connect
-        // failure maps as it does for a read.
+        // Nothing is sent before the connection is made.
         let mut client = Client::connect_bounded(endpoint, identity, wait)
-            .map_err(|error| CliError::from_client(error, "agent.status"))?;
+            .map_err(|error| CliError::from_connect(error, method))?;
         client
             .request(id, method, Some(body))
             .map_err(|error| CliError::from_client(error, method))
@@ -875,7 +867,7 @@ fn continue_workspace(
         identity,
         Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
     )
-    .map_err(|error| CliError::from_client(error, "health"))?;
+    .map_err(|error| CliError::from_connect(error, "health"))?;
     let fields = invocation.params.clone().unwrap_or_default();
     arkdeck_cli::continue_workspace(verb, &fields, &mut |method, params| {
         if method == "health" {

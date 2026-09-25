@@ -10,6 +10,9 @@ pub use artifact_resources::{
 };
 pub use import_resources::execute_import;
 mod bootstrap_resources;
+mod failure_mapping;
+use failure_mapping::Transport;
+pub use failure_mapping::{BOUNDED_READ_ONLY_METHODS, bounded_read_only};
 mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
@@ -162,314 +165,179 @@ impl CliError {
             _ => 70,
         }
     }
-    pub fn from_client(error: ClientError, method: &str) -> Self {
-        if matches!(
-            method,
-            "workspace.project.register"
-                | "workspace.project.update"
-                | "workspace.project.remove"
-                | "workspace.preset.register"
-                | "workspace.preset.update"
-                | "workspace.preset.remove"
-        ) && !matches!(error, ClientError::Remote(_))
-        {
-            return CliError::new(
-                "outcomeUnknown",
-                "workspace registration response is unconfirmed; no request was replayed",
-            );
-        }
-        if matches!(
-            method,
-            "job.submit"
-                | "job.run"
-                | "job.cancel"
-                | "job.reconcile"
-                | "agent.run"
-                | "agent.abandon"
-                | "agent.resume"
-                | "human-action.resume"
-                | "target.adopt"
-                | "runtime.hdc.impact-preview"
-                | "runtime.hdc.restart"
-                | "runtime.tool.select"
-                | "control-action.list"
-                | "control-action.show"
-                | "control-action.reconcile"
-        ) {
-            return job_plan::mutation_error(error, method);
-        }
-        if matches!(
-            method,
-            "agent.status" | "agent.list" | "human-action.list" | "human-action.show"
-        ) {
-            return agent_executions::read_error(error, method);
-        }
-        if matches!(
-            method,
-            "artifact.import.begin"
-                | "artifact.import.append"
-                | "artifact.import.abort"
-                | "artifact.import.commit"
-                | "artifact.import.release"
-        ) && !matches!(error, ClientError::Remote(_))
-        {
-            let mut result = Self::new(
-                "outcomeUnknown",
-                "Import response is unconfirmed; inspect the same request identity before continuing",
-            );
-            result.details.insert("method".into(), json!(method));
-            return result;
-        }
-
-        if target_resources::is_mutation(method) {
-            return target_resources::client_error(error, method);
-        }
-        if method == "artifact.export" && !matches!(error, ClientError::Remote(_)) {
-            let mut result = Self::new(
-                "outcomeUnknown",
-                "Artifact export response is unconfirmed; inspect the exact destination before retrying",
-            );
-            result.details.insert("method".into(), json!(method));
-            return result;
-        }
-        if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
-            return bootstrap_resources::retirement_error(error, method);
-        }
-        if matches!(method, "session.cleanup.apply" | "trace.cache.purge")
-            && matches!(
-                error,
-                ClientError::Transport(_)
-                    | ClientError::Contract(_)
-                    | ClientError::ConnectionUnusable
-            )
-        {
-            let mut result = Self::new(
-                "outcomeUnknown",
-                if method == "trace.cache.purge" {
-                    "Trace cache purge response is unconfirmed; no request was replayed"
-                } else {
-                    "Session cleanup response is unconfirmed; no request was replayed"
-                },
-            );
-            result
-                .details
-                .insert("method".into(), Value::String(method.into()));
-            return result;
-        }
-        let mut result = match error {
+    /// Swift `CLIRuntimeSession.mapped` of a connection that did not open for
+    /// `method`: nothing was sent, so nothing was accepted, whatever the
+    /// method (`runtimeUnavailable`, in Swift's words for an OS error). The
+    /// client's own deadline is the exception: it says nothing about the
+    /// request.
+    pub fn from_connect(error: ClientError, method: &str) -> Self {
+        let mut result = match &error {
+            ClientError::Transport(error) if client_deadline(error) => Self::new(
+                failure_mapping::transport_code(Transport::ClientTimeout, method),
+                CLIENT_DEADLINE,
+            ),
             ClientError::Transport(error) => Self::new(
-                if matches!(
-                    method,
-                    "runtime.tool.register"
-                        | "runtime.bundle.register"
-                        | "trace.cache.purge"
-                        | "history.filter.save"
-                        | "history.filter.delete"
-                        | "runtime.storage.policy"
-                        | "runtime.storage.root"
-                        | "session.pin"
-                        | "session.unpin"
-                ) {
-                    "outcomeUnknown"
-                } else if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
-                ) {
-                    "clientTimeout"
-                } else {
-                    "runtimeUnavailable"
+                failure_mapping::transport_code(Transport::ConnectFailed, method),
+                match error.raw_os_error() {
+                    Some(number) => format!("connect failed: errno {number}"),
+                    None => error.to_string(),
                 },
-                error.to_string(),
             ),
-            ClientError::Contract(
-                ContractError::UnsupportedVersion | ContractError::ContractMismatch,
-            ) => Self::new(
-                "protocolVersionUnsupported",
-                "client and Runtime must use the same current control contract",
+            other => Self::new(
+                failure_mapping::transport_code(Transport::ConnectFailed, method),
+                other.to_string(),
             ),
-            ClientError::Contract(_) => Self::new(
-                "protocolMalformed",
-                "the local Runtime response does not conform to the current contract",
-            ),
-            ClientError::ConnectionUnusable => Self::new(
-                "runtimeUnavailable",
-                "the connection is unusable; no request was replayed",
-            ),
-            ClientError::Remote(error) => {
-                let proof = error.details.as_ref().is_some_and(|d| {
-                    d.get("phase") == Some(&json!("preAdmission"))
-                        && d.get("newDispatchCount") == Some(&json!(0))
-                });
-                let host_proof = matches!(
-                    method,
-                    "history.filter.list" | "history.filter.save" | "history.filter.delete"
-                ) && error.details.as_ref().is_some_and(|d| {
-                    d.get("phase") == Some(&json!("historyFilterOwner"))
-                        && d.get("newDispatchCount") == Some(&json!(0))
-                });
-                let host_proof = host_proof
-                    || (matches!(
-                        method,
-                        "runtime.storage.status"
-                            | "runtime.storage.policy"
-                            | "runtime.storage.root"
-                    ) && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("runtimeStorageOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                    }));
-                let host_proof = host_proof
-                    || (matches!(
-                        method,
-                        "session.list"
-                            | "session.show"
-                            | "session.pin"
-                            | "session.unpin"
-                            | "session.cleanup.preview"
-                            | "session.cleanup.apply"
-                            | "session.export.preview"
-                            | "session.export.apply"
-                    ) && error.details.as_ref().is_some_and(|details| {
-                        details.get("phase") == Some(&json!("sessionOwner"))
-                            && details.get("newDispatchCount") == Some(&json!(0))
-                    }));
-                let bootstrap_proof = matches!(
-                    method,
-                    "runtime.tool.inspect"
-                        | "runtime.bundle.inspect"
-                        | "runtime.tool.register"
-                        | "runtime.bundle.register"
-                        | "runtime.bundle.list"
-                        | "runtime.tool.list"
-                ) && error.details.as_ref().is_some_and(|details| {
-                    details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
-                        && details.get("newDispatchCount") == Some(&json!(0))
-                });
-                let artifact_proof = matches!(
-                    method,
-                    "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export"
-                ) && error.details.as_ref().is_some_and(|d| {
-                    d.get("phase") == Some(&json!("artifactOwner"))
-                        && d.get("newDispatchCount") == Some(&json!(0))
-                });
-                let import_proof = method.starts_with("artifact.import.")
-                    && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("importOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                    });
-                let trace_proof = matches!(method, "trace.cache.status" | "trace.cache.purge")
-                    && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("traceCacheOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                            && d.get("purgeScope") == Some(&json!("inactiveDerivedDatabases"))
-                    });
-                // Swift's Trace inspection owner refused before anything ran.
-                let inspection_proof = method == "trace.inspect"
-                    && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("traceInspectionOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                    });
-                let workspace_proof = (method.starts_with("workspace.project.")
-                    && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("workspaceProjectOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                    }))
-                    || (method.starts_with("workspace.preset.")
-                        && error.details.as_ref().is_some_and(|d| {
-                            d.get("phase") == Some(&json!("workspacePresetOwner"))
-                                && d.get("newDispatchCount") == Some(&json!(0))
-                        }));
-                let host_proof = host_proof
-                    || bootstrap_proof
-                    || artifact_proof
-                    || import_proof
-                    || trace_proof
-                    || workspace_proof;
-                let code = match error.code.as_str() {
-                    "invalidInput" if inspection_proof => "invalidInput",
-                    "operationUnavailable" if inspection_proof => "operationUnavailable",
-                    "resourceNotFound" if inspection_proof => "resourceNotFound",
-                    "artifactIntegrityFailed" if inspection_proof => "artifactIntegrityFailed",
-                    "recordUnreadable" if inspection_proof => "recordUnreadable",
-                    "operationFailed" if inspection_proof => "operationFailed",
-                    "artifactIntegrityFailed" if artifact_proof || import_proof => {
-                        "artifactIntegrityFailed"
-                    }
-                    "operationFailed" if artifact_proof => "operationFailed",
-                    "sensitiveAccessDenied" if artifact_proof => "sensitiveAccessDenied",
-                    "admissionDenied" if bootstrap_proof => "admissionDenied",
-                    "fileIdentityChanged"
-                        if bootstrap_proof
-                            && matches!(
-                                method,
-                                "runtime.tool.register"
-                                    | "runtime.bundle.register"
-                                    | "runtime.tool.list"
-                            ) =>
-                    {
-                        "fileIdentityChanged"
-                    }
-                    "idempotencyConflict" if import_proof || workspace_proof => {
-                        "idempotencyConflict"
-                    }
-                    "factsDrifted" if workspace_proof => "factsDrifted",
-                    "invalidInput" if host_proof => "invalidInput",
-                    "resourceConflict" if host_proof => "resourceConflict",
-                    "resourceNotFound" if host_proof => "resourceNotFound",
-                    "ioFailure" if host_proof => "ioFailure",
-                    "outcomeUnknown" if host_proof => "outcomeUnknown",
-                    "quotaExceeded" if host_proof => "quotaExceeded",
-                    "invalidCursor" if host_proof => "invalidCursor",
-                    "inputTooLarge" if host_proof => "inputTooLarge",
-                    "operationUnavailable" if host_proof => "operationUnavailable",
-                    "unsupportedProtocolVersion" => "protocolVersionUnsupported",
-                    "malformedFrame" => "protocolMalformed",
-                    "unknownMethod" => "controlMethodUnavailable",
-                    "invalidParams" => "invalidInput",
-                    "conflict" => "resourceConflict",
-                    "notFound" => "resourceNotFound",
-                    // A Job read before its terminal result: read it again
-                    // later, as the Swift CLI tells its caller.
-                    "resultNotReady" => "resultNotReady",
-                    "recordUnreadable" if method == "runtime.tool.list" && !bootstrap_proof => {
-                        "internalError"
-                    }
-                    "recordUnreadable" => "recordUnreadable",
-                    "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
-                    // Swift `CLIControlFailureMapper`: a named refusal whose
-                    // handler proved nothing was admitted keeps its code,
-                    // whatever the method.
-                    "resourceConflict" if proof => "resourceConflict",
-                    "factsDrifted" if proof => "factsDrifted",
-                    "admissionDenied" if proof => "admissionDenied",
-                    "targetTrustPending" if proof => "targetTrustPending",
-                    "invalidInput" if proof => "invalidInput",
-                    "operationUnavailable" if proof => "operationUnavailable",
-                    "inputTooLarge" if proof => "inputTooLarge",
-                    "invalidCursor" if proof => "invalidCursor",
-                    "idempotencyConflict" if proof => "idempotencyConflict",
-                    "reviewedPlanMismatch" if proof => "reviewedPlanMismatch",
-                    "resourceNotFound" if proof => "resourceNotFound",
-                    "humanActionExpired" if proof => "humanActionExpired",
-                    "orchestrationBudgetExpired" if proof => "orchestrationBudgetExpired",
-                    "orchestrationClockUntrusted" if proof => "orchestrationClockUntrusted",
-                    "bindingRevisionStale" if proof => "bindingRevisionStale",
-                    "rejected" if proof => "admissionDenied",
-                    "rejected" => "operationFailed",
-                    _ => "internalError",
-                };
-                let mut result = Self::new(code, error.message);
-                result.details = error.details.unwrap_or_default();
-                result
-                    .details
-                    .insert("wireCode".into(), Value::String(error.code));
-                result
-            }
         };
         result
             .details
             .insert("method".into(), Value::String(method.into()));
         result
     }
+
+    /// Swift `CLIRuntimeSession.mapped` of a request to `method` that went
+    /// out. The code is Swift's mapper's (`failure_mapping`), and the details
+    /// are Swift's: the Runtime's own, if it gave any, with the method and
+    /// the wire code. A reply that did not come back whole leaves a
+    /// mutation-capable method's outcome unknown, in this CLI's words for
+    /// what to read next; Swift passes the transport's own text.
+    pub fn from_client(error: ClientError, method: &str) -> Self {
+        let mut result = match error {
+            ClientError::Remote(wire) => {
+                let mut result = Self::new(
+                    failure_mapping::wire_code(&wire.code, method, wire.details.as_ref()),
+                    wire.message,
+                );
+                result.details = wire.details.unwrap_or_default();
+                result
+                    .details
+                    .insert("wireCode".into(), Value::String(wire.code));
+                result
+            }
+            ClientError::Transport(error) if client_deadline(&error) => Self::new(
+                failure_mapping::transport_code(Transport::ClientTimeout, method),
+                CLIENT_DEADLINE,
+            ),
+            // Proved before the business request left: this client's own
+            // request check or the health preflight.
+            ClientError::Contract(
+                ContractError::UnsupportedVersion | ContractError::ContractMismatch,
+            ) => Self::new(
+                "protocolVersionUnsupported",
+                "client and Runtime must use the same current control contract",
+            ),
+            error if !failure_mapping::bounded_read_only(method) => {
+                Self::new("outcomeUnknown", unconfirmed(method, &error))
+            }
+            ClientError::Transport(error) => Self::new(
+                failure_mapping::transport_code(Transport::LostResponse, method),
+                error.to_string(),
+            ),
+            ClientError::Contract(_) => Self::new(
+                failure_mapping::transport_code(Transport::MalformedResponse, method),
+                "the local Runtime response does not conform to the current contract",
+            ),
+            ClientError::ConnectionUnusable => Self::new(
+                "runtimeUnavailable",
+                "the connection is unusable; no request was replayed",
+            ),
+        };
+        result
+            .details
+            .insert("method".into(), Value::String(method.into()));
+        result
+    }
+}
+
+/// Swift's words when the client stops waiting.
+pub const CLIENT_DEADLINE: &str = "the client wait deadline expired; no cancellation was requested";
+
+/// Whether a transport failure is the client's own deadline, which Swift's
+/// client names `deadlineExceeded`.
+fn client_deadline(error: &std::io::Error) -> bool {
+    matches!(
+        error.kind(),
+        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
+    )
+}
+
+/// This CLI's words for a mutation-capable request whose reply did not come
+/// back whole: what the caller reads next instead of repeating it.
+fn unconfirmed(method: &str, error: &ClientError) -> String {
+    match method {
+        "job.submit" => {
+            "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
+        }
+        "job.run" => {
+            "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
+        }
+        "job.cancel" => {
+            "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
+        }
+        "job.reconcile" => {
+            "the Job reconcile reply is unconfirmed; read the Job with job status to learn what it settled; the original effect is never replayed"
+        }
+        "agent.run" => {
+            "the agent run reply is unconfirmed; read the execution with agent status, or run the same execution again, instead of starting a new one"
+        }
+        "agent.resume" => {
+            "the agent resume reply is unconfirmed; read the execution with agent status instead of resuming it again"
+        }
+        "agent.abandon" => {
+            "the agent abandon reply is unconfirmed; read the execution with agent status to learn whether it was abandoned"
+        }
+        "human-action.resume" => {
+            "the human-action resume reply is unconfirmed; read the action with human-action show instead of resuming it again"
+        }
+        "target.adopt" => {
+            "the target adoption reply is unconfirmed; read the device candidates and the target list to learn whether it was adopted"
+        }
+        "runtime.hdc.impact-preview"
+        | "runtime.hdc.restart"
+        | "control-action.list"
+        | "control-action.show"
+        | "control-action.reconcile" => {
+            "the HDC control-action reply is unconfirmed; no request was replayed"
+        }
+        "runtime.tool.select" => {
+            "the tool-selection reply is unconfirmed; select again with the same action request ID to read the same control action, never a new one"
+        }
+        "runtime.tool.register" | "runtime.bundle.register" => {
+            "Runtime mutation response is unconfirmed; no request was replayed"
+        }
+        "runtime.tool.remove" | "runtime.bundle.remove" => {
+            return format!("{method} has no verified receipt: {error}");
+        }
+        "workspace.project.register"
+        | "workspace.project.update"
+        | "workspace.project.remove"
+        | "workspace.preset.register"
+        | "workspace.preset.update"
+        | "workspace.preset.remove" => {
+            "workspace registration response is unconfirmed; no request was replayed"
+        }
+        "artifact.import.begin"
+        | "artifact.import.append"
+        | "artifact.import.abort"
+        | "artifact.import.commit"
+        | "artifact.import.release" => {
+            "Import response is unconfirmed; inspect the same request identity before continuing"
+        }
+        "artifact.export" => {
+            "Artifact export response is unconfirmed; inspect the exact destination before retrying"
+        }
+        "target.display-name.set"
+        | "target.display-name.clear"
+        | "device.display-name.set"
+        | "device.display-name.clear" => {
+            "Display-name response is unconfirmed; read current state before another update; no request was replayed"
+        }
+        "session.cleanup.apply" => {
+            "Session cleanup response is unconfirmed; no request was replayed"
+        }
+        "trace.cache.purge" => "Trace cache purge response is unconfirmed; no request was replayed",
+        _ => return format!("the {method} reply is unconfirmed; no request was replayed"),
+    }
+    .to_owned()
 }
 
 pub fn valid_correlation(id: &str) -> bool {

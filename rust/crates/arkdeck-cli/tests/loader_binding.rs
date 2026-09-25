@@ -73,12 +73,14 @@ mod runtime {
         assert!(envelope["meta"].get("lifecycle").is_none());
 
         // A refusal is the Runtime's own, in the CLI's vocabulary (Swift's
-        // `CLIControlFailureMapper`), with the Runtime's words.
+        // `CLIControlFailureMapper`), with the Runtime's words: a `rejected`
+        // without the pre-admission proof leaves this mutation-capable
+        // method's outcome unknown.
         let refused = recorded("bind.lineageAmbiguous");
         let (output, envelope) = bind(&refused);
         assert_ne!(output.status.code(), Some(0));
         assert_eq!(envelope["ok"], false);
-        assert_eq!(envelope["error"]["code"], "operationFailed");
+        assert_eq!(envelope["error"]["code"], "outcomeUnknown");
         assert_eq!(envelope["error"]["message"], refused["error"]["message"]);
     }
 }

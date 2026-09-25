@@ -10,8 +10,7 @@ use crate::read_only_resources::{
     duration, keys, known_job_state, publication, terminal_job_state,
 };
 use crate::{CliError, Invocation};
-use arkdeck_client::ClientError;
-use arkdeck_contract::{CATALOG_CANONICAL_JSON, ContractError, canonical_json, strict_json};
+use arkdeck_contract::{CATALOG_CANONICAL_JSON, canonical_json, strict_json};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 use std::io::Read;
@@ -105,25 +104,6 @@ const JOB_KEYS: [&str; 7] = [
     "waitingForHuman",
     "outstandingResidueCount",
     "sessionPublication",
-];
-/// The failures a pre-admission proof lets a Runtime refusal keep (Swift
-/// `CLIControlFailureMapper`'s named codes).
-const NAMED_REFUSALS: [&str; 15] = [
-    "resourceConflict",
-    "factsDrifted",
-    "admissionDenied",
-    "targetTrustPending",
-    "invalidInput",
-    "operationUnavailable",
-    "inputTooLarge",
-    "invalidCursor",
-    "idempotencyConflict",
-    "reviewedPlanMismatch",
-    "resourceNotFound",
-    "humanActionExpired",
-    "orchestrationBudgetExpired",
-    "orchestrationClockUntrusted",
-    "bindingRevisionStale",
 ];
 /// Swift `CLIErrorCode`: an execution's `failureCode` settles a run only
 /// when it names one of these.
@@ -994,70 +974,4 @@ pub fn agent_exit(result: &Value) -> Option<(u8, String)> {
         ));
     }
     crate::run_exit(&result["job"]).map(|(code, reason)| (code, reason.to_owned()))
-}
-
-/// Swift `CLIControlFailureMapper` for the bounded read `agent.status`: a
-/// named refusal keeps its code only with the pre-admission proof, and any
-/// other unclassified failure is an internal error, never an unknown outcome.
-pub(crate) fn read_error(error: ClientError, method: &str) -> CliError {
-    let mut result = match error {
-        ClientError::Remote(wire) => {
-            let proof = wire.details.as_ref().is_some_and(|details| {
-                details.get("phase") == Some(&json!("preAdmission"))
-                    && details.get("newDispatchCount") == Some(&json!(0))
-            });
-            let code = match wire.code.as_str() {
-                named if NAMED_REFUSALS.contains(&named) => {
-                    if proof {
-                        cli_code(named).unwrap_or("internalError")
-                    } else {
-                        "internalError"
-                    }
-                }
-                "unsupportedProtocolVersion" => "protocolVersionUnsupported",
-                "malformedFrame" => "protocolMalformed",
-                "unknownMethod" => "controlMethodUnavailable",
-                "invalidParams" => "invalidInput",
-                "conflict" => "resourceConflict",
-                "notFound" => "resourceNotFound",
-                "resultNotReady" => "resultNotReady",
-                "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
-                "recordUnreadable" => "recordUnreadable",
-                "rejected" if proof => "admissionDenied",
-                "rejected" => "operationFailed",
-                _ => "internalError",
-            };
-            let mut result = CliError::new(code, wire.message);
-            result.details = wire.details.unwrap_or_default();
-            result.details.insert("wireCode".into(), json!(wire.code));
-            result
-        }
-        ClientError::Transport(error) => CliError::new(
-            if matches!(
-                error.kind(),
-                std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
-            ) {
-                "clientTimeout"
-            } else {
-                "runtimeUnavailable"
-            },
-            error.to_string(),
-        ),
-        ClientError::Contract(
-            ContractError::UnsupportedVersion | ContractError::ContractMismatch,
-        ) => CliError::new(
-            "protocolVersionUnsupported",
-            "client and Runtime must use the same current control contract",
-        ),
-        ClientError::Contract(_) => CliError::new(
-            "protocolMalformed",
-            "the local Runtime response does not conform to the current contract",
-        ),
-        ClientError::ConnectionUnusable => CliError::new(
-            "runtimeUnavailable",
-            "the connection is unusable; no request was replayed",
-        ),
-    };
-    result.details.insert("method".into(), json!(method));
-    result
 }
