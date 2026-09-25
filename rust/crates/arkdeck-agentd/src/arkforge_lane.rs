@@ -74,6 +74,15 @@ impl Composed {
         flash_planning(unavailable, toolchain, self.rockusb(), state, hdc)
     }
 
+    /// Swift's lane plan previewer, composed only with a lane: the profile
+    /// the lane was composed for (`main.swift` 1410-1414).
+    pub(crate) fn lane_plan_preview(&self) -> Option<String> {
+        self.lane
+            .as_ref()
+            .ok()
+            .map(|lane| lane.profile_reference().to_owned())
+    }
+
     /// Stops the lane's daemon, once, after the owner's drain.
     pub(crate) fn stop(&self) {
         if let Ok(lane) = &self.lane

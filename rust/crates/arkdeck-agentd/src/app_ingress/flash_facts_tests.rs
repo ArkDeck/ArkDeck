@@ -1,6 +1,7 @@
 //! The App's Flash workspace asks `flash.bootloader-status` with no
-//! parameters and `flash.prerequisites` of one Target for the profile it
-//! prepared, as ClientKit's `FlashApplicationFacade` does. A recording host
+//! parameters, `flash.prerequisites` of one Target for the profile it
+//! prepared and `flash.lanePlanPreview` of one imported archive for them, as
+//! ClientKit's `FlashApplicationFacade` does. A recording host
 //! stands in for the observers: the boundary is under test here, the reads
 //! themselves are replayed by `flash_host_facts_control`. No signed peer,
 //! board or installed Runtime is represented.
@@ -49,6 +50,13 @@ impl HostServices for Facts {
             "bindingRevision": 2,
             "observations": [{"identifier": "loader-mode", "status": "unknown"}],
         }))
+    }
+    fn flash_lane_plan_preview(&self, target_id: &str) -> Result<Value, WireError> {
+        self.calls
+            .lock()
+            .unwrap()
+            .push(format!("preview:{target_id}"));
+        Ok(json!({"targetId": target_id, "bindingRevision": 2, "state": "laneNotComposed"}))
     }
 }
 fn facts(root: &Root) -> (AppIngress<Facts>, Arc<Control<Facts>>, Calls) {
@@ -194,4 +202,69 @@ fn the_app_names_only_a_target_and_a_profile_and_never_a_board_path_or_command()
     );
     assert_eq!(code(&unsupported), "invalidParams");
     assert!(calls.lock().unwrap().is_empty());
+}
+
+/// The App previews the lane plan of one imported archive for one Target and
+/// profile, as ClientKit sends it: exactly those three strings, and never a
+/// path, a topology or a plan of its own.
+#[test]
+fn the_app_previews_one_archive_for_one_target_and_names_nothing_else() {
+    let root = Root::new();
+    let (ingress, control, calls) = facts(&root);
+    let digest = "e".repeat(64);
+    let preview = frame(
+        "flash.lanePlanPreview",
+        json!({"targetId": "TGT-1", "profileReference": "dayu200", "archiveSha256": digest}),
+    );
+    let reply = ingress.handle(&preview, root.peer());
+    assert_eq!(
+        result(&reply, "flash.lanePlanPreview")["state"],
+        "laneNotComposed"
+    );
+    // The local socket reaches the same Control and answers the same bytes.
+    assert_eq!(control.handle_frame(&preview), reply);
+    for params in [
+        json!({}),
+        json!({"targetId": "TGT-1", "profileReference": "dayu200"}),
+        json!({"targetId": "TGT-1", "profileReference": "dayu200", "archiveSha256": 7}),
+        json!({"targetId": "TGT-1", "profileReference": "dayu200", "archiveSha256": digest,
+            "usbTopology": "17956864"}),
+        json!({"targetId": "TGT-1", "profileReference": "dayu200", "archiveSha256": digest,
+            "bundle": "/tmp/x.zip"}),
+    ] {
+        let reply = ingress.handle(&frame("flash.lanePlanPreview", params.clone()), root.peer());
+        assert_eq!(code(&reply), "invalidParams", "{params}");
+    }
+    // A digest the closed shape carries but Swift's handler refuses is the
+    // shared Control's refusal, before any preview.
+    let short = ingress.handle(
+        &frame(
+            "flash.lanePlanPreview",
+            json!({"targetId": "TGT-1", "profileReference": "dayu200",
+                "archiveSha256": "e".repeat(63)}),
+        ),
+        root.peer(),
+    );
+    assert_eq!(code(&short), "invalidParams");
+    // Another user, another process or the foreground console is refused.
+    for peer in [
+        PeerOrigin {
+            euid: root.peer().euid.wrapping_add(1),
+            ..root.peer()
+        },
+        PeerOrigin {
+            pid: 1,
+            ..root.peer()
+        },
+        PeerOrigin {
+            foreground_console: true,
+            ..root.peer()
+        },
+    ] {
+        assert_eq!(code(&ingress.handle(&preview, peer)), "rejected");
+    }
+    assert_eq!(
+        calls.lock().unwrap().as_slice(),
+        ["preview:TGT-1", "preview:TGT-1"]
+    );
 }

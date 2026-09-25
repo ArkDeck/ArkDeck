@@ -529,6 +529,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
                 &composed.runtime_directory,
             ))
+            .with_lane_plan_preview(composed.lane_plan_preview())
             // Swift's Loader binding coordinator over the same root, census
             // and lane directory, with the Runtime's records below the root.
             .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(

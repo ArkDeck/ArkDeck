@@ -199,6 +199,10 @@ pub struct Host {
     /// in the lane's runtime directory, a fresh bounded session per read.
     #[cfg(target_os = "macos")]
     device_access: Option<arkdeck_provider_arkforge::DeviceAccessObserver>,
+    /// Swift's `ComposedLanePlanPreviewer`, which exists only with a composed
+    /// ArkForge lane: the profile that lane was composed for.
+    #[cfg(target_os = "macos")]
+    lane_plan_preview: Option<String>,
     /// Swift `ProductRockchipLoaderBindingCoordinator`: the binding of the
     /// Application Support root, the Runtime's records below it, the census
     /// and ArkForge's Loader observation.
@@ -871,6 +875,15 @@ impl Host {
         self
     }
 
+    /// `flash.lanePlanPreview` previews through the ArkForge lane composed
+    /// for `profile`, over this host's Target store and Rockchip facts; none
+    /// without a lane, as Swift composes its previewer only with one.
+    #[cfg(target_os = "macos")]
+    pub fn with_lane_plan_preview(mut self, profile: Option<String>) -> Self {
+        self.lane_plan_preview = profile;
+        self
+    }
+
     /// The owners this composition holds, by name, in a fixed order: what the
     /// production composition reports at its start and its tests compare.
     #[cfg(target_os = "macos")]
@@ -906,6 +919,7 @@ impl Host {
             ("flashInvocations", self.flash_invocations.is_some()),
             ("flashHostFacts", self.flash_facts.is_some()),
             ("deviceAccess", self.device_access.is_some()),
+            ("lanePlanPreview", self.lane_plan_preview.is_some()),
             ("loaderBinding", self.loader_binding.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1002,6 +1016,8 @@ impl Host {
             flash_planning: None,
             #[cfg(target_os = "macos")]
             device_access: None,
+            #[cfg(target_os = "macos")]
+            lane_plan_preview: None,
             #[cfg(target_os = "macos")]
             loader_binding: None,
             #[cfg(all(test, target_os = "macos"))]
@@ -2468,6 +2484,40 @@ impl HostServices for Host {
                 details: None,
             }),
         }
+    }
+    /// Swift's handler over its Target store and, with a lane, its composed
+    /// previewer: the Target's facts through the ArkForge provider's port —
+    /// this host's, measured over its HDC — or, with no facts composed, the
+    /// provider's refusal to resolve any.
+    #[cfg(target_os = "macos")]
+    fn flash_lane_plan_preview(&self, target_id: &str) -> Result<serde_json::Value, WireError> {
+        let Some(targets) = &self.targets else {
+            return Err(WireError {
+                code: "internalError".into(),
+                message: "lane plan preview is not configured".into(),
+                details: None,
+            });
+        };
+        let hdc = self
+            .hdc
+            .as_deref()
+            .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch);
+        let previewer = |target: &str| {
+            arkdeck_hoststore::preview_before_lane(
+                match &self.flash_facts {
+                    Some(facts) => facts.current_facts(targets, hdc, target),
+                    None => Err("production ArkForge target facts are not registered".to_owned()),
+                },
+                target,
+            )
+        };
+        arkdeck_hoststore::lane_plan_preview(
+            targets,
+            target_id,
+            self.lane_plan_preview
+                .as_ref()
+                .map(|_| &previewer as &dyn Fn(&str) -> arkdeck_hoststore::LanePreview),
+        )
     }
     #[cfg(target_os = "macos")]
     fn flash_device_access(&self) -> Result<serde_json::Value, WireError> {

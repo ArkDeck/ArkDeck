@@ -172,7 +172,10 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "internalError"
         } else if matches!(
             *method,
-            "flash.reconcile-alias" | "flash.prerequisites" | "flash.bind-current-loader"
+            "flash.reconcile-alias"
+                | "flash.prerequisites"
+                | "flash.bind-current-loader"
+                | "flash.lanePlanPreview"
         ) {
             // Swift reads these parameters before their owners.
             "invalidParams"

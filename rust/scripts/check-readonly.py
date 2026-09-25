@@ -374,11 +374,11 @@ def main() -> None:
                     # No composition here holds the Flash recovery broker's invocations, the
                     # post-flash alias, the Loader binding or the ArkForge lane's runtime
                     # directory: as Swift's daemon without them, the broker and the reads answer
-                    # that their owner is not configured, and the reconciler and the binding read
-                    # their parameters first.
+                    # that their owner is not configured, and the reconciler, the binding, the
+                    # prerequisites and the lane plan preview read their parameters first.
                     if method in {"debug.start", "debug.evaluate", "debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
                         expected = "internalError"
-                    if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader"}:
+                    if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader", "flash.lanePlanPreview"}:
                         expected = "invalidParams"
                     # No composition here holds a Trace inspector (Swift composes one only beside
                     # a loaded ArkTrace distribution): its owner refuses before any parameter.
@@ -416,6 +416,7 @@ def main() -> None:
                     ("reconcile-alias-missing-owner", "flash.reconcile-alias", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
                     ("bind-loader-missing-owner", "flash.bind-current-loader", {"targetId": "target-fixture", "expectedBindingRevision": 1}, "internalError"),
                     ("prerequisites-missing-owner", "flash.prerequisites", {"targetId": "target-fixture", "profileReference": "dayu200"}, "internalError"),
+                    ("lane-preview-missing-owner", "flash.lanePlanPreview", {"targetId": "target-fixture", "profileReference": "dayu200", "archiveSha256": "e" * 64}, "internalError"),
                     ("device-access-parameter", "flash.device-access", {"socketPath": "/caller/path"}, "invalidParams"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
