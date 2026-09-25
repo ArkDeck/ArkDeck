@@ -40,6 +40,33 @@ pub struct HostDirectoryFacts {
     pub volume_identity: String,
 }
 
+/// What identifies a file's bytes without reading them: its device and
+/// inode, its size, and its modification and change times to the nanosecond.
+/// A write changes the size or both times, and any change of the file's
+/// metadata its change time, which no caller can set.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct HostFileIdentity {
+    pub device: u64,
+    pub inode: u64,
+    pub size: u64,
+    /// Seconds and nanoseconds since 1970.
+    pub modified: (i64, i64),
+    /// Seconds and nanoseconds since 1970.
+    pub changed: (i64, i64),
+}
+
+impl HostFileIdentity {
+    fn of(metadata: &std::fs::Metadata) -> Self {
+        Self {
+            device: metadata.dev(),
+            inode: metadata.ino(),
+            size: metadata.len(),
+            modified: (metadata.mtime(), metadata.mtime_nsec()),
+            changed: (metadata.ctime(), metadata.ctime_nsec()),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 enum Ownership {
     Private,
@@ -903,6 +930,17 @@ impl HostDirectory {
     }
 
     pub fn read(&self, name: &str, maximum: usize) -> io::Result<Vec<u8>> {
+        self.read_identified(name, maximum).map(|(bytes, _)| bytes)
+    }
+
+    /// [`Self::read`], and the identity of the file whose bytes these are:
+    /// `read` requires it unchanged from before the read to after it, and
+    /// still linked at `name`.
+    pub fn read_identified(
+        &self,
+        name: &str,
+        maximum: usize,
+    ) -> io::Result<(Vec<u8>, HostFileIdentity)> {
         let file = self.open_at(name, 0)?;
         owned(&file, false, self.1)?;
         let before = file.metadata()?;
@@ -916,7 +954,20 @@ impl HostDirectory {
         if !read_whole(&before, &after, &linked, bytes.len() as u64, maximum) {
             return Err(fail());
         }
-        Ok(bytes)
+        Ok((bytes, HostFileIdentity::of(&before)))
+    }
+
+    /// The identity of what `name` names in the held directory, a link
+    /// itself rather than what it names, without opening it.
+    pub fn file_identity(&self, name: &str) -> io::Result<HostFileIdentity> {
+        let stat = self.stat_at(name)?;
+        Ok(HostFileIdentity {
+            device: stat.st_dev as u64,
+            inode: stat.st_ino,
+            size: stat.st_size as u64,
+            modified: (stat.st_mtime, stat.st_mtime_nsec),
+            changed: (stat.st_ctime, stat.st_ctime_nsec),
+        })
     }
 
     /// [`Self::read`] for a reader that parses the document as it streams

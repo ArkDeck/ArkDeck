@@ -298,4 +298,9 @@ samples taken, five sessions building) while the crate tests ran.
 
 ## CI
 
-Pending.
+#2230, head `159fb4c8e`, run 36195413805: every selected lane passed.
+- Rust workspace: macOS 12m20s, Ubuntu 2m15s, Windows 4m50s. Host-independent checks: 39s.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `4eb8c6778`. Recorded by a later slice (TASK-XPA-014, the Session verdict cache), as
+AGENTS.md has it.

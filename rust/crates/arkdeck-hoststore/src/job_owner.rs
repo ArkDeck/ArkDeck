@@ -48,6 +48,10 @@ pub struct JobStore {
     /// sees it, as Swift's `recordForRead` does, until the Job is persisted
     /// again or the process ends.
     resident: std::sync::Mutex<std::collections::BTreeMap<String, JobRecord>>,
+    /// The retained Sessions the last complete continuity scan let pass, in
+    /// memory only (`mutation_state_continuity.rs`). Taken only under
+    /// `activity`.
+    session_verdicts: std::sync::Mutex<mutation_state_continuity::SessionVerdicts>,
 }
 const RECORD_BOUND: usize = 16 * 1024 * 1024;
 
@@ -160,6 +164,7 @@ impl JobStore {
             activity: std::sync::Mutex::new(()),
             hdc_lifecycle: std::sync::RwLock::new(()),
             resident: Default::default(),
+            session_verdicts: Default::default(),
         })
     }
 
