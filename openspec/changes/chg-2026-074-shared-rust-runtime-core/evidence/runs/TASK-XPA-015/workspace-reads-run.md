@@ -238,4 +238,8 @@ touches.
 
 ## CI
 
-Pending.
+PR #2190, merged as `10aede724`: Agent PR 36135998624 (`open-pr`), SDD Guard
+36135998568 (`guard`, `ds-tokens`) and Swift CI 36135998811 (`plan`,
+`swift-tests`, `ds-interactions`, the Rust host-independent checks, the Rust
+workspace on ubuntu-latest, macos-26 and windows-latest, and the `swift`
+aggregate; `app-build` skipped by the plan) all succeeded at `eb4be7604`.

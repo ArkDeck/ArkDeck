@@ -106,20 +106,15 @@ impl PendingMutation {
 }
 
 impl PresetRecord {
-    /// Swift `presetResource`. Nothing is applied in the isolated Runtime, so
-    /// an available preset always awaits a restart.
-    pub(super) fn resource(&self) -> Result<Value, WireError> {
+    /// Swift `presetResource`, with the configuration status the store
+    /// derives for it (`WorkspaceProjectStore::preset_resource`).
+    pub(super) fn resource(&self, status: &str) -> Result<Value, WireError> {
         if timestamp(&self.registered_at).is_none() || timestamp(&self.updated_at).is_none() {
             return Err(failure(
                 "recordUnreadable",
                 "workspace preset timestamps are invalid",
             ));
         }
-        let status = if self.state == "removed" {
-            "removed"
-        } else {
-            "runtimeRestartRequired"
-        };
         Ok(json!({
             "schemaVersion": "arkdeck.workspace-preset/1",
             "presetRef": self.preset_ref,
@@ -562,7 +557,7 @@ impl WorkspaceProjectStore {
                             "registration request identity belongs to another preset",
                         ));
                     }
-                    return existing.resource();
+                    return self.preset_resource(existing);
                 }
                 if !next
                     .records
@@ -641,8 +636,8 @@ impl WorkspaceProjectStore {
                             "outcomeUnknown",
                             "workspace preset publication could not be verified",
                         )
-                    })?
-                    .resource()
+                    })
+                    .and_then(|record| self.preset_resource(record))
             },
         )
     }
@@ -694,7 +689,7 @@ impl WorkspaceProjectStore {
                             "mutation request identity belongs to another preset update",
                         ));
                     }
-                    return current.resource();
+                    return self.preset_resource(&current);
                 }
                 if !current.available() || current.generation != expected {
                     return Err(failure(
@@ -775,8 +770,8 @@ impl WorkspaceProjectStore {
                             "outcomeUnknown",
                             "workspace preset update could not be verified",
                         )
-                    })?
-                    .resource()
+                    })
+                    .and_then(|record| self.preset_resource(record))
             },
         )
     }
@@ -822,7 +817,7 @@ impl WorkspaceProjectStore {
                             "mutation request identity belongs to another preset removal",
                         ));
                     }
-                    return current.resource();
+                    return self.preset_resource(&current);
                 }
                 if !current.available() || current.generation != expected {
                     return Err(failure(
@@ -852,7 +847,7 @@ impl WorkspaceProjectStore {
                 transaction.save(&next)?;
                 let next = self.reconcile(transaction, next)?;
                 self.forget_applied_preset(preset);
-                next.presets[index].resource()
+                self.preset_resource(&next.presets[index])
             },
         )
     }

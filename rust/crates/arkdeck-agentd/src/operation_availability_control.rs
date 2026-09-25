@@ -203,11 +203,14 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         .filter(|v| v["availability"] == "available")
         .map(|v| v["reference"].as_str().unwrap())
         .collect();
+    // `debug.template@1` runs on this executor and asks after the same pinned
+    // tool, as Swift's HDC provider offers it.
     assert_eq!(
         available,
         [
             "analyzer.extract-crash-signature@1",
             "capture.diagnostics@1",
+            "debug.template@1",
             "observe.device@1"
         ]
     );
@@ -343,6 +346,10 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         json!(["tool_identity_drift"])
     );
     assert_eq!(
+        entry(&rows, "debug.template@1")["reasonCodes"],
+        json!(["tool_identity_drift"])
+    );
+    assert_eq!(
         entry(&rows, "capture.diagnostics@1")["availability"],
         "unavailable"
     );
@@ -423,4 +430,162 @@ fn absent_artifact_and_job_owners_are_configuration_failures_not_available() {
             json!(["host_configuration", "host_configuration"])
         );
     }
+}
+
+/// The daemon's workspace composition answers its own rows and project
+/// answers: Swift's provider and dispatcher reasons over the registered
+/// project's start-up profile — the Rust mutation owner's first for a tree
+/// mutation, which this development composition cannot acquire — and the
+/// project active after the start that composed it, carrying what that start
+/// published. `workspace_availability_oracle` holds the rows and answers to
+/// Swift's recording; this holds the daemon's wiring to them.
+#[test]
+fn workspace_rows_and_projects_follow_the_composed_provider() {
+    use arkdeck_hoststore::WorkspaceProjectStore;
+    let fixture = Fixture::new();
+    let owner = fixture.0.join("workspace-projects");
+    let bootstrap = fixture.0.join("bootstrap");
+    for directory in [&owner, &bootstrap] {
+        fs::DirBuilder::new().mode(0o700).create(directory).unwrap();
+    }
+    let root = fixture.0.join("project");
+    for path in ["build-profile.json5", "entry/src/main/module.json5"] {
+        fs::create_dir_all(root.join(path).parent().unwrap()).unwrap();
+        fs::write(root.join(path), "{}\n").unwrap();
+    }
+    // Registered before this start, as a daemon finds it.
+    let registered = WorkspaceProjectStore::open(&owner)
+        .unwrap()
+        .handle(
+            "workspace.project.register",
+            &serde_json::Map::from_iter([
+                (
+                    "registrationRequestId".into(),
+                    json!("availability-project"),
+                ),
+                ("kind".into(), json!("openharmony")),
+                ("root".into(), json!(root.to_str().unwrap())),
+            ]),
+            &|| "2026-09-25T00:00:00Z".into(),
+            &|_| Ok(()),
+        )
+        .unwrap();
+    assert_eq!(registered["configurationStatus"], "runtimeRestartRequired");
+    let host = fixture
+        .host(true, true)
+        .with_workspace_projects(WorkspaceProjectStore::open(&owner).unwrap())
+        .with_workspace_operations(&fixture.0, &bootstrap, None, None, None)
+        .unwrap();
+    let control = Control::new(host).unwrap();
+    let rows = call(&control, "operation.list", json!({}));
+    let row = |reference: &str| {
+        let row = entry(&rows, reference);
+        (
+            row["availability"].as_str().unwrap().to_owned(),
+            row["reasons"].clone(),
+            row["reasonCodes"].clone(),
+        )
+    };
+    for reference in [
+        "workspace.create-checkpoint@1",
+        "workspace.apply-patch@1",
+        "workspace.revert-patch@1",
+    ] {
+        assert_eq!(
+            row(reference),
+            (
+                "unavailable".into(),
+                json!(["runtime.mutationOwnerUnavailable"]),
+                json!(["provider_tool_unavailable"])
+            ),
+            "{reference}"
+        );
+    }
+    for reference in ["workspace.build-openharmony@1", "workspace.run-tests@1"] {
+        assert_eq!(
+            row(reference),
+            (
+                "unavailable".into(),
+                json!([
+                    "runtime.mutationOwnerUnavailable",
+                    "workspace.presetUnavailable"
+                ]),
+                json!(["provider_tool_unavailable", "workspace_preset_unavailable"])
+            ),
+            "{reference}"
+        );
+    }
+    for reference in [
+        "workspace.read-source-range@1",
+        "workspace.prepare-isolated-copy@1",
+        "workspace.sweep-isolated-copies@1",
+    ] {
+        assert_eq!(
+            row(reference),
+            ("available".into(), json!([]), json!([])),
+            "{reference}"
+        );
+    }
+    assert_eq!(
+        row("workspace.inspect-diff@1"),
+        (
+            "unavailable".into(),
+            json!(["workspace.presetUnavailable"]),
+            json!(["workspace_preset_unavailable"])
+        )
+    );
+    assert_eq!(
+        row("workspace.symbolize-crash@1"),
+        (
+            "unavailable".into(),
+            json!(["workspace.symbolPresetUnavailable"]),
+            json!(["workspace_preset_unavailable"])
+        )
+    );
+    assert_eq!(
+        row("workspace.inspect-source@1"),
+        (
+            "unavailable".into(),
+            json!(["no_workspace_inspector_configured"]),
+            json!(["provider_tool_unavailable"])
+        )
+    );
+    let described = call(
+        &control,
+        "operation.describe",
+        json!({"reference": "workspace.inspect-diff@1"}),
+    );
+    assert_eq!(
+        described["availabilityReasons"],
+        json!(["workspace.presetUnavailable"])
+    );
+    // The start composed the registration: it is active and publishes its
+    // profile — the source inspection is its provider's, so it is available
+    // here without an inspector.
+    let listed = call(&control, "workspace.project.list", json!({}));
+    let project = &listed["projects"][0];
+    assert_eq!(project["projectRef"], registered["projectRef"]);
+    assert_eq!(project["configurationStatus"], "active");
+    assert_eq!(project["availability"], "available");
+    let published: Vec<_> = project["operations"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|operation| {
+            (
+                operation["reference"].as_str().unwrap().to_owned(),
+                operation["availability"].as_str().unwrap().to_owned(),
+            )
+        })
+        .collect();
+    assert_eq!(published.len(), 13);
+    assert!(published.contains(&("workspace.inspect-source@1".into(), "available".into())));
+    assert!(published.contains(&("workspace.inspect-diff@1".into(), "unavailable".into())));
+    let shown = call(
+        &control,
+        "workspace.project.show",
+        json!({"projectRef": registered["projectRef"]}),
+    );
+    assert_eq!(shown["configurationStatus"], "active");
+    assert_eq!(shown["operations"].as_array().unwrap().len(), 13);
 }

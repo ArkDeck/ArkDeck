@@ -1063,20 +1063,10 @@ impl HostServices for Host {
                     .zip(self.jobs.as_deref())
                     .is_some_and(|(authority, jobs)| authority.require_state(jobs).is_ok()),
                 code_sign_helper: self.code_sign_helper.is_some(),
+                // Asked only of an operation this executor runs: every other
+                // one is unsupported whatever the tool measures.
                 hdc_tool_current: if provider == "hdc"
-                    && [
-                        "observe.device@1",
-                        "capture.diagnostics@1",
-                        "input.tap@1",
-                        "input.long-press@1",
-                        "input.swipe@1",
-                        "port-forward.create@1",
-                        "port-forward.remove@1",
-                        "debug.hap@1",
-                        "capture.screen-sequence@1",
-                        "deploy.native-library.app-owned@1",
-                    ]
-                    .contains(&reference)
+                    && arkdeck_hoststore::hdc_operation_runs(reference)
                 {
                     self.hdc
                         .as_ref()
@@ -1084,6 +1074,7 @@ impl HostServices for Host {
                 } else {
                     false
                 },
+                workspace: self.workspace.as_deref(),
             },
         )
     }

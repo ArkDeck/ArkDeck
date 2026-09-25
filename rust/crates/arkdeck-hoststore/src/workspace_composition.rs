@@ -41,7 +41,7 @@ use arkdeck_provider_workspace::signing_action::{SigningAction, SigningAttemptPa
 use arkdeck_provider_workspace::signing_preset::{
     DEFAULT_PRESET_ID, SigningPresetStore, SigningSecrets, remeasure_for_dispatch,
 };
-use serde_json::{Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs::DirBuilder;
 use std::io;
@@ -301,6 +301,46 @@ struct RegisteredPresets {
     environment: BTreeMap<String, Vec<(String, String)>>,
     composed: BTreeMap<String, (String, u64)>,
     failures: BTreeMap<String, String>,
+}
+
+/// Every workspace operation of the Catalog, by reference, sorted: the rows
+/// `WorkspaceProjectPublication.make` publishes for a project.
+fn workspace_references() -> &'static [String] {
+    static REFERENCES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    REFERENCES.get_or_init(|| {
+        let catalog: Vec<Value> =
+            serde_json::from_str(arkdeck_contract::CATALOG_CANONICAL_JSON).unwrap_or_default();
+        let mut references: Vec<String> = catalog
+            .iter()
+            .filter(|descriptor| descriptor["provider"] == "workspace")
+            .filter_map(|descriptor| {
+                let id = descriptor["id"].as_str()?;
+                Some(match descriptor["version"].as_u64() {
+                    Some(version) => format!("{id}@{version}"),
+                    None => id.to_owned(),
+                })
+            })
+            .collect();
+        references.sort();
+        references
+    })
+}
+
+/// Swift `WorkspaceProjectPublication.unresolved(projectRef:reason:)`, less
+/// the reference and kind: a registered project the Runtime could not
+/// resolve when it started, published with why rather than omitted.
+fn unresolved_publication(reason: &str) -> Map<String, Value> {
+    Map::from_iter([
+        ("availability".into(), json!("unavailable")),
+        (
+            "reasonCode".into(),
+            json!("workspace_project_profile_unavailable"),
+        ),
+        ("reason".into(), json!(reason)),
+        ("allowedFileGlobs".into(), json!([])),
+        ("presetRefs".into(), json!([])),
+        ("operations".into(), json!([])),
+    ])
 }
 
 /// Swift's `case "signing"` of the same pass: the toolchain pin and the
@@ -632,9 +672,110 @@ impl WorkspaceComposition {
             notes.unadopted = composition.adopt_runtime_workspaces();
             (composition, notes)
         };
+        // What `workspace project list/show` publish (Swift's
+        // `workspaceProjectPublications`): each project resolved now as a
+        // provider over its profile alone answers it, and every other
+        // registered project as unresolved, with the reason it did not
+        // resolve. Asked once, here, as Swift asks it.
+        let mut publications: BTreeMap<String, Map<String, Value>> = resolved
+            .iter()
+            .map(|profile| (profile.project_ref.clone(), composed.0.publication(profile)))
+            .collect();
+        for record in &records {
+            publications
+                .entry(record.project_ref.clone())
+                .or_insert_with(|| {
+                    unresolved_publication(
+                        failures
+                            .get(&record.project_ref)
+                            .map_or("this project profile could not be derived", String::as_str),
+                    )
+                });
+        }
         projects.mark_applied(applied);
         projects.mark_applied_presets(applied_presets);
+        projects.mark_preset_failures(presets.failures.keys().cloned().collect());
+        projects.mark_published(publications);
         Ok(composed)
+    }
+
+    /// Swift `WorkspaceProjectPublication.make(profile:availability:)`, less
+    /// the reference and kind the registration carries: the profile's sorted
+    /// globs, its presets by kind and reference, and every workspace
+    /// operation of the Catalog, in reference order, as a provider over that
+    /// profile alone answers it. The project is available when any
+    /// operation is.
+    fn publication(&self, profile: &WorkspaceProfile) -> Map<String, Value> {
+        let operations: Vec<Value> = workspace_references()
+            .iter()
+            .map(
+                |reference| match self.unavailability_of(profile, reference) {
+                    None => json!({"reference": reference, "availability": "available",
+                    "reasonCode": null, "reason": null}),
+                    Some((code, reason)) => json!({"reference": reference,
+                    "availability": "unavailable", "reasonCode": code, "reason": reason}),
+                },
+            )
+            .collect();
+        let usable = operations
+            .iter()
+            .any(|operation| operation["availability"] == "available");
+        let mut globs = profile.allowed_file_globs.clone();
+        globs.sort();
+        let presets: Vec<Value> = profile
+            .published_presets()
+            .into_iter()
+            .map(|(preset, kind, timeout)| {
+                json!({"presetRef": preset, "kind": kind, "timeoutSeconds": timeout})
+            })
+            .collect();
+        Map::from_iter([
+            (
+                "availability".into(),
+                json!(if usable { "available" } else { "unavailable" }),
+            ),
+            (
+                "reasonCode".into(),
+                if usable {
+                    Value::Null
+                } else {
+                    json!("workspace_project_has_no_available_operation")
+                },
+            ),
+            (
+                "reason".into(),
+                if usable {
+                    Value::Null
+                } else {
+                    json!("the project resolved but no published workspace operation can run in it")
+                },
+            ),
+            ("allowedFileGlobs".into(), json!(globs)),
+            ("presetRefs".into(), Value::Array(presets)),
+            ("operations".into(), Value::Array(operations)),
+        ])
+    }
+
+    /// Swift's workspace dispatcher's `unavailableReason(providerID:)`: with
+    /// start-up profiles, the combined resolver's generic resolution over
+    /// every executable they pinned; with none, the inspector's fixed route
+    /// when one is configured, and otherwise the refusing dispatcher's
+    /// reason.
+    pub(crate) fn dispatcher_unavailability(&self) -> Option<String> {
+        if self.primaries.is_empty() {
+            return self
+                .inspector
+                .is_none()
+                .then(|| "no workspace ProjectProfile is configured".to_owned());
+        }
+        let profiles: Vec<WorkspaceProfile> = self
+            .primaries
+            .iter()
+            .filter_map(|project_ref| self.registry.profile(project_ref))
+            .collect();
+        WorkspaceProfile::generic_resolution(&profiles)
+            .err()
+            .map(|detail| format!("provider executable is unavailable: failed({detail:?})"))
     }
 
     /// A composition over the given primary profiles with its copies under
