@@ -2,17 +2,17 @@
 //! `RuntimeOperationCatalog`) and the rules Swift admission and planning apply
 //! to it: exact descriptor lookup, typed input validation, the host-only
 //! descriptor check, the effect a request resolves to and the steps it selects.
+use crate::CATALOG_CANONICAL_JSON;
 use crate::catalog_pattern;
-use arkdeck_contract::CATALOG_CANONICAL_JSON;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
 #[derive(Clone, Debug)]
-pub(crate) struct CatalogField {
-    pub(crate) name: String,
-    pub(crate) kind: String,
-    pub(crate) required: bool,
+pub struct CatalogField {
+    pub name: String,
+    pub kind: String,
+    pub required: bool,
     enum_values: Option<Vec<String>>,
     max_length: Option<u64>,
     pattern: Option<String>,
@@ -23,50 +23,50 @@ pub(crate) struct CatalogField {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CatalogStep {
-    pub(crate) step_id: String,
-    pub(crate) kind: String,
-    pub(crate) effect: String,
-    pub(crate) cancellation: String,
-    pub(crate) binding: String,
-    pub(crate) optional: bool,
+pub struct CatalogStep {
+    pub step_id: String,
+    pub kind: String,
+    pub effect: String,
+    pub cancellation: String,
+    pub binding: String,
+    pub optional: bool,
     /// Swift `actionReference`: the catalog and action an approved remote
     /// operation names, as (`catalogId`, `actionId`).
-    pub(crate) action: Option<(String, String)>,
+    pub action: Option<(String, String)>,
 }
 
 /// A product the operation declares (Swift `CatalogArtifactDeclaration`).
 #[derive(Clone, Debug)]
-pub(crate) struct CatalogArtifact {
-    pub(crate) name: String,
-    pub(crate) required: bool,
-    pub(crate) media_type: String,
-    pub(crate) privacy: String,
-    pub(crate) retention_class: String,
+pub struct CatalogArtifact {
+    pub name: String,
+    pub required: bool,
+    pub media_type: String,
+    pub privacy: String,
+    pub retention_class: String,
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct CatalogOperation {
+pub struct CatalogOperation {
     id: String,
     version: Option<i64>,
-    pub(crate) provider: String,
+    pub provider: String,
     binding: String,
     minimum_effect: String,
     permitted_effects: Vec<String>,
-    pub(crate) authorization: BTreeMap<String, String>,
+    pub authorization: BTreeMap<String, String>,
     concurrency_key: String,
     default_policy_issuance: bool,
-    pub(crate) inputs: Vec<CatalogField>,
-    pub(crate) steps: Vec<CatalogStep>,
-    pub(crate) artifacts: Vec<CatalogArtifact>,
-    pub(crate) timeout_seconds: i64,
-    pub(crate) output_byte_budget: i64,
+    pub inputs: Vec<CatalogField>,
+    pub steps: Vec<CatalogStep>,
+    pub artifacts: Vec<CatalogArtifact>,
+    pub timeout_seconds: i64,
+    pub output_byte_budget: i64,
 }
 
 /// Why typed inputs are refused. `Unsupported` names a constraint this
 /// validator does not evaluate; a caller refuses rather than skipping it.
 #[derive(Debug, PartialEq, Eq)]
-pub(crate) enum InputRefusal {
+pub enum InputRefusal {
     Invalid(String),
     Unsupported(String),
 }
@@ -190,13 +190,13 @@ impl CatalogOperation {
 
     /// Swift `RuntimeOperationCatalog.descriptor(id:version:)`: an exact id
     /// and version, so an unversioned request names only an unversioned entry.
-    pub(crate) fn lookup(id: &str, version: Option<i64>) -> Option<&'static Self> {
+    pub fn lookup(id: &str, version: Option<i64>) -> Option<&'static Self> {
         operations()
             .iter()
             .find(|operation| operation.id == id && operation.version == version)
     }
 
-    pub(crate) fn reference(&self) -> String {
+    pub fn reference(&self) -> String {
         match self.version {
             Some(version) => format!("{}@{version}", self.id),
             None => self.id.clone(),
@@ -204,22 +204,22 @@ impl CatalogOperation {
     }
 
     /// Swift `CatalogOperationDescriptor.id` and `version`.
-    pub(crate) fn id(&self) -> &str {
+    pub fn id(&self) -> &str {
         &self.id
     }
 
-    pub(crate) fn version(&self) -> Option<i64> {
+    pub fn version(&self) -> Option<i64> {
         self.version
     }
 
     /// Swift `defaultPolicyIssuanceEnabled`: whether the Runtime may issue a
     /// capability for this operation when the caller names none.
-    pub(crate) fn default_policy_issuance(&self) -> bool {
+    pub fn default_policy_issuance(&self) -> bool {
         self.default_policy_issuance
     }
 
     /// Swift's `minimumEffect == .destructive || permittedEffects.contains(.destructive)`.
-    pub(crate) fn permits_destructive(&self) -> bool {
+    pub fn permits_destructive(&self) -> bool {
         self.minimum_effect == "destructive"
             || self
                 .permitted_effects
@@ -229,12 +229,12 @@ impl CatalogOperation {
 
     /// Swift `CatalogOperationDescriptor.binding`: `none` for an operation
     /// that binds no device, otherwise the binding its steps require.
-    pub(crate) fn binding(&self) -> &str {
+    pub fn binding(&self) -> &str {
         &self.binding
     }
 
     /// Swift `RuntimeJobEngine.validateInputs`; keys are judged in byte order.
-    pub(crate) fn validate_inputs(&self, inputs: &Map<String, Value>) -> Result<(), InputRefusal> {
+    pub fn validate_inputs(&self, inputs: &Map<String, Value>) -> Result<(), InputRefusal> {
         let invalid = |message: String| Err(InputRefusal::Invalid(message));
         // A pattern outside the syntax `catalog_pattern` reads is refused, not
         // skipped; every pattern the published catalog declares is read.
@@ -352,11 +352,7 @@ impl CatalogOperation {
     }
 
     /// Swift `CatalogOperationEffectResolver.resolvedInputValue`.
-    pub(crate) fn resolved<'a>(
-        &'a self,
-        name: &str,
-        inputs: &'a Map<String, Value>,
-    ) -> Option<&'a Value> {
+    pub fn resolved<'a>(&'a self, name: &str, inputs: &'a Map<String, Value>) -> Option<&'a Value> {
         inputs.get(name).or_else(|| {
             self.inputs
                 .iter()
@@ -366,7 +362,7 @@ impl CatalogOperation {
     }
 
     /// Swift `CatalogOperationEffectResolver.stepIsSelected`.
-    pub(crate) fn step_is_selected(&self, step: &CatalogStep, inputs: &Map<String, Value>) -> bool {
+    pub fn step_is_selected(&self, step: &CatalogStep, inputs: &Map<String, Value>) -> bool {
         if step.optional {
             return self.optional_step_is_selected(step, inputs);
         }
@@ -422,7 +418,7 @@ impl CatalogOperation {
     }
 
     /// Swift `CatalogOperationEffectResolver.effectiveEffect`.
-    pub(crate) fn effective_effect(&self, inputs: &Map<String, Value>) -> String {
+    pub fn effective_effect(&self, inputs: &Map<String, Value>) -> String {
         let mut effect = self.minimum_effect.clone();
         for step in &self.steps {
             if self.step_is_selected(step, inputs) && rank(&step.effect) > rank(&effect) {
@@ -435,7 +431,7 @@ impl CatalogOperation {
     /// Swift `RuntimeJobEngine.validateHostOnlyDescriptor`: an unbound
     /// operation stays host-only all the way down, except the two reviewed
     /// workspace mutation authorities.
-    pub(crate) fn validate_host_only(&self) -> Result<(), String> {
+    pub fn validate_host_only(&self) -> Result<(), String> {
         let reference = self.reference();
         let standing_workspace_mutation = self.provider == "workspace"
             && self

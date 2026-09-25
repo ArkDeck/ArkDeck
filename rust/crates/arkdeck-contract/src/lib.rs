@@ -6,6 +6,7 @@ mod canonical;
 mod debug_templates;
 pub use debug_templates::{DEBUG_TEMPLATES, DebugTemplateDefinition};
 mod catalog_generated;
+mod catalog_pattern;
 mod cbor;
 mod control_generated;
 /// Foundation's path arithmetic for inputs read from disk.
@@ -13,6 +14,7 @@ pub mod foundation_path;
 mod framing;
 mod imports;
 mod job_state_preflight;
+pub mod operation_catalog;
 pub use imports::{
     IMPORT_MAX_CHUNK_BYTES, IMPORT_MAX_CHUNKS, IMPORT_MAX_RECORD_BYTES, IMPORT_MAX_RECORDS,
     IMPORT_STAGING_QUOTA, ImportIntent, ImportProjection, decode_import_chunk, encode_import_chunk,
