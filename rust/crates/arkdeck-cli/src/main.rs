@@ -18,13 +18,9 @@ fn correlation() -> io::Result<String> {
     ))
 }
 
-fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
-    if invocation.command == "debug.template.list" {
-        return arkdeck_cli::debug_template_list();
-    }
-    arkdeck_cli::validate_read_only_request(invocation)?;
-    arkdeck_cli::validate_bootstrap_request(invocation)?;
-    arkdeck_cli::validate_session_request(invocation)?;
+/// The local Runtime this invocation reaches: `--socket`, `ARKDECK_ENDPOINT`
+/// or the default endpoint, and the daemon identity it must prove.
+fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIdentity), CliError> {
     let endpoint = match invocation
         .socket
         .clone()
@@ -61,6 +57,17 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         authenticode_sha256: std::env::var("ARKDECK_DAEMON_SIGNER_SHA256").ok(),
         package_family: std::env::var("ARKDECK_DAEMON_PACKAGE_FAMILY").ok(),
     };
+    Ok((endpoint, identity))
+}
+
+fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
+    if invocation.command == "debug.template.list" {
+        return arkdeck_cli::debug_template_list();
+    }
+    arkdeck_cli::validate_read_only_request(invocation)?;
+    arkdeck_cli::validate_bootstrap_request(invocation)?;
+    arkdeck_cli::validate_session_request(invocation)?;
+    let (endpoint, identity) = runtime_endpoint(invocation)?;
     if matches!(invocation.command, "job.plan" | "job.submit") {
         // The request document is read before any connection is made.
         let submit = invocation.command == "job.submit";
@@ -958,6 +965,101 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
     }
 }
 
+/// A domain leaf (Swift `runDomainOperation`): the typed request from the
+/// caller's options, the client-side executor's run, and its end as
+/// `emitAgentOutcome` renders it. A completed run is the receipt; a failed one
+/// is still the machine answer, then its reason and exit 1; a pause or a
+/// Runtime refusal is the failure envelope; anything else escapes Swift's
+/// handler as a diagnostic and its exit status, with nothing on stdout.
+fn serve_domain_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    use arkdeck_cli::domain_leaves::{self, Answer, LocalRuntime};
+    let root = invocation.command.split('.').next().unwrap_or_default();
+    let plain = |failure: domain_leaves::Plain| -> std::process::ExitCode {
+        eprintln!("arkdeck {root}: {}", failure.message);
+        failure.exit_code.into()
+    };
+    let request = match domain_leaves::execution_request(invocation) {
+        Ok(request) => request,
+        Err(failure) => return plain(failure),
+    };
+    let answer = match runtime_endpoint(invocation) {
+        Ok((endpoint, identity)) => domain_leaves::run(
+            &request,
+            LocalRuntime {
+                endpoint: &endpoint,
+                identity: &identity,
+            },
+            domain_leaves::state_directory(&endpoint),
+        ),
+        Err(error) => Answer::Refused {
+            error,
+            progress: None,
+        },
+    };
+    let human = !invocation.json && !invocation.legacy_json;
+    let emit = |receipt: Value| -> io::Result<()> {
+        if invocation.legacy_json {
+            io::stdout()
+                .lock()
+                .write_all(&arkdeck_cli::legacy_document(&receipt))
+        } else if invocation.json {
+            write_document(&arkdeck_cli::with_lifecycle(
+                success_envelope(invocation.command, receipt, id),
+                invocation.command,
+            ))
+        } else {
+            writeln!(
+                io::stdout().lock(),
+                "{}",
+                serde_json::to_string_pretty(&receipt).expect("a JSON document")
+            )
+        }
+    };
+    match answer {
+        Answer::Completed(receipt) => {
+            if emit(receipt).is_err() {
+                return 74.into();
+            }
+            0.into()
+        }
+        Answer::Failed { reason, receipt } => {
+            // A terminal failed run is a complete result in a machine mode;
+            // the human rendering has only the reason.
+            if !human && emit(receipt).is_err() {
+                return 74.into();
+            }
+            plain(domain_leaves::Plain {
+                exit_code: 1,
+                message: reason,
+            })
+        }
+        Answer::Refused { error, progress } => {
+            if invocation.json {
+                if write_document(&arkdeck_cli::with_lifecycle(
+                    failure_envelope(invocation.command, &error, id, true),
+                    invocation.command,
+                ))
+                .is_err()
+                {
+                    return 74.into();
+                }
+            } else if invocation.legacy_json {
+                let document = arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(&error));
+                if io::stdout().lock().write_all(&document).is_err() {
+                    return 74.into();
+                }
+            } else {
+                if let Some(progress) = progress {
+                    eprintln!("{progress}");
+                }
+                eprintln!("arkdeck: {}", error.message);
+            }
+            error.exit_code().into()
+        }
+        Answer::Plain(failure) => plain(failure),
+    }
+}
+
 /// `maintainer contracts export|check`: its one document, then its failure, if
 /// any, which after a document is only a diagnostic and the exit status
 /// (Swift `suppressesMachineRendering`).
@@ -1117,6 +1219,9 @@ fn main() -> std::process::ExitCode {
     }
     if invocation.command.starts_with("maintainer.contracts.") {
         return serve_maintainer_contracts(&invocation, id);
+    }
+    if arkdeck_cli::domain_leaves::serves(invocation.command) {
+        return serve_domain_leaf(&invocation, id);
     }
     // Swift `warnIfLegacy`: a compatibility leaf says so on stderr before
     // its request, in the human rendering only.
