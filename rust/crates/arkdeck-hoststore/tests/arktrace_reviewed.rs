@@ -11,12 +11,14 @@
 
 use arkdeck_hoststore::{
     AnalyzerComposition, AnalyzerProfile, AnalyzerProfiles, ArkTraceProfileLoader,
+    ArtifactReadStore, JobAdmitter, JobPlanner, JobResultReader, JobRunner, JobStore,
     ProductionDistributionTrust, ProductionDoctorProbe,
 };
-use serde_json::{Value, json};
-use std::fs::{self, OpenOptions};
+use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
+use std::fs::{self, File, OpenOptions};
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 const ROOT: &str = "/private/tmp/arkdeck-arktrace-reviewed";
 const LOCK: &str = "/private/tmp/arkdeck-arktrace-oracle.lock";
@@ -57,12 +59,9 @@ fn projection(profile: &AnalyzerProfile) -> Value {
     })
 }
 
-#[test]
-fn a_reviewed_distribution_passes_production_trust_and_its_own_doctor() {
-    let Ok(descriptor) = std::env::var("ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR") else {
-        eprintln!("set ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR for the reviewed signed App gate");
-        return;
-    };
+/// Serializes every user of the fixed root, Swift producers included, and
+/// leaves it empty and owner-only.
+fn exclusive_root() -> File {
     let lock = OpenOptions::new()
         .read(true)
         .write(true)
@@ -74,6 +73,16 @@ fn a_reviewed_distribution_passes_production_trust_and_its_own_doctor() {
     let _ = fs::remove_dir_all(ROOT);
     fs::create_dir(ROOT).unwrap();
     fs::set_permissions(ROOT, fs::Permissions::from_mode(0o700)).unwrap();
+    lock
+}
+
+#[test]
+fn a_reviewed_distribution_passes_production_trust_and_its_own_doctor() {
+    let Ok(descriptor) = std::env::var("ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR") else {
+        eprintln!("set ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR for the reviewed signed App gate");
+        return;
+    };
+    let _lock = exclusive_root();
     let doctor = ProductionDoctorProbe::new(Path::new(&format!("{ROOT}/home")));
     let snapshots = format!("{ROOT}/snapshots");
     let loader = ArkTraceProfileLoader {
@@ -126,4 +135,217 @@ fn a_reviewed_distribution_passes_production_trust_and_its_own_doctor() {
         );
     }
     fs::remove_dir_all(ROOT).unwrap();
+}
+
+fn fixed_now() -> Option<String> {
+    Some("2026-09-14T00:00:00Z".into())
+}
+
+fn fixed_precise_now() -> Option<String> {
+    Some("2026-09-14T00:00:00.000Z".into())
+}
+
+/// Every file one level below each directory under `base`, dotfiles only
+/// when `dotfiles` holds.
+fn files(base: &Path, dotfiles: bool) -> BTreeMap<String, Vec<u8>> {
+    let mut files = BTreeMap::new();
+    for directory in fs::read_dir(base).unwrap() {
+        let directory = directory.unwrap().path();
+        for file in fs::read_dir(&directory).unwrap() {
+            let file = file.unwrap().path();
+            let name = file.file_name().unwrap().to_str().unwrap();
+            if !dotfiles && name.starts_with('.') {
+                continue;
+            }
+            files.insert(
+                format!(
+                    "{}/{name}",
+                    directory.file_name().unwrap().to_str().unwrap()
+                ),
+                fs::read(&file).unwrap(),
+            );
+        }
+    }
+    files
+}
+
+fn same_files(rust: &BTreeMap<String, Vec<u8>>, swift: &BTreeMap<String, Vec<u8>>) {
+    assert_eq!(
+        rust.keys().collect::<Vec<_>>(),
+        swift.keys().collect::<Vec<_>>()
+    );
+    for (path, bytes) in swift {
+        assert_eq!(
+            String::from_utf8_lossy(&rust[path]),
+            String::from_utf8_lossy(bytes),
+            "{path}"
+        );
+    }
+}
+
+fn answer<T>(outcome: Result<Value, T>, error: impl Fn(T) -> Value) -> Value {
+    match outcome {
+        Ok(result) => json!({"ok": true, "result": result}),
+        Err(refusal) => json!({"ok": false, "error": error(refusal)}),
+    }
+}
+
+/// Host acceptance of `analyzer.summarize-trace@1` with the reviewed
+/// distribution: when `ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT` names what
+/// `ArkTraceReviewedDistributionOracleContractTests/
+/// testSwiftSummarizesTheFixtureTraceWithTheReviewedDistribution` recorded,
+/// the Rust daemon's own load of the distribution, then the plan, admission,
+/// run and reads of the same request over the repository's `zlib.htrace`,
+/// the real CLI launched at its canonical snapshot path, must answer as
+/// Swift's did and leave the same Job and Artifact files, byte for byte.
+#[test]
+fn a_reviewed_distribution_summarizes_the_fixture_trace_as_swift_did() {
+    let (Ok(descriptor), Ok(recorded)) = (
+        std::env::var("ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR"),
+        std::env::var("ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT"),
+    ) else {
+        eprintln!(
+            "set ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR and ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT"
+        );
+        return;
+    };
+    let recorded = PathBuf::from(recorded);
+    let read = |name: &str| -> Value {
+        serde_json::from_slice(&fs::read(recorded.join(name)).unwrap()).unwrap()
+    };
+    let _lock = exclusive_root();
+    let root = PathBuf::from(ROOT);
+    let doctor = ProductionDoctorProbe::new(&root.join("home"));
+    let loader = ArkTraceProfileLoader {
+        doctor: &doctor,
+        trust: &ProductionDistributionTrust,
+        snapshot_root: Some(format!("{ROOT}/snapshots")),
+        hooks: None,
+    };
+    let profiles = loader.load_profiles(&descriptor).unwrap();
+    assert_eq!(
+        json!(profiles.iter().map(projection).collect::<Vec<_>>()),
+        read("profiles.json")
+    );
+    // The source Swift published, as it published it.
+    for directory in ["artifacts", "artifacts/job-reviewed-source", "jobs-state"] {
+        fs::create_dir(root.join(directory)).unwrap();
+        fs::set_permissions(root.join(directory), fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    for file in fs::read_dir(recorded.join("artifacts/job-reviewed-source")).unwrap() {
+        let file = file.unwrap().path();
+        let name = file.file_name().unwrap();
+        let destination = root.join("artifacts/job-reviewed-source").join(name);
+        fs::copy(&file, &destination).unwrap();
+        fs::set_permissions(
+            &destination,
+            fs::Permissions::from_mode(if name == "index.json" { 0o600 } else { 0o400 }),
+        )
+        .unwrap();
+    }
+    let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+    let composed = AnalyzerProfiles::new(profiles, BTreeMap::new());
+    let planner = JobPlanner {
+        imports: None,
+        artifacts: Some(&artifacts),
+        analyzer: Some(&composed as &dyn AnalyzerComposition),
+        state_root: &root,
+        hdc: None,
+        workspace: None,
+    };
+    let answers = read("answers.json");
+    let params = read("requests.json")["job.plan"].clone();
+    let params = params.as_object().unwrap();
+    let mut actual = Map::new();
+    let mut planned = answer(planner.handle(params), |refused| {
+        json!({"code": refused.code, "message": refused.message,
+            "details": {"newDispatchCount": 0, "phase": "preAdmission"}})
+    });
+    // The step set's digest is Rust presentation provenance (#2121).
+    assert_eq!(
+        planned["result"]
+            .as_object_mut()
+            .unwrap()
+            .remove("stepSetDigestSHA256"),
+        Some(json!(arkdeck_contract::sha256_hex(
+            b"summarize-trace|runDeterministicAnalyzer|hostOnly|immediate|none"
+        )))
+    );
+    actual.insert("job.plan".into(), planned);
+    let accepted = JobAdmitter {
+        planner,
+        jobs: &jobs,
+        now: fixed_now,
+        authority: None,
+    }
+    .handle(params);
+    let accepted = answer(
+        accepted,
+        |refused| json!({"code": refused.code, "message": refused.message}),
+    );
+    let job = accepted["result"]["jobId"].as_str().unwrap().to_owned();
+    actual.insert("job.submit".into(), accepted);
+    let job_params = Map::from_iter([("jobId".into(), json!(job))]);
+    let runner = JobRunner {
+        imports: None,
+        mutation: None,
+        jobs: &jobs,
+        artifacts: &artifacts,
+        analyzer: Some(&composed),
+        quota: 64 * 1024 * 1024,
+        home: &format!("{ROOT}/home"),
+        now: fixed_now,
+        precise_now: fixed_precise_now,
+        sessions: None,
+        cancellation: None,
+        after_commit: None,
+        hdc: None,
+        workspace: None,
+    };
+    actual.insert(
+        "job.run".into(),
+        answer(
+            runner.handle(&job_params),
+            |refused| json!({"code": refused.code, "message": refused.message}),
+        ),
+    );
+    let reader = JobResultReader {
+        jobs: &jobs,
+        artifacts: &artifacts,
+    };
+    for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        let outcome = if matches!(method, "job.result" | "job.evidence") {
+            reader.handle(method, &job_params)
+        } else {
+            jobs.handle_resource(method, &job_params)
+        };
+        actual.insert(
+            method.into(),
+            answer(
+                outcome,
+                |error| json!({"code": error.code, "message": error.message}),
+            ),
+        );
+    }
+    let mut differences = Vec::new();
+    for (method, swift) in answers.as_object().unwrap() {
+        if actual.get(method) != Some(swift) {
+            differences.push(format!(
+                "{method}:\n  swift {swift}\n  rust  {}",
+                actual.get(method).unwrap_or(&Value::Null)
+            ));
+        }
+    }
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    drop(jobs);
+    same_files(
+        &files(&root.join("jobs-state/jobs"), true),
+        &files(&recorded.join("store/jobs"), true),
+    );
+    same_files(
+        &files(&root.join("artifacts"), false),
+        &files(&recorded.join("artifacts"), false),
+    );
+    fs::remove_dir_all(&root).unwrap();
 }

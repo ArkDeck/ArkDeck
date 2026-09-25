@@ -11,6 +11,7 @@ use std::collections::BTreeMap;
 
 const CRASH_SIGNATURE: &str = "crash-signature@1";
 const HILOG_SUMMARY: &str = crate::hilog_summary::ANALYZER_REF;
+const TRACE_SUMMARY: &str = crate::arktrace_profile::SUMMARY_REF;
 /// `HarnessCrashLedgerAnalysis.schemaVersion`.
 pub(crate) const SCHEMA_VERSION: &str = "1.0.0";
 /// `HarnessCrashLedgerAnalysis.analyzerRef` and `analyzerVersion`, which the
@@ -26,11 +27,13 @@ pub(crate) struct Receipt<'a> {
     pub truncated: bool,
 }
 
-/// The source identity Swift's typed analyzer action records.
+/// The source identity Swift's typed analyzer action records, and the lease
+/// path its invocation names as its last argument.
 pub(crate) struct Source<'a> {
     pub artifact_id: &'a str,
     pub sha256: &'a str,
     pub byte_count: u64,
+    pub path: &'a str,
 }
 
 /// A verified answer: Swift's provenance summary, keyed as Swift keys it, and
@@ -39,6 +42,9 @@ pub(crate) struct Verified {
     pub summary: BTreeMap<&'static str, String>,
     analyzer_ref: String,
     analysis: Value,
+    /// What the analyzer printed, which an ArkTrace product publishes as it
+    /// is.
+    stdout: Vec<u8>,
 }
 
 impl Verified {
@@ -76,9 +82,42 @@ impl Verified {
                 "analyzerOutputByteCount": count("derivedByteCount")?,
                 "result": self.analysis,
             }),
+            // ArkTrace's validated machine envelope carries its own complete
+            // provenance; a wrapper would change the reviewed bytes.
+            TRACE_SUMMARY => return Some(self.stdout.clone()),
             _ => return None,
         };
         crate::session_json::encode(&envelope).ok()
+    }
+
+    /// Swift `RuntimeArtifactService.traceSummaryDerivation`: the closed
+    /// provenance an ArkTrace product is published with, from the verified
+    /// summary; `None` for any other product, or when a member is missing.
+    pub(crate) fn derivation(&self) -> Option<Value> {
+        if self.analyzer_ref != TRACE_SUMMARY {
+            return None;
+        }
+        let field = |key: &str| self.summary.get(key).cloned();
+        let number = |key: &str| field(key)?.parse::<i64>().ok();
+        Some(json!({
+            "analyzerRef": field("analyzerRef")?,
+            "analyzerVersion": field("analyzerVersion")?,
+            "sourceArtifactID": field("sourceArtifactId")?,
+            "sourceSHA256": field("sourceSha256")?,
+            "sourceByteCount": number("sourceByteCount")?,
+            "toolSHA256": field("toolSha256")?,
+            "parserSHA256": field("parserSha256")?,
+            "parserVersion": field("parserVersion")?,
+            "parserUpstreamRevision": field("parserUpstreamRevision")?,
+            "parserBuildRecipeVersion": field("parserBuildRecipeVersion")?,
+            "parserAdapterVersion": field("parserAdapterVersion")?,
+            "schemaAdapterVersion": field("schemaAdapterVersion")?,
+            "indexSchemaVersion": number("indexSchemaVersion")?,
+            "timeoutMs": number("requestTimeoutMs")?,
+            "maxRows": number("requestMaxRows")?,
+            "maxEvents": number("requestMaxEvents")?,
+            "maxOutputBytes": number("requestMaxOutputBytes")?,
+        }))
     }
 }
 
@@ -159,6 +198,31 @@ pub(crate) fn verify(
             }
             document
         }
+        // Swift `ArkTraceSummaryEnvelopeValidator`: a silent child, and the
+        // closed envelope of exactly this invocation.
+        TRACE_SUMMARY => {
+            let mut arguments = profile.fixed_arguments.clone();
+            arguments.push(source.path.to_owned());
+            let invocation = crate::arktrace_summary::SummaryInvocation {
+                analyzer_ref: reference,
+                executable_sha256: &profile.executable_sha256,
+                arguments: &arguments,
+                timeout_seconds: profile.timeout_seconds,
+                output_byte_budget: Some(profile.output_byte_budget as u64),
+                source_sha256: source.sha256,
+                source_byte_count: source.byte_count,
+                contract: profile.arktrace_summary.as_ref(),
+            };
+            if !receipt.stderr.is_empty()
+                || !crate::arktrace_summary::valid_summary(receipt.stdout, &invocation)
+            {
+                return Err((
+                    "analyzer.schemaMismatch",
+                    format!("{reference} produced JSON outside ArkTrace contract 1.0"),
+                ));
+            }
+            document
+        }
         _ => {
             return Err((
                 "analyzer.schemaMismatch",
@@ -179,10 +243,46 @@ pub(crate) fn verify(
     if reference == HILOG_SUMMARY {
         summary.insert("toolSha256", profile.executable_sha256.clone());
     }
+    if let Some(contract) = &profile.arktrace_summary {
+        summary.insert("toolSha256", profile.executable_sha256.clone());
+        summary.insert("parserSha256", contract.parser_sha256.clone());
+        summary.insert("parserVersion", contract.parser_version.clone());
+        summary.insert(
+            "parserUpstreamRevision",
+            contract.parser_upstream_revision.clone(),
+        );
+        summary.insert(
+            "parserBuildRecipeVersion",
+            contract.parser_build_recipe_version.clone(),
+        );
+        summary.insert(
+            "parserAdapterVersion",
+            contract.parser_adapter_version.clone(),
+        );
+        summary.insert(
+            "schemaAdapterVersion",
+            contract.schema_adapter_version.clone(),
+        );
+        summary.insert(
+            "indexSchemaVersion",
+            contract.index_schema_version.to_string(),
+        );
+        summary.insert(
+            "requestTimeoutMs",
+            (profile.timeout_seconds * 1_000).to_string(),
+        );
+        summary.insert("requestMaxRows", "1000".to_owned());
+        summary.insert("requestMaxEvents", "10000".to_owned());
+        summary.insert(
+            "requestMaxOutputBytes",
+            profile.output_byte_budget.to_string(),
+        );
+    }
     Ok(Verified {
         summary,
         analyzer_ref: reference.to_owned(),
         analysis,
+        stdout: receipt.stdout.to_vec(),
     })
 }
 
@@ -232,6 +332,7 @@ mod tests {
         artifact_id: "ART-00000000000000000000000000000001",
         sha256: "0000000000000000000000000000000000000000000000000000000000000002",
         byte_count: 30,
+        path: "/private/tmp/arkdeck-analyzer-output/source.log",
     };
 
     fn profile(analyzer_ref: &str, budget: usize) -> AnalyzerProfile {
@@ -337,6 +438,7 @@ mod tests {
             artifact_id: SOURCE.artifact_id,
             sha256: &digest,
             byte_count: bytes.len() as u64,
+            path: SOURCE.path,
         };
         let hilog = profile(HILOG_SUMMARY, 8 * 1024);
         let verified = verify(&receipt(&stdout), &source, &hilog).unwrap();
@@ -359,6 +461,91 @@ mod tests {
         assert_eq!(
             verify(&receipt(&stdout), &SOURCE, &hilog).err().unwrap().0,
             "analyzer.schemaMismatch"
+        );
+    }
+
+    /// A reviewed ArkTrace summary (the `reviewed` case of the
+    /// `arktrace-summary-validator` oracle) is published as the bytes the
+    /// child printed, with the closed derivation Swift's
+    /// `traceSummaryDerivation` builds from its verified summary; a child
+    /// that also wrote to stderr is refused with Swift's detail.
+    #[test]
+    fn a_trace_summary_is_its_own_bytes_with_its_derivation() {
+        let oracle: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/arktrace-summary-validator/cases.json"
+        ))
+        .unwrap();
+        let case = &oracle["cases"][0];
+        assert_eq!(case["name"], "reviewed");
+        let invocation = &case["invocation"];
+        let contract = &oracle["contract"];
+        let text = |value: &Value| value.as_str().unwrap().to_owned();
+        let arguments: Vec<String> = invocation["arguments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(text)
+            .collect();
+        let (path, fixed) = arguments.split_last().unwrap();
+        let summary = AnalyzerProfile {
+            analyzer_version: "0.1.0+1".into(),
+            executable_sha256: text(&invocation["executableSHA256"]),
+            fixed_arguments: fixed.to_vec(),
+            output_byte_budget: 8 * 1024 * 1024,
+            arktrace_summary: Some(crate::arktrace_profile::ArkTraceContract {
+                tool_version: text(&contract["toolVersion"]),
+                parser_version: text(&contract["parserVersion"]),
+                parser_upstream_revision: text(&contract["parserUpstreamRevision"]),
+                parser_sha256: text(&contract["parserSHA256"]),
+                parser_build_recipe_version: text(&contract["parserBuildRecipeVersion"]),
+                parser_adapter_version: text(&contract["parserAdapterVersion"]),
+                schema_adapter_version: text(&contract["schemaAdapterVersion"]),
+                index_schema_version: contract["indexSchemaVersion"].as_i64().unwrap(),
+            }),
+            ..profile(TRACE_SUMMARY, 8 * 1024 * 1024)
+        };
+        let source_sha256 = text(&invocation["sourceSHA256"]);
+        let source = Source {
+            artifact_id: "ART-SOURCE",
+            sha256: &source_sha256,
+            byte_count: invocation["sourceByteCount"].as_u64().unwrap(),
+            path,
+        };
+        let stdout = case["envelope"].as_str().unwrap().as_bytes();
+        let verified = verify(&receipt(stdout), &source, &summary).unwrap();
+        assert_eq!(verified.envelope().unwrap(), stdout);
+        assert_eq!(
+            verified.derivation().unwrap(),
+            json!({
+                "analyzerRef": "trace-summary@1", "analyzerVersion": "0.1.0+1",
+                "sourceArtifactID": "ART-SOURCE", "sourceSHA256": source_sha256,
+                "sourceByteCount": 4096, "toolSHA256": "b".repeat(64),
+                "parserSHA256": "5".repeat(64), "parserVersion": "4.3.7",
+                "parserUpstreamRevision": "6".repeat(40),
+                "parserBuildRecipeVersion": "7".repeat(64), "parserAdapterVersion": "1",
+                "schemaAdapterVersion": "2", "indexSchemaVersion": 3, "timeoutMs": 30000,
+                "maxRows": 1000, "maxEvents": 10000, "maxOutputBytes": 8388608,
+            })
+        );
+        let noisy = Receipt {
+            stderr: b"warning\n",
+            ..receipt(stdout)
+        };
+        assert_eq!(
+            verify(&noisy, &source, &summary).err().unwrap(),
+            (
+                "analyzer.schemaMismatch",
+                "trace-summary@1 produced JSON outside ArkTrace contract 1.0".to_owned()
+            )
+        );
+        // Another analyzer's verified answer carries no derivation.
+        assert!(
+            verify(
+                &receipt(stdout),
+                &source,
+                &profile(CRASH_SIGNATURE, 1 << 20)
+            )
+            .map_or(true, |verified| verified.derivation().is_none())
         );
     }
 }

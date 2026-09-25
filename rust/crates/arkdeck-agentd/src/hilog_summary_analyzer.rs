@@ -13,8 +13,11 @@
 //! summary is written to stdout, exit 0. Anything else is one of Swift's two
 //! fixed lines, which never name the path or the bytes: a usage refusal and
 //! exit 64 before anything is read, or a failure and exit 1.
-use arkdeck_hoststore::{AnalyzerProfile, AnalyzerProfiles};
-use std::ffi::OsString;
+use arkdeck_hoststore::{
+    AnalyzerProfile, AnalyzerProfiles, ArkTraceProfileLoader, ProductionDistributionTrust,
+    ProductionDoctorProbe,
+};
+use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::fd::AsFd;
@@ -61,14 +64,18 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
 /// Swift's `FixedExecutableResolver` hashes `Bundle.main.executableURL`;
 /// otherwise the HiLog summary is unavailable by name.
 ///
-/// Without `ARKDECK_ARKTRACE_DESCRIPTOR` (`arktrace_descriptor` false), the
-/// two ArkTrace analyzers are unavailable as Swift names them,
-/// `analyzer.arktraceNotFound`. A named descriptor is not loaded here yet:
-/// its analyzers stay without a profile and their operations without an
-/// executor, and the production start names the variable as unread.
+/// Then the two ArkTrace analyzers from `ARKDECK_ARKTRACE_DESCRIPTOR`
+/// (`arktrace_descriptor`), as Swift's `ArkTraceSummaryAnalyzerProfileLoader`
+/// loads it in `state`: the production trust checker, the doctor's private
+/// home `arktrace-availability-home` and the snapshot generations of
+/// `arktrace-profile-snapshots`. A descriptor that loads composes both
+/// profiles; one that does not leaves both unavailable for the loader's
+/// reason, and no descriptor for `analyzer.arktraceNotFound`. The load runs
+/// the reviewed CLI's own self-test, so a named descriptor spawns a child.
 pub(crate) fn composed(
     path: Option<&Path>,
-    arktrace_descriptor: bool,
+    arktrace_descriptor: Option<&OsStr>,
+    state: &Path,
 ) -> io::Result<Option<AnalyzerProfiles>> {
     let profiles = match path {
         None => AnalyzerProfiles::default(),
@@ -81,9 +88,111 @@ pub(crate) fn composed(
             AnalyzerProfiles::for_daemon_analyzer(analyzer, own.as_deref())
         }
     };
-    Ok(Some(if arktrace_descriptor {
-        profiles
-    } else {
-        profiles.without_arktrace()
+    let Some(descriptor) = arktrace_descriptor else {
+        return Ok(Some(profiles.without_arktrace()));
+    };
+    let descriptor = file_url_path(
+        &descriptor.to_string_lossy(),
+        &std::env::current_dir()?.to_string_lossy(),
+        arkdeck_platform::runtime_home().as_deref(),
+    );
+    let doctor = ProductionDoctorProbe::new(&state.join("arktrace-availability-home"));
+    let loader = ArkTraceProfileLoader {
+        doctor: &doctor,
+        trust: &ProductionDistributionTrust,
+        snapshot_root: Some(
+            state
+                .join("arktrace-profile-snapshots")
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        hooks: None,
+    };
+    Ok(Some(match loader.load_profiles(&descriptor) {
+        Ok(loaded) => profiles.with_arktrace(loaded),
+        Err(error) => profiles.with_arktrace_unavailable(error.reason()),
     }))
+}
+
+/// Swift `URL(filePath:).path` of a daemon setting: `~/` names the home
+/// directory `NSHomeDirectory()` reports, a relative path is resolved against
+/// the current directory with its `.` and `..` segments removed, and no
+/// trailing solidus is kept but the root's. A repeated solidus stays, as
+/// Swift keeps it.
+fn file_url_path(value: &str, current: &str, home: Option<&str>) -> String {
+    let path = match (value.strip_prefix("~/"), home) {
+        (Some(rest), Some(home)) => format!("{}/{rest}", home.trim_end_matches('/')),
+        _ if value.starts_with('/') => value.to_owned(),
+        _ => {
+            let merged = format!("{}/{value}", current.trim_end_matches('/'));
+            let mut kept: Vec<&str> = Vec::new();
+            let segments: Vec<&str> = merged.split('/').skip(1).collect();
+            for (index, segment) in segments.iter().enumerate() {
+                let last = index + 1 == segments.len();
+                match *segment {
+                    "." => {}
+                    ".." => {
+                        kept.pop();
+                    }
+                    segment => kept.push(segment),
+                }
+                // A final dot segment leaves its directory.
+                if last && matches!(*segment, "." | "..") {
+                    kept.push("");
+                }
+            }
+            format!("/{}", kept.join("/"))
+        }
+    };
+    let trimmed = path.trim_end_matches('/');
+    if trimmed.is_empty() {
+        "/".to_owned()
+    } else {
+        trimmed.to_owned()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_url_path;
+
+    /// What Swift's `URL(filePath:).path` answered for each setting, with
+    /// the current directory `/private/tmp/cwd/sub` and the home
+    /// `/Users/someone`.
+    #[test]
+    fn a_descriptor_setting_names_the_path_swift_s_url_names() {
+        for (value, path) in [
+            ("/a/b.json", "/a/b.json"),
+            ("/a//b.json", "/a//b.json"),
+            ("/a/b.json/", "/a/b.json"),
+            ("/a/b.json//", "/a/b.json"),
+            ("/a/./b.json", "/a/./b.json"),
+            ("/a/../b.json", "/a/../b.json"),
+            ("//x.json", "//x.json"),
+            ("/", "/"),
+            ("/~/x.json", "/~/x.json"),
+            ("rel/x.json", "/private/tmp/cwd/sub/rel/x.json"),
+            ("./x.json", "/private/tmp/cwd/sub/x.json"),
+            ("a/./b.json", "/private/tmp/cwd/sub/a/b.json"),
+            ("a/../b.json", "/private/tmp/cwd/sub/b.json"),
+            ("../x.json", "/private/tmp/cwd/x.json"),
+            ("a//b.json", "/private/tmp/cwd/sub/a//b.json"),
+            ("a/b.json/", "/private/tmp/cwd/sub/a/b.json"),
+            ("", "/private/tmp/cwd/sub"),
+            (".", "/private/tmp/cwd/sub"),
+            ("./", "/private/tmp/cwd/sub"),
+            ("..", "/private/tmp/cwd"),
+            ("~", "/private/tmp/cwd/sub/~"),
+            ("~root/x.json", "/private/tmp/cwd/sub/~root/x.json"),
+            ("a/~/x", "/private/tmp/cwd/sub/a/~/x"),
+            ("~/x.json", "/Users/someone/x.json"),
+            ("~/", "/Users/someone"),
+        ] {
+            assert_eq!(
+                file_url_path(value, "/private/tmp/cwd/sub", Some("/Users/someone")),
+                path,
+                "{value}"
+            );
+        }
+    }
 }

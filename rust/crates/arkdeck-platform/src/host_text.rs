@@ -54,6 +54,11 @@ pub fn host_control_character(scalar: char) -> bool {
     member(1, scalar)
 }
 
+pub fn host_alphanumeric(scalar: char) -> bool {
+    // CFCharacterSet.h: kCFCharacterSetAlphaNumeric = 10 (L*, M* and N*).
+    member(10, scalar)
+}
+
 pub fn host_whitespace_or_newline(scalar: char) -> bool {
     // CFCharacterSet.h: kCFCharacterSetWhitespaceAndNewline = 3.
     member(3, scalar)

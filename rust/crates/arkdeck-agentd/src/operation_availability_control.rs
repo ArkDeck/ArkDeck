@@ -104,9 +104,14 @@ impl Fixture {
     }
 
     fn host(&self, artifacts: bool, jobs: bool) -> crate::host::Host {
-        self.host_with(artifacts, jobs, false)
+        self.host_with(artifacts, jobs, None)
     }
-    fn host_with(&self, artifacts: bool, jobs: bool, arktrace: bool) -> crate::host::Host {
+    fn host_with(
+        &self,
+        artifacts: bool,
+        jobs: bool,
+        arktrace: Option<&std::ffi::OsStr>,
+    ) -> crate::host::Host {
         let mut host = crate::host::Host::from_environment()
             .with_targets(TargetStore::open(&self.0.join("targets")).unwrap())
             // The daemon's own composition of the analyzer it is named: the
@@ -115,8 +120,12 @@ impl Fixture {
             // descriptor named.
             .with_planning(
                 &self.0,
-                crate::hilog_summary_analyzer::composed(Some(&self.0.join("analyzer")), arktrace)
-                    .unwrap(),
+                crate::hilog_summary_analyzer::composed(
+                    Some(&self.0.join("analyzer")),
+                    arktrace,
+                    &self.0,
+                )
+                .unwrap(),
             )
             .with_development_hdc(Some(ProcessDispatch::new(
                 VerifiedTool::open(
@@ -363,25 +372,35 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         );
     }
 }
-/// A named ArkTrace descriptor is not loaded by this Runtime yet: its two
-/// analyzers keep no profile and their operations no executor, which is what
-/// they say.
+/// A named ArkTrace descriptor is loaded as Swift's daemon loads it: one
+/// that does not load leaves both ArkTrace analyzers unavailable for the
+/// loader's reason, an absent descriptor and a malformed one alike, refused
+/// before the reviewed CLI's self-test could run.
 #[test]
-fn a_named_arktrace_descriptor_leaves_its_analyzers_without_an_executor() {
+fn a_named_arktrace_descriptor_that_does_not_load_names_the_loader_s_reason() {
     let fixture = Fixture::new();
-    let control = Control::new(fixture.host_with(true, true, true)).unwrap();
-    let rows = call(&control, "operation.list", json!({}));
-    for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
-        let row = entry(&rows, reference);
-        assert_eq!(row["availability"], "unavailable");
-        assert_eq!(row["reasonCodes"], json!(["operation_not_supported"]));
-        assert_eq!(
-            row["reasons"],
-            json!([format!(
-                "Rust analyzer provider has no complete production executor for {reference}"
-            )])
-        );
+    let malformed = fixture.0.join("arktrace-descriptor.json");
+    fs::write(&malformed, "{}").unwrap();
+    fs::set_permissions(&malformed, fs::Permissions::from_mode(0o600)).unwrap();
+    for (descriptor, reason) in [
+        (
+            fixture.0.join("absent-descriptor.json"),
+            "analyzer.arktraceNotFound",
+        ),
+        (malformed, "analyzer.arktraceDescriptorInvalid"),
+    ] {
+        let control =
+            Control::new(fixture.host_with(true, true, Some(descriptor.as_os_str()))).unwrap();
+        let rows = call(&control, "operation.list", json!({}));
+        for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
+            let row = entry(&rows, reference);
+            assert_eq!(row["availability"], "unavailable", "{reference}");
+            assert_eq!(row["reasonCodes"], json!(["provider_tool_unavailable"]));
+            assert_eq!(row["reasons"], json!([reason]), "{reference}");
+        }
     }
+    // No doctor ran: its private home was never made.
+    assert!(!fixture.0.join("arktrace-availability-home").exists());
 }
 
 #[test]

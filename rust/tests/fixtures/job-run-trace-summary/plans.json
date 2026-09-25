@@ -1,0 +1,131 @@
+[
+  {
+    "composition" : "composed",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-trace-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-trace-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "a1e2c6fa72be5f25b7519a06e898556cd57c63d745f74fd43740918d56669d04",
+        "operation" : "analyzer.summarize-trace@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "c7381fe3a4c59ac699d14e44fdf10de035dc2126d8705c806ec632fc0fba55c1",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "summarize-trace"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "composition" : "unconfigured",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-trace-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-trace-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.summarize-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "treeDrifted",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-trace-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-trace-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.summarize-trace@1 is runtime unavailable: analyzer.profileIdentityDrift"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "infoPlistDrifted",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-trace-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-trace-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.summarize-trace@1 is runtime unavailable: analyzer.profileIdentityDrift"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "bundleWritable",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-trace-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-trace-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "a1e2c6fa72be5f25b7519a06e898556cd57c63d745f74fd43740918d56669d04",
+        "operation" : "analyzer.summarize-trace@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "c7381fe3a4c59ac699d14e44fdf10de035dc2126d8705c806ec632fc0fba55c1",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "summarize-trace"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  }
+]

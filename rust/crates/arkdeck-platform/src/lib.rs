@@ -171,7 +171,9 @@ pub use host_sqlite::{HostSqlite, SqliteValue};
 #[cfg(target_os = "macos")]
 mod host_text;
 #[cfg(target_os = "macos")]
-pub use host_text::{host_canonical_text, host_control_character, host_whitespace_or_newline};
+pub use host_text::{
+    host_alphanumeric, host_canonical_text, host_control_character, host_whitespace_or_newline,
+};
 
 #[cfg(target_os = "macos")]
 mod host_url_properties;

@@ -822,4 +822,199 @@ and published; then `trace-analysis@1` (`ArkTraceAnalysisRequest`,
 
 ### CI
 
+PR #2165, merged as `27bb8da0c`: Agent PR 36085558505, SDD Guard 36085558616
+and Swift CI 36085558689 all succeeded at `f9912e156` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).
+
+## 7. `analyzer.summarize-trace@1` on the Rust daemon
+
+Base: protected `main` `b5d254c2c` (#2162). No contract input changes.
+
+### What a caller sees
+
+- A daemon started with `ARKDECK_ARKTRACE_DESCRIPTOR` (development or
+  production) loads the named ArkTrace distribution at its start, as Swift's
+  daemon does: the production trust checker, the doctor's private home
+  `<state>/arktrace-availability-home`, the snapshot generations of
+  `<state>/arktrace-profile-snapshots`, the setting read as Swift's
+  `URL(filePath:).path` reads it (`~/` from the home `NSHomeDirectory()`
+  reports, a relative path against the daemon's current directory with its
+  dot segments removed, trailing solidi dropped). A descriptor that loads
+  composes both ArkTrace profiles; one that does not leaves both unavailable
+  for the loader's reason (`analyzer.arktraceDescriptorInvalid`, …) instead
+  of the production start naming the variable as unread.
+- `analyzer.summarize-trace@1` is then available, and a Job of it is planned,
+  admitted, run, published, read (`job.result`, `job.evidence`) and
+  reconciled as Swift's engine does it; `arkdeck agent run` of it ends
+  `completed`. The published `trace-summary.json` is the exact envelope the
+  reviewed CLI printed.
+- `analyzer.analyze-trace@1` is not executed yet: with a loaded descriptor it
+  is `operation_not_supported` ("no complete production executor"), and
+  `job.plan`/`job.submit` refuse it as before (declared below).
+
+### Swift, the oracles
+
+- `ArkTraceSummaryValidatorOracleContractTests` (new,
+  `rust/tests/fixtures/arktrace-summary-validator/`): Swift's
+  `ArkTraceSummaryEnvelopeValidator` on 95 envelopes (13 accepted) around the
+  reviewed one — every member's type, range and closure, the source digest,
+  size and path, the tool and parser pins, the limits, data quality,
+  truncation, the result sections and their event sources, duplicate keys,
+  integer tokens, control and format scalars, and an invocation whose
+  arguments, budget, analyzer or digests are not the reviewed ones.
+- `JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceSummaryJobs`
+  (new, `rust/tests/fixtures/job-run-trace-summary/`): Swift's engine with the
+  real descriptor-bound dispatcher over a stand-in distribution — a Mach-O CLI
+  checked in compiled (`arktrace`, from `arktrace.c`, 34 KB, so both runtimes
+  run one SHA-256), inside an owner-only bundle, with a pinned parser, a
+  pinned `Info.plist` outside the pinned `Resources` tree. Five plans
+  (composed; no descriptor; a file added to the tree; the `Info.plist`
+  changed; the bundle writable by others), then twelve Jobs run in order over
+  one store: a reviewed answer (succeeded, published), stderr written, an
+  envelope of another source, an extra member, a non-zero exit, no output,
+  non-JSON, 9 MiB of output (truncated), a signal death (outcome unknown), and
+  the three drifts at dispatch (each undone after its run); every Job's
+  status, details, result and evidence; the arguments of the nine children
+  that ran (the source's inode alias normalized); the Job index and files and
+  every Artifact file.
+- `ArkTraceReviewedDistributionOracleContractTests/testSwiftSummarizesTheFixtureTraceWithTheReviewedDistribution`
+  (new, host acceptance, run only when `ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR`
+  and `ARKDECK_REVIEWED_ARKTRACE_JOB_RECORD` are set): Swift's production load
+  of the reviewed distribution, then `Packages/ArkDeckKit/Fixtures/traces/zlib.htrace`
+  published as a source and planned, admitted, run with the real CLI and read.
+
+What the oracles showed about Swift, all ported:
+
+- The ArkTrace operations publish before the step's outcome
+  (`publishesBeforeOutcome`): a publication failure leaves the intent
+  outstanding and the typed action recorded, and the success path appends
+  its `artifact trace-summary.json -> …` timeline line to a record the step
+  then overwrites, so a published trace summary leaves no such line.
+- The publication is Swift's `preservesValidatedMachineBytes`: no redaction
+  (the reviewed envelope's `token=secretvalue` event source is published as
+  it is), the closed ArkTrace derivation in the index row, refused as
+  `evidenceVerificationFailed` for any other product.
+- The dispatcher reports every failure after the source is bound only by
+  class: `analyzer process identity refused` (the bundle, a tree, a pinned
+  file, the executable, a refused launch) or `analyzer process outcome
+  unknown` (a timeout, a signal, an unobservable child); a source that is
+  not its lease's bytes stays `analyzer input Artifact identity refused`.
+  The child's capture is the dispatcher's 8 MiB whatever the profile says.
+- A plan made while a pin drifted is refused as
+  `analyzer.profileIdentityDrift`; a writable bundle is not seen at plan
+  time, only at dispatch.
+
+### Rust
+
+- `arkdeck-platform`: `host_alphanumeric` (`CharacterSet.alphanumerics`,
+  CFCharacterSet set 10).
+- `arkdeck-hoststore`:
+  - `arktrace_summary.rs` (new): the validator (`valid_summary`) with its
+    strict-JSON duplicate check, integer-token check, private-path check,
+    quality scopes and categories.
+  - `analyzer_output.rs`: the trace-summary verification (a silent child and
+    a valid envelope of exactly this invocation), the ArkTrace provenance in
+    the verified summary, the exact bytes as the product, and `derivation()`
+    (Swift `traceSummaryDerivation`).
+  - `artifact_publication.rs`: `publish_machine_bytes`.
+  - `job_run.rs`: `dispatch_arktrace` (source bound by `VerifiedResource`,
+    `VerifiedNamespace`, trees, pinned files, `VerifiedTool`,
+    `run_tool_at_canonical_path` with the bindings rechecked around the
+    spawn, the source's `/.vol` alias as the last argument, no environment
+    but the clean base, 8 MiB capture, class-only failures) and the
+    publication before the outcome; the lease path is part of the analyzer
+    `Source`.
+  - `analyzer_composition.rs`: `analyzer.summarize-trace@1` executed,
+    `publishes_before_outcome`, `with_arktrace`, `with_arktrace_unavailable`.
+  - `job_plan.rs`, `job_result.rs`: the operation materialized and read.
+- `arkdeck-agentd`: `hilog_summary_analyzer::composed` loads a named
+  descriptor with `ProductionDistributionTrust` and `ProductionDoctorProbe`
+  in the daemon's state directory (`file_url_path` for the setting); the
+  development and production starts pass it; `ARKDECK_ARKTRACE_DESCRIPTOR`
+  leaves the production start's unread list.
+
+### Evidence
+
+- `cargo test -p arkdeck-hoststore --lib arktrace_summary`: all 95 of Swift's
+  verdicts. `--test job_run_trace_summary`: the five plans, twelve admissions,
+  twelve runs, 48 reads, the nine children's arguments and argument zero (the
+  bundle's canonical path), the Job index, every Job file and every Artifact
+  index and payload, byte for byte as Swift's; the signal-parked Job is then
+  reconciled `executionConfirmedNotPerformed`, twice.
+- Host acceptance on this Mac (the descriptor the installed daemon names):
+  Swift recorded its summary of `zlib.htrace` at
+  `/private/tmp/arkdeck-s25-e2-reviewed-job-swift` (2.4 s: load, the real
+  CLI's self-test, the run); `cargo test -p arkdeck-hoststore --test
+  arktrace_reviewed` with `ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT` pointing at
+  it: the Rust load gives Swift's two profiles and the plan, admission, run
+  and four reads answer as Swift's did, with the same Job files and the same
+  2,208-byte `trace-summary.json` (ArkTrace `dataQuality` warnings and all)
+  and index row. `cargo test -p arkdeck-agentd --test trace_summary_analyzer`
+  with the same variables: the built daemon started with the descriptor
+  describes `analyzer.summarize-trace@1` as available, and a Job run
+  directly and one owned by an agent execution (`completed`, Job
+  `succeeded`) each publish Swift's bytes. Nothing installed was written;
+  logs `/private/tmp/arkdeck-s25-e2-reviewed-{swift,rust}.log`,
+  `/private/tmp/arkdeck-s25-e2-agentd-reviewed.log`.
+- Unit tests: the setting's path for 25 forms Swift's `URL(filePath:)` was
+  probed with; a descriptor that does not load (absent, malformed) names the
+  loader's reason for both analyzers without running any child; an ArkTrace
+  dispatch refuses a source by its own words and a refused launch by class.
+- Mutations: 12 of 12 caught, each restored by SHA-256 — publication after
+  the outcome, the redacting publication, a derivation without
+  `maxOutputBytes`, stderr ignored, the tree, the bundle or the pinned files
+  not held at dispatch, a refused launch reported with its detail, the
+  results not read, the profile's budget as the capture, a relative setting
+  kept relative, a load failure reported as not found. Logs
+  `/private/tmp/arkdeck-s25-e2-mutations{,-b}.log`.
+
+### Differences from Swift (declared)
+
+- `analyzer.analyze-trace@1` with a loaded descriptor: Swift executes it; the
+  Rust daemon names it `operation_not_supported` and refuses its plan
+  (`… is not materialized by the Rust Runtime yet`) until the next slice.
+- A child's base environment, as declared in §6.
+- Swift validates the loaded profiles once more at start
+  (`AnalyzerProvider.validatedProfiles`); every profile the loader returns
+  satisfies it by construction, so the Rust start does not repeat it.
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-e2-*.log`:
+
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-platform -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak -p arkdeck-cli -p arkdeck-client -p arkdeck-provider-hdc
+  -p arkdeck-provider-arkforge -p arkdeck-provider-workspace --all-targets
+  -- -D warnings`: exit 0; the platform, host store and daemon again for
+  `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: exit 0.
+- `cargo test -p arkdeck-hoststore --no-fail-fast`: exit 0, 599 passed, 14
+  ignored (existing).
+- `cargo test -p arkdeck-agentd --no-fail-fast`: exit 0, 163 passed.
+- `cargo test -p arkdeck-cli --no-fail-fast`: exit 0, 252 passed;
+  `cargo test -p arkdeck-platform -p arkdeck-client -p arkdeck-provider-hdc
+  -p arkdeck-provider-arkforge -p arkdeck-provider-workspace -p arkdeck-soak
+  --no-fail-fast`: exit 0, 434 passed. No stand-in or fake HDC left running.
+- Swift: `run-swiftpm.sh test --filter 'JobRunAnalyzerOracleContractTests'`
+  (all seven oracles of the class), `--filter
+  'ArkTraceSummaryValidatorOracleContractTests|ArkTraceReviewedDistributionOracleContractTests'`:
+  exit 0 (the reviewed ones skipped without their variables; run with them
+  above).
+- `sh scripts/check-sdd.sh`: exit 0.
+- Not run: `generate-contract.py`/`check-contracts.py` (no contract input
+  changes), the App, a device.
+
+### Next
+
+`trace-analysis@1`: `ArkTraceAnalysisRequest` (the request's closed
+cross-field contract, its arguments and its recovery digest in the typed
+action), `ArkTraceAnalysisEnvelopeValidator`, the derivation with the
+request's members, and `analyzer.analyze-trace@1` materialized, executed and
+read; then the Trace inspector decision (§4).
+
+### CI
+
 Pending.

@@ -449,7 +449,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                     std::env::var_os("ARKDECK_ANALYZER_PATH")
                         .as_deref()
                         .map(std::path::Path::new),
-                    std::env::var_os("ARKDECK_ARKTRACE_DESCRIPTOR").is_some(),
+                    std::env::var_os("ARKDECK_ARKTRACE_DESCRIPTOR").as_deref(),
+                    &root,
                 )?,
             );
         let development_hdc = development_hdc()?;

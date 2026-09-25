@@ -43,7 +43,8 @@ use crate::job_record::{JobRecord, terminal};
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
 use arkdeck_platform::{
-    AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource, VerifiedTool,
+    AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ToolLimits, ToolRequest, ToolRunError,
+    ToolTermination, VerifiedNamespace, VerifiedResource, VerifiedSource, VerifiedTool,
 };
 use serde_json::{Map, Value, json};
 use std::ffi::OsString;
@@ -535,10 +536,14 @@ impl JobRunner<'_> {
         {
             return Err(uncertain());
         }
+        let Some(lease_path) = leased.path.to_str() else {
+            return Err(uncertain());
+        };
         let source = Source {
             artifact_id: &leased.artifact_id,
             sha256: &sha256,
             byte_count,
+            path: lease_path,
         };
         let derived = analyzer_composition::derived_artifact_name(&profile.analyzer_ref);
         let target = run.record.request["target"]["targetId"]
@@ -667,12 +672,6 @@ impl JobRunner<'_> {
         if let Some(hook) = self.after_commit {
             hook(&run.record.job_id);
         }
-        run.outcome(step, "succeeded", None)?;
-        run.record
-            .timeline
-            .push(format!("verified {step} {}", verified.fact_names()));
-        run.record.set_recovery(None, None, None);
-        // The declared product is published after the correlated outcome.
         let job_id = run.record.job_id.clone();
         let session_id = format!("session-{job_id}");
         let mut binding = json!({"targetID": target});
@@ -702,27 +701,53 @@ impl JobRunner<'_> {
             now: self.now,
         };
         let contents = verified.envelope().unwrap_or_else(|| b"{}".to_vec());
-        match publisher.publish(&product, &contents) {
-            Ok(metadata) => run.record.timeline.push(format!(
-                "artifact {derived} -> {}",
-                metadata["artifactID"].as_str().unwrap_or_default()
-            )),
-            Err(error) => {
-                // A publication failure is recorded, never swallowed.
-                let _ = publisher.record_missing(&product, &error);
-                run.record
-                    .timeline
-                    .push(format!("artifact {derived} missing: {error}"));
-                let reason = format!(
-                    "artifact publication failed: {derived} could not be published: {error}"
-                );
-                run.record.set_operation_failure(Some(failure(
-                    "artifactPublicationFailed",
-                    "storage",
-                    "notAutomatic",
-                    "inspectJob",
-                )));
-                return self.close(run, &reason);
+        // Swift publishes an ArkTrace product as the exact bytes its
+        // validator approved, with the derivation that closes them.
+        let derivation = verified.derivation();
+        let publish = || match &derivation {
+            Some(derivation) => publisher.publish_machine_bytes(&product, &contents, derivation),
+            None => publisher.publish(&product, &contents),
+        };
+        // A publication failure is recorded, never swallowed, and fails the
+        // Job with whatever its step has written so far.
+        let unpublished = |run: &mut Run, error: String| {
+            let _ = publisher.record_missing(&product, &error);
+            run.record
+                .timeline
+                .push(format!("artifact {derived} missing: {error}"));
+            run.record.set_operation_failure(Some(failure(
+                "artifactPublicationFailed",
+                "storage",
+                "notAutomatic",
+                "inspectJob",
+            )));
+            self.close(
+                run,
+                &format!("artifact publication failed: {derived} could not be published: {error}"),
+            )
+        };
+        // Swift makes an ArkTrace product durable before the journal can call
+        // its step succeeded: a failure leaves the intent outstanding and the
+        // typed action recorded. Its publication line is appended to a record
+        // the step then overwrites, so a published product leaves none.
+        let publishes_before_outcome = analyzer_composition::publishes_before_outcome(&operation);
+        if publishes_before_outcome && let Err(error) = publish() {
+            return unpublished(run, error);
+        }
+        run.outcome(step, "succeeded", None)?;
+        run.record
+            .timeline
+            .push(format!("verified {step} {}", verified.fact_names()));
+        run.record.set_recovery(None, None, None);
+        // Any other declared product is published after the correlated
+        // outcome.
+        if !publishes_before_outcome {
+            match publish() {
+                Ok(metadata) => run.record.timeline.push(format!(
+                    "artifact {derived} -> {}",
+                    metadata["artifactID"].as_str().unwrap_or_default()
+                )),
+                Err(error) => return unpublished(run, error),
             }
         }
         run.transition("running", "finalizing", "steps-complete")?;
@@ -832,6 +857,9 @@ impl JobRunner<'_> {
         source: &Source<'_>,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<Exited, Dispatch> {
+        if profile.arktrace_summary.is_some() || profile.arktrace_analysis.is_some() {
+            return dispatch_arktrace(profile, source, cancelled);
+        }
         let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
             .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
         let tool = VerifiedTool::open(&profile.executable_path, &profile.executable_sha256)
@@ -870,6 +898,92 @@ impl JobRunner<'_> {
     }
 }
 
+/// Swift `DescriptorBoundProcessDispatcher.dispatch` for an ArkTrace analyzer,
+/// whose reviewed CLI is an inner executable of a signed bundle
+/// (`.verifiedCanonicalPath`): the source bound by one retained descriptor
+/// (`VerifiedRegularFileDescriptor`), then the bundle's owner-only namespace,
+/// the pinned trees and files, and the pinned executable spawned suspended at
+/// its canonical path, resumed only once its first mapping is the retained
+/// inode and the namespace, the pinned files and the source still hold. The
+/// child reads the source's inode alias, under the dispatcher's own capture
+/// and no environment beyond the clean base. A failure after the source is
+/// bound is reported only by its class, as Swift keeps the authorized
+/// executable's path out of a trace operation's durable failure.
+fn dispatch_arktrace(
+    profile: &AnalyzerProfile,
+    source: &Source<'_>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Exited, Dispatch> {
+    const REFUSED: &str = "analyzer process identity refused";
+    const UNKNOWN: &str = "analyzer process outcome unknown";
+    let refused = || Dispatch::Failed(REFUSED.into());
+    let bound_source = VerifiedResource::open(source.path, source.sha256, source.byte_count, false)
+        .ok()
+        .filter(|bound| source.byte_count > 0 && bound.byte_count() == source.byte_count)
+        .ok_or_else(|| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
+    let namespace = profile
+        .canonical_namespace_root
+        .as_deref()
+        .map(VerifiedNamespace::open_owner_only)
+        .transpose()
+        .map_err(|_| refused())?;
+    let trees_hold = profile.pinned_trees.iter().all(|tree| {
+        crate::hilog_summary::profile_path(&tree.path, false)
+            .is_ok_and(|path| arkdeck_platform::tree_matches(&path, &tree.path, &tree.sha256))
+    });
+    if !trees_hold {
+        return Err(refused());
+    }
+    let mut resources = profile
+        .pinned_files
+        .iter()
+        .map(|pin| {
+            let byte_count = pin.byte_count.max(1);
+            VerifiedResource::open(&pin.path, &pin.sha256, byte_count, pin.require_executable)
+                .ok()
+                .filter(|resource| resource.byte_count() == byte_count)
+        })
+        .collect::<Option<Vec<_>>>()
+        .ok_or_else(refused)?;
+    let mut arguments: Vec<OsString> = profile.fixed_arguments.iter().map(OsString::from).collect();
+    arguments.push(bound_source.inode_path().into());
+    resources.push(bound_source);
+    let tool = VerifiedTool::open(&profile.executable_path, &profile.executable_sha256)
+        .map_err(|_| refused())?;
+    let bound = || -> std::io::Result<()> {
+        if let Some(namespace) = &namespace {
+            namespace.revalidate()?;
+        }
+        resources.iter().try_for_each(VerifiedResource::revalidate)
+    };
+    let request = ToolRequest {
+        arguments: &arguments,
+        environment: &[],
+        working_directory: None,
+        limits: ToolLimits {
+            timeout: Duration::from_secs(profile.timeout_seconds.max(1) as u64),
+            capture_bytes: CAPTURE_BYTES,
+        },
+    };
+    match tool.run_tool_at_canonical_path(&request, &bound, cancelled) {
+        Err(ToolRunError::Refused(_)) => Err(refused()),
+        Err(ToolRunError::Unobservable(_)) => Err(Dispatch::OutcomeUnknown(UNKNOWN.into())),
+        Ok(execution) => match execution.termination {
+            ToolTermination::Exited(status) => Ok(Exited {
+                status,
+                stdout: execution.stdout,
+                stderr: execution.stderr,
+                truncated: execution.truncated,
+            }),
+            ToolTermination::TimedOut | ToolTermination::Signalled(_) => {
+                Err(Dispatch::OutcomeUnknown(UNKNOWN.into()))
+            }
+            // Whether a request stopped it is the run's to judge.
+            ToolTermination::Cancelled { drained } => Err(Dispatch::Cancelled { drained }),
+        },
+    }
+}
+
 /// Swift `validateResolvedInputArtifact` for an analyzer: a host-only
 /// request may read an Artifact collected from its own target; any other
 /// binding must be the materialized one. The refusal is Swift's
@@ -903,5 +1017,90 @@ pub(crate) fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Op
             rejected("host-only Artifact lease must not claim a device binding or identity")
         }
         None => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arktrace_profile::ArkTraceContract;
+    use std::os::unix::fs::PermissionsExt;
+
+    struct Scratch(std::path::PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn write(path: &Path, bytes: &[u8], mode: u32) {
+        std::fs::write(path, bytes).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    /// Before any child runs, an ArkTrace dispatch refuses a source that is
+    /// not its lease's bytes by the source's own words, and a launch the
+    /// runner refuses — here a budget beyond an hour — only by the class
+    /// Swift keeps at the trace operations' boundary, whatever the detail.
+    #[test]
+    fn an_arktrace_dispatch_refuses_by_class_before_any_child() {
+        let scratch = Scratch(std::path::PathBuf::from(format!(
+            "/private/tmp/arkdeck-job-run-arktrace-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        )));
+        std::fs::create_dir(&scratch.0).unwrap();
+        std::fs::set_permissions(&scratch.0, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let executable = include_bytes!("../../../tests/fixtures/job-run-trace-summary/arktrace");
+        let tool = scratch.0.join("arktrace");
+        write(&tool, executable, 0o700);
+        let source_path = scratch.0.join("trace.htrace");
+        write(&source_path, b"answered\n", 0o400);
+        let contract = ArkTraceContract {
+            tool_version: "0.1.0".into(),
+            parser_version: "4.3.7".into(),
+            parser_upstream_revision: "6".repeat(40),
+            parser_sha256: "5".repeat(64),
+            parser_build_recipe_version: "7".repeat(64),
+            parser_adapter_version: "1".into(),
+            schema_adapter_version: "2".into(),
+            index_schema_version: 3,
+        };
+        let profile = AnalyzerProfile {
+            analyzer_ref: "trace-summary@1".into(),
+            analyzer_version: "0.1.0+1".into(),
+            executable_path: tool.clone(),
+            executable_sha256: arkdeck_contract::sha256_hex(executable),
+            fixed_arguments: vec!["summary".into()],
+            timeout_seconds: 3601,
+            output_byte_budget: 8 * 1024 * 1024,
+            canonical_namespace_root: None,
+            pinned_files: Vec::new(),
+            pinned_trees: Vec::new(),
+            arktrace_summary: Some(contract),
+            arktrace_analysis: None,
+        };
+        let digest = arkdeck_contract::sha256_hex(b"answered\n");
+        let path = source_path.to_str().unwrap();
+        let source = |sha256: &str| {
+            dispatch_arktrace(
+                &profile,
+                &Source {
+                    artifact_id: "ART-SOURCE",
+                    sha256,
+                    byte_count: 9,
+                    path,
+                },
+                &|| false,
+            )
+        };
+        let failed = |outcome: Result<Exited, Dispatch>| match outcome {
+            Err(Dispatch::Failed(reason)) => reason,
+            _ => panic!("not a definite failure"),
+        };
+        assert_eq!(
+            failed(source(&"0".repeat(64))),
+            "analyzer input Artifact identity refused"
+        );
+        assert_eq!(failed(source(&digest)), "analyzer process identity refused");
     }
 }
