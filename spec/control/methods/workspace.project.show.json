@@ -70,10 +70,16 @@
                 "type": "string"
               },
               "reason": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "reasonCode": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "reference": {
                 "type": "string"
@@ -164,7 +170,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 5,
-    "request": 7,
-    "result": 2
+    "request": 8,
+    "result": 3
   }
 }
