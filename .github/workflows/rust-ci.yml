@@ -166,7 +166,17 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-26, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # A change to the contract inputs runs the workspace tests three times on
+    # each host: the Workspace tests step below, then the published and
+    # candidate views of check-contracts.py, each view with its own clippy
+    # and build. On macOS each of those test runs takes about 10 to 11
+    # minutes, against 1 to 1.6 on the other hosts. #2197's macOS job (run
+    # 36152711471) was cancelled at 30 minutes in its candidate view and
+    # would have needed about 37, while Linux finished in 4 and Windows in
+    # 7.5. So macOS gets 50 minutes, and the other hosts keep 30, which still
+    # stops a hung job early. The check is on the prefix, so a newer macOS
+    # runner label keeps the longer bound.
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}
     defaults:
       run:
         shell: bash
