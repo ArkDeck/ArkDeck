@@ -156,7 +156,10 @@ enum HDCOracleHarness {
   /// answers `trace.probe`, which the daemon also gives its engine to bracket
   /// a Trace capture with parameter snapshots. With `testHooks`, the engine calls the
   /// package-only hooks of `RuntimeJobEngine.Configuration.TestHooks` (none
-  /// unless an oracle names them). None of these is applied unless an oracle
+  /// unless an oracle names them). With `analyzers`, the analyzer provider
+  /// over those profiles is registered beside the HDC provider, and the
+  /// daemon's dispatcher router sends analysis plans to the descriptor-bound
+  /// analyzer dispatcher over them. None of these is applied unless an oracle
   /// names it.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
@@ -168,7 +171,8 @@ enum HDCOracleHarness {
     fixedInvocationSeconds: Double? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
-    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none,
+    analyzers: [AnalyzerProfile] = []
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -200,12 +204,23 @@ enum HDCOracleHarness {
     } else {
       provider = HDCObservationProviderAdapter(factsPort: factsPort)
     }
-    let providers = DeviceProviderRegistry(providers: [provider])
+    var registered: [any DeviceProvider] = [provider]
+    if !analyzers.isEmpty {
+      registered.append(try AnalyzerProvider(profiles: analyzers))
+    }
+    let providers = DeviceProviderRegistry(providers: registered)
     let processes = DescriptorBoundProcessDispatcher(
       resolver: try FixedExecutableResolver.hashing(path: hdc.path, providerID: "hdc"))
-    let dispatcher: any RuntimeProcessDispatching =
+    let hdcDispatcher: any RuntimeProcessDispatching =
       fixedInvocationSeconds.map { FixedDurationDispatcher(base: processes, seconds: $0) }
       ?? processes
+    let dispatcher: any RuntimeProcessDispatching =
+      analyzers.isEmpty
+      ? hdcDispatcher
+      : RuntimeProcessDispatcherRouter(
+        hdc: hdcDispatcher, rockchip: hdcDispatcher,
+        analyzer: DescriptorBoundProcessDispatcher(
+          resolver: try AnalyzerExecutableResolver(profiles: analyzers)))
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: jobsState, testHooks: testHooks, sessionPublicationWriter: writer),

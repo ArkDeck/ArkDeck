@@ -20,13 +20,13 @@
     },
     "agent.run": {
       "errors": 11,
-      "requests": 26,
-      "successes": 15
+      "requests": 28,
+      "successes": 17
     },
     "agent.status": {
       "errors": 2,
-      "requests": 11,
-      "successes": 9
+      "requests": 12,
+      "successes": 10
     },
     "artifact.export": {
       "errors": 4,
@@ -531,15 +531,15 @@
   },
   "corpusRecordCounts": {
     "errors": 449,
-    "requests": 991,
-    "successes": 542
+    "requests": 994,
+    "successes": 545
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "cfd1413674c0e3804903f15d797420ef36baaa87acfd48db919653361f5669e8",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "ad5bc9a8302767cc9206b700d3c53d1f1d7c374a9b90d33854ec6754ccfbf93d",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "9912ed86bb519f074416d98bf1e68e4ea8269211fbdd119eb0bfcad7502cc081"
+    "spec/control/methods": "0fe74438a7dd9067e886f95305da7f6f0b62e944a81d679941672360bae2a554"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -727,12 +727,12 @@
       "sha256": "a74513032a68071f18c8f9c45edeb46b8e3f72b877c925bff259535606103c74"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.run.jsonl": {
-      "blob": "a50698f8d789bf297617274a0b049aeea7eaf8de",
-      "sha256": "db66de5ce12a7ab3dfa8942cd9bd91b494b452dfbd4f9e918b341cddeca1ef1e"
+      "blob": "4fb2b7cbca15f39cf1ecdd5a46917cf3409676ee",
+      "sha256": "7b6c64660b92fa55f56d5c320de2badb839932bc1713e270a2704575d6527d91"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.status.jsonl": {
-      "blob": "cd09b6aa398d8243a5e5203b2eb20fe0c5c0a28c",
-      "sha256": "609fbb69d12e2007d5011753ef0972a519a0ecbf2d99e8a6fcb654833563c662"
+      "blob": "dda92260401d965a39f0ed786ba690eb2be5e416",
+      "sha256": "177b00085a893b352a77edcea6d8b7a264921df2d6ecf55b0d17a1201c120985"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.export.jsonl": {
       "blob": "294a7e11eca1a71198217b967800a4e2eb297544",
@@ -1323,12 +1323,12 @@
       "sha256": "1d3585b030cf4df8d3a5ae25d7eec6966c3f81678043071c517b4d244005db5f"
     },
     "spec/control/methods/agent.run.json": {
-      "blob": "cc91f952891b34b3503226444a8c66ec2e6ae618",
-      "sha256": "b5a3bbfc9c9b8837174ba56636bba1123bc1e3954be77a94c2f97c0b6cb9b364"
+      "blob": "2667280abef8bcb654bc30eaf5c4f7c825fa0122",
+      "sha256": "78bc118a94538ac0bc445559f58c2b87196aab32a4083379d69d24118db691ba"
     },
     "spec/control/methods/agent.status.json": {
-      "blob": "17df50a9174422863f289f3a7abc2ba95af90b99",
-      "sha256": "daee0e00ec979e0d5d9347b08e874384120a95d1e8e98d12218f4de084a9a03c"
+      "blob": "e50731240594151501dcceff65c19eea1b12a749",
+      "sha256": "ee06df2c83842833535b0206c86c9b427cc78d5449d3863d700f0ef7d6d22c99"
     },
     "spec/control/methods/artifact.export.json": {
       "blob": "a5e9bba8d59089e6aa1de5069eb7f0561b505656",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "3630ba376750dd4b974beb6275986b8dee743afd4d2d30cda80dd2f51b2e61ee",
+  "inputDigest": "27c85b6365c306b18bdeb7340715efd4c5f830008c9af6fa470807851b9475e0",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

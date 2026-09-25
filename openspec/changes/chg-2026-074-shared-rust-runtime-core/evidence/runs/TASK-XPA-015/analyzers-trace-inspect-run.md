@@ -77,7 +77,8 @@ executions only, so a host-only execution's `artifacts[].bindingRevision`,
 forever; answering `completed` needs a Swift recording of a host-only agent
 execution and those two schemas widened (a contract-input change, held for the
 coordinator to order against the M4 lane's `generate-contract`). The same gap
-is S23's chip for the workspace operations and the input gestures.
+is S23's chip for the workspace operations and the input gestures. Section 3
+widens the two schemas.
 
 ### Checks (local, targeted)
 
@@ -277,6 +278,121 @@ checked again on each (below).
   the change adds a module and alters nothing they use),
   `generate-contract.py`/`check-contracts.py` (no contract input changes), the
   App, a device.
+
+### CI
+
+PR #2160, merged as `9ae1e4997`: Agent PR 36076386272, SDD Guard 36076386147
+and Swift CI 36076386420 all succeeded at `eb7293d87` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).
+
+## 3. `agent.status` and `agent.run` answer a completed host-only execution
+
+Base: protected `main` `9ae1e4997` (#2160); developed on `3317bda08` (#2159,
+after M4's contract-input PR merged) and rebased without conflict;
+`generate-contract.py --write` on the rebased tree changed nothing. This is a
+contract-input change: `spec/control/methods/agent.run.json`,
+`spec/control/methods/agent.status.json`, three new corpus lines and the
+regenerated `spec/baselines/swift-single-v1.json` (outside this task's Allowed
+paths, declared as the workspace isolation slice declared its own).
+
+### What a caller sees
+
+`arkdeck agent run --operation analyzer.extract-crash-signature@1 …` on the
+Rust daemon now ends `completed` with the Job `succeeded`, its derived
+Artifact and evidence, and `agent.status` of that execution answers the same.
+Since §1 the daemon had refused its own answer to both
+(`internalError`, "the result does not conform to the current contract"),
+because the published result schemas only knew device-bound executions.
+
+### Swift, the oracle
+
+- `AgentExecutionAnalyzerOracleContractTests/testSwiftCompletesAHostOnlyAgentExecution`
+  (new, `rust/tests/fixtures/agent-execution-analyzer/`): the intent the CLI
+  sends for `analyzer.extract-crash-signature@1` over a crash listing
+  collected from an adopted Target, with the daemon's agent execution owner
+  and `AnalyzerProvider` composed beside the shared fake HDC
+  (`HDCOracleHarness.composition(analyzers:)`, new: the provider is registered
+  and the dispatcher router sends analysis plans to a descriptor-bound
+  analyzer dispatcher, as the daemon composes them). The oracle analyzer holds
+  until the oracle releases it, so the accepted run's answer keeps the name of
+  the Job state it read, not its value; the oracle then waits for the
+  execution's durable `completed`, reads `agent.status`, sends the intent
+  again, and reads `job.result`, `job.evidence` and `artifact.list`, keeping
+  the Target, Job, Session, execution and Artifact files.
+- Swift answers a host-only execution with `bindingRevision: null` and
+  `stableIdentitySha256: null` on each Artifact (the owned Job binds no
+  device), and `evidence.bindingRevision: null`.
+- Schemas: the oracle's frames (`ARKDECK_CONTROL_FRAME_LOG`), derived with
+  `generate-control-contract.py --derive-method-schemas` over the corpus and
+  those frames for the two methods only, widen five members of each result
+  from one type to that type or `null`: `artifacts[].bindingRevision`,
+  `artifacts[].stableIdentitySha256`, `evidence.artifacts[].bindingRevision`,
+  `evidence.artifacts[].stableIdentitySha256`, `evidence.bindingRevision`.
+  Nothing else in the structure changes (compared member by member: no
+  property, code or requirement removed or added); the corpus grows by the
+  run's two `agent.run` frames (26 → 28 lines) and one `agent.status` frame
+  (11 → 12). `x-arkdeck-sampleCounts` now counts those corpus lines (28/12
+  requests); the earlier counts (59/26) came from a larger recording and no
+  check reads them. The baseline is regenerated (105 methods, 994 recorded
+  shapes, contract identity `1d7d101e83fe`).
+
+### Rust
+
+No production change: the Rust owners already answer as Swift does once the
+schemas admit it.
+
+- `rust/crates/arkdeck-hoststore/tests/agent_execution_analyzer.rs` (new):
+  replays the oracle against the agent execution owner, the Job admitter and
+  runner with the analyzer, run in the background as `start_agent_run` runs
+  it: every answer (the held run's Job state compared by name and required
+  non-terminal), the Target document and every file the execution, the Job
+  and the Session leave, byte for byte.
+- `rust/crates/arkdeck-agentd/tests/crash_ledger_analyzer.rs`: §1's
+  process-level test now also reads the completed execution through
+  `agent.status` and `agent.run` and requires `completed`, `succeeded` and the
+  null revision and identity; in the merge base's published view (narrow
+  schemas) it requires the daemon's `internalError` instead, as the other
+  published-view tests do.
+
+### Evidence
+
+- The Swift oracle compares byte for byte after recording
+  (`run-swiftpm.sh test --filter 'AgentExecutionAnalyzerOracleContractTests|ControlMethodSchemaContractTests'`,
+  exit 0, with and without `ARKDECK_CONTROL_FRAME_LOG`, so the recorded
+  frames validate against the new schemas).
+- `cargo test -p arkdeck-hoststore --test agent_execution_analyzer`: 1/1 on
+  the first run.
+- Mutations on the rebased tree: 5/5 caught, each restored by SHA-256
+  (`agent.status`'s `artifacts[].bindingRevision` narrowed back to an
+  integer; a host-only Artifact's revision answered as `0`; its identity as
+  `""`; the published view taken for the checkout; the agent run's analyzer
+  left out; log `/private/tmp/arkdeck-s25-a2-r-mutations.log`).
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-a2-r-*.log` (before the rebase:
+`/private/tmp/arkdeck-s25-a2-*.log`, the same results):
+
+- `generate-contract.py --write` then `--check`: exit 0, nothing to write.
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-hoststore -p arkdeck-agentd --all-targets -- -D warnings`:
+  exit 0 (only their tests changed).
+- `cargo test -p arkdeck-hoststore --test agent_execution_analyzer --test
+  agent_execution --test agent_lifecycle --test agent_human_action_raise
+  --test agent_human_action_records`: exit 0, 13 passed, 1 ignored
+  (existing).
+- `cargo test -p arkdeck-contract -p arkdeck-control -p arkdeck-agentd -p
+  arkdeck-cli -p arkdeck-client -p arkdeck-soak --no-fail-fast`: exit 0, 505
+  passed. No fake HDC or test daemon left running.
+- Swift: the two classes above, exit 0.
+- `sh scripts/check-sdd.sh`: exit 0.
+- Not run: `check-contracts.py` (its two views build the whole workspace
+  twice in their own targets, more than this host's free disk allowed; CI's
+  Rust lane runs it), the App (it calls neither method; only the CLI does),
+  a device.
 
 ### CI
 
