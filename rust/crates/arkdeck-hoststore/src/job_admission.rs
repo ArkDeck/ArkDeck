@@ -162,10 +162,45 @@ pub struct MutationAuthority<'a> {
 }
 
 impl MutationAuthority<'_> {
+    /// Swift's `validateMutationState`, before an admission and before each
+    /// consumption: the Runtime's mutation state is continuous across the
+    /// default root and the Session root the storage status names. That
+    /// status is read as Swift reads it, waiting for the storage lock: a
+    /// device mutation submitted while the previous Job's Session is being
+    /// published is admitted once the publication releases the lock, never
+    /// refused because it holds it.
     pub fn require_state(&self, jobs: &JobStore) -> Result<(), arkdeck_contract::WireError> {
+        let status = match self.sessions {
+            Some(sessions) => Some(sessions.waited_status()?),
+            None => None,
+        };
+        self.prove(jobs, status.as_ref())
+    }
+
+    /// Whether the mutation state is proved now, as the operation
+    /// availability report asks it, without waiting for the storage lock: a
+    /// held lock reads as not proved. Swift's availability reads no storage,
+    /// so a publication or an export in flight must not make `operation.list`
+    /// wait.
+    pub fn state_proven_now(&self, jobs: &JobStore) -> bool {
+        let status = match self
+            .sessions
+            .map(crate::SessionStore::status_without_waiting)
+        {
+            Some(Ok(status)) => Some(status),
+            Some(Err(_)) => return false,
+            None => None,
+        };
+        self.prove(jobs, status.as_ref()).is_ok()
+    }
+
+    fn prove(
+        &self,
+        jobs: &JobStore,
+        status: Option<&Value>,
+    ) -> Result<(), arkdeck_contract::WireError> {
         let mut roots = Vec::new();
-        if let Some(sessions) = self.sessions {
-            let status = sessions.handle("runtime.storage.status", &Map::new())?;
+        if let Some(status) = status {
             let root = status["rootPath"]
                 .as_str()
                 .ok_or_else(|| arkdeck_contract::WireError {
