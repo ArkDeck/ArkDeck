@@ -224,7 +224,8 @@ pub use job_reconcile::JobReconciler;
 mod session_publication;
 #[cfg(target_os = "macos")]
 pub use session_publication::{
-    SessionPublisher, StorageClaims, StorageProbe, StorageSnapshot, SystemStorageProbe,
+    PublicationPoint, SessionPublisher, StagedRecovery, StorageClaims, StorageProbe,
+    StorageSnapshot, SystemStorageProbe,
 };
 // The Catalog's operation model, its input matching (with the Catalog's
 // pattern subset) and its effect resolution live in `arkdeck-contract`, shared

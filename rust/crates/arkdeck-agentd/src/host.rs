@@ -77,6 +77,10 @@ pub struct Host {
     /// as Swift's reads `engine.quarantinedJobRecords`.
     #[cfg(target_os = "macos")]
     quarantined: std::sync::OnceLock<Vec<(String, String)>>,
+    /// The staged Session entries the start kept in the active Sessions
+    /// root, and why (`recover_staged_sessions`); `doctor` names them.
+    #[cfg(target_os = "macos")]
+    staged_kept: std::sync::OnceLock<Vec<(String, String)>>,
     #[cfg(target_os = "macos")]
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
     // The owners a background agent run keeps using after its request has
@@ -249,6 +253,34 @@ impl Host {
         // rather than reading them again.
         let _ = self.quarantined.set(recovered.quarantined.clone());
         Ok(Some(recovered))
+    }
+    /// Once Jobs are recovered and before the daemon serves: the staged
+    /// Sessions a publication stopped by a crash left behind, each removed
+    /// once it is proved this Runtime's and otherwise kept and named
+    /// (`SessionPublisher::recover_staged`); nothing is published again. A
+    /// recovery that cannot read staging keeps it all. None without a Job and
+    /// a Session owner.
+    #[cfg(target_os = "macos")]
+    pub fn recover_staged_sessions(&self) -> Option<arkdeck_hoststore::StagedRecovery> {
+        let (Some(storage), Some(jobs)) = (self.storage.as_deref(), self.jobs.as_deref()) else {
+            return None;
+        };
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let recovered = arkdeck_hoststore::SessionPublisher {
+            sessions: &storage.0,
+            claims: &self.claims,
+            probe: &probe,
+        }
+        .recover_staged(jobs)
+        .unwrap_or_else(|error| arkdeck_hoststore::StagedRecovery {
+            kept: vec![(
+                ".staging".into(),
+                format!("staging could not be recovered: {error}"),
+            )],
+            ..Default::default()
+        });
+        let _ = self.staged_kept.set(recovered.kept.clone());
+        Some(recovered)
     }
     /// Once Jobs are recovered, the line naming the enter-Loader transition
     /// that awaits the binding the start-up reconciliation carried its Target
@@ -958,6 +990,8 @@ impl Host {
         Self {
             #[cfg(target_os = "macos")]
             quarantined: std::sync::OnceLock::new(),
+            #[cfg(target_os = "macos")]
+            staged_kept: std::sync::OnceLock::new(),
             #[cfg(target_os = "macos")]
             imports: None,
             #[cfg(target_os = "macos")]
@@ -2656,6 +2690,7 @@ impl HostServices for Host {
                     || self.provider.is_some(),
                 cleanup_debt,
                 quarantined: self.quarantined.get().cloned().unwrap_or_default(),
+                staged_sessions_kept: self.staged_kept.get().cloned().unwrap_or_default(),
                 // Swift reads the whole ledger only for a deep report, and
                 // names at most sixteen of what it finds.
                 unreadable_records: match (&self.jobs, deep) {

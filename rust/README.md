@@ -694,7 +694,10 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   `SessionStore::waited_status`). That read waits for the storage lock, as
   Swift's `validateMutationState` does: a mutation submitted while the previous
   Job's Session is being published is admitted once the publication releases
-  it. The operation availability report asks the same question without waiting
+  it. The lock is held for the read alone: the continuity scan of the roots
+  that follows takes none, and passes over a publication's staging (see
+  Session publication). The operation availability report asks the same
+  question without waiting
   (`MutationAuthority::state_proven_now`), as Swift's availability reads no
   storage at all. Reading that status takes the storage owner's lock and the
   retention catalog's, so an admission leaves
@@ -1077,6 +1080,35 @@ from it. A parked Job, whose outcome is unknown, publishes nothing. As in
 Swift, a restart never resumes a publication and nothing retries one;
 `job.reconcile` publishes a Job's Session once it confirms the parked intent not
 executed (see Job run).
+
+A publication writes the Session aside and renames it whole. Swift writes it in
+place, where its one-level continuity scan never looks; this Runtime's scan
+reads every retained Session's Journal and takes no storage lock (see Job
+admission), so it must never meet a Session before it is complete. The
+publication stages the Session in the Sessions root's own `.staging/<UUID>` and
+writes the tree, the Journal copy, the outcome audit and the Manifest there;
+both scans pass over exactly `.staging` of a Sessions root. It holds the Session
+owner's storage lock (`.session-storage.lock`) only to read the status, to
+create staging, and to rename the Session to its name (`renameatx_np` with
+`RENAME_EXCL`, never over another entry), remove staging once it is empty and
+register the catalog entry. One sample on a quiet host, publishing a
+10,013-record Journal in 50 s, held it for 0.6, 6.1 and 23.3 ms. A Session name
+something already holds is refused where Swift refuses it, before anything is
+staged. A publication that stops short of its rename moves what it staged to the
+Session's name, as Swift leaves what it wrote in place. A crash leaves the
+staged Session: the daemon's next start removes it once it is proved this
+Runtime's (a staged name, a private directory, and the canonical Session
+identity of a Job this Runtime holds) and publishes nothing again, as Swift
+resumes no publication. Anything else is kept as it is, named on the daemon's
+standard error and in every `doctor` report (`storage.stagedSessionQuarantined`,
+a warning). `tests/pointer_input_run.rs` stops the tap's publication once its
+staged Journal ends at the injection intent: the long press submitted then is
+admitted at once, as Swift admitted it. Stopped with the lock held to rename, a
+scan answers at once and finds no Session at the name, and the long press waits
+for its status read. It also kills a publication once its staged Manifest is
+published and shows the next start removing what it staged.
+`tests/production_composition.rs` starts the daemon over a staged Session and an
+entry nothing proves.
 
 `rust/tests/fixtures/job-publication-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests.testSwiftPublishesTheSharedAnalyzerSessions`

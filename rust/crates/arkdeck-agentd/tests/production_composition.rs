@@ -821,12 +821,12 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-#[test]
-fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the_home() {
-    let _turn = turn();
-    let home = Home::new();
+/// A Job admitted and run at the home's state root before a start, parked by
+/// its analyzer's signal death: the durable state a cutover takes over. The
+/// analyzer counts each of its starts in `dispatches`, and has started once.
+/// Answers the Job, the analyzer and `dispatches`.
+fn parked_job(home: &Home) -> (String, PathBuf, PathBuf) {
     let state = home.state();
-    home.state_directory();
     // An analyzer whose every start is counted, and dies by a signal.
     let dispatches = home.0.join("dispatches");
     let analyzer = home.0.join("analyzer");
@@ -858,8 +858,6 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
         let mode = if name == "index.json" { 0o600 } else { 0o400 };
         fs::set_permissions(source.join(name), fs::Permissions::from_mode(mode)).unwrap();
     }
-    // A Job admitted and run at the state root before this start, parked by
-    // its analyzer's signal death: the durable state a cutover takes over.
     let job = {
         let jobs = JobStore::open_state_root_owner(&state).unwrap();
         let store = ArtifactReadStore::open(&artifacts).unwrap();
@@ -905,6 +903,15 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
         job
     };
     assert_eq!(fs::read(&dispatches).unwrap(), b"x");
+    (job, analyzer, dispatches)
+}
+
+#[test]
+fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the_home() {
+    let _turn = turn();
+    let home = Home::new();
+    home.state_directory();
+    let (job, analyzer, dispatches) = parked_job(&home);
 
     let mut daemon = Daemon::start(production(&home).env("ARKDECK_ANALYZER_PATH", &analyzer));
     assert_eq!(
@@ -948,6 +955,115 @@ fn start_up_recovery_carries_a_parked_job_over_and_reconcile_publishes_below_the
     );
     // The analyzer never ran again.
     assert_eq!(fs::read(&dispatches).unwrap(), b"x");
+}
+
+/// A publication a crash stopped before its rename left its Session staged
+/// in the Sessions root (TASK-XPA-014). The next start removes it once it is
+/// proved this Runtime's, naming it on its standard output, and publishes
+/// nothing again; what nothing proves is kept as it is and named on its
+/// standard error and in every doctor report.
+#[test]
+fn the_start_removes_a_stopped_publications_staged_session_and_keeps_what_nothing_proves() {
+    let _turn = turn();
+    let home = Home::new();
+    home.state_directory();
+    let (job, analyzer, _) = parked_job(&home);
+    let sessions = home.support().join("Sessions");
+    let staging = sessions.join(".staging");
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&staging)
+        .unwrap();
+    // The Job's Session as its publication staged it, stopped with its
+    // Journal copied in part; and an entry nothing proves this Runtime's.
+    let own = "7E7CC05A-7463-4C0E-80B2-23FBF9C481B8";
+    let foreign = "00000000-0000-4000-8000-000000000000";
+    for (name, files) in [
+        (
+            own,
+            vec![
+                (
+                    ".session-identity.json",
+                    format!(
+                        r#"{{"jobId":"{job}","schemaVersion":"1.0.0","sessionId":"session-{job}"}}"#
+                    ),
+                ),
+                ("journal.jsonl", String::new()),
+            ],
+        ),
+        (foreign, Vec::new()),
+    ] {
+        let directory = staging.join(name);
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&directory)
+            .unwrap();
+        for (file, text) in files {
+            fs::write(directory.join(file), text).unwrap();
+            fs::set_permissions(directory.join(file), fs::Permissions::from_mode(0o600)).unwrap();
+        }
+    }
+
+    let mut daemon = Daemon::start(production(&home).env("ARKDECK_ANALYZER_PATH", &analyzer));
+    assert_eq!(
+        daemon.line("removed staged Session "),
+        format!("removed staged Session {own} of job {job}, which a stopped publication left")
+    );
+    let daemon = daemon.serving(&home);
+    assert!(!staging.join(own).exists());
+    assert!(staging.join(foreign).is_dir());
+    for deep in [false, true] {
+        let report = answered(&home, "doctor", json!({"deep": deep}));
+        let kept: Vec<&Value> = report["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|finding| finding["code"] == "storage.stagedSessionQuarantined")
+            .collect();
+        assert_eq!(
+            kept,
+            [
+                &json!({"code": "storage.stagedSessionQuarantined", "severity": "warning",
+                "scope": "storage",
+                "summary": format!("a staged Session entry in the active Sessions root's .staging was kept as it is at the Runtime's start: {foreign} — it holds no readable Session identity. No admission or answer reads it")})
+            ],
+            "{report}"
+        );
+    }
+    // Nothing was published: the Job keeps no publication and no Session.
+    let shown = answered(&home, "job.show", json!({"jobId": job}));
+    assert_eq!(
+        shown["job"]["sessionPublication"],
+        json!({"catalogGeneration": null, "manifestSha256": null,
+            "reasonCode": "noCurrentPublicationRecord", "state": "unavailable"}),
+        "{shown}"
+    );
+    let names = fs::read_dir(&sessions)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .filter(|name| name.len() == 4)
+        .collect::<Vec<_>>();
+    assert!(names.is_empty(), "{names:?}");
+    let stderr = Arc::clone(&daemon.stderr);
+    assert!(daemon.stop().success());
+    // Written whole once the daemon's standard error ends.
+    let deadline = Instant::now() + DEADLINE;
+    let written = loop {
+        let written = stderr.lock().unwrap().clone();
+        if !written.is_empty() || Instant::now() > deadline {
+            break written;
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    };
+    assert!(
+        written.contains(&format!(
+            "arkdeck-agentd: staged Session {foreign} is kept as it is: it holds no readable \
+             Session identity\n"
+        )),
+        "{written}"
+    );
+    assert!(!written.contains(own), "{written}");
 }
 
 /// One scenario of Swift's start-up oracle (`rust/tests/fixtures/

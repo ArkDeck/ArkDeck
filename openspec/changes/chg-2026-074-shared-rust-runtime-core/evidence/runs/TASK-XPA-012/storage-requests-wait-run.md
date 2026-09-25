@@ -239,4 +239,9 @@ frames are not appended: they hold no shape the corpus lacks.
 
 ## CI
 
-Pending.
+#2222, head `fdf5efb97`, run 36192336653: every selected lane passed.
+- Rust workspace: macOS 13m10s, Ubuntu 2m7s, Windows 4m50s. Host-independent checks: 41s.
+- `swift-tests` 6m49s; `guard`; `swift` aggregate.
+
+It merged as `9f1fdcce3`. Recorded by the next slice (TASK-XPA-014, the staged Session
+publication), as AGENTS.md has it.

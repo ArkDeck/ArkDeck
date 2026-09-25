@@ -8,14 +8,17 @@ mod support;
 use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{
     ArtifactReadStore, HdcComposition, JobAdmitter, JobPlanner, JobResultReader, JobRunner,
-    JobStore, SessionPublisher, SessionStore, StorageClaims, TargetStore,
+    JobStore, PublicationPoint, SessionPublisher, SessionStore, StorageClaims, StorageProbe,
+    StorageSnapshot, TargetStore,
 };
-use arkdeck_platform::VerifiedTool;
+use arkdeck_platform::{HostDirectory, VerifiedTool};
 use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessDispatch, ProcessPlan, Receipt};
 use serde_json::{Map, Value, json};
 use std::cell::Cell;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, mpsc};
+use std::time::Duration;
 use support::{OracleProbe, chmod, fixed_now, fixed_precise_now};
 
 /// `HDCOracleFake`'s fixed root and lock, which the fake's driver names.
@@ -486,6 +489,505 @@ fn replay(fault: Fault) {
     );
     drop(jobs);
     support::assert_leftovers_at(&fixture, &root, &default_root);
+}
+
+/// Where a tap's publication is stopped.
+#[derive(Clone, Copy, PartialEq)]
+enum StopPoint {
+    /// The staged Session's Journal ends at the injection intent: its outcome
+    /// is not copied and there is no Manifest. The storage lock is not held.
+    Injection,
+    /// The staged Session is complete, and the storage lock is held to rename
+    /// it to its published name.
+    Moving,
+    /// The staged Session is complete and not yet renamed: the process dies.
+    Crash,
+}
+
+/// The oracle's probe, which also stops a publication at `at` until it is told
+/// to go on.
+struct StopAt {
+    oracle: OracleProbe,
+    sessions: PathBuf,
+    at: StopPoint,
+    stopped: Mutex<Option<mpsc::Sender<usize>>>,
+    resume: Mutex<mpsc::Receiver<()>>,
+}
+
+/// The one Session a publication has staged under `sessions`.
+fn staged(sessions: &Path) -> PathBuf {
+    let entries: Vec<PathBuf> = fs::read_dir(sessions.join(".staging"))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect();
+    assert_eq!(entries.len(), 1, "{entries:?}");
+    entries.into_iter().next().unwrap()
+}
+
+impl StorageProbe for StopAt {
+    fn snapshot(&self, root: &HostDirectory) -> std::io::Result<StorageSnapshot> {
+        self.oracle.snapshot(root)
+    }
+    fn reached(&self, point: PublicationPoint) {
+        let copied = match (self.at, point) {
+            (StopPoint::Injection, PublicationPoint::JournalCopied { copied, .. }) => {
+                let journal =
+                    fs::read_to_string(staged(&self.sessions).join("journal.jsonl")).unwrap();
+                let last: Value = serde_json::from_str(journal.lines().last().unwrap()).unwrap();
+                if last["eventId"] != "intent-inject-pointer-input" {
+                    return;
+                }
+                copied
+            }
+            (StopPoint::Moving, PublicationPoint::Moving) => 0,
+            (StopPoint::Crash, PublicationPoint::ManifestPublished) => std::process::exit(75),
+            _ => return,
+        };
+        if let Some(stopped) = self.stopped.lock().unwrap().take() {
+            stopped.send(copied).unwrap();
+            // Told to go on, or the test ended: a failed assertion drops the
+            // sender, so the publication never outlives it.
+            let _ = self.resume.lock().unwrap().recv();
+        }
+    }
+}
+
+/// A gesture submitted while the previous one's Session is being published
+/// (TASK-XPA-014). The publication writes the Session aside, in the Sessions
+/// root's `.staging`, which no continuity scan reads, and holds the storage
+/// lock only to rename it, whole, to its published name and register it. An
+/// admission reads the storage status under that lock, as Swift's does, and
+/// scans the Session root without it.
+///
+/// Stopped while the staged Journal ends at the injection intent, the long
+/// press is admitted at once, as Swift admitted it: the lock is not held, and
+/// its scan passes the half-written Session over. Stopped with the lock held
+/// to rename, a scan answers at once and the Session is not at its name; the
+/// long press waits for its status read until the publication goes on.
+/// Either way the tap ends as Swift's did and its Session is published whole.
+/// No sleeps: each bound only lets an early answer arrive or a stop be
+/// reached.
+fn tap_publication(at: StopPoint) {
+    // A crash child runs under its parent's hold of the fixed root.
+    let _lock = (at != StopPoint::Crash).then(exclusive);
+    let fixture = support::fixture("pointer-input");
+    let cases = support::document(&fixture, "cases.json");
+    let provenance = support::document(&fixture, "provenance.json");
+    let exchanges = cases["exchanges"].as_array().unwrap();
+    let exchange = |name: &str| {
+        exchanges
+            .iter()
+            .find(|exchange| exchange["name"] == name)
+            .unwrap()
+    };
+    let root = rebuild(&fixture);
+    let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
+    let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+    let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let jobs = JobStore::open_owner(&root.join("store")).unwrap();
+    let capabilities =
+        arkdeck_hoststore::CapabilityStore::open(&root.join("store/capabilities")).unwrap();
+    let holds = arkdeck_hoststore::DeviceHolds::default();
+    let default_root = root.join("store");
+    let sessions = SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
+    let hdc = HdcComposition {
+        targets: &targets,
+        dispatch: &dispatch,
+        receive_root: None,
+        tool_sha256: &digest,
+        now: fixed_now,
+        code_sign_helper: None,
+    };
+    let session = root.join("Sessions/2026/09/session-job-4ac2c3640786ad0e831952ab62bb71bc");
+    let (stopped, stops) = mpsc::channel();
+    let (resume, resumed) = mpsc::channel();
+    let probe = StopAt {
+        oracle: OracleProbe::new(&provenance),
+        sessions: root.join("Sessions"),
+        at,
+        stopped: Mutex::new(Some(stopped)),
+        resume: Mutex::new(resumed),
+    };
+    let claims = StorageClaims::default();
+    let publisher = SessionPublisher {
+        sessions: &sessions,
+        claims: &claims,
+        probe: &probe,
+    };
+    let authority = arkdeck_hoststore::MutationAuthority {
+        capabilities: &capabilities,
+        holds: &holds,
+        default_root: &default_root,
+        sessions: Some(&sessions),
+    };
+    let admit = |name: &str| {
+        let admitter = JobAdmitter {
+            planner: JobPlanner {
+                imports: None,
+                artifacts: Some(&artifacts),
+                analyzer: None,
+                state_root: &root,
+                hdc: Some(&hdc),
+                workspace: None,
+            },
+            jobs: &jobs,
+            now: fixed_now,
+            authority: Some(authority),
+        };
+        match admitter.handle(exchange(name)["params"].as_object().unwrap()) {
+            Ok(result) => json!({"ok": true, "result": result}),
+            Err(refusal) => refused(
+                refusal.code,
+                refusal.message,
+                Some(if refusal.proven { proven() } else { Map::new() }),
+            ),
+        }
+    };
+    let runner = JobRunner {
+        imports: None,
+        mutation: Some(arkdeck_hoststore::MutationExecution {
+            authority,
+            state_root: &root,
+        }),
+        jobs: &jobs,
+        artifacts: &artifacts,
+        analyzer: None,
+        quota: provenance["quotaBytes"].as_u64().unwrap(),
+        home: provenance["home"].as_str().unwrap(),
+        now: fixed_now,
+        precise_now: fixed_precise_now,
+        sessions: Some(&publisher),
+        cancellation: None,
+        after_commit: None,
+        hdc: Some(&hdc),
+        workspace: None,
+    };
+    let recorded = |name: &str| semantic(&exchange(name)["answer"]);
+    assert_eq!(semantic(&admit("tap.submit")), recorded("tap.submit"));
+    fs::write(root.join("hdc-mode"), "normal\n").unwrap();
+    if at == StopPoint::Crash {
+        let _ = runner.handle(exchange("tap.run")["params"].as_object().unwrap());
+        panic!("the tap's publication never reached its staged Manifest");
+    }
+    std::thread::scope(|scope| {
+        // Owned here, so that a failed assertion lets the publication go on.
+        let resume = resume;
+        let tap = scope.spawn(|| {
+            match runner.handle(exchange("tap.run")["params"].as_object().unwrap()) {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(refusal) => refused(refusal.code, refusal.message, Some(refusal.details)),
+            }
+        });
+        let copied = stops
+            .recv_timeout(Duration::from_secs(120))
+            .expect("the tap's publication reaches its stop");
+        let staged = staged(&root.join("Sessions"));
+        assert!(!session.exists(), "published before its rename");
+        let long_press = match at {
+            StopPoint::Injection => {
+                let journal = fs::read_to_string(staged.join("journal.jsonl")).unwrap();
+                assert_eq!(journal.lines().count(), copied);
+                assert!(!staged.join("manifest.json").exists());
+                // Admitted at once, over the half-written Session.
+                let long_press = admit("longPress.submit");
+                assert_eq!(semantic(&long_press), recorded("longPress.submit"));
+                jobs.require_mutation_state(&default_root, &[root.join("Sessions")])
+                    .unwrap();
+                resume.send(()).unwrap();
+                long_press
+            }
+            StopPoint::Crash => unreachable!("the crash returns before the scope"),
+            StopPoint::Moving => {
+                assert!(staged.join("manifest.json").exists());
+                // The continuity scan takes no storage lock: it answers while
+                // the lock is held to rename, and cannot meet the Session,
+                // which is not at its name until the rename, whole.
+                let (scanned, scan) = mpsc::channel();
+                let (jobs, default_root) = (&jobs, &default_root);
+                let sessions = root.join("Sessions");
+                scope.spawn(move || {
+                    let _ = scanned.send(jobs.require_mutation_state(default_root, &[sessions]));
+                });
+                scan.recv_timeout(Duration::from_secs(120))
+                    .expect("the scan answers while the storage lock is held to rename")
+                    .unwrap();
+                assert!(!session.exists(), "published before its rename");
+                let (sender, receiver) = mpsc::channel();
+                scope.spawn(move || sender.send(admit("longPress.submit")).unwrap());
+                if let Ok(early) = receiver.recv_timeout(Duration::from_millis(200)) {
+                    panic!(
+                        "the long press was answered while the tap's Session was renamed: {early}"
+                    );
+                }
+                resume.send(()).unwrap();
+                receiver.recv_timeout(Duration::from_secs(120)).unwrap()
+            }
+        };
+        assert_eq!(semantic(&tap.join().unwrap()), recorded("tap.run"));
+        assert_eq!(semantic(&long_press), recorded("longPress.submit"));
+    });
+    assert!(session.join("manifest.json").exists());
+    assert!(!root.join("Sessions/.staging").exists());
+}
+
+#[test]
+fn a_gesture_submitted_while_the_previous_one_writes_its_session_is_admitted_at_once() {
+    tap_publication(StopPoint::Injection);
+}
+
+#[test]
+fn a_gesture_submitted_while_the_previous_one_renames_its_session_waits_for_it() {
+    tap_publication(StopPoint::Moving);
+}
+
+#[test]
+fn pointer_staged_crash_child() {
+    if std::env::var_os("ARKDECK_POINTER_STAGED_CRASH_CHILD").is_some() {
+        tap_publication(StopPoint::Crash);
+    }
+}
+
+/// A publication stopped between its staged Session and the rename: the
+/// process dies once the staged Manifest is published. At the next start the
+/// staged Session, proved this Runtime's, is removed, and nothing is published
+/// again, as Swift's restart resumes no publication: the Job's record and
+/// Journal are left as the crash left them, and its Session's name stays free.
+/// Staged entries nothing proves are kept exactly as they are, and a second
+/// start changes nothing.
+#[test]
+fn a_publication_stopped_before_its_rename_is_removed_at_the_next_start() {
+    let _lock = exclusive();
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args(["--exact", "pointer_staged_crash_child", "--nocapture"])
+        .env("ARKDECK_POINTER_STAGED_CRASH_CHILD", "1")
+        .output()
+        .unwrap();
+    assert_eq!(
+        output.status.code(),
+        Some(75),
+        "{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+    let root = PathBuf::from(ROOT);
+    let job = "job-4ac2c3640786ad0e831952ab62bb71bc";
+    let session = root.join(format!("Sessions/2026/09/session-{job}"));
+    let staged = staged(&root.join("Sessions"));
+    assert!(staged.join("manifest.json").exists());
+    assert!(!session.exists());
+    let job_directory = root.join(format!("store/jobs/{job}"));
+    let left = |name: &str| fs::read(job_directory.join(name)).unwrap();
+    let (record, journal) = (left("job-record.json"), left("journal.jsonl"));
+    let marker: Value = serde_json::from_slice(&record).unwrap();
+    assert!(marker.get("sessionPublicationRecord").is_none());
+    // What nothing proves this Runtime's is kept as it is.
+    let rogue = [
+        ("not-a-staged-name", None),
+        ("00000000-0000-4000-8000-000000000000", None),
+        (
+            "11111111-1111-4111-8111-111111111111",
+            Some(
+                r#"{"jobId":"job-ffffffffffffffffffffffffffffffff","schemaVersion":"1.0.0","sessionId":"session-job-ffffffffffffffffffffffffffffffff"}"#,
+            ),
+        ),
+    ];
+    for (name, identity) in rogue {
+        let directory = root.join("Sessions/.staging").join(name);
+        fs::create_dir(&directory).unwrap();
+        chmod(&directory, 0o700);
+        if let Some(identity) = identity {
+            fs::write(directory.join(".session-identity.json"), identity).unwrap();
+            chmod(&directory.join(".session-identity.json"), 0o600);
+        }
+    }
+    let jobs = JobStore::open_owner(&root.join("store")).unwrap();
+    let sessions = SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
+    let provenance = support::document(&support::fixture("pointer-input"), "provenance.json");
+    let probe = OracleProbe::new(&provenance);
+    let claims = StorageClaims::default();
+    let publisher = SessionPublisher {
+        sessions: &sessions,
+        claims: &claims,
+        probe: &probe,
+    };
+    let recovered = publisher.recover_staged(&jobs).unwrap();
+    let staged_name = staged.file_name().unwrap().to_str().unwrap();
+    assert_eq!(
+        recovered.removed,
+        [(staged_name.to_owned(), job.to_owned())]
+    );
+    let kept: std::collections::BTreeSet<&str> = recovered
+        .kept
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect();
+    assert_eq!(
+        kept,
+        rogue.iter().map(|(name, _)| *name).collect(),
+        "{:?}",
+        recovered.kept
+    );
+    assert!(!staged.exists());
+    for (name, _) in rogue {
+        assert!(root.join("Sessions/.staging").join(name).exists());
+    }
+    // Nothing is published again, and the Job is left as the crash left it.
+    assert!(!session.exists());
+    assert_eq!(left("job-record.json"), record);
+    assert_eq!(left("journal.jsonl"), journal);
+    // A second start changes nothing.
+    let again = publisher.recover_staged(&jobs).unwrap();
+    assert!(again.removed.is_empty());
+    assert_eq!(again.kept, recovered.kept);
+    // Once nothing is left in it, staging goes.
+    for (name, _) in rogue {
+        fs::remove_dir_all(root.join("Sessions/.staging").join(name)).unwrap();
+    }
+    let empty = publisher.recover_staged(&jobs).unwrap();
+    assert_eq!(empty, arkdeck_hoststore::StagedRecovery::default());
+    assert!(!root.join("Sessions/.staging").exists());
+}
+
+/// The oracle's probe, which also notes where the publication stands and
+/// how long each hold of the storage lock lasted.
+struct Timed {
+    oracle: OracleProbe,
+    marks: Mutex<Vec<(&'static str, std::time::Instant)>>,
+    holds: Mutex<Vec<Duration>>,
+}
+
+impl StorageProbe for Timed {
+    fn snapshot(&self, root: &HostDirectory) -> std::io::Result<StorageSnapshot> {
+        let snapshot = self.oracle.snapshot(root);
+        self.marks
+            .lock()
+            .unwrap()
+            .push(("probed", std::time::Instant::now()));
+        snapshot
+    }
+    fn reached(&self, point: PublicationPoint) {
+        let name = match point {
+            PublicationPoint::SessionCreated => "created",
+            PublicationPoint::JournalCopied { .. } => "copied",
+            PublicationPoint::ManifestPublished => "manifest",
+            PublicationPoint::Moving => "moving",
+            PublicationPoint::StorageReleased { held } => {
+                self.holds.lock().unwrap().push(held);
+                return;
+            }
+        };
+        self.marks
+            .lock()
+            .unwrap()
+            .push((name, std::time::Instant::now()));
+    }
+}
+
+/// How long the tap's publication writes its staged Session and holds the
+/// Session storage lock. A measurement, not a check: run on a quiet host with
+/// `--ignored --nocapture`.
+#[test]
+#[ignore = "a measurement for a quiet host"]
+fn the_tap_publication_holds_the_storage_lock_for() {
+    let _lock = exclusive();
+    let fixture = support::fixture("pointer-input");
+    let cases = support::document(&fixture, "cases.json");
+    let provenance = support::document(&fixture, "provenance.json");
+    let exchanges = cases["exchanges"].as_array().unwrap();
+    let exchange = |name: &str| {
+        exchanges
+            .iter()
+            .find(|exchange| exchange["name"] == name)
+            .unwrap()
+    };
+    let root = rebuild(&fixture);
+    let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
+    let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+    let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let jobs = JobStore::open_owner(&root.join("store")).unwrap();
+    let capabilities =
+        arkdeck_hoststore::CapabilityStore::open(&root.join("store/capabilities")).unwrap();
+    let holds = arkdeck_hoststore::DeviceHolds::default();
+    let default_root = root.join("store");
+    let sessions = SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
+    let hdc = HdcComposition {
+        targets: &targets,
+        dispatch: &dispatch,
+        receive_root: None,
+        tool_sha256: &digest,
+        now: fixed_now,
+        code_sign_helper: None,
+    };
+    let probe = Timed {
+        oracle: OracleProbe::new(&provenance),
+        marks: Mutex::new(Vec::new()),
+        holds: Mutex::new(Vec::new()),
+    };
+    let claims = StorageClaims::default();
+    let publisher = SessionPublisher {
+        sessions: &sessions,
+        claims: &claims,
+        probe: &probe,
+    };
+    let authority = arkdeck_hoststore::MutationAuthority {
+        capabilities: &capabilities,
+        holds: &holds,
+        default_root: &default_root,
+        sessions: Some(&sessions),
+    };
+    JobAdmitter {
+        planner: JobPlanner {
+            imports: None,
+            artifacts: Some(&artifacts),
+            analyzer: None,
+            state_root: &root,
+            hdc: Some(&hdc),
+            workspace: None,
+        },
+        jobs: &jobs,
+        now: fixed_now,
+        authority: Some(authority),
+    }
+    .handle(exchange("tap.submit")["params"].as_object().unwrap())
+    .unwrap();
+    fs::write(root.join("hdc-mode"), "normal\n").unwrap();
+    JobRunner {
+        imports: None,
+        mutation: Some(arkdeck_hoststore::MutationExecution {
+            authority,
+            state_root: &root,
+        }),
+        jobs: &jobs,
+        artifacts: &artifacts,
+        analyzer: None,
+        quota: provenance["quotaBytes"].as_u64().unwrap(),
+        home: provenance["home"].as_str().unwrap(),
+        now: fixed_now,
+        precise_now: fixed_precise_now,
+        sessions: Some(&publisher),
+        cancellation: None,
+        after_commit: None,
+        hdc: Some(&hdc),
+        workspace: None,
+    }
+    .handle(exchange("tap.run")["params"].as_object().unwrap())
+    .unwrap();
+    let marks = probe.marks.lock().unwrap().clone();
+    let at = |name: &str| marks.iter().find(|(mark, _)| *mark == name).unwrap().1;
+    let copied: Vec<_> = marks.iter().filter(|(mark, _)| *mark == "copied").collect();
+    println!(
+        "tap publication: probed -> created {:?}; {} records copied {:?}; copied -> manifest {:?}; \
+         manifest -> moving {:?}; storage lock held {:?}",
+        at("created") - at("probed"),
+        copied.len(),
+        copied.last().unwrap().1 - at("created"),
+        at("manifest") - copied.last().unwrap().1,
+        at("moving") - at("manifest"),
+        probe.holds.lock().unwrap(),
+    );
 }
 
 #[test]

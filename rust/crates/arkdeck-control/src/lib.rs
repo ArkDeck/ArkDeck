@@ -627,6 +627,11 @@ pub struct DoctorFacts {
     /// `engine.unreadableDurableRecords()`, whose sample stops at 16). Read
     /// only for a deep report, so absent otherwise.
     pub unreadable_records: Option<(u64, Vec<String>)>,
+    /// The staged Session entries the daemon's start kept in the active
+    /// Sessions root's `.staging`, in its order, each with the reason: nothing
+    /// proved them this Runtime's, or they could not be removed. Swift stages
+    /// no Session, so no Swift finding names them.
+    pub staged_sessions_kept: Vec<(String, String)>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1797,6 +1802,20 @@ impl<H: HostServices> Control<H> {
             "Session output storage has no published Runtime owner",
             None,
         );
+        // Not Swift's, which stages no Session: each staged Session entry the
+        // daemon's start kept, named once. No admission or answer reads it,
+        // so it is a warning and never makes the report unready.
+        for (entry, reason) in &facts.staged_sessions_kept {
+            add(
+                "storage.stagedSessionQuarantined",
+                "warning",
+                "storage",
+                &format!(
+                    "a staged Session entry in the active Sessions root's .staging was kept as it is at the Runtime's start: {entry} — {reason}. No admission or answer reads it"
+                ),
+                None,
+            );
+        }
 
         let mut target_check = json!({
             "configured": facts.targets != TargetStoreFacts::NotConfigured,

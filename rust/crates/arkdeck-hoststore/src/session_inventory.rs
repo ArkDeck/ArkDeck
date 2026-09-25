@@ -22,6 +22,11 @@ pub use export::{SessionExportSnapshot, session_export_snapshot};
 
 const METADATA: &str = ".arkdeck-retention-catalog.json";
 const LOCK: &str = ".arkdeck-retention-catalog.lock";
+/// Where a publication writes a Session aside before it renames it, whole,
+/// to its published name under the storage lock (`SessionPublisher`). Only
+/// this exact entry of a Sessions root is passed over: what it holds is
+/// never a published Session, and no answer counts it.
+pub(crate) const STAGING: &str = ".staging";
 fn invalid() -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, "Session snapshot refused")
 }
@@ -140,7 +145,7 @@ fn scan_session(
 fn scan(root: &HostDirectory) -> io::Result<Tree> {
     let mut tree = Tree::default();
     for year in root.names(usize::MAX)? {
-        if year == METADATA || year == LOCK {
+        if year == METADATA || year == LOCK || year == STAGING {
             continue;
         }
         let year_root = if year.len() == 4 && year.bytes().all(|b| b.is_ascii_digit()) {

@@ -214,4 +214,9 @@ Not run: the App, which calls none of the four methods, and a device.
 
 ## CI
 
-Pending.
+#2220, head `caaf590c6`, run 36191407533: every selected lane passed.
+- Rust workspace: macOS 31m12s, Ubuntu 4m43s, Windows 8m15s. Host-independent checks: 33s.
+- `swift-tests` 8m13s; `guard`; `swift` aggregate.
+
+It merged as `ca2f94706`. Recorded by a later slice (TASK-XPA-014, the staged Session
+publication), as AGENTS.md has it.
