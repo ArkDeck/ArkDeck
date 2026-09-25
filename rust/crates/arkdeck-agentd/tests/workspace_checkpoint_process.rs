@@ -1,13 +1,19 @@
 //! The production daemon checkpoints registered workspace projects and sweeps
 //! its own isolated copies (TASK-XPA-015, M3) through its installed socket as
-//! a caller meets them, with the host's own pinned `/usr/bin/git` and
-//! `/usr/bin/bsdtar`: a project inside a git working copy is checkpointed as
-//! a commit object under the Runtime's own one-use capability for the exact
-//! plan — each checkpoint under the next generation, no capability a caller
-//! names admitted — leaving the working copy as it was; a plain project is
-//! sealed into the Runtime-owned archive; a Runtime-owned copy is measured by
-//! a dry sweep, then destroyed by a wet one, after which its reference no
-//! longer resolves.
+//! a caller meets them, with the host's own tools: a project inside a git
+//! working copy is checkpointed as a commit object under the Runtime's own
+//! one-use capability for the exact plan — each checkpoint under the next
+//! generation, no capability a caller names admitted — leaving the working
+//! copy as it was; a plain project is sealed into the Runtime-owned archive
+//! by `/usr/bin/bsdtar`; a Runtime-owned copy is measured by a dry sweep,
+//! then destroyed by a wet one, after which its reference no longer resolves.
+//!
+//! `/usr/bin/git` is an `xcode-select` tool shim: one file under clang's,
+//! make's and seventy-five other names, which started from its inode runs
+//! whichever of them last started by name. So each git checkpoint here comes
+//! right after clang or make has run, the project holds a Makefile whose
+//! `stash` and `create` targets would leave a mark, and the checkpoint must
+//! still be git's, with no mark: the Runtime pins the git xcrun resolves.
 //!
 //! The daemon runs with its environment cleared and `CFFIXED_USER_HOME`
 //! naming a temporary home below `/private/tmp`, as the production composition
@@ -217,17 +223,41 @@ fn revision(files: &[(&str, &[u8])]) -> String {
     sha256_hex(material.as_bytes())
 }
 
-/// Submits, runs and reads one Job: its identity and its result.
-fn job(home: &Home, request: Value) -> (String, Value) {
+/// Submits and runs one Job: its identity and what the run answered.
+fn run(home: &Home, request: Value) -> (String, Value) {
     let job = answered(home, "job.submit", request)["jobId"]
         .as_str()
         .unwrap()
         .to_owned();
     let ran = answered(home, "job.run", json!({"jobId": job}));
+    (job, ran)
+}
+
+/// Submits, runs and reads one Job: its identity and its result.
+fn job(home: &Home, request: Value) -> (String, Value) {
+    let (job, ran) = run(home, request);
     assert_eq!(ran["state"], "succeeded", "{ran}");
     let result = answered(home, "job.result", json!({"jobId": job}));
     (job, result)
 }
+
+/// Starts one of the shim's other names, as a build would, so that a launch
+/// of the shim from its inode would run that tool next.
+fn prime(tool: &str) {
+    let started = Command::new(tool)
+        .arg("--version")
+        .env_clear()
+        .env("PATH", "/usr/bin:/bin")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .unwrap();
+    assert!(started.success(), "{tool}");
+}
+
+/// The marks the Makefile's targets leave, which a checkpoint that ran make
+/// in the project would have left.
+const MAKE_MARKS: [&str; 2] = ["ran-make-stash", "ran-make-create"];
 
 /// The one product a Job published.
 fn product(home: &Home, job: &str, result: &Value) -> Vec<u8> {
@@ -242,6 +272,11 @@ fn the_production_daemon_checkpoints_and_sweeps_with_the_host_tools() {
     let plain = home.0.join("plain");
     project(&checkout);
     project(&plain);
+    fs::write(
+        checkout.join("Makefile"),
+        "stash create:\n\t@touch ran-make-$@\n",
+    )
+    .unwrap();
     git(&["init", "--quiet"], &checkout);
     git(&["add", "-A"], &checkout);
     git(&["commit", "--quiet", "-m", "base"], &checkout);
@@ -276,6 +311,7 @@ fn the_production_daemon_checkpoints_and_sweeps_with_the_host_tools() {
     let planned = answered(&home, "job.plan", checkpoint.clone());
     assert_eq!(planned["authorizationPolicy"], "runtimeCapability");
     assert_eq!(planned["effectiveEffect"], "deviceMutation");
+    prime("/usr/bin/clang");
     let (first, result) = job(&home, checkpoint);
     let authority = &result["evidence"]["authority"];
     assert_eq!(authority["kind"], "runtimeCapability", "{result}");
@@ -293,8 +329,9 @@ fn the_production_daemon_checkpoints_and_sweeps_with_the_host_tools() {
     assert_eq!(git(&["status", "--porcelain=v1"], &checkout), status_before);
     assert_eq!(fs::read(checkout.join(".git/index")).unwrap(), index_before);
     // The capability was one use: the next checkpoint runs under the next
-    // generation of the same policy.
-    let (_, again) = job(
+    // generation of the same policy, and runs git after make has run.
+    prime("/usr/bin/make");
+    let (again, ran) = run(
         &home,
         job_request(
             "git-again",
@@ -303,6 +340,14 @@ fn the_production_daemon_checkpoints_and_sweeps_with_the_host_tools() {
             None,
         ),
     );
+    for mark in MAKE_MARKS {
+        assert!(
+            !checkout.join(mark).exists(),
+            "the checkpoint ran make in the project: {ran}"
+        );
+    }
+    assert_eq!(ran["state"], "succeeded", "{ran}");
+    let again = answered(&home, "job.result", json!({"jobId": again}));
     assert_eq!(
         again["evidence"]["authority"]["reference"],
         format!("{}-G2", reference.strip_suffix("-G1").unwrap())

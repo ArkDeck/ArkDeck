@@ -40,14 +40,50 @@ pub struct ExecutableIdentity {
 /// moved is not read again.
 type FileIdentity = (String, u64, u64, u64, i64, i64, i64, i64);
 
-fn digest_memo() -> &'static Mutex<HashMap<FileIdentity, String>> {
-    static MEMO: OnceLock<Mutex<HashMap<FileIdentity, String>>> = OnceLock::new();
+/// A file's digest, and whether it is an `xcode-select` tool shim.
+type Measured = (String, bool);
+
+fn digest_memo() -> &'static Mutex<HashMap<FileIdentity, Measured>> {
+    static MEMO: OnceLock<Mutex<HashMap<FileIdentity, Measured>>> = OnceLock::new();
+    MEMO.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Swift `XcodeToolShim`'s resolutions: the tool each shim resolved to under
+/// the developer directory `xcode-select` had chosen. A new choice resolves
+/// again, and a shim that resolved to nothing is asked again next time.
+type Resolution = (FileIdentity, Option<std::path::PathBuf>);
+
+fn resolution_memo() -> &'static Mutex<HashMap<Resolution, String>> {
+    static MEMO: OnceLock<Mutex<HashMap<Resolution, String>>> = OnceLock::new();
     MEMO.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 impl ExecutableIdentity {
-    /// Swift `WorkspaceExecutableIdentity.hashing(path:)`.
+    /// Swift `WorkspaceExecutableIdentity.hashing(path:)`: the executable a
+    /// launch of `path` runs. An `xcode-select` tool shim has no tool of its
+    /// own — it runs whichever one the name the kernel reports for it selects
+    /// — so it stands for the tool `xcrun --find` resolves for its name. One
+    /// that resolves to none, or to another shim, is measured as itself, and
+    /// nothing a profile that pinned it offers is then available.
     pub fn hashing(path: &str) -> Result<Self, String> {
+        let (identity, shim, key) = Self::measure(path)?;
+        if !shim {
+            return Ok(identity);
+        }
+        let name = identity.path.rsplit('/').next().unwrap_or_default();
+        match Self::resolved(key, name).map(|tool| Self::measure(&tool)) {
+            Some(Ok((tool, false, _))) => Ok(tool),
+            _ => Ok(identity),
+        }
+    }
+
+    /// Swift `WorkspaceExecutableIdentity.measuring(path:)`: the file at
+    /// `path` itself, and whether it is an `xcode-select` tool shim.
+    pub(crate) fn measuring(path: &str) -> Result<(Self, bool), String> {
+        Self::measure(path).map(|(identity, shim, _)| (identity, shim))
+    }
+
+    fn measure(path: &str) -> Result<(Self, bool, FileIdentity), String> {
         let canonical = foundation_standardized(path);
         let metadata = fs::metadata(&canonical).map_err(|error| format!("{canonical}: {error}"))?;
         let key = (
@@ -60,19 +96,43 @@ impl ExecutableIdentity {
             metadata.ctime(),
             metadata.ctime_nsec(),
         );
-        if let Some(cached) = digest_memo()
+        if let Some((digest, shim)) = digest_memo()
             .lock()
             .ok()
             .and_then(|memo| memo.get(&key).cloned())
         {
-            return Self::new(canonical, cached);
+            return Ok((Self::new(canonical, digest)?, shim, key));
         }
         let bytes = fs::read(&canonical).map_err(|error| format!("{canonical}: {error}"))?;
-        let digest = support::sha256(&bytes);
+        let (digest, shim) = (
+            support::sha256(&bytes),
+            arkdeck_platform::bytes_are_tool_shim(&bytes),
+        );
         if let Ok(mut memo) = digest_memo().lock() {
-            memo.insert(key, digest.clone());
+            memo.insert(key.clone(), (digest.clone(), shim));
         }
-        Self::new(canonical, digest)
+        Ok((Self::new(canonical, digest)?, shim, key))
+    }
+
+    /// The tool the shim `key` resolves to for `name`, as a path.
+    fn resolved(key: FileIdentity, name: &str) -> Option<String> {
+        let chosen = fs::read_link("/var/db/xcode_select_link").ok();
+        let key = (key, chosen);
+        if let Some(tool) = resolution_memo()
+            .lock()
+            .ok()
+            .and_then(|memo| memo.get(&key).cloned())
+        {
+            return Some(tool);
+        }
+        let tool = arkdeck_platform::resolve_tool_shim(name)
+            .ok()?
+            .to_str()?
+            .to_owned();
+        if let Ok(mut memo) = resolution_memo().lock() {
+            memo.insert(key, tool.clone());
+        }
+        Some(tool)
     }
 
     /// Swift's initializer: canonical, absolute and a lowercase digest.
@@ -722,8 +782,8 @@ impl WorkspaceProfile {
             return Err("workspace profile has no executable presets");
         }
         if identities.iter().any(|identity| {
-            ExecutableIdentity::hashing(&identity.path)
-                .is_ok_and(|measured| measured.sha256 == identity.sha256)
+            ExecutableIdentity::measuring(&identity.path)
+                .is_ok_and(|(measured, shim)| !shim && measured.sha256 == identity.sha256)
         }) {
             return Ok(());
         }
@@ -804,8 +864,16 @@ impl WorkspaceProfile {
             return Some((PRESET_UNAVAILABLE, "workspace.presetUnavailable".into()));
         }
         for identity in self.executable_identities() {
-            match ExecutableIdentity::hashing(&identity.path) {
-                Ok(measured) if measured.sha256 == identity.sha256 => {}
+            match ExecutableIdentity::measuring(&identity.path) {
+                // A shim is never launched: the tool it would run is not the
+                // one pinned.
+                Ok((_, true)) => {
+                    return Some((
+                        "provider_tool_unavailable",
+                        "workspace.toolchainUnavailable".into(),
+                    ));
+                }
+                Ok((measured, false)) if measured.sha256 == identity.sha256 => {}
                 Ok(_) => {
                     return Some(("tool_identity_drift", "workspace.toolIdentityDrift".into()));
                 }
@@ -1252,12 +1320,8 @@ mod tests {
                 copy_root.clone()
             ]
         );
-        assert!(
-            !copy
-                .executable_identities()
-                .iter()
-                .any(|identity| identity.path == "/usr/bin/git")
-        );
+        let git = &primary.source_control.as_ref().unwrap().executable;
+        assert!(!copy.executable_identities().contains(&git));
         assert_eq!(
             primary.unavailability("workspace.prepare-isolated-copy@1", true),
             None
@@ -1304,5 +1368,203 @@ mod tests {
         );
         fs::remove_dir_all(&root).unwrap();
         fs::remove_dir_all(&copy_root).unwrap();
+    }
+    /// `/usr/bin/git` is an `xcode-select` tool shim, so what a profile pins
+    /// for it is the tool xcrun resolves, never the shim; a tool of its own
+    /// measures as itself.
+    #[test]
+    fn a_pinned_tool_shim_stands_for_the_tool_xcrun_resolves() {
+        let tool = arkdeck_platform::resolve_tool_shim("git").unwrap();
+        let git = ExecutableIdentity::hashing("/usr/bin/git").unwrap();
+        assert_eq!(git.path, tool.to_str().unwrap());
+        assert_eq!(git.sha256, support::sha256(&fs::read(&tool).unwrap()));
+        assert!(!ExecutableIdentity::measuring(&git.path).unwrap().1);
+        let (shim, is_shim) = ExecutableIdentity::measuring("/usr/bin/git").unwrap();
+        assert!(is_shim);
+        assert_eq!(shim.path, "/usr/bin/git");
+        let sed = ExecutableIdentity::hashing("/usr/bin/sed").unwrap();
+        assert_eq!(sed.path, "/usr/bin/sed");
+    }
+
+    /// A profile left pinning a shim — one xcrun resolved to nothing — offers
+    /// nothing, and a registry of shims resolves no executable.
+    #[test]
+    fn a_profile_that_pinned_a_shim_offers_nothing() {
+        let root = temporary("shim");
+        let shim = |preset: &str| {
+            let (identity, _) = ExecutableIdentity::measuring("/usr/bin/git").unwrap();
+            WorkspaceCommandPreset::new(preset, identity, None, Vec::new(), 120, Vec::new())
+                .unwrap()
+        };
+        let primary = WorkspaceProfile::primary(
+            "profile-test@1",
+            "ProfileTest",
+            &root,
+            &["Sources/**"],
+            WorkspaceCommandPreset::hashing("inspect", "/usr/bin/grep", None, &[], 10).unwrap(),
+            WorkspaceCommandPreset::hashing("patch", "/usr/bin/patch", None, &[], 10).unwrap(),
+            ProfilePresets {
+                source_control: Some(shim("git")),
+                ..ProfilePresets::default()
+            },
+        )
+        .unwrap();
+        let unavailable = Some((
+            "provider_tool_unavailable",
+            "workspace.toolchainUnavailable".to_owned(),
+        ));
+        for operation in [
+            "workspace.create-checkpoint@1",
+            "workspace.inspect-git-status@1",
+            "workspace.inspect-source@1",
+        ] {
+            assert_eq!(
+                primary.unavailability(operation, false),
+                unavailable,
+                "{operation}"
+            );
+        }
+        let shims = WorkspaceProfile::primary(
+            "profile-test@1",
+            "ProfileTest",
+            &root,
+            &["Sources/**"],
+            shim("inspect"),
+            shim("patch"),
+            ProfilePresets::default(),
+        )
+        .unwrap();
+        assert!(WorkspaceProfile::generic_resolution(&[shims]).is_err());
+        assert!(WorkspaceProfile::generic_resolution(&[profile(&root)]).is_ok());
+        fs::remove_dir_all(&root).unwrap();
+    }
+    /// Launched from its inode, as the Runtime launches what it pinned,
+    /// `/usr/bin/git` runs whichever of the shim's names the kernel last
+    /// recorded for it: once clang has, clang; once make has,
+    /// `make -C <root> stash create` with the project's Makefile. What the
+    /// Runtime pins for `/usr/bin/git` is no shim, so it runs git whichever
+    /// name that is, and leaves the Makefile alone. Any process on the host
+    /// that starts one of the shim's names moves that name, so the shim is
+    /// primed as far as it will go, never required to hold.
+    #[test]
+    fn what_is_pinned_for_git_runs_git_whatever_ran_last() {
+        use std::os::unix::process::CommandExt;
+        use std::process::{Command, Output, Stdio};
+        let root = temporary("inode-launch");
+        fs::write(
+            format!("{root}/Makefile"),
+            "stash create:\n\t@touch ran-make-$@\n",
+        )
+        .unwrap();
+        fs::write(format!("{root}/Sources/App.txt"), "a\n").unwrap();
+        let host = |program: &str, arguments: &[&str]| {
+            let ran = Command::new(program)
+                .args(arguments)
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("GIT_CONFIG_NOSYSTEM", "1")
+                .env("GIT_CONFIG_GLOBAL", "/dev/null")
+                .env("GIT_AUTHOR_NAME", "Profile")
+                .env("GIT_AUTHOR_EMAIL", "profile@invalid.example")
+                .env("GIT_COMMITTER_NAME", "Profile")
+                .env("GIT_COMMITTER_EMAIL", "profile@invalid.example")
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status()
+                .unwrap();
+            assert!(ran.success(), "{program} {arguments:?}");
+        };
+        host("/usr/bin/git", &["-C", &root, "init", "--quiet"]);
+        host("/usr/bin/git", &["-C", &root, "add", "-A"]);
+        host(
+            "/usr/bin/git",
+            &["-C", &root, "commit", "--quiet", "-m", "base"],
+        );
+        fs::write(format!("{root}/Sources/App.txt"), "a\nb\n").unwrap();
+        let launched = |executable: &str, arguments: &[&str]| -> Output {
+            let metadata = fs::metadata(executable).unwrap();
+            Command::new(format!("/.vol/{}/{}", metadata.dev(), metadata.ino()))
+                .arg0(executable)
+                .args(arguments)
+                .env_clear()
+                .env("PATH", "/usr/bin:/bin")
+                .env("LANG", "C")
+                .env("LC_ALL", "C")
+                .current_dir(&root)
+                .stdin(Stdio::null())
+                .output()
+                .unwrap()
+        };
+        let pinned = ExecutableIdentity::hashing("/usr/bin/git").unwrap();
+        // Read by codesign, not by the Runtime's own reading of it.
+        let shown = Command::new("/usr/bin/codesign")
+            .args(["-dv", &pinned.path])
+            .output()
+            .unwrap();
+        let identifier = String::from_utf8_lossy(&shown.stderr)
+            .lines()
+            .find_map(|line| line.strip_prefix("Identifier=").map(str::to_owned))
+            .unwrap();
+        assert!(
+            !identifier.starts_with(arkdeck_platform::XCODE_TOOL_SHIM_IDENTIFIER),
+            "{} is a shim: {identifier}",
+            pinned.path
+        );
+        let resolved = Command::new("/usr/bin/xcrun")
+            .args(["--find", "git"])
+            .env_clear()
+            .output()
+            .unwrap();
+        let resolved = String::from_utf8_lossy(&resolved.stdout)
+            .trim_end_matches('\n')
+            .to_owned();
+        let mut launches = Vec::new();
+        for (primed, banner) in [
+            ("/usr/bin/clang", "clang version"),
+            ("/usr/bin/make", "GNU Make"),
+        ] {
+            // Started by name until the shim itself, from its inode, runs it.
+            let primed_shim = (0..20).any(|_| {
+                host(primed, &["--version"]);
+                String::from_utf8_lossy(&launched("/usr/bin/git", &["--version"]).stdout)
+                    .contains(banner)
+            });
+            if !primed_shim {
+                eprintln!("the shim never ran {primed} here: another process moved its name");
+            }
+            let ran = launched(&pinned.path, &["-C", &root, "stash", "create"]);
+            let object = String::from_utf8_lossy(&ran.stdout).trim().to_owned();
+            let marks: Vec<&str> = ["ran-make-stash", "ran-make-create"]
+                .into_iter()
+                .filter(|mark| fs::metadata(format!("{root}/{mark}")).is_ok())
+                .collect();
+            launches.push(serde_json::json!({
+                "primed": primed,
+                "exitStatus": ran.status.code(),
+                "checkpointObject": object.len() == 40
+                    && object.chars().all(|c| c.is_ascii_hexdigit()),
+                "stderr": String::from_utf8_lossy(&ran.stderr).replace(&root, "<root>"),
+                "marks": marks,
+            }));
+        }
+        // Swift's `XcodeToolShimOracleContractTests` recorded the same
+        // document after the fix, from Swift's own pin.
+        let document = serde_json::json!({
+            "schemaVersion": "arkdeck.xcode-tool-shim-oracle/1",
+            "requested": "/usr/bin/git",
+            "pinned": if pinned.path == resolved { "<xcrun --find git>" } else { &pinned.path },
+            "pinnedSigningIdentifier": identifier,
+            "launches": launches,
+        });
+        let recorded: serde_json::Value = serde_json::from_slice(
+            &fs::read(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../tests/fixtures/workspace-tool-shim-oracle/after.json"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(document, recorded, "{} ran another tool", pinned.path);
+        fs::remove_dir_all(&root).unwrap();
     }
 }

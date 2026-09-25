@@ -1,0 +1,14 @@
+{
+  "after": "after.json: recorded with this change, main 3315a9cba plus the fix, on macOS 27 (Darwin 27.0.0) with Xcode's developer directory chosen by xcode-select: /usr/bin/git pins the git xcrun resolves (com.apple.git), which leaves git's checkpoint object and no mark whichever of the shim's names last started",
+  "before": "before.json: recorded with the Swift sources at main 3315a9cba and only this oracle test added, the second of four recordings: /usr/bin/git pins the shim itself (com.apple.dt.xcode_select.tool-shim-public); once clang last started it ran clang (exit 1), once make last started it ran `make -C <root> stash create`, which ran the project's Makefile (exit 0, both marks). In all four recordings the make round ran the Makefile; in two of them the clang round ran git, because any process that starts one of the shim's names moves the name the kernel reports",
+  "command": "ARKDECK_RUST_TOOL_SHIM_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter XcodeToolShimOracleContractTests",
+  "determinism": "paths that differ between hosts are named, not spelled: `<xcrun --find git>` for the tool xcrun resolves with a cleared environment and `<root>` for the fabricated project; the checkpoint object is recorded as whether one was written, never its id; the signing identifier is read by codesign, independently of the Runtime. after.json does not depend on which name the shim last took; before.json does, and is kept as the defect's evidence, not replayed",
+  "files": {
+    "after.json": "feb1cc29aba85aff459151d23b89c0e68b7e5086e90fbe69f642c163830b6c75",
+    "before.json": "e78d4579f60b7e121d47c8de9098c144c7f48c7e672549f390777bc2792e663b"
+  },
+  "recordedBy": "XcodeToolShimOracleContractTests.testWhatThePinnedGitRunsIsRecorded",
+  "replayedBy": "arkdeck-hoststore workspace_profile::tests::what_is_pinned_for_git_runs_git_whatever_ran_last, against after.json",
+  "source": "the product's own pinning, WorkspaceExecutableIdentity.hashing(path: \"/usr/bin/git\"); the launch from the pinned file's inode (/.vol/<device>/<inode>, as the Runtime launches what it pinned), the priming of clang and make by name, codesign and xcrun are the test's own, over a committed git project under the temporary directory whose Makefile's `stash` and `create` targets leave a mark",
+  "why": "the pinned xcode-select tool shim (TASK-XPA-015): /usr/bin/git is one file under 78 names and, launched from its inode, runs whichever of them the kernel last recorded for it"
+}

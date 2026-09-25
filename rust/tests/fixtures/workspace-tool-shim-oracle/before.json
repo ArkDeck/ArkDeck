@@ -1,0 +1,27 @@
+{
+  "launches" : [
+    {
+      "checkpointObject" : false,
+      "exitStatus" : 1,
+      "marks" : [
+
+      ],
+      "primed" : "/usr/bin/clang",
+      "stderr" : "clang: error: no such file or directory: 'stash'\nclang: error: no such file or directory: 'create'\n"
+    },
+    {
+      "checkpointObject" : false,
+      "exitStatus" : 0,
+      "marks" : [
+        "ran-make-stash",
+        "ran-make-create"
+      ],
+      "primed" : "/usr/bin/make",
+      "stderr" : ""
+    }
+  ],
+  "pinned" : "/usr/bin/git",
+  "pinnedSigningIdentifier" : "com.apple.dt.xcode_select.tool-shim-public",
+  "requested" : "/usr/bin/git",
+  "schemaVersion" : "arkdeck.xcode-tool-shim-oracle/1"
+}

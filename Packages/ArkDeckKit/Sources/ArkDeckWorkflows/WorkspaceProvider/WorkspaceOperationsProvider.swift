@@ -7,6 +7,7 @@
 // before/after readback record that can be reconciled or reverted.
 
 import ArkDeckCore
+import ArkDeckProcess
 import CryptoKit
 import Foundation
 
@@ -27,20 +28,58 @@ public struct WorkspaceExecutableIdentity: Sendable, Equatable, Hashable, Codabl
     self.sha256 = sha256
   }
 
+  /// The executable a launch of `path` runs. An `xcode-select` tool shim has
+  /// no tool of its own — it runs whichever one the name the kernel reports
+  /// for it selects — so it stands for the tool `xcrun --find` resolves for
+  /// its name. One that resolves to none, or to another shim, is measured as
+  /// itself, and nothing a profile that pinned it offers is then available.
   package static func hashing(path: String) throws -> WorkspaceExecutableIdentity {
+    let measured = try measuring(path: path)
+    guard measured.isToolShim else { return measured.identity }
+    let shim = URL(filePath: measured.identity.path)
+    guard let tool = resolvedTool(shim: shim, named: shim.lastPathComponent),
+      let resolved = try? measuring(path: tool), !resolved.isToolShim
+    else { return measured.identity }
+    return resolved.identity
+  }
+
+  /// The file at `path` itself, and whether it is an `xcode-select` tool
+  /// shim.
+  package static func measuring(
+    path: String
+  ) throws -> (identity: WorkspaceExecutableIdentity, isToolShim: Bool) {
     let canonical = URL(filePath: path).standardizedFileURL.path
     let url = URL(filePath: canonical)
     // Availability asks this once per published operation, so the same
     // executable was being read and hashed twenty-five times per
     // `operation.list`. The digest is a pure function of the bytes; the file
     // identity behind the memo is the complete invalidation condition.
-    if let cached = RuntimeFileDerivedCaches.executableDigest.value(for: url) {
-      return try WorkspaceExecutableIdentity(path: canonical, sha256: cached)
+    if let cached = RuntimeFileDerivedCaches.executableDigest.value(for: url),
+      let shim = RuntimeFileDerivedCaches.executableToolShim.value(for: url)
+    {
+      return (try WorkspaceExecutableIdentity(path: canonical, sha256: cached), shim == "true")
     }
     let bytes = try Data(contentsOf: url)
     let digest = WorkspaceProviderSupport.sha256(bytes)
+    let shim = XcodeToolShim.isToolShim(bytes: bytes)
     RuntimeFileDerivedCaches.executableDigest.store(digest, for: url)
-    return try WorkspaceExecutableIdentity(path: canonical, sha256: digest)
+    RuntimeFileDerivedCaches.executableToolShim.store(shim ? "true" : "false", for: url)
+    return (try WorkspaceExecutableIdentity(path: canonical, sha256: digest), shim)
+  }
+
+  /// The tool the shim at `shim` resolves to for `name`, as a path.
+  private static func resolvedTool(shim: URL, named name: String) -> String? {
+    let chosen =
+      (try? FileManager.default.destinationOfSymbolicLink(atPath: "/var/db/xcode_select_link"))
+      ?? ""
+    if let cached = RuntimeFileDerivedCaches.xcodeToolResolution.value(for: shim),
+      let separator = cached.firstIndex(of: "\n"), cached[..<separator] == chosen
+    {
+      return String(cached[cached.index(after: separator)...])
+    }
+    guard let tool = try? XcodeToolShim.resolve(tool: name) else { return nil }
+    RuntimeFileDerivedCaches.xcodeToolResolution.store(chosen + "\n" + tool, for: shim)
+    return tool
   }
 }
 
@@ -1028,8 +1067,13 @@ package struct WorkspaceActionExecutableResolver: RuntimeExecutableResolving {
   /// executable is still caught here. The executor checks again atomically at
   /// spawn either way.
   private func validated(_ identity: WorkspaceExecutableIdentity) throws -> ResolvedExecutable {
-    let measured = try WorkspaceExecutableIdentity.hashing(path: identity.path).sha256
-    guard measured == identity.sha256 else {
+    let measured = try WorkspaceExecutableIdentity.measuring(path: identity.path)
+    // A shim is never launched: the tool it would run is not the one pinned.
+    guard !measured.isToolShim else {
+      throw RuntimeDispatchFailure.failed(
+        "workspace executable is an xcode-select tool shim: \(identity.path)")
+    }
+    guard measured.identity.sha256 == identity.sha256 else {
       throw RuntimeDispatchFailure.failed(
         "workspace executable identity drifted: \(identity.path)")
     }
@@ -1257,8 +1301,14 @@ package struct WorkspaceOperationsProvider: DeviceProvider {
         // the answer is worth. The memo re-derives whenever a file's own
         // identity moves, so drift is still refused; a file that cannot be
         // read still throws into the catch below.
-        let measured = try WorkspaceExecutableIdentity.hashing(path: identity.path).sha256
-        guard measured == identity.sha256 else {
+        let measured = try WorkspaceExecutableIdentity.measuring(path: identity.path)
+        // A shim is never launched: the tool it would run is not the one
+        // pinned.
+        guard !measured.isToolShim else {
+          return .unavailable(
+            code: .providerToolUnavailable, reason: "workspace.toolchainUnavailable")
+        }
+        guard measured.identity.sha256 == identity.sha256 else {
           return .unavailable(
             code: .toolIdentityDrift, reason: "workspace.toolIdentityDrift")
         }

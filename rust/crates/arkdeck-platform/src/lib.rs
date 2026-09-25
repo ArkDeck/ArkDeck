@@ -37,6 +37,12 @@ mod temporary_directory;
 pub use temporary_directory::foundation_temporary_directory;
 mod secret;
 pub use secret::{Secret, wipe};
+mod tool_shim;
+#[cfg(target_os = "macos")]
+pub use tool_shim::resolve as resolve_tool_shim;
+pub use tool_shim::{
+    XCODE_TOOL_SHIM_IDENTIFIER, bytes_are_tool_shim, is_tool_shim, signing_identifiers,
+};
 #[cfg(feature = "allocation-meter")]
 mod allocation_meter;
 #[cfg(feature = "allocation-meter")]
