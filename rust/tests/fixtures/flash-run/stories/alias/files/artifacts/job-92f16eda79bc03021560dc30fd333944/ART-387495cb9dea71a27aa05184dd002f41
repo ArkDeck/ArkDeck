@@ -1,0 +1,22 @@
+{
+  "artifact" : "post-flash-facts.json",
+  "authority" : {
+    "consumptionFingerprintSha256" : "0576d060088fc6c77972f73f157f1f3d485558738dac493505acd01a851794fa",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "const.ohos.fullname" : "OpenHarmony-7.0.0.36",
+  "const.product.model" : "DAYU200",
+  "expectedBindingRevision" : 1,
+  "firmware" : "OpenHarmony-7.0.0.36",
+  "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+  "materializedPlanDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+  "model" : "DAYU200",
+  "operation" : "flash.dayu200",
+  "providerId" : "arkforge",
+  "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "targetId" : "TGT-83405c84ff74",
+  "transport" : "usb",
+  "usbTopology" : "42"
+}

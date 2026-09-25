@@ -1,0 +1,147 @@
+[
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "Sessions"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/.imports-v1"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/.imports-v1/identities"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/.imports-v1/identities/imp-7bc9fbc7-3979-4440-9771-d78172a5119f.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/.imports-v1/identities/imp-a8f9d0aa-7806-489c-923c-05a32656b475.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/.imports-v1/payloads"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/.imports-v1/records"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/.imports-v1/records/a395fa591aee0d71c83dfa0d5e8e101b9724a798df010c1176553e8723fc44de.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/.imports-v1/records/c9fb7ddac13d397e993e9adc231b0c276f673f514b60f4c8d5eca446aa06cdc6.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/imp-7bc9fbc7-3979-4440-9771-d78172a5119f"
+  },
+  {
+    "kind" : "file",
+    "mode" : "400",
+    "path" : "artifacts/imp-7bc9fbc7-3979-4440-9771-d78172a5119f/.payload-verification-v1.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "400",
+    "path" : "artifacts/imp-7bc9fbc7-3979-4440-9771-d78172a5119f/ART-8048c074232554064150238f1bf20a3f"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/imp-7bc9fbc7-3979-4440-9771-d78172a5119f/index.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "artifacts/imp-a8f9d0aa-7806-489c-923c-05a32656b475"
+  },
+  {
+    "kind" : "file",
+    "mode" : "400",
+    "path" : "artifacts/imp-a8f9d0aa-7806-489c-923c-05a32656b475/.payload-verification-v1.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "400",
+    "path" : "artifacts/imp-a8f9d0aa-7806-489c-923c-05a32656b475/ART-8426324c63866659ed9ebc8ce1ef7ae3"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "artifacts/imp-a8f9d0aa-7806-489c-923c-05a32656b475/index.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "session-owner"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/.superseding-recovery-epochs.lock"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/capabilities"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/.runtime-capabilities.lock"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "targets-state"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "targets-state/.target-display-names.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "targets-state/.targets.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "targets-state/target-display-names.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "targets-state/targets.json"
+  }
+]

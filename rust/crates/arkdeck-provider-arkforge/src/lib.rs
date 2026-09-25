@@ -8,18 +8,24 @@
 //!
 //! It composes the lane — one owned, paired `arkforged` generation — and reads
 //! through the daemon's public socket: which Rockchip flashing modes it sees,
-//! and its half of the dual-source Loader observation. The controller surface
-//! that plans and permits follows in later slices.
+//! and its half of the dual-source Loader observation. The Runtime's Flash
+//! execution reaches a lane through `FlashLane`; the controller surface that
+//! plans and permits behind it follows in later slices.
 
 #![forbid(unsafe_code)]
 
 mod device_access;
+mod flash_lane;
 #[cfg(target_os = "macos")]
 mod lane;
 mod loader;
 
 pub use device_access::{
     DEVICE_ACCESS_TIMEOUT, DeviceAccessFailure, DeviceAccessObserver, DeviceMode,
+};
+pub use flash_lane::{
+    ActionReceipt, DeviceBinding, Execution, FlashLane, LaneArtifact, LaneFailure, PrewarmReceipt,
+    Terminal, canonical_facts_digest, validate_completion,
 };
 #[cfg(target_os = "macos")]
 pub use lane::{

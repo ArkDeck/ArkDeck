@@ -841,18 +841,7 @@ impl Host {
     ) -> Option<T> {
         let (state_root, analyzer) = self.planning.as_ref()?;
         let hdc = self.hdc();
-        let facts = match (&self.flash_facts, &self.targets) {
-            (Some(facts), Some(targets)) => Some(move |target_id: &str| {
-                facts.current_facts(
-                    targets,
-                    self.hdc
-                        .as_deref()
-                        .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
-                    target_id,
-                )
-            }),
-            _ => None,
-        };
+        let facts = self.flash_facts_port();
         Some(run(&arkdeck_hoststore::FlashPlanner {
             planner: arkdeck_hoststore::JobPlanner {
                 imports: self.imports.as_deref(),
@@ -867,6 +856,27 @@ impl Host {
                 .as_ref()
                 .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
         }))
+    }
+
+    /// Swift's ArkForge facts port: the Target store's facts, measured over
+    /// this host's HDC when it has one. None without the facts owner or the
+    /// Target store.
+    #[cfg(target_os = "macos")]
+    fn flash_facts_port(
+        &self,
+    ) -> Option<impl Fn(&str) -> Result<arkdeck_hoststore::RockchipFacts, String> + '_> {
+        let (Some(facts), Some(targets)) = (&self.flash_facts, &self.targets) else {
+            return None;
+        };
+        Some(move |target_id: &str| {
+            facts.current_facts(
+                targets,
+                self.hdc
+                    .as_deref()
+                    .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+                target_id,
+            )
+        })
     }
 
     /// `flash.bind-current-loader` binds through this owner, against this
@@ -1560,7 +1570,8 @@ impl HostServices for Host {
                 ])),
             })
     }
-    /// `job.submit` admits into the Job owner the planner materializes for.
+    /// `job.submit` admits into the Job owner the planner materializes for,
+    /// the ArkForge Flash operations over the Flash composition and facts.
     #[cfg(target_os = "macos")]
     fn job_submit(
         &self,
@@ -1574,18 +1585,25 @@ impl HostServices for Host {
             });
         };
         let hdc = self.hdc();
-        arkdeck_hoststore::JobAdmitter {
-            planner: arkdeck_hoststore::JobPlanner {
-                imports: self.imports.as_deref(),
-                artifacts: self.artifacts.as_deref(),
-                analyzer: Some(analyzer),
-                state_root,
-                hdc: hdc.as_ref(),
-                workspace: self.workspace.as_deref(),
+        let facts = self.flash_facts_port();
+        arkdeck_hoststore::FlashAdmitter {
+            admitter: arkdeck_hoststore::JobAdmitter {
+                planner: arkdeck_hoststore::JobPlanner {
+                    imports: self.imports.as_deref(),
+                    artifacts: self.artifacts.as_deref(),
+                    analyzer: Some(analyzer),
+                    state_root,
+                    hdc: hdc.as_ref(),
+                    workspace: self.workspace.as_deref(),
+                },
+                jobs,
+                now: arkdeck_hoststore::runtime_now,
+                authority: self.authority(),
             },
-            jobs,
-            now: arkdeck_hoststore::runtime_now,
-            authority: self.authority(),
+            flash: self.flash_planning.as_ref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
         }
         .handle(params)
         // A refusal before the admission point proves zero dispatch; Swift

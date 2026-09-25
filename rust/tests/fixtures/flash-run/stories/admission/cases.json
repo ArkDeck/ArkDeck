@@ -1,0 +1,501 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "deviceProfileRef" : "dayu200",
+            "intent" : "fullRestore",
+            "verification" : "full"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operation" : "flash.full-restore@1",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "c7e7a4328afa505eda2981c0ddabd7a734c5ecfaed96e15a75a1a7130cd76a79",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.plan",
+      "name" : "plan.canonical",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-plan\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "admissionDenied",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "caller-supplied capabilities cannot admit a Runtime-owned policy"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.callerCapability",
+      "params" : {
+        "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-CALLER-SELECTED\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-caller-capability\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-caller-capability\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "reviewedPlanMismatch",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the fresh materialized plan differs from the immutable reviewed plan"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.reviewedMismatch",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-reviewed-mismatch\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-reviewed-mismatch\",\"reviewedPlanDigest\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "reviewedPlanDigest must be a lowercase SHA-256 precondition"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.reviewedMalformed",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-reviewed-malformed\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-reviewed-malformed\",\"reviewedPlanDigest\":\"NOT-A-DIGEST\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "admissionDenied",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "provider execution prerequisite blocked before capability issuance: flash.crossModeBindingUnprepared: target TGT-83405c84ff74 is not covered by the durable DAYU200 cross-mode binding"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.crossModeUnprepared",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-cross-mode\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-cross-mode\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "unprepared",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "typed plan preflight failed before authorization: post-flash HDC binding expectation is absent or malformed"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.noAlias",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-no-alias\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-no-alias\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : null,
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.staleRevision",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-stale\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-stale\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 2,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : {
+
+          },
+          "message" : "the Runtime could not complete the Job lifecycle request"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.aliasShortPlan",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-alias-short\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"req-flash-alias-short\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "operation flash.dayu200@1 is not in the catalog"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.aliasVersioned",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-alias-versioned\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\",\"version\":1},\"requestId\":\"req-flash-alias-versioned\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash bundle Artifact lease is not resolvable: rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"Artifact lease target/binding/identity does not match the materialized request\")"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit.otherTargetLease",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-other-target\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-a8f9d0aa-7806-489c-923c-05a32656b475:ART-8426324c63866659ed9ebc8ce1ef7ae3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-other-target\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : [
+
+        ]
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "capability.list",
+      "name" : "capabilities",
+      "params" : {
+
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    }
+  ]
+}

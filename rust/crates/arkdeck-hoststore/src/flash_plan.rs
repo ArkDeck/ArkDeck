@@ -206,7 +206,7 @@ pub struct FlashPlanner<'a> {
     pub facts: Option<RockchipFactsPort<'a>>,
 }
 
-impl FlashPlanner<'_> {
+impl<'a> FlashPlanner<'a> {
     /// The `job.plan` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, PlanRefusal> {
         self.plan(request_json(params)?.as_bytes())
@@ -257,6 +257,21 @@ impl FlashPlanner<'_> {
             "jobAdmitted": false,
             "dispatchDisposition": "notDispatched",
         }))
+    }
+
+    /// Swift's Import holds, then `materializeTypedPlanBeforeAuthorization`
+    /// for a Flash request being admitted: the holds stay with the plan until
+    /// admission is done with it.
+    pub(crate) fn admission_materialized(
+        &self,
+        flash: &FlashPlanning,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<(Materialized<'a>, Option<String>), PlanRefusal> {
+        let hold = self.planner.import_hold(request, descriptor)?;
+        let (mut materialized, blocker) = self.materialize(flash, request, descriptor)?;
+        materialized._import_use = hold;
+        Ok((materialized, blocker))
     }
 
     /// Swift `materializeTypedPlanBeforeAuthorization` for a Flash request:

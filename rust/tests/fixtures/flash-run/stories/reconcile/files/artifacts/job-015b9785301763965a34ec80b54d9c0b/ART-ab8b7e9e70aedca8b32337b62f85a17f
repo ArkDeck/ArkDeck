@@ -1,0 +1,53 @@
+{
+  "artifacts" : {
+    "post-flash-facts.json" : {
+      "artifactId" : "ART-0dc6059cd891c1d91ae2a65b935816e6",
+      "byteCount" : 947,
+      "required" : true,
+      "sha256" : "b3dee661680ed358d46211fc79c8596a04905dec866ded697dd8a79c33b0f2e8",
+      "status" : "published"
+    },
+    "post-flash-hilog.txt" : {
+      "artifactId" : "ART-24d4fec1e2aaed7767b7c0edd9d867b2",
+      "byteCount" : 149,
+      "required" : false,
+      "sha256" : "6bbbd0aae2215135c309fd6df3b6e5bee70b801d187a69b01e7e2103aa06b657",
+      "status" : "published"
+    }
+  },
+  "authority" : {
+    "consumptionFingerprintSha256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "completeness" : "complete",
+  "expectedBindingRevision" : 1,
+  "jobId" : "job-015b9785301763965a34ec80b54d9c0b",
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "missingRequired" : [
+
+  ],
+  "operation" : "flash.full-restore@1",
+  "providerId" : "arkforge",
+  "request" : {
+    "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+    "deviceProfileRef" : "dayu200",
+    "intent" : "fullRestore",
+    "verification" : "full"
+  },
+  "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "targetId" : "TGT-83405c84ff74",
+  "verifiedSteps" : [
+    "capture-post-flash-diagnostics",
+    "enter-loader-mode",
+    "flash-partitions",
+    "rebind-and-verify-build",
+    "rebind-loader-identity",
+    "reboot-device",
+    "verify-flash-readback",
+    "wait-for-hdc",
+    "wait-loader-disconnect",
+    "wait-loader-reconnect"
+  ]
+}

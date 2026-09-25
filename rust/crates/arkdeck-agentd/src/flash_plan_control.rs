@@ -5,7 +5,8 @@
 //! flash bundle Swift's Import committed there. Each composition's answer is
 //! the one Swift's daemon gives in the same composition; the plans themselves
 //! are replayed against Swift in `arkdeck-hoststore` (`tests/flash_plan.rs`).
-//! Nothing is admitted: `job.submit` still refuses a Flash operation.
+//! A `job.submit` of a Flash materializes over the same composition and is
+//! refused where its plan is; nothing is admitted.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION};
 use arkdeck_control::Control;
 use arkdeck_hoststore::{
@@ -284,11 +285,18 @@ fn a_flash_plan_is_answered_as_swifts_daemon_answers_it_in_each_composition() {
         );
     }
 
-    // Planning a Flash admits nothing: admission still refuses it before it
-    // is admitted.
-    refused(
-        &call(&control, "job.submit", &canonical),
-        "rejected",
-        "flash.full-restore@1 is not materialized by the Rust Runtime yet",
+    // Admission materializes the same plan first, and refuses it where the
+    // plan stops, before anything is admitted or issued.
+    for request in [&canonical, &alias] {
+        refused(
+            &call(&control, "job.submit", request),
+            "invalidInput",
+            "typed plan preflight failed before authorization: post-flash HDC binding \
+             expectation is absent or malformed",
+        );
+    }
+    // No Job directory was made.
+    assert!(
+        fs::read_dir(root.0.join("jobs/jobs")).map_or(true, |mut entries| entries.next().is_none())
     );
 }

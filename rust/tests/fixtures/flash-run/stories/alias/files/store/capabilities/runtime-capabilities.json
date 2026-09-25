@@ -1,0 +1,71 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+        "effectCeiling" : "destructive",
+        "exactArtifactFacts" : {
+          "artifactByteCount" : "903",
+          "artifactId" : "ART-8048c074232554064150238f1bf20a3f",
+          "artifactSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d"
+        },
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "deviceProfile" : "dayu200",
+          "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+          "partitionPlan" : [
+            "uboot",
+            "resource",
+            "boot_linux",
+            "ramdisk",
+            "system",
+            "vendor",
+            "updater",
+            "chip_ckm",
+            "userdata"
+          ],
+          "postFlashVerification" : "basic"
+        },
+        "exactPlanDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+        "expiresAtUTC" : "2026-09-25T04:00:00Z",
+        "inputConstraints" : {
+          "deviceProfile" : {
+            "kind" : "exactString",
+            "value" : "dayu200"
+          },
+          "imageBundleLease" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f"
+          },
+          "postFlashVerification" : {
+            "kind" : "exactString",
+            "value" : "basic"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:flash.dayu200"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "flash.dayu200"
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 1
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

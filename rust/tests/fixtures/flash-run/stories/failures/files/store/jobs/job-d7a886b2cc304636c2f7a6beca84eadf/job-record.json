@@ -1,0 +1,144 @@
+{
+  "actualEffect" : "destructive",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-d7a886b2cc304636c2f7a6beca84eadf",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationFailure" : {
+    "category" : "externalTool",
+    "code" : "executionConfirmedNotPerformed",
+    "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "flash.full-restore@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-prewarmRefused",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-prewarmRefused",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-prewarmRefused",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-prewarmRefused",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1907",
+      "lastSequence" : 4,
+      "sha256" : "691cfbe9825076564bc40a2893ed707f2f0d0cf460267322112289a1caa0902b"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-d7a886b2cc304636c2f7a6beca84eadf",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67443",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2289",
+      "lastSequence" : 5,
+      "sha256" : "9cacd4eacd8d3b621d30fdb847b5b8c75cc7822bf12531c30b767107aba17fec"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-25T00:00:00Z",
+      "manifestByteCount" : "1179",
+      "manifestSHA256" : "52905da145f72720386632c2fb0984e450ea0829a1080562da84b5f48dd59d20",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "52905da145f72720386632c2fb0984e450ea0829a1080562da84b5f48dd59d20",
+      "publishedAtUTC" : "2026-09-25T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-d7a886b2cc304636c2f7a6beca84eadf",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-flash-run-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-d7a886b2cc304636c2f7a6beca84eadf",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "running->finalizing",
+    "reason: arkforged artifact prewarm failed before capability consumption; nothing was dispatched and the device was not touched: fixture ArkForge content store unavailable",
+    "finalizing->failed",
+    "reason: arkforged artifact prewarm failed before capability consumption; nothing was dispatched and the device was not touched: fixture ArkForge content store unavailable"
+  ]
+}

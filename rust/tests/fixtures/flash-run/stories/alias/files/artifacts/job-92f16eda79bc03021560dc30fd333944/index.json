@@ -1,0 +1,95 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-387495cb9dea71a27aa05184dd002f41",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 940,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-92f16eda79bc03021560dc30fd333944",
+      "mediaType" : "application\/json",
+      "name" : "post-flash-facts.json",
+      "privacy" : "sensitive",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-92f16eda79bc03021560dc30fd333944",
+      "sha256" : "fc6cadaa95a84374062c983085561577e3801654dfbffe0915c100e65c3cd695",
+      "sourceOperation" : "flash.dayu200",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "rebind-and-verify-build"
+    },
+    {
+      "artifactID" : "ART-MISSING-5d3e678a6c92a786164a8390c1556c35",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-92f16eda79bc03021560dc30fd333944",
+      "mediaType" : "text\/plain",
+      "name" : "post-flash-hilog.txt",
+      "privacy" : "sensitive",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-92f16eda79bc03021560dc30fd333944",
+      "sha256" : "",
+      "sourceOperation" : "flash.dayu200",
+      "status" : {
+        "missing" : {
+          "reason" : "step not selected by the request inputs"
+        }
+      },
+      "stepID" : "capture-post-flash-diagnostics"
+    },
+    {
+      "artifactID" : "ART-8948cb68870c354de1e013684079135d",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 1695,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-92f16eda79bc03021560dc30fd333944",
+      "mediaType" : "application\/json",
+      "name" : "flash-report.json",
+      "privacy" : "standard",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-92f16eda79bc03021560dc30fd333944",
+      "sha256" : "327b1d6de9ccdd9faa6019b443e22ddf77f4a32ff9f9cd8cd26685d8f586ad53",
+      "sourceOperation" : "flash.dayu200",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

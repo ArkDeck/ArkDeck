@@ -1,0 +1,154 @@
+{
+  "actualEffect" : "destructive",
+  "actualStepKinds" : [
+    "captureRemoteStdout"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G2",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "planDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "reservationID" : "idem-flash-second",
+      "stepSetDigestSHA256" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-09-25T04:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-25T00:00:00Z",
+    "firmware" : "OpenHarmony-7.0.0.36",
+    "model" : "DAYU200",
+    "preflightSteps" : [
+
+    ],
+    "providerID" : "arkforge",
+    "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetID" : "TGT-83405c84ff74",
+    "toolSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "toolVersion" : "arkforged native RockUSB",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationReference" : "flash.full-restore@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-second",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-second",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G2"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-second",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-second",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "contractViolation",
+      "detail" : "composed Manifest was refused by the current contract: invalidManifest(\"succeeded status contains failed Step\")"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-72a1a92bbfa388a3b8c63bc5618e6a4e"
+  },
+  "skipReasons" : {
+    "capture-post-flash-diagnostics" : "failed(\"post-flash HiLog capture returned no bytes\")"
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G2",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "ArkForge artifact prewarm ready (imported, total 11 ms, consume wait <ms> ms)",
+    "capability consumed before first mutation",
+    "intent flash-partitions correlated daemon-job=JOB-FLASH-2",
+    "delegated reboot-device to the ArkForge lane's own plan",
+    "delegated wait-for-hdc to the ArkForge lane's own plan",
+    "delegated rebind-and-verify-build to the ArkForge lane's own plan",
+    "artifact post-flash-facts.json -> ART-135fa9b6a4093efc67ee9c498dd820e2",
+    "intent capture-post-flash-diagnostics",
+    "failed capture-post-flash-diagnostics",
+    "skipped capture-post-flash-diagnostics: failed(\"post-flash HiLog capture returned no bytes\")",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

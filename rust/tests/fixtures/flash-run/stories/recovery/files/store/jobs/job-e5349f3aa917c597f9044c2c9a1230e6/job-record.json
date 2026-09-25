@@ -1,0 +1,113 @@
+{
+  "actualEffect" : "destructive",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "planDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "reservationID" : "idem-flash-original",
+      "stepSetDigestSHA256" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-09-25T04:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "flash.full-restore@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-original",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-original",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "arkforge",
+  "recoveryIntentEventID" : "intent-flash-partitions",
+  "recoveryStepID" : "flash-partitions",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-original",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-original",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "ArkForge artifact prewarm ready (store-hit, total 7 ms, consume wait <ms> ms)",
+    "capability consumed before first mutation",
+    "intent flash-partitions correlated daemon-job=JOB-FLASH-1",
+    "outcomeUnknown flash-partitions; correlated daemon job retained",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: fixture lost the controller after the daemon accepted the exact job"
+  ]
+}

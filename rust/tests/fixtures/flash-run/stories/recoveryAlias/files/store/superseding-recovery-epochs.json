@@ -1,0 +1,52 @@
+{
+  "epochs" : [
+    {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "bindingRevision" : 1,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback",
+        "reboot-device",
+        "wait-for-hdc",
+        "rebind-and-verify-build",
+        "capture-post-flash-diagnostics"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "intent-flash-partitions",
+          "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+          "observedAtUTC" : "2026-09-25T00:00:00Z",
+          "operationReference" : "flash.full-restore@1",
+          "possibleEffects" : [
+            "partition:uboot",
+            "partition:resource",
+            "partition:boot_linux",
+            "partition:ramdisk",
+            "partition:system",
+            "partition:vendor",
+            "partition:updater",
+            "partition:chip_ckm",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "epochID" : "recovery-epoch-97c9966c14ccaf85cb302d4f261fb256",
+      "epochSHA256" : "db5ae44c692e50b0fb5c699feb2aca015553a5732de03e09ea5e38d610c86027",
+      "establishedAtUTC" : "2026-09-25T00:00:00Z",
+      "materializedPlanDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "recoveryIntentEventID" : "intent-flash-partitions",
+      "recoveryJobID" : "job-282fd9a2d9abd089dc6d22ac5a1a67b9",
+      "resultingTargetEpochSHA256" : "ef0f32f0b8081e33b26e75cc500c128af62bbffdea14e193da53cffb7246e338",
+      "source" : "distinctRecoveryExecution",
+      "stableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      "uncertainEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

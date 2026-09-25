@@ -28,6 +28,7 @@ mod native_library_plan;
 mod screen_sequence_plan;
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
+pub(crate) use flash_plan::is_flash;
 pub use flash_plan::{
     FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
 };
@@ -275,6 +276,7 @@ fn internal_failure() -> PlanRefusal {
 
 /// The owners a plan reads. The state root holds the Runtime debug attempt
 /// permits Swift consults while materializing.
+#[derive(Clone, Copy)]
 pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
     pub imports: Option<&'a crate::ImportUploadStore>,

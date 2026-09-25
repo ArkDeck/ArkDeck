@@ -8,6 +8,8 @@
 #![allow(dead_code)]
 
 pub mod debug_hap;
+#[cfg(target_os = "macos")]
+pub mod flash_lane;
 pub mod hdc_oracle;
 pub mod native_library;
 pub mod reconcile;
@@ -145,7 +147,7 @@ pub fn rebuild(fixture: &Path, sources: &[&str], cases: &[Value]) -> PathBuf {
 /// A Job record's publication marker names this machine's volume, device,
 /// inode and claim generation; each reads as a fixed label, and a refused
 /// marker's blank or zero value stays as it is.
-fn machine_independent(bytes: &[u8]) -> Vec<u8> {
+pub fn machine_independent(bytes: &[u8]) -> Vec<u8> {
     let mut text = String::from_utf8(bytes.to_vec()).unwrap();
     for key in MACHINE_FACTS {
         let needle = format!("\"{key}\"");

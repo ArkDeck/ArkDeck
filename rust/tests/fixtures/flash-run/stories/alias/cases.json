@@ -1,0 +1,700 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "deduplicated" : false,
+          "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+          "newDispatchCount" : 0,
+          "schemaVersion" : "arkdeck.job-acceptance/1"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-alias-basic\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"basic\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"req-flash-alias-basic\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "createdAtUtc" : "2026-09-25T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-92f16eda79bc03021560dc30fd333944",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-92f16eda79bc03021560dc30fd333944",
+              "kind" : "job"
+            }
+          },
+          "operation" : "flash.dayu200",
+          "outcome" : "succeeded",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-92f16eda79bc03021560dc30fd333944",
+          "sessionPublication" : {
+            "catalogGeneration" : "1",
+            "manifestSha256" : "31e155934717d29b388c87a7c8c27b76d1dd258641491b6c58b51acc30df2ea6",
+            "reasonCode" : null,
+            "state" : "published"
+          },
+          "startedAtUtc" : "2026-09-25T00:00:00Z",
+          "state" : "succeeded",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-83405c84ff74",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "flash"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+        "prewarm job-92f16eda79bc03021560dc30fd333944 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d profile=org.openharmony.dayu200@1.0.0",
+        "prepare job-92f16eda79bc03021560dc30fd333944 purpose=primaryFlash target=TGT-83405c84ff74 revision=1 identity=83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1 connectKey=post-flash-hdc-address topology=42 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d profile=org.openharmony.dayu200@1.0.0",
+        "perform flash-partitions job-92f16eda79bc03021560dc30fd333944 daemonJob=JOB-FLASH-1 plan=PLAN-FLASH-1 purpose=primaryFlash",
+        "finishPrewarm job-92f16eda79bc03021560dc30fd333944"
+      ],
+      "method" : "job.run",
+      "name" : "run",
+      "params" : {
+        "jobId" : "job-92f16eda79bc03021560dc30fd333944"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "createdAtUtc" : "2026-09-25T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-92f16eda79bc03021560dc30fd333944",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-92f16eda79bc03021560dc30fd333944",
+              "kind" : "job"
+            }
+          },
+          "operation" : "flash.dayu200",
+          "outcome" : "succeeded",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-92f16eda79bc03021560dc30fd333944",
+          "sessionPublication" : {
+            "catalogGeneration" : "1",
+            "manifestSha256" : "31e155934717d29b388c87a7c8c27b76d1dd258641491b6c58b51acc30df2ea6",
+            "reasonCode" : null,
+            "state" : "published"
+          },
+          "startedAtUtc" : "2026-09-25T00:00:00Z",
+          "state" : "succeeded",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-83405c84ff74",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "flash"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.status",
+      "name" : "alias.status",
+      "params" : {
+        "jobId" : "job-92f16eda79bc03021560dc30fd333944"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "artifacts" : [
+            {
+              "artifactId" : "ART-8948cb68870c354de1e013684079135d",
+              "byteCount" : "1695",
+              "bytesVerified" : true,
+              "mediaType" : "application/json",
+              "name" : "flash-report.json",
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-8948cb68870c354de1e013684079135d",
+              "sha256" : "327b1d6de9ccdd9faa6019b443e22ddf77f4a32ff9f9cd8cd26685d8f586ad53",
+              "status" : "published"
+            },
+            {
+              "artifactId" : "ART-387495cb9dea71a27aa05184dd002f41",
+              "byteCount" : "940",
+              "bytesVerified" : true,
+              "mediaType" : "application/json",
+              "name" : "post-flash-facts.json",
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-387495cb9dea71a27aa05184dd002f41",
+              "sha256" : "fc6cadaa95a84374062c983085561577e3801654dfbffe0915c100e65c3cd695",
+              "status" : "published"
+            },
+            {
+              "artifactId" : "ART-MISSING-5d3e678a6c92a786164a8390c1556c35",
+              "byteCount" : "0",
+              "bytesVerified" : false,
+              "mediaType" : "text/plain",
+              "name" : "post-flash-hilog.txt",
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-MISSING-5d3e678a6c92a786164a8390c1556c35",
+              "sha256" : "",
+              "status" : "missing"
+            }
+          ],
+          "cleanup" : [
+
+          ],
+          "evidence" : {
+            "actualEffect" : "destructive",
+            "actualStepKinds" : [
+              "waitForReconnect",
+              "probeDevice",
+              "flashPartition",
+              "verifyRemoteState",
+              "rebootDevice"
+            ],
+            "artifacts" : [
+              {
+                "bindingRevision" : 1,
+                "byteCount" : "940",
+                "bytesVerified" : true,
+                "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+                "providerId" : "arkforge",
+                "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-387495cb9dea71a27aa05184dd002f41",
+                "sha256" : "fc6cadaa95a84374062c983085561577e3801654dfbffe0915c100e65c3cd695",
+                "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetId" : "TGT-83405c84ff74"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : "1695",
+                "bytesVerified" : true,
+                "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+                "providerId" : "arkforge",
+                "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-8948cb68870c354de1e013684079135d",
+                "sha256" : "327b1d6de9ccdd9faa6019b443e22ddf77f4a32ff9f9cd8cd26685d8f586ad53",
+                "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetId" : "TGT-83405c84ff74"
+              }
+            ],
+            "authority" : {
+              "admittedAtUtc" : "2026-09-25T00:00:00Z",
+              "artifactDigest" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+              "consumptionFingerprintSha256" : "0576d060088fc6c77972f73f157f1f3d485558738dac493505acd01a851794fa",
+              "kind" : "runtimeCapability",
+              "planDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+              "recoveryEpoch" : null,
+              "reference" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+              "reservationId" : "idem-flash-alias-basic",
+              "stepSetDigest" : "eab9d8c4631a991bbb0c2ae089dbdd15c164b01465f0b335a9b6fc988c1c2782",
+              "targetBindingDigest" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+              "useOrdinal" : 1,
+              "validUntilUtc" : "2026-09-25T04:00:00Z"
+            },
+            "bindingRevision" : 1,
+            "blockers" : [
+
+            ],
+            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "executionMode" : "execute",
+            "finishedAtUtc" : "2026-09-25T00:00:00Z",
+            "firstEvidenceStepAtUtc" : "2026-09-25T00:00:00Z",
+            "inventoryAvailable" : true,
+            "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+            "missingRequiredArtifacts" : [
+
+            ],
+            "observation" : {
+              "bindingRevision" : 1,
+              "confirmationMethod" : "machineReadback",
+              "confirmedAtUtc" : "2026-09-25T00:00:00Z",
+              "firmware" : "OpenHarmony-7.0.0.36",
+              "model" : "DAYU200",
+              "preflightSteps" : [
+
+              ],
+              "providerId" : "arkforge",
+              "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+              "targetId" : "TGT-83405c84ff74",
+              "toolSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "toolVersion" : "arkforged native RockUSB",
+              "transport" : "usb"
+            },
+            "operationReference" : "flash.dayu200",
+            "outcomeUnknown" : false,
+            "parameters" : {
+              "deviceProfile" : "dayu200",
+              "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+              "partitionPlan" : [
+                "uboot",
+                "resource",
+                "boot_linux",
+                "ramdisk",
+                "system",
+                "vendor",
+                "updater",
+                "chip_ckm",
+                "userdata"
+              ],
+              "postFlashVerification" : "basic"
+            },
+            "providerId" : "arkforge",
+            "recoveryEpoch" : null,
+            "schemaVersion" : "arkdeck.job-evidence/1",
+            "startedAtUtc" : "2026-09-25T00:00:00Z",
+            "status" : "verified",
+            "targetId" : "TGT-83405c84ff74",
+            "terminalState" : "succeeded",
+            "traceProbeAfter" : null,
+            "traceProbeBefore" : null
+          },
+          "job" : {
+            "actualEffect" : "destructive",
+            "createdAtUtc" : "2026-09-25T00:00:00Z",
+            "executionMode" : "execute",
+            "failure" : null,
+            "finishedAtUtc" : "2026-09-25T00:00:00Z",
+            "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+            "nextAction" : {
+              "kind" : "readResult",
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "reasonCode" : "job.resultAvailable",
+              "resource" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              }
+            },
+            "operation" : "flash.dayu200",
+            "outcome" : "succeeded",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : 0,
+            "processProgress" : null,
+            "recoveryEpochId" : null,
+            "resolvedByTargetAliasResolutionId" : null,
+            "schemaVersion" : "arkdeck.job-status/1",
+            "sessionId" : "session-job-92f16eda79bc03021560dc30fd333944",
+            "sessionPublication" : {
+              "catalogGeneration" : "1",
+              "manifestSha256" : "31e155934717d29b388c87a7c8c27b76d1dd258641491b6c58b51acc30df2ea6",
+              "reasonCode" : null,
+              "state" : "published"
+            },
+            "startedAtUtc" : "2026-09-25T00:00:00Z",
+            "state" : "succeeded",
+            "supersededByRecoveryEpochId" : null,
+            "targetId" : "TGT-83405c84ff74",
+            "threadId" : null,
+            "waitingForHuman" : false,
+            "workspaceKind" : "flash"
+          },
+          "nextAction" : null,
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.job-result/1",
+          "terminal" : true
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.result",
+      "name" : "alias.result",
+      "params" : {
+        "jobId" : "job-92f16eda79bc03021560dc30fd333944"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "actualStepKinds" : [
+            "waitForReconnect",
+            "probeDevice",
+            "flashPartition",
+            "verifyRemoteState",
+            "rebootDevice"
+          ],
+          "artifacts" : [
+            {
+              "bindingRevision" : 1,
+              "byteCount" : "940",
+              "bytesVerified" : true,
+              "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+              "providerId" : "arkforge",
+              "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-387495cb9dea71a27aa05184dd002f41",
+              "sha256" : "fc6cadaa95a84374062c983085561577e3801654dfbffe0915c100e65c3cd695",
+              "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+              "targetId" : "TGT-83405c84ff74"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : "1695",
+              "bytesVerified" : true,
+              "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+              "providerId" : "arkforge",
+              "reference" : "arkdeck-artifact://job-92f16eda79bc03021560dc30fd333944/ART-8948cb68870c354de1e013684079135d",
+              "sha256" : "327b1d6de9ccdd9faa6019b443e22ddf77f4a32ff9f9cd8cd26685d8f586ad53",
+              "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+              "targetId" : "TGT-83405c84ff74"
+            }
+          ],
+          "authority" : {
+            "admittedAtUtc" : "2026-09-25T00:00:00Z",
+            "artifactDigest" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+            "consumptionFingerprintSha256" : "0576d060088fc6c77972f73f157f1f3d485558738dac493505acd01a851794fa",
+            "kind" : "runtimeCapability",
+            "planDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+            "recoveryEpoch" : null,
+            "reference" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+            "reservationId" : "idem-flash-alias-basic",
+            "stepSetDigest" : "eab9d8c4631a991bbb0c2ae089dbdd15c164b01465f0b335a9b6fc988c1c2782",
+            "targetBindingDigest" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+            "useOrdinal" : 1,
+            "validUntilUtc" : "2026-09-25T04:00:00Z"
+          },
+          "bindingRevision" : 1,
+          "blockers" : [
+
+          ],
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "executionMode" : "execute",
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "firstEvidenceStepAtUtc" : "2026-09-25T00:00:00Z",
+          "inventoryAvailable" : true,
+          "jobId" : "job-92f16eda79bc03021560dc30fd333944",
+          "missingRequiredArtifacts" : [
+
+          ],
+          "observation" : {
+            "bindingRevision" : 1,
+            "confirmationMethod" : "machineReadback",
+            "confirmedAtUtc" : "2026-09-25T00:00:00Z",
+            "firmware" : "OpenHarmony-7.0.0.36",
+            "model" : "DAYU200",
+            "preflightSteps" : [
+
+            ],
+            "providerId" : "arkforge",
+            "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+            "targetId" : "TGT-83405c84ff74",
+            "toolSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "toolVersion" : "arkforged native RockUSB",
+            "transport" : "usb"
+          },
+          "operationReference" : "flash.dayu200",
+          "outcomeUnknown" : false,
+          "parameters" : {
+            "deviceProfile" : "dayu200",
+            "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "partitionPlan" : [
+              "uboot",
+              "resource",
+              "boot_linux",
+              "ramdisk",
+              "system",
+              "vendor",
+              "updater",
+              "chip_ckm",
+              "userdata"
+            ],
+            "postFlashVerification" : "basic"
+          },
+          "providerId" : "arkforge",
+          "recoveryEpoch" : null,
+          "schemaVersion" : "arkdeck.job-evidence/1",
+          "startedAtUtc" : "2026-09-25T00:00:00Z",
+          "status" : "verified",
+          "targetId" : "TGT-83405c84ff74",
+          "terminalState" : "succeeded",
+          "traceProbeAfter" : null,
+          "traceProbeBefore" : null
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.evidence",
+      "name" : "alias.evidence",
+      "params" : {
+        "jobId" : "job-92f16eda79bc03021560dc30fd333944"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "fc6cadaa95a84374062c983085561577e3801654dfbffe0915c100e65c3cd695",
+              "artifactId" : "ART-387495cb9dea71a27aa05184dd002f41",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetId" : "TGT-83405c84ff74"
+              },
+              "byteCount" : 940,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "lease" : "lease-v1:job-92f16eda79bc03021560dc30fd333944:ART-387495cb9dea71a27aa05184dd002f41",
+              "mediaType" : "application/json",
+              "name" : "post-flash-facts.json",
+              "observationWindow" : null,
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "arkforge",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-10-02T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "flash.dayu200",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "327b1d6de9ccdd9faa6019b443e22ddf77f4a32ff9f9cd8cd26685d8f586ad53",
+              "artifactId" : "ART-8948cb68870c354de1e013684079135d",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetId" : "TGT-83405c84ff74"
+              },
+              "byteCount" : 1695,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "lease" : "lease-v1:job-92f16eda79bc03021560dc30fd333944:ART-8948cb68870c354de1e013684079135d",
+              "mediaType" : "application/json",
+              "name" : "flash-report.json",
+              "observationWindow" : null,
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "arkforge",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-10-02T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "flash.dayu200",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : null,
+              "artifactId" : "ART-MISSING-5d3e678a6c92a786164a8390c1556c35",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetId" : "TGT-83405c84ff74"
+              },
+              "byteCount" : 0,
+              "createdAtUtc" : "2026-09-25T00:00:00Z",
+              "lease" : null,
+              "mediaType" : "text/plain",
+              "name" : "post-flash-hilog.txt",
+              "observationWindow" : null,
+              "owner" : {
+                "id" : "job-92f16eda79bc03021560dc30fd333944",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "arkforge",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-10-02T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "flash.dayu200",
+              "status" : "missing"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "artifact.list",
+      "name" : "alias.artifacts",
+      "params" : {
+        "owner" : {
+          "id" : "job-92f16eda79bc03021560dc30fd333944",
+          "kind" : "job"
+        },
+        "pageSize" : 1000
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : [
+          {
+            "capabilityId" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+            "consumptionCount" : 1,
+            "effectCeiling" : "destructive",
+            "lineageAllowsNewExecution" : false,
+            "lineageBlocker" : "maximumUses exhausted",
+            "maximumUses" : 1,
+            "remainingUses" : 0
+          }
+        ]
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "capability.list",
+      "name" : "capabilities",
+      "params" : {
+
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    }
+  ]
+}

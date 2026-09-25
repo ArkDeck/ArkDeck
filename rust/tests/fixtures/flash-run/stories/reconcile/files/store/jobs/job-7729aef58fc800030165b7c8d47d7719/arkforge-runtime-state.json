@@ -1,0 +1,18 @@
+{
+  "execution" : {
+    "arkDeckJobID" : "job-7729aef58fc800030165b7c8d47d7719",
+    "artifactProfileID" : "org.openharmony.dayu200@1.0.0",
+    "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "bindingRevision" : 1,
+    "daemonJobID" : "JOB-FLASH-3",
+    "executionPurpose" : "primaryFlash",
+    "observationMode" : "loader",
+    "planID" : "PLAN-FLASH-3",
+    "planSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+    "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetID" : "TGT-83405c84ff74",
+    "toolchainSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "usbTopology" : "42"
+  },
+  "schemaVersion" : "arkdeck-arkforge-runtime-state\/v1"
+}

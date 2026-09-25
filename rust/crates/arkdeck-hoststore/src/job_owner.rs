@@ -22,6 +22,10 @@ use std::{
 #[path = "mutation_state_continuity.rs"]
 mod mutation_state_continuity;
 
+#[cfg(target_os = "macos")]
+#[path = "job_flash_state.rs"]
+mod flash_state;
+
 #[cfg(test)]
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;

@@ -144,7 +144,9 @@ mod device_steps;
 #[cfg(target_os = "macos")]
 mod job_admission;
 #[cfg(target_os = "macos")]
-pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtime_now};
+pub use job_admission::{
+    AdmissionRefusal, FlashAdmitter, JobAdmitter, MutationAuthority, runtime_now,
+};
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
