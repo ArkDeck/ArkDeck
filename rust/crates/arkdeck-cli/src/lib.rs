@@ -89,6 +89,7 @@ pub mod runtime_service;
 pub mod runtime_service_install;
 #[cfg(target_os = "macos")]
 pub mod runtime_service_verify;
+pub mod signing_leaves;
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
 pub const CLI_VERSION: &str = "0.1.0";
@@ -836,6 +837,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "service", "uninstall"] => "runtime.service.uninstall",
         // §12's superseded spelling of `runtime service`: the same handler,
         // reporting the name the caller typed (Swift `runAgentDaemon`).
+        ["runtime", "signing", "status"] => "runtime.signing.status",
+        ["signing", "status"] => "signing.status",
         ["agentd", "install"] => "agentd.install",
         ["agentd", "update"] => "agentd.update",
         ["agentd", "restart"] => "agentd.restart",
@@ -894,6 +897,16 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         let mut error = CliError::new(
             "invalidOption",
             "--json belongs only to the leaves that declare it and excludes --output",
+        );
+        error.command = Some(command);
+        return Err(error);
+    }
+    // Neither do the signing leaves: Swift's registry declares no
+    // correlation identity for them, and its refusal is the one reported.
+    if signing_leaves::serves(command) && (id.is_some() || socket.is_some()) {
+        let mut error = CliError::new(
+            "invalidOption",
+            "the signing leaves take no --control-request-id or --socket",
         );
         error.command = Some(command);
         return Err(error);

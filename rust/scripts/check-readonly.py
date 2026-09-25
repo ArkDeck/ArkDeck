@@ -85,8 +85,12 @@ def assert_boundaries() -> None:
         # The zero-Runtime `runtime service install` pins its bundle and
         # publishes the first HDC selection, and `uninstall` releases the pins,
         # through the Bootstrap registry's one owner (协调会话 2026-09-26); the
-        # CLI links no Runtime store (never arkdeck-hoststore).
-        "arkdeck-cli": {"arkdeck-bootstrap", "arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
+        # CLI links no Runtime store (never arkdeck-hoststore). Q8: the signing
+        # leaves read the workspace provider's preset store and owner.
+        "arkdeck-cli": {
+            "arkdeck-bootstrap", "arkdeck-contract", "arkdeck-client", "arkdeck-platform",
+            "arkdeck-provider-workspace",
+        },
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore", "arkdeck-provider-arkforge"},
         # The ArkForge lane (lane D) speaks to `arkforged` only through
         # ArkForge's own client crate; no other ArkDeck crate reaches ArkForge.
