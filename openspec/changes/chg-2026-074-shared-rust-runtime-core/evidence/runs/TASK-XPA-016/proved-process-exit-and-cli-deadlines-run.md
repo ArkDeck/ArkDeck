@@ -196,4 +196,7 @@ Logs: `/private/tmp/arkdeck-s26-*.log`; probe builds, sources and runs:
 
 ## CI
 
-Pending (this PR).
+PR #2174, head `bea19bb50`, merged as `681988448`: Agent PR 36100031789, SDD Guard
+36100031801 (`guard`, `ds-tokens`) and Swift CI 36100031948 all succeeded (plan; Rust
+host-independent checks; Rust workspace on ubuntu-latest, windows-latest and macos-26; `swift`
+aggregate; swift-tests, ds-interactions and app-build skipped by the plan).

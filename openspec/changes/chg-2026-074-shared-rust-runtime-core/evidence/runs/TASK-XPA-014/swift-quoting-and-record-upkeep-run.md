@@ -129,4 +129,7 @@ outputs).
 
 ## CI
 
-Pending (this PR).
+PR #2175, head `c45f5d3b0`, merged as `daed1b7a4`: Agent PR 36101338222, SDD Guard
+36101338205 (`guard`, `ds-tokens`) and Swift CI 36101338648 all succeeded (plan; Rust
+host-independent checks; Rust workspace on ubuntu-latest, windows-latest and macos-26; `swift`
+aggregate; swift-tests, ds-interactions and app-build skipped by the plan).

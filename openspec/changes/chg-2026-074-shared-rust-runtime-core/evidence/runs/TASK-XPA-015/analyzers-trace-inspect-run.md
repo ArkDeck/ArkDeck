@@ -1171,3 +1171,157 @@ and Swift CI 36094205038 all succeeded at `5f797e59a` (plan; Rust
 host-independent; Rust workspace on ubuntu-latest, windows-latest and
 macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
 app-build skipped by plan).
+
+## 9. `trace.inspect` from the reviewed ArkTrace CLI: measured, and kept refused
+
+Base: protected `main` `aa2afe6ba` (#2173). No production, test or contract
+input change: the Rust daemon keeps §4's answer (option (c)). This section
+records why option (b) was not taken.
+
+### The ruling, and what it assumed
+
+The coordinator's delegated ruling (2026-09-25) chose option (b) of §4: answer
+`trace.inspect` from the reviewed CLI the daemon loaded and verified, through
+§7's trust chain, with `engine.sourceRevision` taken from the distribution
+manifest's `source.revision` as a declared difference; Swift's handler order
+and refusals; answers compared byte for byte with a Swift recording. It set
+two stops: real schema fingerprints or data quality that do not match, and a
+(b) that needs an ArkTrace upstream change — in either case keep (c) and do
+not land half of (b). Both stops hold.
+
+### What was measured
+
+On this Mac, over the reviewed distribution the installed daemon names
+(manifest `49a69405…`, `source.revision` `61d0f2ae…`, trace_streamer 4.3.7
+`7c5ed515…` with build recipe `e4fec8cc…`), copied to
+`/private/tmp/arkdeck-s27-probe/dist` and read only from there, and the
+repository's three traces (`Packages/ArkDeckKit/Fixtures/traces/`:
+`zlib.htrace`, `hiprofiler_data_ability.htrace`, `trace_small_10.systrace`),
+each named by its `/.vol` inode alias as the Runtime names a source. Swift's
+engine is ArkTrace `9172c952…`, the revision ArkDeck links (`Package.resolved`,
+`ArkDeckTraceConfiguration.arkTraceSourceRevision`); the reviewed CLI's
+revision is its ancestor, 74 commits older.
+
+1. **Swift's inspector over the reviewed distribution refuses before it
+   parses.** `ArkDeckTraceOfflineInspectionService` composed as
+   `ProductTraceOfflineInspector` composes it (the distribution's
+   `ArkTraceCLI.app`, the contract read from its manifest with the loader's
+   adapter versions `1`, `2` and index version 3), run through
+   `run-swiftpm.sh` from an uncommitted `ArkDeckTraceAdapterTests` host test:
+   `traceStreamerIdentityMismatch` ("TraceStreamer identity does not match its
+   pinned manifest", field `buildRecipeVersion`). ArkTrace `9172c952` accepts
+   only trace_streamer build recipe `a2e47752…`
+   (`TraceStreamerProcessParser.supportedBuildRecipeVersion`); ArkTrace
+   `61d0f2ae`, which built the reviewed distribution, pinned `e4fec8cc…`. So
+   the Swift daemon built from `main` answers every request that reaches its
+   inspector over this distribution `operationFailed` "Trace inspection failed
+   without creating evidence". The App's own parser
+   (`/Applications/ArkDeck.app`, recipe `a2e47752…`) cannot stand in: it is
+   signed `app-sandbox` + `inherit` and reports no version outside the App
+   (`reportedVersion`, `unreported`).
+2. **With the reviewed parser admitted, Swift's inspection service refuses
+   every repository trace.** A measurement-only build of ArkTrace `9172c952`
+   (`/private/tmp/arkdeck-s27-arktrace-9172`: the recipe pin changed to
+   `e4fec8cc…`, nothing else, plus two instruments — one calls
+   `TraceOfflineInspectionService.inspect` as the adapter does, one prints the
+   `repository.metadata()` it reads): `traceDatabaseInvalid`,
+   `dataQualityNotMachineSafe`, for all three traces. Every issue ArkTrace's
+   schema adapter records carries a message ("callstack.ts: quality probe
+   truncated after 1024 rows; …"), and `TraceOfflineInspectionQualityIssue`
+   admits only issues without one. Swift's inspection therefore answers only a
+   Trace with no data-quality issue; these three have six to eight each.
+3. **The CLI's values, command by command.** Both CLIs were run with `--json
+   --no-cache --timeout-ms 30000 --max-rows 1000 --max-events 10000
+   --max-output-bytes 8388608` and only `PATH`, `LANG`, `LC_ALL`, `HOME`,
+   `CFFIXED_USER_HOME` and `TMPDIR` set: the reviewed one, and the
+   measurement build of `9172c952` placed in an `ArkTraceCLI.app` beside the
+   reviewed parser.
+   - `inspect` — in the reviewed CLI's closed command set, unlike §7's
+     `summary` the command that reports the metadata the inspection reads —
+     carries every field of the inspection report (the trace's digest, byte
+     count, duration, schema fingerprint and parser; the parser adapter and
+     build recipe, schema adapter, index version and upstream database digest
+     and size; the five capabilities; the metadata's data quality, messages
+     written `null`). At `9172c952` it equals the engine's metadata field for
+     field on all three traces.
+   - The reviewed CLI's `inspect` equals it on `zlib.htrace` and
+     `trace_small_10.systrace`, not on `hiprofiler_data_ability.htrace`:
+     `processCounters` `false` against the engine's `true`, and four
+     data-quality issues (`process_measure_filter.{id,ipid,name}` truncated,
+     `stat.stat_type` dropped) against the engine's eight (the four
+     `process_measure.*` probes as well): ArkTrace moved process counters to
+     `process_measure` after `61d0f2ae`.
+   - `summary` adds the summary's own issues (`unavailableValue` for
+     `process.start_ts` and `thread.start_ts`) to the metadata's, so it is not
+     the inspection's data quality at any revision.
+   - Duration, schema fingerprint (`cb34d8b6…` for all three), index and
+     adapter versions and the upstream database identity agree across both
+     revisions on all three traces.
+
+| Trace | issues: `summary` 61d0 / `inspect` 61d0 / `inspect` 9172 / engine 9172 | `processCounters` 61d0 / 9172 |
+| --- | --- | --- |
+| `zlib.htrace` | 8 / 6 / 6 / 6 | false / false |
+| `hiprofiler_data_ability.htrace` | 6 / 4 / 8 / 8 | false / true |
+| `trace_small_10.systrace` | 9 / 7 / 7 / 7 | false / false |
+
+### Why (b) is not taken
+
+- The first stop holds: the reviewed CLI reports other capabilities and data
+  quality than the engine the Swift daemon links, for a repository trace. An
+  answer from it would state capabilities the Swift engine does not.
+- There is no Swift success to replay. Over the reviewed distribution Swift
+  refuses every inspection (the recipe pin), and over any distribution every
+  Trace with a data-quality issue (the messages). A CLI-backed inspector would
+  answer where Swift refuses; replaying Swift would mean refusing both.
+- The second stop holds: a faithful (b) needs ArkTrace-side action this lane
+  cannot take — (i) a reviewed ArkTrace CLI distribution built from the
+  revision ArkDeck links, so that its parser passes the linked pin, its
+  values are the linked engine's and `engine.sourceRevision` agrees as well
+  (a signed, notarized release: the maintainer's); and (ii) a decision on
+  the message refusal: either ArkTrace drops the messages at that boundary,
+  as its CLI's machine contract does (an ArkTrace change), or the refusal is
+  the contract and a Rust inspector refuses every Trace whose `inspect`
+  reports an issue.
+- Nothing regresses: on this host neither daemon answers a Trace — Swift
+  `operationFailed` after it reads the request, Rust `operationUnavailable`
+  before it (§4's declared difference, now with its cause).
+
+### For the slice after those decisions
+
+`arktrace inspect --json --no-cache …` over the source's inode alias through
+§7's verified canonical-path launch, the pinned files, trees and bundle held;
+the envelope validated as closed; the report mapped field for field (the
+adapter's issue order, Swift's `RuntimeTraceInspectionReport` checks, and
+the refusal above for issues if that is the decision); the handler's order
+and refusals as `RuntimeTraceInspectionResourceHandler`'s, recorded with an
+inspector composed in `TraceInspectOracleContractTests`. Contract inputs it
+needs: Swift answers `resourceNotFound` for a missing Job or Artifact, which
+the published `trace.inspect` `errorCode` does not list, so those answers need
+frames in `Fixtures/ControlFrames/trace.inspect.jsonl`, the method schema's
+enum widened and `spec/baselines/**` regenerated.
+
+### Evidence
+
+- Swift adapter over the reviewed distribution: log
+  `/private/tmp/arkdeck-s27-swift-probe.log` (the refusal of item 1); over the
+  App's parser: `/private/tmp/arkdeck-s27-swift-probe-2.log`.
+- Measurement build and its outputs: `/private/tmp/arkdeck-s27-arktrace-9172`
+  (`git diff` there shows the one pin change and the two instruments),
+  `/private/tmp/arkdeck-s27-probe/out/` — `lib-*` (item 2's refusals),
+  `meta-*` (the engine's metadata), `inspect61d0-*`, `inspect9172-*`,
+  `cli61d0-*`, `cli9172-*` (item 3). The reviewed CLI's two runs of
+  `summary` on `zlib.htrace` were byte-identical (2,208 bytes, §7's size).
+- Nothing installed was run or written: the reviewed distribution and the
+  App's parser were copied to `/private/tmp` and run from there.
+
+### Checks (local, targeted)
+
+- `sh scripts/check-sdd.sh` (validation venv): exit 0, 0 errors, 0 warnings;
+  log `/private/tmp/arkdeck-s27-check-sdd.log`. `git diff --check`: clean.
+- Not run: Rust and Swift tests (no code changes; the host test of item 1
+  was a measurement and is not committed), `generate-contract.py` (no contract
+  input change), the App, a device.
+
+### CI
+
+Pending (this PR).
