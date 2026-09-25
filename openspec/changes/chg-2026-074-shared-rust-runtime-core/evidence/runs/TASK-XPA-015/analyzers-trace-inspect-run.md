@@ -1166,4 +1166,8 @@ only the maintainer's word on `engine.sourceRevision`.
 
 ### CI
 
-Pending.
+PR #2169, merged as `a5a98af19`: Agent PR 36094205142, SDD Guard 36094204890
+and Swift CI 36094205038 all succeeded at `5f797e59a` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).

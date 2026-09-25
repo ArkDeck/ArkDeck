@@ -2,6 +2,7 @@
 //! durable reader runs before it decodes a document. It refuses a member name
 //! repeated in one object at any depth and malformed input, in Swift's words
 //! and at Swift's byte offsets, and says nothing about the document's shape.
+use unicode_segmentation::UnicodeSegmentation;
 
 /// Swift `StrictJSONError`.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,27 +24,87 @@ impl StrictJsonError {
 }
 
 /// Swift's `debugDescription` of a `String`, which interpolating an error
-/// case uses for its payload: quoted, with `Unicode.Scalar.escaped`'s escapes.
+/// case uses for its payload (Swift 6.4's `String.debugDescription`, recorded
+/// for every scalar). Each scalar is spelled as
+/// `Unicode.Scalar.escaped(asASCII: false)` spells it — `\0`, `\t`, `\n`,
+/// `\r`, `\"`, `\'` and `\\`, any other ASCII control as `\u{XX}` with two
+/// upper-case digits, anything else as itself — except that a scalar left as
+/// itself may not make one grapheme with the opening quote or an escape
+/// before it, nor with the closing quote (or an escape) after it: such a
+/// scalar is spelled `\u{XXXX}` instead, eight digits beyond the Basic
+/// Multilingual Plane. That is a mark or joiner the text begins with or that
+/// follows an escape, and a prepended mark the text ends with.
 pub(crate) fn swift_quoted(text: &str) -> String {
     let mut quoted = String::with_capacity(text.len() + 2);
     quoted.push('"');
+    // Whether what was written last is the opening quote or an escape.
+    let mut after_escape = true;
     for scalar in text.chars() {
-        match scalar {
-            '\\' => quoted.push_str("\\\\"),
-            '\t' => quoted.push_str("\\t"),
-            '\n' => quoted.push_str("\\n"),
-            '\r' => quoted.push_str("\\r"),
-            '"' => quoted.push_str("\\\""),
-            '\'' => quoted.push_str("\\'"),
-            '\0' => quoted.push_str("\\0"),
-            control if control.is_ascii_control() => {
-                quoted.push_str(&format!("\\u{{{:x}}}", u32::from(control)));
-            }
-            other => quoted.push(other),
+        if let Some(escape) = ascii_escape(scalar) {
+            quoted.push_str(&escape);
+            after_escape = true;
+        } else if after_escape && joins(quoted.chars().next_back(), scalar) {
+            quoted.push_str(&unicode_escape(scalar));
+        } else {
+            quoted.push(scalar);
+            after_escape = false;
         }
     }
+    // Nor may the last scalar left as itself join what follows it: the
+    // closing quote, then the escape that took its successor's place.
+    let mut tail = String::new();
+    let mut next = '"';
+    while let Some(last) = quoted.chars().next_back()
+        && joins(Some(last), next)
+    {
+        quoted.pop();
+        tail.insert_str(0, &unicode_escape(last));
+        next = '\\';
+    }
+    quoted.push_str(&tail);
     quoted.push('"');
     quoted
+}
+
+/// `Unicode.Scalar.escaped(asASCII: false)` where it escapes, which is ASCII
+/// only.
+fn ascii_escape(scalar: char) -> Option<String> {
+    Some(match scalar {
+        '\\' => "\\\\".into(),
+        '\'' => "\\'".into(),
+        '"' => "\\\"".into(),
+        ' '..='~' => return None,
+        '\0' => "\\0".into(),
+        '\n' => "\\n".into(),
+        '\r' => "\\r".into(),
+        '\t' => "\\t".into(),
+        control if control.is_ascii() => format!("\\u{{{:02X}}}", u32::from(control)),
+        _ => return None,
+    })
+}
+
+/// `Unicode.Scalar.escaped(asASCII: true)` of a scalar beyond ASCII.
+fn unicode_escape(scalar: char) -> String {
+    let value = u32::from(scalar);
+    if value <= 0xFFFF {
+        format!("\\u{{{value:04X}}}")
+    } else {
+        format!("\\u{{{value:08X}}}")
+    }
+}
+
+/// Whether the two scalars side by side make one extended grapheme cluster:
+/// Swift's `_GraphemeBreakingState().shouldBreak(between:and:)` answering
+/// no. Two scalars never meet the Indic conjunct rule, the one place Swift's
+/// runtime and the segmenter part (`session_graphemes`).
+fn joins(left: Option<char>, right: char) -> bool {
+    let Some(left) = left else {
+        return false;
+    };
+    let mut pair = String::with_capacity(8);
+    pair.push(left);
+    pair.push(right);
+    pair.graphemes(true).nth(1).is_none()
 }
 
 /// Validates `bytes` as one JSON value without duplicate member names.
@@ -345,11 +406,36 @@ mod tests {
         );
     }
 
+    /// Recorded from Swift 6.4, `String(reflecting:)` (what interpolating an
+    /// error case's payload prints); every scalar alone, before and after
+    /// ASCII, and twice agreed with Swift once, exhaustively
+    /// (`evidence/runs/TASK-XPA-014/swift-quoting-and-record-upkeep-run.md`).
     #[test]
     fn swift_quoting_escapes_what_swift_escapes() {
-        assert_eq!(
-            swift_quoted("a\"b\\c'd\te\u{1b}"),
-            r#""a\"b\\c\'d\te\u{1b}""#
-        );
+        for (text, swift) in [
+            ("a\"b\\c'd\te\u{1b}", r#""a\"b\\c\'d\te\u{1B}""#),
+            // Any other ASCII control: two upper-case digits.
+            (
+                "\u{1}\u{b}\u{10}\u{1f}\u{7f}\0\r\n",
+                r#""\u{01}\u{0B}\u{10}\u{1F}\u{7F}\0\r\n""#,
+            ),
+            // Beyond ASCII, as itself, controls and marks after a base included.
+            (
+                "x\u{85}y\u{2028}z\u{feff}\u{e9}e\u{301}",
+                "\"x\u{85}y\u{2028}z\u{feff}\u{e9}e\u{301}\"",
+            ),
+            // Nothing may join the opening quote or an escape before it...
+            ("\u{301}x", r#""\u{0301}x""#),
+            ("\u{1b}\u{301}\u{301}", r#""\u{1B}\u{0301}\u{0301}""#),
+            ("\u{200d}\u{903}", r#""\u{200D}\u{0903}""#),
+            ("\u{1f3fb}x", r#""\u{0001F3FB}x""#),
+            // ...nor the closing quote, or an escape, after it.
+            ("a\u{600}\u{600}", r#""a\u{0600}\u{0600}""#),
+            ("\u{600}a\u{600}", "\"\u{600}a\\u{0600}\""),
+            ("a\u{110bd}", r#""a\u{000110BD}""#),
+            ("a\u{110bd}b", "\"a\u{110bd}b\""),
+        ] {
+            assert_eq!(swift_quoted(text), swift, "{text:?}");
+        }
     }
 }

@@ -260,4 +260,9 @@ Not run:
 
 ## CI
 
-CI: pending.
+PR #2153. Its first head `8f8cabe6e`: Agent PR 36055652647, SDD Guard 36055652592 and Swift
+CI 36055653203 all succeeded. Rebased onto #2152 as `ed8272f01` and merged as `4b89780f3`:
+Agent PR 36057643861, SDD Guard 36057643799 (`guard`, `ds-tokens`) and Swift CI 36057644390 all
+succeeded (plan; swift-tests; ds-interactions; Rust host-independent checks; Rust workspace on
+ubuntu-latest, windows-latest and macos-26; `swift` aggregate; app-build skipped by the plan) —
+the verification of the rebased tree, which was not rebuilt locally (above).
