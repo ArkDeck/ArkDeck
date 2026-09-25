@@ -13,6 +13,10 @@ manifest in its own PR, and `origin/main` never enters: a merge elsewhere cannot
 make this checkout red. The published-versus-candidate comparison is
 check-contracts.py's job, later in the same lane.
 
+The tests run with `--no-fail-fast`. A red run then takes longer, but it shows
+every failing test binary at once, where cargo would otherwise stop at the
+first and hide the rest until the next run.
+
 Exit codes are cargo's when the tests run, 1 when the manifest or bindings need
 regeneration or cannot be read.
 """
@@ -48,7 +52,9 @@ def main(run=subprocess.run, generator=None) -> int:
         )
         return 1
     return run(
-        ("cargo", "test", "--workspace"), cwd=REPO_ROOT / "rust", check=False
+        ("cargo", "test", "--workspace", "--no-fail-fast"),
+        cwd=REPO_ROOT / "rust",
+        check=False,
     ).returncode
 
 

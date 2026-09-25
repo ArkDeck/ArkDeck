@@ -38,6 +38,14 @@ RUST_CONTRACT_INPUT_PREFIXES = (
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/",
 )
+# The machine-contract bundle the Rust export renders. Its test holds every
+# product to `rust/tests/fixtures/contracts-bundle/owned.json` or to the
+# committed file, and check-contracts.py holds that table to the committed
+# bundle. A PR can regenerate products without touching rust/: Swift's export
+# rewrites them when a registry or the App's capability table changes. Such a
+# PR still runs the Rust lane, so the table and the Rust copies cannot drift
+# into main and fail the next unrelated Rust PR.
+RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
@@ -143,6 +151,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         # only rust/spec misses source, schema, fixture and Catalog-only edits.
         if (
             path.startswith(RUST_CONTRACT_INPUT_PREFIXES)
+            or path.startswith(RUST_BUNDLE_PREFIXES)
             or path in RUST_CONTRACT_INPUT_FILES
             or (
                 path.endswith(".swift")

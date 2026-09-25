@@ -223,7 +223,8 @@ class ContractChecksTests(unittest.TestCase):
             return subprocess.CompletedProcess(argv, 7)
 
         self.assertEqual(workspace.main(run=run, generator=contract), 7)
-        self.assertEqual(calls, [(("cargo", "test", "--workspace"), self.root / "rust")])
+        self.assertEqual(
+            calls, [(("cargo", "test", "--workspace", "--no-fail-fast"), self.root / "rust")])
         calls.clear()
         self.change_candidate()
         with contextlib.redirect_stderr(io.StringIO()) as stderr:
