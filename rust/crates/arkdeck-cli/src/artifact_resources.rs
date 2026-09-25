@@ -29,7 +29,7 @@ fn text(v: &Value, maximum: usize) -> bool {
     v.as_str()
         .is_some_and(|s| !s.is_empty() && s.len() <= maximum)
 }
-fn owner(v: &Value) -> bool {
+pub(crate) fn owner(v: &Value) -> bool {
     if !keys(v, &["kind", "id"]) {
         return false;
     }

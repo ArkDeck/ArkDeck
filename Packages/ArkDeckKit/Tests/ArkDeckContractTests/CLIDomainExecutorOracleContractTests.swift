@@ -647,7 +647,7 @@ final class CLIDomainExecutorOracleContractTests: XCTestCase {
 }
 
 /// Reads of a fixed clock, one second apart.
-private final class CountingClock: @unchecked Sendable {
+final class CountingClock: @unchecked Sendable {
   private let lock = NSLock()
   private var count = 0
 
@@ -666,7 +666,7 @@ private final class CountingClock: @unchecked Sendable {
 /// current Runtime answers it, unless the script's next entry is `health`;
 /// each business frame takes the script's next entry, which must name its
 /// method. `close` ends the connection unanswered.
-private final class ScriptedRuntime: @unchecked Sendable {
+final class ScriptedRuntime: @unchecked Sendable {
   enum Reply {
     case result(JSONValue)
     case error(String, String, [String: JSONValue]?)
