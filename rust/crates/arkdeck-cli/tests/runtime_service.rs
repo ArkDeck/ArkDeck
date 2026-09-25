@@ -11,6 +11,9 @@
 //! oracle (`rust/tests/fixtures/agent-execution/cases.json`).
 #![cfg(target_os = "macos")]
 
+use arkdeck_bootstrap::{
+    BundleRegistryReadStore, PublishedIdentities, ReferenceOwner, ToolRegistryStore,
+};
 use arkdeck_cli::runtime_service::{
     LaunchAgentPaths, PlainFailure, ServiceAnswer, ServiceHost, restart_leaf, status_leaf,
     verify_leaf,
@@ -493,6 +496,9 @@ fn host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
         launchctl: launchd,
         validate_daemon_bundle: &canonical,
         validate_facade: &signed,
+        // The stand-in trust for the registry's retained test bundles.
+        bundle_trust: Arc::new(|bundle: &Path| bundle.canonicalize()),
+        hdc_identities: None,
         now_utc: &fixed_now,
         connection_timeout: Duration::from_secs(5),
         poll_interval: Duration::from_millis(20),
@@ -1520,7 +1526,8 @@ fn restart_of_an_unready_service_touches_nothing() {
             failure: Some(PlainFailure {
                 exit_code: 69,
                 message: "LaunchAgent is not ready: LaunchAgent is not installed".into()
-            })
+            }),
+            refusal: None,
         }
     );
     assert!(launchd.calls().is_empty());
@@ -2573,47 +2580,530 @@ fn a_cutover_the_held_pass_refuses_starts_the_old_service_again() {
     assert!(!home.paths.cutover_snapshots.exists());
 }
 
+// MARK: - The typed install and the uninstall over the Bootstrap registry
+
+const REGISTERED_AT: &str = "2026-09-24T00:00:00Z";
+
+/// The home's Bootstrap registry as a caller left it before the typed
+/// install: helper bundles registered under the stand-in trust (their
+/// canonical path, never a production signature) and a native HDC published
+/// under a stand-in identity, through the same owners the install uses.
+struct Registry {
+    root: PathBuf,
+    hdc: PathBuf,
+    identities: PublishedIdentities,
+}
+
+impl Registry {
+    fn new(home: &Home) -> Self {
+        let root = home.paths.bootstrap_registry.clone();
+        arkdeck_bootstrap::create_store(&root).unwrap();
+        let hdc = home.root.join("tools/hdc");
+        directory(hdc.parent().unwrap());
+        fs::copy("/usr/bin/true", &hdc).unwrap();
+        fs::set_permissions(&hdc, fs::Permissions::from_mode(0o700)).unwrap();
+        let published = digest(&hdc);
+        let identities: PublishedIdentities = Arc::new(move |sha256: &str| {
+            (sha256 == published).then(
+                || json!({"version": "3.2.0f", "profileReferences": ["OPENHARMONY-TOOLS@0.5.0"]}),
+            )
+        });
+        Self {
+            root,
+            hdc,
+            identities,
+        }
+    }
+
+    fn bundles(&self) -> BundleRegistryReadStore {
+        BundleRegistryReadStore::open_existing(&self.root)
+            .unwrap()
+            .with_bundle_validator(Arc::new(|bundle: &Path| bundle.canonicalize()))
+    }
+
+    fn tools(&self) -> ToolRegistryStore {
+        ToolRegistryStore::open_existing(&self.root)
+            .unwrap()
+            .with_published_identities(self.identities.clone())
+    }
+
+    /// The helper retained and recorded as registration leaves it: its bytes
+    /// copied owner-only under `bundle-<digest>.app`, measured under the
+    /// stand-in trust, its record available at generation 1. (Registration
+    /// captures only a production-signed helper, which no test bundle is.)
+    fn register(&self, helper: &Helper) -> String {
+        fn copy(source: &Path, destination: &Path) {
+            fs::DirBuilder::new()
+                .mode(0o700)
+                .create(destination)
+                .unwrap();
+            for entry in fs::read_dir(source).unwrap() {
+                let entry = entry.unwrap();
+                let target = destination.join(entry.file_name());
+                let metadata = entry.metadata().unwrap();
+                if metadata.is_dir() {
+                    copy(&entry.path(), &target);
+                } else {
+                    fs::copy(entry.path(), &target).unwrap();
+                    let mode = if metadata.permissions().mode() & 0o111 == 0 {
+                        0o600
+                    } else {
+                        0o700
+                    };
+                    fs::set_permissions(&target, fs::Permissions::from_mode(mode)).unwrap();
+                }
+            }
+        }
+        let staged = self.root.join(".fixture-staging.app");
+        copy(&helper.bundle, &staged);
+        let content = arkdeck_bootstrap::bundle_content::inspect_bundle_content_with(
+            &staged,
+            &|bundle: &Path| bundle.canonicalize(),
+        )
+        .unwrap();
+        fs::rename(
+            &staged,
+            self.root.join(format!("bundle-{}.app", content.digest)),
+        )
+        .unwrap();
+        let reference = format!("bundle:sha256:{}", content.digest);
+        let path = self.root.join("bundles.json");
+        let mut index: Value = fs::read(&path).map_or_else(
+            |_| json!({"schemaVersion": "arkdeck.bootstrap-bundles/1", "records": []}),
+            |bytes| serde_json::from_slice(&bytes).unwrap(),
+        );
+        let records = index["records"].as_array_mut().unwrap();
+        records.push(json!({"reference": reference, "digest": content.digest,
+            "registeredAtUTC": REGISTERED_AT, "byteCount": content.byte_count,
+            "entryCount": content.entry_count, "generation": 1, "state": "available",
+            "references": []}));
+        records.sort_by(|a, b| a["reference"].as_str().cmp(&b["reference"].as_str()));
+        fs::write(&path, arkdeck_contract::canonical_json(&index).unwrap()).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        reference
+    }
+
+    fn register_hdc(&self) -> String {
+        self.tools().register(&self.hdc, REGISTERED_AT).unwrap()["toolRef"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    }
+
+    fn index(&self, name: &str) -> Value {
+        serde_json::from_slice(&fs::read(self.root.join(name)).unwrap()).unwrap()
+    }
+
+    fn references(&self, bundle: &str) -> Value {
+        self.index("bundles.json")["records"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|record| record["reference"] == bundle)
+            .unwrap()["references"]
+            .clone()
+    }
+
+    fn selection(&self) -> Value {
+        self.index("tools.json")
+            .get("selection")
+            .cloned()
+            .unwrap_or(Value::Null)
+    }
+
+    /// Holds the store's lock until the returned guard drops.
+    fn hold(root: &Path) -> arkdeck_platform::HostReadLock {
+        arkdeck_platform::HostDirectory::open(root)
+            .unwrap()
+            .lock_document(".lock")
+            .unwrap()
+    }
+}
+
+fn installation_pin() -> Value {
+    json!([{"kind": "installation", "id": "runtime-service-installation"}])
+}
+
+fn typed_host<'a>(home: &Home, launchd: &'a Launchd, registry: &Registry) -> ServiceHost<'a> {
+    let mut host = host(home, launchd);
+    host.hdc_identities = Some(registry.identities.clone());
+    host
+}
+
+fn typed_options(
+    bundle: &str,
+    generation: &str,
+    tool: &str,
+    tool_generation: &str,
+) -> Map<String, Value> {
+    Map::from_iter([
+        ("bundle".to_owned(), json!(bundle)),
+        ("bundleGeneration".to_owned(), json!(generation)),
+        ("tool".to_owned(), json!(tool)),
+        ("toolGeneration".to_owned(), json!(tool_generation)),
+    ])
+}
+
+/// The answer is Swift's session failure: the code, its words and
+/// `newDispatchCount: 0`, and nothing else.
+fn refused(answer: &ServiceAnswer, code: &str, message: &str) {
+    assert_eq!(answer.document, None);
+    assert_eq!(answer.failure, None);
+    let refusal = answer.refusal.clone().expect("a coded refusal");
+    assert_eq!((refusal.code, refusal.message.as_str()), (code, message));
+    assert_eq!(
+        Value::Object(refusal.details),
+        json!({"newDispatchCount": 0})
+    );
+}
+
 #[test]
-fn uninstall_removes_the_service_as_swift_does_unless_the_registry_pins_it() {
+fn the_typed_install_pins_its_bundle_selects_its_tool_installs_them_and_keeps_only_that_pin() {
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let earlier = Helper::new(&home, "earlier", &Daemon::Swift);
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let earlier_bundle = registry.register(&earlier);
+    let bundle = registry.register(&helper);
+    let tool = registry.register_hdc();
+    // An earlier attempt left its candidate pinned for the installation.
+    registry
+        .bundles()
+        .acquire(
+            &earlier_bundle,
+            "1",
+            &ReferenceOwner::service_installation(),
+        )
+        .unwrap();
+    let launchd = Launchd::default();
+    let answer = install_leaf(
+        &typed_host(&home, &launchd, &registry),
+        &typed_options(&bundle, "1", &tool, "1"),
+    );
+    assert_eq!(
+        (answer.failure.clone(), answer.refusal.clone()),
+        (None, None)
+    );
+    assert_eq!(
+        answer.document.unwrap(),
+        json!({"schemaVersion": "arkdeck.runtime-service-installation/1", "installed": true,
+            "bundleRef": bundle, "bundleGeneration": "1", "activeToolRef": tool,
+            "activeToolSelectionGeneration": "1"})
+    );
+    // launchd: the loaded check and bootstrap; an absent service reads nothing.
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    // The installed helper is the retained bundle's copy, and the plist runs
+    // it with the retained HDC the selection names.
+    let retained = registry
+        .root
+        .join(format!("bundle-{}.app", &bundle["bundle:sha256:".len()..]));
+    let installed = &home.paths.installed_daemon;
+    assert_eq!(
+        fs::read(installed).unwrap(),
+        fs::read(retained.join("Contents/MacOS/arkdeck-agentd")).unwrap()
+    );
+    let hdc = registry
+        .root
+        .join(format!("tool-{}.hdc/hdc", &tool["tool:sha256:".len()..]));
+    let environment = BTreeMap::from([
+        ("ARKDECK_HDC_PATH".to_owned(), text(&hdc)),
+        ("ARKDECK_ANALYZER_PATH".to_owned(), text(installed)),
+        (
+            "ARKDECK_WORKSPACE_INSPECTOR".to_owned(),
+            "/usr/bin/grep".to_owned(),
+        ),
+    ]);
+    assert_eq!(
+        fs::read_to_string(&home.paths.plist).unwrap(),
+        plist(
+            &text(installed),
+            &environment,
+            &text(&home.paths.standard_output),
+            &text(&home.paths.standard_error),
+        )
+    );
+    // Only the installed bundle keeps the installation's pin, and the tool is
+    // the active selection with its pin.
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(registry.references(&earlier_bundle), json!([]));
+    assert_eq!(
+        registry.selection(),
+        json!({"activeToolRef": tool, "activeGeneration": 1})
+    );
+    // The retained daemon was asked the preflight once and refused it as
+    // Swift's daemon does; nothing else ran it.
+    assert_eq!(
+        helper.runs(),
+        [format!(
+            "--cutover-preflight|{home}|{home}|production|",
+            home = text(&home.paths.home)
+        )]
+    );
+    // The installation reads back as consistent.
+    let status = host(&home, &launchd).status().unwrap();
+    assert!(
+        status
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.contains("drift") && !diagnostic.contains("plist")),
+        "{:?}",
+        status.diagnostics
+    );
+}
+
+#[test]
+fn the_typed_install_is_the_zero_runtime_path_and_refuses_before_it_pins() {
+    // An existing service: refused after the status read, the registry
+    // untouched, as Swift's.
     let home = Home::new();
     home.install();
-    // The registry pins a bundle for the service installation.
-    let index = &home.paths.bootstrap_bundle_index;
-    directory(index.parent().unwrap());
-    let pinned = json!({"schemaVersion": "arkdeck.bootstrap-bundles/1", "records": [
-        {"reference": "bundle:sha256:aa", "references": [
-            {"kind": "installation", "id": "runtime-service-installation"}]},
-        {"reference": "bundle:sha256:bb", "references": []}]});
-    fs::write(index, serde_json::to_vec(&pinned).unwrap()).unwrap();
-    let before = tree(&home.paths.home);
     let launchd = Launchd::loaded();
-    let answer = uninstall_leaf(&host(&home, &launchd));
+    refused(
+        &install_leaf(
+            &host(&home, &launchd),
+            &typed_options("bundle:sha256:aa", "1", "tool:sha256:bb", "1"),
+        ),
+        "resourceConflict",
+        "runtime service install is only the zero-Runtime bootstrap path; use the reviewed \
+         service update lifecycle for an existing installation",
+    );
+    assert_eq!(launchd.calls(), [print_call()]);
+    assert!(!home.paths.bootstrap_registry.exists());
+
+    // An installed signing preset refuses before the registry is read (ruling 3).
+    let home = Home::new();
+    let launchd = Launchd::default();
+    directory(home.paths.signing_receipt.parent().unwrap());
+    fs::write(&home.paths.signing_receipt, b"{}").unwrap();
+    let answer = install_leaf(
+        &host(&home, &launchd),
+        &typed_options("bundle:sha256:aa", "1", "tool:sha256:bb", "1"),
+    );
     let failure = answer.failure.unwrap();
     assert_eq!(failure.exit_code, 69);
     assert!(
-        failure.message.contains("bundle:sha256:aa"),
+        failure.message.contains("signing preset"),
+        "{}",
+        failure.message
+    );
+    assert!(!home.paths.bootstrap_registry.exists());
+    fs::remove_file(&home.paths.signing_receipt).unwrap();
+
+    // A reference is exact: a malformed or unknown one is refused, and the
+    // registry Swift creates on the way is left empty.
+    refused(
+        &install_leaf(
+            &host(&home, &launchd),
+            &typed_options("bundle:sha256:aa", "1", "tool:sha256:bb", "1"),
+        ),
+        "invalidInput",
+        "expected a content-addressed daemon bundle reference",
+    );
+    let registry = Registry::new(&home);
+    assert_eq!(
+        registry.index("bundles.json"),
+        json!({"records": [], "schemaVersion": "arkdeck.bootstrap-bundles/1"})
+    );
+    let missing = format!("bundle:sha256:{}", "0".repeat(64));
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&missing, "1", "tool:sha256:bb", "1"),
+        ),
+        "resourceNotFound",
+        "bundle reference does not exist",
+    );
+
+    // The bundle generation must be the one registered: nothing is pinned.
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let bundle = registry.register(&helper);
+    let tool = registry.register_hdc();
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&bundle, "2", &tool, "1"),
+        ),
+        "resourceConflict",
+        "bundle is removed or its generation changed",
+    );
+    assert_eq!(registry.references(&bundle), json!([]));
+    assert_eq!(registry.selection(), Value::Null);
+
+    // A bundle the helper policy refuses is never pinned.
+    let mut refusing = typed_host(&home, &launchd, &registry);
+    refusing.bundle_trust = Arc::new(|_: &Path| {
+        Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "not the production helper",
+        ))
+    });
+    refused(
+        &install_leaf(&refusing, &typed_options(&bundle, "1", &tool, "1")),
+        "admissionDenied",
+        "registered bundle failed the production helper trust policy",
+    );
+    assert_eq!(registry.references(&bundle), json!([]));
+
+    // Another owner holds the store: refused at once, not waited for.
+    let held = Registry::hold(&registry.root);
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&bundle, "1", &tool, "1"),
+        ),
+        "resourceConflict",
+        "another bootstrap operation holds the store; retry after it completes",
+    );
+    drop(held);
+
+    // The tool generation is checked after the pin: the bundle stays pinned
+    // for a retry, no selection is published and launchd is never asked.
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&bundle, "1", &tool, "2"),
+        ),
+        "resourceConflict",
+        "initial service tool is removed or its generation changed",
+    );
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(registry.selection(), Value::Null);
+    assert!(launchd.calls().is_empty());
+    assert!(!home.paths.plist.exists());
+    // The retry installs.
+    let answer = install_leaf(
+        &typed_host(&home, &launchd, &registry),
+        &typed_options(&bundle, "1", &tool, "1"),
+    );
+    assert_eq!(answer.document.unwrap()["installed"], true);
+    assert_eq!(registry.references(&bundle), installation_pin());
+}
+
+#[test]
+fn a_typed_install_failing_after_its_pin_leaves_the_pin_and_selection_for_a_retry() {
+    // The Rust daemon without the analyzer mode is refused before the service
+    // changes; the refusal says what stays.
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let rust = Helper::new(
+        &home,
+        "rust",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+            analyzer: Analyzer::Absent,
+        },
+    );
+    let bundle = registry.register(&rust);
+    let tool = registry.register_hdc();
+    let launchd = Launchd::default();
+    let answer = install_leaf(
+        &typed_host(&home, &launchd, &registry),
+        &typed_options(&bundle, "1", &tool, "1"),
+    );
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 69);
+    assert!(
+        failure.message.ends_with(
+            "the service was not changed, and the bundle and HDC selection stay pinned for a retry"
+        ),
         "{}",
         failure.message
     );
     assert!(launchd.calls().is_empty());
-    assert_eq!(tree(&home.paths.home), before);
-    // An index that cannot be read proves nothing either.
-    fs::write(index, b"{").unwrap();
-    let answer = uninstall_leaf(&host(&home, &launchd));
-    assert_eq!(answer.failure.unwrap().exit_code, 69);
-    assert!(launchd.calls().is_empty());
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(registry.selection()["activeToolRef"], tool);
 
-    // With nothing pinned, the service is booted out and removed; the state
-    // and logs stay.
-    fs::write(
-        index,
-        serde_json::to_vec(&json!({"schemaVersion": "arkdeck.bootstrap-bundles/1",
-            "records": [{"reference": "bundle:sha256:bb", "references": []}]}))
-        .unwrap(),
-    )
-    .unwrap();
+    // launchd refusing the bootstrap: the plist is written, the pins stay,
+    // and the service now exists, so a retry is `update`'s to make.
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let bundle = registry.register(&helper);
+    let tool = registry.register_hdc();
+    let launchd = Launchd::default();
+    launchd.bootstrap.lock().unwrap().push_back(1);
+    let answer = install_leaf(
+        &typed_host(&home, &launchd, &registry),
+        &typed_options(&bundle, "1", &tool, "1"),
+    );
+    assert_eq!(answer.failure.unwrap().exit_code, 1);
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(registry.selection()["activeToolRef"], tool);
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&bundle, "1", &tool, "1"),
+        ),
+        "resourceConflict",
+        "runtime service install is only the zero-Runtime bootstrap path; use the reviewed \
+         service update lifecycle for an existing installation",
+    );
+
+    // The pin not finalized after launchd started the service: Swift's
+    // words, and both pins left for reconciliation.
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let earlier = registry.register(&Helper::new(&home, "earlier", &Daemon::Swift));
+    let bundle = registry.register(&Helper::new(&home, "src", &Daemon::Swift));
+    let tool = registry.register_hdc();
+    registry
+        .bundles()
+        .acquire(&earlier, "1", &ReferenceOwner::service_installation())
+        .unwrap();
+    let launchd = Launchd::default();
+    let held = Arc::new(Mutex::new(None));
+    let (hold, root) = (held.clone(), registry.root.clone());
+    *launchd.on_bootstrap.lock().unwrap() = Some(Box::new(move || {
+        *hold.lock().unwrap() = Some(Registry::hold(&root));
+    }));
+    refused(
+        &install_leaf(
+            &typed_host(&home, &launchd, &registry),
+            &typed_options(&bundle, "1", &tool, "1"),
+        ),
+        "resourceConflict",
+        "service started, but its durable bundle reference could not be finalized: another \
+         bootstrap operation holds the store; retry after it completes",
+    );
+    held.lock().unwrap().take();
+    assert!(home.paths.plist.exists());
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(registry.references(&earlier), installation_pin());
+}
+
+#[test]
+fn uninstall_removes_the_service_then_releases_the_installations_pins() {
+    let home = Home::new();
+    home.install();
+    let registry = Registry::new(&home);
+    let first = registry.register(&Helper::new(&home, "first", &Daemon::Swift));
+    let second = registry.register(&Helper::new(&home, "second", &Daemon::Swift));
+    let installation = ReferenceOwner::service_installation();
+    let rollback = ReferenceOwner::new("rollback", "previous").unwrap();
+    registry
+        .bundles()
+        .acquire(&first, "1", &installation)
+        .unwrap();
+    registry
+        .bundles()
+        .acquire(&second, "1", &installation)
+        .unwrap();
+    registry.bundles().acquire(&second, "1", &rollback).unwrap();
+    let launchd = Launchd::loaded();
     let answer = uninstall_leaf(&host(&home, &launchd));
-    assert_eq!(answer.failure, None);
+    assert_eq!(
+        (answer.failure.clone(), answer.refusal.clone()),
+        (None, None)
+    );
     assert_eq!(
         answer.document.unwrap(),
         json!({"removedPlist": true, "removedDaemon": true, "removedReceipt": true,
@@ -2628,31 +3118,74 @@ fn uninstall_removes_the_service_as_swift_does_unless_the_registry_pins_it() {
     assert!(!home.paths.plist.exists() && !home.paths.receipt.exists());
     assert!(!home.paths.installed_daemon_bundle.exists());
     assert!(home.paths.state_directory.exists() && home.paths.log_directory.exists());
-    // Again: nothing to remove, nothing loaded.
+    // Only the installation's pins went; another owner's stays.
+    assert_eq!(registry.references(&first), json!([]));
+    assert_eq!(
+        registry.references(&second),
+        json!([{"kind": "rollback", "id": "previous"}])
+    );
+    // Now the first bundle can be removed, as Swift's registry allows.
+    assert_eq!(
+        registry.bundles().retire(&first, "1").unwrap()["state"],
+        "removed"
+    );
+    // Again: nothing to remove or release; the index is republished as is.
     let answer = uninstall_leaf(&host(&home, &launchd));
     assert_eq!(answer.document.unwrap()["removedDaemon"], false);
+
+    // With no registry at all, Swift's owner creates it and releases nothing.
+    let home = Home::new();
+    let answer = uninstall_leaf(&host(&home, &Launchd::default()));
+    assert_eq!(answer.document.unwrap()["removedPlist"], false);
+    assert_eq!(
+        serde_json::from_slice::<Value>(
+            &fs::read(home.paths.bootstrap_registry.join("bundles.json")).unwrap()
+        )
+        .unwrap(),
+        json!({"records": [], "schemaVersion": "arkdeck.bootstrap-bundles/1"})
+    );
 }
 
 #[test]
-fn the_typed_install_is_refused_by_name_before_anything_is_read() {
+fn an_uninstall_whose_release_fails_reports_it_after_the_removal_it_keeps() {
     let home = Home::new();
-    let launchd = Launchd::default();
-    let options = Map::from_iter([
-        ("bundle".to_owned(), json!("bundle:sha256:aa")),
-        ("bundleGeneration".to_owned(), json!("1")),
-        ("tool".to_owned(), json!("tool:sha256:bb")),
-        ("toolGeneration".to_owned(), json!("1")),
-    ]);
-    let answer = install_leaf(&host(&home, &launchd), &options);
-    assert_eq!(answer.document, None);
-    let failure = answer.failure.unwrap();
-    assert_eq!(failure.exit_code, 69);
-    assert!(
-        failure.message.contains("installation references"),
-        "{}",
-        failure.message
+    home.install();
+    let registry = Registry::new(&home);
+    let bundle = registry.register(&Helper::new(&home, "first", &Daemon::Swift));
+    registry
+        .bundles()
+        .acquire(&bundle, "1", &ReferenceOwner::service_installation())
+        .unwrap();
+    // Another owner takes the store while launchd boots the service out.
+    let launchd = Launchd::loaded();
+    let held = Arc::new(Mutex::new(None));
+    let (hold, root) = (held.clone(), registry.root.clone());
+    *launchd.on_bootout.lock().unwrap() = Some(Box::new(move || {
+        *hold.lock().unwrap() = Some(Registry::hold(&root));
+    }));
+    refused(
+        &uninstall_leaf(&host(&home, &launchd)),
+        "resourceConflict",
+        "service was removed, but its durable bundle references could not be released: \
+         another bootstrap operation holds the store; retry after it completes",
     );
-    assert!(launchd.calls().is_empty());
+    held.lock().unwrap().take();
+    // The removal stands; the pin stays for a retry, which releases it.
+    assert!(!home.paths.plist.exists() && !home.paths.installed_daemon_bundle.exists());
+    assert_eq!(registry.references(&bundle), installation_pin());
+    assert_eq!(uninstall_leaf(&host(&home, &launchd)).refusal, None);
+    assert_eq!(registry.references(&bundle), json!([]));
+    // An index the owner cannot read is reported in its words, and kept.
+    let index = registry.root.join("bundles.json");
+    fs::write(&index, b"{").unwrap();
+    fs::set_permissions(&index, fs::Permissions::from_mode(0o600)).unwrap();
+    refused(
+        &uninstall_leaf(&host(&home, &launchd)),
+        "recordUnreadable",
+        "service was removed, but its durable bundle references could not be released: \
+         bundle index failed bounded schema and identity validation",
+    );
+    assert_eq!(fs::read(&index).unwrap(), b"{");
 }
 
 // MARK: - The CLI process over a relocated home
@@ -2865,26 +3398,58 @@ fn the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service(
         "{}",
         String::from_utf8_lossy(&output.stderr)
     );
-    // The typed install is refused by name.
-    let output = cli(
-        &home,
-        None,
-        &[
-            "runtime",
-            "service",
-            "install",
-            "--bundle",
-            "bundle:sha256:aa",
-            "--bundle-generation",
-            "1",
-            "--tool",
-            "tool:sha256:bb",
-            "--tool-generation",
-            "1",
-        ],
-    );
+    // The typed install too, before it reads the registry.
+    let typed = [
+        "runtime",
+        "service",
+        "install",
+        "--bundle",
+        "bundle:sha256:aa",
+        "--bundle-generation",
+        "1",
+        "--tool",
+        "tool:sha256:bb",
+        "--tool-generation",
+        "1",
+    ];
+    let output = cli(&home, None, &typed);
     assert_eq!(output.status.code(), Some(69));
     assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("signing preset"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!home.paths.bootstrap_registry.exists());
+    fs::remove_file(&home.paths.signing_receipt).unwrap();
+    // Without one, the registry's refusal is Swift's session failure: the
+    // envelope with its code and `newDispatchCount: 0`, and the code's exit
+    // status; the registry Swift creates on the way is left empty.
+    let output = cli(&home, None, &[&typed[..], &["--output", "json"]].concat());
+    assert_eq!(output.status.code(), Some(65));
+    let envelope = stdout_json(&output);
+    assert_eq!(envelope["command"], "runtime.service.install");
+    assert_eq!(envelope["ok"], false);
+    assert_eq!(
+        envelope["error"],
+        json!({"code": "invalidInput",
+            "message": "expected a content-addressed daemon bundle reference",
+            "controlRequestRetryable": false, "attentionRequired": false,
+            "details": {"newDispatchCount": 0}})
+    );
+    assert_eq!(envelope["meta"]["controlProtocolVersion"], PROTOCOL_VERSION);
+    assert_eq!(
+        fs::read(home.paths.bootstrap_registry.join("bundles.json")).unwrap(),
+        br#"{"records":[],"schemaVersion":"arkdeck.bootstrap-bundles/1"}"#
+    );
+    // In the human rendering it is the registry's line on stderr alone.
+    let output = cli(&home, None, &typed);
+    assert_eq!(output.status.code(), Some(65));
+    assert!(output.stdout.is_empty());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "arkdeck: expected a content-addressed daemon bundle reference\n"
+    );
     // Uninstall asks launchd only through the relocated home's own recording
     // executable, and removes nothing that is not there.
     let output = cli(
@@ -2938,6 +3503,46 @@ fn the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service(
             "runtime.service.uninstall"
         ]
     );
+}
+
+/// The CLI binary holds a retained bundle to the production helper policy:
+/// an unsigned helper registered under the stand-in trust is refused at its
+/// pin, and nothing is pinned or selected.
+#[test]
+fn the_cli_holds_a_retained_bundle_to_the_production_helper_policy() {
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let bundle = registry.register(&Helper::new(&home, "src", &Daemon::Swift));
+    let tool = registry.register_hdc();
+    let output = cli(
+        &home,
+        None,
+        &[
+            "runtime",
+            "service",
+            "install",
+            "--bundle",
+            &bundle,
+            "--bundle-generation",
+            "1",
+            "--tool",
+            &tool,
+            "--tool-generation",
+            "1",
+            "--output",
+            "json",
+        ],
+    );
+    assert_eq!(output.status.code(), Some(77));
+    let error = &stdout_json(&output)["error"];
+    assert_eq!(error["code"], "admissionDenied");
+    assert_eq!(
+        error["message"],
+        "registered bundle failed the production helper trust policy"
+    );
+    assert_eq!(error["details"], json!({"newDispatchCount": 0}));
+    assert_eq!(registry.references(&bundle), json!([]));
+    assert_eq!(registry.selection(), Value::Null);
 }
 
 /// `agentd …` is `runtime service …` under its superseded name: the same

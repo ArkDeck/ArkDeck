@@ -440,8 +440,9 @@ crate. `arkdeck-bootstrap` owns the current-user Bootstrap registry's bundle and
 HDC tool files (`…/ArkDeck/Bootstrap/v1`: the two indexes, their content checks,
 registration, retirement and the HDC selection ledger) under the store's one
 lock, over `arkdeck-contract` and `arkdeck-platform` only; every writer of that
-store uses it, and `arkdeck-hoststore` composes the Runtime's paged inventories
-and the DevEco registry over it.
+store uses it — the CLI's zero-Runtime `runtime service install` and its
+`uninstall` among them — and `arkdeck-hoststore` composes the Runtime's paged
+inventories and the DevEco registry over it.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while
@@ -2549,12 +2550,21 @@ receipt as Swift's `JSONEncoder` writes it, bootout and bootstrap — and keeps 
 helper it replaced one generation in `Helpers/.rollback/ArkDeckAgent.app`. It is
 refused before anything changes while an OpenHarmony signing preset is installed,
 since the replacement daemon's identity would have to be re-recorded in its
-receipt and there is no Rust signing owner yet. `uninstall` removes the plist,
-helper and receipt as Swift does, and is refused while the bootstrap bundle
-registry still pins a bundle for the service installation, which this CLI cannot
-release; the typed zero-Runtime `install` (bundle and tool generations pinned
-through the bootstrap registries) is refused by name. The documents are Swift's;
-a refusal is a stderr line and Swift's exit status with an empty stdout.
+receipt and there is no Rust signing owner yet. The typed zero-Runtime
+`install --bundle … --bundle-generation … --tool … --tool-generation …`, only
+with no service installed, loaded or listening, pins the exact bundle generation
+for `installation/runtime-service-installation` in the Bootstrap registry,
+publishes the first HDC selection from the exact tool generation (both through
+`arkdeck-bootstrap`, the owner the Runtime writes that store through), installs
+the retained bundle with the retained HDC as `update` installs, and then keeps
+only that bundle pinned (Swift `acquire`, `initializeServiceSelection`,
+`retainOnly`); a failure after the pin leaves the pin and the selection for a
+retry. `uninstall` removes the plist, helper and receipt as Swift does and then
+releases the installation's pins (`releaseAll`); a release that fails is
+reported after the removal, which stands. The documents are Swift's; a plain
+refusal is a stderr line and Swift's exit status with an empty stdout, and the
+registry's refusals are Swift's session failures (the failure envelope with
+`newDispatchCount: 0` in machine output).
 
 launchd is reached only through `arkdeck_platform::launchd`: fixed argument
 arrays (`print`, `bootout`, `bootstrap`, `enable`) run by one fixed executable,

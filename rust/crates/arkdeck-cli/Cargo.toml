@@ -11,6 +11,7 @@ name = "arkdeck"
 path = "src/main.rs"
 
 [dependencies]
+arkdeck-bootstrap.workspace = true
 arkdeck-contract.workspace = true
 arkdeck-client.workspace = true
 arkdeck-platform.workspace = true

@@ -945,6 +945,14 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
                 return 74.into();
             }
         }
+        if let Some(refusal) = answer.refusal {
+            return serve_runtime_service_refusal(
+                invocation,
+                id,
+                refusal,
+                answer.document.is_some(),
+            );
+        }
         match answer.failure {
             Some(failure) => {
                 eprintln!("arkdeck {}: {}", invocation.command, failure.message);
@@ -973,6 +981,47 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
         }
         error.exit_code().into()
     }
+}
+
+/// A coded refusal of a LaunchAgent leaf, as Swift's session answers one
+/// (`CLIRuntimeSession.fail`): the failure envelope, the legacy failure
+/// document or `arkdeck: <message>` on stderr, and the code's exit status.
+/// After an emitted document stdout keeps that one document, and the refusal
+/// is the stderr line alone (Swift's `suppressesMachineRendering`).
+#[cfg(target_os = "macos")]
+fn serve_runtime_service_refusal(
+    invocation: &Invocation,
+    id: &str,
+    refusal: arkdeck_cli::runtime_service::CodedFailure,
+    emitted: bool,
+) -> std::process::ExitCode {
+    let error = CliError {
+        code: refusal.code,
+        message: refusal.message,
+        details: refusal.details,
+        command: None,
+    };
+    let written =
+        if emitted {
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        } else if invocation.json {
+            write_document(&arkdeck_cli::with_lifecycle(
+                failure_envelope(invocation.command, &error, id, true),
+                invocation.command,
+            ))
+        } else if invocation.legacy_json {
+            io::stdout().lock().write_all(&arkdeck_cli::legacy_document(
+                &arkdeck_cli::legacy_failure(&error),
+            ))
+        } else {
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        };
+    if written.is_err() {
+        return 74.into();
+    }
+    error.exit_code().into()
 }
 
 /// A domain leaf (Swift `runDomainOperation`): the typed request from the

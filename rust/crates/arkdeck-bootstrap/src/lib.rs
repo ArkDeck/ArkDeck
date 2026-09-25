@@ -84,7 +84,14 @@ pub use tool_selection_ledger::{
 };
 
 #[cfg(target_os = "macos")]
+mod store;
+#[cfg(target_os = "macos")]
+pub use store::create_store;
+
+#[cfg(target_os = "macos")]
 pub mod bundle_content;
+#[cfg(target_os = "macos")]
+mod bundle_references;
 #[cfg(target_os = "macos")]
 mod bundle_registration;
 #[cfg(target_os = "macos")]
@@ -92,4 +99,6 @@ mod bundle_registry_owner;
 #[cfg(target_os = "macos")]
 mod bundle_retirement;
 #[cfg(target_os = "macos")]
-pub use bundle_registry_owner::BundleRegistryReadStore;
+pub use bundle_references::ReferenceOwner;
+#[cfg(target_os = "macos")]
+pub use bundle_registry_owner::{BundleRegistryReadStore, BundleValidator};
