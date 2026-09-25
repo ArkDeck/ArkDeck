@@ -694,7 +694,10 @@ fn confirmed_restart_transfers_dispatch_only_after_terminal_identity_proof() {
             let lease = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
             std::fs::write(fake.0.join("stop"), []).unwrap();
             let deadline = Instant::now() + Duration::from_secs(3);
-            while lease.revalidate().is_ok() {
+            // The proof fails the moment the replacement's exit begins, while
+            // its listener still accepts: the next start on the endpoint
+            // waits until nothing answers there as well.
+            while lease.revalidate().is_ok() || reachable(endpoint) {
                 assert!(
                     Instant::now() < deadline,
                     "the synthetic replacement did not stop"

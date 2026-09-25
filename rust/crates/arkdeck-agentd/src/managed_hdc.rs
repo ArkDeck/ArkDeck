@@ -339,7 +339,9 @@ impl ManagedHdc {
                  proved ({reason}); nothing was signalled"
             ));
         }
-        // Ended politely, killed, or gone on its own since the proof.
+        // Ended politely, killed, or gone on its own since the proof, and its
+        // exit finished whichever it was: the kernel has closed its listener,
+        // so the endpoint is left as a stop without a restart leaves it.
         match end_proved_process(lease.identity(), TERMINATION_GRACE, KILL_GRACE) {
             Ok(_) => ReplacementStop::Ended,
             Err(error) => ReplacementStop::Survived(format!(
@@ -369,7 +371,7 @@ pub(crate) struct Stop {
 pub(crate) enum ReplacementStop {
     /// No confirmed restart transferred ownership in this Runtime.
     None,
-    /// The proved replacement has ended.
+    /// The proved replacement has ended, its exit finished.
     Ended,
     /// A restart's outcome was uncertain: whatever it left is unknown and
     /// was not signalled (REQ-HDC-003).

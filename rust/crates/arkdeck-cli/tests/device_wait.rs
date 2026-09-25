@@ -130,13 +130,14 @@ mod runtime {
     fn the_client_stops_waiting_without_adopting_or_cancelling_anything() {
         let mut other = snapshot();
         other["observations"][0]["authorizationState"] = json!("Connected");
-        // The wait stops at its own deadline: the leaf reads at most twice
-        // inside 200 ms (it backs off 100 ms, then the rest of the budget), and
-        // a slower host simply reads fewer times.
-        let (output, envelope) = support::run_partial(
-            &argv("offline", "200ms"),
-            observations(vec![other.clone(), other.clone(), other.clone(), other]),
-        );
+        // The wait stops at its own deadline. Its budget holds the connection,
+        // `health` and the first read (the deadline starts before any of
+        // them), so it is seconds, not the few backoff steps it covers: inside
+        // two seconds the leaf reads at most five times (100, 200, 400 and
+        // 800 ms apart), and a slower host simply reads fewer times. More
+        // snapshots are offered than it can ask for.
+        let (output, envelope) =
+            support::run_partial(&argv("offline", "2s"), observations(vec![other; 8]));
         assert_eq!(output.status.code(), Some(75));
         assert_eq!(envelope["error"]["code"], "clientTimeout");
         assert_eq!(

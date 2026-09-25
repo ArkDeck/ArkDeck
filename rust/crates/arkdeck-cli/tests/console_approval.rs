@@ -148,6 +148,14 @@ fn control_action_outcomes_preserve_their_exit_and_projection() {
     }
 }
 
+/// The `--timeout` of the expired-deadline run. The CLI's deadline starts
+/// before it connects, so it has to outlast the connection, `health` and the
+/// request that fetches the challenge on a loaded host; the harness then types
+/// only once this long has passed since the prompt appeared, which the
+/// deadline preceded, so the answer always arrives after it expired.
+#[cfg(target_os = "macos")]
+const DEADLINE_MS: u64 = 2_000;
+
 #[cfg(target_os = "macos")]
 fn pty_run(input: &[u8], state: &str, timeout: bool, drop_reply: bool) -> Value {
     use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
@@ -161,8 +169,7 @@ fn pty_run(input: &[u8], state: &str, timeout: bool, drop_reply: bool) -> Value 
             "providers":[],"publishedMethods":METHODS},
         "params":frame["params"],"challenge":frame["result"],"terminal":terminal(state),
         "input":input,"drop_reply":drop_reply,
-        "timeout":if timeout { Some("250ms") } else { None },
-        "delay_ms":if timeout { 350 } else { 0 },
+        "timeout_ms":if timeout { Some(DEADLINE_MS) } else { None },
     });
     let mut child = Command::new("/usr/bin/python3")
         .args(["-c", include_str!("support/console_pty.py")])
