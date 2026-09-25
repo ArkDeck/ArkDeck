@@ -105,55 +105,6 @@ const JOB_KEYS: [&str; 7] = [
     "outstandingResidueCount",
     "sessionPublication",
 ];
-/// Swift `CLIErrorCode`: an execution's `failureCode` settles a run only
-/// when it names one of these.
-const CLI_CODES: [&str; 45] = [
-    "invalidCommand",
-    "invalidOption",
-    "commandRemoved",
-    "invalidInput",
-    "inputTooLarge",
-    "invalidCursor",
-    "idempotencyConflict",
-    "reviewedPlanMismatch",
-    "resourceConflict",
-    "resourceNotFound",
-    "workspaceReferenceNotFound",
-    "protocolVersionUnsupported",
-    "controlMethodUnavailable",
-    "runtimeUnavailable",
-    "operationUnavailable",
-    "unsupportedOnPlatform",
-    "quotaExceeded",
-    "blockedByProductDefect",
-    "healthRequirementFailed",
-    "targetSelectionRequired",
-    "targetAmbiguous",
-    "targetTrustPending",
-    "humanActionRequired",
-    "humanActionExpired",
-    "resultNotReady",
-    "clientTimeout",
-    "eventHistoryUnavailable",
-    "orchestrationBudgetExpired",
-    "outcomeUnknown",
-    "reconcileRequired",
-    "previewExpired",
-    "orchestrationClockUntrusted",
-    "fileIdentityChanged",
-    "bindingRevisionStale",
-    "factsDrifted",
-    "previewDrifted",
-    "admissionDenied",
-    "sensitiveAccessDenied",
-    "operationFailed",
-    "artifactIntegrityFailed",
-    "recordUnreadable",
-    "ioFailure",
-    "protocolMalformed",
-    "internalError",
-    "clientInterrupted",
-];
 
 fn usage(message: impl Into<String>) -> CliError {
     CliError::new("invalidOption", message)
@@ -163,9 +114,10 @@ fn invalid_input(message: impl Into<String>) -> CliError {
     CliError::new("invalidInput", message)
 }
 
-/// The static name of a Swift `CLIErrorCode`.
+/// The static name of a Swift `CLIErrorCode`: an execution's `failureCode`
+/// settles a run only when the error registry has it.
 fn cli_code(code: &str) -> Option<&'static str> {
-    CLI_CODES.iter().copied().find(|known| *known == code)
+    crate::error_registry::code(code)
 }
 
 /// Swift `AgentExecutionIntent.validIdentifier`.
