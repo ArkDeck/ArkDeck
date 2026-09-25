@@ -1,0 +1,50 @@
+{
+  "artifacts" : {
+    "post-flash-facts.json" : {
+      "artifactId" : "ART-135fa9b6a4093efc67ee9c498dd820e2",
+      "byteCount" : 947,
+      "required" : true,
+      "sha256" : "07f7c80644ee7fbaa8dc52948c8dabe6b635f2f2515d9ef8f2b5d49c7c429611",
+      "status" : "published"
+    },
+    "post-flash-hilog.txt" : {
+      "detail" : "failed(\"post-flash HiLog capture returned no bytes\")",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "authority" : {
+    "consumptionFingerprintSha256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G2"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "completeness" : "complete",
+  "expectedBindingRevision" : 1,
+  "jobId" : "job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "missingRequired" : [
+
+  ],
+  "operation" : "flash.full-restore@1",
+  "providerId" : "arkforge",
+  "request" : {
+    "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+    "deviceProfileRef" : "dayu200",
+    "intent" : "fullRestore",
+    "verification" : "full"
+  },
+  "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "targetId" : "TGT-83405c84ff74",
+  "verifiedSteps" : [
+    "enter-loader-mode",
+    "flash-partitions",
+    "rebind-and-verify-build",
+    "rebind-loader-identity",
+    "reboot-device",
+    "verify-flash-readback",
+    "wait-for-hdc",
+    "wait-loader-disconnect",
+    "wait-loader-reconnect"
+  ]
+}

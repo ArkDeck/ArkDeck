@@ -1,0 +1,205 @@
+{
+  "actualEffect" : "destructive",
+  "actualStepKinds" : [
+    "captureRemoteStdout"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "completeOverwriteRecovery" : {
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "intent-flash-partitions",
+          "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+          "observedAtUTC" : "2026-09-25T00:00:00Z",
+          "operationReference" : "flash.full-restore@1",
+          "possibleEffects" : [
+            "partition:uboot",
+            "partition:resource",
+            "partition:boot_linux",
+            "partition:ramdisk",
+            "partition:system",
+            "partition:vendor",
+            "partition:updater",
+            "partition:chip_ckm",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "destructiveEpochOrdinal" : 2,
+      "profileReference" : "dayu200",
+      "uncertainEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+    },
+    "consumptionFingerprintSHA256" : "b41ab43c1168099d0bd8cec7fb74c96eb16a8fe1e97441928489264e881f14ce",
+    "kind" : "runtimeCapability",
+    "recoveryProviderExecutableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "reference" : "CAP-RT-POLICY-F42B18A5F21095916AE84A90A920E415F565B766-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "planDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "reservationID" : "idem-flash-alias-recovery",
+      "stepSetDigestSHA256" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-09-25T04:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-25T00:00:00Z",
+    "firmware" : "OpenHarmony-7.0.0.36",
+    "model" : "DAYU200",
+    "preflightSteps" : [
+
+    ],
+    "providerID" : "arkforge",
+    "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetID" : "TGT-83405c84ff74",
+    "toolSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "toolVersion" : "arkforged native RockUSB",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-282fd9a2d9abd089dc6d22ac5a1a67b9",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationReference" : "flash.dayu200",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-alias-recovery",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "req-flash-alias-recovery",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-F42B18A5F21095916AE84A90A920E415F565B766-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-alias-recovery",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "req-flash-alias-recovery",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "contractViolation",
+      "detail" : "terminal state recovered has no current Manifest status"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-282fd9a2d9abd089dc6d22ac5a1a67b9"
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "recovered",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "complete-overwrite recovery classified epoch 2; covered intents 1",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-F42B18A5F21095916AE84A90A920E415F565B766-G1",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "ArkForge artifact prewarm ready (store-hit, total 7 ms, consume wait <ms> ms)",
+    "capability consumed before first mutation",
+    "running->recoveringByCompleteOverwrite",
+    "reason: distinct complete-overwrite capability reserved; original intents not replayed",
+    "recovery coverage 36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678 for 1 unknown intent(s)",
+    "intent flash-partitions correlated daemon-job=JOB-FLASH-2",
+    "delegated reboot-device to the ArkForge lane's own plan",
+    "delegated wait-for-hdc to the ArkForge lane's own plan",
+    "delegated rebind-and-verify-build to the ArkForge lane's own plan",
+    "artifact post-flash-facts.json -> ART-34b40c58059b800c2a75bf0cdff4c39b",
+    "intent capture-post-flash-diagnostics",
+    "verified capture-post-flash-diagnostics [\"byteCount\", \"debugRuntime\", \"recordId\", \"verification\"]",
+    "artifact post-flash-hilog.txt -> ART-d3321450734fdea67cc305b968551b46",
+    "host-step finalize-session",
+    "recoveringByCompleteOverwrite->finalizing",
+    "reason: steps-complete",
+    "superseding recovery epoch recovery-epoch-97c9966c14ccaf85cb302d4f261fb256 established; original outcomes remain unknown",
+    "finalizing->recovered",
+    "reason: complete overwrite, readback, reboot, rebind and postflight confirmed"
+  ]
+}

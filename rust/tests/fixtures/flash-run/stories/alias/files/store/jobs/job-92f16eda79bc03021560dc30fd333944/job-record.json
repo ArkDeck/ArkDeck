@@ -1,0 +1,198 @@
+{
+  "actualEffect" : "destructive",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "0576d060088fc6c77972f73f157f1f3d485558738dac493505acd01a851794fa",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "planDigestSHA256" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+      "reservationID" : "idem-flash-alias-basic",
+      "stepSetDigestSHA256" : "eab9d8c4631a991bbb0c2ae089dbdd15c164b01465f0b335a9b6fc988c1c2782",
+      "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-09-25T04:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-25T00:00:00Z",
+    "firmware" : "OpenHarmony-7.0.0.36",
+    "model" : "DAYU200",
+    "preflightSteps" : [
+
+    ],
+    "providerID" : "arkforge",
+    "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetID" : "TGT-83405c84ff74",
+    "toolSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "toolVersion" : "arkforged native RockUSB",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-92f16eda79bc03021560dc30fd333944",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationReference" : "flash.dayu200",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-alias-basic",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "basic"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "req-flash-alias-basic",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "recoveryIntentEventID" : "intent-rebind-and-verify-build",
+  "recoveryStepID" : "rebind-and-verify-build",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-alias-basic",
+    "inputs" : {
+      "deviceProfile" : "dayu200",
+      "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "partitionPlan" : [
+        "uboot",
+        "resource",
+        "boot_linux",
+        "ramdisk",
+        "system",
+        "vendor",
+        "updater",
+        "chip_ckm",
+        "userdata"
+      ],
+      "postFlashVerification" : "basic"
+    },
+    "operation" : {
+      "id" : "flash.dayu200"
+    },
+    "requestId" : "req-flash-alias-basic",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "9283",
+      "lastSequence" : 14,
+      "sha256" : "be07e7c5a77f3919fbc0188b387bdf70cfa45f1a8c1075461aae14c6d401c3d1"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-92f16eda79bc03021560dc30fd333944",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "74819",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "9669",
+      "lastSequence" : 15,
+      "sha256" : "34f343f120db17fc7e9f45ce1c875e57fe163cfb51da89b98cfe69c778d475d8"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-25T00:00:00Z",
+      "manifestByteCount" : "5154",
+      "manifestSHA256" : "31e155934717d29b388c87a7c8c27b76d1dd258641491b6c58b51acc30df2ea6",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "31e155934717d29b388c87a7c8c27b76d1dd258641491b6c58b51acc30df2ea6",
+      "publishedAtUTC" : "2026-09-25T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-92f16eda79bc03021560dc30fd333944",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-flash-run-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-92f16eda79bc03021560dc30fd333944",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+    "capture-post-flash-diagnostics" : "step not selected by the request inputs"
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-F8F690BA35061B4FC56DF7A5F079077771ED9686-G1",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "ArkForge artifact prewarm ready (store-hit, total 7 ms, consume wait <ms> ms)",
+    "capability consumed before first mutation",
+    "intent flash-partitions correlated daemon-job=JOB-FLASH-1",
+    "delegated reboot-device to the ArkForge lane's own plan",
+    "delegated wait-for-hdc to the ArkForge lane's own plan",
+    "delegated rebind-and-verify-build to the ArkForge lane's own plan",
+    "artifact post-flash-facts.json -> ART-387495cb9dea71a27aa05184dd002f41",
+    "skipped capture-post-flash-diagnostics: step not selected by the request inputs",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

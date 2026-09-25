@@ -31,6 +31,10 @@ use crate::operation_request::OperationRequest;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
 
+#[path = "flash_admission.rs"]
+mod flash_admission;
+pub use flash_admission::FlashAdmitter;
+
 /// Swift `RuntimeDefaultReadOnlyPolicy` bounds.
 const READ_ONLY_TIMEOUT_SECONDS: i64 = 900;
 const READ_ONLY_OUTPUT_BYTES: i64 = 1 << 29;

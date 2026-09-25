@@ -1,0 +1,382 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "deduplicated" : false,
+          "jobId" : "job-015b9785301763965a34ec80b54d9c0b",
+          "newDispatchCount" : 0,
+          "schemaVersion" : "arkdeck.job-acceptance/1"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "first.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-first\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-first\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "cancelRequested" : true
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.cancel",
+      "name" : "first.cancel",
+      "params" : {
+        "jobId" : "job-015b9785301763965a34ec80b54d9c0b"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceConflict",
+          "details" : {
+            "jobId" : "job-015b9785301763965a34ec80b54d9c0b",
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "job job-015b9785301763965a34ec80b54d9c0b is cancelled, not runnable"
+        },
+        "ok" : false
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.run",
+      "name" : "first.run",
+      "params" : {
+        "jobId" : "job-015b9785301763965a34ec80b54d9c0b"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "createdAtUtc" : "2026-09-25T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : {
+            "category" : "cancelled",
+            "code" : "cancelled",
+            "recovery" : "none",
+            "retryability" : "notAutomatic",
+            "schemaVersion" : "1.0.0"
+          },
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "jobId" : "job-015b9785301763965a34ec80b54d9c0b",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-015b9785301763965a34ec80b54d9c0b",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-015b9785301763965a34ec80b54d9c0b",
+              "kind" : "job"
+            }
+          },
+          "operation" : "flash.full-restore@1",
+          "outcome" : "cancelled",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-015b9785301763965a34ec80b54d9c0b",
+          "sessionPublication" : {
+            "catalogGeneration" : "1",
+            "manifestSha256" : "df9ea473ded8aed60c4797041c0c9949f6f10d03b99913535ce921292208f25e",
+            "reasonCode" : null,
+            "state" : "published"
+          },
+          "startedAtUtc" : null,
+          "state" : "cancelled",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-83405c84ff74",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "flash"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.status",
+      "name" : "first.status",
+      "params" : {
+        "jobId" : "job-015b9785301763965a34ec80b54d9c0b"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "deduplicated" : false,
+          "jobId" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+          "newDispatchCount" : 0,
+          "schemaVersion" : "arkdeck.job-acceptance/1"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.submit",
+      "name" : "next.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-flash-next\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"req-flash-next\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "createdAtUtc" : "2026-09-25T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "jobId" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+              "kind" : "job"
+            }
+          },
+          "operation" : "flash.full-restore@1",
+          "outcome" : "succeeded",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-6a9bd2498485cd9fdd3272d6c87868ee",
+          "sessionPublication" : {
+            "catalogGeneration" : "2",
+            "manifestSha256" : "d73b0132ee5937133fe4cb345f112445e767fb1af127305402e29b664213a934",
+            "reasonCode" : null,
+            "state" : "published"
+          },
+          "startedAtUtc" : "2026-09-25T00:00:00Z",
+          "state" : "succeeded",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-83405c84ff74",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "flash"
+        }
+      },
+      "dispatchCalls" : [
+        "capture-post-flash-diagnostics job-6a9bd2498485cd9fdd3272d6c87868ee identifier=rockchip.hdc.capture-post-flash-hilog.v1 target=TGT-83405c84ff74 revision=1 connectKey=post-flash-hdc-address identity=83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1 tool=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb action=34071c3da630b853c5cbcd23192c45cf4d08cc732f1a85f39d627a29f42b009a budget=none"
+      ],
+      "laneCalls" : [
+        "prewarm job-6a9bd2498485cd9fdd3272d6c87868ee sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d profile=org.openharmony.dayu200@1.0.0",
+        "prepare job-6a9bd2498485cd9fdd3272d6c87868ee purpose=primaryFlash target=TGT-83405c84ff74 revision=1 identity=83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1 connectKey=post-flash-hdc-address topology=42 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d profile=org.openharmony.dayu200@1.0.0",
+        "perform flash-partitions job-6a9bd2498485cd9fdd3272d6c87868ee daemonJob=JOB-FLASH-1 plan=PLAN-FLASH-1 purpose=primaryFlash",
+        "finishPrewarm job-6a9bd2498485cd9fdd3272d6c87868ee"
+      ],
+      "method" : "job.run",
+      "name" : "next.run",
+      "params" : {
+        "jobId" : "job-6a9bd2498485cd9fdd3272d6c87868ee"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actualEffect" : "destructive",
+          "createdAtUtc" : "2026-09-25T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : "2026-09-25T00:00:00Z",
+          "jobId" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-6a9bd2498485cd9fdd3272d6c87868ee",
+              "kind" : "job"
+            }
+          },
+          "operation" : "flash.full-restore@1",
+          "outcome" : "succeeded",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-6a9bd2498485cd9fdd3272d6c87868ee",
+          "sessionPublication" : {
+            "catalogGeneration" : "2",
+            "manifestSha256" : "d73b0132ee5937133fe4cb345f112445e767fb1af127305402e29b664213a934",
+            "reasonCode" : null,
+            "state" : "published"
+          },
+          "startedAtUtc" : "2026-09-25T00:00:00Z",
+          "state" : "succeeded",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-83405c84ff74",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "flash"
+        }
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "job.status",
+      "name" : "next.status",
+      "params" : {
+        "jobId" : "job-6a9bd2498485cd9fdd3272d6c87868ee"
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : [
+          {
+            "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1",
+            "consumptionCount" : 1,
+            "effectCeiling" : "destructive",
+            "lineageAllowsNewExecution" : false,
+            "lineageBlocker" : "maximumUses exhausted",
+            "maximumUses" : 1,
+            "remainingUses" : 0
+          }
+        ]
+      },
+      "dispatchCalls" : [
+
+      ],
+      "laneCalls" : [
+
+      ],
+      "method" : "capability.list",
+      "name" : "capabilities",
+      "params" : {
+
+      },
+      "script" : {
+        "aliasTopology" : "42",
+        "bindingRevision" : 1,
+        "crossMode" : "satisfied",
+        "diagnostics" : "hilog",
+        "perform" : "ok",
+        "prepare" : "ok",
+        "prewarm" : "storeHit",
+        "terminal" : "none"
+      }
+    }
+  ]
+}

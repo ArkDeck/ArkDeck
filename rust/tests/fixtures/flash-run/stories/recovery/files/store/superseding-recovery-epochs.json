@@ -1,0 +1,52 @@
+{
+  "epochs" : [
+    {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "bindingRevision" : 1,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback",
+        "reboot-device",
+        "wait-for-hdc",
+        "rebind-and-verify-build",
+        "capture-post-flash-diagnostics"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "intent-flash-partitions",
+          "jobID" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+          "observedAtUTC" : "2026-09-25T00:00:00Z",
+          "operationReference" : "flash.full-restore@1",
+          "possibleEffects" : [
+            "partition:uboot",
+            "partition:resource",
+            "partition:boot_linux",
+            "partition:ramdisk",
+            "partition:system",
+            "partition:vendor",
+            "partition:updater",
+            "partition:chip_ckm",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "epochID" : "recovery-epoch-2205e795647f63f2be9109deed6a305b",
+      "epochSHA256" : "ff3dc376f28644bf5f4fe296b2a85f2b206bc75df2bf871532f749a217201dd6",
+      "establishedAtUTC" : "2026-09-25T00:00:00Z",
+      "materializedPlanDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "operationReference" : "flash.full-restore@1",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "recoveryIntentEventID" : "intent-flash-partitions",
+      "recoveryJobID" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+      "resultingTargetEpochSHA256" : "827eeeb56fe13b0fdaca4604d2a9fb42816f5e7d0b544ec104ccbb8c601b1a5b",
+      "source" : "distinctRecoveryExecution",
+      "stableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      "uncertainEffectSetSHA256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

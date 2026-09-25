@@ -1,0 +1,81 @@
+{
+  "execution" : {
+    "arkDeckJobID" : "job-015b9785301763965a34ec80b54d9c0b",
+    "artifactProfileID" : "org.openharmony.dayu200@1.0.0",
+    "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "bindingRevision" : 1,
+    "daemonJobID" : "JOB-FLASH-1",
+    "executionPurpose" : "primaryFlash",
+    "observationMode" : "loader",
+    "planID" : "PLAN-FLASH-1",
+    "planSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+    "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+    "targetID" : "TGT-83405c84ff74",
+    "toolchainSHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "usbTopology" : "42"
+  },
+  "planCompletionReceipt" : {
+    "actionID" : "",
+    "attemptID" : "",
+    "disposition" : "semanticSuccess",
+    "evidenceSHA256" : [
+      26,
+      229,
+      171,
+      156,
+      47,
+      129,
+      201,
+      85,
+      74,
+      89,
+      238,
+      149,
+      32,
+      35,
+      129,
+      111,
+      252,
+      95,
+      47,
+      82,
+      116,
+      130,
+      243,
+      115,
+      99,
+      130,
+      58,
+      111,
+      89,
+      65,
+      30,
+      202
+    ],
+    "facts" : [
+      {
+        "key" : "const.product.model",
+        "value" : "DAYU200"
+      },
+      {
+        "key" : "const.ohos.fullname",
+        "value" : "OpenHarmony-7.0.0.36"
+      },
+      {
+        "key" : "usbTopology",
+        "value" : "42"
+      }
+    ],
+    "failureClassification" : "",
+    "jobID" : "JOB-FLASH-1",
+    "permitID" : "PERMIT-FLASH-1",
+    "planID" : "PLAN-FLASH-1",
+    "stepID" : "STEP-023",
+    "typedSkipReason" : "",
+    "verificationOutcome" : "",
+    "verificationStrength" : "",
+    "verifiedRangeLength" : 0,
+    "verifiedRangeStart" : 0
+  },
+  "schemaVersion" : "arkdeck-arkforge-runtime-state\/v1"
+}

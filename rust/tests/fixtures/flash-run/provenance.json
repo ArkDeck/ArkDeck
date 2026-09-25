@@ -1,0 +1,22 @@
+{
+  "availableBytes" : 1099511627776,
+  "home" : "/private/tmp/arkdeck-flash-run-oracle/home",
+  "inputsFrom" : "rust/tests/fixtures/flash-plan (its imported bundle and Target store)",
+  "nowPreciseUTC" : "2026-09-25T00:00:00.000Z",
+  "nowUTC" : "2026-09-25T00:00:00Z",
+  "producer" : "FlashRunOracleContractTests.testSwiftSubmitsAndRunsEveryFlashStoryAsTheRustRuntimeReplays",
+  "profileId" : "org.openharmony.dayu200@1.0.0",
+  "quotaBytes" : 8589934592,
+  "root" : "/private/tmp/arkdeck-flash-run-oracle",
+  "stories" : [
+    "admission",
+    "canonical",
+    "alias",
+    "failures",
+    "reconcile",
+    "recovery",
+    "recoveryAlias",
+    "cancel"
+  ],
+  "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+}

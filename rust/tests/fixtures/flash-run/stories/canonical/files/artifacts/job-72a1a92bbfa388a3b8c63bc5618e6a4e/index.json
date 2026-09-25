@@ -1,0 +1,95 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-135fa9b6a4093efc67ee9c498dd820e2",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 947,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "mediaType" : "application\/json",
+      "name" : "post-flash-facts.json",
+      "privacy" : "sensitive",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "sha256" : "07f7c80644ee7fbaa8dc52948c8dabe6b635f2f2515d9ef8f2b5d49c7c429611",
+      "sourceOperation" : "flash.full-restore@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "rebind-and-verify-build"
+    },
+    {
+      "artifactID" : "ART-MISSING-62fee07fd26248bed185f1765588ca77",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "mediaType" : "text\/plain",
+      "name" : "post-flash-hilog.txt",
+      "privacy" : "sensitive",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "sha256" : "",
+      "sourceOperation" : "flash.full-restore@1",
+      "status" : {
+        "missing" : {
+          "reason" : "failed(\"post-flash HiLog capture returned no bytes\")"
+        }
+      },
+      "stepID" : "capture-post-flash-diagnostics"
+    },
+    {
+      "artifactID" : "ART-76e7e00f49a032299722c8c6f9547d6b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetID" : "TGT-83405c84ff74"
+      },
+      "byteCount" : 1716,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "mediaType" : "application\/json",
+      "name" : "flash-report.json",
+      "privacy" : "standard",
+      "providerID" : "arkforge",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-72a1a92bbfa388a3b8c63bc5618e6a4e",
+      "sha256" : "6ffb3e853bcc02d5457a873cf9050a8ee996c0ef12ff6dfefd7bef002c09fd19",
+      "sourceOperation" : "flash.full-restore@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

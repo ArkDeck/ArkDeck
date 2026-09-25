@@ -1,0 +1,133 @@
+{
+  "actualEffect" : "destructive",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-015b9785301763965a34ec80b54d9c0b",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationFailure" : {
+    "category" : "cancelled",
+    "code" : "cancelled",
+    "recovery" : "none",
+    "retryability" : "notAutomatic",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "flash.full-restore@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-first",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-first",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-first",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-first",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1725",
+      "lastSequence" : 4,
+      "sha256" : "41b26bbd5c0e47e4c0dcffc8fbcae1b0f2a4b303af154f59fe589fa2b4ca2539"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-015b9785301763965a34ec80b54d9c0b",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67261",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2110",
+      "lastSequence" : 5,
+      "sha256" : "fce026f1118404908f9c135791313b0c408796b0bfad82ddf154a3efd552d634"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-25T00:00:00Z",
+      "manifestByteCount" : "1039",
+      "manifestSHA256" : "df9ea473ded8aed60c4797041c0c9949f6f10d03b99913535ce921292208f25e",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "cancelled"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "df9ea473ded8aed60c4797041c0c9949f6f10d03b99913535ce921292208f25e",
+      "publishedAtUTC" : "2026-09-25T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-015b9785301763965a34ec80b54d9c0b",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-flash-run-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-015b9785301763965a34ec80b54d9c0b",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "cancelled",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->cancelRequested",
+    "reason: client-cancel before execution",
+    "cancelRequested->cancellingAtSafeBoundary",
+    "reason: no provider intent was dispatched",
+    "cancellingAtSafeBoundary->cancelled",
+    "reason: never-started job closed with zero dispatch"
+  ]
+}

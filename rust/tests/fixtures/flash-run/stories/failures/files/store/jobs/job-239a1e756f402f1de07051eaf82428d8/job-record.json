@@ -1,0 +1,161 @@
+{
+  "actualEffect" : "destructive",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G3",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "planDigestSHA256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+      "reservationID" : "idem-flash-prepareUncorrelated",
+      "stepSetDigestSHA256" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+      "targetBindingDigestSHA256" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-09-25T04:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-239a1e756f402f1de07051eaf82428d8",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+  "materializedStableTargetIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+  "operationFailure" : {
+    "category" : "externalTool",
+    "code" : "executionConfirmedNotPerformed",
+    "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "flash.full-restore@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-prepareUncorrelated",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-prepareUncorrelated",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "arkforge",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G3"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-flash-prepareUncorrelated",
+    "inputs" : {
+      "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+      "deviceProfileRef" : "dayu200",
+      "intent" : "fullRestore",
+      "verification" : "full"
+    },
+    "operation" : {
+      "id" : "flash.full-restore",
+      "version" : 1
+    },
+    "requestId" : "req-flash-prepareUncorrelated",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-83405c84ff74"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1821",
+      "lastSequence" : 4,
+      "sha256" : "a6bcd08322916e11cac7a2e791f640dd08c09ef06a79049c82f1c1e5d0e7d474"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-239a1e756f402f1de07051eaf82428d8",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67357",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2203",
+      "lastSequence" : 5,
+      "sha256" : "b618d95002f7b197147fb696fa57182849d1700eb3754cd542ff4da806c708f5"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-25T00:00:00Z",
+      "manifestByteCount" : "1179",
+      "manifestSHA256" : "fc64233a7fc9447534910a097f5e60b8076d34f485fb1807eb4a42f7ea1a3ddd",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "5",
+      "manifestSHA256" : "fc64233a7fc9447534910a097f5e60b8076d34f485fb1807eb4a42f7ea1a3ddd",
+      "publishedAtUTC" : "2026-09-25T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-239a1e756f402f1de07051eaf82428d8",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-flash-run-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-239a1e756f402f1de07051eaf82428d8",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "ArkForge artifact prewarm started after durable admission",
+    "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step verify-image-bundle",
+    "hash-images profile=dayu200 build=OpenHarmony-7.0.0.36 sha256=1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "host-step hash-images",
+    "destructive intent bound to Runtime capability CAP-RT-POLICY-3316450B8B0F4A1E1411DAF214BA3BCBA282EAC4-G3",
+    "delegated enter-loader-mode to the ArkForge lane's own plan",
+    "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+    "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+    "delegated rebind-loader-identity to the ArkForge lane's own plan",
+    "ArkForge artifact prewarm ready (store-hit, total 7 ms, consume wait <ms> ms)",
+    "capability consumed before first mutation",
+    "running->finalizing",
+    "reason: persisted ArkForge execution correlation does not match the admitted Runtime attempt; no permit was signed by this call",
+    "finalizing->failed",
+    "reason: persisted ArkForge execution correlation does not match the admitted Runtime attempt; no permit was signed by this call"
+  ]
+}
