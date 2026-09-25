@@ -124,6 +124,9 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     if invocation.command == "job.wait" {
         return wait_for_job(invocation, id, &endpoint, &identity);
     }
+    if let Some(verb) = invocation.command.strip_prefix("workspace.continuation.") {
+        return continue_workspace(invocation, id, verb, &endpoint, &identity);
+    }
     if matches!(
         invocation.command,
         "agent.status"
@@ -837,6 +840,43 @@ fn run_agent(
     }
 }
 
+/// Swift `runWorkspaceContinuation` over one connection. The health it opens
+/// with is the contract preflight, and every exchange shares the invocation's
+/// one deadline (`--timeout`, 30 s unless given), as Swift's bounded client
+/// does.
+fn continue_workspace(
+    invocation: &Invocation,
+    id: &str,
+    verb: &str,
+    endpoint: &LocalEndpoint,
+    identity: &ServerIdentity,
+) -> Result<Value, CliError> {
+    // Nothing is sent before the connection is made.
+    let mut client = Client::connect_bounded(
+        endpoint,
+        identity,
+        Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
+    )
+    .map_err(|error| CliError::from_client(error, "health"))?;
+    let fields = invocation.params.clone().unwrap_or_default();
+    arkdeck_cli::continue_workspace(verb, &fields, &mut |method, params| {
+        if method == "health" {
+            // A health document off the contract is this read's own
+            // malformed answer, as for `runtime health`.
+            return client.health(id).map_err(|error| match error {
+                arkdeck_client::ClientError::Contract(_) => CliError::new(
+                    "protocolMalformed",
+                    "the local Runtime response does not conform to the current contract",
+                ),
+                error => CliError::from_client(error, "health"),
+            });
+        }
+        client
+            .request(id, method, params)
+            .map_err(|error| CliError::from_client(error, method))
+    })
+}
+
 fn write_document(value: &Value) -> io::Result<()> {
     let bytes = render(value).map_err(io::Error::other)?;
     io::stdout().lock().write_all(&bytes)
@@ -1029,6 +1069,10 @@ fn main() -> std::process::ExitCode {
                 "job.run" | "job.wait" => {
                     arkdeck_cli::run_exit(&result).map(|(code, reason)| (code, reason.to_owned()))
                 }
+                // Swift `terminalJobExit` of the Job the continuation ran or
+                // found settled.
+                "workspace.continuation.run" => arkdeck_cli::run_exit(&result["job"])
+                    .map(|(code, reason)| (code, reason.to_owned())),
                 "operation.validate" => arkdeck_cli::validation_attention(&result),
                 "job.result" => Some(arkdeck_cli::result_exit(&result))
                     .filter(|code| *code != 0)
