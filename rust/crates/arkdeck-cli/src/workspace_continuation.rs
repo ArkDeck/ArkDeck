@@ -14,7 +14,8 @@
 //! The typed request is judged as Swift's `RuntimeOperationRequest` decodes
 //! it, which decides only whether the recorded request is readable.
 use crate::CliError;
-use crate::read_only_resources::{date, identifier, keys, publication};
+use crate::job_resources::{validate_show, validate_status};
+use crate::read_only_resources::{identifier, keys};
 use arkdeck_contract::operation_catalog::CatalogOperation;
 use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
 use serde_json::{Map, Value, json};
@@ -25,48 +26,6 @@ const SCHEMA_VERSION: &str = "arkdeck.workspace-continuation/1";
 const CLIENT_NAME: &str = "arkdeck-cli-workspace-continuation";
 const CONTINUED_FROM: &str = "arkdeck.continuedFromJob";
 const THREAD: &str = "arkdeck.threadId";
-const SHOW_KEYS: [&str; 14] = [
-    "schemaVersion",
-    "job",
-    "request",
-    "catalogDigest",
-    "providerId",
-    "materializedPlanDigest",
-    "materializedBindingRevision",
-    "materializedStableIdentitySha256",
-    "actualStepKinds",
-    "timeline",
-    "events",
-    "evidence",
-    "ringCoverage",
-    "screenSequence",
-];
-const STATUS_KEYS: [&str; 24] = [
-    "schemaVersion",
-    "jobId",
-    "operation",
-    "targetId",
-    "state",
-    "outcome",
-    "waitingForHuman",
-    "outcomeUnknown",
-    "outstandingResidueCount",
-    "executionMode",
-    "sessionId",
-    "threadId",
-    "workspaceKind",
-    "actualEffect",
-    "createdAtUtc",
-    "startedAtUtc",
-    "finishedAtUtc",
-    "supersededByRecoveryEpochId",
-    "recoveryEpochId",
-    "resolvedByTargetAliasResolutionId",
-    "sessionPublication",
-    "nextAction",
-    "failure",
-    "processProgress",
-];
 const HEALTH_KEYS: [&str; 6] = [
     "status",
     "protocolVersion",
@@ -139,97 +98,6 @@ fn sha256(value: &Value) -> bool {
 /// Swift `CLIWorkspaceContinuationDraft.nonnegativeInteger`.
 fn nonnegative(value: &Value) -> Option<i64> {
     value.as_i64().filter(|number| *number >= 0)
-}
-
-/// Swift `CLIJobReadValidation.validate` for `show`, in its order and words.
-fn validate_show(show: &Value, job_id: &str) -> Result<(), CliError> {
-    let invalid = || {
-        fail(
-            "recordUnreadable",
-            "the Runtime returned an invalid Job read projection",
-        )
-    };
-    if show["schemaVersion"] != "arkdeck.job/1"
-        || !keys(show, &SHOW_KEYS)
-        || !show["request"].is_object()
-        || !sha256(&show["catalogDigest"])
-    {
-        return Err(invalid());
-    }
-    let id = validate_status(&show["job"], Some(job_id))?;
-    if show["events"] != json!({"method": "job.events", "jobId": id})
-        || show["evidence"] != json!({"method": "job.evidence", "jobId": id})
-    {
-        return Err(invalid());
-    }
-    validate_timeline(&show["timeline"], &id)
-}
-
-/// Swift `CLIJobReadValidation.validateStatus`: the closed status a read
-/// answers, which reads successfully even when its next action needs a person
-/// or a reconciliation.
-fn validate_status(status: &Value, expected: Option<&str>) -> Result<String, CliError> {
-    let closed = || {
-        fail(
-            "recordUnreadable",
-            "Job status does not match its closed read schema",
-        )
-    };
-    let id = status["jobId"]
-        .as_str()
-        .filter(|id| identifier(id))
-        .ok_or_else(closed)?;
-    let outcome = if status["outcomeUnknown"] == true {
-        json!("outcomeUnknown")
-    } else {
-        status["state"].clone()
-    };
-    if !keys(status, &STATUS_KEYS)
-        || expected.is_some_and(|expected| expected != id)
-        || status["outcome"] != outcome
-        || !date(&status["createdAtUtc"])
-    {
-        return Err(closed());
-    }
-    if !publication(&status["sessionPublication"]) {
-        return Err(fail(
-            "recordUnreadable",
-            "Job status carries an unreadable Session publication",
-        ));
-    }
-    match crate::job_wait::observed(id, status) {
-        Err(error) if !matches!(error.code, "outcomeUnknown" | "humanActionRequired") => Err(error),
-        _ => Ok(id.to_owned()),
-    }
-}
-
-/// Swift `CLIJobReadValidation.validateTimeline` for a Job's own timeline.
-fn validate_timeline(timeline: &Value, job_id: &str) -> Result<(), CliError> {
-    let unreadable = |message: &str| Err(fail("recordUnreadable", message));
-    if !timeline.is_object() {
-        return unreadable("Job timeline is unreadable");
-    }
-    match timeline["kind"].as_str() {
-        Some("inline") => {
-            if !keys(timeline, &["kind", "entries"])
-                || !timeline["entries"]
-                    .as_array()
-                    .is_some_and(|entries| entries.iter().all(Value::is_string))
-            {
-                return unreadable("Job timeline is unreadable");
-            }
-        }
-        Some("snapshotPages") => {
-            if !keys(timeline, &["kind", "jobId", "method"])
-                || timeline["method"] != "job.timeline"
-                || timeline["jobId"] != job_id
-            {
-                return unreadable("Job timeline reference is unreadable");
-            }
-        }
-        _ => return unreadable("unknown Job timeline projection"),
-    }
-    Ok(())
 }
 
 /// Swift `decodeIfPresent(Int.self)`: absent or null is no value, and

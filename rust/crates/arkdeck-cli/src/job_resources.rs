@@ -2,7 +2,7 @@
 //! it is returned; resource references are never followed by this module.
 use crate::{
     CliError,
-    read_only_resources::{date, invalid, keys, known_job_state, validate_job_status},
+    read_only_resources::{date, identifier, invalid, keys, known_job_state, publication},
     session_resources::{digest, uuid},
 };
 use serde_json::{Map, Value, json};
@@ -70,36 +70,153 @@ pub(super) fn configure_list(fields: &mut Map<String, Value>) -> Result<(), CliE
     Ok(())
 }
 
-fn timeline(value: &Value, job_id: &str, allow_null: bool) -> bool {
-    if value.is_null() {
-        return allow_null;
-    }
-    match value["kind"].as_str() {
-        Some("inline") => {
-            keys(value, &["kind", "entries"])
-                && value["entries"]
-                    .as_array()
-                    .is_some_and(|entries| entries.iter().all(Value::is_string))
-        }
-        Some("snapshotPages") => {
-            keys(value, &["kind", "jobId", "method"])
-                && value["jobId"] == job_id
-                && value["method"] == "job.timeline"
-        }
-        _ => false,
-    }
-}
+const SHOW_KEYS: [&str; 14] = [
+    "schemaVersion",
+    "job",
+    "request",
+    "catalogDigest",
+    "providerId",
+    "materializedPlanDigest",
+    "materializedBindingRevision",
+    "materializedStableIdentitySha256",
+    "actualStepKinds",
+    "timeline",
+    "events",
+    "evidence",
+    "ringCoverage",
+    "screenSequence",
+];
+const STATUS_KEYS: [&str; 24] = [
+    "schemaVersion",
+    "jobId",
+    "operation",
+    "targetId",
+    "state",
+    "outcome",
+    "waitingForHuman",
+    "outcomeUnknown",
+    "outstandingResidueCount",
+    "executionMode",
+    "sessionId",
+    "threadId",
+    "workspaceKind",
+    "actualEffect",
+    "createdAtUtc",
+    "startedAtUtc",
+    "finishedAtUtc",
+    "supersededByRecoveryEpochId",
+    "recoveryEpochId",
+    "resolvedByTargetAliasResolutionId",
+    "sessionPublication",
+    "nextAction",
+    "failure",
+    "processProgress",
+];
 
-pub(super) fn validate_show(id: &str, value: &Value) -> Result<(), CliError> {
-    if value["schemaVersion"] != "arkdeck.job/1"
-        || !digest(&value["catalogDigest"])
-        || value["events"] != json!({"method":"job.events", "jobId":id})
-        || value["evidence"] != json!({"method":"job.evidence", "jobId":id})
-        || !timeline(&value["timeline"], id, false)
+/// Swift `CLIJobReadValidation.validate` for `show`, in its order and words.
+pub(crate) fn validate_show(show: &Value, job_id: &str) -> Result<(), CliError> {
+    let invalid = || {
+        CliError::new(
+            "recordUnreadable",
+            "the Runtime returned an invalid Job read projection",
+        )
+    };
+    if show["schemaVersion"] != "arkdeck.job/1"
+        || !keys(show, &SHOW_KEYS)
+        || !show["request"].is_object()
+        || !digest(&show["catalogDigest"])
     {
         return Err(invalid());
     }
-    validate_job_status(id, &value["job"])
+    let id = validate_status(&show["job"], Some(job_id))?;
+    if show["events"] != json!({"method": "job.events", "jobId": id})
+        || show["evidence"] != json!({"method": "job.evidence", "jobId": id})
+    {
+        return Err(invalid());
+    }
+    validate_timeline(&show["timeline"], &id, false)
+}
+
+/// Swift `CLIJobReadValidation.validateStatus`: the closed status every Job
+/// read answers, whose identity it returns. It reads even when its next action
+/// needs a person or a reconciliation: that is the Job's state, reported as
+/// the Runtime answered it, not an unreadable answer.
+pub(crate) fn validate_status(status: &Value, expected: Option<&str>) -> Result<String, CliError> {
+    let closed = || {
+        CliError::new(
+            "recordUnreadable",
+            "Job status does not match its closed read schema",
+        )
+    };
+    let id = status["jobId"]
+        .as_str()
+        .filter(|id| identifier(id))
+        .ok_or_else(closed)?;
+    let outcome = if status["outcomeUnknown"] == true {
+        json!("outcomeUnknown")
+    } else {
+        status["state"].clone()
+    };
+    if !keys(status, &STATUS_KEYS)
+        || expected.is_some_and(|expected| expected != id)
+        || status["outcome"] != outcome
+        || !date(&status["createdAtUtc"])
+    {
+        return Err(closed());
+    }
+    if !publication(&status["sessionPublication"]) {
+        return Err(CliError::new(
+            "recordUnreadable",
+            "Job status carries an unreadable Session publication",
+        ));
+    }
+    // `observed` also refuses a failure awaiting finalization, which Swift's
+    // `validatedObservedJobStatus` leaves to the waits that call it: a read
+    // reports that Job as it is.
+    match crate::job_wait::observed(id, status) {
+        Err(error)
+            if !matches!(
+                error.code,
+                "outcomeUnknown" | "humanActionRequired" | "resultNotReady"
+            ) =>
+        {
+            Err(error)
+        }
+        _ => Ok(id.to_owned()),
+    }
+}
+
+/// Swift `CLIJobReadValidation.validateTimeline`: a Job's inline timeline or
+/// its reference, and a list row's absent one where it was not asked for.
+fn validate_timeline(timeline: &Value, job_id: &str, allow_null: bool) -> Result<(), CliError> {
+    let unreadable = |message: &str| Err(CliError::new("recordUnreadable", message));
+    if allow_null && timeline.is_null() {
+        return Ok(());
+    }
+    if !timeline.is_object() {
+        return unreadable("Job timeline is unreadable");
+    }
+    match timeline["kind"].as_str() {
+        Some("inline") => {
+            if !keys(timeline, &["kind", "entries"])
+                || !timeline["entries"]
+                    .as_array()
+                    .is_some_and(|entries| entries.iter().all(Value::is_string))
+            {
+                return unreadable("Job timeline is unreadable");
+            }
+        }
+        Some("snapshotPages") => {
+            if !keys(timeline, &["kind", "jobId", "method"])
+                || timeline["method"] != "job.timeline"
+                || timeline["jobId"] != job_id
+            {
+                return unreadable("Job timeline reference is unreadable");
+            }
+        }
+        _ => return unreadable("unknown Job timeline projection"),
+    }
+    Ok(())
 }
 
 // The producer sorts parsed Dates, not their textual timezone/fraction spelling.
@@ -197,8 +314,13 @@ pub(super) fn validate_list(params: &Map<String, Value>, value: &Value) -> Resul
         let row_timeline = status.remove("timeline").ok_or_else(invalid)?;
         status.insert("schemaVersion".into(), json!("arkdeck.job-status/1"));
         let status = Value::Object(status);
-        let id = status["jobId"].as_str().ok_or_else(invalid)?;
-        validate_job_status(id, &status)?;
+        let id = validate_status(&status, None)?;
+        validate_timeline(
+            &row_timeline,
+            &id,
+            params.get("includeTimeline") != Some(&json!(true)),
+        )?;
+        let id = id.as_str();
         for (key, field) in [
             ("state", "state"),
             ("operation", "operation"),
@@ -212,13 +334,7 @@ pub(super) fn validate_list(params: &Map<String, Value>, value: &Value) -> Resul
                 return Err(invalid());
             }
         }
-        if !seen.insert(id.to_owned())
-            || !timeline(
-                &row_timeline,
-                id,
-                params.get("includeTimeline") != Some(&json!(true)),
-            )
-        {
+        if !seen.insert(id.to_owned()) {
             return Err(invalid());
         }
         let date = date_seconds(&status["createdAtUtc"]).ok_or_else(invalid)?;
@@ -308,4 +424,87 @@ pub(super) fn validate_timeline_page(
         previous = Some((index, part, last));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A recorded Swift daemon status, by the state it was recorded in.
+    fn recorded(state: &str) -> Value {
+        include_str!(
+            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
+        )
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|frame| frame["ok"] == true && frame["result"]["state"] == state)
+        .unwrap_or_else(|| panic!("Swift recorded a {state} status"))["result"]
+            .clone()
+    }
+
+    fn refusal(status: &Value) -> String {
+        let id = status["jobId"].as_str().unwrap_or("job-1");
+        validate_status(status, Some(id)).unwrap_err().message
+    }
+
+    #[test]
+    fn a_status_whose_next_action_needs_attention_reads_as_swift_reads_it() {
+        // Waiting on a person: its next action is the human action.
+        let mut human = recorded("running");
+        let id = human["jobId"].as_str().unwrap().to_owned();
+        human["waitingForHuman"] = json!(true);
+        human["nextAction"] = json!({
+            "kind": "humanAction",
+            "owner": {"kind": "job", "id": id},
+            "resource": {"kind": "humanAction", "id": "human-action-1"},
+            "reasonCode": "device.notObserved",
+            "resumeReference": "resume-1",
+            "expiresAt": null,
+        });
+        assert_eq!(validate_status(&human, Some(&id)).unwrap(), id);
+        // An unknown outcome, and a failure awaiting finalization: the waits
+        // refuse them, a read reports them.
+        let mut unknown = recorded("running");
+        unknown["outcomeUnknown"] = json!(true);
+        unknown["outcome"] = json!("outcomeUnknown");
+        unknown["nextAction"] = json!({
+            "kind": "reconcile",
+            "owner": {"kind": "job", "id": id},
+            "resource": {"kind": "job", "id": id},
+            "reasonCode": "recovery.outcomeUnknown",
+        });
+        assert!(validate_status(&unknown, None).is_ok());
+        let finalizing = recorded("finalizing");
+        assert!(validate_status(&finalizing, None).is_ok());
+        assert_eq!(
+            crate::job_wait::observed(finalizing["jobId"].as_str().unwrap(), &finalizing)
+                .unwrap_err()
+                .code,
+            "resultNotReady"
+        );
+    }
+
+    #[test]
+    fn a_malformed_status_is_refused_in_swifts_words() {
+        let status = recorded("running");
+        let mut outcome = status.clone();
+        outcome["outcome"] = json!("succeeded");
+        assert_eq!(
+            refusal(&outcome),
+            "Job status does not match its closed read schema"
+        );
+        let mut publication = status.clone();
+        publication["sessionPublication"]["reasonCode"] = json!("guessed");
+        assert_eq!(
+            refusal(&publication),
+            "Job status carries an unreadable Session publication"
+        );
+        let mut next = status.clone();
+        next["nextAction"]["kind"] = json!("readResult");
+        assert_eq!(refusal(&next), "Job status has no supported next action");
+        // A person-waiting status whose next action is not the human action.
+        let mut human = status;
+        human["waitingForHuman"] = json!(true);
+        assert_eq!(refusal(&human), "Job status has no supported next action");
+    }
 }

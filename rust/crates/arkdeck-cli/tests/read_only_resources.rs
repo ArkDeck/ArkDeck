@@ -423,12 +423,15 @@ mod endpoint {
         os::unix::fs::DirBuilderExt,
     };
     fn run(argv: &[&str], response: Value) -> (std::process::Output, Vec<Value>) {
-        run_delayed(argv, response, 0)
+        run_delayed(argv, response, [0, 0])
     }
+    /// The CLI against a fake Runtime that answers `health`, then `response`,
+    /// each only `delays_ms` after that request arrived. It stops when the CLI
+    /// closes the connection, which is when the CLI has exited.
     fn run_delayed(
         argv: &[&str],
         response: Value,
-        delay_ms: u64,
+        delays_ms: [u64; 2],
     ) -> (std::process::Output, Vec<Value>) {
         let suffix = arkdeck_platform::random_bytes::<8>()
             .unwrap()
@@ -449,10 +452,13 @@ mod endpoint {
                 .set_read_timeout(Some(std::time::Duration::from_secs(5)))
                 .unwrap();
             let mut requests = Vec::new();
-            for result in [
+            for (result, delay_ms) in [
                 json!({"id":"health","ok":true,"result":{"status":"ok","protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}}),
                 response,
-            ] {
+            ]
+            .into_iter()
+            .zip(delays_ms)
+            {
                 let frame = match read_frame(&mut stream, MAX_REQUEST_BYTES) {
                     Ok(frame) => frame,
                     Err(error) if error.kind() == std::io::ErrorKind::UnexpectedEof => break,
@@ -654,14 +660,22 @@ mod endpoint {
         assert_eq!(requests.len(), 2);
     }
 
+    /// One `--timeout` for `health` and the query, whose deadline starts before
+    /// the CLI connects. Each reply comes that long after its own request, so
+    /// together they always outlast the budget, while each alone fits inside it
+    /// (a budget per exchange would succeed). `health` is answered with 1.5 s
+    /// of the budget left for a slow connection on a loaded host.
+    const SHARED_BUDGET: &str = "4s";
+    const SHARED_DELAYS_MS: [u64; 2] = [2_500, 2_000];
+
     #[test]
     fn evidence_timeout_is_shared_by_health_and_query_and_emits_no_snapshot_or_replay() {
         let snapshot = sample(EVIDENCE)["result"].clone();
         let id = snapshot["jobId"].as_str().unwrap();
         let (out, requests) = run_delayed(
-            &["job", "evidence", "--job", id, "--timeout", "2s"],
+            &["job", "evidence", "--job", id, "--timeout", SHARED_BUDGET],
             json!({"id":"cli-read-test","ok":true,"result":snapshot}),
-            1200,
+            SHARED_DELAYS_MS,
         );
         assert_eq!(out.status.code(), Some(75));
         assert!(out.stderr.is_empty());
@@ -679,9 +693,9 @@ mod endpoint {
         let snapshot = sample(STATUS)["result"].clone();
         let id = snapshot["jobId"].as_str().unwrap();
         let (out, requests) = run_delayed(
-            &["job", "status", "--job", id, "--timeout", "2s"],
+            &["job", "status", "--job", id, "--timeout", SHARED_BUDGET],
             json!({"id":"cli-read-test","ok":true,"result":snapshot}),
-            1200,
+            SHARED_DELAYS_MS,
         );
         assert_eq!(out.status.code(), Some(75));
         assert!(out.stderr.is_empty());
