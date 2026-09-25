@@ -104,12 +104,25 @@ impl SessionStore {
                         "Session snapshot directory is unavailable",
                     )
                 })?;
+            // Swift's `listSessions` takes the storage lock for a first page
+            // before its pager, and reads a cursor's page under none: a first
+            // page waiting for the lock holds no snapshot lock meanwhile.
+            let lock = match cursor {
+                None => Some(self.resource_lock()?),
+                Some(_) => None,
+            };
             return pager.page(
                 method,
                 "completedAtDescSessionIdAsc",
                 page_size,
                 cursor,
-                || self.resource_rows(None, None),
+                || match &lock {
+                    Some(lock) => self.resource_rows(lock, None, None),
+                    None => Err(failure(
+                        "recordUnreadable",
+                        "Session storage is unavailable or unsafe",
+                    )),
+                },
             );
         }
         let mutation = matches!(method, "session.pin" | "session.unpin");
@@ -152,7 +165,7 @@ impl SessionStore {
         } else {
             None
         };
-        self.resource_rows(Some(id), pin)?
+        self.resource_rows(&self.resource_lock()?, Some(id), pin)?
             .into_iter()
             .next()
             .ok_or_else(|| {
@@ -163,8 +176,24 @@ impl SessionStore {
             })
     }
 
+    /// The storage lock for a Session resource request: Swift's
+    /// `listSessions`, `showSession` and `updateSessionPin` run under
+    /// `withLockedDocument`, which waits for it.
+    fn resource_lock(&self) -> Result<HostReadLock, WireError> {
+        use crate::snapshot_pager::failure;
+        let unavailable = |_| {
+            failure(
+                "recordUnreadable",
+                "Session storage is unavailable or unsafe",
+            )
+        };
+        self.root.validate_path(&self.path).map_err(unavailable)?;
+        self.root.wait_lock(LOCK, false).map_err(unavailable)
+    }
+
     fn resource_rows(
         &self,
+        lock: &HostReadLock,
         selected: Option<&str>,
         pin: Option<(u64, bool)>,
     ) -> Result<Vec<Value>, WireError> {
@@ -175,14 +204,6 @@ impl SessionStore {
                 "Session storage is unavailable or unsafe",
             )
         };
-        self.root.validate_path(&self.path).map_err(unavailable)?;
-        let lock = self.root.lock_document(LOCK).map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "Session storage is being updated")
-            } else {
-                unavailable(error)
-            }
-        })?;
         let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
             Ok(value) => value,
             Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
@@ -313,7 +334,7 @@ impl SessionStore {
     /// once the read has reconciled (and the first time initialized) the
     /// catalog. Swift's status read waits for the storage lock, so a request or
     /// a publication holding it at this instant delays the read rather than
-    /// refusing it, as the `runtime.storage.*` methods here refuse.
+    /// refusing it, as `runtime.storage.status` waits.
     pub(crate) fn waited_status(&self) -> Result<Value, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
@@ -476,13 +497,11 @@ impl SessionStore {
             None
         };
         self.root.validate_path(&self.path).map_err(unreadable)?;
-        let lock = self.root.lock_document(LOCK).map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "Session storage is being updated")
-            } else {
-                unreadable(e)
-            }
-        })?;
+        // Swift's `RuntimeStorageResourceHandler` reads and writes under
+        // `withLockedDocument`, which waits for the storage lock: a request
+        // made while a publication or another request holds it is answered
+        // once the lock is released, never refused because it is held.
+        let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
         self.locked_storage(&lock, expected, replacement_policy, selection)
     }
 
@@ -573,13 +592,7 @@ impl SessionStore {
         })?;
         // Reconcile the real tree before committing config. A measurement
         // failure cannot hide a completed config mutation or invite its replay.
-        let result = session_inventory_owned(&next, &selected).map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "Session catalog is being updated")
-            } else {
-                unreadable(e)
-            }
-        })?;
+        let result = session_inventory_owned(&next, &selected).map_err(unreadable)?;
         lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
         self.root.validate_path(&self.path).map_err(unreadable)?;
         if !status {
@@ -647,8 +660,7 @@ mod tests {
         std::thread::scope(|scope| {
             let store = &store;
             scope.spawn(move || sender.send(store.publication_status()).unwrap());
-            // A typed status read refuses the held lock at once; the
-            // publication's read, as Swift's, is still waiting for it.
+            // The publication's read, as Swift's, is still waiting for it.
             assert!(
                 receiver
                     .recv_timeout(std::time::Duration::from_millis(200))
@@ -660,6 +672,95 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(status, (root.0.join("sessions"), 1, 90));
+        });
+    }
+
+    #[test]
+    fn storage_requests_wait_for_a_held_storage_lock() {
+        // Swift's `RuntimeStorageResourceHandler` reads and writes under the
+        // blocking `withLockedDocument`: a request made while the lock is
+        // held is answered once it is released, and a write then lands.
+        // These methods refused a held lock here ("Session storage is being
+        // updated").
+        let root = Root::new();
+        let store = root.open();
+        let custom = root.0.join("custom");
+        for (method, request, generation) in [
+            ("runtime.storage.status", Map::new(), "1"),
+            ("runtime.storage.policy", policy("1"), "2"),
+            (
+                "runtime.storage.root",
+                params(json!({"expectedGeneration":"2","rootPath":custom})),
+                "3",
+            ),
+        ] {
+            let held = store.root.lock_document(LOCK).unwrap();
+            let (sender, receiver) = std::sync::mpsc::channel();
+            std::thread::scope(|scope| {
+                let (store, request) = (&store, &request);
+                scope.spawn(move || sender.send(store.handle(method, request)).unwrap());
+                assert!(
+                    receiver
+                        .recv_timeout(std::time::Duration::from_millis(200))
+                        .is_err(),
+                    "{method} answered while the storage lock was held"
+                );
+                drop(held);
+                let answer = receiver
+                    .recv_timeout(std::time::Duration::from_secs(30))
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(answer["generation"], generation, "{method}");
+            });
+        }
+        assert_eq!(
+            store.handle("runtime.storage.status", &Map::new()).unwrap()["rootPath"],
+            json!(custom)
+        );
+    }
+
+    #[test]
+    fn storage_writes_and_publication_reads_wait_for_each_other() {
+        // #2147's shape for the storage methods: a policy write and a
+        // publication's status read meet at a Barrier before each of 64
+        // rounds, so each round they contend for the storage lock. Both wait
+        // for it, as Swift's blocking `flock` does, so every write lands in
+        // turn and every read sees one whole generation; neither is refused
+        // because the other holds the lock. No sleeps and no time bound.
+        let root = Root::new();
+        let store = root.open();
+        let barrier = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            let reads = scope.spawn(|| {
+                (0..64)
+                    .map(|_| {
+                        barrier.wait();
+                        store.publication_status()
+                    })
+                    .collect::<Vec<_>>()
+            });
+            let writes = scope.spawn(|| {
+                (1..=64_u64)
+                    .map(|expected| {
+                        barrier.wait();
+                        store.handle("runtime.storage.policy", &policy(&expected.to_string()))
+                    })
+                    .collect::<Vec<_>>()
+            });
+            for (written, generation) in writes.join().unwrap().into_iter().zip(2_u64..) {
+                assert_eq!(written.unwrap()["generation"], generation.to_string());
+            }
+            let mut last = 1;
+            for read in reads.join().unwrap() {
+                let (sessions, generation, days) = read.unwrap();
+                assert_eq!(sessions, root.0.join("sessions"));
+                assert!(
+                    (last..=65).contains(&generation),
+                    "{generation} after {last}"
+                );
+                assert_eq!(days, if generation == 1 { 90 } else { 30 });
+                last = generation;
+            }
         });
     }
 
@@ -971,21 +1072,37 @@ mod tests {
         assert!(SessionStore::open(&root.0, &root.0.join("sessions")).is_err());
     }
     #[test]
-    fn corrupt_configuration_is_not_replaced_and_catalog_lock_failure_prevents_policy_write() {
+    fn corrupt_configuration_is_not_replaced_and_a_held_catalog_lock_delays_a_policy_write() {
         let root = Root::new();
         let sessions = HostDirectory::open(&root.0.join("sessions")).unwrap();
         let lock = sessions
             .lock_document(".arkdeck-retention-catalog.lock")
             .unwrap();
-        assert_eq!(
-            root.open()
-                .handle("runtime.storage.policy", &policy("1"))
-                .unwrap_err()
-                .code,
-            "resourceConflict"
-        );
-        assert!(!root.0.join("state/session-storage.json").exists());
-        drop(lock);
+        // Swift's retention catalog waits for its lock, and so does the
+        // policy write that reconciles it: nothing is written while it is
+        // held, and the write lands once it is released.
+        let store = root.open();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let store = &store;
+            scope.spawn(move || {
+                sender
+                    .send(store.handle("runtime.storage.policy", &policy("1")))
+                    .unwrap()
+            });
+            assert!(
+                receiver
+                    .recv_timeout(std::time::Duration::from_millis(200))
+                    .is_err()
+            );
+            assert!(!root.0.join("state/session-storage.json").exists());
+            drop(lock);
+            let written = receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+            assert_eq!(written["generation"], "2");
+        });
         fs::write(root.0.join("state/session-storage.json"), b"damaged").unwrap();
         assert_eq!(
             root.open()

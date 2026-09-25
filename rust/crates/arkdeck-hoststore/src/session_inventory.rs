@@ -296,17 +296,11 @@ pub(crate) fn session_resource_rows(
 ) -> Result<Vec<Value>, arkdeck_contract::WireError> {
     use crate::snapshot_pager::failure;
     let unreadable = |_| failure("recordUnreadable", "Session catalog cannot be read safely");
-    let conflict = |error: io::Error| {
-        if error.kind() == io::ErrorKind::WouldBlock {
-            failure("resourceConflict", "Session catalog is being updated")
-        } else {
-            unreadable(error)
-        }
-    };
-    session_inventory_owned(configuration, path).map_err(conflict)?;
+    session_inventory_owned(configuration, path).map_err(unreadable)?;
     let root = HostDirectory::open_session_tree(path).map_err(unreadable)?;
     let owner = HostDirectory::open(path).map_err(unreadable)?;
-    let lock = owner.lock_document(LOCK).map_err(conflict)?;
+    // Swift's `SessionRetentionCatalog` waits for its lock.
+    let lock = owner.wait_lock(LOCK, false).map_err(unreadable)?;
     let mut document = catalog(&root).ok_or_else(|| unreadable(invalid()))?;
     if document.generation > i64::MAX as u64 {
         return Err(unreadable(invalid()));
@@ -555,8 +549,10 @@ fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Resul
     } else {
         None
     };
+    // The owned catalog waits for its lock, as Swift's
+    // `SessionRetentionCatalog` does; a read-only inventory never waits.
     let lock = if let Some(owner) = &owner {
-        owner.lock_document(LOCK)?
+        owner.wait_lock(LOCK, false)?
     } else {
         root.try_lock_existing(LOCK)?.ok_or_else(|| {
             io::Error::new(
@@ -787,18 +783,33 @@ mod owner_tests {
         assert!(!root.0.join(METADATA).exists());
     }
     #[test]
-    fn unknown_content_counts_bytes_and_lock_conflict_never_initializes() {
+    fn unknown_content_counts_bytes_and_a_held_catalog_lock_delays_initialization() {
         let root = Root::new();
         let owner = HostDirectory::open(&root.0).unwrap();
         let lock = owner.lock_document(LOCK).unwrap();
-        assert_eq!(
-            session_inventory_owned(&root.config(), &root.0)
-                .unwrap_err()
-                .kind(),
-            io::ErrorKind::WouldBlock
-        );
-        assert!(!root.0.join(METADATA).exists());
-        drop(lock);
+        // Swift's retention catalog waits for its lock: nothing is initialized
+        // while it is held, and the catalog is once it is released.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let root = &root;
+            scope.spawn(move || {
+                sender
+                    .send(session_inventory_owned(&root.config(), &root.0).map(|_| ()))
+                    .unwrap()
+            });
+            assert!(
+                receiver
+                    .recv_timeout(std::time::Duration::from_millis(200))
+                    .is_err()
+            );
+            assert!(!root.0.join(METADATA).exists());
+            drop(lock);
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+        });
+        assert!(root.0.join(METADATA).exists());
         fs::write(root.0.join("unregistered"), b"12345").unwrap();
         let value = root.scan();
         assert_eq!(value["usage"]["usedBytes"], "5");

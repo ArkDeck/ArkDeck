@@ -195,20 +195,31 @@ Custom Session roots must stay inside the development root and disjoint from
 state and immutable Artifacts. Artifact indexed usage is verified before Session
 configuration mutation, including retained payload identity and SHA-256. Unknown Session bytes
 remain visible as incomplete measurement; corrupt or lost initialized catalogs
-are preserved for inspection. Artifact publication and installed activation
-are still pending migration.
+are preserved for inspection. A storage request waits for the storage lock
+(`session-state/.session-storage.lock`) and for the selected root's retention
+catalog lock, as Swift's `RuntimeSessionStorageStore` and
+`SessionRetentionCatalog` do: one made while a Session publication or another
+request holds either is answered once it is released. So do the Session
+resources and export below; only Session cleanup still tries the storage lock
+and refuses a held one (`resourceConflict`). `storage_lock_wait_oracle` replays
+Swift's answers. Artifact publication and installed activation are still
+pending migration.
 
 Run `python3 rust/scripts/check-session-owner.py` after building the binaries for
-actual socket/CLI, nonempty Session census, restart/CAS, pin retention, damaged
-catalog, isolated-root refusal and corrupt-payload-before-mutation checks. Its
-fixtures are explicitly simulated host data and provide no device evidence.
+actual socket/CLI, nonempty Session census, restart/CAS, requests made while the
+storage lock is held, pin retention, damaged catalog, isolated-root refusal and
+corrupt-payload-before-mutation checks. Its fixtures are explicitly simulated host
+data and provide no device evidence.
 
 The isolated owner also serves `session list [--page-size <n>] [--cursor <cursor>]`,
 `session show --session <id>`, and `session pin|unpin --session <id>
 --expected-generation <catalog-generation>`. Catalog generations can start at
 zero; they are distinct from the storage configuration generation. Repeating an
 already satisfied pin state does not advance the catalog. A stale generation or
-an incomplete whole-root measurement prevents pin publication.
+an incomplete whole-root measurement prevents pin publication. A first `list`
+page takes the storage lock before its snapshot pager, as Swift's does, and a
+cursor's page reads its snapshot under no storage lock, so a first page waiting
+for the lock holds up no cursor.
 
 Pages are immutable private snapshots with query-bound cursors and bounded
 retention (32 snapshots, 64 MiB total, 16 MiB per snapshot, 1 MiB per page). They
@@ -683,8 +694,7 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   `SessionStore::waited_status`). That read waits for the storage lock, as
   Swift's `validateMutationState` does: a mutation submitted while the previous
   Job's Session is being published is admitted once the publication releases
-  it, where the `runtime.storage.*` methods refuse a held lock. The operation
-  availability report asks the same question without waiting
+  it. The operation availability report asks the same question without waiting
   (`MutationAuthority::state_proven_now`), as Swift's availability reads no
   storage at all. Reading that status takes the storage owner's lock and the
   retention catalog's, so an admission leaves

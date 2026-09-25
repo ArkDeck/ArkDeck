@@ -15,6 +15,7 @@ import select
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -71,6 +72,23 @@ def main():
         def refused(method,params,code):
             reply=exchange(method,params)
             assert not reply['ok'] and reply['error']['code']==code,reply
+        def while_locked(lock_path,method,params):
+            # Swift's Session owner waits for the storage lock and for the
+            # retention catalog's: a request made while either is held is
+            # answered once it is released, never refused.
+            answers=[]
+            waiting=threading.Thread(target=lambda:answers.append(exchange(method,params)))
+            lock=os.open(lock_path,os.O_RDWR)
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                waiting.start()
+                waiting.join(.5)
+                assert waiting.is_alive() and not answers,(method,answers)
+            finally: os.close(lock)
+            waiting.join(10)
+            assert not waiting.is_alive() and len(answers)==1,(method,answers)
+            assert answers[0]['ok'],answers[0]
+            return answers[0]['result']
         def command(arguments,expected=0):
             answer=subprocess.run([str(cli),'session',*arguments,'--socket',str(endpoint),'--output','json'],env=env,capture_output=True,timeout=15)
             assert answer.returncode==expected,(answer.returncode,answer.stdout,answer.stderr)
@@ -138,15 +156,11 @@ def main():
             descriptor=os.open(root/'session-state/.session-storage.lock',os.O_RDWR)
             try:
                 fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'resourceConflict')
+                # A cursor page reads its private snapshot, under no storage lock.
                 assert result('session.list',{'pageSize':1,'cursor':cursor})==next_page
             finally:os.close(descriptor)
-            assert catalog_path.read_bytes()==before
-            descriptor=os.open(root/'sessions/.arkdeck-retention-catalog.lock',os.O_RDWR)
-            try:
-                fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'resourceConflict')
-            finally:os.close(descriptor)
+            assert while_locked(root/'session-state/.session-storage.lock','session.show',{'sessionId':'session-latest'})==unpinned
+            assert while_locked(root/'sessions/.arkdeck-retention-catalog.lock','session.show',{'sessionId':'session-latest'})==unpinned
             assert catalog_path.read_bytes()==before
             rogue=session('session-unregistered','09')
             assert result('session.show',{'sessionId':'session-latest'})==unpinned

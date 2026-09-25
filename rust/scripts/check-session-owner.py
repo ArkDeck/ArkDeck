@@ -10,6 +10,7 @@ from pathlib import Path
 import socket
 import subprocess
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -56,6 +57,21 @@ def main():
             return json.loads(answer.stdout)
         def policy(generation, **extra):
             return {'expectedGeneration':str(generation),'totalQuotaBytes':'500000','safetyMarginBytes':'1000','retentionDays':'30',**extra}
+        def while_locked(method,params):
+            # Swift's storage requests wait for the storage lock: one made while
+            # it is held is answered once it is released, never refused.
+            answers=[]
+            waiting=threading.Thread(target=lambda:answers.append(exchange(method,params)))
+            lock=os.open(root/'session-state/.session-storage.lock',os.O_RDWR)
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                waiting.start()
+                waiting.join(.5)
+                assert waiting.is_alive() and not answers,(method,answers)
+            finally: os.close(lock)
+            waiting.join(10)
+            assert not waiting.is_alive() and len(answers)==1,(method,answers)
+            return answers[0]
         try:
             first=start()
             value=exchange('runtime.storage.status',{})
@@ -102,11 +118,7 @@ def main():
             assert exchange('runtime.storage.root',{'expectedGeneration':'3','resetToDefault':True})['result']['sessionDomain']['generation']=='4'
             assert command(['root','--expected-generation','4','--root',str(custom)])['result']['sessionDomain']['generation']=='5'
             assert exchange('runtime.storage.status',{})['result']['sessionDomain']['generation']=='5'
-            lock=os.open(root/'session-state/.session-storage.lock',os.O_RDWR)
-            try:
-                fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                assert exchange('runtime.storage.policy',policy(5))['error']['code']=='resourceConflict'
-            finally: os.close(lock)
+            assert while_locked('runtime.storage.status',{})['result']['sessionDomain']['generation']=='5'
             # Published bytes are verified before any Session mutation.
             artifact_dir=root/'artifacts/JOB-TEST';artifact_dir.mkdir(mode=0o700)
             artifact_id='ART-'+'a'*32
@@ -139,6 +151,8 @@ def main():
                 assert exchange('runtime.storage.root',{'expectedGeneration':'8','rootPath':str(custom)})['error']['code']=='invalidInput'
             finally: custom.chmod(0o700)
             assert (root/'session-state/session-storage.json').read_bytes()==before
+            assert while_locked('runtime.storage.policy',policy(8))['result']['sessionDomain']['generation']=='9'
+            assert while_locked('runtime.storage.root',{'expectedGeneration':'9','resetToDefault':True})['result']['sessionDomain']['generation']=='10'
         finally:
             for child in children:
                 if child.poll() is None:child.terminate()

@@ -208,4 +208,9 @@ not change it.
 
 ## CI
 
-Pending.
+#2207, head `78b3e8390`, run 36166497620: every selected lane passed.
+- Rust workspace: macOS 14m27s, Ubuntu 2m18s, Windows 4m49s. Host-independent checks: 45s.
+- `guard`; `swift` aggregate.
+
+It merged as `a3de6c316`. Recorded by the next slice (TASK-XPA-012, storage requests wait), as
+AGENTS.md has it.

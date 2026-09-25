@@ -37,13 +37,8 @@ pub fn session_export_snapshot(
     }
     session_resource_rows(configuration, path, Some(session_id), None)?;
     let owner = HostDirectory::open(path).map_err(unreadable)?;
-    let lock = owner.lock_document(LOCK).map_err(|error| {
-        if error.kind() == io::ErrorKind::WouldBlock {
-            failure("resourceConflict", "Session catalog is being updated")
-        } else {
-            unreadable(error)
-        }
-    })?;
+    // Swift's `SessionRetentionCatalog` waits for its lock.
+    let lock = owner.wait_lock(LOCK, false).map_err(unreadable)?;
     let root = HostDirectory::open_session_tree(path).map_err(unreadable)?;
     let root_facts = root.export_facts().map_err(unreadable)?;
     let document = catalog(&root).ok_or_else(|| unreadable(invalid()))?;
