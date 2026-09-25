@@ -129,10 +129,14 @@ serves, from `crates/arkdeck-cli/src/command_registry.json`, which
 `CLIRustCommandRegistryCopyContractTests` holds to Swift's projection.
 `scripts/copy-command-registry.py` refreshes that copy from the published registry
 (`--check` only reports drift).
-`crates/arkdeck-cli/tests/argv_fixtures.rs` replays the Swift argv fixture of every
-served leaf, copied unchanged into `tests/fixtures/current-cli-argv`, and pins the
-cases this parser still answers otherwise; TASK-XPA-018's `cli-parity-audit.py`
-classifies the 256 coverage entries from these.
+`crates/arkdeck-cli/tests/argv_fixtures.rs` replays the argv fixture of every
+served leaf through the parser. The fixtures are the ones the CLI renders for the
+machine-contract bundle (`machine_contracts::argv_fixture`); `tests/machine_contracts.rs`
+holds them byte for byte to the documents Swift publishes, through the digest table
+`tests/fixtures/contracts-bundle/owned.json`. After an export changes the bundle,
+`scripts/refresh-contract-digests.py` rewrites that table from the committed files
+(`--check` only reports drift). TASK-XPA-018's `cli-parity-audit.py` classifies the
+256 coverage entries from the leaves the CLI serves.
 
 The Unix default endpoint is a private development socket under the temporary
 directory, separate from the published Swift socket. Windows uses a local

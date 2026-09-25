@@ -9,9 +9,6 @@ use serde_json::{Value, json};
 #[cfg(target_os = "macos")]
 mod support;
 
-const ARGV: &str =
-    include_str!("../../../tests/fixtures/current-cli-argv/runtime.tool.select.json");
-
 fn args(argv: &[&str]) -> Vec<String> {
     argv.iter().map(|arg| (*arg).to_owned()).collect()
 }
@@ -37,7 +34,7 @@ fn select(tool: &str, generation: &str, request: &str) -> Vec<String> {
 
 #[test]
 fn the_published_argv_fixture_replays() {
-    let doc: Value = serde_json::from_str(ARGV).unwrap();
+    let doc = arkdeck_cli::machine_contracts::argv_fixture("runtime.tool.select").unwrap();
     for case in doc["cases"].as_array().unwrap() {
         let argv: Vec<String> = case["argv"]
             .as_array()

@@ -2,10 +2,7 @@ use arkdeck_cli::{parse, validate_read_only_response};
 use serde_json::{Value, json};
 #[test]
 fn unary_events_argv_matches_current_swift_and_preserves_exclusive_cursor() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/job.events.json"
-    ))
-    .unwrap();
+    let fixture: Value = arkdeck_cli::machine_contracts::argv_fixture("job.events").unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let args = row["argv"]
             .as_array()

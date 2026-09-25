@@ -3,15 +3,15 @@ use serde_json::{Value, json};
 
 #[test]
 fn existing_bootstrap_argv_fixtures_keep_their_dispatch_contract() {
-    for corpus in [
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.tool.list.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.tool.remove.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.tool.inspect.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.inspect.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.list.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.remove.json"),
+    for command in [
+        "runtime.tool.list",
+        "runtime.tool.remove",
+        "runtime.tool.inspect",
+        "runtime.bundle.inspect",
+        "runtime.bundle.list",
+        "runtime.bundle.remove",
     ] {
-        let corpus: Value = serde_json::from_str(corpus).unwrap();
+        let corpus = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in corpus["cases"].as_array().unwrap() {
             let argv: Vec<String> = case["argv"]
                 .as_array()

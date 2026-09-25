@@ -3,12 +3,9 @@
 //! `runtime.hdc.status` frame corpus, served to the actual CLI by a fake
 //! Runtime that checks the request carries no parameters.
 use arkdeck_cli::parse;
-use serde_json::Value;
 
 #[cfg(target_os = "macos")]
 mod support;
-
-const ARGV: &str = include_str!("../../../tests/fixtures/current-cli-argv/runtime.hdc.status.json");
 
 fn args(argv: &[&str]) -> Vec<String> {
     argv.iter().map(|arg| (*arg).to_owned()).collect()
@@ -16,7 +13,7 @@ fn args(argv: &[&str]) -> Vec<String> {
 
 #[test]
 fn the_published_argv_fixture_replays() {
-    let doc: Value = serde_json::from_str(ARGV).unwrap();
+    let doc = arkdeck_cli::machine_contracts::argv_fixture("runtime.hdc.status").unwrap();
     for case in doc["cases"].as_array().unwrap() {
         let argv: Vec<String> = case["argv"]
             .as_array()

@@ -322,27 +322,32 @@ pub fn valid_correlation(id: &str) -> bool {
 /// Swift's words, `details` and leaf. Otherwise this parser's own refusal
 /// names the leaf the path resolved to, as Swift's handler failures do. A
 /// path the registry names but this CLI does not serve keeps its own
-/// refusal. Neither pass widens or narrows what is accepted.
+/// refusal, and so does an option this platform does not offer (`--socket`
+/// off macOS): Swift's parser only ever judged macOS. Neither pass widens or
+/// narrows what is accepted.
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if let Some(answer) = command_registry::answer_by_name(argv) {
         return answer;
     }
-    parse_argv(argv).map_err(|error| {
-        let leaf = registry_parse::leaf(argv);
-        if error.code == "invalidCommand" && leaf.is_some() {
-            return error;
-        }
-        match registry_parse::check(argv) {
-            Err(swift) => swift,
-            Ok(()) => {
-                let mut error = error;
-                if error.command.is_none() && error.code != "invalidCommand" {
-                    error.command = leaf;
-                }
-                error
+    parse_argv(argv).map_err(|error| reported(argv, error))
+}
+
+/// The refusal `parse` reports for `argv`, given this parser's own.
+fn reported(argv: &[String], error: CliError) -> CliError {
+    let leaf = registry_parse::leaf(argv);
+    if error.code == "invalidCommand" && leaf.is_some() {
+        return error;
+    }
+    match registry_parse::check(argv) {
+        Err(swift) if error.code != "unsupportedOnPlatform" => swift,
+        _ => {
+            let mut error = error;
+            if error.command.is_none() && error.code != "invalidCommand" {
+                error.command = leaf;
             }
+            error
         }
-    })
+    }
 }
 
 fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
@@ -791,11 +796,21 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         error.command = Some(command);
         return Err(error);
     }
-    // Swift's parser refuses `--socket` on `runtime tool register` unless the
-    // kind is DevEco, because its HDC registration runs in its own process.
-    // This CLI sends every registration to the Runtime that owns the Bootstrap
-    // store, so the endpoint is exactly what this leaf needs; the divergence is
-    // recorded in TASK-XPA-018's audit.
+    // Swift's parser takes `--socket` on the shared registration leaf only for
+    // the DevEco kind, and so does this one. This CLI sends an HDC
+    // registration to the Runtime too; `ARKDECK_ENDPOINT` names another one.
+    if command == "runtime.tool.register"
+        && socket.is_some()
+        && method_options.get("kind") != Some(&json!("deveco"))
+    {
+        let mut error = CliError::new("invalidOption", "HDC registration does not accept --socket");
+        error.details = Map::from_iter([
+            ("command".to_owned(), json!(command)),
+            ("option".to_owned(), json!("--socket")),
+        ]);
+        error.command = Some(command);
+        return Err(error);
+    }
     // Neither local leaf reaches a Runtime, and `completion` writes a script
     // to stdout, so it takes no output mode at all (CLI spec §8.1).
     if command == "completion"
@@ -1681,4 +1696,34 @@ pub fn render(value: &Value) -> Result<Vec<u8>, ContractError> {
     let mut bytes = canonical_json(value)?;
     bytes.push(b'\n');
     Ok(bytes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CliError, reported};
+
+    /// Off macOS this parser refuses `--socket` as the platform's
+    /// (`unsupportedOnPlatform`), and that stands where Swift's registry pass
+    /// refuses the same argv, as it does an HDC registration's `--socket`.
+    #[test]
+    fn a_platform_refusal_stands_where_swift_refuses_too() {
+        let argv = [
+            "runtime", "tool", "register", "--kind", "hdc", "--socket", "/tmp/s",
+        ]
+        .map(String::from);
+        let error = reported(
+            &argv,
+            CliError::new(
+                "unsupportedOnPlatform",
+                "--socket is only available on macOS",
+            ),
+        );
+        assert_eq!(
+            (error.code, error.command),
+            ("unsupportedOnPlatform", Some("runtime.tool.register"))
+        );
+        // Any other refusal of that argv is reported in Swift's words.
+        let error = reported(&argv, CliError::new("invalidOption", "refused"));
+        assert_eq!(error.message, "HDC registration does not accept --socket");
+    }
 }

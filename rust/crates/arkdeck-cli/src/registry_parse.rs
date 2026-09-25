@@ -14,20 +14,19 @@
 //!    exclusions, the exactly-one-of groups and the positionals.
 //!
 //! What it accepts is the parser's to read, which judges what the values mean
-//! as Swift's handlers do. Help, `--version` and a node path are left to it.
+//! as Swift's handlers do. For an executable leaf it also says what Swift's
+//! parser answers ([`Accepted`]), which the argv fixtures record
+//! (`machine_contracts`). Help or `--version` without a leaf, a node path,
+//! `arkdeck help <path>`, a leaf that is not executable and `--version` after
+//! a leaf are left to the parser.
 //!
 //! The CLI spec (§5.1) lets a global option stand ahead of the command path
 //! or after the leaf's arguments, and this CLI reads `--control-request-id`,
 //! `--timeout` and `--socket` in either place. Swift's parser reads only the
 //! four above ahead of the path, so the pass judges one of these three, with
 //! its value, where Swift reads it: just after the path, as the leaf's own.
-//!
-//! One Swift check is left out: its parser refuses `--socket` on
-//! `runtime tool register` unless the kind is DevEco, which this CLI declares
-//! a divergence (it registers every kind through the Runtime).
-use crate::{CliError, valid_correlation};
+use crate::{CliError, command_registry, valid_correlation};
 use serde_json::{Map, Value, json};
-use std::sync::OnceLock;
 
 const HELP: [&str; 2] = ["--help", "-h"];
 const VERSION: &str = "--version";
@@ -36,11 +35,7 @@ const OUTPUT: &str = "--output";
 const LEADING_GLOBALS: [&str; 3] = ["--control-request-id", "--timeout", "--socket"];
 
 fn leaves() -> &'static [Value] {
-    static REGISTRY: OnceLock<Value> = OnceLock::new();
-    REGISTRY.get_or_init(|| {
-        serde_json::from_str(include_str!("command_registry.json"))
-            .expect("the checked-in command registry")
-    })["commands"]
+    command_registry::projection()["commands"]
         .as_array()
         .expect("the registry's commands")
 }
@@ -131,6 +126,24 @@ struct State {
 enum Global {
     Consumed,
     NotGlobal,
+}
+
+/// What Swift's parser answers a leaf's argv with when it accepts it (Swift
+/// `CLIInvocation`).
+#[derive(Debug)]
+pub(crate) enum Accepted {
+    /// `arkdeck help`.
+    RootHelp,
+    LeafHelp(&'static str),
+    /// `commands`, in its output mode.
+    Commands(String),
+    /// `completion`, for its shell.
+    Completion(String),
+    /// A leaf's handler, given the argv from the first path token on.
+    Dispatch {
+        command: &'static str,
+        handler_arguments: Vec<String>,
+    },
 }
 
 /// Swift `consumeGlobal`: `--help`, `-h`, `--version` and `--output`.
@@ -261,10 +274,11 @@ pub(crate) fn leaf(argv: &[String]) -> Option<&'static str> {
     None
 }
 
-/// Swift's registry pass over `argv`; see the module.
-pub(crate) fn check(argv: &[String]) -> Result<(), CliError> {
+/// Swift's registry pass over `argv`; see the module. `None` where it
+/// leaves the answer to the parser.
+pub(crate) fn check(argv: &[String]) -> Result<Option<Accepted>, CliError> {
     if argv.is_empty() {
-        return Ok(());
+        return Ok(None);
     }
     let argv = &as_swift_reads(argv);
     let mut state = State::default();
@@ -286,9 +300,10 @@ pub(crate) fn check(argv: &[String]) -> Result<(), CliError> {
     }
     // A bare `--version` or `--help` is a complete request.
     if index == argv.len() {
-        return Ok(());
+        return Ok(None);
     }
     // Phase 2: the command path.
+    let path_start = index;
     let first = argv[index].as_str();
     index += 1;
     let mut path = vec![first];
@@ -325,7 +340,7 @@ pub(crate) fn check(argv: &[String]) -> Result<(), CliError> {
             // An incomplete path: a request for the node's help, or a
             // command that needs its subcommand.
             if state.help {
-                return help(&state);
+                return help(&state).map(|()| None);
             }
             return Err(refusal(
                 "invalidCommand",
@@ -344,7 +359,7 @@ pub(crate) fn check(argv: &[String]) -> Result<(), CliError> {
                     return Err(duplicate(next, None));
                 }
                 state.help = true;
-                return help(&state);
+                return help(&state).map(|()| None);
             }
             return Err(refusal(
                 "invalidOption",
@@ -360,21 +375,22 @@ pub(crate) fn check(argv: &[String]) -> Result<(), CliError> {
         index += 1;
         path.push(next.as_str());
     };
-    check_leaf(argv, index, &path, leaf, state)
+    check_leaf(argv, index, path_start, &path, leaf, state)
 }
 
 /// Swift `parseLeaf` for an executable leaf, from the token after its path.
 fn check_leaf(
     argv: &[String],
     mut index: usize,
+    path_start: usize,
     path: &[&str],
     leaf: &'static Value,
     mut state: State,
-) -> Result<(), CliError> {
+) -> Result<Option<Accepted>, CliError> {
     // Leaves that are not executable are answered by name before this pass
     // (`command_registry::answer_by_name`).
     if leaf["kind"] != "executable" {
-        return Ok(());
+        return Ok(None);
     }
     let command = leaf["command"]
         .as_str()
@@ -419,11 +435,23 @@ fn check_leaf(
         positionals.push(token);
         index += 1;
     }
+    // Swift: the shared registration leaf connects only for the DevEco kind.
+    if command == "runtime.tool.register"
+        && provided.get("--kind") != Some(&json!("deveco"))
+        && provided.contains_key("--socket")
+    {
+        return Err(refusal(
+            "invalidOption",
+            "HDC registration does not accept --socket".into(),
+            json!({"command": command, "option": "--socket"}),
+            Some(command),
+        ));
+    }
     if state.help {
-        return help(&state);
+        return help(&state).map(|()| Some(Accepted::LeafHelp(command)));
     }
     if state.version {
-        return Ok(());
+        return Ok(None);
     }
     // `--output` is position-global but leaf-scoped: given in both regions it
     // is still one option given twice.
@@ -462,7 +490,21 @@ fn check_leaf(
             ));
         }
     }
-    validate(leaf, command, &name, options, &provided, &positionals)
+    validate(leaf, command, &name, options, &provided, &positionals)?;
+    Ok(match command {
+        "commands" => Some(Accepted::Commands(
+            state.output.unwrap_or_else(|| "human".into()),
+        )),
+        // The registry requires the shell, which `validate` has checked.
+        "completion" => Some(Accepted::Completion(positionals[0].to_owned())),
+        // Swift `helpInvocation(for:)`, without a path.
+        "help" if positionals.is_empty() => Some(Accepted::RootHelp),
+        "help" => None,
+        _ => Some(Accepted::Dispatch {
+            command,
+            handler_arguments: argv[path_start..].to_vec(),
+        }),
+    })
 }
 
 /// Swift `validate(leaf:path:provided:positionals:)`.

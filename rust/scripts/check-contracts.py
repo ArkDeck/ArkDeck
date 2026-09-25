@@ -190,14 +190,6 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
         write_json(path, provenance)
 
 
-def verify_current_cli_argv() -> None:
-    """Keep packaged parser samples byte-identical to the current Swift corpus."""
-    source = ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv"
-    for sample in sorted((ROOT / "rust/tests/fixtures/current-cli-argv").glob("*.json")):
-        if sample.read_bytes() != (source / sample.name).read_bytes():
-            raise ValueError(f"current CLI argv fixture drift: {sample.name}")
-
-
 def verify_contract_bundle_digests() -> None:
     """Hold the digests the Rust contract export is tested against to the
     committed machine-contract bundle, which the contract views do not carry.
@@ -219,7 +211,6 @@ def verify_contract_bundle_digests() -> None:
 
 
 def check(output_root: Path) -> Path:
-    verify_current_cli_argv()
     verify_contract_bundle_digests()
     contract.verify_checkout()
     published_commit = contract.published_base()

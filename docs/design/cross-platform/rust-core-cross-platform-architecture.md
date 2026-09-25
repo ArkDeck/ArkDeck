@@ -68,7 +68,7 @@
 | 29 | Journal 单一世代 | CHG-2026-075 TASK-SVC-002 合入后 Swift 只接受 `1.0.0`（`isSupportedSchemaVersion` 是精确相等），与契约 `journal-event.schema.json` 的 `const "1.0.0"` 一致；扫描时的五代并存与该冲突已消解 | F | `Sources/ArkDeckStorage/JournalEvent.swift:39-42,76-78`；`openspec/contracts/journal-event.schema.json:3,19` |
 | 30 | 状态机是代码 | `JobState` 20 态/6 终态、`allowedDestinations(from:mode:)` 是 `switch`；规格里是 ASCII 图；`simulated` 不是引擎 mode，只是 manifest/展示词汇 | F | `Sources/ArkDeckCore/JobStateMachine.swift:1-4,6-9,36-38,488-493,558-620`；`openspec/specs/workflow-journal-recovery/spec.md:82-112`；`Sources/ArkDeckStorage/SessionManifest.swift:905,983,1057-1060` |
 | 31 | Canonical 形态 | JCS（UTF-16 code unit 键序、ECMAScript 数字、不转义 `/`）+ 10 向量 5 拒绝；deterministic CBOR 只用于 StepPermit 并与 Rust 交叉验证；digest 全部 SHA-256 小写 hex；Catalog digest 由 Python 生成器算（Profiles 不入 digest） | F | `Sources/ArkDeckCore/PortableCanonicalJSON.swift:16-41,85,97-183`；`openspec/contracts/cli-canonical-json-vectors.json`；`Sources/ArkDeckCore/CanonicalCBOR.swift:24`；`scripts/catalog_gen/generate.py:741-748` |
-| 32 | 机器契约的事实源是 Swift | `arkdeck maintainer contracts export/check` 从 Swift 导出机器契约；当前 CLI corpus 为 208 个 argv fixture，index 共列 223 个 fixture 文件，不能与 96 个控制面录制文件混计 | F | `Sources/ArkDeckCLI/CLIMachineContracts.swift`；`Tests/ArkDeckContractTests/Fixtures/CLI/index.json`；`Tests/ArkDeckContractTests/CLIMachineContractTests.swift` |
+| 32 | 机器契约的事实源是 Swift | `arkdeck maintainer contracts export/check` 从 Swift 导出机器契约；当前 CLI corpus 为 209 个 argv fixture，index 共列 224 个 fixture 文件，不能与 96 个控制面录制文件混计 | F | `Sources/ArkDeckCLI/CLIMachineContracts.swift`；`Tests/ArkDeckContractTests/Fixtures/CLI/index.json`；`Tests/ArkDeckContractTests/CLIMachineContractTests.swift` |
 | 33 | Darwin 绑定密度 | ArkDeckCore 与 TraceAdapter 无 Darwin import；Process 5/5 文件、Storage 17、Workflows 32 处 `import Darwin`，另有 `Security/LocalAuthentication/IOKit/os/AVFoundation/CoreGraphics` | H | 逐模块统计见 §E.1（engine 盘点） |
 | 34 | 进程执行器 | `posix_spawn`，argv[0] 用 `/.vol/<dev>/<ino>` inode 路径，执行前后双重 revalidate；25 ms `poll` 抽取；无 kqueue | F | `Sources/ArkDeckProcess/VerifiedRegularFileDescriptor.swift:130-142,180-219`；`Sources/ArkDeckProcess/ArkDeckProcess.swift:6-9,1030`；`Sources/ArkDeckProcess/IdentityBoundDaemonLauncher.swift:20-23,165` |
 | 35 | HDC supervisor 观测 | `proc_listallpids/proc_pidpath/proc_pidinfo/sysctl KERN_PROCARGS2`、socket 归属解码，全部 libproc | F | `Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift:310-401`；`Sources/ArkDeckOpenHarmony/ArkDeckOpenHarmony.swift:655-740` |
@@ -376,7 +376,7 @@ flowchart TB
 | ArkDeckWorkflows：`DeviceRecordingBudget`、AVFoundation `.mov` 合成 | **split** | 预算/帧率语义 → `arkdeck-runtime`；视频合成 → 平台 App | Windows 用 Media Foundation 或先只交付帧序列 |
 | ArkDeckAgentDaemon：`RuntimeControlPlaneHandler`、`AgentXPCListener`、server | **migrate** | `arkdeck-control` + `arkdeck-platform::ipc` + `arkdeck-agentd` | handler 保持 transport-free（`AgentDaemon.swift:89`；ADR-0005 第 3 条） |
 | ArkDeckAgentClient | **split** | `arkdeck-client`（Rust，供 CLI）+ `ArkDeckClientKit`/`ArkDeck.ClientKit`（生成） | SVC 完成后的 deadline、单 v1 验证和失败语义契约测试改为黑盒对 Rust daemon 复跑 |
-| ArkDeckCLI | **migrate** | `arkdeck-cli` | 当前 208 个 argv fixtures + envelope/page/nextAction 样本是回归面；以单 v1 fixture index 为准；`maintainer contracts export` 移到 Rust 后事实源翻转 |
+| ArkDeckCLI | **migrate** | `arkdeck-cli` | 当前 209 个 argv fixtures + envelope/page/nextAction 样本是回归面；以单 v1 fixture index 为准；`maintainer contracts export` 移到 Rust 后事实源翻转 |
 | ArkDeckAgentComposition | **migrate / 部分 retire** | `arkdeck-runtime::workspace` | campaign host 已随 CHG-2026-065/066 退役（ADR-0009 注记），只保留 Runtime-owned isolated workspace |
 | ArkDeckBootstrap、ArkDeckLaunchAgent | **migrate** | `arkdeck-cli::service` + `arkdeck-platform::service` | macOS `launchctl` argv；Windows Task Scheduler（COM）/客户端自启动；ArkForge.bundle 校验逻辑（`LaunchAgentService.swift:176-261`）同迁 |
 | ArkDeckAgentDaemonMain | **retire** | `arkdeck-agentd` | 组合根换语言 |
@@ -1025,7 +1025,7 @@ flowchart TD
 #### TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 - 平台/GJ：macOS GJ-1～5 headless 用 Rust CLI re-pass；Windows 侧开始后即为唯一 CLI（r8）。
 - 依赖：XPA-002 已交付 foundation 的 Rust CLI 起持续（r8），最终依赖 XPA-016（所有 leaf 含 macOS 进程内兼容 leaf 由 Rust daemon 服务或按 CLI 规格 §12 tombstone）；必须先于 XPA-017 完成（r3）。
-- AC：当前单 v1 index 中全部 argv fixtures（本次为 208 个）与 envelope/page/nextAction 样本字节相等；`maintainer contracts export` 由 Rust 生成并与已发布 bundle 零漂移；`cli-feature-coverage.json` 在两平台 `fullFunction`；Swift CLI 删除。
+- AC：当前单 v1 index 中全部 argv fixtures（本次为 209 个）与 envelope/page/nextAction 样本字节相等；`maintainer contracts export` 由 Rust 生成并与已发布 bundle 零漂移；`cli-feature-coverage.json` 在两平台 `fullFunction`；Swift CLI 删除。
 - 规模：L。
 
 #### TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows

@@ -11,10 +11,7 @@ fn args(values: &[&str]) -> Vec<String> {
 
 #[test]
 fn cancel_argv_matches_current_swift() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/job.cancel.json"
-    ))
-    .unwrap();
+    let fixture: Value = arkdeck_cli::machine_contracts::argv_fixture("job.cancel").unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let argv: Vec<String> = row["argv"]
             .as_array()

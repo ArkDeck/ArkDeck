@@ -4,10 +4,7 @@ use serde_json::Value;
 
 #[test]
 fn quota_argv_matches_current_swift() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/artifact.quota.json"
-    ))
-    .unwrap();
+    let fixture: Value = arkdeck_cli::machine_contracts::argv_fixture("artifact.quota").unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let argv: Vec<String> = row["argv"]
             .as_array()

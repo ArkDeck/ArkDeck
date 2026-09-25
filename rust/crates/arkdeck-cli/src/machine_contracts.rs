@@ -5,10 +5,13 @@
 //! byte for byte to the committed bundle
 //! (`rust/tests/fixtures/contracts-bundle/owned.json`). The rest stay Swift's
 //! until their slices move them.
+use crate::registry_parse::Accepted;
+use crate::{CliError, command_registry, error_registry, registry_parse};
 use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, canonical_json,
 };
 use serde_json::{Map, Value, json};
+use std::collections::BTreeSet;
 
 /// Swift `CLIProductVersion.machineContract`.
 pub const BUNDLE_VERSION: &str = "arkdeck.cli.contracts/1";
@@ -74,21 +77,52 @@ pub fn contract_products() -> Vec<Product> {
 }
 
 /// The fixtures this CLI owns next to the contract tests
-/// (`Fixtures/CLI/`), sorted by path as Swift writes them.
+/// (`Fixtures/CLI/`), sorted by path as Swift writes them: every one of them,
+/// the index last written.
 pub fn fixture_products() -> Vec<Product> {
-    let mut products: Vec<Product> = next_actions()
-        .into_iter()
-        .map(|(kind, document)| Product::json(&format!("next-action/{kind}.json"), &document))
-        .collect();
+    let mut products = argv_fixtures();
+    products.extend(envelope_products());
+    products.extend(
+        next_actions()
+            .into_iter()
+            .map(|(kind, document)| Product::json(&format!("next-action/{kind}.json"), &document)),
+    );
     products.push(Product::json("next-action/null.json", &Value::Null));
     products.push(Product::json("page/snapshot.json", &snapshot_page()));
     products.push(Product::json(
         "page/event-stream.json",
         &event_stream_page(),
     ));
-    products.extend(envelope_products());
+    let mut files: Vec<&str> = products
+        .iter()
+        .map(|product| product.relative_path.as_str())
+        .collect();
+    files.sort_unstable();
+    let index = json!({
+        "schemaVersion": FIXTURE_INDEX_SCHEMA_VERSION,
+        "bundleVersion": BUNDLE_VERSION,
+        "cliVersion": crate::CLI_VERSION,
+        "argvFixtureSchemaVersion": ARGV_FIXTURE_SCHEMA_VERSION,
+        "envelopeFixtureSchemaVersion": ENVELOPE_FIXTURE_SCHEMA_VERSION,
+        "controlRequestId": FIXTURE_CONTROL_REQUEST_ID,
+        "files": files,
+    });
+    products.push(Product::json("index.json", &index));
     products.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     products
+}
+
+/// One leaf's argv fixture (`argv/<command>.json`) as this CLI renders it,
+/// which the digest table holds to the published one; `None` for a command
+/// the registry does not name.
+pub fn argv_fixture(command: &str) -> Option<Value> {
+    let leaf = array(&command_registry::projection()["commands"])
+        .iter()
+        .find(|leaf| leaf["command"] == command)?;
+    Some(
+        serde_json::from_slice(&json_document(&argv_document(leaf)))
+            .expect("a rendered fixture is JSON"),
+    )
 }
 
 // MARK: Rendering
@@ -925,6 +959,11 @@ fn next_actions() -> Vec<(&'static str, Value)> {
 /// Swift `fixtureControlRequestID`: fixed, so the committed envelopes are a
 /// function of the build alone.
 const FIXTURE_CONTROL_REQUEST_ID: &str = "ctl-fixture-0001";
+/// Swift `argvFixtureSchemaVersion`, `envelopeFixtureSchemaVersion` and
+/// `fixtureIndexSchemaVersion`.
+const ARGV_FIXTURE_SCHEMA_VERSION: &str = "arkdeck.cli.argv-fixture/1";
+const ENVELOPE_FIXTURE_SCHEMA_VERSION: &str = "arkdeck.cli.envelope-fixture/1";
+const FIXTURE_INDEX_SCHEMA_VERSION: &str = "arkdeck.cli.fixture-index/1";
 
 fn wait_action() -> Value {
     next_actions()
@@ -968,6 +1007,255 @@ fn empty_snapshot_page() -> Value {
         "hasMore": false,
         "nextCursor": null,
     })
+}
+
+// MARK: Argv fixtures
+
+fn array(value: &Value) -> &[Value] {
+    value.as_array().map_or(&[], Vec::as_slice)
+}
+
+fn name(option: &Value) -> &str {
+    option["name"].as_str().expect("an option's name")
+}
+
+fn required_and_published(option: &Value) -> bool {
+    option["required"] == true && option["published"] == true
+}
+
+/// Swift `ArgvFixtures.sample(for:)`, over the registry's projection of each
+/// grammar.
+fn sample(grammar: &Value) -> String {
+    let number = |key: &str| {
+        grammar[key]
+            .as_u64()
+            .unwrap_or_else(|| panic!("{key} of {grammar}"))
+    };
+    match grammar["kind"].as_str() {
+        Some("opaque") => "sample".into(),
+        Some("positiveInteger" | "nonNegativeInteger") => number("minimum").to_string(),
+        Some("enumeration") => grammar["values"][0].as_str().unwrap_or("sample").into(),
+        Some("hexDigest") => "0".repeat(number("length") as usize),
+        // Swift projects its control-request identity grammar as this pattern.
+        Some("pattern") if grammar["pattern"] == CONTROL_REQUEST_ID_PATTERN => {
+            FIXTURE_CONTROL_REQUEST_ID.into()
+        }
+        Some("duration") if number("maximumMilliseconds") >= 1000 => "1s".into(),
+        Some("duration") => "1ms".into(),
+        _ => panic!("no sample for the grammar {grammar}"),
+    }
+}
+
+/// The option and, if it takes one, a sample value.
+fn push_option(argv: &mut Vec<String>, option: &Value) {
+    argv.push(name(option).into());
+    if option["form"] == "value" {
+        argv.push(sample(&option["grammar"]));
+    }
+}
+
+/// Swift `ArgvFixtures.validArgv`: the path, each required published option,
+/// the first declared member of each exactly-one group nothing named yet, and
+/// each required positional, all with samples.
+fn valid_argv(path: &[String], leaf: &Value) -> Vec<String> {
+    let options = array(&leaf["options"]);
+    let mut argv = path.to_vec();
+    let mut present: Vec<&str> = Vec::new();
+    for option in options
+        .iter()
+        .filter(|option| required_and_published(option))
+    {
+        push_option(&mut argv, option);
+        present.push(name(option));
+    }
+    for group in array(&leaf["requiresExactlyOneOf"]) {
+        let group: Vec<&str> = array(group).iter().filter_map(Value::as_str).collect();
+        if group.iter().any(|member| present.contains(member)) {
+            continue;
+        }
+        if let Some(option) = options.iter().find(|option| group.contains(&name(option))) {
+            push_option(&mut argv, option);
+            present.push(name(option));
+        }
+    }
+    for positional in array(&leaf["positionals"]) {
+        if positional["required"] == true {
+            argv.push(sample(&positional["grammar"]));
+        }
+    }
+    argv
+}
+
+/// What this CLI's parser answers `argv` with: a leaf that is not
+/// executable by name, as it serves one (`command_registry::answer_by_name`),
+/// any other by the registry pass.
+fn parsed(argv: &[String]) -> Result<Accepted, CliError> {
+    match command_registry::answer_by_name(argv) {
+        Some(Ok(invocation)) => {
+            assert!(invocation.help, "{argv:?} is answered by name with help");
+            Ok(Accepted::LeafHelp(invocation.command))
+        }
+        Some(Err(error)) => Err(error),
+        None => registry_parse::check(argv).map(|accepted| {
+            accepted.unwrap_or_else(|| panic!("the registry pass leaves {argv:?} to the parser"))
+        }),
+    }
+}
+
+/// Swift `ArgvFixtures.outcome`: the answer, and for a refusal its code, exit
+/// category and status, the leaf it names, and that leaf's lifecycle where
+/// the registry publishes it as legacy or deprecated.
+fn outcome(argv: &[String]) -> Value {
+    match parsed(argv) {
+        Ok(Accepted::RootHelp) => json!({"outcome": "rootHelp"}),
+        Ok(Accepted::LeafHelp(command)) => json!({"outcome": "leafHelp", "command": command}),
+        Ok(Accepted::Commands(mode)) => json!({"outcome": "commands", "outputMode": mode}),
+        Ok(Accepted::Completion(shell)) => json!({"outcome": "completion", "shell": shell}),
+        Ok(Accepted::Dispatch {
+            command,
+            handler_arguments,
+        }) => json!({
+            "outcome": "dispatch",
+            "command": command,
+            "handlerArguments": handler_arguments,
+        }),
+        Err(error) => {
+            let category = error_registry::category(error.code)
+                .unwrap_or_else(|| panic!("{} is a registry code", error.code));
+            let mut fields = json!({
+                "outcome": "failure",
+                "code": error.code,
+                "category": category.machine_name(),
+                "exitCode": error.exit_code(),
+            });
+            if let Some(command) = error.command {
+                fields["command"] = json!(command);
+                if let Some((status, replacement)) = command_registry::lifecycle(command) {
+                    fields["lifecycleStatus"] = json!(status);
+                    if let Some(pattern) = replacement {
+                        fields["replacementArgvPattern"] = json!(pattern);
+                    }
+                }
+            }
+            fields
+        }
+    }
+}
+
+/// Swift `ArgvFixtures.document`: a leaf's argv cases, each with the answer
+/// this CLI's parser gives it.
+fn argv_document(leaf: &Value) -> Value {
+    let command = leaf["command"]
+        .as_str()
+        .expect("a leaf's canonical command");
+    let path: Vec<String> = array(&leaf["path"])
+        .iter()
+        .filter_map(Value::as_str)
+        .map(str::to_owned)
+        .collect();
+    let options = array(&leaf["options"]);
+    let valid = valid_argv(&path, leaf);
+    let with = |base: &[String], extra: &[&str]| -> Vec<String> {
+        base.iter()
+            .cloned()
+            .chain(extra.iter().map(|word| (*word).to_owned()))
+            .collect()
+    };
+    let mut cases = vec![
+        ("valid", valid.clone()),
+        ("leafHelp", with(&path, &["--help"])),
+    ];
+    if leaf["kind"] == "executable" {
+        cases.push(("unknownOption", with(&valid, &["--no-such-option"])));
+        if let Some(option) = options.iter().find(|option| required_and_published(option)) {
+            let mut duplicate = valid.clone();
+            push_option(&mut duplicate, option);
+            cases.push(("duplicateOption", duplicate));
+        }
+        if options.iter().any(required_and_published)
+            || !array(&leaf["requiresExactlyOneOf"]).is_empty()
+            || array(&leaf["positionals"])
+                .iter()
+                .any(|positional| positional["required"] == true)
+        {
+            cases.push(("missingRequired", path.clone()));
+        }
+        let declares = |option: &str| options.iter().any(|declared| declared["name"] == option);
+        if declares("--output") && !array(&leaf["outputModes"]).contains(&json!("jsonl")) {
+            cases.push(("jsonlRefused", with(&valid, &["--output", "jsonl"])));
+        }
+        if (leaf["connectsToRuntime"] != true || command == "runtime.tool.register")
+            && !declares("--endpoint")
+        {
+            cases.push(("endpointRefused", with(&valid, &["--endpoint", "local"])));
+        }
+        if let Some(option) = options
+            .iter()
+            .find(|option| option["stability"] == "macosCompatibilityOnly")
+            .filter(|option| option["form"] == "value")
+        {
+            let value = sample(&option["grammar"]);
+            cases.push((
+                "macosCompatibilityOption",
+                with(&valid, &[name(option), &value]),
+            ));
+        }
+        if command == "runtime.tool.register" {
+            let socket = ["--socket", "/private/tmp/arkdeck.sock"];
+            let deveco = [
+                "--kind",
+                "deveco",
+                "--root",
+                "/Applications/DevEco-Studio.app/Contents",
+            ];
+            cases.push(("devecoSocket", with(&with(&path, &deveco), &socket)));
+            cases.push(("hdcSocketRefused", with(&valid, &socket)));
+        }
+        match parsed(&valid) {
+            Ok(Accepted::Dispatch {
+                command: dispatched,
+                ..
+            }) if dispatched != command => {
+                panic!("the generated valid argv for {command} dispatches to {dispatched}")
+            }
+            Ok(_) => {}
+            Err(error) => {
+                panic!("the generated valid argv for {command} is refused: {valid:?}: {error:?}")
+            }
+        }
+    }
+    let cases: Vec<Value> = cases
+        .into_iter()
+        .map(|(name, argv)| json!({"name": name, "expected": outcome(&argv), "argv": argv}))
+        .collect();
+    json!({
+        "schemaVersion": ARGV_FIXTURE_SCHEMA_VERSION,
+        "cliVersion": crate::CLI_VERSION,
+        "command": command,
+        "path": path,
+        "kind": leaf["kind"],
+        "lifecycleStatus": leaf["lifecycleStatus"],
+        "cases": cases,
+    })
+}
+
+/// Swift `ArgvFixtures`: one document for each leaf of the registry.
+fn argv_fixtures() -> Vec<Product> {
+    let projection = command_registry::projection();
+    let mut seen = BTreeSet::new();
+    array(&projection["commands"])
+        .iter()
+        .map(|leaf| {
+            let command = leaf["command"]
+                .as_str()
+                .expect("a leaf's canonical command");
+            assert!(
+                seen.insert(command.to_owned()),
+                "canonical command {command} is declared twice"
+            );
+            Product::json(&format!("argv/{command}.json"), &argv_document(leaf))
+        })
+        .collect()
 }
 
 /// Swift `EnvelopeFixtures.products`: one of each machine answer, each
@@ -1074,4 +1362,21 @@ fn event_stream_page() -> Value {
         "hasMore": false,
         "nextCursor": EVENT_CURSOR,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sample;
+    use serde_json::json;
+
+    /// Swift `ArgvFixtures.sample(for:)` for the grammars no published case
+    /// samples yet: no duration option is required, and each leaf's first
+    /// macOS-compatibility option is `--socket`.
+    #[test]
+    fn a_duration_is_sampled_as_swift_samples_it() {
+        let duration = |maximum: u64| json!({"kind": "duration", "maximumMilliseconds": maximum});
+        assert_eq!(sample(&duration(600_000)), "1s");
+        assert_eq!(sample(&duration(1000)), "1s");
+        assert_eq!(sample(&duration(999)), "1ms");
+    }
 }

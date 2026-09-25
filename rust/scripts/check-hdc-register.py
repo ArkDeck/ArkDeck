@@ -131,8 +131,12 @@ def exercise(args, run):
     def command(endpoint, arguments, code=None):
         remaining = min(30, deadline - time.monotonic())
         check(remaining > 0, "bounded process check expired")
-        argv = [str(cli), *arguments, "--socket", str(endpoint), "--output", "json"]
-        result = subprocess.run(argv, env=env, capture_output=True, timeout=remaining)
+        # Swift's parser, and this CLI's, take `--socket` on the registration
+        # leaf only for DevEco, so every command names the temporary daemon in
+        # `ARKDECK_ENDPOINT`.
+        argv = [str(cli), *arguments, "--output", "json"]
+        result = subprocess.run(argv, env={**env, "ARKDECK_ENDPOINT": str(endpoint)},
+                                capture_output=True, timeout=remaining)
         cli_rows.append({"argv": argv, "exitCode": result.returncode,
                          "stdout": result.stdout.decode(), "stderr": result.stderr.decode()})
         value = json.loads(result.stdout)

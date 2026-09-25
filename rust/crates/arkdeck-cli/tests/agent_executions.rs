@@ -198,16 +198,16 @@ fn an_abandonment_is_checked_and_refused_as_a_mutation_and_a_page_as_a_read() {
 
 #[test]
 fn argv_fixtures_replay_as_the_swift_cli_parses_them() {
-    // The Swift CLI's argv fixtures, as packaged beside the other parser
-    // samples, which `check-contracts.py` keeps byte-identical to Swift's.
-    for bytes in [
-        include_str!("../../../tests/fixtures/current-cli-argv/agent.run.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/agent.status.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/agent.list.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/agent.abandon.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/artifact.list.json"),
+    // The argv fixtures this CLI renders for the bundle, which
+    // `machine_contracts.rs` holds byte for byte to Swift's published ones.
+    for command in [
+        "agent.run",
+        "agent.status",
+        "agent.list",
+        "agent.abandon",
+        "artifact.list",
     ] {
-        let document: Value = serde_json::from_str(bytes).unwrap();
+        let document = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in document["cases"].as_array().unwrap() {
             let argv: Vec<String> = case["argv"]
                 .as_array()

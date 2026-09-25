@@ -11,8 +11,8 @@ fn argv(row: &Value) -> Vec<String> {
         .collect()
 }
 
-fn check(fixture: &str, command: &str, params: Option<Value>) {
-    let fixture: Value = serde_json::from_str(fixture).unwrap();
+fn check(command: &str, params: Option<Value>) {
+    let fixture = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let result = parse(&argv(row));
         let expected = &row["expected"];
@@ -47,17 +47,12 @@ fn check(fixture: &str, command: &str, params: Option<Value>) {
 
 #[test]
 fn list_argv_matches_current_swift() {
-    check(
-        include_str!("../../../tests/fixtures/current-cli-argv/capability.list.json"),
-        "capability.list",
-        None,
-    );
+    check("capability.list", None);
 }
 
 #[test]
 fn inspect_argv_matches_current_swift() {
     check(
-        include_str!("../../../tests/fixtures/current-cli-argv/capability.inspect.json"),
         "capability.inspect",
         Some(json!({"capabilityId": "sample"})),
     );

@@ -20,10 +20,7 @@ fn corpus(method: &str) -> Vec<Value> {
 #[test]
 fn artifact_cli_keeps_the_published_argv_contract() {
     for method in ["artifact.inspect", "artifact.read", "artifact.export"] {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-            "../../tests/fixtures/current-cli-argv/{method}.json"
-        ));
-        let rows: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let rows = arkdeck_cli::machine_contracts::argv_fixture(method).unwrap();
         for row in rows["cases"].as_array().unwrap() {
             let args = row["argv"]
                 .as_array()

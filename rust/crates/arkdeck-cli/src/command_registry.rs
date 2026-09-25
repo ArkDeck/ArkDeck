@@ -9,8 +9,17 @@
 //! listed entry is Swift's own entry for that leaf, in the registry's order.
 use crate::{CliError, Invocation, parse};
 use serde_json::{Map, Value, json};
+use std::sync::OnceLock;
 
-const REGISTRY: &str = include_str!("command_registry.json");
+/// Swift's registry projection as this CLI carries it, read once: the
+/// `commandRegistrySchemaVersion` and the `commands` of every leaf.
+pub(crate) fn projection() -> &'static Value {
+    static REGISTRY: OnceLock<Value> = OnceLock::new();
+    REGISTRY.get_or_init(|| {
+        serde_json::from_str(include_str!("command_registry.json"))
+            .expect("the checked-in command registry")
+    })
+}
 
 /// The registry's leaves that are not executable — Swift's tombstones and
 /// refused stubs — by path. The parser answers them by name.
@@ -80,7 +89,7 @@ pub(crate) fn answer_by_name(argv: &[String]) -> Option<Result<Invocation, CliEr
 /// a tombstone is `commandRemoved` with its lifecycle facts (`removedError`),
 /// a refused stub `invalidCommand`; either names the leaf.
 fn refusal(command: &'static str) -> CliError {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     let entry = registry["commands"]
         .as_array()
         .and_then(|entries| entries.iter().find(|entry| entry["command"] == command))
@@ -143,7 +152,7 @@ fn serves(entry: &Value) -> bool {
 
 /// `{commandRegistrySchemaVersion, commands}` over the served leaves.
 pub fn command_registry() -> Value {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     let commands: Vec<Value> = registry["commands"]
         .as_array()
         .expect("the registry's commands")
@@ -200,18 +209,12 @@ fn pad(text: &str, width: usize) -> String {
     )
 }
 
-/// Swift's registry projection as this CLI carries it: the
-/// `commandRegistrySchemaVersion` and the `commands` of every leaf.
-pub(crate) fn projection() -> Value {
-    serde_json::from_str(REGISTRY).expect("the checked-in command registry")
-}
-
 /// A leaf's lifecycle when the registry publishes it as a compatibility
 /// surface, legacy or deprecated: its status and the argv pattern that
 /// replaces it, if one does. A removed leaf answers by name with its own
 /// lifecycle details instead (`answer_by_name`).
 pub(crate) fn lifecycle(command: &str) -> Option<(String, Option<String>)> {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     let entry = registry["commands"]
         .as_array()?
         .iter()
@@ -227,7 +230,7 @@ pub(crate) fn lifecycle(command: &str) -> Option<(String, Option<String>)> {
 
 /// Whether the registry declares `option` for the leaf `command`.
 pub(crate) fn declares(command: &str, option: &str) -> bool {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     registry["commands"]
         .as_array()
         .expect("the registry's commands")
@@ -240,7 +243,7 @@ pub(crate) fn declares(command: &str, option: &str) -> bool {
 /// The output modes one leaf publishes, as the registry declares them. A leaf
 /// the registry does not name takes the two every Runtime leaf takes.
 pub fn output_modes(command: &str) -> Vec<String> {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     registry["commands"]
         .as_array()
         .expect("the registry's commands")
@@ -262,7 +265,7 @@ pub fn output_modes(command: &str) -> Vec<String> {
 /// this CLI serves, because the served set is what `parse` is deciding when it
 /// asks. Whether the node has anything to show is `help_text`'s answer.
 pub fn is_node(path: &[&str]) -> bool {
-    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    let registry = projection();
     let entries: Vec<Vec<&str>> = registry["commands"]
         .as_array()
         .expect("the registry's commands")

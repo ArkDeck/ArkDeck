@@ -8,10 +8,10 @@ use serde_json::{Value, json};
 #[cfg(target_os = "macos")]
 mod support;
 
-const ARGV: [&str; 3] = [
-    include_str!("../../../tests/fixtures/current-cli-argv/control-action.list.json"),
-    include_str!("../../../tests/fixtures/current-cli-argv/control-action.show.json"),
-    include_str!("../../../tests/fixtures/current-cli-argv/control-action.reconcile.json"),
+const LEAVES: [&str; 3] = [
+    "control-action.list",
+    "control-action.show",
+    "control-action.reconcile",
 ];
 
 fn args(argv: &[&str]) -> Vec<String> {
@@ -20,8 +20,8 @@ fn args(argv: &[&str]) -> Vec<String> {
 
 #[test]
 fn the_published_argv_fixtures_replay() {
-    for corpus in ARGV {
-        let doc: Value = serde_json::from_str(corpus).unwrap();
+    for command in LEAVES {
+        let doc = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in doc["cases"].as_array().unwrap() {
             let argv: Vec<String> = case["argv"]
                 .as_array()

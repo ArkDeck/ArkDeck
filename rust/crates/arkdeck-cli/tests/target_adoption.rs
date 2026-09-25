@@ -6,18 +6,14 @@
 use arkdeck_cli::parse;
 use serde_json::Value;
 
-const ADOPT_ARGV: &str = include_str!("../../../tests/fixtures/current-cli-argv/target.adopt.json");
-const AVAILABILITY_ARGV: &str =
-    include_str!("../../../tests/fixtures/current-cli-argv/target.availability.json");
-
 fn args(argv: &[&str]) -> Vec<String> {
     argv.iter().map(|arg| (*arg).to_owned()).collect()
 }
 
 #[test]
 fn published_argv_fixtures_replay() {
-    for corpus in [ADOPT_ARGV, AVAILABILITY_ARGV] {
-        let doc: Value = serde_json::from_str(corpus).unwrap();
+    for command in ["target.adopt", "target.availability"] {
+        let doc = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in doc["cases"].as_array().unwrap() {
             let argv: Vec<String> = case["argv"]
                 .as_array()
