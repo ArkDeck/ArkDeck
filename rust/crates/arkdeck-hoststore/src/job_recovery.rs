@@ -34,10 +34,21 @@ use crate::operation_catalog::CatalogOperation;
 use serde_json::Value;
 use std::io;
 
-/// Swift `ArkForgeFlashOperation.containsDurableRecordReference`.
-const ARKFORGE: [&str; 2] = ["flash.full-restore@1", "flash.dayu200@1"];
-/// Swift `ArkForgeRuntimeJobState`'s file beside a Job's record.
-const ARKFORGE_STATE: &str = "arkforge-runtime-state.json";
+/// Swift `ArkForgeFlashOperation.containsDurableRecordReference`: the
+/// canonical reference, the alias as its records spell it, and the alias's
+/// retired versioned spelling.
+const ARKFORGE: [&str; 3] = ["flash.full-restore@1", "flash.dayu200", "flash.dayu200@1"];
+/// The states whose ArkForge execution lived in the lane process a restart
+/// lost (Swift `lostArkForgeExecutionState`).
+const LANE_HELD: [&str; 7] = [
+    "running",
+    "waitingForDevice",
+    "awaitingRebindConfirmation",
+    "cancelRequested",
+    "cancellingAtSafeBoundary",
+    "recoveringByCompleteOverwrite",
+    "resumeAtConfirmedSafeBoundary",
+];
 /// Swift `JobStateMachine.isAllowedTransition(from:to: .waitingForRecovery,
 /// mode: .execute)`.
 const PARKS: [&str; 11] = [
@@ -190,7 +201,7 @@ fn recover_rows(
             // The projection is restored from the admission's own record.
             RecordState::Absent => JobRecord::decode(&row.record).ok(),
         };
-        if let Some(reason) = unheld_state(jobs, &row, record.as_ref())? {
+        if let Some(reason) = unheld_state(record.as_ref()) {
             result.refused.push((row.id, reason));
             continue;
         }
@@ -226,41 +237,19 @@ fn recover_rows(
 }
 
 /// Why the Job's recovery needs state this Runtime does not hold, if it does.
-fn unheld_state(
-    jobs: &JobStore,
-    row: &JobRow,
-    record: Option<&JobRecord>,
-) -> Result<Option<String>, RecoveryError> {
-    let lane = jobs
-        .job_entry_exists(&row.id, ARKFORGE_STATE)
-        .map_err(|error| internal(format!("job {} directory is unreadable: {error}", row.id)))?;
-    if lane {
-        return Ok(Some(
-            "its ArkForge execution state is not held by the Rust Runtime; nothing was written"
-                .into(),
-        ));
-    }
-    let Some(record) = record else {
-        return Ok(None);
-    };
-    if ARKFORGE.contains(&record.operation()) {
-        return Ok(Some(format!(
-            "{} keeps its execution state in the ArkForge lane, which the Rust Runtime does \
-             not hold; nothing was written",
-            record.operation()
-        )));
-    }
+fn unheld_state(record: Option<&JobRecord>) -> Option<String> {
+    let record = record?;
     if record
         .admission_evidence()
         .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some())
     {
-        return Ok(Some(
+        return Some(
             "a complete-overwrite recovery completes against its superseding epoch, which the \
              Rust Runtime does not recover yet; nothing was written"
                 .into(),
-        ));
+        );
     }
-    Ok(None)
+    None
 }
 
 /// Every complete record of the Job's journal, in order (Swift
@@ -434,8 +423,8 @@ fn settle_known(record: &mut JobRecord) {
     record.set_recovery(None, None, None);
 }
 
-/// Swift `RuntimeRecoveryService.replay(_:)` with the ArkForge branches
-/// refused beforehand.
+/// Swift `RuntimeRecoveryService.replay(_:)`, a complete-overwrite
+/// recovery's own completion refused beforehand.
 fn replay(
     jobs: &JobStore,
     row: &JobRow,
@@ -523,7 +512,17 @@ fn replay(
                 && event["payload"]["from"] == "finalizing"
                 && event["payload"]["to"] == "waitingForRecovery"
         });
-    let park = unresolved || identity_proof_pending;
+    // An ArkForge Flash's execution lives behind one delegated step: until
+    // the lane's drive returns, its daemon job, receipts and completed plan
+    // exist only in the lane's process. A restart can therefore find a clean
+    // journal after an external execution started; resuming would materialize
+    // the same destructive plan again, so the Job is parked unknown.
+    let lane_lost = ARKFORGE.contains(&record.operation())
+        && facts
+            .current_state
+            .as_deref()
+            .is_some_and(|state| LANE_HELD.contains(&state));
+    let park = unresolved || lane_lost || identity_proof_pending;
     if park
         && let Some(current) = facts
             .current_state
@@ -533,7 +532,11 @@ fn replay(
         journal.transition(
             &current,
             "waitingForRecovery",
-            "durably park unresolved provider intent after restart",
+            if lane_lost {
+                "durably park non-resumable ArkForge execution after restart"
+            } else {
+                "durably park unresolved provider intent after restart"
+            },
             None,
         )?;
         (facts, events) = refresh(&journal)?;
@@ -567,6 +570,21 @@ fn replay(
             mark(
                 &mut record,
                 "recovered: declared compensation needs fresh identity proof; no redispatch",
+            );
+        } else if lane_lost {
+            record.set_operation_failure(Some(failure(
+                "outcomeUnknown",
+                "unknownOutcome",
+                "runtimeDecisionRequired",
+                "awaitRuntimeReconciliation",
+            )));
+            if record.finished_at().is_none() {
+                record.finish(&clock(now)?);
+            }
+            mark(
+                &mut record,
+                "recovered: ArkForge execution state was process-owned; parked unknown; no \
+                 redispatch",
             );
         } else {
             mark(

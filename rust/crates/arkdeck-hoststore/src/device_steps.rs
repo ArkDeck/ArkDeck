@@ -1022,6 +1022,13 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         (SCREEN_SEQUENCE, "receive-screen-sequence") => &["frames.tar"],
         (NATIVE, "atomic-publish") => &["publish-report.json"],
         (NATIVE, "verify-loaded-library") => &["verification-report.json"],
+        // The Flash alias reads the canonical operation's products.
+        ("flash.full-restore@1" | "flash.dayu200", "rebind-and-verify-build") => {
+            &["post-flash-facts.json"]
+        }
+        ("flash.full-restore@1" | "flash.dayu200", "capture-post-flash-diagnostics") => {
+            &["post-flash-hilog.txt"]
+        }
         _ => &[],
     }
 }

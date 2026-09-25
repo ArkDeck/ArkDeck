@@ -82,6 +82,10 @@ use arkdeck_contract::WireError;
 use serde_json::{Map, Value};
 use std::path::PathBuf;
 
+#[path = "flash_reconcile.rs"]
+mod flash_reconcile;
+pub use flash_reconcile::FlashReconciler;
+
 #[path = "job_reconcile_device.rs"]
 mod device;
 
@@ -500,7 +504,7 @@ impl JobReconciler<'_> {
         if let Some(refusal) = self.device_refusal(&record)? {
             return Err(refused("rejected", refusal));
         }
-        self.resident(record)
+        self.resident(record, None)
     }
 
     /// Why this owner does not reconcile a device-bound Job whose outcome is
@@ -698,7 +702,11 @@ impl JobReconciler<'_> {
     /// terminal, with what a failure has journaled kept resident. A Job whose
     /// outcome is known and that is no stuck cancellation is answered as it
     /// is: the lineage repair Swift calls there needs a failed Job.
-    fn resident(&self, record: JobRecord) -> Result<Value, WireError> {
+    fn resident(
+        &self,
+        record: JobRecord,
+        lane: Option<&dyn arkdeck_provider_arkforge::FlashLane>,
+    ) -> Result<Value, WireError> {
         // Swift continues a debug HAP's failure finalization first.
         if record.operation() == HAP && record.state == "finalizing" && !record.outcome_unknown() {
             let directory = self
@@ -722,7 +730,7 @@ impl JobReconciler<'_> {
             .map_err(|error| other(format!("{error:?}")))?;
         let mut held = Held::open(record, directory, self.now)?;
         let result = if held.run.record.outcome_unknown() {
-            self.reconcile_unknown(&mut held)
+            self.reconcile_unknown(&mut held, lane)
         } else {
             self.settle_cancellation(&mut held)
         };
@@ -788,7 +796,11 @@ impl JobReconciler<'_> {
 
     /// Swift `reconcileOwned` from its outcome-unknown gate: `Some(status)`
     /// when the Job stays resident, `None` when it is to be released.
-    fn reconcile_unknown(&self, held: &mut Held) -> Result<Option<Value>, WireError> {
+    fn reconcile_unknown(
+        &self,
+        held: &mut Held,
+        lane: Option<&dyn arkdeck_provider_arkforge::FlashLane>,
+    ) -> Result<Option<Value>, WireError> {
         let id = held.run.record.job_id.clone();
         let mut events = held.events(self.jobs)?;
         let mut facts = held.run.journal.facts();
@@ -862,6 +874,12 @@ impl JobReconciler<'_> {
             record.recovery_action().cloned(),
             record.recovery_intent().map(str::to_owned),
         ) else {
+            // A delegated Flash has one durable intent and its daemon
+            // correlation: only that daemon job's canonical completed-plan
+            // receipt can settle it.
+            if flash_reconcile::ARKFORGE.contains(&record.operation()) {
+                return self.reconcile_lane(held, lane);
+            }
             return Err(engine(
                 "internalFailure",
                 &format!("unknown outcome has no persisted exact typed action for {id}"),
@@ -1202,6 +1220,33 @@ impl JobReconciler<'_> {
         decision: Decision,
         binding_revision: Option<i64>,
     ) -> Result<Option<Value>, WireError> {
+        self.finish_annotated(
+            held,
+            events,
+            intent,
+            step,
+            attempt,
+            decision,
+            binding_revision,
+            None,
+        )
+    }
+
+    /// Swift `finishReconcile`, with the semantic code and summary its
+    /// confirmed completion's outcome carries (`successSemanticCode`,
+    /// `successSummary`), where the caller names them.
+    #[allow(clippy::too_many_arguments)]
+    fn finish_annotated(
+        &self,
+        held: &mut Held,
+        events: &[Value],
+        intent: &str,
+        step: &str,
+        attempt: &str,
+        decision: Decision,
+        binding_revision: Option<i64>,
+        success: Option<(&str, &str)>,
+    ) -> Result<Option<Value>, WireError> {
         let Some(exact) = events.iter().find(|event| event["eventId"] == intent) else {
             return Err(engine("internalFailure", "reconcile intent disappeared"));
         };
@@ -1237,31 +1282,39 @@ impl JobReconciler<'_> {
             held.persist(self.jobs)?;
         }
         // The correlated outcome, unless the journal already holds one.
-        let outcome =
-            |held: &mut Held, result: &str, code: Option<&str>| -> Result<(), WireError> {
-                if durable {
-                    return Ok(());
-                }
-                let sequence = held.run.sequence;
-                let envelope = held
-                    .run
-                    .envelope(format!("reconciled-outcome-{sequence}"))
-                    .map_err(from_run)?;
-                held.append(events::step_outcome(
-                    &envelope,
-                    &dispatched,
-                    1,
-                    intent,
-                    result,
-                    "confirmed",
-                    code,
-                    None,
-                ))
-            };
+        let outcome = |held: &mut Held,
+                       result: &str,
+                       code: Option<&str>,
+                       summary: Option<&str>|
+         -> Result<(), WireError> {
+            if durable {
+                return Ok(());
+            }
+            let sequence = held.run.sequence;
+            let envelope = held
+                .run
+                .envelope(format!("reconciled-outcome-{sequence}"))
+                .map_err(from_run)?;
+            held.append(events::step_outcome(
+                &envelope,
+                &dispatched,
+                1,
+                intent,
+                result,
+                "confirmed",
+                code,
+                summary,
+            ))
+        };
         let host_only = binding_revision.is_none();
         let (next, result, certainty, safe, decided_revision, detail) = match &decision {
             Decision::Completed(keys) => {
-                outcome(held, "succeeded", None)?;
+                outcome(
+                    held,
+                    "succeeded",
+                    success.map(|(code, _)| code),
+                    success.map(|(_, summary)| summary),
+                )?;
                 let mut keys = keys.clone();
                 keys.sort();
                 (
@@ -1278,7 +1331,7 @@ impl JobReconciler<'_> {
                 )
             }
             Decision::NotExecuted => {
-                outcome(held, "failed", Some(CONFIRMED_NOT_EXECUTED))?;
+                outcome(held, "failed", Some(CONFIRMED_NOT_EXECUTED), None)?;
                 (
                     "finalizing",
                     if host_only {

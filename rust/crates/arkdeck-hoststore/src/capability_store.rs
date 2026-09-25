@@ -37,7 +37,7 @@
 //! `JSONValue` holds it. The refusal of a fraction quotes serde's spelling of
 //! the number where Foundation quotes the document's.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
@@ -166,6 +166,13 @@ pub(crate) struct Generation {
     pub(crate) remaining_uses: i64,
     pub(crate) expires_at: String,
     pub(crate) revoked: bool,
+    pub(crate) issued_at: String,
+    /// Swift `lineageAllowsNewExecution`: no use of it is unsettled and a use
+    /// remains.
+    pub(crate) lineage_allows_new_execution: bool,
+    /// The last outcome recorded for its last use, with the terminal state it
+    /// was recorded for (Swift `lineage.last?.outcomeHistory.last`).
+    pub(crate) last_outcome: Option<(UseOutcome, String)>,
 }
 
 /// A use on a Target binding left without a settled outcome.
@@ -399,6 +406,17 @@ impl CapabilityStore {
                     remaining_uses: record.remaining_uses,
                     expires_at: record.capability.expires_at.clone(),
                     revoked: matches!(record.capability.revocation, Revocation::Revoked { .. }),
+                    issued_at: record.capability.issued_at.clone(),
+                    lineage_allows_new_execution: record.remaining_uses > 0
+                        && record
+                            .consumptions
+                            .iter()
+                            .all(|use_| use_.current().settled()),
+                    last_outcome: record.consumptions.last().and_then(|use_| {
+                        use_.outcomes
+                            .last()
+                            .map(|outcome| (outcome.outcome, outcome.terminal_state.clone()))
+                    }),
                 }))
         })
     }
@@ -413,6 +431,20 @@ impl CapabilityStore {
         binding_revision: i64,
         owner: Option<(&str, &str)>,
     ) -> Result<Option<UnresolvedUse>, CapabilityStoreError> {
+        self.unresolved_use_beyond(identity, binding_revision, owner, &BTreeSet::new())
+    }
+
+    /// As [`Self::unresolved_use`], with the Jobs a durable superseding
+    /// recovery epoch or the admitted recovery covers left out, as Swift
+    /// leaves them out: their uses stay unknown, and a complete overwrite
+    /// has superseded them.
+    pub(crate) fn unresolved_use_beyond(
+        &self,
+        identity: &str,
+        binding_revision: i64,
+        owner: Option<(&str, &str)>,
+        superseded: &BTreeSet<String>,
+    ) -> Result<Option<UnresolvedUse>, CapabilityStoreError> {
         self.locked(|_, document, _| {
             for record in &document.records {
                 for use_ in &record.consumptions {
@@ -420,6 +452,7 @@ impl CapabilityStore {
                     if use_.target.as_deref() != Some(identity)
                         || use_.binding_revision != Some(binding_revision)
                         || outcome.settled()
+                        || superseded.contains(&use_.job)
                     {
                         continue;
                     }

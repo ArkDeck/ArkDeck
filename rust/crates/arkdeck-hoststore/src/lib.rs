@@ -203,7 +203,7 @@ pub use artifact_publication::collect_expired_artifacts;
 #[cfg(target_os = "macos")]
 mod job_run;
 #[cfg(target_os = "macos")]
-pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};
+pub use job_run::{FlashExecution, FlashRunner, JobRunner, RunRefusal, runtime_precise_now};
 #[cfg(target_os = "macos")]
 mod job_result;
 #[cfg(target_os = "macos")]
@@ -221,7 +221,7 @@ mod job_lineage_repair;
 #[cfg(target_os = "macos")]
 mod job_reconcile;
 #[cfg(target_os = "macos")]
-pub use job_reconcile::JobReconciler;
+pub use job_reconcile::{FlashReconciler, JobReconciler};
 #[cfg(target_os = "macos")]
 mod session_publication;
 #[cfg(target_os = "macos")]

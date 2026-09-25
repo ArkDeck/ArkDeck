@@ -1638,6 +1638,8 @@ impl HostServices for Host {
             facts: facts
                 .as_ref()
                 .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
+            // No production lane executes a Flash yet.
+            executes: false,
         }
         .handle(params)
         // A refusal before the admission point proves zero dispatch; Swift

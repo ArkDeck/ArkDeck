@@ -28,9 +28,11 @@ mod native_library_plan;
 mod screen_sequence_plan;
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
-pub(crate) use flash_plan::is_flash;
 pub use flash_plan::{
     FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
+};
+pub(crate) use flash_plan::{
+    admission_blocker, canonical_inputs, delegated_arguments, is_flash, plan_completion_arguments,
 };
 pub(crate) use native_library_plan::read_library;
 

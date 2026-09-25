@@ -45,6 +45,22 @@ pub(crate) fn contents(
     if reference == crate::device_steps::SCREEN_SEQUENCE && name == "sequence.json" {
         return sequence(record);
     }
+    let payload = statuses(name, descriptor, record, recorded, finalize_names)?;
+    session_json::encode_canonical_pretty(&payload)
+        .map_err(|_| "the document cannot be encoded".into())
+}
+
+/// Swift `finalArtifactContents`' status document: every other declared
+/// product's final status and, but for an index, whether the required ones
+/// all published.
+fn statuses(
+    name: &str,
+    descriptor: &CatalogOperation,
+    record: &JobRecord,
+    recorded: &[Value],
+    finalize_names: &[&str],
+) -> Result<Value, String> {
+    let reference = descriptor.reference();
     let finalized = |name: &str| finalize_names.contains(&name);
     let mut artifacts = Map::new();
     for declaration in descriptor
@@ -105,7 +121,100 @@ pub(crate) fn contents(
     {
         payload["trace"] = trace(record, recorded, tags);
     }
+    Ok(payload)
+}
+
+/// Swift `appendFlashArtifactLineage`: what every Flash product names of the
+/// Job it came from — its catalog, provider, Target binding, identity, plan
+/// and the authority it ran under.
+fn flash_lineage(fields: &mut Map<String, Value>, record: &JobRecord) {
+    let target = &record.request["target"];
+    fields.insert("catalogDigest".into(), json!(record.catalog_digest()));
+    fields.insert("providerId".into(), json!(record.provider()));
+    fields.insert("targetId".into(), target["targetId"].clone());
+    if let Some(revision) = target["expectedBindingRevision"].as_i64() {
+        fields.insert("expectedBindingRevision".into(), json!(revision));
+    }
+    let observed = record
+        .evidence_observation()
+        .and_then(|observation| observation["stableIdentitySHA256"].as_str());
+    if let Some(identity) = observed.or(record.materialized_identity()) {
+        fields.insert("stableIdentitySha256".into(), json!(identity));
+    }
+    if let Some(digest) = record.materialized_plan() {
+        fields.insert("materializedPlanDigest".into(), json!(digest));
+    }
+    if let Some(evidence) = record.admission_evidence() {
+        let mut authority = json!({"kind": evidence["kind"], "reference": evidence["reference"]});
+        if let Some(fingerprint) = evidence["consumptionFingerprintSHA256"].as_str() {
+            authority["consumptionFingerprintSha256"] = json!(fingerprint);
+        }
+        fields.insert("authority".into(), authority);
+    }
+}
+
+/// Swift `finalArtifactContents` of a Flash's report: the status of every
+/// other declared product, the Job's lineage, the steps it confirmed and the
+/// canonical request it ran.
+pub(crate) fn flash_report(
+    descriptor: &CatalogOperation,
+    record: &JobRecord,
+    recorded: &[Value],
+    verified_steps: &[&str],
+) -> Result<Vec<u8>, String> {
+    let report = "flash-report.json";
+    let mut payload = statuses(report, descriptor, record, recorded, &[report])?;
+    let fields = payload
+        .as_object_mut()
+        .ok_or("the report is not a document")?;
+    flash_lineage(fields, record);
+    fields.insert("verifiedSteps".into(), json!(verified_steps));
+    let inputs = record.request["inputs"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default();
+    fields.insert(
+        "request".into(),
+        Value::Object(
+            crate::job_plan::canonical_inputs(&descriptor.reference(), &inputs).unwrap_or_default(),
+        ),
+    );
     session_json::encode_canonical_pretty(&payload)
+        .map_err(|_| "the document cannot be encoded".into())
+}
+
+/// Swift `artifactContents` for a Flash step's facts product: the Job and
+/// the observation it made, the facts the step verified, and the Job's
+/// lineage.
+pub(crate) fn flash_facts(
+    descriptor: &CatalogOperation,
+    record: &JobRecord,
+    name: &str,
+    facts: &std::collections::BTreeMap<String, String>,
+) -> Result<Vec<u8>, String> {
+    let mut fields = Map::from_iter([
+        ("artifact".to_owned(), json!(name)),
+        ("operation".to_owned(), json!(descriptor.reference())),
+        ("jobId".to_owned(), json!(record.job_id)),
+        ("catalogDigest".to_owned(), json!(record.catalog_digest())),
+    ]);
+    if let Some(observation) = record.evidence_observation() {
+        for (member, key) in [
+            ("model", "model"),
+            ("firmware", "firmware"),
+            ("transport", "transport"),
+            ("stableIdentitySHA256", "stableIdentitySha256"),
+        ] {
+            if let Some(value) = observation[member].as_str() {
+                fields.insert(key.into(), json!(value));
+            }
+        }
+    }
+    for (key, value) in facts {
+        fields.insert(key.clone(), json!(value));
+    }
+    flash_lineage(&mut fields, record);
+    session_json::encode_canonical_pretty(&Value::Object(fields))
         .map_err(|_| "the document cannot be encoded".into())
 }
 

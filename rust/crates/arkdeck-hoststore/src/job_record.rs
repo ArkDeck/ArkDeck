@@ -949,8 +949,16 @@ impl JobRecord {
         json!({"schemaVersion":"1.0.0", "code":code, "category":category, "retryability":retry, "recovery":recovery})
     }
     fn workspace(&self) -> Option<&str> {
+        // Swift `RuntimeWorkspaceKindProjection.kind`: the ArkForge Flash
+        // operations by their exact references, the alias's retired
+        // versioned spelling among them.
+        if matches!(
+            self.operation.as_str(),
+            "flash.full-restore@1" | "flash.dayu200" | "flash.dayu200@1"
+        ) {
+            return Some("flash");
+        }
         match self.operation.split('@').next().unwrap_or("") {
-            "flash.full-restore" | "flash.board-provision" => Some("flash"),
             "debug.hap"
             | "debug.template"
             | "deploy.native-library.app-owned"

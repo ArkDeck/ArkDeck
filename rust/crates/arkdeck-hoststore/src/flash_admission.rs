@@ -12,11 +12,18 @@
 //!    catalog's Runtime-owned policy, the provider's execution blocker, a
 //!    capability a caller named.
 //!
+//! 6. the Runtime's own one-use destructive capability for the exact plan
+//!    and Artifact, issued or rolled over as Swift rolls it
+//!    (`capability_policy::issue_destructive`), and validated for this
+//!    execution; nothing is consumed yet;
+//! 7. the Job admitted: its index row, its journal's `jobCreated` and
+//!    `queued -> preflight`, and its record.
+//!
 //! Every refusal comes before the durable admission point and dispatches
-//! nothing. A request that passes them all is refused too, before any
-//! capability is issued: the Runtime's one-use destructive capability and
-//! the complete-overwrite admission (DEC-016) are the execution's to issue,
-//! and a Flash is admitted only together with the run that consumes it.
+//! nothing. A binding a superseding recovery would have to cover — an
+//! unresolved destructive use — is refused by its lineage before anything
+//! is issued: this Runtime does not admit a complete-overwrite recovery
+//! (DEC-016) yet.
 use super::*;
 use crate::job_plan::{FlashPlanner, FlashPlanning, RockchipFactsPort, is_flash};
 
@@ -29,6 +36,11 @@ pub struct FlashAdmitter<'a> {
     pub flash: Option<&'a FlashPlanning>,
     /// The facts port; none when the daemon composed none.
     pub facts: Option<RockchipFactsPort<'a>>,
+    /// Whether this composition also runs an admitted Flash. A Flash is
+    /// admitted only together with the run that consumes its capability:
+    /// without one it is refused after every check and before anything is
+    /// issued, so no Job is left waiting for a run that cannot come.
+    pub executes: bool,
 }
 
 impl FlashAdmitter<'_> {
@@ -115,11 +127,46 @@ impl FlashAdmitter<'_> {
                 "the fresh materialized plan differs from the immutable reviewed plan",
             ));
         }
-        self.preauthorize(&request, descriptor, &effect, &materialized, blocker)
+        let capability =
+            self.preauthorize(&request, descriptor, &effect, &materialized, blocker)?;
+        let job_id = format!(
+            "job-{}",
+            &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
+        );
+        let mut authorized = request.clone();
+        authorized.capability_id = Some(capability);
+        let timestamp = admitter.clock()?;
+        let mut record = JobRecord::admitted(
+            &job_id,
+            authorized.canonical_value(),
+            request.canonical_value(),
+            &descriptor.reference(),
+            CATALOG_DIGEST,
+            &descriptor.provider,
+            &timestamp,
+            &effect,
+            None,
+            &materialized.digest,
+        );
+        record.set_materialized(materialized.identity.clone(), materialized.binding_revision);
+        match _admission
+            .admit(&record, &fingerprint)
+            .map_err(|_| uncertain())?
+        {
+            AdmissionVerdict::Duplicate(existing) => {
+                return admitter.duplicate(&existing, &request, true);
+            }
+            AdmissionVerdict::Conflict => return Err(conflict()),
+            AdmissionVerdict::Admitted => (),
+        }
+        // Past the durable admission point: a failure below is uncertain.
+        admitter.start(&record, &timestamp).ok_or_else(uncertain)?;
+        Ok(acceptance(&job_id, false))
     }
 
-    /// Swift `preauthorize` for a Flash, up to the Runtime capability it
-    /// would issue: every check that can refuse before one exists.
+    /// Swift `preauthorize` for a Flash: every check that can refuse before
+    /// a capability exists, then the Runtime's own capability issued and
+    /// validated for this execution. Answers its identity.
     fn preauthorize(
         &self,
         request: &OperationRequest,
@@ -127,7 +174,7 @@ impl FlashAdmitter<'_> {
         effect: &str,
         materialized: &Materialized<'_>,
         blocker: Option<String>,
-    ) -> Result<Value, AdmissionRefusal> {
+    ) -> Result<String, AdmissionRefusal> {
         let admitter = &self.admitter;
         let reference = descriptor.reference();
         let unserved = || {
@@ -172,15 +219,36 @@ impl FlashAdmitter<'_> {
                 ),
             ));
         }
-        if materialized.identity.is_none() || materialized.binding_revision.is_none() {
+        let (Some(identity), Some(binding)) =
+            (materialized.identity.clone(), materialized.binding_revision)
+        else {
             return Err(refused(
                 "admissionDenied",
                 "complete-overwrite admission requires stable target identity and binding",
             ));
-        }
+        };
         // Swift's complete-overwrite admission (DEC-016) reads the
-        // superseding recovery epochs under their store's lock first.
-        admitter.jobs.recovery_epochs().map_err(|_| uncertain())?;
+        // superseding recovery epochs under their store's lock first; the
+        // Jobs an epoch covers on this binding no longer block its lineage.
+        let superseded: std::collections::BTreeSet<String> = admitter
+            .jobs
+            .recovery_epochs()
+            .map_err(|_| uncertain())?
+            .iter()
+            .filter(|epoch| {
+                crate::swift_decoding::same_text(
+                    &epoch.draft.stable_target_identity_sha256,
+                    &identity,
+                ) && epoch.draft.binding_revision == binding
+            })
+            .flat_map(|epoch| {
+                epoch
+                    .draft
+                    .covered_intents
+                    .iter()
+                    .map(|intent| intent.job_id.clone())
+            })
+            .collect();
         if policy == "runtimeCapability" {
             if request.capability_id.is_some() {
                 return Err(refused(
@@ -194,7 +262,53 @@ impl FlashAdmitter<'_> {
                     format!("catalog disabled Runtime capability issuance for {reference}"),
                 ));
             }
+        } else {
+            return Err(unserved());
         }
-        Err(unserved())
+        if !self.executes {
+            return Err(refused(
+                "rejected",
+                format!("{reference} is not executed by the Rust Runtime yet"),
+            ));
+        }
+        let query = CapabilityQuery {
+            operation_id: descriptor.id().to_owned(),
+            operation_version: descriptor.version(),
+            effect: Effect::Destructive,
+            target_stable_identity_sha256: Some(identity),
+            target_binding_revision: Some(binding),
+            plan_digest: Some(materialized.digest.clone()),
+            inputs: request.inputs.clone(),
+            artifact_facts: materialized.artifact_facts.clone(),
+            workspace_identity_sha256: None,
+            workspace_revision: None,
+            workspace_file_scopes_digest: None,
+        };
+        let capability = capability_policy::issue_destructive(
+            authority.capabilities,
+            descriptor,
+            &query,
+            None,
+            &superseded,
+            &admitter.clock()?,
+        )
+        .map_err(|failure| match failure {
+            IssueFailure::Refused(message) => refused("admissionDenied", message),
+            IssueFailure::Unreadable => uncertain(),
+        })?;
+        authority
+            .capabilities
+            .validate_new_execution(&capability, &query, &admitter.clock()?)
+            .map_err(|error| {
+                refused(
+                    "admissionDenied",
+                    format!(
+                        "capability denied [denial:{}]: {}",
+                        denial_code(&error),
+                        error.swift()
+                    ),
+                )
+            })?;
+        Ok(capability)
     }
 }

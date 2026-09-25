@@ -1,13 +1,14 @@
 //! The fakes the Swift Flash run oracle (`FlashRunOracleContractTests`,
 //! `rust/tests/fixtures/flash-run`) scripts, as the Rust replay composes them:
-//! the ArkForge lane and the facts port, each answering as the exchange's
+//! the ArkForge lane, the Rockchip host and the facts port, each answering as
+//! the exchange's
 //! recorded `script` says and logging what it was asked in the oracle's own
 //! words. No device, `arkforged`, HDC or installed service is reached; what
 //! they answer is fixture data, never device evidence.
 use arkdeck_hoststore::RockchipFacts;
 use arkdeck_provider_arkforge::{
-    ActionReceipt, DeviceBinding, Execution, FlashLane, LaneArtifact, LaneFailure, PrewarmReceipt,
-    Terminal, canonical_facts_digest,
+    ActionReceipt, DeviceBinding, Execution, FlashLane, HostAction, HostReceipt, LaneArtifact,
+    LaneFailure, PrewarmReceipt, RockchipHost, Terminal, canonical_facts_digest,
 };
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
@@ -373,5 +374,63 @@ impl FlashLane for FakeLane {
             .unwrap_or_else(PoisonError::into_inner)
             .get(job_id)
             .cloned()
+    }
+}
+
+/// What the fake capture of the post-flash HiLog answers: one line names a
+/// path in the configured home, which the Artifact store redacts.
+pub const HILOG: &str = "09-25 00:00:00.000  1234  1234 I A00001/fixture: post-flash boot complete\n\
+09-25 00:00:00.001  1234  1234 I A00001/fixture: opened /private/tmp/arkdeck-flash-run-oracle/home/.config/app\n";
+
+/// The Rockchip per-action host as the oracle scripts it: the one
+/// host-managed action a delegated Flash runs itself is the post-flash HiLog
+/// capture.
+pub struct FakeHost(pub Fakes);
+
+impl RockchipHost for FakeHost {
+    fn dispatch(&self, action: &HostAction) -> Result<HostReceipt, LaneFailure> {
+        self.0.dispatched(format!(
+            "{} {} identifier={} target={} revision={} connectKey={} identity={} tool={} \
+             action={} budget={}",
+            action.step_id,
+            action.job_id,
+            action.identifier,
+            action.target_id,
+            action.binding_revision,
+            action.connect_key,
+            action.expected_identity_sha256,
+            action.provider_executable_sha256,
+            action.action_sha256,
+            action
+                .output_byte_budget
+                .map_or_else(|| "none".to_owned(), |budget| budget.to_string())
+        ));
+        if action.step_id != "capture-post-flash-diagnostics" {
+            return Err(LaneFailure::Failed(
+                "the Flash oracle dispatches only the post-flash diagnostics capture".into(),
+            ));
+        }
+        if self.0.current().diagnostics != "hilog" {
+            return Err(LaneFailure::Failed(
+                "post-flash HiLog capture returned no bytes".into(),
+            ));
+        }
+        let stdout = HILOG.as_bytes().to_vec();
+        Ok(HostReceipt {
+            exit_status: Some(0),
+            summary: BTreeMap::from([
+                ("byteCount".to_owned(), stdout.len().to_string()),
+                ("debugRuntime".to_owned(), "ready".to_owned()),
+                ("verification".to_owned(), "full".to_owned()),
+            ]),
+            stdout,
+            stderr: Vec::new(),
+            stdout_truncated: false,
+            duration_seconds: 0.25,
+            record_id: Some(format!(
+                "rockchip-record-{}-{}",
+                action.job_id, action.step_id
+            )),
+        })
     }
 }

@@ -53,6 +53,10 @@ use std::time::Duration;
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
+#[path = "flash_run.rs"]
+mod flash_run;
+pub use flash_run::{FlashExecution, FlashRunner};
+
 const STEP_KIND: &str = "runDeterministicAnalyzer";
 /// Swift `DescriptorBoundProcessDispatcher`'s per-stream capture, whatever
 /// budget the analyzer profile gives its answer.
