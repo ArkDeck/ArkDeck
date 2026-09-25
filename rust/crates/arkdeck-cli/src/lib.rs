@@ -47,6 +47,7 @@ pub use trace_cache::validate_trace_cache_response;
 mod agent_executions;
 mod command_registry;
 mod human_action_resources;
+mod registry_parse;
 pub use agent_executions::{
     Settlement, agent_exit, execution_intent, human_action_progress, require_execution_identity,
     resume_params, settle_execution, validate_execution,
@@ -459,10 +460,39 @@ pub fn valid_correlation(id: &str) -> bool {
             .all(|c| c.is_ascii_alphanumeric() || b"._:-".contains(&c))
 }
 
+/// Parse `argv`. A leaf that is not executable is answered by name, as Swift
+/// answers it; everything else is this parser's to accept or refuse.
+///
+/// A refusal is reported as Swift's CLI reports it (TASK-XPA-018 a3): where
+/// Swift's registry pass (`registry_parse`) refuses the argv too, which Swift
+/// would have done before any handler ran, its answer is the one given, with
+/// Swift's words, `details` and leaf. Otherwise this parser's own refusal
+/// names the leaf the path resolved to, as Swift's handler failures do. A
+/// path the registry names but this CLI does not serve keeps its own
+/// refusal. Neither pass widens or narrows what is accepted.
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if let Some(answer) = command_registry::answer_by_name(argv) {
         return answer;
     }
+    parse_argv(argv).map_err(|error| {
+        let leaf = registry_parse::leaf(argv);
+        if error.code == "invalidCommand" && leaf.is_some() {
+            return error;
+        }
+        match registry_parse::check(argv) {
+            Err(swift) => swift,
+            Ok(()) => {
+                let mut error = error;
+                if error.command.is_none() && error.code != "invalidCommand" {
+                    error.command = leaf;
+                }
+                error
+            }
+        }
+    })
+}
+
+fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     let mut positional = Vec::new();
     let mut method_options = Map::new();
     let mut seen = std::collections::BTreeSet::new();
