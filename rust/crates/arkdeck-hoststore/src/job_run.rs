@@ -30,7 +30,7 @@
 //! (`device_run.rs`), and a resumed Job continues under the capability use
 //! it holds, never a second one (`mutation_execution.rs`).
 use crate::analyzer_composition::{self, AnalyzerComposition};
-use crate::analyzer_output::{self, Receipt, Source};
+use crate::analyzer_output::{self, Invocation, Receipt, Source};
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
 use crate::device_facts::HdcComposition;
@@ -38,7 +38,6 @@ use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Envelope, Target};
 use crate::job_journal_writer::JournalWriter;
 use crate::job_owner::JobStore;
-use crate::job_plan::AnalyzerProfile;
 use crate::job_record::{JobRecord, terminal};
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
@@ -545,6 +544,11 @@ impl JobRunner<'_> {
             byte_count,
             path: lease_path,
         };
+        let empty = Map::new();
+        let inputs = run.record.request["inputs"].as_object().unwrap_or(&empty);
+        let Ok(invocation) = Invocation::of(profile, inputs, lease_path) else {
+            return Err(uncertain());
+        };
         let derived = analyzer_composition::derived_artifact_name(&profile.analyzer_ref);
         let target = run.record.request["target"]["targetId"]
             .as_str()
@@ -577,13 +581,17 @@ impl JobRunner<'_> {
             return self.close_cancelled(run, None);
         }
         // The exact typed action is durable before its intent can be.
+        let mut action_arguments = json!({
+            "analyzerRef": profile.analyzer_ref, "analyzerVersion": profile.analyzer_version,
+            "sourceArtifactId": leased.artifact_id, "sourceSha256": sha256,
+            "sourceByteCount": byte_count});
+        if let Some(request) = &invocation.analysis {
+            action_arguments["requestDigestSha256"] = json!(request.recovery_digest_sha256());
+        }
         run.record.set_recovery(
             Some(step),
             Some(&intent_id),
-            Some(json!({"kind": "analyzer.analyze", "arguments": {
-                "analyzerRef": profile.analyzer_ref, "analyzerVersion": profile.analyzer_version,
-                "sourceArtifactId": leased.artifact_id, "sourceSha256": sha256,
-                "sourceByteCount": byte_count}})),
+            Some(json!({"kind": "analyzer.analyze", "arguments": action_arguments})),
         );
         run.persist(self.jobs)?;
         if run.append(intent).is_err() {
@@ -598,7 +606,7 @@ impl JobRunner<'_> {
         let cancelled = || self.cancellation.is_some_and(RunCancellation::pending);
         let opened = (self.precise_now)();
         let dispatched = match opened {
-            Some(_) => self.dispatch(profile, &leased.path, &source, &cancelled),
+            Some(_) => self.dispatch(&invocation, &leased.path, &source, &cancelled),
             None => Err(Dispatch::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
             )),
@@ -658,7 +666,7 @@ impl JobRunner<'_> {
             stderr: &exited.stderr,
             truncated: exited.truncated,
         };
-        let verified = match analyzer_output::verify(&receipt, &source, profile) {
+        let verified = match analyzer_output::verify(&receipt, &source, &invocation) {
             Ok(verified) => verified,
             Err((code, detail)) => {
                 run.outcome(step, "failed", None)?;
@@ -852,13 +860,14 @@ impl JobRunner<'_> {
     /// is stopped once `cancelled` holds.
     fn dispatch(
         &self,
-        profile: &AnalyzerProfile,
+        invocation: &Invocation<'_>,
         path: &Path,
         source: &Source<'_>,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<Exited, Dispatch> {
+        let profile = invocation.profile;
         if profile.arktrace_summary.is_some() || profile.arktrace_analysis.is_some() {
-            return dispatch_arktrace(profile, source, cancelled);
+            return dispatch_arktrace(invocation, source, cancelled);
         }
         let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
             .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
@@ -910,10 +919,11 @@ impl JobRunner<'_> {
 /// bound is reported only by its class, as Swift keeps the authorized
 /// executable's path out of a trace operation's durable failure.
 fn dispatch_arktrace(
-    profile: &AnalyzerProfile,
+    invocation: &Invocation<'_>,
     source: &Source<'_>,
     cancelled: &dyn Fn() -> bool,
 ) -> Result<Exited, Dispatch> {
+    let profile = invocation.profile;
     const REFUSED: &str = "analyzer process identity refused";
     const UNKNOWN: &str = "analyzer process outcome unknown";
     let refused = || Dispatch::Failed(REFUSED.into());
@@ -945,7 +955,14 @@ fn dispatch_arktrace(
         })
         .collect::<Option<Vec<_>>>()
         .ok_or_else(refused)?;
-    let mut arguments: Vec<OsString> = profile.fixed_arguments.iter().map(OsString::from).collect();
+    // Swift binds the source to the invocation's last argument, the lease
+    // path, and hands the child its inode alias in its place.
+    let Some((_, leading)) = invocation.arguments.split_last() else {
+        return Err(Dispatch::Failed(
+            "analyzer input Artifact identity refused".into(),
+        ));
+    };
+    let mut arguments: Vec<OsString> = leading.iter().map(OsString::from).collect();
     arguments.push(bound_source.inode_path().into());
     resources.push(bound_source);
     let tool = VerifiedTool::open(&profile.executable_path, &profile.executable_sha256)
@@ -961,7 +978,7 @@ fn dispatch_arktrace(
         environment: &[],
         working_directory: None,
         limits: ToolLimits {
-            timeout: Duration::from_secs(profile.timeout_seconds.max(1) as u64),
+            timeout: Duration::from_secs(invocation.timeout_seconds.max(1) as u64),
             capture_bytes: CAPTURE_BYTES,
         },
     };
@@ -1024,6 +1041,7 @@ pub(crate) fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Op
 mod tests {
     use super::*;
     use crate::arktrace_profile::ArkTraceContract;
+    use crate::job_plan::AnalyzerProfile;
     use std::os::unix::fs::PermissionsExt;
 
     struct Scratch(std::path::PathBuf);
@@ -1081,9 +1099,10 @@ mod tests {
         };
         let digest = arkdeck_contract::sha256_hex(b"answered\n");
         let path = source_path.to_str().unwrap();
+        let invocation = Invocation::of(&profile, &Map::new(), path).unwrap();
         let source = |sha256: &str| {
             dispatch_arktrace(
-                &profile,
+                &invocation,
                 &Source {
                     artifact_id: "ART-SOURCE",
                     sha256,

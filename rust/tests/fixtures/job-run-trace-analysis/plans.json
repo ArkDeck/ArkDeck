@@ -1,0 +1,115 @@
+[
+  {
+    "composition" : "composed",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analysis-context-0001\",\"inputs\":{\"kind\":\"context\",\"maxEvents\":1000,\"maxOutputBytes\":1048576,\"maxRows\":100,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf\",\"timeoutMs\":30000,\"timestampNs\":16000000000},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analysis-context\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "kind" : "context",
+          "maxEvents" : 1000,
+          "maxOutputBytes" : 1048576,
+          "maxRows" : 100,
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf",
+          "timeoutMs" : 30000,
+          "timestampNs" : 16000000000
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "8a71a19a393824f972f1ef6b7eb73723e3948f48f0f1d313d8084f5e1d1b1c9b",
+        "operation" : "analyzer.analyze-trace@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "33884e154f9712888cb4c90bf5cd812fe654d8a43f9cf213eace52782da2e4e8",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "analyze-trace"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "composition" : "unconfigured",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analysis-context-0001\",\"inputs\":{\"kind\":\"context\",\"maxEvents\":1000,\"maxOutputBytes\":1048576,\"maxRows\":100,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf\",\"timeoutMs\":30000,\"timestampNs\":16000000000},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analysis-context\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.analyze-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "timestampAndRange",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analysis-timestampAndRange-0001\",\"inputs\":{\"endNs\":10,\"kind\":\"cpu\",\"maxEvents\":1,\"maxOutputBytes\":1024,\"maxRows\":1,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf\",\"startNs\":0,\"timeoutMs\":30000,\"timestampNs\":5},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analysis-timestampAndRange\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "ArkTrace analysis request violates its closed cross-field contract"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "contextWithLimit",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analysis-contextWithLimit-0001\",\"inputs\":{\"kind\":\"context\",\"limit\":1,\"maxEvents\":1,\"maxOutputBytes\":1024,\"maxRows\":1,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf\",\"timeoutMs\":30000,\"timestampNs\":5},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analysis-contextWithLimit\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "ArkTrace analysis request violates its closed cross-field contract"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "composition" : "processKeyAndPid",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analysis-processKeyAndPid-0001\",\"inputs\":{\"endNs\":10,\"kind\":\"range\",\"maxEvents\":1,\"maxOutputBytes\":1024,\"maxRows\":1,\"pid\":3,\"processKey\":2,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-54bde9a63da7a96e81ebf52832f82ccf\",\"startNs\":0,\"timeoutMs\":30000},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analysis-processKeyAndPid\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "ArkTrace analysis request violates its closed cross-field contract"
+      },
+      "ok" : false
+    }
+  }
+]

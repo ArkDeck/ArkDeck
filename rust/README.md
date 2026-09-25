@@ -2337,8 +2337,12 @@ its pinned files and trees and the source held, its answer is judged by the
 port of Swift's `ArkTraceSummaryEnvelopeValidator` (`arktrace_summary.rs`),
 and the exact bytes it printed are published with their derivation before
 the step's outcome (`ArtifactPublisher::publish_machine_bytes`).
-`analyzer.analyze-trace@1` is not executed yet: with a loaded descriptor it is
-unavailable as `operation_not_supported`.
+`analyzer.analyze-trace@1` runs the same way with the request its Job's inputs
+make (`arktrace_analysis.rs`: Swift's `ArkTraceAnalysisRequest`, its closed
+cross-field contract refused at plan, submission and agent intent alike, its
+arguments, deadline and recovery digest), judged by the port of Swift's
+`ArkTraceAnalysisEnvelopeValidator` and published with the request's
+derivation.
 
 The loader is ported: `arkdeck_hoststore::ArkTraceProfileLoader` reads the
 descriptor and the distribution manifest as Swift's bounded physical reader
@@ -2371,9 +2375,11 @@ over a stand-in compiled from `rust/tests/fixtures/arktrace-doctor/fake-arktrace
 `ARKDECK_REVIEWED_ARKTRACE_SWIFT` names one), and summarizes
 `Packages/ArkDeckKit/Fixtures/traces/zlib.htrace` with it as Swift's engine did
 when `ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT` names Swift's recording
-(`ArkTraceReviewedDistributionOracleContractTests`); `cargo test -p
-arkdeck-agentd --test trace_summary_analyzer` does the same through the built
-daemon.
+(`ArkTraceReviewedDistributionOracleContractTests`), and analyzes it (a
+context window and a long-slice analysis) when
+`ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT` names that recording; `cargo test
+-p arkdeck-agentd --test trace_summary_analyzer` does the same through the
+built daemon.
 
 `rust/tests/fixtures/job-run-trace-summary/` is Swift's trace-summary Job
 oracle (`JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceSummaryJobs`)
@@ -2382,6 +2388,12 @@ runtimes run the same bytes; `cargo test -p arkdeck-hoststore --test
 job_run_trace_summary` replays its plans, runs, reads, child arguments and
 store byte for byte, and `rust/tests/fixtures/arktrace-summary-validator/`
 holds Swift's verdicts on 95 summary envelopes.
+`rust/tests/fixtures/job-run-trace-analysis/` is the trace-analysis Job oracle
+over the same stand-in, answering the reviewed CLI's own context and analysis
+envelopes, and `rust/tests/fixtures/arktrace-analysis-validator/` holds those
+envelopes (`reviewed/`, answered for `zlib.htrace` and
+`trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
+reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
 
 ## macOS facade host owners (TASK-XPA-012)
 

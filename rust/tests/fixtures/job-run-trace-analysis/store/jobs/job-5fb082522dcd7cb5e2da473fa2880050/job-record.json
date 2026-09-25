@@ -1,0 +1,95 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-5fb082522dcd7cb5e2da473fa2880050",
+  "materializedPlanDigest" : "606642167b9c92034afa8e3b914e4e4a1f167a674f33e09bb68aaac9e2b22e30",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.analyze-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-overOutputBudget-0001",
+    "inputs" : {
+      "endNs" : 1100000000,
+      "kind" : "context",
+      "maxEvents" : 1000,
+      "maxOutputBytes" : 1024,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-e204c6cc9d4b8749a423e0239fe45c6f",
+      "startNs" : 1000000000,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-overOutputBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-overOutputBudget-0001",
+    "inputs" : {
+      "endNs" : 1100000000,
+      "kind" : "context",
+      "maxEvents" : 1000,
+      "maxOutputBytes" : 1024,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-e204c6cc9d4b8749a423e0239fe45c6f",
+      "startNs" : 1000000000,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-overOutputBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent analyze-trace",
+    "failed analyze-trace: analyzer.outputLimitExceeded: trace-analysis@1 output exceeded its byte budget",
+    "running->finalizing",
+    "reason: analyzer.outputLimitExceeded: trace-analysis@1 output exceeded its byte budget",
+    "finalizing->failed",
+    "reason: analyzer.outputLimitExceeded: trace-analysis@1 output exceeded its byte budget"
+  ]
+}

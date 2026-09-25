@@ -1,0 +1,152 @@
+{
+  "journalMode" : "wal",
+  "rows" : [
+    {
+      "admissionSequence" : 1,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-context-0001",
+      "jobId" : "job-2c026d2e5bddaca1fd8bf65eb2350c08",
+      "recordSHA256" : "53a0ce22fc39f02a3a8899327966adbd385e57c78a377ab5ee25d1894fa3a9fe",
+      "requestHash" : "33884e154f9712888cb4c90bf5cd812fe654d8a43f9cf213eace52782da2e4e8",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 4
+    },
+    {
+      "admissionSequence" : 2,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-cpu-0001",
+      "jobId" : "job-b0e68441760491ee40e7fedc450a7283",
+      "recordSHA256" : "147a0c15c39ca47dcef0b72fe0d82385a317a27805da565b5e2262412377afe4",
+      "requestHash" : "b1969a4536636f2fc27ffa7b730999f4f92e7f8f5d64cc205132bdb35ed4cc0a",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 4
+    },
+    {
+      "admissionSequence" : 3,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-hotIntervals-0001",
+      "jobId" : "job-44f30a1b8b8fcc473ce42f5ae8599b5d",
+      "recordSHA256" : "973f21eca49ad9312b576683ba129cf8f31a4ffa60e55f2571845ad018ba0973",
+      "requestHash" : "60a7cac88a39fc8f856b88860b32ea6a65fabd5148a4d8fc5b73b2dc5c1c8270",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 4
+    },
+    {
+      "admissionSequence" : 4,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-stderrWritten-0001",
+      "jobId" : "job-b8763c1cd75a854c18ccedcbde7004cd",
+      "recordSHA256" : "031c1627a27c169a29540e670ea77fd68c440815fe3a162a4afb57beb6de5747",
+      "requestHash" : "5d3701756983cfa35d681e8ec93893305bcfd52e77be1d939ee6f48a1a502104",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 5,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-otherRequest-0001",
+      "jobId" : "job-c39e5814452a3fe0b83d5feee1cb7792",
+      "recordSHA256" : "0fe5d12a2fe349dd663cf14516e6432a550691012303271edb8473ce39e3a016",
+      "requestHash" : "5a2a65742833ce2010a34859bfd92805ad77b65844ce60d99bdec5f36e779c24",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 6,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-overOutputBudget-0001",
+      "jobId" : "job-5fb082522dcd7cb5e2da473fa2880050",
+      "recordSHA256" : "0c1a6b5be26e7a581ac85d4a52bdb71794963c03471e3c158ef0efc91bc7279f",
+      "requestHash" : "404b5b00e1518ec07be6adc91bb710a1ca10324083abc3c92cc9f95ef2507ab5",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 7,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-truncatedStdout-0001",
+      "jobId" : "job-8098e48103ab41b614ecda708bdda550",
+      "recordSHA256" : "7347a7e513bd63501fe2ec5937eaab993d93be975341fbeae7fb0d885782c7ad",
+      "requestHash" : "cc43e395b6fad53dcc51cd1c4cb177c98c99259e03f553e037a4c1f76d8163a4",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 8,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-nonZeroExit-0001",
+      "jobId" : "job-fcf420082c2a724c7945977c54a65d11",
+      "recordSHA256" : "61c9ec29179ac2380026f0bb995d34d7627cc4c213082974a69268a35e65ae94",
+      "requestHash" : "30a9236924b93debff3c981aea63177254c147b32861af7fe17583cdb43656c7",
+      "state" : "failed",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 9,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-analysis-signalled-0001",
+      "jobId" : "job-3de482e8c3b8f6c1ede128addce97fab",
+      "recordSHA256" : "bc83a2a48c76d428b58269f75aa3140610aad45c2f9022553483c57e0ba8c914",
+      "requestHash" : "66d4a7b67cbb863ac811a02ccacae0b769528c4146c87a1ae4cbdff13c9ae379",
+      "state" : "waitingForRecovery",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 4
+    }
+  ],
+  "schema" : [
+    {
+      "name" : "runtime_job",
+      "sql" : "CREATE TABLE runtime_job(\n  job_id TEXT PRIMARY KEY,\n  idempotency_key TEXT NOT NULL UNIQUE,\n  request_hash TEXT NOT NULL,\n  state TEXT NOT NULL,\n  admission_sequence INTEGER NOT NULL,\n  created_at_utc TEXT NOT NULL,\n  created_at_order_key TEXT NOT NULL,\n  updated_at_utc TEXT NOT NULL,\n  version INTEGER NOT NULL CHECK(version >= 1),\n  initial_record_json BLOB\n)",
+      "tableName" : "runtime_job",
+      "type" : "table"
+    },
+    {
+      "name" : "runtime_job_admission_sequence_idx",
+      "sql" : "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_created_idx",
+      "sql" : "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_updated_idx",
+      "sql" : "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_1",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_2",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    }
+  ],
+  "userVersion" : 1
+}

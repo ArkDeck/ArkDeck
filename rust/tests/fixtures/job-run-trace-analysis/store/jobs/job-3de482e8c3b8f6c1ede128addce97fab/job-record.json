@@ -1,0 +1,108 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-3de482e8c3b8f6c1ede128addce97fab",
+  "materializedPlanDigest" : "01dcd1ec45a8b2d926ade5820936b1707d1a08620d5a72c58b2d370e63d76434",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.analyze-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-signalled-0001",
+    "inputs" : {
+      "endNs" : 32210627000,
+      "kind" : "cpu",
+      "limit" : 10,
+      "maxEvents" : 10000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-44090bbb399aaabe5b4701614386e1aa",
+      "startNs" : 0,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-signalled",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "analyzer",
+  "recoveryAction" : {
+    "arguments" : {
+      "analyzerRef" : "trace-analysis@1",
+      "analyzerVersion" : "0.1.0+1",
+      "requestDigestSha256" : "8f547e90e8d16cf5d7e19271c505f484ef5070162e579e458a7b61912d441ebd",
+      "sourceArtifactId" : "ART-44090bbb399aaabe5b4701614386e1aa",
+      "sourceByteCount" : 31,
+      "sourceSha256" : "6d5c74173cb12823e72a723b970bf25eae489117200fdf1607bc32a4acf02ab7"
+    },
+    "kind" : "analyzer.analyze"
+  },
+  "recoveryIntentEventID" : "intent-analyze-trace",
+  "recoveryStepID" : "analyze-trace",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-signalled-0001",
+    "inputs" : {
+      "endNs" : 32210627000,
+      "kind" : "cpu",
+      "limit" : 10,
+      "maxEvents" : 10000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-44090bbb399aaabe5b4701614386e1aa",
+      "startNs" : 0,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-signalled",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent analyze-trace",
+    "outcomeUnknown analyze-trace; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: analyzer process outcome unknown"
+  ]
+}

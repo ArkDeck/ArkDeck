@@ -2,12 +2,14 @@
 //! `ARKDECK_ARKTRACE_DESCRIPTOR`: a descriptor that does not load leaves both
 //! unavailable for the loader's reason, and — on a host with a reviewed,
 //! signed and notarized distribution (`ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR`)
-//! and Swift's recording of its summary of the repository's `zlib.htrace`
-//! (`ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT`, from
+//! and Swift's recordings of its summary and analyses of the repository's
+//! `zlib.htrace` (`ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT`,
+//! `ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT`, from
 //! `ArkTraceReviewedDistributionOracleContractTests`) — a descriptor that
-//! loads makes `analyzer.summarize-trace@1` available, and a Job of it, run
-//! directly and through an agent execution, publishes the bytes Swift
-//! published. Host only: no HDC, no Swift daemon, no device.
+//! loads makes `analyzer.summarize-trace@1` and `analyzer.analyze-trace@1`
+//! available, and their Jobs, run directly and through agent executions,
+//! publish the bytes Swift published. Host only: no HDC, no Swift daemon, no
+//! device.
 #![cfg(target_os = "macos")]
 
 use serde_json::{Value, json};
@@ -271,4 +273,117 @@ fn a_reviewed_distribution_summarizes_the_fixture_trace_on_the_daemon_as_swift_d
     assert_eq!(stored["state"], "completed", "{stored}");
     assert_eq!(stored["jobState"], "succeeded", "{stored}");
     assert_eq!(published(root, &job), swift);
+}
+
+/// The bytes of the one Artifact Swift published for `job` in `recorded`.
+fn swift_product(recorded: &Path, job: &str) -> Vec<u8> {
+    fs::read_dir(recorded.join("artifacts").join(job))
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .find(|path| path.file_name().unwrap() != "index.json")
+        .map(|path| fs::read(path).unwrap())
+        .unwrap()
+}
+
+/// The published `trace-analysis.json` of `job`.
+fn published_analysis(root: &Path, job: &str) -> Vec<u8> {
+    let owner = json!({"kind": "job", "id": job});
+    let listed = request(root, "artifact.list", json!({"owner": owner}));
+    let derived = listed["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|item| item["name"] == "trace-analysis.json")
+        .unwrap_or_else(|| panic!("{listed}"));
+    let read = request(
+        root,
+        "artifact.read",
+        json!({"owner": owner, "artifactId": derived["artifactId"]}),
+    );
+    unbase64(read["base64"].as_str().unwrap())
+}
+
+/// With Swift's recording of its context window and long-slice analysis of
+/// `zlib.htrace` (`ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT`), the built
+/// daemon started with the reviewed descriptor describes
+/// `analyzer.analyze-trace@1` as available, and the context Job run directly
+/// and the analysis Job owned by an agent execution each publish Swift's
+/// bytes.
+#[test]
+fn a_reviewed_distribution_analyzes_the_fixture_trace_on_the_daemon_as_swift_did() {
+    let (Some(descriptor), Some(recorded)) = (
+        std::env::var_os("ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR"),
+        std::env::var_os("ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT"),
+    ) else {
+        eprintln!(
+            "set ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR and ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT"
+        );
+        return;
+    };
+    let recorded = PathBuf::from(recorded);
+    let scratch = Scratch::new("analysis");
+    let root = &scratch.0;
+    seed(&scratch, &recorded);
+    let _runtime = Runtime::start(root, Path::new(&descriptor));
+    let described = request(
+        root,
+        "operation.describe",
+        json!({"reference": "analyzer.analyze-trace@1"}),
+    );
+    assert_eq!(described["availability"], "available", "{described}");
+    let requests: Value =
+        serde_json::from_slice(&fs::read(recorded.join("requests.json")).unwrap()).unwrap();
+    let answers: Value =
+        serde_json::from_slice(&fs::read(recorded.join("answers.json")).unwrap()).unwrap();
+    let swift_job = |name: &str| {
+        answers[name]["job.submit"]["result"]["jobId"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+
+    let accepted = request(root, "job.submit", requests["context"].clone());
+    let job = accepted["jobId"].as_str().unwrap().to_owned();
+    let finished = request(root, "job.run", json!({"jobId": job}));
+    assert_eq!(finished["state"], "succeeded", "{finished}");
+    assert_eq!(
+        published_analysis(root, &job),
+        swift_product(&recorded, &swift_job("context"))
+    );
+
+    let request_json: Value =
+        serde_json::from_str(requests["slices"]["requestJson"].as_str().unwrap()).unwrap();
+    let execution = "trace-analysis-execution";
+    let owned = request(
+        root,
+        "agent.run",
+        json!({
+            "schemaVersion": "arkdeck.agent-execution-request/1",
+            "executionId": execution,
+            "operation": "analyzer.analyze-trace@1",
+            "inputs": request_json["inputs"],
+            "target": {"targetId": request_json["target"]["targetId"]},
+            "maximumWaitMilliseconds": "300000",
+        }),
+    );
+    let job = owned["jobId"].as_str().unwrap().to_owned();
+    let record = root.join("agent-executions").join(format!(
+        "execution-{}.json",
+        arkdeck_contract::sha256_hex(execution.as_bytes())
+    ));
+    let deadline = Instant::now() + Duration::from_secs(120);
+    let stored = loop {
+        let stored: Value = serde_json::from_slice(&fs::read(&record).unwrap()).unwrap();
+        if stored["state"] != "jobOwned" {
+            break stored;
+        }
+        assert!(Instant::now() < deadline, "{stored}");
+        std::thread::sleep(Duration::from_millis(20));
+    };
+    assert_eq!(stored["state"], "completed", "{stored}");
+    assert_eq!(stored["jobState"], "succeeded", "{stored}");
+    assert_eq!(
+        published_analysis(root, &job),
+        swift_product(&recorded, &swift_job("slices"))
+    );
 }

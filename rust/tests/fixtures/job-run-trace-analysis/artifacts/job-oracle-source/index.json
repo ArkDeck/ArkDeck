@@ -1,0 +1,275 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-54bde9a63da7a96e81ebf52832f82ccf",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 32,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-context.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "1059acf357334cddfda57a6f248d70fd0901cbed12701d7f51b6fd75dcc1a7cc",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-35bff36cb42e9b892b20fadf894f0f0e",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 28,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-cpu.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "4db3335ac7e4f200d1ecac2e6e7f46417ced05e1e8157fe45d5f8d6c65c8d4f3",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-dff3442c34857eadfb80637912e2c96b",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 28,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-hotIntervals.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "6dab5945a7fc13ec8fd8c30d2a273617ed3b054cd92296d5cceb24f1ee711f9c",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-541035131fbc2f9043f9ead48cdaf821",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 31,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-stderrWritten.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "e75007e143dc69f5795d809bbfa80843389e76770aaa0d54eb020d5218f45523",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-77054ffa0390e394ee36227549ecfeeb",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 30,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-otherRequest.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "91830c7d3f4f1466f01dded1178cdb7f2924f3f3b334733061996c9ff8b4a41d",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-e204c6cc9d4b8749a423e0239fe45c6f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 30,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-overOutputBudget.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "2ba0a94727e690f69d6776037a01df0c5fcef429786f2692dc42987aa8e55878",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-79e2dcaa37ba549118dee4b25371bf6e",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 28,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-truncatedStdout.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "0ba859b7887c66242dc9feca958db71e27a2867a9f6484f968ee43e8374b8e38",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-121dffe2900821b517681fd40c26ed34",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 29,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-nonZeroExit.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "af39d02b2f74ec5244d0db8055c0a7cd238d26df575fee41eef66c4236d4636a",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    },
+    {
+      "artifactID" : "ART-44090bbb399aaabe5b4701614386e1aa",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 31,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace-signalled.htrace",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "6d5c74173cb12823e72a723b970bf25eae489117200fdf1607bc32a4acf02ab7",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
