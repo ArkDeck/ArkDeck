@@ -43,6 +43,17 @@ entitlements、Developer ID 和 hardened runtime，逐层执行严格 codesign �
 写入 `LOCAL-DEVELOPMENT-BUILD.txt`；产物只可用于当前 Mac 的 `agentd install/update`、签名预设和
 CLI 真机验证，绝不是发布物。正式发布仍只能运行 `build-helpers.sh`，其公证要求没有本地绕过开关。
 
+M5 切换窗口用的 Rust helper 也由 `build-helpers.sh` 发布：`ARKDECK_HELPER_RUNTIME=rust`（缺省
+`swift`，即上面的 Swift helper）以 Rust `arkdeck`/`arkdeck-agentd` 为两个包的主程序：包结构、
+Info.plist、provisioning profile、entitlements 与可执行名同 Swift helper（只少了只有 Swift 读的
+SwiftPM 资源，daemon 仍带 OpenHarmony code-sign helper），并经过同样的 profile 校验、Developer ID、
+hardened runtime、secure timestamp、公证、staple 与 Gatekeeper assessment。Rust daemon 包不含
+façade；`ARKDECK_ROLLBACK_HELPER` 必须指向当前发布的 Swift helper（Swift daemon 加
+Rust façade 的 `ArkDeckAgent.app`），它原样复制到输出的 `rollback/ArkDeckAgent.app` 保留一个周期。
+`Distribution/macOS/build-unsigned-rust-helpers.sh` 用同一布局步骤产出 ad hoc 签名、占位 profile 的
+一对 helper，输出根写有 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`，只供
+`Distribution/macOS/check-rust-helpers.py` 检查结构；生产 helper 校验会拒绝它，不可分发或安装。
+
 `install` 会严格验证 helper bundle 的 Developer ID、Team、bundle ID、hardened runtime、
 embedded provisioning profile 和共享 Keychain entitlement，再哈希 daemon/HDC，把完整 daemon
 bundle 复制到 `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，生成

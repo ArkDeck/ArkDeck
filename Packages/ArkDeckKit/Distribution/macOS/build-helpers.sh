@@ -10,6 +10,25 @@ daemon_profile="${ARKDECK_DAEMON_PROVISIONING_PROFILE:-}"
 notary_profile="${ARKDECK_NOTARY_KEYCHAIN_PROFILE:-}"
 team_identifier="8AQTYW5FKR"
 keychain_group="$team_identifier.com.arkdeck.shared"
+# CHG-2026-074 M5 (G5 slice 20a): ARKDECK_HELPER_RUNTIME=rust releases the same
+# helper pair with the Rust CLI and daemon as its main programs, and keeps the
+# current Swift helper, named by ARKDECK_ROLLBACK_HELPER, beside it for one
+# cycle. Swift stays the default until the cutover window changes it.
+helper_runtime="${ARKDECK_HELPER_RUNTIME:-swift}"
+rollback_helper="${ARKDECK_ROLLBACK_HELPER:-}"
+case "$helper_runtime" in
+  swift) ;;
+  rust)
+    if [[ "$rollback_helper" != /* || ! -d "$rollback_helper" ]]; then
+      echo "ARKDECK_ROLLBACK_HELPER must name the current Swift ArkDeckAgent.app to keep for one cycle" >&2
+      exit 64
+    fi
+    ;;
+  *)
+    echo "ARKDECK_HELPER_RUNTIME must be swift or rust" >&2
+    exit 64
+    ;;
+esac
 
 if [[ -z "$cli_profile" || -z "$daemon_profile" || -z "$notary_profile" ]]; then
   echo "CLI/daemon provisioning profiles and ARKDECK_NOTARY_KEYCHAIN_PROFILE are required" >&2
@@ -65,6 +84,41 @@ validate_profile() {
 
 validate_profile "cli" "$cli_profile" "$team_identifier.com.arkdeck.cli"
 validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd"
+
+if [[ "$helper_runtime" == rust ]]; then
+  # The same gates as the Swift release below: Developer ID with hardened
+  # runtime and a secure timestamp, strict verification, then notarization,
+  # stapling and Gatekeeper assessment of the pair and of the retained helper.
+  rust_root="$(cd "$package_root/../../rust" && pwd)"
+  (cd "$rust_root" && cargo build --locked --release --target aarch64-apple-darwin \
+    -p arkdeck-cli -p arkdeck-agentd --bins)
+  target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
+    | plutil -extract target_directory raw -o - -)"
+  staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-helper-build.XXXXXX")"
+  bash "$distribution_root/package-rust-helpers.sh" \
+    "$target_directory/aarch64-apple-darwin/release" "$staging_root" \
+    "$cli_profile" "$daemon_profile" "$identity" --timestamp "$rollback_helper"
+  cli_bundle="$staging_root/ArkDeckCLI.app"
+  archive="$staging_root/ArkDeckCLI-notarization.zip"
+  ditto -c -k --keepParent "$cli_bundle" "$archive"
+  xcrun notarytool submit "$archive" --keychain-profile "$notary_profile" --wait
+  xcrun stapler staple "$cli_bundle"
+  spctl --assess --type execute --verbose=2 "$cli_bundle"
+  rm "$archive"
+  rollback_archive="$staging_root/ArkDeckAgent-rollback-notarization.zip"
+  ditto -c -k --keepParent "$staging_root/rollback/ArkDeckAgent.app" "$rollback_archive"
+  xcrun notarytool submit "$rollback_archive" --keychain-profile "$notary_profile" --wait
+  xcrun stapler staple "$staging_root/rollback/ArkDeckAgent.app"
+  spctl --assess --type execute --verbose=2 "$staging_root/rollback/ArkDeckAgent.app"
+  rm "$rollback_archive"
+  mkdir -p "$(dirname "$output_root")"
+  mv "$staging_root" "$output_root"
+  staging_root=""
+  rm -rf "$profile_root"
+  trap - EXIT
+  echo "$output_root/ArkDeckCLI.app"
+  exit 0
+fi
 
 # Host helpers ship for Apple silicon only, including when Swift runs under Rosetta.
 swift build --package-path "$package_root" --arch arm64 -c release --product arkdeck

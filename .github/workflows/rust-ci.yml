@@ -240,6 +240,24 @@ jobs:
         working-directory: .
         run: python rust/scripts/workspace-tests.py
 
+      # The Rust helper pair's release layout (G5 slice 20a,
+      # Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh), laid
+      # out from the binaries the tests above built, signed ad hoc and checked
+      # without any signing identity: the file tree, Info.plist and its App
+      # version parity, entitlements, signing parameters, arm64, and the two
+      # answers `runtime service update` asks of a Rust daemon. It compiles
+      # nothing and takes seconds; macOS only.
+      - name: Rust helper package structure (unsigned)
+        if: runner.os == 'macOS'
+        working-directory: .
+        run: |
+          set -eu
+          output="$RUNNER_TEMP/arkdeck-unsigned-rust-helpers"
+          ARKDECK_RUST_HELPER_BINARIES="$PWD/rust/target/debug" \
+          ARKDECK_UNSIGNED_HELPER_OUTPUT="$output" \
+            bash Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
+          python Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
+
       - name: Published consumer and candidate contract parity
         working-directory: .
         run: python rust/scripts/check-contracts.py
