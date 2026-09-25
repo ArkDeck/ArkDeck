@@ -2324,8 +2324,21 @@ for byte
 ArkTrace CLI a host names with `ARKDECK_ARKTRACE_DESCRIPTOR`. Without one, the
 daemon's composition (`hilog_summary_analyzer::composed`) names both analyzers
 unavailable as Swift's does, `analyzer.arktraceNotFound`, and `job.plan` and
-`job.submit` refuse them by that reason before admission
-(`JobPlanner::unmaterialized_analyzer`). A named descriptor is not loaded yet.
+`job.submit` refuse them by that reason before admission. With one, the
+daemon (development and production alike) loads it at its start as Swift's
+does — the production trust checker, the doctor's private home
+`<state>/arktrace-availability-home`, snapshot generations under
+`<state>/arktrace-profile-snapshots`, the setting read as Swift's
+`URL(filePath:)` reads it — and composes both profiles, or names both
+unavailable for the loader's reason. `analyzer.summarize-trace@1` is then
+planned, admitted, run, published, read and reconciled like the other
+analyzers: the CLI is launched at its canonical snapshot path with the bundle,
+its pinned files and trees and the source held, its answer is judged by the
+port of Swift's `ArkTraceSummaryEnvelopeValidator` (`arktrace_summary.rs`),
+and the exact bytes it printed are published with their derivation before
+the step's outcome (`ArtifactPublisher::publish_machine_bytes`).
+`analyzer.analyze-trace@1` is not executed yet: with a loaded descriptor it is
+unavailable as `operation_not_supported`.
 
 The loader is ported: `arkdeck_hoststore::ArkTraceProfileLoader` reads the
 descriptor and the distribution manifest as Swift's bounded physical reader
@@ -2355,7 +2368,20 @@ verified inode, its `VerifiedResource`s and `VerifiedNamespace` held).
 over a stand-in compiled from `rust/tests/fixtures/arktrace-doctor/fake-arktrace.c`;
 `--test arktrace_reviewed` loads a reviewed distribution a host names with
 `ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR` (and compares it with Swift's load when
-`ARKDECK_REVIEWED_ARKTRACE_SWIFT` names one).
+`ARKDECK_REVIEWED_ARKTRACE_SWIFT` names one), and summarizes
+`Packages/ArkDeckKit/Fixtures/traces/zlib.htrace` with it as Swift's engine did
+when `ARKDECK_REVIEWED_ARKTRACE_JOB_SWIFT` names Swift's recording
+(`ArkTraceReviewedDistributionOracleContractTests`); `cargo test -p
+arkdeck-agentd --test trace_summary_analyzer` does the same through the built
+daemon.
+
+`rust/tests/fixtures/job-run-trace-summary/` is Swift's trace-summary Job
+oracle (`JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceSummaryJobs`)
+over a checked-in stand-in CLI, `arktrace`, compiled from `arktrace.c` so both
+runtimes run the same bytes; `cargo test -p arkdeck-hoststore --test
+job_run_trace_summary` replays its plans, runs, reads, child arguments and
+store byte for byte, and `rust/tests/fixtures/arktrace-summary-validator/`
+holds Swift's verdicts on 95 summary envelopes.
 
 ## macOS facade host owners (TASK-XPA-012)
 

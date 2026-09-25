@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-72ab37e7767d855c40365809ee234c74",
+  "materializedPlanDigest" : "94b34646585ec463f0d581586a11d05e13957a4db13f52a5b82ce21296d2cb6a",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-121dffe2900821b517681fd40c26ed34"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-121dffe2900821b517681fd40c26ed34"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-trace",
+    "failed summarize-trace: analyzer.failed: trace-summary@1 exited 3",
+    "running->finalizing",
+    "reason: analyzer.failed: trace-summary@1 exited 3",
+    "finalizing->failed",
+    "reason: analyzer.failed: trace-summary@1 exited 3"
+  ]
+}

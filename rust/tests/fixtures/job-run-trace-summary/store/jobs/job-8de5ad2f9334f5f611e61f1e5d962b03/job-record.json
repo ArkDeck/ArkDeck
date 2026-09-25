@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-8de5ad2f9334f5f611e61f1e5d962b03",
+  "materializedPlanDigest" : "c4c5fa2edbefcf7d99f986e05753b29b3d4f82e538a30ba31109440d7e5fa4a9",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-stderrWritten-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-541035131fbc2f9043f9ead48cdaf821"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-stderrWritten",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-stderrWritten-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-541035131fbc2f9043f9ead48cdaf821"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-stderrWritten",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-trace",
+    "failed summarize-trace: analyzer.schemaMismatch: trace-summary@1 produced JSON outside ArkTrace contract 1.0",
+    "running->finalizing",
+    "reason: analyzer.schemaMismatch: trace-summary@1 produced JSON outside ArkTrace contract 1.0",
+    "finalizing->failed",
+    "reason: analyzer.schemaMismatch: trace-summary@1 produced JSON outside ArkTrace contract 1.0"
+  ]
+}

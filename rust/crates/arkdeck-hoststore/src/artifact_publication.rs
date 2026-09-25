@@ -134,7 +134,37 @@ impl ArtifactPublisher<'_> {
     /// Swift `publish`: the stored metadata, or Swift's refusal.
     pub(crate) fn publish(&self, product: &Product<'_>, contents: &[u8]) -> Result<Value, String> {
         self.store
-            .with_retention_lock(|| self.publish_guarded(product, contents))
+            .with_retention_lock(|| self.publish_guarded(product, contents, None))
+            .map_err(|error| io_failure(&format!("cannot inspect artifact retention: {error}")))?
+    }
+
+    /// Swift `publish` with `preservesValidatedMachineBytes`: a validated
+    /// ArkTrace envelope published as the exact bytes the validator approved,
+    /// never redacted, with the derivation that closes it. Only the two
+    /// ArkTrace products, as JSON, with their own closed derivation, may be.
+    pub(crate) fn publish_machine_bytes(
+        &self,
+        product: &Product<'_>,
+        contents: &[u8],
+        derivation: &Value,
+    ) -> Result<Value, String> {
+        let closed = (product.name == "trace-summary.json"
+            && product.source_operation == "analyzer.summarize-trace@1"
+            && derivation["analyzerRef"] == "trace-summary@1"
+            && derivation.get("requestCommand").is_none())
+            || (product.name == "trace-analysis.json"
+                && product.source_operation == "analyzer.analyze-trace@1"
+                && derivation["analyzerRef"] == "trace-analysis@1"
+                && derivation.get("requestCommand").is_some()
+                && derivation.get("requestKind").is_some());
+        if !closed || product.media_type != "application/json" {
+            return Err(artifact_error(
+                "evidenceVerificationFailed",
+                "exact machine-byte publication lacks a closed ArkTrace derivation",
+            ));
+        }
+        self.store
+            .with_retention_lock(|| self.publish_guarded(product, contents, Some(derivation)))
             .map_err(|error| io_failure(&format!("cannot inspect artifact retention: {error}")))?
     }
 
@@ -206,14 +236,22 @@ impl ArtifactPublisher<'_> {
             .sum())
     }
 
-    fn publish_guarded(&self, product: &Product<'_>, contents: &[u8]) -> Result<Value, String> {
-        let (payload, redacted) = redact(contents, product.media_type, self.home);
+    fn publish_guarded(
+        &self,
+        product: &Product<'_>,
+        contents: &[u8],
+        derivation: Option<&Value>,
+    ) -> Result<Value, String> {
+        let (payload, redacted) = match derivation {
+            Some(_) => (contents.to_vec(), false),
+            None => redact(contents, product.media_type, self.home),
+        };
         let digest = sha256_hex(&payload);
         let identity =
             sha256_hex(format!("{}\0{}\0{digest}", product.job_id, product.name).as_bytes());
         let artifact_id = format!("ART-{}", &identity[..32]);
         let created = self.clock()?;
-        let metadata = self.metadata(
+        let mut metadata = self.metadata(
             product,
             &artifact_id,
             payload.len() as u64,
@@ -222,6 +260,9 @@ impl ArtifactPublisher<'_> {
             json!({"published": {}}),
             redacted,
         )?;
+        if let Some(derivation) = derivation {
+            metadata["derivation"] = derivation.clone();
+        }
         let job = self.job_directory(product.job_id)?;
         let index = self.load_index(&job, product.job_id)?;
         if let Some(existing) = index.iter().find(|row| row["name"] == product.name)

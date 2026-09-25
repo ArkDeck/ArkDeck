@@ -8,10 +8,18 @@ use std::collections::BTreeMap;
 
 pub(crate) const CRASH_SIGNATURE: &str = "analyzer.extract-crash-signature@1";
 pub(crate) const HILOG_SUMMARY: &str = "analyzer.summarize-hilog@1";
+pub(crate) const TRACE_SUMMARY: &str = "analyzer.summarize-trace@1";
 
 /// The analyzer operations this Runtime plans, admits, runs, reconciles and
 /// reads: each one's product is verified and published here.
-pub(crate) const EXECUTED: [&str; 2] = [CRASH_SIGNATURE, HILOG_SUMMARY];
+pub(crate) const EXECUTED: [&str; 3] = [CRASH_SIGNATURE, HILOG_SUMMARY, TRACE_SUMMARY];
+
+/// Swift's `publishesBeforeOutcome`: the ArkTrace operations, whose exact
+/// validated bytes become durable before the journal can call their step
+/// succeeded.
+pub(crate) fn publishes_before_outcome(reference: &str) -> bool {
+    [TRACE_SUMMARY, "analyzer.analyze-trace@1"].contains(&reference)
+}
 
 /// `AnalyzerProvider.analyzerForOperation`: the one analyzer an operation may
 /// name. The mapping is the Runtime's; no request chooses another.
@@ -19,7 +27,7 @@ pub(crate) fn analyzer_for_operation(reference: &str) -> Option<&'static str> {
     match reference {
         CRASH_SIGNATURE => Some("crash-signature@1"),
         HILOG_SUMMARY => Some("hilog-summary@1"),
-        "analyzer.summarize-trace@1" => Some("trace-summary@1"),
+        TRACE_SUMMARY => Some("trace-summary@1"),
         "analyzer.analyze-trace@1" => Some("trace-analysis@1"),
         _ => None,
     }
@@ -30,7 +38,7 @@ pub(crate) fn step(reference: &str) -> Option<&'static str> {
     match reference {
         CRASH_SIGNATURE => Some("extract-crash-signature"),
         HILOG_SUMMARY => Some("summarize-hilog"),
-        "analyzer.summarize-trace@1" => Some("summarize-trace"),
+        TRACE_SUMMARY => Some("summarize-trace"),
         "analyzer.analyze-trace@1" => Some("analyze-trace"),
         _ => None,
     }
@@ -108,18 +116,30 @@ impl AnalyzerProfiles {
     /// Swift's daemon composition of the two ArkTrace analyzers when no
     /// descriptor is named (`ARKDECK_ARKTRACE_DESCRIPTOR` unset): both
     /// unavailable as `analyzer.arktraceNotFound`.
-    pub fn without_arktrace(mut self) -> Self {
+    pub fn without_arktrace(self) -> Self {
+        self.with_arktrace_unavailable(
+            crate::arktrace_profile::ArkTraceProfileError::NotFound.reason(),
+        )
+    }
+
+    /// Swift's daemon composition of the two ArkTrace analyzers when the
+    /// named descriptor did not load: both unavailable for the loader's
+    /// reason.
+    pub fn with_arktrace_unavailable(mut self, reason: &str) -> Self {
         for analyzer_ref in [
             crate::arktrace_profile::SUMMARY_REF,
             crate::arktrace_profile::ANALYSIS_REF,
         ] {
-            self.unavailable.insert(
-                analyzer_ref.to_owned(),
-                crate::arktrace_profile::ArkTraceProfileError::NotFound
-                    .reason()
-                    .to_owned(),
-            );
+            self.unavailable
+                .insert(analyzer_ref.to_owned(), reason.to_owned());
         }
+        self
+    }
+
+    /// Swift's daemon composition of the profiles a named descriptor loaded
+    /// (`loadProfiles`), after the host's own analyzers.
+    pub fn with_arktrace(mut self, loaded: Vec<AnalyzerProfile>) -> Self {
+        self.profiles.extend(loaded);
         self
     }
 }

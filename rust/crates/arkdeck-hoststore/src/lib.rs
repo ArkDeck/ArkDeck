@@ -86,6 +86,8 @@ mod arktrace_doctor;
 #[cfg(target_os = "macos")]
 pub use arktrace_doctor::ProductionDoctorProbe;
 #[cfg(target_os = "macos")]
+mod arktrace_summary;
+#[cfg(target_os = "macos")]
 mod arktrace_trust;
 #[cfg(target_os = "macos")]
 pub use arktrace_trust::ProductionDistributionTrust;

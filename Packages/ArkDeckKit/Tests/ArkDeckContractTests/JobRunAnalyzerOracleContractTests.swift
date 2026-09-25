@@ -1294,6 +1294,371 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     return files
   }
 
+  private static let traceSummaryOracle = repository.appending(
+    path: "rust/tests/fixtures/job-run-trace-summary", directoryHint: .isDirectory)
+
+  /// The trace-summary Job oracle `rust/crates/arkdeck-hoststore/tests/
+  /// job_run_trace_summary.rs` replays: `analyzer.summarize-trace@1` planned
+  /// where a reviewed ArkTrace distribution is composed and where none is;
+  /// then one Job per answer of the checked-in ArkTrace stand-in (`arktrace`,
+  /// compiled from `arktrace.c`), each over its own trace source and run in
+  /// order over one store through the real descriptor-bound dispatcher, whose
+  /// verified canonical-path launch holds the bundle, the distribution's
+  /// pinned files, its pinned tree and the source; the last three Jobs each
+  /// run while one of those no longer holds — a file added to the pinned
+  /// tree, the pinned `Info.plist` changed, the bundle writable by others —
+  /// restored after its run, and each is planned then too; and every Job's
+  /// status, details, result and evidence, with the arguments each child was
+  /// given. The stand-in answers by the first line of its source; its
+  /// reviewed answers are ArkTrace summary envelopes of these sources,
+  /// written here. Record it with
+  /// `ARKDECK_RUST_JOB_RUN_TRACE_SUMMARY_RECORD=/private/tmp/<new directory>`.
+  func testSwiftRunsTheSharedTraceSummaryJobs() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await traceSummaryFiles(), oracle: Self.traceSummaryOracle,
+      variable: "ARKDECK_RUST_JOB_RUN_TRACE_SUMMARY_RECORD")
+  }
+
+  /// Each Job's name, the answer its source names, and the state its run
+  /// ends in. The last three run while the distribution does not hold.
+  private static let traceSummaryJobs: [(name: String, mode: String, ends: String)] = [
+    ("answered", "answered", "succeeded"),
+    ("stderrWritten", "stderr", "failed"),
+    ("otherSource", "mismatch", "failed"),
+    ("extraMember", "extra", "failed"),
+    ("nonZeroExit", "exit", "failed"),
+    ("emptyResult", "empty", "failed"),
+    ("malformedResult", "malformed", "failed"),
+    ("truncatedStdout", "big", "failed"),
+    ("signalled", "signal", "waitingForRecovery"),
+    ("treeDrifted", "tree", "failed"),
+    ("infoPlistDrifted", "plist", "failed"),
+    ("bundleWritable", "bundle", "failed"),
+  ]
+
+  /// A trace source whose first line names the stand-in's answer.
+  private static func traceSource(_ mode: String) -> Data {
+    Data((mode + "\n" + "OHOSPROF trace stand-in\n").utf8)
+  }
+
+  /// The reviewed ArkTrace summary envelope of `source` from the stand-in
+  /// whose bytes have `executableSHA256`: the summary validator oracle's
+  /// reviewed envelope, bound to this source and this tool.
+  private static func traceEnvelope(
+    of source: Data, executableSHA256: String, extraMember: Bool = false
+  ) -> Data {
+    var envelope = ArkTraceSummaryValidatorOracleContractTests.envelope()
+    var tool = envelope["tool"] as! [String: Any]
+    tool["buildRevision"] = executableSHA256
+    envelope["tool"] = tool
+    var trace = envelope["trace"] as! [String: Any]
+    trace["sha256"] = sha256(source)
+    trace["byteCount"] = source.count
+    envelope["trace"] = trace
+    if extraMember { envelope["zzz"] = 1 }
+    return Data(ArkTraceSummaryValidatorOracleContractTests.json(envelope).utf8)
+  }
+
+  private static func traceSubmitParams(
+    _ name: String, lease: String
+  ) throws -> [String: JSONValue] {
+    let fields: [String: JSONValue] = [
+      "documentType": .string("runtime-operation-request"),
+      "schemaVersion": .string("1.0.0"),
+      "requestId": .string("req-oracle-trace-\(name)"),
+      "idempotencyKey": .string("idem-oracle-trace-\(name)-0001"),
+      "target": .object(["targetId": .string(Self.target)]),
+      "operation": .object([
+        "id": .string("analyzer.summarize-trace"), "version": .integer(1),
+      ]),
+      "inputs": .object(["sourceArtifactRef": .string(lease)]),
+    ]
+    let bytes = try CanonicalJSONEncoders.canonical().encode(JSONValue.object(fields))
+    return ["requestJson": .string(String(decoding: bytes, as: UTF8.self))]
+  }
+
+  private func traceSummaryFiles() async throws -> [String: Data] {
+    let manager = FileManager.default
+    try? manager.removeItem(at: Self.root)
+    try manager.createDirectory(
+      at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? manager.removeItem(at: Self.root) }
+    func directory(_ path: String) throws -> URL {
+      let url = Self.root.appending(path: path, directoryHint: .isDirectory)
+      try manager.createDirectory(
+        at: url, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+      return url
+    }
+    func write(_ data: Data, to url: URL, mode: mode_t) throws {
+      try data.write(to: url)
+      guard chmod(url.path, mode) == 0 else { throw POSIXError(.EPERM) }
+    }
+    // The reviewed distribution: the stand-in inside an owner-only bundle,
+    // and the parser it ships, pinned by itself and by its directory's tree.
+    let executableBytes = try Data(
+      contentsOf: Self.traceSummaryOracle.appending(path: "arktrace"))
+    let standInSource = try Data(
+      contentsOf: Self.traceSummaryOracle.appending(path: "arktrace.c"))
+    let bundle = try directory("ArkTrace.app")
+    _ = try directory("ArkTrace.app/Contents")
+    _ = try directory("ArkTrace.app/Contents/MacOS")
+    let resources = try directory("ArkTrace.app/Contents/Resources")
+    let executable = bundle.appending(path: "Contents/MacOS/arktrace")
+    try write(executableBytes, to: executable, mode: 0o700)
+    let parserBytes = Data("trace_streamer stand-in\n".utf8)
+    let parser = resources.appending(path: "trace_streamer")
+    try write(parserBytes, to: parser, mode: 0o700)
+    // Pinned by itself only, outside the pinned tree.
+    let infoPlistBytes = Data("<plist>stand-in</plist>\n".utf8)
+    let driftedInfoPlistBytes = Data("<plist>drifted!!</plist>\n".utf8)
+    let infoPlist = bundle.appending(path: "Contents/Info.plist")
+    try write(infoPlistBytes, to: infoPlist, mode: 0o600)
+    // Added to the pinned tree, and removed again.
+    let extraResource = resources.appending(path: "extra.txt")
+    let extraResourceBytes = Data("not reviewed\n".utf8)
+    // The stand-in's answers, and where it logs its arguments.
+    _ = try directory("arktrace")
+    let answers = try directory("arktrace/answers")
+    let executableSHA256 = AnalyzerProvider.sha256(executableBytes)
+    let contract = ArkTraceSummaryValidatorOracleContractTests.contract
+    let fixedArguments = [
+      "summary", "--json", "--no-cache", "--timeout-ms", "30000", "--max-rows", "1000",
+      "--max-events", "10000", "--max-output-bytes", "8388608",
+    ]
+    let profile = AnalyzerProfile(
+      analyzerRef: "trace-summary@1", analyzerVersion: contract.toolVersion + "+1",
+      executablePath: executable.path, executableSHA256: executableSHA256,
+      canonicalNamespaceRoot: bundle.path, fixedArguments: fixedArguments,
+      timeoutSeconds: 30, outputByteBudget: 8 * 1024 * 1024,
+      pinnedFiles: [
+        AnalyzerPinnedFile(
+          path: parser.path, sha256: AnalyzerProvider.sha256(parserBytes),
+          byteCount: parserBytes.count, requireExecutable: true),
+        AnalyzerPinnedFile(
+          path: infoPlist.path, sha256: AnalyzerProvider.sha256(infoPlistBytes),
+          byteCount: infoPlistBytes.count),
+      ],
+      pinnedTrees: [
+        AnalyzerPinnedTree(
+          path: resources.path,
+          sha256: try ArkTraceDistributionTreeHasher.digest(rootPath: resources.path))
+      ],
+      arkTraceSummaryContract: contract)
+
+    let artifacts = Self.root.appending(path: "artifacts", directoryHint: .isDirectory)
+    let store = try RuntimeArtifactStore(
+      rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
+      redaction: ArtifactRedactionPolicy(homeDirectory: Self.home), nowUTC: { Self.nowUTC })
+    let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
+    let handler = try hilogHandler(
+      provider: try AnalyzerProvider(profiles: [profile]), profiles: [profile],
+      jobsState: jobsState, store: store, capabilities: capabilities)
+    // The daemon without `ARKDECK_ARKTRACE_DESCRIPTOR`.
+    let notFound = ArkTraceSummaryProfileError.notFound.reason
+    let unconfigured = try hilogHandler(
+      provider: try AnalyzerProvider(
+        profiles: [],
+        unavailableReasons: ["trace-summary@1": notFound, "trace-analysis@1": notFound]),
+      profiles: [], jobsState: jobsState, store: store, capabilities: capabilities)
+
+    var sources: [String: String] = [:]
+    var sourceBytes: [String: Data] = [:]
+    for job in Self.traceSummaryJobs {
+      let bytes = Self.traceSource(job.mode)
+      sourceBytes[job.mode] = bytes
+      let source = try await store.publish(
+        RuntimeArtifactPublicationRequest(
+          jobID: Self.sourceJob, sessionID: "HTASK-JOBRUNORACLE", stepID: "capture-trace",
+          name: "trace-\(job.name).htrace", mediaType: "application/octet-stream",
+          privacy: .standard, retentionClass: .default,
+          sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: Self.target, bindingRevision: 3,
+            stableIdentitySHA256: String(repeating: "c", count: 64)),
+          contents: bytes))
+      sources[job.name] = try await store.leaseReference(
+        jobID: source.jobID, artifactID: source.artifactID)
+    }
+    var answerFiles: [String: Data] = [:]
+    func envelope(_ mode: String, extraMember: Bool = false) -> Data {
+      Self.traceEnvelope(
+        of: sourceBytes[mode]!, executableSHA256: executableSHA256, extraMember: extraMember)
+    }
+    answerFiles["answered.stdout"] = envelope("answered")
+    answerFiles["stderr.stdout"] = envelope("stderr")
+    answerFiles["stderr.stderr"] = Data("warning\n".utf8)
+    answerFiles["mismatch.stdout"] = envelope("answered")
+    answerFiles["extra.stdout"] = envelope("extra", extraMember: true)
+    answerFiles["exit.stderr"] = Data("oracle analyzer failed\n".utf8)
+    answerFiles["exit.exit"] = Data("3\n".utf8)
+    answerFiles["malformed.stdout"] = Data("trace summary: none\n".utf8)
+    for mode in ["tree", "plist", "bundle"] {
+      answerFiles["\(mode).stdout"] = envelope(mode)
+    }
+    for (name, data) in answerFiles {
+      try write(data, to: answers.appending(path: name), mode: 0o600)
+    }
+
+    // How each composition plans the first Job's request.
+    let planned = try Self.traceSubmitParams("answered", lease: sources["answered"]!)
+    var plans: [JSONValue] = []
+    for (name, composition) in [("composed", handler), ("unconfigured", unconfigured)] {
+      plans.append(
+        .object([
+          "composition": .string(name), "params": .object(planned),
+          "response": try await exchange(composition, "job.plan", planned),
+        ]))
+    }
+    var recorded: [JSONValue] = []
+    var jobIDs: [String] = []
+    for job in Self.traceSummaryJobs {
+      let submit = try Self.traceSubmitParams(job.name, lease: sources[job.name]!)
+      let accepted = try await exchange(handler, "job.submit", submit)
+      guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
+        case .string(let jobID)? = result["jobId"]
+      else { throw CocoaError(.coderInvalidValue) }
+      jobIDs.append(jobID)
+      recorded.append(
+        .object([
+          "name": .string(job.name), "mode": .string(job.mode), "submit": .object(submit),
+          "accepted": accepted, "params": .object(["jobId": .string(jobID)]),
+        ]))
+    }
+    for (index, job) in Self.traceSummaryJobs.enumerated() {
+      // After every admission, the distribution stops holding for one run:
+      // the plan made then is recorded, and the change is undone after it.
+      switch job.mode {
+      case "tree": try write(extraResourceBytes, to: extraResource, mode: 0o600)
+      case "plist": try write(driftedInfoPlistBytes, to: infoPlist, mode: 0o600)
+      case "bundle": guard chmod(bundle.path, 0o777) == 0 else { throw POSIXError(.EPERM) }
+      default: break
+      }
+      if ["tree", "plist", "bundle"].contains(job.mode) {
+        plans.append(
+          .object([
+            "composition": .string(job.name), "params": .object(planned),
+            "response": try await exchange(handler, "job.plan", planned),
+          ]))
+      }
+      defer {
+        switch job.mode {
+        case "tree": try? manager.removeItem(at: extraResource)
+        case "plist": try? write(infoPlistBytes, to: infoPlist, mode: 0o600)
+        case "bundle": _ = chmod(bundle.path, 0o700)
+        default: break
+        }
+      }
+      let response = try await exchange(handler, "job.run", ["jobId": .string(jobIDs[index])])
+      guard case .object(let fields) = response, case .object(let result)? = fields["result"]
+      else { throw CocoaError(.coderInvalidValue) }
+      XCTAssertEqual(result["state"], .string(job.ends), job.name)
+      guard case .object(var entry) = recorded[index] else { continue }
+      entry["response"] = response
+      recorded[index] = .object(entry)
+    }
+    var reads: [String: JSONValue] = [:]
+    for jobID in jobIDs {
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+    // Each child's arguments; the source's inode alias names this machine.
+    let calls = String(
+      decoding: try Data(contentsOf: Self.root.appending(path: "arktrace/calls.log")),
+      as: UTF8.self)
+    let inodeAlias = try NSRegularExpression(pattern: #"/\.vol/[0-9]+/[0-9]+"#)
+    let normalizedCalls = inodeAlias.stringByReplacingMatches(
+      in: calls, range: NSRange(calls.startIndex..., in: calls),
+      withTemplate: "/.vol/<device>/<inode>")
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    let profileDocument: JSONValue = .object([
+      "analyzerRef": .string(profile.analyzerRef),
+      "analyzerVersion": .string(profile.analyzerVersion),
+      "executablePath": .string(profile.executablePath),
+      "executableSHA256": .string(profile.executableSHA256),
+      "canonicalNamespaceRoot": .string(bundle.path),
+      "fixedArguments": .array(profile.fixedArguments.map(JSONValue.string)),
+      "timeoutSeconds": .integer(Int64(profile.timeoutSeconds)),
+      "outputByteBudget": .integer(Int64(profile.outputByteBudget)),
+      "pinnedFiles": .array(
+        profile.pinnedFiles.map {
+          .object([
+            "path": .string($0.path), "sha256": .string($0.sha256),
+            "byteCount": .integer(Int64($0.byteCount)),
+            "requireExecutable": .bool($0.requireExecutable),
+          ])
+        }),
+      "pinnedTrees": .array(
+        profile.pinnedTrees.map {
+          .object(["path": .string($0.path), "sha256": .string($0.sha256)])
+        }),
+      "contract": .object([
+        "toolVersion": .string(contract.toolVersion),
+        "parserVersion": .string(contract.parserVersion),
+        "parserUpstreamRevision": .string(contract.parserUpstreamRevision),
+        "parserSHA256": .string(contract.parserSHA256),
+        "parserBuildRecipeVersion": .string(contract.parserBuildRecipeVersion),
+        "parserAdapterVersion": .string(contract.parserAdapterVersion),
+        "schemaAdapterVersion": .string(contract.schemaAdapterVersion),
+        "indexSchemaVersion": .integer(Int64(contract.indexSchemaVersion)),
+      ]),
+      "parser": .string(String(decoding: parserBytes, as: UTF8.self)),
+      "infoPlist": .string(String(decoding: infoPlistBytes, as: UTF8.self)),
+      "driftedInfoPlist": .string(String(decoding: driftedInfoPlistBytes, as: UTF8.self)),
+      "extraResource": .string(String(decoding: extraResourceBytes, as: UTF8.self)),
+    ])
+    var files: [String: Data] = [
+      "arktrace": executableBytes,
+      "arktrace.c": standInSource,
+      "profile.json": try encoder.encode(profileDocument) + Data("\n".utf8),
+      "calls.log": Data(normalizedCalls.utf8),
+      "plans.json": try encoder.encode(JSONValue.array(plans)) + Data("\n".utf8),
+      "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
+      "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
+      "store/index.json": try encoder.encode(try Self.index(of: jobsState)) + Data("\n".utf8),
+    ]
+    for (name, data) in answerFiles { files["answers/\(name)"] = data }
+    for job in try manager.contentsOfDirectory(atPath: artifacts.path).sorted()
+    where !job.hasPrefix(".") {
+      let directory = artifacts.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
+      where !name.hasPrefix(".") {
+        files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    let jobs = jobsState.appending(path: "jobs", directoryHint: .isDirectory)
+    for job in try manager.contentsOfDirectory(atPath: jobs.path).sorted() {
+      let directory = jobs.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted() {
+        files["store/jobs/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    var digests: [String: JSONValue] = [:]
+    for (path, data) in files { digests[path] = .string(Self.sha256(data)) }
+    files["provenance.json"] =
+      try encoder.encode(
+        JSONValue.object([
+          "producer": .string(
+            "JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceSummaryJobs"),
+          "root": .string(Self.root.path),
+          "nowUTC": .string(Self.nowUTC),
+          "nowPreciseUTC": .string(Self.nowPreciseUTC),
+          "home": .string(Self.home),
+          "quotaBytes": .integer(Int64(Self.quotaBytes)),
+          "standIn": .string("arktrace compiled from arktrace.c with `cc -Os -o arktrace arktrace.c`"),
+          "files": .object(digests),
+        ])) + Data("\n".utf8)
+    return files
+  }
+
   private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {
     let fields: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),

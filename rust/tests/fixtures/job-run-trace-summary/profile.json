@@ -1,0 +1,56 @@
+{
+  "analyzerRef" : "trace-summary@1",
+  "analyzerVersion" : "0.1.0+1",
+  "canonicalNamespaceRoot" : "/private/tmp/arkdeck-job-plan-oracle/ArkTrace.app",
+  "contract" : {
+    "indexSchemaVersion" : 3,
+    "parserAdapterVersion" : "1",
+    "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+    "parserSHA256" : "5555555555555555555555555555555555555555555555555555555555555555",
+    "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+    "parserVersion" : "4.3.7",
+    "schemaAdapterVersion" : "2",
+    "toolVersion" : "0.1.0"
+  },
+  "driftedInfoPlist" : "<plist>drifted!!</plist>\n",
+  "executablePath" : "/private/tmp/arkdeck-job-plan-oracle/ArkTrace.app/Contents/MacOS/arktrace",
+  "executableSHA256" : "471b600a0130f2419c134c68814453745d7b9bce5689590007452e497f5ba580",
+  "extraResource" : "not reviewed\n",
+  "fixedArguments" : [
+    "summary",
+    "--json",
+    "--no-cache",
+    "--timeout-ms",
+    "30000",
+    "--max-rows",
+    "1000",
+    "--max-events",
+    "10000",
+    "--max-output-bytes",
+    "8388608"
+  ],
+  "infoPlist" : "<plist>stand-in</plist>\n",
+  "outputByteBudget" : 8388608,
+  "parser" : "trace_streamer stand-in\n",
+  "pinnedFiles" : [
+    {
+      "byteCount" : 24,
+      "path" : "/private/tmp/arkdeck-job-plan-oracle/ArkTrace.app/Contents/Resources/trace_streamer",
+      "requireExecutable" : true,
+      "sha256" : "5e432437d9f6480692e4beba1e049450a2b380b6f772df61e8a3305dc5738591"
+    },
+    {
+      "byteCount" : 24,
+      "path" : "/private/tmp/arkdeck-job-plan-oracle/ArkTrace.app/Contents/Info.plist",
+      "requireExecutable" : false,
+      "sha256" : "4943bd36d68bba96546b05e0d489c37b7b2def83b196ac29186e63a424d4ca02"
+    }
+  ],
+  "pinnedTrees" : [
+    {
+      "path" : "/private/tmp/arkdeck-job-plan-oracle/ArkTrace.app/Contents/Resources",
+      "sha256" : "c3f1c77c3d687ec4deaf9c9cb6017faf875f34cc94c4692d42501122d7e46dd5"
+    }
+  ],
+  "timeoutSeconds" : 30
+}

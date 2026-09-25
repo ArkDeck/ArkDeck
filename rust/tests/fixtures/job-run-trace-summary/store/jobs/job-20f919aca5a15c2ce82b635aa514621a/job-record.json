@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-20f919aca5a15c2ce82b635aa514621a",
+  "materializedPlanDigest" : "acd82530384c6811daf2cfd295f674457d103656376d608d52b10347e577a99f",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-truncatedStdout-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-79e2dcaa37ba549118dee4b25371bf6e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-truncatedStdout",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-truncatedStdout-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-79e2dcaa37ba549118dee4b25371bf6e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-truncatedStdout",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-trace",
+    "failed summarize-trace: analyzer.truncatedResult: trace-summary@1 output was truncated",
+    "running->finalizing",
+    "reason: analyzer.truncatedResult: trace-summary@1 output was truncated",
+    "finalizing->failed",
+    "reason: analyzer.truncatedResult: trace-summary@1 output was truncated"
+  ]
+}

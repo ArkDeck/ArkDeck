@@ -1,0 +1,56 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-2b50733fe711464105cf97cf871985b9",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 1541,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "derivation" : {
+        "analyzerRef" : "trace-summary@1",
+        "analyzerVersion" : "0.1.0+1",
+        "indexSchemaVersion" : 3,
+        "maxEvents" : 10000,
+        "maxOutputBytes" : 8388608,
+        "maxRows" : 1000,
+        "parserAdapterVersion" : "1",
+        "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+        "parserSHA256" : "5555555555555555555555555555555555555555555555555555555555555555",
+        "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+        "parserVersion" : "4.3.7",
+        "schemaAdapterVersion" : "2",
+        "sourceArtifactID" : "ART-6ea7218d1d1d30a5bbdbb7683d37b602",
+        "sourceByteCount" : 33,
+        "sourceSHA256" : "5e3565a449d17b69d3969081e241ffa71f4d2b316a0cec261b38360d3b6db1b5",
+        "timeoutMs" : 30000,
+        "toolSHA256" : "471b600a0130f2419c134c68814453745d7b9bce5689590007452e497f5ba580"
+      },
+      "jobID" : "job-126f2429c6a546a30c005773e358af40",
+      "mediaType" : "application\/json",
+      "name" : "trace-summary.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "analyzer",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-126f2429c6a546a30c005773e358af40",
+      "sha256" : "a2cd4a47f9b2afa5acb5474c979794cc7f88fd2eaabb43a172424edf32865815",
+      "sourceOperation" : "analyzer.summarize-trace@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "summarize-trace"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

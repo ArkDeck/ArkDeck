@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-e84feb829e6effa8dce569065e38861f",
+  "materializedPlanDigest" : "d4280a3082930f2e056ee6afbd159ee36b7255a452cfea9092accccabd212448",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-bundleWritable-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-314dda00326940ec1a65d44bf1cc5451"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-bundleWritable",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-bundleWritable-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-314dda00326940ec1a65d44bf1cc5451"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-bundleWritable",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-trace",
+    "failed summarize-trace",
+    "running->finalizing",
+    "reason: analyzer process identity refused",
+    "finalizing->failed",
+    "reason: analyzer process identity refused"
+  ]
+}

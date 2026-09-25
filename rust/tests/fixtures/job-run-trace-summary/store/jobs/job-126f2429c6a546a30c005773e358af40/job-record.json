@@ -1,0 +1,74 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-126f2429c6a546a30c005773e358af40",
+  "materializedPlanDigest" : "a1e2c6fa72be5f25b7519a06e898556cd57c63d745f74fd43740918d56669d04",
+  "operationReference" : "analyzer.summarize-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-trace-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-6ea7218d1d1d30a5bbdbb7683d37b602"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-trace-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-trace",
+    "verified summarize-trace [\"analyzerRef\", \"analyzerVersion\", \"derivedByteCount\", \"derivedSha256\", \"indexSchemaVersion\", \"parserAdapterVersion\", \"parserBuildRecipeVersion\", \"parserSha256\", \"parserUpstreamRevision\", \"parserVersion\", \"requestMaxEvents\", \"requestMaxOutputBytes\", \"requestMaxRows\", \"requestTimeoutMs\", \"schemaAdapterVersion\", \"sourceArtifactId\", \"sourceByteCount\", \"sourceSha256\", \"toolSha256\", \"truncated\"]",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

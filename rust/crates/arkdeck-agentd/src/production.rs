@@ -326,8 +326,7 @@ pub(crate) fn claim(layout: &Layout, started_at_utc: &str) -> Result<Claim, Stri
 /// What Swift's LaunchAgent may hand its daemon for an owner this Runtime
 /// does not compose yet (`LaunchAgentService.renderTemplate`): each one set
 /// is named at the start rather than quietly ignored.
-const UNREAD: [(&str, &str); 5] = [
-    ("ARKDECK_ARKTRACE_DESCRIPTOR", "ArkTrace profile loader"),
+const UNREAD: [(&str, &str); 4] = [
     // The workspace provider is composed over the registered projects; the
     // inspector tool and the legacy environment roots are not read.
     ("ARKDECK_WORKSPACE_INSPECTOR", "workspace source inspector"),
@@ -343,12 +342,15 @@ const UNREAD: [(&str, &str); 5] = [
 ];
 
 /// What Swift's LaunchAgent hands its daemon that this composition reads —
-/// the HDC adopted when no selection exists, the analyzer and the HDC server
-/// port — and which of its other inputs are set.
+/// the HDC adopted when no selection exists, the analyzer, the ArkTrace
+/// distribution descriptor and the HDC server port — and which of its other
+/// inputs are set.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Inputs {
     pub(crate) hdc: Option<PathBuf>,
     pub(crate) analyzer: Option<PathBuf>,
+    /// As it is set: Swift's loader judges it, a relative path included.
+    pub(crate) arktrace_descriptor: Option<std::ffi::OsString>,
     pub(crate) server_port: Option<String>,
     pub(crate) unread: Vec<(&'static str, &'static str)>,
     /// The ArkForge lane's environment: its bundle, its campaign and the
@@ -368,6 +370,7 @@ impl Inputs {
         Ok(Self {
             hdc: absolute("ARKDECK_HDC_PATH")?,
             analyzer: absolute("ARKDECK_ANALYZER_PATH")?,
+            arktrace_descriptor: std::env::var_os("ARKDECK_ARKTRACE_DESCRIPTOR"),
             server_port: arkdeck_provider_hdc::ProcessDispatch::inherited_server_port(),
             unread: UNREAD
                 .into_iter()
@@ -575,10 +578,8 @@ pub(crate) fn compose(
             &layout.state,
             crate::hilog_summary_analyzer::composed(
                 inputs.analyzer.as_deref(),
-                inputs
-                    .unread
-                    .iter()
-                    .any(|(name, _)| *name == "ARKDECK_ARKTRACE_DESCRIPTOR"),
+                inputs.arktrace_descriptor.as_deref(),
+                &layout.state,
             )?,
         )
         // Swift's Flash invocation owner keeps its documents beside the Job
