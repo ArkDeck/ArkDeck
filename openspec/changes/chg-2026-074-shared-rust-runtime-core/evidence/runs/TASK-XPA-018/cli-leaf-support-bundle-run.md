@@ -43,8 +43,12 @@ Host evidence only, in private temporary roots.
 - `tests/support_bundle.rs` (`swifts_recorded_runs_replay_through_the_cli`) replays all 15 in a
   private root spelled both ways, approving this host's own preview: the same exit status, stdout
   and stderr in the machine modes, the human rendering (Swift's outline, this CLI's pretty JSON,
-  T2) held to its status, and the same exported tree, byte for byte and mode for mode (only the
-  generation time in `bundle.json` differs).
+  T2) held to its status, and the same exported tree, byte for byte and mode for mode. What
+  differs by nature is compared as such: the generation time in `bundle.json`, and the host facts
+  in `metadata.json` — the platform, held to Swift's shape `macOS <n>.<n>.<n>`, and the
+  architecture — with the byte counts that move when the host's platform is spelled at another
+  length than the recording's (CI's macOS 26 runner, job 108274381729, against a macOS 27
+  recording). Swift's comparison run ignores the same facts.
 - The other tests pin the digest formula over the parent's identity and entries, every refusal
   leaving nothing behind, each failure point of the publication (removed before and after the
   rename, or an unknown outcome), and the CLI's options and renderings.

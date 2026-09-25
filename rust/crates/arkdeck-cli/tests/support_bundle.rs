@@ -447,6 +447,58 @@ fn stable(text: &str) -> String {
     output
 }
 
+/// `text` with the host facts the bundle names spelled as placeholders: the
+/// platform (held to Swift's shape, `macOS <n>.<n>.<n>`) and the architecture;
+/// and, where this host's platform is spelled at another length than the
+/// recording's, the byte counts that length moves.
+fn hostless(text: &str, sizes_comparable: bool) -> String {
+    let mut output = String::new();
+    let mut rest = text;
+    while let Some(at) = rest.find("macOS ") {
+        output.push_str(&rest[..at + 6]);
+        rest = &rest[at + 6..];
+        let version: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '.')
+            .collect();
+        let parts: Vec<&str> = version.split('.').collect();
+        if parts.len() == 3 && parts.iter().all(|part| !part.is_empty()) {
+            output.push_str("<version>");
+            rest = &rest[version.len()..];
+        }
+    }
+    output.push_str(rest);
+    let mut output = output
+        .replace(
+            "\"architecture\":\"arm64\"",
+            "\"architecture\":\"<architecture>\"",
+        )
+        .replace(
+            "\"architecture\":\"x86_64\"",
+            "\"architecture\":\"<architecture>\"",
+        );
+    if !sizes_comparable {
+        for key in [
+            "\"estimatedBytes\":",
+            "\"exportedBytes\":",
+            "estimatedBytes: ",
+        ] {
+            let mut spelled = String::new();
+            let mut rest = output.as_str();
+            while let Some(at) = rest.find(key) {
+                spelled.push_str(&rest[..at + key.len()]);
+                rest = &rest[at + key.len()..];
+                let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+                spelled.push_str("<bytes>");
+                rest = &rest[digits..];
+            }
+            spelled.push_str(rest);
+            output = spelled;
+        }
+    }
+    output
+}
+
 /// Swift's recorded runs (`rust/tests/fixtures/support-bundle`,
 /// `CLISupportBundleOracleContractTests`, whose owners are
 /// `RuntimeCLI.runRuntimeSupportBundle`, `RuntimeSupportBundleApplicationFacade`
@@ -504,6 +556,11 @@ fn swifts_recorded_runs_replay_through_the_cli() {
         text.replace("<private-root>", &private_root)
             .replace("<root>", &root)
     };
+    // This host's platform as the bundle spells it, against the recording's.
+    let (major, minor, patch) = arkdeck_platform::operating_system_version().unwrap();
+    let platform = format!("macOS {major}.{minor}.{patch}");
+    let comparable = oracle["host"]["platform"].as_str().map(str::len) == Some(platform.len());
+    let facts = |text: &str| hostless(&stable(text), comparable);
     let mut digest: Option<String> = None;
     let mut failures = Vec::new();
     for run in oracle["runs"].as_array().unwrap() {
@@ -536,7 +593,7 @@ fn swifts_recorded_runs_replay_through_the_cli() {
         let machine = argv.contains(&"--output") || argv.contains(&"--json");
         let same = run["exit"].as_i64() == output.status.code().map(i64::from)
             && run["stderr"] == stderr.as_str()
-            && (!machine || stable(run["stdout"].as_str().unwrap()) == stable(&stdout));
+            && (!machine || facts(run["stdout"].as_str().unwrap()) == facts(&stdout));
         if !same {
             failures.push(format!(
                 "{name}: exit {:?} stdout {stdout} stderr {stderr}",
@@ -583,7 +640,7 @@ fn swifts_recorded_runs_replay_through_the_cli() {
                         "kind": if metadata.is_dir() { "directory" } else { "file" }});
                     if !metadata.is_dir() {
                         file["text"] =
-                            json!(stable(&label(&String::from_utf8_lossy(&std::fs::read(&full).unwrap()))));
+                            json!(facts(&label(&String::from_utf8_lossy(&std::fs::read(&full).unwrap()))));
                     }
                     file
                 })
@@ -595,7 +652,7 @@ fn swifts_recorded_runs_replay_through_the_cli() {
                 .map(|file| {
                     let mut file = file.clone();
                     if let Some(text) = file["text"].as_str() {
-                        file["text"] = json!(stable(text));
+                        file["text"] = json!(facts(text));
                     }
                     file
                 })
