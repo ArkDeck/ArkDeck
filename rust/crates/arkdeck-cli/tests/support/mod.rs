@@ -139,7 +139,9 @@ fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> 
 /// The actual CLI run with `argv` against a fake Runtime that answers,
 /// one connection each, health and then the next request, which must be
 /// the method and parameters `replies` names, with its answer. The CLI
-/// may make no other connection.
+/// may make no other connection. A null answer is held: that request stays
+/// unanswered until the CLI hangs up, as a Runtime still at work when the
+/// CLI's own deadline passes.
 pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
     connections(argv, replies, true)
 }
@@ -242,6 +244,12 @@ fn connections(
             let request: Value = serde_json::from_str(&line).unwrap();
             assert_eq!(request["method"], method.as_str());
             assert_eq!(request["params"], params, "{method}");
+            if answer.is_null() {
+                // Held until the CLI hangs up, or the read times out.
+                let mut rest = String::new();
+                let _ = reader.read_line(&mut rest);
+                continue;
+            }
             let mut answer = answer;
             answer["id"] = request["id"].clone();
             if writeln!(reader.get_mut(), "{answer}").is_err() {

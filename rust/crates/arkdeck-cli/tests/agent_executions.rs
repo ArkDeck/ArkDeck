@@ -778,38 +778,36 @@ fn an_artifact_page_is_the_owner_s_snapshot_in_its_order() {
     );
 }
 
-/// A run whose owned Job never moves, as the GJ-5 rehearsal's analyzer run
-/// did before #2157, against a fake Runtime that answers Swift's recorded run
-/// and then Swift's recorded status each time the execution is read: the
-/// execution owns a running Job, and its deadline, five minutes after Swift
-/// recorded it at 2026-09-14T00:00Z, is long past. That deadline is the
-/// execution's `--maximum-wait` budget for orchestrating up to its Job, which
-/// Swift's `status` no longer reads once a Job is owned, so it ends nothing
-/// here. The run reads the execution again, backing off, until the caller's
-/// own `--timeout` ends the wait in Swift's words, naming the execution; it
-/// asks for nothing but the run and those reads, so nothing is abandoned or
-/// cancelled.
+/// One exchange the fake Runtime serves: its method, its parameters and its
+/// answer.
 #[cfg(target_os = "macos")]
-#[test]
-fn a_run_whose_job_never_moves_ends_at_the_callers_timeout_and_cancels_nothing() {
+type Reply = (String, Value, Value);
+
+/// How the fake Runtime serves a run: `support::run` or `support::run_partial`.
+#[cfg(target_os = "macos")]
+type Serve = fn(&[&str], Vec<Reply>) -> (std::process::Output, Value);
+
+/// A recorded exchange of Swift's agent execution oracle as the fake Runtime
+/// serves it, with the Job state the oracle labels read as running.
+#[cfg(target_os = "macos")]
+fn served(name: &str) -> Reply {
+    let recorded = exchange(name);
+    (
+        recorded["method"].as_str().unwrap().to_owned(),
+        recorded["params"].clone(),
+        json!({"ok": true, "result": unlabelled(recorded["answer"].clone())}),
+    )
+}
+
+/// `agent run` of Swift's recorded device observation, `gj1-observe`, with a
+/// two-second `--timeout`, against a fake Runtime serving `replies` as
+/// `serve` serves them. The run fails when that deadline passes and not
+/// before, exiting 75; the failure is returned.
+#[cfg(target_os = "macos")]
+fn observe_until_timeout(serve: Serve, replies: Vec<Reply>) -> Value {
     let target = oracle()["target"]["targetId"].as_str().unwrap().to_owned();
-    let reply = |name: &str| {
-        let recorded = exchange(name);
-        (
-            recorded["method"].as_str().unwrap().to_owned(),
-            recorded["params"].clone(),
-            json!({"ok": true, "result": unlabelled(recorded["answer"].clone())}),
-        )
-    };
-    let running = reply("observed.running");
-    let execution = &running.2["result"];
-    assert_eq!(
-        (&execution["state"], &execution["jobState"]),
-        (&json!("jobOwned"), &json!("running"))
-    );
-    assert_eq!(execution["deadline"], "2026-09-14T00:05:00.000Z");
     let started = std::time::Instant::now();
-    let (output, envelope) = support::run_partial(
+    let (output, envelope) = serve(
         &[
             "agent",
             "run",
@@ -822,23 +820,96 @@ fn a_run_whose_job_never_moves_ends_at_the_callers_timeout_and_cancels_nothing()
             "--timeout",
             "2s",
         ],
-        std::iter::once(reply("observed.run"))
-            .chain(std::iter::repeat_n(running, 30))
-            .collect(),
+        replies,
     );
     let waited = started.elapsed();
     assert_eq!(output.status.code(), Some(75), "{envelope}");
     assert_eq!(envelope["ok"], false, "{envelope}");
     assert_eq!(envelope["command"], "agent.run", "{envelope}");
-    assert_eq!(envelope["error"]["code"], "clientTimeout", "{envelope}");
-    assert_eq!(
-        envelope["error"]["message"],
-        "client stopped waiting; the Runtime execution and Job were not cancelled"
-    );
-    assert_eq!(
-        envelope["error"]["details"],
-        json!({"executionId": "gj1-observe"})
-    );
     // The run waited out the caller's deadline, not the execution's.
     assert!(waited >= std::time::Duration::from_secs(2), "{waited:?}");
+    envelope["error"].clone()
+}
+
+/// A run whose owned Job never moves, as the GJ-5 rehearsal's analyzer run
+/// did before #2157, against a fake Runtime that answers Swift's recorded run
+/// and then Swift's recorded status each time the execution is read: the
+/// execution owns a running Job, and its deadline, five minutes after Swift
+/// recorded it at 2026-09-14T00:00Z, is long past. That deadline is the
+/// execution's `--maximum-wait` budget for orchestrating up to its Job, which
+/// Swift's `status` no longer reads once a Job is owned, so it ends nothing
+/// here. The run reads the execution again, backing off, until the caller's
+/// own `--timeout` ends the wait; it asks for nothing but the run and those
+/// reads, so nothing is abandoned or cancelled.
+///
+/// Where that deadline falls decides the words, as in Swift, whose client is
+/// bounded by it as well. Between two reads, the run's own check stops the
+/// wait. Inside a read, the client's bound ends that read, answered as Swift's
+/// session answers any request whose deadline passed: a status read is a
+/// bounded read, and the run itself a mutation whose outcome is then unknown.
+/// The next test holds a status read to pin those words.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_run_whose_job_never_moves_ends_at_the_callers_timeout_and_cancels_nothing() {
+    let running = served("observed.running");
+    let execution = &running.2["result"];
+    assert_eq!(
+        (&execution["state"], &execution["jobState"]),
+        (&json!("jobOwned"), &json!("running"))
+    );
+    assert_eq!(execution["deadline"], "2026-09-14T00:05:00.000Z");
+    let error = observe_until_timeout(
+        support::run_partial,
+        std::iter::once(served("observed.run"))
+            .chain(std::iter::repeat_n(running, 30))
+            .collect(),
+    );
+    let (code, message, details) = match error["details"].get("method") {
+        None => (
+            "clientTimeout",
+            "client stopped waiting; the Runtime execution and Job were not cancelled",
+            json!({"executionId": "gj1-observe"}),
+        ),
+        Some(method) => (
+            if method == "agent.status" {
+                "clientTimeout"
+            } else {
+                "outcomeUnknown"
+            },
+            "the client wait deadline expired; no cancellation was requested",
+            json!({"method": method, "executionId": "gj1-observe"}),
+        ),
+    };
+    assert_eq!(
+        (&error["code"], &error["message"], &error["details"]),
+        (&json!(code), &json!(message), &details),
+        "{error}"
+    );
+}
+
+/// The same run when the caller's deadline passes inside a status read: the
+/// fake Runtime answers the run, then holds its answer to the status read
+/// that follows until the run hangs up. The client's bound ends that read,
+/// and the run fails as Swift's session fails a status read whose deadline
+/// passed, in its words and naming the method and the execution, rather than
+/// with the words of the run's own check between reads. It asks for nothing
+/// more, so nothing is abandoned or cancelled.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_deadline_inside_a_status_read_is_answered_as_swift_answers_that_read() {
+    let held = (
+        "agent.status".to_owned(),
+        json!({"executionId": "gj1-observe"}),
+        Value::Null,
+    );
+    let error = observe_until_timeout(support::run, vec![served("observed.run"), held]);
+    assert_eq!(
+        (&error["code"], &error["message"], &error["details"]),
+        (
+            &json!("clientTimeout"),
+            &json!("the client wait deadline expired; no cancellation was requested"),
+            &json!({"method": "agent.status", "executionId": "gj1-observe"})
+        ),
+        "{error}"
+    );
 }
