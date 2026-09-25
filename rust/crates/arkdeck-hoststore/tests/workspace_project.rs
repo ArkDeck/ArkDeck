@@ -245,3 +245,215 @@ fn completed_presets_are_validated_and_preserved_without_acquiring_dependencies(
     );
     assert_eq!(bytes, fs::read(root.path()).unwrap());
 }
+
+/// One preset or project request, with no Job to find in the census.
+fn owner_call(
+    owner: &WorkspaceProjectStore,
+    method: &str,
+    params: Value,
+) -> Result<Value, arkdeck_contract::WireError> {
+    owner.handle(method, params.as_object().unwrap(), &|| NOW.into(), &|_| {
+        Ok(())
+    })
+}
+
+/// A registered project with one symbol preset, the preset removed and then
+/// the project: the removed preset's record stays behind, naming a project
+/// the store no longer holds. Answers the project and preset references.
+fn remove_after_presets(
+    root: &Root,
+    owner: &WorkspaceProjectStore,
+    request: &str,
+) -> (Value, Value) {
+    let project =
+        call(owner, "register", root.params(request, "first")).unwrap()["projectRef"].clone();
+    let preset = owner_call(
+        owner,
+        "workspace.preset.register",
+        json!({"registrationRequestId": format!("{request}-symbol"), "projectRef": project,
+            "kind": "symbol", "templateRef": "openharmony.arkts-symbol@1",
+            "timeoutSeconds": "300", "relativeSourceMap": "entry/build/sourceMaps.map"}),
+    )
+    .unwrap()["presetRef"]
+        .clone();
+    owner_call(
+        owner,
+        "workspace.preset.remove",
+        json!({"mutationRequestId": format!("{request}-symbol-remove"), "projectRef": project,
+            "presetRef": preset, "expectedGeneration": "1"}),
+    )
+    .unwrap();
+    let removed = owner_call(
+        owner,
+        "workspace.project.remove",
+        json!({"projectRef": project, "expectedGeneration": "1"}),
+    )
+    .unwrap();
+    assert_eq!(removed["configurationStatus"], "removed");
+    (project, preset)
+}
+
+/// The store a project removed after its presets leaves behind reads again,
+/// now and after a restart: its list is empty, its project and presets are
+/// not found, the preset removal's replay answers its tombstone.
+#[test]
+fn a_project_removed_after_its_presets_leaves_a_readable_store() {
+    let root = Root::new();
+    let owner = root.store();
+    let (project, preset) = remove_after_presets(&root, &owner, "tombstone");
+    for owner in [owner, root.store()] {
+        assert_eq!(
+            call(&owner, "list", json!({})).unwrap()["projects"],
+            json!([])
+        );
+        assert_eq!(
+            call(&owner, "show", json!({"projectRef": project}))
+                .unwrap_err()
+                .code,
+            "workspaceReferenceNotFound"
+        );
+        assert_eq!(
+            owner_call(
+                &owner,
+                "workspace.preset.list",
+                json!({"projectRef": project})
+            )
+            .unwrap_err()
+            .code,
+            "workspaceReferenceNotFound"
+        );
+        let replay = owner_call(
+            &owner,
+            "workspace.preset.remove",
+            json!({"mutationRequestId": "tombstone-symbol-remove", "projectRef": project,
+                "presetRef": preset, "expectedGeneration": "1"}),
+        )
+        .unwrap();
+        assert_eq!(replay["configurationStatus"], "removed");
+    }
+}
+
+/// Only that shape is accepted: the same tombstone damaged, a preset in a
+/// removed state its generation cannot have, and an available preset whose
+/// project is gone are each refused, as before, and nothing is written.
+#[test]
+fn only_a_removed_preset_may_outlive_its_project() {
+    let root = Root::new();
+    let owner = root.store();
+    let (_, preset) = remove_after_presets(&root, &owner, "tombstone");
+    let healthy: Value = serde_json::from_slice(&fs::read(root.path()).unwrap()).unwrap();
+    assert_eq!(healthy["presets"][0]["presetRef"], preset);
+    let refused = |document: &Value, message: &str| {
+        root.write(document);
+        let bytes = fs::read(root.path()).unwrap();
+        let error = call(&root.store(), "list", json!({})).unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            ("recordUnreadable", message)
+        );
+        assert_eq!(bytes, fs::read(root.path()).unwrap());
+    };
+    let mut damaged = healthy.clone();
+    damaged["presets"][0]["lastMutationDigest"] = json!("0".repeat(64));
+    refused(&damaged, "workspace preset store record is inconsistent");
+    let mut regressed = healthy.clone();
+    regressed["presets"][0]["generation"] = json!(1);
+    refused(
+        &regressed,
+        "workspace preset state and generation are inconsistent",
+    );
+    // An available preset of a project that is registered, then the
+    // project's record dropped from the file.
+    let second = root.store();
+    root.write(
+        &json!({"schemaVersion": "arkdeck.workspace-project-store/3",
+        "records": [], "presets": []}),
+    );
+    let project =
+        call(&second, "register", root.params("available", "second")).unwrap()["projectRef"]
+            .clone();
+    owner_call(
+        &second,
+        "workspace.preset.register",
+        json!({"registrationRequestId": "available-symbol", "projectRef": project,
+            "kind": "symbol", "templateRef": "openharmony.arkts-symbol@1",
+            "timeoutSeconds": "300", "relativeSourceMap": "entry/build/sourceMaps.map"}),
+    )
+    .unwrap();
+    let mut orphan: Value = serde_json::from_slice(&fs::read(root.path()).unwrap()).unwrap();
+    orphan["records"] = json!([]);
+    refused(&orphan, "workspace preset store record is inconsistent");
+    root.write(&healthy);
+    assert_eq!(
+        call(&root.store(), "list", json!({})).unwrap()["projects"],
+        json!([])
+    );
+}
+
+/// After the fix the removals repeat: the same project registered again, a
+/// new preset registered and removed, the project removed again — each
+/// succeeds, and the store with two tombstones still reads.
+#[test]
+fn the_preset_and_project_removals_can_be_repeated() {
+    let root = Root::new();
+    let owner = root.store();
+    let (project, _) = remove_after_presets(&root, &owner, "tombstone");
+    let again = call(&owner, "register", root.params("tombstone", "first")).unwrap();
+    assert_eq!(again["projectRef"], project);
+    let preset = owner_call(
+        &owner,
+        "workspace.preset.register",
+        json!({"registrationRequestId": "tombstone-symbol-again", "projectRef": project,
+            "kind": "symbol", "templateRef": "openharmony.arkts-symbol@1",
+            "timeoutSeconds": "300", "relativeSourceMap": "entry/build/sourceMaps.map"}),
+    )
+    .unwrap()["presetRef"]
+        .clone();
+    owner_call(
+        &owner,
+        "workspace.preset.remove",
+        json!({"mutationRequestId": "tombstone-symbol-again-remove", "projectRef": project,
+            "presetRef": preset, "expectedGeneration": "1"}),
+    )
+    .unwrap();
+    owner_call(
+        &owner,
+        "workspace.project.remove",
+        json!({"projectRef": project, "expectedGeneration": "1"}),
+    )
+    .unwrap();
+    let document: Value = serde_json::from_slice(&fs::read(root.path()).unwrap()).unwrap();
+    assert_eq!(document["presets"].as_array().unwrap().len(), 2);
+    assert_eq!(document["records"], json!([]));
+    assert_eq!(
+        call(&root.store(), "list", json!({})).unwrap()["projects"],
+        json!([])
+    );
+}
+
+/// A daemon starts over the store the removals leave behind: its composition
+/// reads the registrations and the presets at start-up, as Swift's daemon
+/// reads `startupRecords()` and `presetCompositionRecords()`, and before the
+/// fix that read refused the store, so the daemon did not start.
+#[test]
+fn a_store_left_by_the_removals_composes_at_start_up() {
+    let root = Root::new();
+    let owner = root.store();
+    remove_after_presets(&root, &owner, "tombstone");
+    let store = Arc::new(root.store());
+    let state = root.0.join("state");
+    fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+    let (_, notes) = arkdeck_hoststore::WorkspaceComposition::compose(
+        Arc::clone(&store),
+        &state,
+        "/var/empty",
+        || Some(NOW.into()),
+        &|_, _, _| Err("the DevEco registry holds no toolchain".into()),
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(notes.unadopted.is_empty());
+    assert!(store.startup_records().unwrap().is_empty());
+    assert!(store.preset_composition_records().unwrap().is_empty());
+}

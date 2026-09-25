@@ -708,6 +708,162 @@ final class RuntimeWorkspaceProjectStoreContractTests: XCTestCase {
     XCTAssertTrue(try reopened.listPresets(projectRef: project.projectRef).isEmpty)
   }
 
+  /// A registered project with one symbol preset, the preset removed and then
+  /// the project: the removed preset's record stays behind, naming a project
+  /// the store no longer holds.
+  private func removeAfterPresets(
+    _ store: RuntimeWorkspaceProjectStore, request: String
+  ) throws -> (projectRef: String, presetRef: String) {
+    let root = try makeRoot("tombstone-project")
+    let project = try store.register(requestID: request, kind: "openharmony", rootPath: root.path)
+    let preset = try store.registerPreset(
+      requestID: "\(request)-symbol", projectRef: project.projectRef,
+      kind: "symbol", templateRef: "openharmony.arkts-symbol@1",
+      toolchainRef: nil, toolchainGeneration: nil, credentialRef: nil,
+      timeoutSeconds: 300,
+      constraints: RuntimeWorkspacePresetConstraints(
+        relativeSourceMap: "entry/build/sourceMaps.map"))
+    _ = try store.removePreset(
+      requestID: "\(request)-symbol-remove", projectRef: project.projectRef,
+      presetRef: preset.presetRef, expectedGeneration: 1, requireNoActiveReference: { _ in })
+    let removed = try store.remove(
+      projectRef: project.projectRef, expectedGeneration: 1, requireNoActiveReference: { _ in })
+    XCTAssertEqual(removed.configurationStatus, "removed")
+    return (project.projectRef, preset.presetRef)
+  }
+
+  private func refusal(_ body: () throws -> Void) -> RuntimeWorkspaceProjectFailure? {
+    do {
+      try body()
+      return nil
+    } catch {
+      return error as? RuntimeWorkspaceProjectFailure
+    }
+  }
+
+  /// `TASK-XPA-015`: removing a project is refused only while an available
+  /// preset names it, so the tombstones of its removed presets stay behind.
+  /// The store used to refuse every later read over them — the daemon's
+  /// start-up reads included, so it no longer started; it reads again, now
+  /// and after a restart, and the preset removal's replay answers its
+  /// tombstone.
+  func testAProjectRemovedAfterItsPresetsLeavesAReadableStore() throws {
+    let store = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    let (projectRef, presetRef) = try removeAfterPresets(store, request: "tombstone")
+    let reopened = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    for owner in [store, reopened] {
+      // The reads a daemon makes when it starts: before the fix they refused
+      // the store, so the daemon did not start.
+      XCTAssertEqual(try owner.startupRecords(), [])
+      XCTAssertEqual(try owner.presetCompositionRecords(), [])
+      XCTAssertEqual(try owner.list(), [])
+      XCTAssertEqual(
+        refusal { _ = try owner.inspect(projectRef) }?.code, "workspaceReferenceNotFound")
+      XCTAssertEqual(
+        refusal { _ = try owner.listPresets(projectRef: projectRef) }?.code,
+        "workspaceReferenceNotFound")
+      let replay = try owner.removePreset(
+        requestID: "tombstone-symbol-remove", projectRef: projectRef, presetRef: presetRef,
+        expectedGeneration: 1, requireNoActiveReference: { _ in })
+      XCTAssertEqual(replay.configurationStatus, "removed")
+    }
+  }
+
+  /// Only that shape is accepted: the same tombstone damaged, a removed
+  /// preset its generation cannot be, and an available preset whose project
+  /// is gone are each refused as before, and nothing is written.
+  func testOnlyARemovedPresetMayOutliveItsProject() throws {
+    let store = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    _ = try removeAfterPresets(store, request: "tombstone")
+    let document = stateDirectory.appending(path: "workspace-projects/projects.json")
+    let healthy = try Data(contentsOf: document)
+    func edited(_ change: (inout [String: Any]) -> Void) throws -> Data {
+      var object = try XCTUnwrap(
+        try JSONSerialization.jsonObject(with: healthy) as? [String: Any])
+      change(&object)
+      return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    }
+    func refused(_ data: Data, _ message: String) throws {
+      try data.write(to: document)
+      let failure = refusal {
+        _ = try RuntimeWorkspaceProjectStore(rootURL: self.stateDirectory).list()
+      }
+      XCTAssertEqual(failure?.code, "recordUnreadable")
+      XCTAssertEqual(failure?.message, message)
+      XCTAssertEqual(try Data(contentsOf: document), data)
+    }
+    try refused(
+      try edited { object in
+        var presets = object["presets"] as! [[String: Any]]
+        presets[0]["lastMutationDigest"] = String(repeating: "0", count: 64)
+        object["presets"] = presets
+      }, "workspace preset store record is inconsistent")
+    try refused(
+      try edited { object in
+        var presets = object["presets"] as! [[String: Any]]
+        presets[0]["generation"] = 1
+        object["presets"] = presets
+      }, "workspace preset state and generation are inconsistent")
+    try healthy.write(to: document)
+    // An available preset of a registered project, then the project's record
+    // dropped from the file.
+    let secondState = stateDirectory.appending(path: "second", directoryHint: .isDirectory)
+    let second = try RuntimeWorkspaceProjectStore(rootURL: secondState)
+    let root = try makeRoot("available-project")
+    let project = try second.register(
+      requestID: "available", kind: "openharmony", rootPath: root.path)
+    _ = try second.registerPreset(
+      requestID: "available-symbol", projectRef: project.projectRef,
+      kind: "symbol", templateRef: "openharmony.arkts-symbol@1",
+      toolchainRef: nil, toolchainGeneration: nil, credentialRef: nil,
+      timeoutSeconds: 300,
+      constraints: RuntimeWorkspacePresetConstraints(
+        relativeSourceMap: "entry/build/sourceMaps.map"))
+    let secondDocument = secondState.appending(path: "workspace-projects/projects.json")
+    var orphan = try XCTUnwrap(
+      try JSONSerialization.jsonObject(with: Data(contentsOf: secondDocument))
+        as? [String: Any])
+    orphan["records"] = [Any]()
+    try JSONSerialization.data(withJSONObject: orphan, options: [.sortedKeys])
+      .write(to: secondDocument)
+    let failure = refusal { _ = try RuntimeWorkspaceProjectStore(rootURL: secondState).list() }
+    XCTAssertEqual(failure?.code, "recordUnreadable")
+    XCTAssertEqual(failure?.message, "workspace preset store record is inconsistent")
+    XCTAssertEqual(try RuntimeWorkspaceProjectStore(rootURL: stateDirectory).list(), [])
+  }
+
+  /// With the fix the removals repeat: the same project registered again, a
+  /// new preset registered and removed, the project removed again — each
+  /// succeeds, and the store with both tombstones still reads.
+  func testThePresetAndProjectRemovalsCanBeRepeated() throws {
+    let store = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    let (projectRef, _) = try removeAfterPresets(store, request: "tombstone")
+    let root = try makeRoot("tombstone-project")
+    let again = try store.register(
+      requestID: "tombstone", kind: "openharmony", rootPath: root.path)
+    XCTAssertEqual(again.projectRef, projectRef)
+    let preset = try store.registerPreset(
+      requestID: "tombstone-symbol-again", projectRef: projectRef,
+      kind: "symbol", templateRef: "openharmony.arkts-symbol@1",
+      toolchainRef: nil, toolchainGeneration: nil, credentialRef: nil,
+      timeoutSeconds: 300,
+      constraints: RuntimeWorkspacePresetConstraints(
+        relativeSourceMap: "entry/build/sourceMaps.map"))
+    _ = try store.removePreset(
+      requestID: "tombstone-symbol-again-remove", projectRef: projectRef,
+      presetRef: preset.presetRef, expectedGeneration: 1, requireNoActiveReference: { _ in })
+    _ = try store.remove(
+      projectRef: projectRef, expectedGeneration: 1, requireNoActiveReference: { _ in })
+    let document = try XCTUnwrap(
+      try JSONSerialization.jsonObject(
+        with: Data(
+          contentsOf: stateDirectory.appending(path: "workspace-projects/projects.json")))
+        as? [String: Any])
+    XCTAssertEqual((document["presets"] as? [Any])?.count, 2)
+    XCTAssertEqual((document["records"] as? [Any])?.count, 0)
+    XCTAssertEqual(try RuntimeWorkspaceProjectStore(rootURL: stateDirectory).list(), [])
+  }
+
   private func makeRoot(_ name: String) throws -> URL {
     let root = stateDirectory.appending(path: name, directoryHint: .isDirectory)
     try FileManager.default.createDirectory(

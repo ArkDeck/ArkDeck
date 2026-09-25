@@ -716,7 +716,17 @@ impl WorkspaceProjectStore {
                                 "registration request identity belongs to another project",
                             ));
                         }
-                        return Ok(resource(existing));
+                        // Swift answers the replay as `list` answers the
+                        // project. When that projection's reason is `null`
+                        // (active, every operation offered), the published
+                        // register result cannot carry it, so the replay
+                        // keeps the restart-required projection (declared).
+                        let projected = self.projection(existing);
+                        return Ok(if projected["reason"].is_string() {
+                            projected
+                        } else {
+                            resource(existing)
+                        });
                     }
                     if next.records.len() >= 64 {
                         return Err(failure(

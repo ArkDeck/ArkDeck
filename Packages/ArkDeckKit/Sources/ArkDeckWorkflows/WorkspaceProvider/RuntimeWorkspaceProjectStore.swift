@@ -1432,7 +1432,16 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
             credentialRef: preset.credentialRef, timeoutSeconds: preset.timeoutSeconds,
             constraints: preset.constraints)
         }
-        guard document.records.contains(where: { $0.projectRef == preset.projectRef }),
+        // A removed preset's record may outlive its project. Removing a
+        // project is refused only while an available preset names it, so the
+        // tombstones of its removed presets stay behind, and refusing them
+        // here made every later read of the store fail with nothing a caller
+        // could do. A tombstone grants nothing: every reader that admits a
+        // Job, composes a profile or pins a dependency takes only available
+        // presets, and one still answers only its own removal's replay. Any
+        // other preset must name a registered project.
+        guard document.records.contains(where: { $0.projectRef == preset.projectRef })
+          || preset.state == "removed",
           ["available", "removed"].contains(preset.state),
           preset.registrationProjectRef == preset.projectRef,
           preset.registrationDigest == expectedRegistrationDigest,
