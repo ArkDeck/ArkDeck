@@ -80,6 +80,28 @@ carry only `rust/` and the contract inputs, never `openspec/contracts`, and
 there the comparison is skipped by design. The products that do not depend on
 the inputs keep S1's digest table, which also holds in the views.
 
+**Changing a contract input.** A PR that changes `control-protocol.json`
+(adds or removes a method, or changes the version or a frame limit) must
+regenerate `openspec/contracts/runtime-control-plane.schema.json` and
+`openspec/contracts/cli-result.schema.json` in the same PR. Since #2188 the
+Rust checkout test enforces this: the rendered schemas follow the compiled
+contract and must equal the committed files. The coupling itself is older:
+the PRs that last changed the file (#1859, #1861, #1862) regenerated the
+control-plane schema with it. Until the Rust export (S6) takes over, the
+bundle is regenerated with Swift's export, run from the repository root:
+
+```bash
+sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build --product arkdeck
+```
+
+```bash
+"$HOME/Library/Caches/com.arkdeck.ArkDeck/SwiftPM/ArkDeckKit/build/debug/arkdeck" maintainer contracts export --contracts-directory openspec/contracts --fixtures-directory Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI
+```
+
+The first builds the Swift CLI through the shared runner, whose cache root
+defaults to that directory. The second is `docs/design/cli-machine-contracts.md`'s
+entry point.
+
 ## The canonical refusals
 
 The published bundle records Swift's description of each refusal, for

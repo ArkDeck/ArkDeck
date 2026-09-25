@@ -16,14 +16,15 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The products built from the compiled contract: the result schema carries
-/// the protocol version, and the control-plane schema the contract identity
-/// and the method set. A contract-input change regenerates them, so a fixed
+/// The products built from the compiled contract: the command registry
+/// carries the Catalog's digest, the result schema the protocol version, and
+/// the control-plane schema the contract identity and the method set. A contract-input change regenerates them, so a fixed
 /// digest cannot hold them. Instead they are compared with the committed
 /// files, wherever a checkout has them. The contract views carry only `rust/`
 /// and the contract inputs, never `openspec/contracts`, so there the
 /// comparison is skipped by design.
-const FROM_THE_CONTRACT: [&str; 2] = [
+const FROM_THE_CONTRACT: [&str; 3] = [
+    "contracts/cli-command-registry.yaml",
     "contracts/cli-result.schema.json",
     "contracts/runtime-control-plane.schema.json",
 ];
@@ -84,10 +85,10 @@ fn every_owned_product_is_the_published_bytes() {
             );
         }
     }
-    // The error registry, the canonical vectors, the result, page, event,
-    // next-action and control-plane schemas, and the eight samples: 15 of the
-    // bundle's 235 products.
-    assert_eq!(produced.len(), 15);
+    // The command and error registries, the canonical vectors, the result,
+    // page, event, next-action and control-plane schemas, the eight samples
+    // and the seven envelopes: 23 of the bundle's 235 products.
+    assert_eq!(produced.len(), 23);
 }
 
 #[test]
