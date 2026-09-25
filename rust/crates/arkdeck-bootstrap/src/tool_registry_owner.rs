@@ -70,10 +70,48 @@ impl ToolRegistryStore {
             identities: Arc::new(published_identity),
         })
     }
+    /// Create only a private leaf below an existing private parent. Registry
+    /// documents remain initialized by the first paged list, not construction.
+    pub fn open_or_create(path: &Path) -> io::Result<Self> {
+        match Self::open_existing(path) {
+            Ok(store) => Ok(store),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                let invalid = || {
+                    io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "private Bootstrap leaf required",
+                    )
+                };
+                let parent = path.parent().ok_or_else(invalid)?;
+                let name = path
+                    .file_name()
+                    .and_then(|v| v.to_str())
+                    .ok_or_else(invalid)?;
+                let held = HostDirectory::open(parent)?;
+                let root = held.private_child(name)?;
+                held.validate_path(parent)?;
+                root.validate_path(path)?;
+                Ok(Self {
+                    root,
+                    path: path.into(),
+                    identities: Arc::new(published_identity),
+                })
+            }
+            Err(error) => Err(error),
+        }
+    }
     /// The identities this store's rows and selection admission match.
     pub fn with_published_identities(mut self, identities: PublishedIdentities) -> Self {
         self.identities = identities;
         self
+    }
+    /// The store's directory, held open since construction.
+    pub fn root(&self) -> &HostDirectory {
+        &self.root
+    }
+    /// The path the store was opened at.
+    pub fn path(&self) -> &Path {
+        &self.path
     }
     pub fn list(&self) -> io::Result<Vec<Value>> {
         self.read(None).map_err(read_error)
@@ -116,7 +154,7 @@ impl ToolRegistryStore {
     }
     /// `reference`'s row in the tool index `bytes`, with this store's
     /// published identities.
-    pub(crate) fn row(&self, bytes: &[u8], reference: &str) -> Option<Value> {
+    pub fn row(&self, bytes: &[u8], reference: &str) -> Option<Value> {
         let (index, _) = read_tools(bytes).ok()?;
         let record = index.records.iter().find(|r| r.reference == reference)?;
         Some(tool_projection(
@@ -125,7 +163,10 @@ impl ToolRegistryStore {
             (self.identities)(&record.executable_sha256),
         ))
     }
-    pub(crate) fn verify_record(&self, record: &Value) -> io::Result<()> {
+    /// The record's retained content measured again and compared with every
+    /// durable claim of the record: digests, size, quarantine, dependencies,
+    /// relocation and native signing.
+    pub fn verify_record(&self, record: &Value) -> io::Result<()> {
         let digest = record["contentDigest"].as_str().ok_or_else(corrupt)?;
         // The strict decoder proved this is exactly 64 lower-case hex bytes.
         let name = format!("tool-{digest}.hdc");

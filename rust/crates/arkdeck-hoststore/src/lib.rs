@@ -56,7 +56,7 @@ mod workspace_tests_symbolize;
 #[cfg(target_os = "macos")]
 pub use workspace_read::Inspector as WorkspaceInspector;
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize};
 
 #[cfg(target_os = "macos")]
 mod job_owner;
@@ -397,16 +397,13 @@ mod session_time;
 pub use session_time::decode_session_timestamp;
 mod session;
 pub use session::decode_session_configuration;
-mod registry;
-pub use registry::{decode_bundles, decode_tool_identity, decode_tools};
+// The Bootstrap registry's index codecs and the frozen-document codec the
+// host store's other decoders share live with its file owners.
+use arkdeck_bootstrap::roundtrip;
+pub use arkdeck_bootstrap::{
+    DecodeError, DecodedStore, decode_bundles, decode_tool_identity, decode_tools,
+};
 use serde_json::{Value, json};
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum DecodeError {
-    Size,
-    Shape,
-    Header,
-}
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -468,32 +465,6 @@ fn canonical_host_text(value: &str) -> Result<String, DecodeError> {
 #[cfg(not(target_os = "macos"))]
 fn canonical_host_text(_: &str) -> Result<String, DecodeError> {
     Err(DecodeError::Shape)
-}
-
-pub struct DecodedStore {
-    pub document: Vec<u8>,
-    pub projection: Value,
-}
-
-fn roundtrip<T: DeserializeOwned + Serialize>(
-    bytes: &[u8],
-    maximum: usize,
-    newline: bool,
-) -> Result<(T, Vec<u8>), DecodeError> {
-    if bytes.is_empty() || bytes.len() > maximum {
-        return Err(DecodeError::Size);
-    }
-    let doc: T = serde_json::from_slice(bytes).map_err(|_| DecodeError::Shape)?;
-    let raw: Value = serde_json::from_slice(bytes).map_err(|_| DecodeError::Shape)?;
-    let encoded = serde_json::to_value(&doc).map_err(|_| DecodeError::Shape)?;
-    if raw != encoded {
-        return Err(DecodeError::Shape);
-    }
-    let mut document = serde_json::to_vec(&encoded).map_err(|_| DecodeError::Shape)?;
-    if newline {
-        document.push(b'\n');
-    }
-    Ok((doc, document))
 }
 
 /// Decode the frozen field set, re-encode durable bytes, and derive the list
@@ -635,39 +606,24 @@ pub use session_graphemes::decode_graphemes;
 #[cfg(target_os = "macos")]
 pub use session_inventory::{session_inventory, session_inventory_owned};
 
+// The Bootstrap registry's bundle and HDC tool file owners are
+// `arkdeck-bootstrap`, which the CLI's zero-Runtime install shares; the
+// Runtime composes its paged inventories and the DevEco toolchain registry
+// over them here.
 #[cfg(target_os = "macos")]
-mod tool_content;
+pub use arkdeck_bootstrap::{
+    BundleRegistryReadStore, DurableSelectionOutcome, PublishedIdentities, SelectionCandidate,
+    SelectionSnapshot, StartupSelection, ToolContent, ToolDependency, ToolRegistryStore,
+    bundle_content, inspect_tool_content, tool_macho,
+};
 #[cfg(target_os = "macos")]
-pub mod tool_macho;
+mod bundle_list_owner;
 #[cfg(target_os = "macos")]
-pub use tool_content::{ToolContent, ToolDependency, inspect_tool_content};
+pub use bundle_list_owner::BootstrapListPage;
 #[cfg(target_os = "macos")]
 mod tool_list_owner;
 #[cfg(target_os = "macos")]
-mod tool_registration;
-#[cfg(target_os = "macos")]
-mod tool_registry_owner;
-#[cfg(target_os = "macos")]
 mod tool_retirement;
-#[cfg(target_os = "macos")]
-mod tool_selection_ledger;
-#[cfg(target_os = "macos")]
-pub use tool_registry_owner::{PublishedIdentities, ToolRegistryStore};
-#[cfg(target_os = "macos")]
-pub use tool_selection_ledger::{
-    DurableSelectionOutcome, SelectionCandidate, SelectionSnapshot, StartupSelection,
-};
-
-#[cfg(target_os = "macos")]
-pub mod bundle_content;
-#[cfg(target_os = "macos")]
-mod bundle_registration;
-#[cfg(target_os = "macos")]
-mod bundle_registry_owner;
-#[cfg(target_os = "macos")]
-mod bundle_retirement;
-#[cfg(target_os = "macos")]
-pub use bundle_registry_owner::BundleRegistryReadStore;
 
 #[cfg(target_os = "macos")]
 mod deveco_registry;

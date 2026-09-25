@@ -23,6 +23,7 @@ wildcards = "deny"
 allow-wildcard-paths = true
 allow = [
     "arkdeck-agentd@0.1.0",
+    "arkdeck-bootstrap@0.1.0",
     "arkdeck-cli@0.1.0",
     "arkdeck-client@0.1.0",
     "arkdeck-contract@0.1.0",

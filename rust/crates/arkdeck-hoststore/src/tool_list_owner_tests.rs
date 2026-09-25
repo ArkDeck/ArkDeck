@@ -175,20 +175,19 @@ fn shared_lock_spans_both_families_and_pager_and_all_indexes_are_rebound() {
     let root = Root::new();
     root.empty();
     let store = root.store();
-    store
-        .list_page_checkpoint(1, None, |_| {
-            assert_eq!(
-                store.root.lock_document(".lock").err().unwrap().kind(),
-                io::ErrorKind::WouldBlock
-            );
-        })
-        .unwrap();
+    list_page_checkpoint(&store, 1, None, |_| {
+        assert_eq!(
+            store.root().lock_document(".lock").err().unwrap().kind(),
+            io::ErrorKind::WouldBlock
+        );
+    })
+    .unwrap();
     for name in [BUNDLES, TOOLS, DEVECO] {
         let root = Root::new();
         root.empty();
         let store = root.store();
         code(
-            store.list_page_checkpoint(1, Some("bad"), |phase| {
+            list_page_checkpoint(&store, 1, Some("bad"), |phase| {
                 if phase == "beforePager" {
                     root.bytes(name, b"{}");
                 }
@@ -200,7 +199,7 @@ fn shared_lock_spans_both_families_and_pager_and_all_indexes_are_rebound() {
     root.empty();
     let store = root.store();
     code(
-        store.list_page_checkpoint(1, None, |phase| {
+        list_page_checkpoint(&store, 1, None, |phase| {
             if phase == "afterPager" {
                 fs::rename(
                     root.0.join("tool-snapshots"),
@@ -224,7 +223,7 @@ fn page_bounds_and_cursor_are_checked_after_valid_empty_inventory() {
         code(root.store().list_page(size, None), "invalidInput");
     }
     code(root.store().list_page(100, Some("bad")), "invalidCursor");
-    let lock = root.store().root.lock_document(".lock").unwrap();
+    let lock = root.store().root().lock_document(".lock").unwrap();
     code(root.store().list_page(0, Some("bad")), "resourceConflict");
     drop(lock);
 }

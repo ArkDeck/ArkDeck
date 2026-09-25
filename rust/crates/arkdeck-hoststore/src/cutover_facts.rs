@@ -105,7 +105,7 @@ pub fn cutover_facts(roots: CutoverRoots<'_>) -> CutoverFacts {
         }
         Err(error) => facts.unreadable("capabilities", error.swift()),
     }
-    match crate::tool_selection_ledger::cutover_pending_selection(roots.bootstrap) {
+    match arkdeck_bootstrap::cutover_pending_selection(roots.bootstrap) {
         Ok(pending) => facts.pending_tool_selection = pending,
         Err(reason) => facts.unreadable("toolSelection", reason),
     }

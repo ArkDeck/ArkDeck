@@ -2,7 +2,9 @@
 //! No selection, installation, process launch or execution authority is exposed.
 use arkdeck_contract::WireError;
 use arkdeck_control::BootstrapRegistryKind;
-use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryStore, ToolRegistryStore};
+use arkdeck_hoststore::{
+    BootstrapListPage, BundleRegistryReadStore, DevEcoRegistryStore, ToolRegistryStore,
+};
 use serde_json::Value;
 use std::{io, path::Path};
 

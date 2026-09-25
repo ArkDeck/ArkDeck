@@ -436,7 +436,12 @@ layer and depends only on `arkdeck-platform`. `arkdeck-provider-arkforge` is the
 ArkForge lane: it launches and pairs `arkforged` through the platform crate,
 reads its release bundle through `arkdeck-contract`, and reaches it only
 through ArkForge's own `arkforge-client`; no other crate depends on an ArkForge
-crate.
+crate. `arkdeck-bootstrap` owns the current-user Bootstrap registry's bundle and
+HDC tool files (`…/ArkDeck/Bootstrap/v1`: the two indexes, their content checks,
+registration, retirement and the HDC selection ledger) under the store's one
+lock, over `arkdeck-contract` and `arkdeck-platform` only; every writer of that
+store uses it, and `arkdeck-hoststore` composes the Runtime's paged inventories
+and the DevEco registry over it.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while

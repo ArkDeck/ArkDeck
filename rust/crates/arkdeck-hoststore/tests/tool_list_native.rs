@@ -1,5 +1,5 @@
 #![cfg(target_os = "macos")]
-use arkdeck_hoststore::ToolRegistryStore;
+use arkdeck_hoststore::{BootstrapListPage, ToolRegistryStore};
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, fs, os::unix::fs::MetadataExt, path::Path};
 type Preserved = BTreeMap<String, (Vec<u8>, u64, u64, u32, i64, i64, i64, i64)>;

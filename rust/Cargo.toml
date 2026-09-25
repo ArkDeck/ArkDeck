@@ -12,6 +12,7 @@ publish = false
 [workspace.dependencies]
 arkdeck-contract = { path = "crates/arkdeck-contract" }
 arkdeck-platform = { path = "crates/arkdeck-platform" }
+arkdeck-bootstrap = { path = "crates/arkdeck-bootstrap" }
 arkdeck-control = { path = "crates/arkdeck-control" }
 arkdeck-hoststore = { path = "crates/arkdeck-hoststore" }
 arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
