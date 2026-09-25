@@ -7,6 +7,10 @@
 //!   The deprecated one says so in `meta.lifecycle`.
 //! - `device list` and `device show`, legacy, both send one parameterless
 //!   `target.list` (Swift `runDevice`) and say what replaces them.
+//! - Both `recovery cleanup continue` spellings send one `cleanupDebt.continue`
+//!   with the Job and its one recorded residue, a remote path or a bundle,
+//!   and print its answer. A reply that is lost once the request went out is
+//!   an unknown outcome, never replayed.
 //! - `trace export` is `artifact export` of the one Trace a diagnostics
 //!   capture publishes. The inspected Artifact must be that Trace before
 //!   anything is exported.
@@ -140,6 +144,163 @@ mod runtime {
         }
     }
 
+    /// Swift's recorded `cleanupDebt.continue` exchanges.
+    fn continuations() -> Vec<Value> {
+        frames("cleanupDebt.continue")
+    }
+
+    #[test]
+    fn both_cleanup_spellings_continue_the_recorded_residue() {
+        let answered: Vec<Value> = continuations()
+            .into_iter()
+            .filter(|frame| frame["ok"] == true)
+            .collect();
+        assert_eq!(answered.len(), 2);
+        for (frame, (path, command, lifecycle)) in answered.iter().zip([
+            (
+                ["recovery", "cleanup", "continue"].as_slice(),
+                "recovery.cleanup.continue",
+                None,
+            ),
+            (
+                ["cleanup-debt", "continue"].as_slice(),
+                "cleanup-debt.continue",
+                Some(json!({"status": "deprecated",
+                    "replacementArgvPattern": "arkdeck recovery cleanup continue --job <id> ...",
+                    "removalVersion": null})),
+            ),
+        ]) {
+            let params = &frame["params"];
+            let mut argv: Vec<&str> = path.to_vec();
+            argv.extend(["--job", params["jobId"].as_str().unwrap()]);
+            match params.get("remotePath") {
+                Some(remote) => argv.extend(["--remote-path", remote.as_str().unwrap()]),
+                None => argv.extend(["--bundle", params["bundleName"].as_str().unwrap()]),
+            }
+            let answer = json!({"ok": true, "result": frame["result"]});
+            let (output, envelope) = support::run_session(
+                &argv,
+                vec![
+                    health(),
+                    ("cleanupDebt.continue".to_owned(), params.clone(), answer),
+                ],
+            );
+            assert_eq!(output.status.code(), Some(0), "{envelope}");
+            assert_eq!(envelope["command"], command);
+            assert_eq!(envelope["result"], frame["result"]);
+            assert_eq!(
+                envelope["meta"].get("lifecycle").cloned(),
+                lifecycle,
+                "{command}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_refused_continuation_is_the_runtimes_refusal() {
+        let refused = continuations()
+            .into_iter()
+            .find(|frame| frame["ok"] == false)
+            .unwrap();
+        let (output, envelope) = support::run_session(
+            &[
+                "recovery", "cleanup", "continue", "--job", "job-1", "--bundle", "b",
+            ],
+            vec![
+                health(),
+                (
+                    "cleanupDebt.continue".to_owned(),
+                    json!({"jobId": "job-1", "bundleName": "b"}),
+                    json!({"ok": false, "error": refused["error"]}),
+                ),
+            ],
+        );
+        let expected = arkdeck_cli::CliError::from_client(
+            arkdeck_client::ClientError::Remote(arkdeck_contract::WireError {
+                code: refused["error"]["code"].as_str().unwrap().into(),
+                message: refused["error"]["message"].as_str().unwrap().into(),
+                details: None,
+            }),
+            "cleanupDebt.continue",
+        );
+        assert_eq!(envelope["error"]["code"], expected.code);
+        assert_eq!(envelope["error"]["message"], expected.message);
+        assert_eq!(output.status.code(), Some(i32::from(expected.exit_code())));
+        assert_eq!(
+            envelope["error"]["details"],
+            serde_json::Value::Object(expected.details)
+        );
+    }
+
+    /// The request went out and no reply came back: the cleanup may have run,
+    /// so the answer is an unknown outcome and the request is not sent again.
+    #[test]
+    fn a_lost_reply_to_a_continuation_is_an_unknown_outcome() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+        let root = std::fs::canonicalize("/tmp").unwrap().join(format!(
+            "arkdeck-cli-continue-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&root)
+            .unwrap();
+        let socket = root.join("a.sock");
+        let listener = std::os::unix::net::UnixListener::bind(&socket).unwrap();
+        std::fs::set_permissions(&socket, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let server = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream);
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let health_request: Value = serde_json::from_str(&line).unwrap();
+            let mut answer = health().2;
+            answer["id"] = health_request["id"].clone();
+            writeln!(reader.get_mut(), "{answer}").unwrap();
+            line.clear();
+            reader.read_line(&mut line).unwrap();
+            let request: Value = serde_json::from_str(&line).unwrap();
+            // Closed without a reply.
+            drop(reader);
+            (request, listener)
+        });
+        let output = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+            .args([
+                "cleanup-debt",
+                "continue",
+                "--job",
+                "job-1",
+                "--remote-path",
+                "/data/x",
+                "--output",
+                "json",
+                "--socket",
+            ])
+            .arg(&socket)
+            .output()
+            .unwrap();
+        let (request, listener) = server.join().unwrap();
+        // The CLI has exited, so any connection it made is already queued.
+        listener.set_nonblocking(true).unwrap();
+        let no_second = matches!(listener.accept(),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock);
+        std::fs::remove_dir_all(&root).unwrap();
+        assert_eq!(request["method"], "cleanupDebt.continue");
+        assert_eq!(
+            request["params"],
+            json!({"jobId": "job-1", "remotePath": "/data/x"})
+        );
+        assert!(no_second, "the request was not sent again");
+        let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "outcomeUnknown", "{envelope}");
+        assert_eq!(
+            envelope["error"]["details"]["method"],
+            "cleanupDebt.continue"
+        );
+        assert_eq!(output.status.code(), Some(75));
+    }
+
     /// A published Artifact Swift recorded, as the Trace a diagnostics
     /// capture publishes.
     fn trace() -> Value {
@@ -247,5 +408,39 @@ mod runtime {
             assert_eq!(envelope["error"]["code"], "invalidInput");
             assert_eq!(envelope["error"]["message"], message);
         }
+    }
+}
+
+/// A continuation names its Job and exactly one recorded residue; anything
+/// else is refused before a connection, with the registry's words.
+#[test]
+fn a_continuation_needs_its_job_and_exactly_one_residue() {
+    for (argv, message) in [
+        (
+            vec!["recovery", "cleanup", "continue", "--job", "j"],
+            "`recovery cleanup continue` requires exactly one of --remote-path, --bundle",
+        ),
+        (
+            vec![
+                "cleanup-debt",
+                "continue",
+                "--job",
+                "j",
+                "--remote-path",
+                "/a",
+                "--bundle",
+                "b",
+            ],
+            "`cleanup-debt continue` requires exactly one of --remote-path, --bundle",
+        ),
+        (
+            vec!["recovery", "cleanup", "continue", "--bundle", "b"],
+            "`recovery cleanup continue` requires --job <job-id>",
+        ),
+    ] {
+        let argv: Vec<String> = argv.into_iter().map(str::to_owned).collect();
+        let error = arkdeck_cli::parse(&argv).unwrap_err();
+        assert_eq!((error.code, error.exit_code()), ("invalidOption", 64));
+        assert_eq!(error.message, message, "{argv:?}");
     }
 }
