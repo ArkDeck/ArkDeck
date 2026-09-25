@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "symbolizeWorkspaceCrash"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-dd51721f999dec2d623db9674aeb87c2",
+  "materializedPlanDigest" : "f04d8de84cf620fc0f8dd202ebb49ffcb3ed8302ed74be489ab3854d93c452dd",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.symbolize-crash@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-symbolize-lost",
+    "inputs" : {
+      "dumpArtifactRef" : "lease-v1:job-input-crash:ART-3fd720ed38ecd545cd0874367461239f",
+      "projectRef" : "TestSymbolizeOracleProject",
+      "symbolPresetRef" : "arkts-sourcemap"
+    },
+    "operation" : {
+      "id" : "workspace.symbolize-crash",
+      "version" : 1
+    },
+    "requestId" : "request-symbolize-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJzeW1ib2xpemVDcmFzaCI6eyJfMCI6eyJhcmd1bWVudHMiOlsiLS1zeW1ib2xpemUtY3Jhc2giLCIvcHJpdmF0ZS90bXAvYXJrZGVjay13b3Jrc3BhY2UtdGVzdC1zeW1ib2xpemUtb3JhY2xlL3NvdXJjZS9lbnRyeS9idWlsZC9kZWZhdWx0L291dHB1dHMvZGVmYXVsdC9tYXBwaW5nL3NvdXJjZU1hcHMubWFwIiwiL3ByaXZhdGUvdG1wL2Fya2RlY2std29ya3NwYWNlLXRlc3Qtc3ltYm9saXplLW9yYWNsZS9hcnRpZmFjdHMvam9iLWlucHV0LWNyYXNoL0FSVC0zZmQ3MjBlZDM4ZWNkNTQ1Y2QwODc0MzY3NDYxMjM5ZiJdLCJleGVjdXRhYmxlIjp7InBhdGgiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXRlc3Qtc3ltYm9saXplLW9yYWNsZS90b29scy9zeW1ib2xpemVyIiwic2hhMjU2IjoiOWFiZGZhZDVmY2JlZjljY2IwNDM1NjA3YTAyOTYwYzE5OTY3Yjg1N2UyZjdiNWMxOWZjMzAxNzkzMjk0OTM1ZiJ9LCJvcGVyYXRpb24iOiJ3b3Jrc3BhY2Uuc3ltYm9saXplLWNyYXNoQDEiLCJwcmVzZXRJRCI6ImFya3RzLXNvdXJjZW1hcCIsInByb2plY3RSZWYiOiJUZXN0U3ltYm9saXplT3JhY2xlUHJvamVjdCIsInByb2plY3RSb290IjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS10ZXN0LXN5bWJvbGl6ZS1vcmFjbGUvc291cmNlIiwidGltZW91dFNlY29uZHMiOjMwfX19"
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-symbolize-crash",
+  "recoveryStepID" : "symbolize-crash",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-symbolize-lost",
+    "inputs" : {
+      "dumpArtifactRef" : "lease-v1:job-input-crash:ART-3fd720ed38ecd545cd0874367461239f",
+      "projectRef" : "TestSymbolizeOracleProject",
+      "symbolPresetRef" : "arkts-sourcemap"
+    },
+    "operation" : {
+      "id" : "workspace.symbolize-crash",
+      "version" : 1
+    },
+    "requestId" : "request-symbolize-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent symbolize-crash",
+    "outcomeUnknown symbolize-crash; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

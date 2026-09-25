@@ -476,18 +476,27 @@ impl WorkspaceProfile {
         home: &str,
         registered: &[RegisteredBuildPreset],
     ) -> Result<Self, String> {
-        Self::water_flow_registered(root, project_ref, home, registered, Vec::new())
+        Self::water_flow_registered(root, project_ref, home, registered, Vec::new(), &[], None)
     }
 
     /// `water_flow_with`, and the signing presets registered against the
     /// project whose credential resolved. A registered project never falls
     /// back to the installed receipt, as Swift's registered profile does not.
+    ///
+    /// A symbol preset registered against the project runs the pinned
+    /// symbolizer (`ARKDECK_ANALYZER_PATH`, the daemon in its one-shot mode)
+    /// as `--symbolize-crash <root>/<its source map>`. A symbolizer that no
+    /// longer resolves declines the symbol presets and nothing else, so
+    /// `symbolize-crash` alone reports its preset unavailable; a symbol preset
+    /// without a source map is skipped.
     pub fn water_flow_registered(
         root: &str,
         project_ref: &str,
         home: &str,
         registered: &[RegisteredBuildPreset],
         signing: Vec<SigningPresetRef>,
+        symbols: &[RegisteredSymbolPreset],
+        symbolizer: Option<&str>,
     ) -> Result<Self, String> {
         let root = foundation_resolved(root);
         let home = foundation_standardized(home);
@@ -591,6 +600,24 @@ impl WorkspaceProfile {
                 test.push(command);
             }
         }
+        let mut symbol = Vec::new();
+        if let Some(symbolizer) = symbolizer.and_then(|path| ExecutableIdentity::hashing(path).ok())
+        {
+            for preset in symbols {
+                let Some(map) = &preset.relative_source_map else {
+                    continue;
+                };
+                let map = format!("{}/{map}", root.trim_end_matches('/'));
+                symbol.push(WorkspaceCommandPreset::new(
+                    &preset.preset_ref,
+                    symbolizer.clone(),
+                    None,
+                    vec!["--symbolize-crash".to_owned(), map],
+                    preset.timeout_seconds,
+                    Vec::new(),
+                )?);
+            }
+        }
         Self::primary(
             "waterflow-openharmony@1",
             project_ref,
@@ -609,8 +636,8 @@ impl WorkspaceProfile {
                 archive_checkpoint: Some(checkpoint),
                 build,
                 test,
+                symbol,
                 build_products,
-                ..ProfilePresets::default()
             },
         )
         .map(|profile| profile.with_signing(signing, false))
@@ -831,6 +858,31 @@ impl WorkspaceProfile {
         })
     }
 
+    /// Swift `resolved(operation:preset:arguments:)` over a test preset: its
+    /// own closed argv, run by the executable it pinned; `None` when the
+    /// profile declares no such preset.
+    pub(crate) fn test_invocation(
+        &self,
+        operation: &str,
+        preset_id: &str,
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.test.get(preset_id)?;
+        Some(self.invocation_of(preset, operation, &[]))
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over a symbol preset:
+    /// its fixed argv, then the crash dump's path; `None` when the profile
+    /// declares no such preset.
+    pub(crate) fn symbol_invocation(
+        &self,
+        operation: &str,
+        preset_id: &str,
+        dump: &str,
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.symbol.get(preset_id)?;
+        Some(self.invocation_of(preset, operation, &[dump]))
+    }
+
     /// The deployable product a build preset declares, relative to the root.
     pub(crate) fn build_product(&self, preset_id: &str) -> Option<&str> {
         self.build_products.get(preset_id).map(String::as_str)
@@ -947,6 +999,15 @@ pub(crate) fn automatic_issuance_permitted(
         None => descriptor.default_policy_issuance(),
         Some(facts) => facts.isolated_task_copy,
     }
+}
+
+/// A symbol preset registered against a project: the source map its
+/// symbolizer reads, relative to the project's root, and its timeout.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RegisteredSymbolPreset {
+    pub preset_ref: String,
+    pub relative_source_map: Option<String>,
+    pub timeout_seconds: i64,
 }
 
 /// Which registered Hvigor task a preset runs.

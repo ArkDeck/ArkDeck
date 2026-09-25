@@ -1,0 +1,129 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-65E1603AE65C5F94CFDAE73EB40ECF8B287688C7-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+          "projectRef" : "evolution-07116a98a247bc156f68",
+          "testPresetRef" : "oracle-tests"
+        },
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-07116a98a247bc156f68"
+          },
+          "testPresetRef" : {
+            "kind" : "exactString",
+            "value" : "oracle-tests"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.run-tests@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.run-tests",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+          "kind" : "workspaceIdentity",
+          "sha256" : "ca693e33d05e8393c3bbe5ef385ec2f27e66465e4b7aad43dd729c8f92519308"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "e11cdbb46d9a63a257cbb983efee4a49c196ab5e9dd62a1d9d3b87b69238e1b0",
+          "consumedAtUTC" : "2026-09-25T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-9f196bb7e2ad656ae60e152848b84f35",
+          "materializedPlanDigest" : "5344a2c918d8d51699b7a5c597fae9f6aadbe1c9787bd71f3680bc764f574f78",
+          "operationReference" : "workspace.run-tests@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-9f196bb7e2ad656ae60e152848b84f35",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "571283f5daf3e55ee53e9cd15c03e2780dd26f219b4aa0cab927a81c2cfddbf4",
+              "recordSHA256" : "41eca7dbfb499a168e994d7e1b6c00b5c3fa05bd4f7564828580fa711c84cf76",
+              "recordedAtUTC" : "2026-09-25T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "6aaafab9cb40ebce3123aae7c69fbbd2683c48d188ae14a4cf1dd6d4ac27335b",
+          "receiptSHA256" : "571283f5daf3e55ee53e9cd15c03e2780dd26f219b4aa0cab927a81c2cfddbf4",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idempotency-tests"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-377ECBAB28D78161D1802B04012CFC4D84970B78-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+          "projectRef" : "evolution-07116a98a247bc156f68",
+          "testPresetRef" : "oracle-failing-tests"
+        },
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "expectedWorkspaceRevision" : {
+            "kind" : "exactString",
+            "value" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9"
+          },
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "evolution-07116a98a247bc156f68"
+          },
+          "testPresetRef" : {
+            "kind" : "exactString",
+            "value" : "oracle-failing-tests"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.run-tests@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.run-tests",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+          "kind" : "workspaceIdentity",
+          "sha256" : "ca693e33d05e8393c3bbe5ef385ec2f27e66465e4b7aad43dd729c8f92519308"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

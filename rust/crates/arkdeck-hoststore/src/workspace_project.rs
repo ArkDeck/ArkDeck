@@ -121,6 +121,8 @@ pub struct WorkspacePresetComposition {
     pub module: Option<String>,
     pub product: Option<String>,
     pub build_mode: Option<String>,
+    /// A symbol preset's source map, relative to its project's root.
+    pub relative_source_map: Option<String>,
 }
 
 /// Swift `RuntimeWorkspaceProjectStartupRecord`, private half included: a
@@ -390,6 +392,7 @@ impl WorkspaceProjectStore {
                         module: record.constraints.module.clone(),
                         product: record.constraints.product.clone(),
                         build_mode: record.constraints.build_mode.clone(),
+                        relative_source_map: record.constraints.relative_source_map.clone(),
                     });
                 }
                 records.sort_by(|a, b| a.preset_ref.cmp(&b.preset_ref));

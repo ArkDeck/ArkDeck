@@ -1,0 +1,104 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "runWorkspaceTests"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "6aaafab9cb40ebce3123aae7c69fbbd2683c48d188ae14a4cf1dd6d4ac27335b",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-65E1603AE65C5F94CFDAE73EB40ECF8B287688C7-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "5344a2c918d8d51699b7a5c597fae9f6aadbe1c9787bd71f3680bc764f574f78",
+      "reservationID" : "idempotency-tests-lost",
+      "stepSetDigestSHA256" : "f0e8781789b7dc6742baa1b32ea206f77640432fc48133c79e3bf2f3fa0c8ebe",
+      "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
+      "useOrdinal" : 2
+    },
+    "validUntilUTC" : "2026-10-25T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-72955b29d95b0612604de209349118d3",
+  "materializedPlanDigest" : "5344a2c918d8d51699b7a5c597fae9f6aadbe1c9787bd71f3680bc764f574f78",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.run-tests@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-tests-lost",
+    "inputs" : {
+      "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+      "projectRef" : "evolution-07116a98a247bc156f68",
+      "testPresetRef" : "oracle-tests"
+    },
+    "operation" : {
+      "id" : "workspace.run-tests",
+      "version" : 1
+    },
+    "requestId" : "request-tests-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJydW5UZXN0cyI6eyJfMCI6eyJhcmd1bWVudHMiOlsiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS10ZXN0LXN5bWJvbGl6ZS1vcmFjbGUvdG9vbHMvaHZpZ29ydy5qcyIsInRlc3QiLCItLW1vZGUiLCJtb2R1bGUiLCItcCIsIm1vZHVsZT1lbnRyeUBkZWZhdWx0IiwiLXAiLCJwcm9kdWN0PWRlZmF1bHQiLCItcCIsImJ1aWxkTW9kZT1kZWJ1ZyIsIi0tYW5hbHl6ZT1ub3JtYWwiLCItLXBhcmFsbGVsIiwiLS1pbmNyZW1lbnRhbCIsIi0tbm8tZGFlbW9uIl0sImV4ZWN1dGFibGUiOnsicGF0aCI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2UtdGVzdC1zeW1ib2xpemUtb3JhY2xlL3Rvb2xzL25vZGUiLCJzaGEyNTYiOiI3MmJmYzE2NTkxODg1NTYxM2ZlZGI4YmU1MGVmZmQ1NDBmM2YyZTU4MzBjNjA3NGI3ZGE5Y2JjODU3YTczMWEwIn0sIm9wZXJhdGlvbiI6IndvcmtzcGFjZS5ydW4tdGVzdHNAMSIsInByZXNldElEIjoib3JhY2xlLXRlc3RzIiwicHJvamVjdFJlZiI6ImV2b2x1dGlvbi0wNzExNmE5OGEyNDdiYzE1NmY2OCIsInByb2plY3RSb290IjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS10ZXN0LXN5bWJvbGl6ZS1vcmFjbGUvZXZvbHV0aW9uLXdvcmtzcGFjZXMvZXZvLTA3MTE2YTk4YTI0N2JjMTU2ZjY4YThhYy93b3Jrc3BhY2UiLCJ0aW1lb3V0U2Vjb25kcyI6NjB9fX0="
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-run-tests",
+  "recoveryStepID" : "run-tests",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-65E1603AE65C5F94CFDAE73EB40ECF8B287688C7-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-tests-lost",
+    "inputs" : {
+      "expectedWorkspaceRevision" : "b8b22bc2472bf94e2152a895368a9ea511fb52635d196f1a86ab03e35c67b0d9",
+      "projectRef" : "evolution-07116a98a247bc156f68",
+      "testPresetRef" : "oracle-tests"
+    },
+    "operation" : {
+      "id" : "workspace.run-tests",
+      "version" : 1
+    },
+    "requestId" : "request-tests-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "capability consumed before first mutation",
+    "intent run-tests",
+    "outcomeUnknown run-tests; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

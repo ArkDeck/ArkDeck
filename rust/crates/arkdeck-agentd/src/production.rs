@@ -550,6 +550,7 @@ pub(crate) fn compose(
                 true,
             )?),
             inputs.workspace_inspector.as_deref(),
+            inputs.analyzer.as_deref().map(std::path::Path::as_os_str),
         )?
         .with_imports(arkdeck_hoststore::ImportUploadStore::open(
             &layout.artifacts,

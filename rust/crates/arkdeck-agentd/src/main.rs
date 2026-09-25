@@ -25,6 +25,8 @@ mod control_action_host_control;
 #[cfg(target_os = "macos")]
 mod crash_ledger_analyzer;
 #[cfg(target_os = "macos")]
+mod crash_symbolizer_mode;
+#[cfg(target_os = "macos")]
 mod cutover_preflight;
 #[cfg(target_os = "macos")]
 mod development_mutation;
@@ -392,6 +394,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 &bootstrap,
                 None,
                 std::env::var_os("ARKDECK_WORKSPACE_INSPECTOR").as_deref(),
+                // As Swift's daemon feeds its WaterFlow symbolizer.
+                std::env::var_os("ARKDECK_ANALYZER_PATH").as_deref(),
             )?
             .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
             .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
@@ -857,11 +861,12 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    // Three one-shot modes are answered before any composition is considered:
+    // Four one-shot modes are answered before any composition is considered:
     // Swift's HiLog summary and crash-ledger analyzers, which the Runtime runs
     // as its analyzer children (`hilog_summary_analyzer.rs`,
-    // `crash_ledger_analyzer.rs`), and the M5 cutover preflight, a read of the
-    // production layout (`cutover_preflight.rs`).
+    // `crash_ledger_analyzer.rs`), its ArkTS crash symbolizer, which a symbol
+    // preset runs (`crash_symbolizer_mode.rs`), and the M5 cutover preflight,
+    // a read of the production layout (`cutover_preflight.rs`).
     #[cfg(target_os = "macos")]
     {
         let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
@@ -871,6 +876,9 @@ fn main() {
         }
         if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
             std::process::exit(crash_ledger_analyzer::run(&arguments));
+        }
+        if first.is_some_and(|argument| argument == crash_symbolizer_mode::FLAG) {
+            std::process::exit(crash_symbolizer_mode::run(&arguments));
         }
         if first.is_some_and(|argument| argument == cutover_preflight::FLAG) {
             std::process::exit(cutover_preflight::run(&arguments));

@@ -20,6 +20,10 @@
 //!   create` through the pinned source-control tool, or the pinned archive
 //!   writer sealing the declared files into the Job's provider-owned
 //!   destination; the plan names the executable by its digest and the argv.
+//! - `workspace.run-tests@1` and `workspace.symbolize-crash@1` are one process
+//!   each: the test preset's pinned executable with its own closed argv, or
+//!   the symbol preset's with its fixed argv and the crash dump's path — the
+//!   dump a device-bound `crash-log.txt` its lease resolves to — in the root.
 //! - `workspace.sweep-isolated-copies@1` is a host workspace action pinned by
 //!   the digest of its typed intent, which records the engine clock as its
 //!   retention clock and runs no process.
@@ -146,6 +150,12 @@ impl JobPlanner<'_> {
                 &reference,
                 "unsignedHapArtifactLease",
                 "unsigned HAP",
+            )?),
+            crate::workspace_tests_symbolize::SYMBOLIZE => Some(self.resolve_input(
+                request,
+                &reference,
+                "dumpArtifactRef",
+                "workspace crash dump",
             )?),
             _ => None,
         };
@@ -290,6 +300,38 @@ impl JobPlanner<'_> {
                         "processKind": "hostWorkspace",
                         "hostManagedDescriptor": descriptor,
                     })
+                }
+                (
+                    crate::workspace_tests_symbolize::TESTS,
+                    crate::workspace_tests_symbolize::TESTS_KIND,
+                )
+                | (
+                    crate::workspace_tests_symbolize::SYMBOLIZE,
+                    crate::workspace_tests_symbolize::SYMBOLIZE_KIND,
+                ) => {
+                    let action = if reference == crate::workspace_tests_symbolize::TESTS {
+                        workspace.tests_action(&reference, &request.inputs)
+                    } else {
+                        workspace.symbolize_action(&reference, &request.inputs, leased.as_ref())
+                    }
+                    .map_err(preflight)?;
+                    workspace.lower_preset(&action).map_err(preflight)?;
+                    let dump = leased
+                        .as_ref()
+                        .map(|leased| (leased.artifact_id.as_str(), leased.sha256.as_str()));
+                    let invocation = action.invocation();
+                    let mut process = json!({
+                        "journalArguments": action.journal_arguments(&request.inputs, dump),
+                        "processKind": "process",
+                        "executableSHA256": invocation.executable_sha256,
+                        "workingDirectory": invocation.project_root,
+                        "argumentSummary": invocation.arguments,
+                        "timeoutSeconds": invocation.timeout_seconds,
+                    });
+                    if let Some(zero) = &invocation.argument_zero {
+                        process["argumentZero"] = json!(zero);
+                    }
+                    process
                 }
                 ("workspace.build-openharmony@1", "buildWorkspaceOpenHarmony") => {
                     let action = workspace

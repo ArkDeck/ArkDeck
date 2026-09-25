@@ -23,8 +23,8 @@ use crate::workspace_patch::{
 };
 use crate::workspace_profile::{
     PRESET_UNAVAILABLE, ProfileKind, ProfileRegistry, RegisteredBuildPreset, RegisteredKind,
-    SigningPresetRef, Unavailability, VerifiedResource, WorkspaceAuthorizationFacts,
-    WorkspaceProfile,
+    RegisteredSymbolPreset, SigningPresetRef, Unavailability, VerifiedResource,
+    WorkspaceAuthorizationFacts, WorkspaceProfile,
 };
 use crate::workspace_project::{WorkspaceProjectStore, WorkspaceUse};
 use crate::workspace_read::{
@@ -33,6 +33,7 @@ use crate::workspace_read::{
 };
 use crate::workspace_signing::SigningSetup;
 use crate::workspace_support::{self as support, foundation_standardized, is_narrower};
+use crate::workspace_tests_symbolize::PresetAction;
 use arkdeck_contract::WireError;
 use arkdeck_provider_workspace::credential_owner::CredentialOwner;
 use arkdeck_provider_workspace::signer::{self, SignedHap, SigningFailure};
@@ -199,6 +200,13 @@ pub type ToolchainResolver<'a> = &'a dyn Fn(&str, u64, &str) -> Result<ResolvedT
 
 /// How a lowered build step runs: the landing a copy's product needs, the
 /// environment its executable's children get and the files it holds open.
+/// What a test run's or a symbolization's dispatch carries beyond its
+/// invocation.
+pub(crate) struct PresetLowering {
+    pub(crate) environment: Vec<(String, String)>,
+    pub(crate) resources: Vec<VerifiedResource>,
+}
+
 pub(crate) struct BuildLowering {
     pub(crate) landing: Option<Landing>,
     pub(crate) environment: Vec<(String, String)>,
@@ -285,6 +293,8 @@ fn registry(profiles: &[WorkspaceProfile]) -> io::Result<ProfileRegistry> {
 /// by executable path, the presets that composed and those that did not.
 struct RegisteredPresets {
     by_project: BTreeMap<String, Vec<RegisteredBuildPreset>>,
+    /// The symbol presets registered against each project.
+    symbols: BTreeMap<String, Vec<RegisteredSymbolPreset>>,
     /// The signing presets whose toolchain pin and credential resolved for
     /// their own project.
     signing: BTreeMap<String, Vec<SigningPresetRef>>,
@@ -331,6 +341,7 @@ fn resolve_registered(
 ) -> RegisteredPresets {
     let mut resolved = RegisteredPresets {
         by_project: BTreeMap::new(),
+        symbols: BTreeMap::new(),
         signing: BTreeMap::new(),
         environment: BTreeMap::new(),
         composed: BTreeMap::new(),
@@ -341,6 +352,15 @@ fn resolve_registered(
             "build" => RegisteredKind::Build,
             "test" => RegisteredKind::Test,
             "symbol" => {
+                resolved
+                    .symbols
+                    .entry(preset.project_ref.clone())
+                    .or_default()
+                    .push(RegisteredSymbolPreset {
+                        preset_ref: preset.preset_ref.clone(),
+                        relative_source_map: preset.relative_source_map.clone(),
+                        timeout_seconds: preset.timeout_seconds,
+                    });
                 resolved.composed.insert(
                     preset.preset_ref.clone(),
                     (preset.project_ref.clone(), preset.generation),
@@ -454,6 +474,7 @@ impl WorkspaceComposition {
         now: fn() -> Option<String>,
         toolchains: ToolchainResolver<'_>,
         signing: Option<SigningSetup>,
+        symbolizer: Option<&str>,
     ) -> Result<(Self, CompositionNotes), String> {
         let records = projects.startup_records().map_err(|error| error.message)?;
         let preset_records = projects
@@ -513,6 +534,12 @@ impl WorkspaceComposition {
                         .get(&record.project_ref)
                         .cloned()
                         .unwrap_or_default(),
+                    presets
+                        .symbols
+                        .get(&record.project_ref)
+                        .map(Vec::as_slice)
+                        .unwrap_or_default(),
+                    symbolizer,
                 ),
                 _ => Err(format!(
                     "workspace.projectProfileUnavailable:{} is unsupported",
@@ -1328,6 +1355,107 @@ impl WorkspaceComposition {
             Err(reason) => return PatchVerdict::Unknown(reason),
         };
         action.verify(receipt, &owned, &profile.project_root)
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.run-tests@1`: the preamble, then the test preset the request
+    /// names in that profile, resolved to its own closed invocation.
+    pub(crate) fn tests_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+    ) -> Result<PresetAction, String> {
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let preset = inputs
+            .get("testPresetRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input testPresetRef is missing")?;
+        profile
+            .test_invocation(reference, preset)
+            .map(PresetAction::Tests)
+            .ok_or_else(|| format!("workspace.testPresetUnavailable:{preset}"))
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.symbolize-crash@1`: the preamble, the crash dump the engine
+    /// resolved from its lease, then the symbol preset the request names, its
+    /// fixed argv followed by the dump's path.
+    pub(crate) fn symbolize_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+        leased: Option<&LeasedInput>,
+    ) -> Result<PresetAction, String> {
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let Some(leased) = leased else {
+            return Err(
+                "workspace crash Artifact lease was not resolved before materialization".into(),
+            );
+        };
+        let preset = inputs
+            .get("symbolPresetRef")
+            .and_then(Value::as_str)
+            .ok_or("workspace input symbolPresetRef is missing")?;
+        profile
+            .symbol_invocation(reference, preset, &leased.path)
+            .map(PresetAction::Symbolize)
+            .ok_or_else(|| format!("workspace.symbolPresetUnavailable:{preset}"))
+    }
+
+    /// Swift `lower(action:context:)` for a test run or a symbolization: the
+    /// executable one the acting profile pinned; what its child finds in its
+    /// environment — a test run the home and temporary directory a Hvigor
+    /// build reads too, and each the overlay the composition names for its
+    /// executable — and the verified resources held open while it runs.
+    pub(crate) fn lower_preset(&self, action: &PresetAction) -> Result<PresetLowering, String> {
+        let invocation = action.invocation();
+        let profile = self
+            .registry
+            .profile(&invocation.project_ref)
+            .ok_or_else(|| {
+                format!(
+                    "workspace.projectProfileUnavailable:{}",
+                    invocation.project_ref
+                )
+            })?;
+        if !profile.owns_executable(&invocation.executable_path, &invocation.executable_sha256) {
+            return Err("workspace provider received a foreign action or executable".into());
+        }
+        let mut environment = match action {
+            PresetAction::Tests(_) => inherited_base(),
+            PresetAction::Symbolize(_) => Vec::new(),
+        };
+        for (key, value) in self
+            .environment
+            .get(&invocation.executable_path)
+            .into_iter()
+            .flatten()
+        {
+            environment.retain(|(existing, _)| existing != key);
+            environment.push((key.clone(), value.clone()));
+        }
+        Ok(PresetLowering {
+            environment,
+            resources: self
+                .resources_for(&invocation.executable_path, &invocation.executable_sha256),
+        })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.verify` for a test run or a
+    /// symbolization, in the acting profile: a profile that is gone leaves
+    /// the verdict unknown.
+    pub(crate) fn verify_preset(
+        &self,
+        action: &PresetAction,
+        receipt: &ToolReceipt,
+    ) -> PatchVerdict {
+        let project_ref = &action.invocation().project_ref;
+        if self.registry.profile(project_ref).is_none() {
+            return PatchVerdict::Unknown(format!(
+                "workspace.projectProfileUnavailable:{project_ref}"
+            ));
+        }
+        action.verify(receipt)
     }
 
     /// Swift `WorkspaceOperationsProvider.action` for

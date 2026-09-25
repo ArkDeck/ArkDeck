@@ -1,0 +1,28 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_TEST_SYMBOLIZE_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspaceTestSymbolizeOracleContractTests",
+  "determinism": "the clock is fixed, the root is fixed and the requests are canonical JSON, so every Job, capability and Artifact identity repeats; node.sh and hvigorw.js stand in for a registered DevEco toolchain's Node launcher and Hvigor script, symbolizer.sh for the daemon's one-shot --symbolize-crash mode, all with fixed bytes, so the plans and capabilities name the same executables and resource on every host; recorded twice, byte-identical",
+  "durable": "capabilities/ is the capability store's checkpoint and ledger; artifacts/job-input-crash/ and artifacts/job-input-host-crash/ the crash logs a device capture published before the first request (index included, seeded as they are); artifacts/<job>/ART-* the products the passing and failing test runs and the symbolization published; parked-*-record.json the durable records of the test run and the symbolization whose receipt was lost after the child ran",
+  "files": {
+    "artifacts/job-4b0a1693582ec3cb0ca008e2d8105188/ART-16e5bd33260aaa1f3721f2b074fed582": "05f45e7fcbc325209856905b2b00db2f97b95745d9ccd532fa57519e159364f9",
+    "artifacts/job-9f196bb7e2ad656ae60e152848b84f35/ART-5fae316e6fd8ade91599ec10081c5dda": "646678d49d62471bc71fe6ab71cf96191f66c46525e1b51b4b711b72961fdac4",
+    "artifacts/job-c29bf3e05fcb74e8ebb6aa03bd490530/ART-adb0e091128d2bea7518712fcf498970": "a162ee9508c5b4ab7677f8eb3b8a280d636e697ee19ca11602ba7ff0f9909a9d",
+    "artifacts/job-input-crash/ART-19e8ad32ad93f2109aa472b57f54ad87": "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+    "artifacts/job-input-crash/ART-3fd720ed38ecd545cd0874367461239f": "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+    "artifacts/job-input-crash/index.json": "c908cfb4d1b581f6e25f50bd8f50fc4b94b9c6685b41d3e5ae017963c3e57a8d",
+    "artifacts/job-input-host-crash/ART-95b04c40eac2d2504d1244a3f0c5be0a": "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+    "artifacts/job-input-host-crash/index.json": "9a5be8ab1b626456c5e50f91227c0acd1c40b9c84f3bd1632e713cd6eee45c52",
+    "capabilities/runtime-capabilities.json": "8772e5dc3ea27296aab0b9638c9eb2d33499a0feaa98c634a0b996f31025ff48",
+    "capabilities/runtime-capabilities.ledger": "89cd37e65d0a651c3eb9d23d6c9c90ee2ff0ee40d2aae1e0f908db34c43e5ebf",
+    "frames.jsonl": "aecfc4f031df2a42cdb5d8d25cf9d324873fe3912760c194a8f3c2e92b7fd996",
+    "hvigorw.js": "22625b64e49821b7139da1605680b370e89c992bdeb4afc067a84fa0a69666fe",
+    "node.sh": "72bfc165918855613fedb8be50effd540f3f2e5830c6074b7da9cbc857a731a0",
+    "parked-symbolize-record.json": "bf6942a47dd68f003703b94a15ee07d2a3cd2196a2ca890fb47732c3b9b085f5",
+    "parked-tests-record.json": "b86dd423655418319007eed67962f9a6c45ec585c99d03db4e069e509f150345",
+    "symbolizer.sh": "9abdfad5fcbef9ccb0435607a02960c19967b857e2f7b5c19fc301793294935f"
+  },
+  "frames": "job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.run-tests@1, workspace.symbolize-crash@1 and workspace.prepare-isolated-copy@1 Job, in the order the control plane answered them (37 frames)",
+  "recordedBy": "WorkspaceTestSymbolizeOracleContractTests.testTheControlPlaneRunsTestsAndSymbolizesAsRecorded",
+  "replayedBy": "the Rust port of workspace.run-tests@1 and workspace.symbolize-crash@1 (TASK-XPA-015, M3)",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager, and DescriptorBoundProcessDispatcher naming DEVECO_SDK_HOME for the stand-in Node launcher, over a fabricated project under /private/tmp/arkdeck-workspace-test-symbolize-oracle; the dispatch loses its receipt only where the sequence says so",
+  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence"
+}

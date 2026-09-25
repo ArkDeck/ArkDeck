@@ -904,6 +904,7 @@ fn a_registered_hvigor_preset_composes_through_its_resolved_toolchain() {
         oracle_now,
         &resolver,
         None,
+        None,
     )
     .unwrap();
     let unadopted = unadopted.unadopted;
