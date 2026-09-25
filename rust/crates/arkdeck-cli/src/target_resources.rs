@@ -1,6 +1,5 @@
 //! Strict presentation-only Target and observation-name consumers.
 use crate::{CliError, Invocation};
-use arkdeck_client::ClientError;
 use serde_json::{Map, Value};
 pub(crate) fn is_mutation(method: &str) -> bool {
     matches!(
@@ -115,48 +114,6 @@ pub(crate) fn configure(
         ));
     }
     Ok(timeout)
-}
-pub(crate) fn client_error(error: ClientError, method: &str) -> CliError {
-    if matches!(
-        error,
-        ClientError::Transport(_) | ClientError::ConnectionUnusable | ClientError::Contract(_)
-    ) {
-        return CliError::new(
-            "outcomeUnknown",
-            "Display-name response is unconfirmed; read current state before another update; no request was replayed",
-        );
-    }
-    let ClientError::Remote(error) = error else {
-        unreachable!()
-    };
-    let phase = if method.starts_with("target.") {
-        "targetDisplayNameOwner"
-    } else {
-        "candidateDisplayNameOwner"
-    };
-    let proof = error.details.as_ref().is_some_and(|d| {
-        d.get("phase").and_then(Value::as_str) == Some(phase)
-            && d.get("newDispatchCount") == Some(&Value::from(0))
-    });
-    let code = match error.code.as_str() {
-        "invalidParams" => "invalidInput",
-        "notFound" => "resourceNotFound",
-        "conflict" => "resourceConflict",
-        "recordUnreadable" => "recordUnreadable",
-        "resourceConflict" if proof => "resourceConflict",
-        "resourceNotFound" if proof => "resourceNotFound",
-        "invalidInput" if proof => "invalidInput",
-        "quotaExceeded" if proof => "quotaExceeded",
-        "ioFailure" if proof => "ioFailure",
-        "outcomeUnknown" if proof => "outcomeUnknown",
-        "operationUnavailable" if proof => "operationUnavailable",
-        _ => "internalError",
-    };
-    let mut result = CliError::new(code, error.message);
-    if let Some(details) = error.details {
-        result.details = details;
-    }
-    result
 }
 fn exact(v: &Value, keys: &[&str]) -> bool {
     v.as_object()
@@ -351,6 +308,7 @@ pub fn validate_target_response(invocation: &Invocation, value: &Value) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    use arkdeck_client::ClientError;
     use serde_json::json;
     fn invocation(args: &[&str]) -> Invocation {
         crate::parse(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>()).unwrap()

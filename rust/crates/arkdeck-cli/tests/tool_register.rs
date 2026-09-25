@@ -314,6 +314,10 @@ mod endpoint {
                 "invalidParams" => "invalidInput",
                 "unknownMethod" => "controlMethodUnavailable",
                 "internalError" => "internalError",
+                // Swift's owner list for registration has no `inputTooLarge`,
+                // though Swift's daemon sends it: Swift's CLI reads it as an
+                // unknown outcome, and so does this one.
+                "inputTooLarge" => "outcomeUnknown",
                 other => other,
             };
             assert_eq!(doc["error"]["code"], expected, "{frame}");

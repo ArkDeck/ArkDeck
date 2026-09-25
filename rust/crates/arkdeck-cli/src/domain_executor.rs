@@ -203,19 +203,15 @@ impl ClientFailure {
         match self {
             // Nothing was sent, so nothing was accepted.
             Self::ConnectFailed(message) => transport("runtimeUnavailable", message),
-            Self::DeadlineExceeded => transport(
-                "outcomeUnknown",
-                "the client wait deadline expired; no cancellation was requested",
-            ),
-            Self::Transport(message) => crate::job_plan::mutation_error(
+            Self::DeadlineExceeded => transport("outcomeUnknown", crate::CLIENT_DEADLINE),
+            Self::Transport(message) => CliError::from_client(
                 ClientError::Transport(std::io::Error::other(message.clone())),
                 method,
             ),
-            Self::MalformedResponse(_) => crate::job_plan::mutation_error(
-                ClientError::Contract(ContractError::Malformed),
-                method,
-            ),
-            Self::DaemonError { code, message } => crate::job_plan::mutation_error(
+            Self::MalformedResponse(_) => {
+                CliError::from_client(ClientError::Contract(ContractError::Malformed), method)
+            }
+            Self::DaemonError { code, message } => CliError::from_client(
                 ClientError::Remote(WireError {
                     code: code.clone(),
                     message: message.clone(),
@@ -227,7 +223,7 @@ impl ClientFailure {
                 code,
                 message,
                 details,
-            } => crate::job_plan::mutation_error(
+            } => CliError::from_client(
                 ClientError::Remote(WireError {
                     code: code.clone(),
                     message: message.clone(),

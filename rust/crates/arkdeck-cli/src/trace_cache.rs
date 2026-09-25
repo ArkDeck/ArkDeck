@@ -129,9 +129,7 @@ mod tests {
         }
         for error in [
             arkdeck_client::ClientError::Transport(std::io::Error::other("lost reply")),
-            arkdeck_client::ClientError::Contract(
-                arkdeck_contract::ContractError::ContractMismatch,
-            ),
+            arkdeck_client::ClientError::Contract(arkdeck_contract::ContractError::SchemaMismatch),
             arkdeck_client::ClientError::ConnectionUnusable,
         ] {
             let error = CliError::from_client(error, "trace.cache.purge");

@@ -150,16 +150,22 @@ pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliErro
             "HDC registration is not published in this CLI contract",
         ));
     }
+    // Refused before any connection, so nothing was sent: the request itself
+    // is off the compiled contract.
     arkdeck_contract::validate_method_value(
         invocation.method,
         "request",
         &Value::Object(invocation.params.clone().unwrap_or_default()),
     )
-    .map_err(|error| {
-        CliError::from_client(
-            arkdeck_client::ClientError::Contract(error),
-            invocation.method,
-        )
+    .map_err(|_| {
+        let mut error = CliError::new(
+            "protocolMalformed",
+            "the local Runtime response does not conform to the current contract",
+        );
+        error
+            .details
+            .insert("method".into(), Value::String(invocation.method.into()));
+        error
     })
 }
 
@@ -508,84 +514,4 @@ fn validate_tool_page(invocation: &Invocation, value: &Value) -> Result<(), CliE
         prior = Some(reference);
     }
     Ok(())
-}
-
-pub(crate) fn retirement_error(error: arkdeck_client::ClientError, method: &str) -> CliError {
-    let mut result = match error {
-        arkdeck_client::ClientError::Remote(error) => {
-            let bounded = error.details.as_ref().is_some_and(|details| {
-                details.get("phase").and_then(Value::as_str) == Some("bootstrapRegistryOwner")
-                    && details.get("newDispatchCount").and_then(Value::as_u64) == Some(0)
-            });
-            let code = match error.code.as_str() {
-                "invalidInput" if bounded => "invalidInput",
-                "resourceNotFound" if bounded => "resourceNotFound",
-                "resourceConflict" if bounded => "resourceConflict",
-                "admissionDenied" if bounded => "admissionDenied",
-                "recordUnreadable" if bounded => "recordUnreadable",
-                "ioFailure" if bounded && method == "runtime.tool.remove" => "ioFailure",
-                "fileIdentityChanged" if bounded && method == "runtime.tool.remove" => {
-                    "fileIdentityChanged"
-                }
-                "inputTooLarge" if bounded && method == "runtime.tool.remove" => "inputTooLarge",
-                "quotaExceeded" if bounded => "quotaExceeded",
-                "operationUnavailable" if bounded => "operationUnavailable",
-                "outcomeUnknown" if bounded => "outcomeUnknown",
-                "unsupportedProtocolVersion" => "protocolVersionUnsupported",
-                "malformedFrame" => "protocolMalformed",
-                "unknownMethod" => "controlMethodUnavailable",
-                "invalidParams" => "invalidInput",
-                "conflict" => "resourceConflict",
-                "notFound" => "resourceNotFound",
-                "rejected"
-                    if error.details.as_ref().is_some_and(|details| {
-                        details.get("phase").and_then(Value::as_str) == Some("preAdmission")
-                            && details.get("newDispatchCount").and_then(Value::as_u64) == Some(0)
-                    }) =>
-                {
-                    "admissionDenied"
-                }
-                "rejected" => "operationFailed",
-                "invalidInput"
-                | "resourceNotFound"
-                | "resourceConflict"
-                | "admissionDenied"
-                | "recordUnreadable"
-                | "ioFailure"
-                | "fileIdentityChanged"
-                | "inputTooLarge"
-                | "quotaExceeded"
-                | "operationUnavailable"
-                | "outcomeUnknown" => "outcomeUnknown",
-                _ => "internalError",
-            };
-            let mut result = CliError::new(code, error.message);
-            result.details = error.details.unwrap_or_default();
-            result
-                .details
-                .insert("wireCode".into(), Value::String(error.code));
-            result
-        }
-        arkdeck_client::ClientError::Contract(
-            arkdeck_contract::ContractError::UnsupportedVersion
-            | arkdeck_contract::ContractError::ContractMismatch,
-        ) => CliError::new(
-            "protocolVersionUnsupported",
-            "client and Runtime must use the same current control contract",
-        ),
-        arkdeck_client::ClientError::Contract(arkdeck_contract::ContractError::UnknownMethod) => {
-            CliError::new(
-                "protocolMalformed",
-                "the local Runtime response does not conform to the current contract",
-            )
-        }
-        other => CliError::new(
-            "outcomeUnknown",
-            format!("{method} has no verified receipt: {other}"),
-        ),
-    };
-    result
-        .details
-        .insert("method".into(), Value::String(method.into()));
-    result
 }

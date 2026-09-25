@@ -1,0 +1,8 @@
+{
+  "owners" : [
+    "CLIRuntimeSession.mapped",
+    "CLIControlFailureMapper",
+    "CLIControlMethodRegistry.effect(of:)"
+  ],
+  "producer" : "CLIClientFailureMappingOracleContractTests"
+}
