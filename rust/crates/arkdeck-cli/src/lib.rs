@@ -16,6 +16,7 @@ pub use failure_mapping::{BOUNDED_READ_ONLY_METHODS, bounded_read_only};
 mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
+pub mod error_registry;
 mod flash_leaves;
 mod trace_inspect;
 pub use debug_templates::debug_template_list;
@@ -124,46 +125,10 @@ impl CliError {
             command: None,
         }
     }
+    /// §9: the exit status of the code's category in the error registry; a
+    /// code the registry does not have is an internal failure.
     pub fn exit_code(&self) -> u8 {
-        match self.code {
-            "invalidCommand" | "invalidOption" | "commandRemoved" => 64,
-            "invalidInput"
-            | "invalidCursor"
-            | "inputTooLarge"
-            | "resourceConflict"
-            | "idempotencyConflict"
-            | "resourceNotFound"
-            | "workspaceReferenceNotFound"
-            | "reviewedPlanMismatch" => 65,
-            "runtimeUnavailable"
-            | "unsupportedOnPlatform"
-            | "protocolVersionUnsupported"
-            | "controlMethodUnavailable"
-            | "healthRequirementFailed" => 69,
-            "operationUnavailable" => 69,
-            "recordUnreadable" | "artifactIntegrityFailed" => 2,
-            "ioFailure" => 74,
-            "outcomeUnknown" | "resultNotReady" => 75,
-            "quotaExceeded" => 69,
-            "operationFailed" => 1,
-            "clientTimeout" => 75,
-            "admissionDenied" | "fileIdentityChanged" | "sensitiveAccessDenied" => 77,
-            "orchestrationClockUntrusted"
-            | "bindingRevisionStale"
-            | "factsDrifted"
-            | "previewDrifted" => 77,
-            "humanActionRequired"
-            | "humanActionExpired"
-            | "orchestrationBudgetExpired"
-            | "reconcileRequired"
-            | "targetSelectionRequired"
-            | "targetAmbiguous"
-            | "targetTrustPending"
-            | "eventHistoryUnavailable"
-            | "previewExpired" => 75,
-            "clientInterrupted" => 130,
-            _ => 70,
-        }
+        error_registry::category(self.code).map_or(70, error_registry::ExitCategory::exit_code)
     }
     /// Swift `CLIRuntimeSession.mapped` of a connection that did not open for
     /// `method`: nothing was sent, so nothing was accepted, whatever the
@@ -1671,8 +1636,8 @@ pub fn success_envelope(command: &str, result: Value, id: &str) -> Value {
 
 pub fn failure_envelope(command: &str, error: &CliError, id: &str, protocol: bool) -> Value {
     let mut details = json!({"code":error.code,"message":error.message,
-        "controlRequestRetryable":matches!(error.code,"clientTimeout"|"resultNotReady"|"runtimeUnavailable"),
-        "attentionRequired":matches!(error.exit_code(),2|75|77)});
+        "controlRequestRetryable":error_registry::control_request_retryable(error.code),
+        "attentionRequired":error_registry::requires_attention(error.code)});
     if !error.details.is_empty() {
         details["details"] = json!(error.details);
     }

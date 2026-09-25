@@ -1,4 +1,7 @@
 {
+  "contracts/cli-canonical-json-vectors.json": "6afe05fefcd447a0b9f196461da40a13cf255a3342f275a62748468cc57b6685",
+  "contracts/cli-error-registry.yaml": "5be3fe55249639c33e9bacbbcefa521df3fc9ae5bb45ab6d7df81f2bb2269891",
+  "contracts/cli-event.schema.json": "fbdd5b019abb27cea4c0df35a17951578d02f5a6765130cec8418dfa668f134c",
   "contracts/cli-next-action.schema.json": "cf510c69aa8247660b7200ddbbd58ae165b3b5b7906165d6a7ce7c0108b9e9b8",
   "contracts/cli-page.schema.json": "63cd97965aa946981faecb207ad2a7a7ad46153ec0e75fb6cbaf7cf35fcd6ca2",
   "fixtures/next-action/cleanup.json": "2f1e97baf13f0a5d88a4e9f75ffa22f5ce985fd3d2ffd756a70a914ea7e8e63c",
