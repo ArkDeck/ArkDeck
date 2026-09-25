@@ -18,7 +18,10 @@ fn validate_content(
     let value = match intent.kind.as_str() {
         "hap" => {
             if file.validator_bytes(4, true).map_err(unreadable)? != b"PK\x03\x04" {
-                return Err(content_invalid());
+                return Err(failure(
+                    "invalidInput",
+                    "Import is not a ZIP-based HAP/HSP container",
+                ));
             }
             json!({"kind":"hap","container":"zip"})
         }
@@ -138,19 +141,16 @@ impl ImportUploadStore {
         quota: u64,
         resolve_binding: impl FnOnce(&ImportIntent) -> Result<ImportBinding, WireError>,
     ) -> Result<Value, WireError> {
+        // Swift's handler: the names, the identity, then the generation; the
+        // owner's lookup then judges the identity's form.
         if fields.len() != 2
             || !fields.contains_key("importId")
             || !fields.contains_key("generation")
         {
-            return Err(invalid());
+            return Err(closed());
         }
-        let id = fields["importId"]
-            .as_str()
-            .filter(|v| import_id(v))
-            .ok_or_else(invalid)?;
-        let generation = import_decimal(&fields["generation"])
-            .filter(|v| *v > 0)
-            .ok_or_else(invalid)?;
+        let id = identity(fields, "importId")?;
+        let generation = positive_generation(fields)?;
         if import_timestamp(now).is_none() {
             return Err(failure(
                 "operationUnavailable",
@@ -400,19 +400,21 @@ impl ImportUploadStore {
         fields: &Map<String, Value>,
         artifacts: Option<&ArtifactReadStore>,
     ) -> Result<Value, WireError> {
+        // Swift `RuntimeArtifactStore.listImports`'s refusals, in its order.
         if fields
             .keys()
             .any(|k| !["target", "state", "pageSize", "cursor"].contains(&k.as_str()))
         {
-            return Err(invalid());
+            return Err(failure("invalidInput", "Import list options are closed"));
         }
+        let filter_invalid = || failure("invalidInput", "Import filter is invalid");
         let mut filters = Map::new();
         for key in ["target", "state"] {
             if let Some(value) = fields.get(key) {
                 let text = value
                     .as_str()
                     .filter(|v| import_identifier(v))
-                    .ok_or_else(invalid)?;
+                    .ok_or_else(filter_invalid)?;
                 if key == "state"
                     && ![
                         "inProgress",
@@ -423,7 +425,7 @@ impl ImportUploadStore {
                     ]
                     .contains(&text)
                 {
-                    return Err(invalid());
+                    return Err(filter_invalid());
                 }
                 filters.insert(key.into(), value.clone());
             }
@@ -432,14 +434,14 @@ impl ImportUploadStore {
             v.as_u64()
                 .filter(|n| (1..=1000).contains(n))
                 .map(|n| n as usize)
-                .ok_or_else(invalid)
+                .ok_or_else(|| failure("invalidInput", "invalid pageSize"))
         })?;
         let cursor = fields
             .get("cursor")
             .map(|v| {
                 v.as_str()
                     .filter(|v| !v.is_empty() && v.len() <= 2048)
-                    .ok_or_else(|| failure("invalidCursor", "Import cursor is malformed"))
+                    .ok_or_else(|| failure("invalidCursor", "invalid Import cursor"))
             })
             .transpose()?;
         let mut cache = self.verified.lock().map_err(unreadable)?;
@@ -458,6 +460,7 @@ impl ImportUploadStore {
                 cursor,
                 || {
                     let mut captured = Vec::new();
+                    let mut total = 0;
                     self.visit(|loaded| {
                         let record = loaded.record;
                         if filters
@@ -470,6 +473,17 @@ impl ImportUploadStore {
                         self.recover(&record, &mut cache)?;
                         if let Some(artifacts) = artifacts {
                             self.finish_release(artifacts, &record)?;
+                        }
+                        // Swift bounds the snapshot by its projections'
+                        // canonical bytes, before the pager stores it.
+                        total += canonical_json(&record.projection())
+                            .map_err(unreadable)?
+                            .len();
+                        if total > 16 * 1024 * 1024 {
+                            return Err(failure(
+                                "operationUnavailable",
+                                "Import snapshot exceeds its storage bound; narrow the query",
+                            ));
                         }
                         captured.push((
                             import_timestamp(&record.created_at)

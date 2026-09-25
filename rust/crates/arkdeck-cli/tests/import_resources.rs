@@ -264,15 +264,24 @@ mod upload {
                 }
             })
             .unwrap_err();
+            // Swift `CLIImports.swift`'s texts (:194, :91, :121).
             assert_eq!(
-                error.code,
-                if matches!(failure, "source" | "sourceMetadata") {
-                    "artifactIntegrityFailed"
-                } else if failure == "target" {
-                    "idempotencyConflict"
-                } else {
-                    "recordUnreadable"
-                }
+                (error.code, error.message.as_str()),
+                match failure {
+                    "source" | "sourceMetadata" => (
+                        "artifactIntegrityFailed",
+                        "Import source changed; staged data was not overwritten or aborted",
+                    ),
+                    "target" => (
+                        "idempotencyConflict",
+                        "Import request identity already names different metadata",
+                    ),
+                    _ => (
+                        "recordUnreadable",
+                        "Import recovery changed its owner or committed prefix",
+                    ),
+                },
+                "{failure}"
             );
             assert_eq!(
                 appends,
@@ -430,13 +439,246 @@ mod upload {
             .unwrap(),
             inspection
         );
-        let mut bad = inspection;
+        let mut bad = inspection.clone();
         bad["references"]["outcomeUnknownJobIds"] = json!(["job-unknown"]);
+        let error = execute_import(&invocation, |_, _, _| Ok(bad.clone())).unwrap_err();
+        // Swift `ArtifactImportInspectionProjection` and `CLIImports.swift`:53.
         assert_eq!(
-            execute_import(&invocation, |_, _, _| Ok(bad.clone()))
+            (error.code, error.message.as_str()),
+            (
+                "recordUnreadable",
+                "Import reference inspection is malformed"
+            )
+        );
+        let mut other = inspection;
+        other["import"]["importRequestId"] = json!("another");
+        other["import"]["metadata"]["importRequestId"] = json!("another");
+        let mut intent = source.intent();
+        intent.request_id = "another".into();
+        other["import"]["metadataFingerprint"] = json!(intent.fingerprint().unwrap());
+        let error = execute_import(&invocation, |_, _, _| Ok(other.clone())).unwrap_err();
+        assert_eq!(
+            (error.code, error.message.as_str()),
+            (
+                "recordUnreadable",
+                "Import inspection returned another requested owner"
+            )
+        );
+    }
+    /// Swift's CLI refusals of an upload, as `ImportRefusalOracleContractTests`
+    /// recorded them (`rust/tests/fixtures/import-refusal-oracle`, "cli"):
+    /// code, message, details and exit status.
+    #[test]
+    fn swift_recorded_upload_refusals_are_answered_in_swift_s_words() {
+        let oracle: Value = serde_json::from_str(include_str!(
+            "../../../tests/fixtures/import-refusal-oracle/cases.json"
+        ))
+        .unwrap();
+        let cases = oracle["cli"].as_array().unwrap();
+        assert_eq!(cases.len(), 5);
+        let mut hap = b"PK\x03\x04".to_vec();
+        hap.resize(4096, b'a');
+        let held = |request: &str, name: &str, offset: u64| {
+            resource(
+                &ImportIntent {
+                    request_id: request.into(),
+                    kind: "hap".into(),
+                    target_id: "TGT-fixture".into(),
+                    binding_revision: 1,
+                    device_profile: None,
+                    name: name.into(),
+                    byte_count: hap.len() as u64,
+                    sha256: sha256_hex(&hap),
+                },
+                offset,
+            )
+        };
+        for case in cases {
+            let name = case["case"].as_str().unwrap();
+            // The file each case uploads, and what the Runtime holds for its
+            // request identity.
+            let (file, bytes, existing) = match name {
+                "cli.sourceCannotBeOpened" => ("fixture.hap", None, None),
+                "cli.sourceOutsideBound" => ("fixture.hap", Some(Vec::new()), None),
+                "cli.metadataOutsideKind" => ("fixture.txt", Some(hap.clone()), None),
+                "cli.sourceChangedForExistingIdentity" => {
+                    let mut changed = hap.clone();
+                    changed[100] = 0xff;
+                    (
+                        "fixture.hap",
+                        Some(changed),
+                        Some(held("oracle-cli-changed", "fixture.hap", 100)),
+                    )
+                }
+                "cli.identityNamesDifferentMetadata" => (
+                    "other.hap",
+                    Some(hap.clone()),
+                    Some(held("oracle-cli-renamed", "fixture.hap", 0)),
+                ),
+                _ => panic!("{name}"),
+            };
+            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                "cli-import-oracle-{:032x}",
+                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+            ));
+            fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+            let path = root.join(file);
+            if let Some(bytes) = bytes {
+                fs::write(&path, bytes).unwrap();
+            }
+            let args: Vec<String> = case["argv"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|arg| match arg.as_str().unwrap() {
+                    "$file" => path.to_str().unwrap().to_owned(),
+                    "$targetId" => "TGT-fixture".to_owned(),
+                    other => other.to_owned(),
+                })
+                .collect();
+            let error = execute_import(&parse(&args).unwrap(), |method, _, _| match method {
+                "artifact.import.inspect" => existing
+                    .clone()
+                    .ok_or_else(|| CliError::new("resourceNotFound", "Import does not exist")),
+                "target.show" => Ok(
+                    json!({"schemaVersion":"arkdeck.target/1","targetId":"TGT-fixture","bindingRevision":1}),
+                ),
+                _ => panic!("{name}: unexpected {method}"),
+            })
+            .unwrap_err();
+            fs::remove_dir_all(&root).unwrap();
+            // The error object as this CLI prints it.
+            assert_eq!(
+                arkdeck_cli::failure_envelope("artifact.import.hap", &error, "oracle", true)["error"],
+                case["error"],
+                "{name}"
+            );
+            assert_eq!(i64::from(error.exit_code()), case["exitStatus"], "{name}");
+        }
+    }
+    /// Swift's CLI refusals of Runtime answers it cannot accept, which no
+    /// Swift daemon gives and so no oracle holds (`CLIImports.swift`).
+    #[test]
+    fn upload_refusals_of_unacceptable_runtime_answers_are_swift_s() {
+        let source = Source::new("fixture.hap", b"abcdefgh".to_vec());
+        let intent = source.intent();
+        let refusal = |error: CliError| (error.code, error.message);
+        // :73, a Target without its exact current binding.
+        assert_eq!(
+            refusal(
+                execute_import(&source.invocation("hap"), |method, _, _| match method {
+                    "artifact.import.inspect" => Err(CliError::new("resourceNotFound", "absent")),
+                    "target.show" => Ok(
+                        json!({"schemaVersion":"arkdeck.target/1","targetId":"TGT-fixture","bindingRevision":0})
+                    ),
+                    _ => panic!("unexpected {method}"),
+                })
                 .unwrap_err()
-                .code,
-            "recordUnreadable"
+            ),
+            (
+                "recordUnreadable",
+                "target has no exact current binding reference".into()
+            )
+        );
+        // ArtifactImportProjection.swift:12, an answer that is no Import.
+        assert_eq!(
+            refusal(
+                execute_import(&source.invocation("hap"), |_, _, _| Ok(
+                    json!({"state":"inProgress"})
+                ))
+                .unwrap_err()
+            ),
+            (
+                "recordUnreadable",
+                "Runtime returned an invalid Import projection".into()
+            )
+        );
+        // :106, a begin that answers other metadata.
+        let mut other = intent.clone();
+        other.name = "other.hap".into();
+        assert_eq!(
+            refusal(
+                execute_import(&source.invocation("hap"), |method, _, _| match method {
+                    "artifact.import.inspect" => Err(CliError::new("resourceNotFound", "absent")),
+                    "target.show" => Ok(
+                        json!({"schemaVersion":"arkdeck.target/1","targetId":"TGT-fixture","bindingRevision":7})
+                    ),
+                    "artifact.import.begin" => Ok(resource(&other, 0)),
+                    _ => panic!("unexpected {method}"),
+                })
+                .unwrap_err()
+            ),
+            (
+                "recordUnreadable",
+                "Import receipt changed the upload metadata".into()
+            )
+        );
+        // :116, an append that answers another offset.
+        assert_eq!(
+            refusal(
+                execute_import(&source.invocation("hap"), |method, _, _| match method {
+                    "artifact.import.inspect" => Ok(resource(&intent, 0)),
+                    "artifact.import.append" => Ok(resource(&intent, 3)),
+                    _ => panic!("unexpected {method}"),
+                })
+                .unwrap_err()
+            ),
+            (
+                "recordUnreadable",
+                "Import append returned another owner or offset".into()
+            )
+        );
+        // :137, a commit that answers another owner.
+        assert_eq!(
+            refusal(
+                execute_import(&source.invocation("hap"), |method, _, _| match method {
+                    "artifact.import.inspect" => Ok(resource(&intent, 8)),
+                    "artifact.import.commit" => {
+                        let mut committed = resource(&intent, 8);
+                        committed["importId"] = json!("imp-00000000-0000-4000-8000-000000000002");
+                        Ok(committed)
+                    }
+                    _ => panic!("unexpected {method}"),
+                })
+                .unwrap_err()
+            ),
+            (
+                "recordUnreadable",
+                "Import commit returned another owner".into()
+            )
+        );
+        // :147, the client's deadline.
+        let timed = parse(&argv(&[
+            "artifact",
+            "import",
+            "hap",
+            "--import-request-id",
+            "request",
+            "--target",
+            "TGT-fixture",
+            "--file",
+            source.path.to_str().unwrap(),
+            "--timeout",
+            "1ms",
+        ]))
+        .unwrap();
+        assert_eq!(
+            refusal(
+                execute_import(&timed, |method, _, _| {
+                    std::thread::sleep(std::time::Duration::from_millis(20));
+                    match method {
+                        "artifact.import.inspect" => {
+                            Err(CliError::new("resourceNotFound", "absent"))
+                        }
+                        _ => panic!("unexpected {method}"),
+                    }
+                })
+                .unwrap_err()
+            ),
+            (
+                "clientTimeout",
+                "Import client timed out; inspect or retry the same request identity".into()
+            )
         );
     }
 }
@@ -502,11 +744,16 @@ fn import_list_rejects_malformed_paging_and_foreign_inventory_without_retry() {
     ] {
         let mut bad = page.clone();
         bad[key] = value;
+        let error =
+            arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone())).unwrap_err();
+        // Swift `ArtifactImportProjection.validatePage`.
         assert_eq!(
-            arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone()))
-                .unwrap_err()
-                .code,
-            "recordUnreadable"
+            (error.code, error.message.as_str()),
+            (
+                "recordUnreadable",
+                "Runtime returned an invalid Import page"
+            ),
+            "{key}"
         );
     }
 }
@@ -581,10 +828,30 @@ fn release_uses_original_generation_and_refuses_foreign_or_unbounded_receipts() 
         ] {
             let mut bad = receipt.clone();
             bad[key] = value;
-            assert!(
-                arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone())).is_err(),
+            let error =
+                arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone())).unwrap_err();
+            // Swift `ArtifactImportReleaseProjection`: the receipt is not
+            // one for its own Import.
+            assert_eq!(
+                (error.code, error.message.as_str()),
+                ("recordUnreadable", "Import release receipt is malformed"),
                 "{key}"
             );
         }
+        // A well-formed receipt of another Import (`CLIImports.swift`:46).
+        let other = "imp-00000000-0000-4000-8000-000000000002";
+        let mut foreign = receipt.clone();
+        foreign["importId"] = json!(other);
+        foreign["owner"] = json!({"kind":"import","id":other});
+        foreign["lease"] = json!(format!("lease-v1:{other}:{artifact}"));
+        let error =
+            arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(foreign.clone())).unwrap_err();
+        assert_eq!(
+            (error.code, error.message.as_str()),
+            (
+                "recordUnreadable",
+                "Import release receipt does not match the requested owner and generation"
+            )
+        );
     }
 }

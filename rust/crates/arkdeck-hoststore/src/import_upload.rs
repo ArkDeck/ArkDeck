@@ -4,10 +4,13 @@
 mod lifecycle;
 #[path = "import_publication.rs"]
 mod publication;
+#[cfg(all(test, target_os = "macos"))]
+#[path = "import_refusal_oracle_tests.rs"]
+mod refusal_oracle_tests;
 use arkdeck_contract::{
     IMPORT_MAX_CHUNKS, IMPORT_MAX_RECORD_BYTES, IMPORT_MAX_RECORDS, IMPORT_STAGING_QUOTA,
-    ImportIntent, ImportProjection, WireError, decode_import_chunk, import_decimal, import_digest,
-    import_id, import_identifier, import_timestamp, sha256_hex, strict_json,
+    ImportIntent, ImportProjection, WireError, canonical_json, decode_import_chunk, import_decimal,
+    import_digest, import_id, import_identifier, import_timestamp, sha256_hex, strict_json,
     validate_import_release,
 };
 use arkdeck_platform::{
@@ -34,36 +37,116 @@ fn failure(code: &str, message: &str) -> WireError {
         ])),
     }
 }
+/// Swift `RuntimeImportControlHandler.response`'s catch-all for a storage
+/// fault. Swift's store names many faults in words of its own; this owner
+/// answers every one with the catch-all, a difference of text only.
 fn unreadable(_: impl std::fmt::Display) -> WireError {
     failure(
         "recordUnreadable",
-        "Import durable state or committed payload is unreadable",
+        "Import state or immutable content is unreadable",
     )
 }
+/// An internal invariant or an Artifact read of an Import owner, never a
+/// refusal of an `artifact.import.*` request: those carry Swift's texts below.
 fn invalid() -> WireError {
     failure(
         "invalidInput",
         "Import requires exact typed metadata, identity and upload bounds",
     )
 }
-fn conflict() -> WireError {
-    failure(
-        "resourceConflict",
-        "Import generation, committed offset or lifetime state changed",
-    )
-}
 fn absent() -> WireError {
     failure("resourceNotFound", "Import does not exist")
 }
+// Swift `RuntimeImportControlHandler.response` refuses these before the
+// owner reads a record, in this order: the parameter names, the identity,
+// then the generation.
+fn closed() -> WireError {
+    failure("invalidInput", "Import control parameters are closed")
+}
+fn selector_required() -> WireError {
+    failure("invalidInput", "exactly one Import selector is required")
+}
+fn identity_required() -> WireError {
+    failure("invalidInput", "Import identity is required")
+}
+fn generation_required() -> WireError {
+    failure("invalidInput", "exact Import generation is required")
+}
+// Swift `RuntimeImportStore` refuses an identity it cannot name when it
+// looks the Import up.
+fn invalid_identity() -> WireError {
+    failure("invalidInput", "invalid Import identity")
+}
+fn invalid_request_identity() -> WireError {
+    failure("invalidInput", "invalid Import request identity")
+}
+/// Swift's `string(_:)`: a non-empty string.
+fn identity<'a>(fields: &'a Map<String, Value>, key: &str) -> Result<&'a str, WireError> {
+    fields
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(identity_required)
+}
+/// Swift's `generation()`: a canonical positive decimal string.
+fn positive_generation(fields: &Map<String, Value>) -> Result<u64, WireError> {
+    fields
+        .get("generation")
+        .and_then(import_decimal)
+        .filter(|generation| *generation > 0)
+        .ok_or_else(generation_required)
+}
+/// An `artifact.import.*` request the upload owner serves, judged as
+/// Swift's handler judges it before any record is read.
+enum Request<'a> {
+    Begin(ImportIntent),
+    Append(AppendRequest<'a>),
+    Abort(&'a str, u64),
+    InspectImportId(&'a str),
+    InspectRequestId(&'a str),
+}
+struct AppendRequest<'a> {
+    id: &'a str,
+    generation: u64,
+    offset: u64,
+    count: u64,
+    digest: &'a str,
+    bytes: Vec<u8>,
+}
+impl<'a> AppendRequest<'a> {
+    /// Swift's order: the offset, bytes and digest, then the identity, then
+    /// the generation.
+    fn parse(fields: &'a Map<String, Value>) -> Result<Self, WireError> {
+        let bounds = || {
+            failure(
+                "invalidInput",
+                "Import append requires exact bounded bytes, offset and digest",
+            )
+        };
+        let offset = import_decimal(&fields["offset"]).ok_or_else(bounds)?;
+        let count = import_decimal(&fields["byteCount"]).ok_or_else(bounds)?;
+        let digest = fields["sha256"]
+            .as_str()
+            .filter(|s| import_digest(s))
+            .ok_or_else(bounds)?;
+        let encoded = fields["base64"].as_str().ok_or_else(bounds)?;
+        let bytes = decode_import_chunk(encoded, count).map_err(|_| bounds())?;
+        Ok(Self {
+            id: identity(fields, "importId")?,
+            generation: positive_generation(fields)?,
+            offset,
+            count,
+            digest,
+            bytes,
+        })
+    }
+}
 fn publication(error: DocumentPublishError) -> WireError {
-    // Preserve the Swift Import owner's existing recordUnreadable classification;
+    // Swift answers a checkpoint it could not write with its catch-all.
     // phase=importOwner never claims a failed checkpoint made no host changes.
     match error {
-        DocumentPublishError::BeforePublication(error) => unreadable(error),
-        DocumentPublishError::OutcomeUnknown(_) => failure(
-            "recordUnreadable",
-            "Import checkpoint may have changed; inspect the same request identity before continuing",
-        ),
+        DocumentPublishError::BeforePublication(error)
+        | DocumentPublishError::OutcomeUnknown(error) => unreadable(error),
     }
 }
 
@@ -428,7 +511,7 @@ impl ImportUploadStore {
         cache: &mut BTreeMap<String, String>,
     ) -> Result<Option<Loaded>, WireError> {
         if !import_identifier(request) {
-            return Err(invalid());
+            return Err(invalid_request_identity());
         }
         self.validate()?;
         let name = format!("{}.json", sha256_hex(request.as_bytes()));
@@ -444,7 +527,7 @@ impl ImportUploadStore {
     }
     fn by_id(&self, id: &str, cache: &mut BTreeMap<String, String>) -> Result<Loaded, WireError> {
         if !import_id(id) {
-            return Err(invalid());
+            return Err(invalid_identity());
         }
         self.validate()?;
         match self.identities.read(&format!("{id}.json"), 1024) {
@@ -508,14 +591,19 @@ impl ImportUploadStore {
             }
             return Ok(loaded.record.projection());
         }
+        // Swift `RuntimeImportControlHandler.binding`: the Target owner's
+        // refusal of the binding as it answers it; a missing owner as Swift's
+        // handler refuses one; any other failure to read the Target store as
+        // its catch-all.
         let binding = resolve(&intent).map_err(|error| match error.code.as_str() {
+            "resourceConflict" => error,
+            "resourceNotFound" => failure(
+                "resourceConflict",
+                "the exact target binding is no longer current",
+            ),
             "operationUnavailable" => failure(
                 "operationUnavailable",
-                "Import requires the configured Target binding owner",
-            ),
-            "resourceConflict" | "resourceNotFound" => failure(
-                "resourceConflict",
-                "Import target binding is no longer current",
+                "Import owner services are unavailable",
             ),
             _ => unreadable("binding"),
         })?;
@@ -591,23 +679,19 @@ impl ImportUploadStore {
     }
     fn append(
         &self,
-        fields: &Map<String, Value>,
+        request: AppendRequest<'_>,
         now: &str,
         cache: &mut BTreeMap<String, String>,
         app_owned: bool,
     ) -> Result<Value, WireError> {
-        let id = fields["importId"].as_str().ok_or_else(invalid)?;
-        let generation = import_decimal(&fields["generation"])
-            .filter(|n| *n > 0)
-            .ok_or_else(invalid)?;
-        let offset = import_decimal(&fields["offset"]).ok_or_else(invalid)?;
-        let count = import_decimal(&fields["byteCount"]).ok_or_else(invalid)?;
-        let digest = fields["sha256"]
-            .as_str()
-            .filter(|s| import_digest(s))
-            .ok_or_else(invalid)?;
-        let encoded = fields["base64"].as_str().ok_or_else(invalid)?;
-        let bytes = decode_import_chunk(encoded, count).map_err(|_| invalid())?;
+        let AppendRequest {
+            id,
+            generation,
+            offset,
+            count,
+            digest,
+            bytes,
+        } = request;
         let loaded = self.by_id(id, cache)?;
         let mut record = loaded.record;
         if app_owned
@@ -620,13 +704,17 @@ impl ImportUploadStore {
                 "Import is outside this App upload scope",
             ));
         }
+        // Swift `RuntimeImportStore.append`'s refusals, in its order.
         if generation != record.generation || record.state != "inProgress" {
-            return Err(conflict());
+            return Err(failure(
+                "resourceConflict",
+                "Import generation or state changed",
+            ));
         }
         if sha256_hex(&bytes) != digest {
             return Err(failure(
                 "artifactIntegrityFailed",
-                "Import chunk digest does not match its bytes",
+                "Import chunk size or digest is invalid",
             ));
         }
         if offset < record.next_offset {
@@ -637,10 +725,16 @@ impl ImportUploadStore {
             {
                 return Ok(record.projection());
             }
-            return Err(conflict());
+            return Err(failure(
+                "resourceConflict",
+                "Import chunk overlaps different committed bytes",
+            ));
         }
         if offset != record.next_offset || count > record.intent.byte_count - offset {
-            return Err(conflict());
+            return Err(failure(
+                "resourceConflict",
+                "Import chunk does not start at the committed offset",
+            ));
         }
         if record.chunks.len() >= IMPORT_MAX_CHUNKS {
             return Err(failure(
@@ -708,7 +802,10 @@ impl ImportUploadStore {
             || record.generation != generation
             || generation == i64::MAX as u64
         {
-            return Err(conflict());
+            return Err(failure(
+                "resourceConflict",
+                "Import commit or another generation owns this upload",
+            ));
         }
         record.state = "aborted".into();
         record.generation += 1;
@@ -730,9 +827,16 @@ impl ImportUploadStore {
         let exact = |keys: &[&str]| {
             fields.len() == keys.len() && keys.iter().all(|key| fields.contains_key(*key))
         };
-        match method {
+        // Swift's handler judges every parameter before the owner reads a
+        // record: the names, then the values in its order.
+        let request = match method {
             "artifact.import.begin" => {
-                ImportIntent::from_wire(fields).map_err(|_| invalid())?;
+                Request::Begin(ImportIntent::from_wire(fields).map_err(|_| {
+                    failure(
+                        "invalidInput",
+                        "Import requires registered metadata and exact target/binding references",
+                    )
+                })?)
             }
             "artifact.import.append"
                 if exact(&[
@@ -742,19 +846,29 @@ impl ImportUploadStore {
                     "byteCount",
                     "sha256",
                     "base64",
-                ]) => {}
-            "artifact.import.abort" if exact(&["importRequestId", "generation"]) => {}
-            "artifact.import.inspect" if exact(&["importId"]) || exact(&["importRequestId"]) => {}
-            "artifact.import.append" | "artifact.import.abort" | "artifact.import.inspect" => {
-                return Err(invalid());
+                ]) =>
+            {
+                Request::Append(AppendRequest::parse(fields)?)
             }
+            "artifact.import.abort" if exact(&["importRequestId", "generation"]) => Request::Abort(
+                identity(fields, "importRequestId")?,
+                positive_generation(fields)?,
+            ),
+            "artifact.import.inspect" if exact(&["importId"]) => {
+                Request::InspectImportId(identity(fields, "importId")?)
+            }
+            "artifact.import.inspect" if exact(&["importRequestId"]) => {
+                Request::InspectRequestId(identity(fields, "importRequestId")?)
+            }
+            "artifact.import.append" | "artifact.import.abort" => return Err(closed()),
+            "artifact.import.inspect" => return Err(selector_required()),
             _ => {
                 return Err(failure(
                     "operationUnavailable",
                     "Import commit, release and Job-reference owners are not configured",
                 ));
             }
-        }
+        };
         if app_owned
             && (method == "artifact.import.inspect"
                 || (method == "artifact.import.begin"
@@ -779,37 +893,20 @@ impl ImportUploadStore {
             .lock()
             .map_err(|_| failure("operationUnavailable", "Import upload owner is unavailable"))?;
         self.validate()?;
-        let result = match method {
-            "artifact.import.begin" => self.begin(
-                ImportIntent::from_wire(fields).map_err(|_| invalid())?,
-                app_owned,
-                now,
-                &mut cache,
-                resolve_binding,
-            ),
-            "artifact.import.append" => self.append(fields, now, &mut cache, app_owned),
-            "artifact.import.abort" => self.abort(
-                fields["importRequestId"].as_str().ok_or_else(invalid)?,
-                import_decimal(&fields["generation"])
-                    .filter(|n| *n > 0)
-                    .ok_or_else(invalid)?,
-                now,
-                &mut cache,
-                app_owned,
-            ),
-            "artifact.import.inspect" => {
-                let loaded = if let Some(id) = fields.get("importId") {
-                    self.by_id(id.as_str().ok_or_else(invalid)?, &mut cache)?
-                } else {
-                    self.by_request(
-                        fields["importRequestId"].as_str().ok_or_else(invalid)?,
-                        &mut cache,
-                    )?
-                    .ok_or_else(absent)?
-                };
-                Ok(loaded.record.projection())
+        let result = match request {
+            Request::Begin(intent) => {
+                self.begin(intent, app_owned, now, &mut cache, resolve_binding)
             }
-            _ => unreachable!(),
+            Request::Append(append) => self.append(append, now, &mut cache, app_owned),
+            Request::Abort(request, generation) => {
+                self.abort(request, generation, now, &mut cache, app_owned)
+            }
+            Request::InspectImportId(id) => Ok(self.by_id(id, &mut cache)?.record.projection()),
+            Request::InspectRequestId(request) => Ok(self
+                .by_request(request, &mut cache)?
+                .ok_or_else(absent)?
+                .record
+                .projection()),
         }?;
         self.validate()?;
         ImportProjection::parse(&result).map_err(unreadable)?;

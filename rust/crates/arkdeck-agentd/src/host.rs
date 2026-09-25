@@ -2933,9 +2933,11 @@ impl Host {
         params: &serde_json::Map<String, serde_json::Value>,
         app_owned: bool,
     ) -> Result<serde_json::Value, WireError> {
+        // Swift's `RuntimeImportControlHandler` without its Artifact or
+        // Target owner refuses every Import method in these words.
         let unavailable = || WireError {
             code: "operationUnavailable".into(),
-            message: "Import requires the Runtime Target owner and publication services".into(),
+            message: "Import owner services are unavailable".into(),
             details: Some(serde_json::Map::from_iter([
                 ("phase".into(), serde_json::json!("importOwner")),
                 ("newDispatchCount".into(), serde_json::json!(0)),
