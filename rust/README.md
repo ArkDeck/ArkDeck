@@ -2344,6 +2344,19 @@ distributions (`ArkTraceProfileLoaderOracleContractTests`) and
 arktrace_profile_loader --test arktrace_absent` replays both byte for byte
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
 
+The production seams are `arkdeck_hoststore::ProductionDistributionTrust`
+(`arkdeck_platform::static_code_holds`: the Security framework's Developer ID
+and notarization checks of the App and its helper) and
+`ProductionDoctorProbe`, which runs the CLI's `doctor --self-test` through
+`VerifiedTool::run_tool_at_canonical_path` (the child spawned suspended at its
+canonical path and continued only once its first executable mapping is the
+verified inode, its `VerifiedResource`s and `VerifiedNamespace` held).
+`cargo test -p arkdeck-hoststore --test arktrace_doctor` replays Swift's probe
+over a stand-in compiled from `rust/tests/fixtures/arktrace-doctor/fake-arktrace.c`;
+`--test arktrace_reviewed` loads a reviewed distribution a host names with
+`ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR` (and compares it with Swift's load when
+`ARKDECK_REVIEWED_ARKTRACE_SWIFT` names one).
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

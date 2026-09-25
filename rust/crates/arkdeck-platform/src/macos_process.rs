@@ -270,6 +270,117 @@ pub(super) fn spawn_suspended(
     stdin: Option<&OwnedFd>,
 ) -> io::Result<SuspendedChild> {
     let inode_path = inode_launch_path(tool)?;
+    spawn_suspended_at(
+        tool,
+        &inode_path,
+        args,
+        environment,
+        working_directory,
+        stdin,
+    )
+}
+
+/// Swift's `.verifiedCanonicalPath` launch: `bound` and the tool verified,
+/// the child spawned suspended at the tool's canonical path, `bound` and the
+/// tool verified again, the child's first executable mapping proved to be the
+/// retained inode, and only then continued. A child refused here is killed
+/// before it ran tool code.
+pub(super) fn spawn_canonical(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+    bound: &dyn Fn() -> io::Result<()>,
+) -> io::Result<RunningChild> {
+    bound()?;
+    tool.revalidate()?;
+    let canonical = CString::new(tool.path.as_os_str().as_bytes())
+        .map_err(|_| invalid("canonical executable path contains NUL"))?;
+    let suspended =
+        spawn_suspended_at(tool, &canonical, args, environment, working_directory, None)?;
+    bound()?;
+    verify_suspended_mapping(suspended.pid(), tool)?;
+    suspended.resume()
+}
+
+/// `struct proc_regioninfo` (`sys/proc_info.h`).
+#[repr(C)]
+struct RegionInfo {
+    protection: u32,
+    max_protection: u32,
+    inheritance: u32,
+    flags: u32,
+    offset: u64,
+    behavior: u32,
+    user_wired_count: u32,
+    user_tag: u32,
+    pages_resident: u32,
+    pages_shared_now_private: u32,
+    pages_swapped_out: u32,
+    pages_dirtied: u32,
+    ref_count: u32,
+    shadow_depth: u32,
+    share_mode: u32,
+    private_pages_resident: u32,
+    shared_pages_resident: u32,
+    obj_id: u32,
+    depth: u32,
+    address: u64,
+    size: u64,
+}
+
+/// `struct proc_regionwithpathinfo`.
+#[repr(C)]
+struct RegionWithPathInfo {
+    region: RegionInfo,
+    vnode: libc::vnode_info_path,
+}
+
+/// `PROC_PIDREGIONPATHINFO`.
+const REGION_PATH_INFO: libc::c_int = 8;
+/// `VM_PROT_EXECUTE`.
+const EXECUTE: u32 = 4;
+
+/// Swift `verifySuspendedExecutableMapping`: a child created suspended has run
+/// no code of its own, so the first executable region the kernel reports is
+/// its main executable, which must be the retained file's device and inode.
+fn verify_suspended_mapping(pid: libc::pid_t, tool: &VerifiedTool) -> io::Result<()> {
+    // SAFETY: zero is a valid representation of these plain C structures.
+    let mut information: RegionWithPathInfo = unsafe { std::mem::zeroed() };
+    let expected = std::mem::size_of::<RegionWithPathInfo>() as libc::c_int;
+    // SAFETY: the buffer is exactly `expected` bytes of the structure the
+    // flavor fills, and the PID is the retained, suspended child.
+    let actual = unsafe {
+        libc::proc_pidinfo(
+            pid,
+            REGION_PATH_INFO,
+            0,
+            (&mut information as *mut RegionWithPathInfo).cast(),
+            expected,
+        )
+    };
+    let mapped = &information.vnode.vip_vi.vi_stat;
+    if actual != expected
+        || information.region.protection & EXECUTE == 0
+        || u64::from(mapped.vst_dev) != tool.initial.dev() as u32 as u64
+        || mapped.vst_ino != tool.initial.ino()
+    {
+        return Err(denied(
+            "the suspended child's executable mapping is not the verified file",
+        ));
+    }
+    Ok(())
+}
+
+/// `spawn_suspended` at `launch`, the path the kernel resolves the program by.
+fn spawn_suspended_at(
+    tool: &VerifiedTool,
+    launch: &CStr,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+    stdin: Option<&OwnedFd>,
+) -> io::Result<SuspendedChild> {
     let (out_read, out_write) = pipe()?;
     let (err_read, err_write) = pipe()?;
     let mut settings = SpawnSettings::new()?;
@@ -325,11 +436,11 @@ pub(super) fn spawn_suspended(
     env_pointers.push(std::ptr::null_mut());
     let mut pid = 0;
     // SAFETY: argv/env are NUL-terminated pointer arrays, all strings and spawn
-    // settings remain live. The child starts suspended on the retained inode.
+    // settings remain live. The child starts suspended at `launch`.
     posix(unsafe {
         libc::posix_spawn(
             &mut pid,
-            inode_path.as_ptr(),
+            launch.as_ptr(),
             &settings.actions,
             &settings.attributes,
             argv_pointers.as_ptr(),

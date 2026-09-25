@@ -21,7 +21,7 @@ pub use process::{
     DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
     PtyFailureCategory, PtyInteraction, PtyRequest, ServerExit, ServerLaunch, ServerStop,
     ToolExecution, ToolLaunchIdentity, ToolLimits, ToolRequest, ToolRunError, ToolTermination,
-    VerifiedSource,
+    VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]
@@ -250,6 +250,11 @@ pub use profile_file_reader::{
     is_physical_directory, open_or_create_owner_private_directory, open_physical_directory,
     open_profile_path, profile_file_matches, read_profile_file, validate_owner_only_authority,
 };
+
+#[cfg(target_os = "macos")]
+mod static_code;
+#[cfg(target_os = "macos")]
+pub use static_code::{StaticCodeExpectation, static_code_holds};
 
 #[cfg(target_os = "macos")]
 mod distribution_tree;
