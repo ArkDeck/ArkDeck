@@ -9,7 +9,6 @@
 //! stderr.
 use arkdeck_cli::{CliError, legacy_document, legacy_failure, legacy_refusal, parse};
 use serde_json::Value;
-use std::path::Path;
 use std::process::Command;
 
 const ORACLE: &str = include_str!("../../../tests/fixtures/legacy-json/cases.json");
@@ -44,7 +43,7 @@ fn each_value_is_rendered_as_swifts_legacy_document() {
     }
 }
 
-/// Every copied Swift argv fixture's valid invocation, with `--json` added:
+/// Every served leaf's argv fixture's valid invocation, with `--json` added:
 /// taken exactly where Swift's registry declares it for that leaf, and never
 /// beside `--output`.
 #[test]
@@ -65,13 +64,13 @@ fn every_leaf_takes_json_exactly_where_swifts_registry_declares_it() {
                     .any(|option| option["name"] == "--json")
             })
     };
-    let directory =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/current-cli-argv");
     let (mut taken, mut refused) = (0, 0);
-    for entry in std::fs::read_dir(directory).unwrap() {
-        let fixture: Value =
-            serde_json::from_slice(&std::fs::read(entry.unwrap().path()).unwrap()).unwrap();
-        let command = fixture["command"].as_str().unwrap();
+    for entry in arkdeck_cli::command_registry()["commands"]
+        .as_array()
+        .unwrap()
+    {
+        let command = entry["command"].as_str().unwrap();
+        let fixture = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         let Some(valid) = fixture["cases"]
             .as_array()
             .unwrap()

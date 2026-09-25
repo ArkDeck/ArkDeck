@@ -1,43 +1,28 @@
-//! Every argv fixture Swift's CLI publishes for a leaf the Rust CLI serves,
-//! copied unchanged into `rust/tests/fixtures/current-cli-argv`, replays
-//! through the Rust parser: the leaf Swift's parser names, help where Swift
-//! answers help, and Swift's refusal code and exit status where Swift refuses.
-//! The cases this parser still answers otherwise are listed exactly, each a
-//! parity defect of a leaf it serves (TASK-XPA-018's audit,
-//! `evidence/runs/TASK-XPA-018/cli-parity-audit-20260919.md`).
+//! The argv fixture of every leaf the Rust CLI serves replays through its
+//! parser: the leaf Swift's parser names, help where Swift answers help, and
+//! Swift's refusal code and exit status where Swift refuses. The fixtures are
+//! the ones this CLI renders for the machine-contract bundle
+//! (`machine_contracts::argv_fixture`), which `machine_contracts.rs` holds
+//! byte for byte to the documents Swift publishes.
+use arkdeck_cli::machine_contracts::{argv_fixture, fixture_products};
 use arkdeck_cli::{
     command_registry, completion_script, failure_envelope, help_text, parse, render,
 };
 use serde_json::{Value, json};
-use std::{collections::BTreeSet, fs, path::Path, process::Command};
+use std::process::Command;
 
-/// `(fixture, case, macOS only)`: `runtime tool register` takes `--socket`
-/// for every kind, where Swift's parser refuses it unless the kind is DevEco —
-/// Swift registers an HDC in its own process, while this CLI sends every
-/// registration to the Runtime that owns the Bootstrap store, so the endpoint
-/// is what the leaf needs (`tool_register.rs`). Off macOS `--socket` is
-/// `unsupportedOnPlatform`, which is what the replay expects there.
-const KNOWN_DEVIATIONS: &[(&str, &str, bool)] = &[
-    ("runtime.tool.register", "hdcSocketRefused", true),
-    ("runtime.tool.register", "macosCompatibilityOption", true),
-];
-
+/// Each served leaf's argv fixture, in the registry's order.
 fn fixtures() -> Vec<(String, Value)> {
-    let directory =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/current-cli-argv");
-    let mut documents: Vec<(String, Value)> = fs::read_dir(&directory)
+    command_registry()["commands"]
+        .as_array()
         .unwrap()
+        .iter()
         .map(|entry| {
-            let path = entry.unwrap().path();
-            let name = path.file_stem().unwrap().to_str().unwrap().to_owned();
-            (
-                name,
-                serde_json::from_slice(&fs::read(&path).unwrap()).unwrap(),
-            )
+            let command = entry["command"].as_str().unwrap().to_owned();
+            let document = argv_fixture(&command).unwrap();
+            (command, document)
         })
-        .collect();
-    documents.sort_by(|left, right| left.0.cmp(&right.0));
-    documents
+        .collect()
 }
 
 /// How this parser's answer differs from Swift's for one case, if it does.
@@ -100,29 +85,22 @@ fn deviation(case: &Value) -> Option<String> {
 }
 
 #[test]
-fn every_copied_swift_argv_fixture_replays_but_the_known_deviations() {
-    let (mut cases, mut deviating, mut report) = (0, BTreeSet::new(), Vec::new());
+fn every_served_leafs_argv_fixture_replays() {
+    let (mut cases, mut report) = (0, Vec::new());
     for (name, document) in fixtures() {
         assert_eq!(document["command"], name.as_str(), "{name}");
         for case in document["cases"].as_array().unwrap() {
             cases += 1;
             if let Some(actual) = deviation(case) {
-                let case_name = case["name"].as_str().unwrap().to_owned();
                 report.push(format!(
-                    "{name} {case_name}: Swift {}, Rust {actual}",
-                    case["expected"]
+                    "{name} {}: Swift {}, Rust {actual}",
+                    case["name"], case["expected"]
                 ));
-                deviating.insert((name.clone(), case_name));
             }
         }
     }
     assert!(cases > 400, "{cases} cases");
-    let known: BTreeSet<(String, String)> = KNOWN_DEVIATIONS
-        .iter()
-        .filter(|(_, _, macos_only)| !macos_only || cfg!(target_os = "macos"))
-        .map(|(name, case, _)| ((*name).to_owned(), (*case).to_owned()))
-        .collect();
-    assert_eq!(deviating, known, "{}", report.join("\n"));
+    assert!(report.is_empty(), "{}", report.join("\n"));
 }
 
 #[test]
@@ -138,14 +116,6 @@ fn commands_lists_the_leaves_this_cli_serves_in_the_registrys_order() {
         .iter()
         .map(|entry| entry["command"].as_str().unwrap().to_owned())
         .collect();
-    // Every listed leaf is one whose Swift argv fixture replays above, and
-    // every such leaf is listed.
-    let replayed: BTreeSet<String> = fixtures().into_iter().map(|(name, _)| name).collect();
-    assert_eq!(
-        listed.iter().cloned().collect::<BTreeSet<_>>(),
-        replayed,
-        "{listed:?}"
-    );
     // The registry's own order, which is Swift's.
     let all: Vec<Value> = serde_json::from_str::<Value>(include_str!(
         "../src/command_registry.json"
@@ -208,12 +178,15 @@ fn the_commands_leaf_answers_as_swifts_local_envelope() {
 
 #[test]
 fn a_retired_leaf_answers_swifts_removed_command_envelope() {
-    // Swift's published sample, copied unchanged from its CLI fixtures.
-    let sample =
-        include_bytes!("../../../tests/fixtures/current-cli-envelopes/result-removed-command.json");
+    // Swift's published sample, as the bundle's envelope fixtures render it.
+    let sample = fixture_products()
+        .into_iter()
+        .find(|product| product.relative_path == "envelopes/result-removed-command.json")
+        .unwrap()
+        .bytes;
     let error = parse(&["agent".to_owned(), "chat".to_owned()]).unwrap_err();
     let envelope = failure_envelope(error.command.unwrap(), &error, "ctl-fixture-0001", false);
-    assert_eq!(render(&envelope).unwrap(), sample.to_vec());
+    assert_eq!(render(&envelope).unwrap(), sample);
     // Answered by name before any flag, as Swift's parser answers it.
     for argv in [
         vec!["agent", "chat", "--no-such-option"],

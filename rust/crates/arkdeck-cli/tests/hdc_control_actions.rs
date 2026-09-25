@@ -8,10 +8,7 @@ use serde_json::{Value, json};
 #[cfg(target_os = "macos")]
 mod support;
 
-const ARGV: [&str; 2] = [
-    include_str!("../../../tests/fixtures/current-cli-argv/runtime.hdc.impact-preview.json"),
-    include_str!("../../../tests/fixtures/current-cli-argv/runtime.hdc.restart.json"),
-];
+const LEAVES: [&str; 2] = ["runtime.hdc.impact-preview", "runtime.hdc.restart"];
 /// The endpoint and digest Swift's recorded requests name.
 const ENDPOINT: &str =
     "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e";
@@ -23,8 +20,8 @@ fn args(argv: &[&str]) -> Vec<String> {
 
 #[test]
 fn the_published_argv_fixtures_replay() {
-    for corpus in ARGV {
-        let doc: Value = serde_json::from_str(corpus).unwrap();
+    for command in LEAVES {
+        let doc = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in doc["cases"].as_array().unwrap() {
             let argv: Vec<String> = case["argv"]
                 .as_array()

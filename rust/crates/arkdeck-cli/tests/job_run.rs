@@ -11,10 +11,7 @@ fn args(values: &[&str]) -> Vec<String> {
 
 #[test]
 fn run_argv_matches_current_swift() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/job.run.json"
-    ))
-    .unwrap();
+    let fixture: Value = arkdeck_cli::machine_contracts::argv_fixture("job.run").unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let argv: Vec<String> = row["argv"]
             .as_array()

@@ -2,7 +2,7 @@
 use arkdeck_cli::{CliError, parse};
 use arkdeck_client::ClientError;
 use arkdeck_contract::WireError;
-use serde_json::{Value, json};
+use serde_json::json;
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
@@ -10,11 +10,8 @@ fn args(values: &[&str]) -> Vec<String> {
 
 #[test]
 fn swift_argv_fixtures() {
-    for text in [
-        include_str!("../../../tests/fixtures/current-cli-argv/human-action.list.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/human-action.show.json"),
-    ] {
-        let fixture: Value = serde_json::from_str(text).unwrap();
+    for command in ["human-action.list", "human-action.show"] {
+        let fixture = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for row in fixture["cases"].as_array().unwrap() {
             let argv: Vec<_> = row["argv"]
                 .as_array()

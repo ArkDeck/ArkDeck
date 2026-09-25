@@ -40,11 +40,9 @@ fn refusal(argv: &[String]) -> Option<&'static str> {
 }
 
 #[test]
-fn current_argv_is_retained_with_rust_hdc_transport_support() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/runtime.tool.register.json"
-    ))
-    .unwrap();
+fn the_published_argv_fixture_replays() {
+    let fixture: Value =
+        arkdeck_cli::machine_contracts::argv_fixture("runtime.tool.register").unwrap();
     for case in fixture["cases"].as_array().unwrap() {
         let argv: Vec<String> = case["argv"]
             .as_array()
@@ -56,11 +54,6 @@ fn current_argv_is_retained_with_rust_hdc_transport_support() {
         let hdc = argv.windows(2).any(|p| p == ["--kind", "hdc"]);
         if !cfg!(target_os = "macos") && argv.iter().any(|v| v == "--socket") {
             assert_eq!(parsed.unwrap_err().code, "unsupportedOnPlatform");
-        } else if hdc && argv.iter().any(|v| v == "--socket") {
-            // Swift refuses `--socket` here because its HDC registration runs
-            // in its own process; this CLI registers through the Runtime that
-            // owns the Bootstrap store, so the endpoint is what it needs.
-            assert_eq!(parsed.unwrap().command, "runtime.tool.register");
         } else if hdc && case["name"] == "valid" {
             // Swift's parser takes the leaf without `--file`; both refuse the
             // missing path before any request reaches a Runtime.
@@ -203,24 +196,28 @@ mod endpoint {
     fn command(root: &str, socket: &std::path::Path) -> std::process::Command {
         command_kind("deveco", root, socket)
     }
+    /// The leaf, naming the Runtime at `socket`: with `--socket` for DevEco,
+    /// and for an HDC, which it takes no `--socket` for, in `ARKDECK_ENDPOINT`.
     fn command_kind(kind: &str, root: &str, socket: &std::path::Path) -> std::process::Command {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"));
-        command
-            .args([
-                "runtime",
-                "tool",
-                "register",
-                "--kind",
-                kind,
-                if kind == "hdc" { "--file" } else { "--root" },
-                root,
-                "--output",
-                "json",
-                "--control-request-id",
-                "register-cli",
-                "--socket",
-            ])
-            .arg(socket);
+        command.args([
+            "runtime",
+            "tool",
+            "register",
+            "--kind",
+            kind,
+            if kind == "hdc" { "--file" } else { "--root" },
+            root,
+            "--output",
+            "json",
+            "--control-request-id",
+            "register-cli",
+        ]);
+        if kind == "hdc" {
+            command.env("ARKDECK_ENDPOINT", socket);
+        } else {
+            command.arg("--socket").arg(socket);
+        }
         command
     }
     #[test]
@@ -460,4 +457,56 @@ fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
         argv.extend(args(&extra));
         assert!(refusal(&argv).is_some(), "{argv:?}");
     }
+}
+
+/// Swift's parser takes `--socket` on the registration leaf only for DevEco,
+/// wherever it stands and before help, and so does this one. An HDC
+/// registration names another Runtime in `ARKDECK_ENDPOINT`
+/// (`endpoint::command_kind`).
+#[cfg(target_os = "macos")]
+#[test]
+fn hdc_registration_refuses_socket_as_swift_does() {
+    for argv in [
+        &[
+            "runtime", "tool", "register", "--kind", "hdc", "--file", "/tmp/hdc", "--socket",
+            "/tmp/s",
+        ][..],
+        &[
+            "--socket", "/tmp/s", "runtime", "tool", "register", "--kind", "hdc", "--file",
+            "/tmp/hdc",
+        ],
+        &[
+            "runtime", "tool", "register", "--socket", "/tmp/s", "--kind", "hdc", "--help",
+        ],
+    ] {
+        let error = parse(&args(argv)).unwrap_err();
+        assert_eq!(
+            (
+                error.code,
+                error.message.as_str(),
+                Value::Object(error.details.clone()),
+                error.command
+            ),
+            (
+                "invalidOption",
+                "HDC registration does not accept --socket",
+                json!({"command": "runtime.tool.register", "option": "--socket"}),
+                Some("runtime.tool.register")
+            ),
+            "{argv:?}"
+        );
+    }
+    let deveco = parse(&args(&[
+        "runtime",
+        "tool",
+        "register",
+        "--kind",
+        "deveco",
+        "--root",
+        "/tmp/root",
+        "--socket",
+        "/tmp/s",
+    ]))
+    .unwrap();
+    assert_eq!(deveco.socket.as_deref(), Some("/tmp/s"));
 }

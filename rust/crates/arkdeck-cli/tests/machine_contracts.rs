@@ -86,9 +86,11 @@ fn every_owned_product_is_the_published_bytes() {
         }
     }
     // The command and error registries, the canonical vectors, the result,
-    // page, event, next-action and control-plane schemas, the eight samples
-    // and the seven envelopes: 23 of the bundle's 235 products.
-    assert_eq!(produced.len(), 23);
+    // page, event, next-action and control-plane schemas, the eight samples,
+    // the seven envelopes, the 209 argv fixtures and their index: 233 of the
+    // bundle's 235 products. The feature coverage and the App's capability
+    // registry are still Swift's.
+    assert_eq!(produced.len(), 233);
 }
 
 #[test]

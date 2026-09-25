@@ -18,10 +18,9 @@ fn imports_keep_current_swift_leaf_argv_and_inspect_uses_reference_inspection() 
         "abort",
         "inspect",
     ] {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
-            "../../tests/fixtures/current-cli-argv/artifact.import.{kind}.json"
-        ));
-        let fixture: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let fixture: Value =
+            arkdeck_cli::machine_contracts::argv_fixture(&format!("artifact.import.{kind}"))
+                .unwrap();
         for row in fixture["cases"].as_array().unwrap() {
             let args = row["argv"]
                 .as_array()

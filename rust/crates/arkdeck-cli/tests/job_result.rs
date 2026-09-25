@@ -49,10 +49,7 @@ fn recorded() -> Vec<(String, String, Value)> {
 
 #[test]
 fn result_argv_matches_current_swift() {
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../../tests/fixtures/current-cli-argv/job.result.json"
-    ))
-    .unwrap();
+    let fixture: Value = arkdeck_cli::machine_contracts::argv_fixture("job.result").unwrap();
     for row in fixture["cases"].as_array().unwrap() {
         let argv: Vec<String> = row["argv"]
             .as_array()

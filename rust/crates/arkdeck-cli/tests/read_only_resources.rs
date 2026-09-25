@@ -39,18 +39,18 @@ fn status_invocation(value: &Value) -> arkdeck_cli::Invocation {
 }
 #[test]
 fn published_argv_fixtures_replay() {
-    for corpus in [
-        include_str!("../../../tests/fixtures/current-cli-argv/operation.example.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/operation.describe.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.status.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.list.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.show.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.evidence.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.timeline.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.plan.json"),
-        include_str!("../../../tests/fixtures/current-cli-argv/job.submit.json"),
+    for command in [
+        "operation.example",
+        "operation.describe",
+        "job.status",
+        "job.list",
+        "job.show",
+        "job.evidence",
+        "job.timeline",
+        "job.plan",
+        "job.submit",
     ] {
-        let doc: Value = serde_json::from_str(corpus).unwrap();
+        let doc = arkdeck_cli::machine_contracts::argv_fixture(command).unwrap();
         for case in doc["cases"].as_array().unwrap() {
             let argv = case["argv"]
                 .as_array()
