@@ -6,6 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Test support only: a counting global allocator (src/allocation_meter.rs).
+allocation-meter = []
+
 [dependencies]
 sha2.workspace = true
 

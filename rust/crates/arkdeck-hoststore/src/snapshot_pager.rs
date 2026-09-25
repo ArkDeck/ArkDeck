@@ -1,12 +1,22 @@
 //! Private immutable pages for resource discovery. A cursor identifies a stored
 //! page and its query; it never causes another inventory scan or a silent restart.
-use arkdeck_contract::{WireError, canonical_json, sha256_hex, strict_json};
-use arkdeck_platform::{HostDirectory, random_bytes};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+//!
+//! Neither storing nor reading a snapshot holds it twice. Storing encodes each
+//! row once, into the stored document, and keeps only the first page's rows for
+//! the answer. Reading a stored page streams the retained file in two passes:
+//! the first validates the whole document exactly as decoding it whole did
+//! (strict JSON, its closed members, every page's bounds) while holding one
+//! page at a time; the second keeps only the page the cursor names.
+use arkdeck_contract::{StrictValue, WireError, canonical_json, sha256_hex, strict_json};
+use arkdeck_platform::{HostDirectory, HostDocument, HostDocumentPass, HostReadLock, random_bytes};
+use serde::Deserialize;
+use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde_json::{Map, Value, json};
 use std::{
+    cell::Cell,
     collections::BTreeSet,
-    io,
+    fmt,
+    io::{self, Read},
     path::{Path, PathBuf},
 };
 
@@ -14,6 +24,9 @@ const MAX_SNAPSHOT: usize = 16 * 1024 * 1024;
 const MAX_PAGE: usize = 1024 * 1024;
 const MAX_TOTAL: u64 = 64 * 1024 * 1024;
 const LOCK: &str = ".snapshots.lock";
+const SCHEMA: &str = "arkdeck.runtime-snapshot/1";
+/// The read-ahead of one pass over a stored snapshot.
+const PASS_BUFFER: usize = 64 * 1024;
 
 pub(crate) fn failure(code: &str, message: &str) -> WireError {
     WireError {
@@ -38,16 +51,13 @@ fn invalid_cursor() -> WireError {
         "Cursor is invalid, belongs to another query, or its snapshot was reclaimed",
     )
 }
-
-#[derive(Serialize, Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct Snapshot {
-    schema_version: String,
-    revision: String,
-    query_digest: String,
-    order: String,
-    tokens: Vec<String>,
-    pages: Vec<Vec<Value>>,
+/// A failed read of a stored snapshot: one no longer present was reclaimed.
+fn read_failure(error: io::Error) -> WireError {
+    if error.kind() == io::ErrorKind::NotFound {
+        invalid_cursor()
+    } else {
+        unreadable(error)
+    }
 }
 
 pub(crate) struct SnapshotPager {
@@ -56,6 +66,98 @@ pub(crate) struct SnapshotPager {
     /// Whether the pager holds its own lock document; a pager whose owner
     /// already serializes every request keeps none.
     locked: bool,
+}
+
+/// The page an answer carries.
+struct Page {
+    revision: String,
+    items: Vec<Value>,
+    more: bool,
+    next: Option<String>,
+}
+
+/// A snapshot being stored, built as its rows arrive in answer order, in
+/// pages of at most `page_size` rows and `MAX_PAGE` bytes. The document is
+/// the canonical encoding of the snapshot, written as it is built: its
+/// members in canonical order put the pages before their tokens, and each
+/// row is encoded once, straight into it. Only the first page's rows are
+/// kept as values, for the answer.
+struct Draft {
+    page_size: usize,
+    document: Vec<u8>,
+    first: Vec<Value>,
+    /// Pages closed so far, and rows on the open one.
+    pages: usize,
+    current: usize,
+    /// Bytes on the open page, and in every page so far.
+    bytes: usize,
+    total: usize,
+    /// The refusal of the first row the snapshot could not take; no later
+    /// row is encoded.
+    refused: Option<WireError>,
+}
+
+impl Draft {
+    fn new(order: &str, page_size: usize) -> Result<Self, WireError> {
+        let mut document = b"{\"order\":".to_vec();
+        document.extend(canonical_json(&json!(order)).map_err(unreadable)?);
+        document.extend_from_slice(b",\"pages\":[");
+        Ok(Self {
+            page_size,
+            document,
+            first: Vec::new(),
+            pages: 0,
+            current: 0,
+            bytes: 2,
+            total: 0,
+            refused: None,
+        })
+    }
+
+    fn push(&mut self, row: Value) {
+        if self.refused.is_none()
+            && let Err(refusal) = self.add(row)
+        {
+            self.refused = Some(refusal);
+        }
+    }
+
+    fn add(&mut self, row: Value) -> Result<(), WireError> {
+        let encoded = canonical_json(&row).map_err(unreadable)?;
+        let size = encoded.len() + 1;
+        if size + 2 > MAX_PAGE {
+            return Err(failure(
+                "inputTooLarge",
+                "Resource projection exceeds its page bound",
+            ));
+        }
+        if self.current == self.page_size || self.bytes + size > MAX_PAGE {
+            self.document.push(b']');
+            self.pages += 1;
+            self.current = 0;
+            self.bytes = 2;
+        }
+        self.total += size;
+        if self.total > MAX_SNAPSHOT {
+            return Err(failure(
+                "operationUnavailable",
+                "Snapshot exceeds its storage bound",
+            ));
+        }
+        let separator: &[u8] = match (self.pages, self.current) {
+            (0, 0) => b"[",
+            (_, 0) => b",[",
+            _ => b",",
+        };
+        self.document.extend_from_slice(separator);
+        self.document.extend(encoded);
+        if self.pages == 0 {
+            self.first.push(row);
+        }
+        self.current += 1;
+        self.bytes += size;
+        Ok(())
+    }
 }
 
 pub(crate) fn uuid() -> Result<String, WireError> {
@@ -129,6 +231,43 @@ impl SnapshotPager {
         cursor: Option<&str>,
         items: impl FnOnce() -> Result<Vec<Value>, WireError>,
     ) -> Result<Value, WireError> {
+        self.page_with(method, filters, order, page_size, cursor, |draft| {
+            for row in items()? {
+                draft.push(row);
+            }
+            Ok(())
+        })
+    }
+
+    /// [`Self::page_filtered`] for an owner that hands its rows over one at a
+    /// time, in answer order, rather than all at once: a new snapshot holds
+    /// the encoding of each row and the values of its first page only. The
+    /// owner's refusal, returned once it has handed over what it had, comes
+    /// before any refusal of a row it handed over, as when it refused before
+    /// the snapshot was built.
+    pub(crate) fn page_streamed(
+        &self,
+        method: &str,
+        filters: &Value,
+        order: &str,
+        page_size: usize,
+        cursor: Option<&str>,
+        rows: impl FnOnce(&mut dyn FnMut(Value)) -> Result<(), WireError>,
+    ) -> Result<Value, WireError> {
+        self.page_with(method, filters, order, page_size, cursor, |draft| {
+            rows(&mut |row| draft.push(row))
+        })
+    }
+
+    fn page_with(
+        &self,
+        method: &str,
+        filters: &Value,
+        order: &str,
+        page_size: usize,
+        cursor: Option<&str>,
+        fill: impl FnOnce(&mut Draft) -> Result<(), WireError>,
+    ) -> Result<Value, WireError> {
         if !(1..=1000).contains(&page_size) {
             return Err(failure(
                 "invalidInput",
@@ -152,124 +291,139 @@ impl SnapshotPager {
         } else {
             None
         };
-        let (snapshot, index) = if let Some(cursor) = cursor {
+        let page = if let Some(cursor) = cursor {
             let (revision, _) = cursor_parts(cursor).ok_or_else(invalid_cursor)?;
-            let snapshot = self.read(revision)?;
-            if snapshot.query_digest != digest || snapshot.order != order {
-                return Err(invalid_cursor());
-            }
-            let index = snapshot
-                .tokens
-                .iter()
-                .position(|value| value == cursor)
-                .ok_or_else(invalid_cursor)?;
-            (snapshot, index)
+            self.read(revision, cursor, &digest, order)?
         } else {
-            let rows = items()?;
-            let revision = uuid()?;
-            let mut pages = Vec::new();
-            let mut current = Vec::new();
-            let (mut bytes, mut total) = (2, 0);
-            for row in rows {
-                let size = canonical_json(&row).map_err(unreadable)?.len() + 1;
-                if size + 2 > MAX_PAGE {
-                    return Err(failure(
-                        "inputTooLarge",
-                        "Resource projection exceeds its page bound",
-                    ));
-                }
-                if current.len() == page_size || bytes + size > MAX_PAGE {
-                    pages.push(current);
-                    current = Vec::new();
-                    bytes = 2;
-                }
-                total += size;
-                if total > MAX_SNAPSHOT {
-                    return Err(failure(
-                        "operationUnavailable",
-                        "Snapshot exceeds its storage bound",
-                    ));
-                }
-                current.push(row);
-                bytes += size;
-            }
-            if !current.is_empty() || pages.is_empty() {
-                pages.push(current);
-            }
-            let tokens = pages
-                .iter()
-                .map(|_| uuid().map(|token| format!("{revision}.{token}")))
-                .collect::<Result<Vec<_>, _>>()?;
-            let snapshot = Snapshot {
-                schema_version: "arkdeck.runtime-snapshot/1".into(),
-                revision,
-                query_digest: digest,
-                order: order.into(),
-                tokens,
-                pages,
-            };
-            let bytes = canonical_json(&serde_json::to_value(&snapshot).map_err(unreadable)?)
-                .map_err(unreadable)?;
-            if bytes.len() > MAX_SNAPSHOT {
-                return Err(failure(
-                    "operationUnavailable",
-                    "Snapshot exceeds its encoded storage bound",
-                ));
-            }
-            self.retain_space(bytes.len())?;
-            if let Some(lock) = &lock {
-                lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
-            }
-            self.root.validate_path(&self.path).map_err(unreadable)?;
-            self.root
-                .publish_document(&filename(&snapshot.revision), &bytes, MAX_SNAPSHOT)
-                .map_err(unreadable)?;
-            (snapshot, 0)
+            let mut draft = Draft::new(order, page_size)?;
+            fill(&mut draft)?;
+            self.store(lock.as_ref(), &digest, draft)?
         };
         if let Some(lock) = &lock {
             lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
         }
         self.root.validate_path(&self.path).map_err(unreadable)?;
-        let more = index + 1 < snapshot.pages.len();
-        Ok(
-            json!({"schemaVersion":"arkdeck.cli.page/1","pageKind":"snapshot",
-            "items":snapshot.pages[index],"order":snapshot.order,"snapshotRevision":snapshot.revision,
-            "hasMore":more,"nextCursor":snapshot.tokens.get(index+1)}),
-        )
+        // The answer `json!` would build, in its member order, with the page's
+        // rows moved into it rather than copied.
+        let mut answer = Map::new();
+        answer.insert("schemaVersion".into(), json!("arkdeck.cli.page/1"));
+        answer.insert("pageKind".into(), json!("snapshot"));
+        answer.insert("items".into(), Value::Array(page.items));
+        answer.insert("order".into(), json!(order));
+        answer.insert("snapshotRevision".into(), Value::String(page.revision));
+        answer.insert("hasMore".into(), Value::Bool(page.more));
+        answer.insert(
+            "nextCursor".into(),
+            page.next.map_or(Value::Null, Value::String),
+        );
+        Ok(Value::Object(answer))
     }
 
-    fn read(&self, revision: &str) -> Result<Snapshot, WireError> {
-        let bytes = self
+    /// Store a drafted snapshot and answer its first page.
+    fn store(
+        &self,
+        lock: Option<&HostReadLock>,
+        digest: &str,
+        draft: Draft,
+    ) -> Result<Page, WireError> {
+        let revision = uuid()?;
+        let Draft {
+            mut document,
+            first,
+            pages,
+            current,
+            refused,
+            ..
+        } = draft;
+        if let Some(refusal) = refused {
+            return Err(refusal);
+        }
+        // The last page closes; a snapshot of no rows has one empty page.
+        document.extend_from_slice(if current > 0 { b"]" } else { b"[]" });
+        let pages = pages + 1;
+        let tokens = (0..pages)
+            .map(|_| uuid().map(|token| format!("{revision}.{token}")))
+            .collect::<Result<Vec<_>, _>>()?;
+        let canonical = |value: Value| canonical_json(&value).map_err(unreadable);
+        document.extend_from_slice(b"],\"queryDigest\":");
+        document.extend(canonical(json!(digest))?);
+        document.extend_from_slice(b",\"revision\":");
+        document.extend(canonical(json!(revision))?);
+        document.extend_from_slice(b",\"schemaVersion\":");
+        document.extend(canonical(json!(SCHEMA))?);
+        document.extend_from_slice(b",\"tokens\":");
+        document.extend(canonical(json!(tokens))?);
+        document.push(b'}');
+        if document.len() > MAX_SNAPSHOT {
+            return Err(failure(
+                "operationUnavailable",
+                "Snapshot exceeds its encoded storage bound",
+            ));
+        }
+        self.retain_space(document.len())?;
+        if let Some(lock) = lock {
+            lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+        }
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        self.root
+            .publish_document(&filename(&revision), &document, MAX_SNAPSHOT)
+            .map_err(unreadable)?;
+        Ok(Page {
+            next: tokens.into_iter().nth(1),
+            more: pages > 1,
+            revision,
+            items: first,
+        })
+    }
+
+    /// The page `cursor` names in stored snapshot `revision`, if that
+    /// snapshot answers this query. One pass validates the whole document,
+    /// holding a page at a time, and notes where each page lies; only then is
+    /// the cursor's page found, and just its bytes are read again, from the
+    /// same inode.
+    fn read(
+        &self,
+        revision: &str,
+        cursor: &str,
+        digest: &str,
+        order: &str,
+    ) -> Result<Page, WireError> {
+        let document = self
             .root
-            .read(&filename(revision), MAX_SNAPSHOT)
-            .map_err(|error| {
-                if error.kind() == io::ErrorKind::NotFound {
-                    invalid_cursor()
-                } else {
-                    unreadable(error)
-                }
-            })?;
-        let value = strict_json(&bytes).map_err(unreadable)?;
-        let snapshot: Snapshot = serde_json::from_value(value).map_err(unreadable)?;
-        if snapshot.schema_version != "arkdeck.runtime-snapshot/1"
-            || snapshot.revision != revision
-            || snapshot.pages.is_empty()
-            || snapshot.pages.len() != snapshot.tokens.len()
-            || snapshot.tokens.iter().collect::<BTreeSet<_>>().len() != snapshot.tokens.len()
-            || snapshot
+            .open_document(&filename(revision), MAX_SNAPSHOT)
+            .map_err(read_failure)?;
+        let (stored, length) = pass(&document)?;
+        if stored.schema_version != SCHEMA
+            || stored.revision != revision
+            || stored.pages.is_empty()
+            || stored.pages.len() != stored.tokens.len()
+            || stored.tokens.iter().collect::<BTreeSet<_>>().len() != stored.tokens.len()
+            || stored
                 .tokens
                 .iter()
                 .any(|token| cursor_parts(token).is_none_or(|(id, _)| id != revision))
-            || snapshot.pages.iter().any(|page| page.len() > 1000)
         {
             return Err(unreadable(()));
         }
-        for page in &snapshot.pages {
-            if canonical_json(&json!(page)).map_err(unreadable)?.len() > MAX_PAGE {
-                return Err(unreadable(()));
-            }
+        if stored.query_digest != digest || stored.order != order {
+            return Err(invalid_cursor());
         }
-        Ok(snapshot)
+        let index = stored
+            .tokens
+            .iter()
+            .position(|value| value == cursor)
+            .ok_or_else(invalid_cursor)?;
+        let place = &stored.pages[index];
+        let bytes = document
+            .read_range(place.start..place.end)
+            .map_err(read_failure)?;
+        document.check(length).map_err(read_failure)?;
+        Ok(Page {
+            revision: revision.into(),
+            items: place.decode(&bytes).ok_or_else(|| unreadable(()))?,
+            more: index + 1 < stored.pages.len(),
+            next: stored.tokens.into_iter().nth(index + 1),
+        })
     }
 
     fn retain_space(&self, bytes: usize) -> Result<(), WireError> {
@@ -304,6 +458,276 @@ impl SnapshotPager {
             remaining -= 1;
         }
         Ok(())
+    }
+}
+
+/// The pass over a stored snapshot, from its first byte to its end, and the
+/// bytes it read, answered as a whole read and then a whole decode answered:
+/// a failed read is that read's failure; a document that changed, was
+/// replaced or was removed while it was read is refused before anything
+/// decoded from it counts; any other refusal is `recordUnreadable`.
+fn pass(document: &HostDocument<'_>) -> Result<(Stored, u64), WireError> {
+    let handed = Cell::new(0);
+    let mut reader = Counted {
+        pass: document.pass(),
+        buffer: vec![0; PASS_BUFFER].into_boxed_slice(),
+        start: 0,
+        end: 0,
+        handed: &handed,
+    };
+    let decoded = decode(&mut reader, &handed);
+    if let Err(error) = &decoded
+        && let Some(kind) = error.io_error_kind()
+    {
+        return Err(read_failure(kind.into()));
+    }
+    // A whole read reads to the end before anything is decoded, and the read
+    // is judged first. So is a document refused part way through.
+    if decoded.is_err() {
+        io::copy(&mut reader.pass, &mut io::sink()).map_err(read_failure)?;
+    }
+    let length = reader.pass.position();
+    document.check(length).map_err(read_failure)?;
+    Ok((decoded.map_err(unreadable)?, length))
+}
+
+/// A pass's bytes, buffered, counting the bytes handed on to the decoder: how
+/// far it has read, from which the pass notes where each page lies.
+struct Counted<'a> {
+    pass: HostDocumentPass<'a>,
+    buffer: Box<[u8]>,
+    start: usize,
+    end: usize,
+    handed: &'a Cell<u64>,
+}
+
+impl Read for Counted<'_> {
+    fn read(&mut self, into: &mut [u8]) -> io::Result<usize> {
+        if self.start == self.end {
+            self.end = self.pass.read(&mut self.buffer)?;
+            self.start = 0;
+        }
+        let count = into.len().min(self.end - self.start);
+        into[..count].copy_from_slice(&self.buffer[self.start..self.start + count]);
+        self.start += count;
+        self.handed.set(self.handed.get() + count as u64);
+        Ok(count)
+    }
+}
+
+/// The members of a stored snapshot, in the order its type declared them.
+const MEMBERS: [&str; 6] = [
+    "schemaVersion",
+    "revision",
+    "queryDigest",
+    "order",
+    "tokens",
+    "pages",
+];
+
+/// Every member of a stored snapshot but its pages, of which the pass keeps
+/// where each lies.
+struct Stored {
+    schema_version: String,
+    revision: String,
+    query_digest: String,
+    order: String,
+    tokens: Vec<String>,
+    pages: Vec<Place>,
+}
+
+/// Where a page lies in the stored document, from its opening bracket to its
+/// closing one, and the length of its canonical encoding.
+struct Place {
+    start: u64,
+    end: u64,
+    encoded: usize,
+}
+
+impl Place {
+    /// The page's rows, decoded again from its bytes, which the pass decoded
+    /// in place, within the whole document: the same bracketed array of the
+    /// same encoding, or nothing.
+    fn decode(&self, bytes: &[u8]) -> Option<Vec<Value>> {
+        if bytes.first() != Some(&b'[') || bytes.last() != Some(&b']') {
+            return None;
+        }
+        let page = strict_json(bytes).ok()?;
+        if canonical_json(&page).ok()?.len() != self.encoded {
+            return None;
+        }
+        match page {
+            Value::Array(rows) => Some(rows),
+            _ => None,
+        }
+    }
+}
+
+/// Decode a stored snapshot from `reader` exactly as `strict_json` and the
+/// snapshot's derived decoding decoded it whole: each row a [`StrictValue`],
+/// decoded in place at the depth the whole document gives it; the members
+/// closed, each once, of their types; nothing but whitespace after the
+/// document; and every page within its bounds. `handed` counts the bytes the
+/// decoder has taken from `reader`.
+fn decode(reader: impl Read, handed: &Cell<u64>) -> serde_json::Result<Stored> {
+    let mut decoder = serde_json::Deserializer::from_reader(reader);
+    let stored = de::Deserializer::deserialize_struct(
+        &mut decoder,
+        "Snapshot",
+        &MEMBERS,
+        Envelope { handed },
+    )?;
+    decoder.end()?;
+    Ok(stored)
+}
+
+struct Envelope<'a> {
+    handed: &'a Cell<u64>,
+}
+
+fn missing<E: de::Error>() -> E {
+    E::custom("a snapshot member is missing")
+}
+
+/// A member named twice is refused, as `strict_json` refuses it.
+fn once<T, E: de::Error>(slot: &Option<T>) -> Result<(), E> {
+    match slot {
+        Some(_) => Err(E::custom("a snapshot member is repeated")),
+        None => Ok(()),
+    }
+}
+
+impl<'de> Visitor<'de> for Envelope<'_> {
+    type Value = Stored;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a Runtime snapshot")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Stored, A::Error> {
+        let (mut schema_version, mut revision, mut query_digest, mut order) =
+            (None, None, None, None);
+        let (mut tokens, mut pages) = (None, None);
+        while let Some(name) = map.next_key::<String>()? {
+            match name.as_str() {
+                "schemaVersion" => {
+                    once(&schema_version)?;
+                    schema_version = Some(map.next_value()?);
+                }
+                "revision" => {
+                    once(&revision)?;
+                    revision = Some(map.next_value()?);
+                }
+                "queryDigest" => {
+                    once(&query_digest)?;
+                    query_digest = Some(map.next_value()?);
+                }
+                "order" => {
+                    once(&order)?;
+                    order = Some(map.next_value()?);
+                }
+                "tokens" => {
+                    once(&tokens)?;
+                    tokens = Some(map.next_value()?);
+                }
+                "pages" => {
+                    once(&pages)?;
+                    pages = Some(map.next_value_seed(Pages {
+                        handed: self.handed,
+                    })?);
+                }
+                _ => return Err(de::Error::custom("a snapshot member is not published")),
+            }
+        }
+        Ok(Stored {
+            schema_version: schema_version.ok_or_else(missing)?,
+            revision: revision.ok_or_else(missing)?,
+            query_digest: query_digest.ok_or_else(missing)?,
+            order: order.ok_or_else(missing)?,
+            tokens: tokens.ok_or_else(missing)?,
+            pages: pages.ok_or_else(missing)?,
+        })
+    }
+
+    /// The derived decoding also takes a struct's members as an array in
+    /// their declared order, so this does too: the documents accepted stay
+    /// exactly those accepted before.
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Stored, A::Error> {
+        Ok(Stored {
+            schema_version: seq.next_element()?.ok_or_else(missing)?,
+            revision: seq.next_element()?.ok_or_else(missing)?,
+            query_digest: seq.next_element()?.ok_or_else(missing)?,
+            order: seq.next_element()?.ok_or_else(missing)?,
+            tokens: seq.next_element()?.ok_or_else(missing)?,
+            pages: seq
+                .next_element_seed(Pages {
+                    handed: self.handed,
+                })?
+                .ok_or_else(missing)?,
+        })
+    }
+}
+
+/// A stored snapshot's pages, each decoded, checked against its bounds and
+/// dropped, keeping only where it lies.
+struct Pages<'a> {
+    handed: &'a Cell<u64>,
+}
+
+impl<'de> DeserializeSeed<'de> for Pages<'_> {
+    type Value = Vec<Place>;
+
+    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<Self::Value, D::Error> {
+        decoder.deserialize_seq(self)
+    }
+}
+
+impl<'de> Visitor<'de> for Pages<'_> {
+    type Value = Vec<Place>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("snapshot pages")
+    }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let mut places = Vec::new();
+        while let Some(place) = seq.next_element_seed(PageSeed {
+            handed: self.handed,
+        })? {
+            places.push(place);
+        }
+        Ok(places)
+    }
+}
+
+/// One page, decoded in place. When it is handed to this seed the decoder
+/// has taken the page's opening bracket, looking ahead for it; when the page
+/// is decoded it has taken the closing bracket and nothing after it.
+struct PageSeed<'a> {
+    handed: &'a Cell<u64>,
+}
+
+impl<'de> DeserializeSeed<'de> for PageSeed<'_> {
+    type Value = Place;
+
+    fn deserialize<D: de::Deserializer<'de>>(self, decoder: D) -> Result<Place, D::Error> {
+        let start = self.handed.get().checked_sub(1).ok_or_else(missing)?;
+        let page = Vec::<StrictValue>::deserialize(decoder)?;
+        let end = self.handed.get();
+        let page: Vec<Value> = page.into_iter().map(|StrictValue(row)| row).collect();
+        // Every stored page holds at most 1000 rows and `MAX_PAGE` bytes
+        // encoded.
+        let encoded = (page.len() <= 1000)
+            .then(|| canonical_json(&Value::Array(page)).ok())
+            .flatten()
+            .map(|bytes| bytes.len())
+            .filter(|length| *length <= MAX_PAGE)
+            .ok_or_else(|| de::Error::custom("a snapshot page exceeds its bounds"))?;
+        Ok(Place {
+            start,
+            end,
+            encoded,
+        })
     }
 }
 
@@ -547,3 +971,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "snapshot_pager_tests.rs"]
+mod bounded_tests;

@@ -472,6 +472,19 @@ impl JobRepository {
     pub fn map_rows<T>(
         &self,
         id: Option<&str>,
+        project: impl FnMut(JobRow) -> io::Result<T>,
+    ) -> io::Result<Vec<T>> {
+        self.map_rows_ordered(id, false, project)
+    }
+
+    /// [`Self::map_rows`] with every row, newest first when `descending`: in
+    /// descending creation order, then ascending identity, the order of a
+    /// Job list that shows the newest Jobs first. Every row is still read,
+    /// checked and counted against the same budget in one SQLite snapshot.
+    pub(crate) fn map_rows_ordered<T>(
+        &self,
+        id: Option<&str>,
+        descending: bool,
         mut project: impl FnMut(JobRow) -> io::Result<T>,
     ) -> io::Result<Vec<T>> {
         self.validate()?;
@@ -517,8 +530,11 @@ impl JobRepository {
                     decode,
                 )
             } else {
+                let direction = if descending { " DESC" } else { "" };
                 db.query_map(
-                    &format!("{sql} ORDER BY created_at_order_key, job_id COLLATE BINARY"),
+                    &format!(
+                        "{sql} ORDER BY created_at_order_key{direction}, job_id COLLATE BINARY"
+                    ),
                     &[],
                     64 * 1024 * 1024,
                     decode,

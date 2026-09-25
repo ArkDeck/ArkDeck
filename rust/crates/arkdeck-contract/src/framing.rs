@@ -29,7 +29,11 @@ impl std::error::Error for ContractError {}
 
 /// Serde's Value normally keeps the last duplicate. Wire parsing must refuse it,
 /// including nested duplicates and escaped spellings of the same decoded key.
-struct StrictValue(Value);
+///
+/// [`strict_json`] decodes a whole document with it. A reader that streams a
+/// larger document decodes each part with it in place, so every part is
+/// refused exactly as the whole document would be, at the same nesting depth.
+pub struct StrictValue(pub Value);
 impl<'de> Deserialize<'de> for StrictValue {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct StrictVisitor;

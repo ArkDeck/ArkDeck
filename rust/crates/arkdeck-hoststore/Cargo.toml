@@ -26,6 +26,8 @@ sha2.workspace = true
 # ArkForge's own codec.
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 arkforge-ipc.workspace = true
+# The pager's tests count what a read holds at once (TASK-XPA-025).
+arkdeck-platform = { workspace = true, features = ["allocation-meter"] }
 
 [lints]
 workspace = true
