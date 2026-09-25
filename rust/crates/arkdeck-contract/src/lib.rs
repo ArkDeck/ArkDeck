@@ -29,8 +29,8 @@ pub use catalog_generated::{CATALOG_CANONICAL_JSON, CATALOG_DIGEST};
 pub use cbor::{CborValue, canonical_cbor};
 pub use control_generated::*;
 pub use framing::{
-    ContractError, Request, Response, WireError, decode_request, decode_response, encode_frame,
-    strict_json, validate_health,
+    ContractError, Request, Response, StrictValue, WireError, decode_request, decode_response,
+    encode_frame, strict_json, validate_health,
 };
 pub use job_state_preflight::{
     CutoverBlock, CutoverExecution, CutoverJob, CutoverUse, JOB_STATE_PREFLIGHT_TABLE,

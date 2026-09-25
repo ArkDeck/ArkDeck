@@ -172,6 +172,28 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
     Ok(())
 }
 
+/// What [`HostDirectory::read`] requires once it has read a document to its
+/// end: exactly the size the file had when it was opened, within the
+/// maximum; the size and the content and status change times unchanged
+/// since; and the name still linking the inode that was read.
+fn read_whole(
+    before: &std::fs::Metadata,
+    after: &std::fs::Metadata,
+    linked: &libc::stat,
+    length: u64,
+    maximum: usize,
+) -> bool {
+    length <= maximum as u64
+        && length == before.len()
+        && before.len() == after.len()
+        && before.mtime() == after.mtime()
+        && before.mtime_nsec() == after.mtime_nsec()
+        && before.ctime() == after.ctime()
+        && before.ctime_nsec() == after.ctime_nsec()
+        && before.dev() == linked.st_dev as u64
+        && before.ino() == linked.st_ino
+}
+
 /// Swift `RockchipPostFlashHDCBindingStore.validateFile`: an owned,
 /// single-link regular file whose mode is exactly owner read/write.
 fn owner_only(file: &File, ownership: Ownership) -> io::Result<std::fs::Metadata> {
@@ -891,19 +913,32 @@ impl HostDirectory {
         (&file).take(maximum as u64 + 1).read_to_end(&mut bytes)?;
         let after = file.metadata()?;
         let linked = self.stat_at(name)?;
-        if bytes.len() > maximum
-            || bytes.len() as u64 != before.len()
-            || before.len() != after.len()
-            || before.mtime() != after.mtime()
-            || before.mtime_nsec() != after.mtime_nsec()
-            || before.ctime() != after.ctime()
-            || before.ctime_nsec() != after.ctime_nsec()
-            || before.dev() != linked.st_dev as u64
-            || before.ino() != linked.st_ino
-        {
+        if !read_whole(&before, &after, &linked, bytes.len() as u64, maximum) {
             return Err(fail());
         }
         Ok(bytes)
+    }
+
+    /// [`Self::read`] for a reader that parses the document as it streams
+    /// instead of holding its bytes: the same open, identity and size checks
+    /// before any byte is read, [`HostDocument::pass`] for a read from the
+    /// first byte, [`HostDocument::read_range`] for a part read again, and
+    /// [`HostDocument::check`] for the checks `read` makes once its read is
+    /// complete.
+    pub fn open_document(&self, name: &str, maximum: usize) -> io::Result<HostDocument<'_>> {
+        let file = self.open_at(name, 0)?;
+        owned(&file, false, self.1)?;
+        let before = file.metadata()?;
+        if before.len() > maximum as u64 {
+            return Err(fail());
+        }
+        Ok(HostDocument {
+            directory: self,
+            name: name.to_owned(),
+            file,
+            before,
+            maximum,
+        })
     }
 
     /// Name an optional export Journal using bounded memory and a retained
@@ -1226,6 +1261,85 @@ impl HostDirectory {
         let lock = HostReadLock { file };
         lock.validate_link(self, name)?;
         Ok(Some(lock))
+    }
+}
+
+/// [`HostDirectory::open_document`]: a document opened as
+/// [`HostDirectory::read`] opens one, for a reader that parses it as it
+/// streams. The descriptor is retained, so every pass reads the inode that
+/// was opened and checked.
+pub struct HostDocument<'a> {
+    directory: &'a HostDirectory,
+    name: String,
+    file: File,
+    before: std::fs::Metadata,
+    maximum: usize,
+}
+
+impl HostDocument<'_> {
+    /// The document from its first byte, read as [`HostDirectory::read`]
+    /// reads it: at most one byte beyond the maximum, so that a document
+    /// grown past it is seen to have grown. Each pass reads by offset, so
+    /// passes never share a position.
+    pub fn pass(&self) -> HostDocumentPass<'_> {
+        HostDocumentPass {
+            file: &self.file,
+            offset: 0,
+            limit: self.maximum as u64 + 1,
+        }
+    }
+
+    /// The bytes at `range` of the document, read by offset from the inode
+    /// that was opened, within the size it had then. A reader makes
+    /// [`Self::check`] after it, as after a pass.
+    pub fn read_range(&self, range: std::ops::Range<u64>) -> io::Result<Vec<u8>> {
+        use std::os::unix::fs::FileExt;
+        if range.start > range.end || range.end > self.before.len() {
+            return Err(fail());
+        }
+        let mut bytes = vec![0; usize::try_from(range.end - range.start).map_err(|_| fail())?];
+        self.file.read_exact_at(&mut bytes, range.start)?;
+        Ok(bytes)
+    }
+
+    /// The checks [`HostDirectory::read`] makes once its read is complete,
+    /// for a pass that read `length` bytes to its end. A reader makes them
+    /// after its last read, before it trusts anything it parsed.
+    pub fn check(&self, length: u64) -> io::Result<()> {
+        let after = self.file.metadata()?;
+        let linked = self.directory.stat_at(&self.name)?;
+        if !read_whole(&self.before, &after, &linked, length, self.maximum) {
+            return Err(fail());
+        }
+        Ok(())
+    }
+}
+
+/// [`HostDocument::pass`].
+pub struct HostDocumentPass<'a> {
+    file: &'a File,
+    offset: u64,
+    limit: u64,
+}
+
+impl HostDocumentPass<'_> {
+    /// The bytes this pass has read.
+    pub fn position(&self) -> u64 {
+        self.offset
+    }
+}
+
+impl Read for HostDocumentPass<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        use std::os::unix::fs::FileExt;
+        let room = usize::try_from(self.limit - self.offset).unwrap_or(usize::MAX);
+        let wanted = buffer.len().min(room);
+        if wanted == 0 {
+            return Ok(0);
+        }
+        let count = self.file.read_at(&mut buffer[..wanted], self.offset)?;
+        self.offset += count as u64;
+        Ok(count)
     }
 }
 

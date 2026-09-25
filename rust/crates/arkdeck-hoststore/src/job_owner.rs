@@ -26,6 +26,10 @@ mod mutation_state_continuity;
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;
 
+#[cfg(test)]
+#[path = "job_list_stream_tests.rs"]
+mod list_stream_tests;
+
 pub struct JobStore {
     repository: JobRepository,
     path: PathBuf,
@@ -709,15 +713,21 @@ impl JobStore {
             }
         }
         let (size, cursor) = pagination(params)?;
+        // The repository hands the rows over in the list's order, creation
+        // time and then identity, so each history row goes to the snapshot as
+        // it is projected, and no list of them all is held.
+        let descending = order == "createdAtDescJobIdAsc";
         SnapshotPager::open(&self.path.join("cli-job-snapshots"))
             .map_err(unreadable)?
-            .page_filtered("job.list", &filters, order, size, cursor, || {
-                let projected = self
-                    .repository
-                    .map_rows(None, |row| {
-                        // Preserve the typed record error while the repository still
-                        // validates every source row in its complete snapshot.
-                        Ok((|| -> Result<_, WireError> {
+            .page_streamed("job.list", &filters, order, size, cursor, |emit| {
+                // A typed record refusal is the list's answer once the
+                // repository has validated every source row in its complete
+                // snapshot: the refusal of the first such record in creation
+                // order, however the rows are handed over.
+                let mut refused: Option<(String, String, WireError)> = None;
+                self.repository
+                    .map_rows_ordered(None, descending, |row| {
+                        let projected = (|| -> Result<_, WireError> {
                             let record = JobRecord::from_row(&row)?;
                             let value = record.history(timeline);
                             if [
@@ -734,25 +744,23 @@ impl JobStore {
                             }) {
                                 return Ok(None);
                             }
-                            Ok(Some((row.order_key, row.id, value)))
-                        })())
+                            Ok(Some(value))
+                        })();
+                        match projected {
+                            Ok(Some(value)) => emit(value),
+                            Ok(None) => {}
+                            Err(error) => {
+                                if refused.as_ref().is_none_or(|(key, id, _)| {
+                                    (&row.order_key, &row.id) < (key, id)
+                                }) {
+                                    refused = Some((row.order_key, row.id, error));
+                                }
+                            }
+                        }
+                        Ok(())
                     })
                     .map_err(unreadable)?;
-                let mut rows = projected
-                    .into_iter()
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>();
-                rows.sort_by(|a, b| {
-                    (if order == "createdAtDescJobIdAsc" {
-                        b.0.cmp(&a.0)
-                    } else {
-                        a.0.cmp(&b.0)
-                    })
-                    .then(a.1.cmp(&b.1))
-                });
-                Ok(rows.into_iter().map(|(_, _, value)| value).collect())
+                refused.map_or(Ok(()), |(_, _, error)| Err(error))
             })
     }
 }

@@ -37,6 +37,10 @@ mod temporary_directory;
 pub use temporary_directory::foundation_temporary_directory;
 mod secret;
 pub use secret::{Secret, wipe};
+#[cfg(feature = "allocation-meter")]
+mod allocation_meter;
+#[cfg(feature = "allocation-meter")]
+pub use allocation_meter::{AllocationMeter, peak_allocation};
 #[cfg(target_os = "macos")]
 mod keychain;
 #[cfg(target_os = "macos")]
@@ -157,10 +161,11 @@ mod host_store;
 #[cfg(target_os = "macos")]
 pub use host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
-    HostDirectory, HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource,
-    HostJournal, HostJournalAppender, HostReadLock, HostUploadFile, HostUploadReader,
-    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
-    PreparedSessionRemoval, PreparedTraceRemoval, UploadChunkCheckpoint, UploadWritePoint,
+    HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
+    HostExportCapacity, HostImportSource, HostJournal, HostJournalAppender, HostReadLock,
+    HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure,
+    PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval, UploadChunkCheckpoint,
+    UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]
