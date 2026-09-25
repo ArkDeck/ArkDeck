@@ -36,7 +36,10 @@ private home, reaching no Keychain.
   left under the home — the owner's lock and, where Swift writes it, its ledger.
 
 The first recording passed `--control-request-id`, which Swift refuses on these leaves; it was
-corrected and re-recorded before any replay was taken as evidence.
+corrected and re-recorded before any replay was taken as evidence. The re-recording then held
+Swift's randomly generated identity verbatim, so Swift's own comparison run could never pass
+(CI run 36194056094 on `f7f8408f1`); the oracle now records and compares it as `ctl-<uuid>`, and
+the replay proves this CLI's generated identity has Swift's shape before comparing it so.
 
 ## Counts
 
@@ -57,8 +60,9 @@ corrected and re-recorded before any replay was taken as evidence.
 - `python rust/scripts/check-readonly.py --bin-dir /private/tmp/arkdeck-cli-lane-rust-target/debug`
   (validation venv) — exit 0, `PASS`.
 - `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter CLISigningStatusOracleContractTests`
-  — exit 0 (recording, in the hub's Swift window; `/private/tmp/arkdeck-cli-lane-swift-signing2.log`).
-  The comparison run against the checked-in oracle is left to CI's Swift lane.
+  — exit 0 (recording, in the hub's Swift window; `/private/tmp/arkdeck-cli-lane-swift-signing2.log`),
+  and exit 0 comparing against the labelled, checked-in oracle
+  (`/private/tmp/arkdeck-cli-lane-swift-signing-compare.log`).
 - `sh scripts/check-sdd.sh` — exit 0.
 
 ## CI

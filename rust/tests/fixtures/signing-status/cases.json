@@ -21,7 +21,7 @@
     "name" : "notInstalledJson",
     "receipt" : null,
     "stderr" : "",
-    "stdout" : "{\"command\":\"runtime.signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-f1b5674f-be31-4b1c-905f-032ed5a5d781\"},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialNotInstalled\"],\"installed\":false,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    "stdout" : "{\"command\":\"runtime.signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialNotInstalled\"],\"installed\":false,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
   },
   {
     "argv" : [
@@ -66,7 +66,7 @@
     "name" : "legacyNotInstalledJson",
     "receipt" : null,
     "stderr" : "",
-    "stdout" : "{\"command\":\"signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-833f0b3f-0697-43b8-a8db-62e42c2f9089\",\"lifecycle\":{\"removalVersion\":null,\"replacementArgvPattern\":\"arkdeck runtime signing status\",\"status\":\"deprecated\"}},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialNotInstalled\"],\"installed\":false,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    "stdout" : "{\"command\":\"signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-<uuid>\",\"lifecycle\":{\"removalVersion\":null,\"replacementArgvPattern\":\"arkdeck runtime signing status\",\"status\":\"deprecated\"}},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialNotInstalled\"],\"installed\":false,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
   },
   {
     "argv" : [
@@ -133,7 +133,7 @@
     "name" : "corruptReceiptJson",
     "receipt" : "{\"schemaVersion\":\"arkdeck-openharmony-signing/v1\"}",
     "stderr" : "",
-    "stdout" : "{\"command\":\"runtime.signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-531a2752-7014-41f0-8515-8975ee45f3b2\"},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialUnavailable\",\"signingCredentialOwnerUnavailable\"],\"installed\":true,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    "stdout" : "{\"command\":\"runtime.signing.status\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"credential\":null,\"diagnostics\":[\"signingCredentialUnavailable\",\"signingCredentialOwnerUnavailable\"],\"installed\":true,\"ready\":false,\"schemaVersion\":\"arkdeck.signing-credential-status/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
   },
   {
     "argv" : [
@@ -152,6 +152,6 @@
     "name" : "unexpectedOption",
     "receipt" : null,
     "stderr" : "",
-    "stdout" : "{\"command\":\"runtime.signing.status\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"command\":\"runtime.signing.status\",\"option\":\"--bundle-name\"},\"message\":\"`runtime signing status` does not accept --bundle-name; run `arkdeck help runtime signing status` for its options\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-c5e33fea-f786-4bdd-93ca-46e65e99351f\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    "stdout" : "{\"command\":\"runtime.signing.status\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"command\":\"runtime.signing.status\",\"option\":\"--bundle-name\"},\"message\":\"`runtime signing status` does not accept --bundle-name; run `arkdeck help runtime signing status` for its options\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
   }
 ]

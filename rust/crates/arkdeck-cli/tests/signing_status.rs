@@ -8,7 +8,8 @@
 //! Each run gets a private home (`CFFIXED_USER_HOME` and `HOME`) holding the
 //! case's preset receipt, if any; no case reaches the Keychain. The CLI must
 //! end as Swift's did: the same exit status, in a machine mode the same bytes
-//! on stdout and stderr (a generated correlation identity compared as one),
+//! on stdout and stderr (a generated correlation identity, of Swift's shape,
+//! compared as the oracle's `ctl-<uuid>`),
 //! in the human rendering the same warning (Swift's outline and this CLI's
 //! pretty JSON, T2), and the same files left under the home.
 #![cfg(target_os = "macos")]
@@ -69,8 +70,9 @@ fn files(root: &Path, directory: &Path, found: &mut Vec<(String, String)>) {
     }
 }
 
-/// `text` with each generated correlation identity (`ctl-<uuid>`) spelled
-/// `ctl-<generated>`: these leaves take none from the caller.
+/// `text` with each generated correlation identity spelled `ctl-<uuid>`, as
+/// the oracle records Swift's (these leaves take none from the caller), once
+/// it is proved Swift's shape: `ctl-` and a lowercase version 4 UUID.
 fn generated(text: &str) -> String {
     let mut output = String::new();
     let mut rest = text;
@@ -81,15 +83,14 @@ fn generated(text: &str) -> String {
             && rest.as_bytes()[..36]
                 .iter()
                 .enumerate()
-                .all(|(index, byte)| {
-                    if [8, 13, 18, 23].contains(&index) {
-                        *byte == b'-'
-                    } else {
-                        byte.is_ascii_digit() || (b'a'..=b'f').contains(byte)
-                    }
+                .all(|(index, byte)| match index {
+                    8 | 13 | 18 | 23 => *byte == b'-',
+                    14 => *byte == b'4',
+                    19 => b"89ab".contains(byte),
+                    _ => byte.is_ascii_digit() || (b'a'..=b'f').contains(byte),
                 });
         if uuid {
-            output.push_str("<generated>");
+            output.push_str("<uuid>");
             rest = &rest[36..];
         }
     }

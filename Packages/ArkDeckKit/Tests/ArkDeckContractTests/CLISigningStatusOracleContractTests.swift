@@ -138,7 +138,11 @@ final class CLISigningStatusOracleContractTests: XCTestCase {
           "name": .string(scripted.name), "argv": .array(scripted.argv.map(JSONValue.string)),
           "receipt": scripted.receipt.map { .string(String(decoding: $0, as: UTF8.self)) }
             ?? .null,
-          "exit": .integer(Int64(run.exitCode)), "stdout": .string(run.stdout),
+          "exit": .integer(Int64(run.exitCode)),
+          "stdout": .string(
+            run.stdout.replacingOccurrences(
+              of: #"ctl-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"#,
+              with: "ctl-<uuid>", options: .regularExpression)),
           "stderr": .string(run.stderr), "files": .array(try Self.files(under: home)),
         ]))
     }
