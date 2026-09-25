@@ -1,0 +1,173 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.empty",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.exact",
+      "params" : {
+        "allowSensitive" : true,
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe",
+        "owner" : {
+          "id" : "job-trace-inspect",
+          "kind" : "job"
+        },
+        "timeoutMs" : 1000
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.notSensitive",
+      "params" : {
+        "allowSensitive" : false,
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe",
+        "owner" : {
+          "id" : "job-trace-inspect",
+          "kind" : "job"
+        },
+        "timeoutMs" : 1000
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.timeoutZero",
+      "params" : {
+        "allowSensitive" : true,
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe",
+        "owner" : {
+          "id" : "job-trace-inspect",
+          "kind" : "job"
+        },
+        "timeoutMs" : 0
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.timeoutPastBound",
+      "params" : {
+        "allowSensitive" : true,
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe",
+        "owner" : {
+          "id" : "job-trace-inspect",
+          "kind" : "job"
+        },
+        "timeoutMs" : 600001
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.sessionOwner",
+      "params" : {
+        "allowSensitive" : true,
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe",
+        "owner" : {
+          "id" : "job-trace-inspect",
+          "kind" : "session"
+        },
+        "timeoutMs" : 1000
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "deviceEvidenceCreated" : false,
+            "newDispatchCount" : 0,
+            "phase" : "traceInspectionOwner"
+          },
+          "message" : "Trace inspection is unavailable"
+        },
+        "ok" : false
+      },
+      "method" : "trace.inspect",
+      "name" : "inspect.artifactOnly",
+      "params" : {
+        "artifactId" : "ART-9c914630ca801dc5e25b24667d40e4fe"
+      }
+    }
+  ],
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  }
+}

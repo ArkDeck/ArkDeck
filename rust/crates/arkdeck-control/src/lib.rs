@@ -365,6 +365,26 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `trace.inspect`: Swift's `RuntimeTraceInspectionResourceHandler`,
+    /// which asks for its Artifact owner and its Trace inspector before it
+    /// reads a parameter. Swift composes an inspector only beside an ArkTrace
+    /// distribution that loaded a `trace-summary@1` profile; a host without
+    /// one refuses every request with the owner's details: nothing
+    /// dispatched and no device evidence created.
+    fn trace_inspection(
+        &self,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Trace inspection is unavailable".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("traceInspectionOwner")),
+                ("newDispatchCount".into(), json!(0)),
+                ("deviceEvidenceCreated".into(), json!(false)),
+            ])),
+        })
+    }
     /// `flash.reconcile-alias` once its two parameters were read: the
     /// Target's post-flash alias reconciled against the one attached board. A
     /// host without the reconciler answers as Swift's daemon without it does.
@@ -923,6 +943,11 @@ impl<H: HostServices> Control<H> {
             "target.adopt" => Response {
                 id: request.id.clone(),
                 outcome: self.host.target_adopt(&params),
+            },
+            // As Swift's handler: the owner answers before any parameter.
+            "trace.inspect" => Response {
+                id: request.id.clone(),
+                outcome: self.host.trace_inspection(&params),
             },
             "trace.cache.purge" if params.is_empty() => Response {
                 id: request.id.clone(),

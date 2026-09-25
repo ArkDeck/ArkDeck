@@ -396,4 +396,120 @@ schemas admit it.
 
 ### CI
 
+PR #2161, merged as `9612b00c0`: Agent PR 36078677970, SDD Guard 36078677985
+and Swift CI 36078678268 all succeeded at `961410f7e` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26, each running `check-contracts.py`'s published and candidate views;
+swift-tests; ds-tokens; ds-interactions; `swift` aggregate; app-build
+skipped by plan).
+
+## 4. `trace.inspect` answers as Swift's daemon without a Trace inspector
+
+Base: protected `main` `9612b00c0` (#2161); developed on `9ae1e4997` (#2160)
+and rebased without conflict. No contract input changes: the
+corpus already holds Swift's refusal (`trace.inspect.jsonl`, the frame with no
+parameters) and the method's schema publishes its code and details.
+
+### What a caller sees
+
+`trace.inspect` on the Rust daemon is routed to a Trace inspection owner and
+answers every request as Swift's daemon does when it composed no Trace
+inspector: `operationUnavailable`, "Trace inspection is unavailable", with the
+owner's details (`phase` `traceInspectionOwner`, `newDispatchCount` 0,
+`deviceEvidenceCreated` false), before it reads a parameter. Until now the
+Rust daemon answered the foundation's `rejected`. The App does not call the
+method, so the App transport is unchanged; the Rust CLI has no `trace inspect`
+leaf yet (CLI parity, TASK-XPA-018).
+
+### Swift, the oracle
+
+- `RuntimeTraceInspectionResourceHandler` asks for its Artifact owner and its
+  inspector before anything else; the daemon composes the inspector
+  (`ProductTraceOfflineInspector`, over ArkTrace's
+  `TraceOfflineInspectionService` linked into the daemon) only beside a
+  `trace-summary@1` profile loaded from an ArkTrace distribution
+  (`ARKDECK_ARKTRACE_DESCRIPTOR`).
+- `TraceInspectOracleContractTests` (new,
+  `rust/tests/fixtures/trace-inspect-unavailable/`): the control-plane
+  handler composed as the daemon is without that profile, over the shared
+  fake HDC and an adopted Target, answers seven requests — none, the exact
+  Job/Artifact request the CLI sends, and each one the owner would otherwise
+  refuse `invalidInput` (no sensitive opt-in, a zero or too-long timeout, a
+  Session owner, a lone Artifact identity) — all with that refusal, and the
+  fake is never called. Every request conforms to the method's request
+  schema, so none of them could put a line the schema refuses into a corpus.
+
+### Rust
+
+- `arkdeck-control`: `HostServices::trace_inspection`, whose default is that
+  refusal, and the `trace.inspect` route, which hands it every request
+  unread. The daemon composes no inspector, so it answers with the default.
+- `check-readonly.py` expects the refusal for `trace.inspect`;
+  `check-corpus-replay.py` serves the method.
+
+### Evidence
+
+- `cargo test -p arkdeck-control --test read_only`:
+  `trace_inspection_without_an_inspector_answers_swift_s_refusal` replays the
+  seven exchanges and sends three requests the schema refuses (a member it
+  does not declare, values of other types, an extra owner member), which
+  reach the same refusal, as in Swift, whose daemon validates no request
+  against a method schema; no other owner is entered.
+- `check-corpus-replay.py --fixture rust/tests/fixtures/trace-inspect-unavailable`
+  over the built daemon and CLI: PASS, 7 exchanges replayed, 13 checks (the
+  fake received no call; a restart; the four refused startups).
+- `check-readonly.py`: PASS (135 control responses, 13 CLI envelopes).
+- Mutations: 6/6 caught, each restored by SHA-256 (the message reworded,
+  another owner's phase, a dispatch counted, evidence claimed, the route
+  removed, parameters read before the owner; log
+  `/private/tmp/arkdeck-s25-c-mutations.log`).
+
+### Differences from Swift (declared), and the decision it needs
+
+On a host whose daemon names an ArkTrace distribution — this maintainer's
+installed daemon does (`ARKDECK_ARKTRACE_DESCRIPTOR`) — Swift composes the
+inspector and inspects the Trace; the Rust daemon refuses. The inspector is
+ArkTrace's own library (`ArkTraceAppSupport.TraceOfflineInspectionService`:
+the bundled `trace_streamer` run over the Artifact, SQLite staging, the
+schema fingerprint and data quality), linked into the Swift daemon; the Rust
+daemon links no ArkTrace. Porting it is not a translation of ArkDeck code, so
+the maintainer decides between:
+
+- (a) port ArkTrace's offline inspection to Rust — a second implementation of
+  ArkTrace's parser staging and schema derivation inside ArkDeck, which then
+  drifts from ArkTrace's own;
+- (b) answer from the pinned ArkTrace CLI once `analyzer.summarize-trace@1`
+  runs on the Rust daemon (this record's next slices): its `summary --json`
+  envelope carries the trace's duration, schema fingerprint, parser identity,
+  provenance and data quality. One published field changes meaning:
+  `engine.sourceRevision` would be the distribution manifest's
+  `source.revision` (the reviewed CLI's revision) instead of the ArkTrace
+  library revision the Swift daemon was built with
+  (`ArkDeckTraceConfiguration.arkTraceSourceRevision`);
+- (c) keep the refusal on the Rust daemon: the App does not call the method;
+  a CLI `trace inspect` would answer unavailable after the cutover.
+
+Proposal: (b) once the summary analyzer runs, with `engine.sourceRevision`
+documented as the reviewed distribution's revision; (c) until then.
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-c-*.log`, and again on `9612b00c0`
+(`/private/tmp/arkdeck-s25-c-r-*.log`, the same results):
+
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-control -p arkdeck-agentd --all-targets -- -D warnings`:
+  exit 0 (the daemon is the only crate that depends on `arkdeck-control`).
+- `cargo test -p arkdeck-control --no-fail-fast`: exit 0, 30 passed.
+- `check-corpus-replay.py` and `check-readonly.py` over
+  `cargo build -p arkdeck-agentd -p arkdeck-cli --bins`: PASS.
+- Swift: `run-swiftpm.sh test --filter TraceInspectOracleContractTests`,
+  exit 0 (recorded, then compared).
+- `sh scripts/check-sdd.sh`: exit 0.
+- Not run: `generate-contract.py`/`check-contracts.py` (no contract input
+  changes), the App (it does not call the method), a device.
+
+### CI
+
 Pending.
