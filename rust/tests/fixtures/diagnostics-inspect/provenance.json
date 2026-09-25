@@ -1,0 +1,10 @@
+{
+  "answers" : "Fixtures/ControlFrames",
+  "owners" : [
+    "RuntimeCLI.runDiagnosticsResource",
+    "DiagnosticSessionOfflineInspector",
+    "DiagnosticSessionReading",
+    "DiagnosticArtifactTextPreview"
+  ],
+  "producer" : "CLIDiagnosticsInspectOracleContractTests"
+}

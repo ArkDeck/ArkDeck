@@ -25,6 +25,7 @@ mod trace_inspect;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
 mod device_wait;
+pub mod diagnostics_resources;
 pub use debug_probe::validate_debug_probe;
 pub use trace_inspect::{
     MACHINE_QUALITY_SCOPES, inspection_projection, inspection_request, validate_inspection,
@@ -335,6 +336,14 @@ pub(crate) fn utc_now() -> String {
     )
 }
 
+/// A frame identity as Swift's `AgentClient` assigns one when its caller
+/// names none: a random UUID in uppercase text.
+pub fn client_frame_id() -> String {
+    job_plan::uuid()
+        .unwrap_or_else(|_| "00000000-0000-4000-8000-000000000000".into())
+        .to_uppercase()
+}
+
 pub fn valid_correlation(id: &str) -> bool {
     (1..=128).contains(&id.len())
         && id.as_bytes()[0].is_ascii_alphanumeric()
@@ -523,6 +532,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--source-job"
                 | "--continuation-request-id"
                 | "--remote-path"
+                | "--max-characters"
                 | "--contracts-directory"
                 | "--fixtures-directory"
                 | "--timeout" => {
@@ -559,6 +569,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--after-cursor" => "afterCursor",
                         "--artifact" => "artifactId",
                         "--max-bytes" => "maxBytes",
+                        "--max-characters" => "maxCharacters",
                         "--session" => "sessionId",
                         "--target" => "targetId",
                         "--time" => "timeRange",
@@ -693,6 +704,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "export"] => "artifact.export",
         ["trace", "export"] => "trace.export",
         ["diagnostics", "export"] => "diagnostics.export",
+        ["diagnostics", "inspect"] => "diagnostics.inspect",
+        ["diagnostics", "preview"] => "diagnostics.preview",
         ["recovery", "cleanup", "list"] => "recovery.cleanup.list",
         ["cleanup-debt", "list"] => "cleanup-debt.list",
         ["recovery", "cleanup", "continue"] => "recovery.cleanup.continue",
@@ -977,6 +990,14 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             &["contractsDirectory", "fixturesDirectory"]
         }
         "trace.inspect" => &["jobId", "artifactId", "allowSensitive", "timeout"],
+        "diagnostics.inspect" => &["jobId", "timeout"],
+        "diagnostics.preview" => &[
+            "jobId",
+            "artifactId",
+            "maxCharacters",
+            "allowSensitive",
+            "timeout",
+        ],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
@@ -1562,6 +1583,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     };
     debug_probe::configure(command, &method_options, help)?;
     trace_inspect::configure(command, &method_options, help)?;
+    let diagnostics_timeout = diagnostics_resources::configure(command, &mut method_options, help)?;
     // Swift's parser names the leaf a refused option belongs to.
     flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
         error.command = Some(command);
@@ -1573,6 +1595,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(wait_timeout)
         .or(import_timeout)
         .or(artifact_timeout)
+        .or(diagnostics_timeout)
         .or(target_timeout)
         .or(workspace_timeout)
         .or(plan_timeout)
@@ -1695,7 +1718,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             )
             // Swift sends a quota request without parameters.
             || (command.starts_with("artifact.") && command != "artifact.quota")
-            || matches!(command, "trace.export" | "diagnostics.export")
+            || command == "trace.export"
+            || command.starts_with("diagnostics.")
             || command.starts_with("target.")
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")

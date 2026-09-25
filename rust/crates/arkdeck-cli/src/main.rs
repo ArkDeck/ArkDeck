@@ -244,6 +244,30 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
                 .map_err(|error| CliError::from_client(error, method))
         });
     }
+    if let Some(verb) = invocation.command.strip_prefix("diagnostics.")
+        && verb != "export"
+    {
+        // Swift's session bounds every request by one deadline.
+        let deadline =
+            Instant::now() + Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000));
+        let options = invocation
+            .params
+            .as_ref()
+            .expect("parsed diagnostics parameters");
+        return arkdeck_cli::diagnostics_resources::run(verb, options, &mut |method, params| {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let mut client = Client::connect_bounded(&endpoint, &identity, remaining)
+                .map_err(|error| CliError::from_connect(error, method))?;
+            // Swift's client proves the contract on each connection, and
+            // names both frames with identities of its own.
+            client
+                .health(&arkdeck_cli::client_frame_id())
+                .map_err(|error| CliError::from_client(error, method))?;
+            client
+                .request(&arkdeck_cli::client_frame_id(), method, Some(params))
+                .map_err(|error| CliError::from_client(error, method))
+        });
+    }
     if matches!(
         invocation.command,
         "artifact.inspect"
