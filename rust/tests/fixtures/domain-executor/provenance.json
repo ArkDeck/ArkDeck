@@ -1,0 +1,10 @@
+{
+  "answers" : "Fixtures/ControlFrames",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "owners" : [
+    "AgentRuntimeExecutor.run",
+    "RuntimeCLI.emitAgentOutcome",
+    "CLIRuntimeSession.mapped"
+  ],
+  "producer" : "CLIDomainExecutorOracleContractTests"
+}
