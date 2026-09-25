@@ -13,8 +13,14 @@
 - 清除失效路径、重复约束和历史状态；删除前检查引用及脚本用途。指令保留目标、完成条件和
   必要边界，常规实现选择留给 Agent。修改后核对链接、触发场景和迁移前后约束是否完整。
   个人与插件 skills 属于独立修改范围。
+- `AGENTS.md` 同时由 Codex 与 Claude 读取，写模型中立的目标、边界与停止条件。不加通用的
+  “仔细思考”“完成前再核一遍”类指令：Claude Opus 5/5.5 默认会思考与自查，这类指令只增加
+  思考量或造成重复验证；思考深度由 effort 控制。
 
 维护依据：[Rethinking skills and prompts for GPT-6 Astra](https://developers.openai.com/blog/rethinking-skills-and-prompts-for-gpt-6-astra)、
 [OpenAI 提示指导](https://developers.openai.com/api/docs/guides/latest-model#prompting-best-practices)、
 [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)、
-[Skills](https://learn.chatgpt.com/docs/build-skills)。
+[Skills](https://learn.chatgpt.com/docs/build-skills)；
+[Prompting Claude Opus 5.5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5)、
+[Prompting Claude Opus 5](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5)、
+[Claude prompting best practices](https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/claude-prompting-best-practices)。
