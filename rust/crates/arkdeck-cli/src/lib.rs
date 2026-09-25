@@ -28,8 +28,8 @@ mod job_plan;
 mod job_resources;
 mod job_wait;
 pub use job_plan::{
-    generates_identity, job_plan_params, job_submit_params, run_exit, validate_acceptance,
-    validate_cancellation, validate_plan,
+    announces_generated_identity, generates_identity, job_plan_params, job_submit_params, run_exit,
+    validate_acceptance, validate_cancellation, validate_plan,
 };
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
@@ -920,17 +920,18 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
-    // The LaunchAgent leaves keep the legacy `--json` rendering (Swift's
-    // registry lists it beside `--output`, which it excludes), connect to no
-    // caller-named Runtime and take no correlation identity.
+    // The LaunchAgent leaves connect to no caller-named Runtime and take no
+    // correlation identity.
     let service = command.starts_with("runtime.service.");
-    if legacy_json
-        && (!(matches!(command, "debug.probe" | "trace.probe") || service) || mode.is_some())
-    {
-        return Err(CliError::new(
+    // The legacy `--json` is the leaf's where the registry declares it, as
+    // Swift's registry does on nearly every leaf, and never beside `--output`.
+    if legacy_json && (!command_registry::declares(command, "--json") || mode.is_some()) {
+        let mut error = CliError::new(
             "invalidOption",
-            "--json belongs to debug probe, trace probe and the runtime service leaves and excludes --output",
-        ));
+            "--json belongs only to the leaves that declare it and excludes --output",
+        );
+        error.command = Some(command);
+        return Err(error);
     }
     if service && (id.is_some() || socket.is_some()) {
         let mut error = CliError::new(
@@ -1793,6 +1794,34 @@ pub fn failure_envelope(command: &str, error: &CliError, id: &str, protocol: boo
         result["meta"]["controlProtocolVersion"] = json!(PROTOCOL_VERSION);
     }
     result
+}
+
+/// Swift `CLIRuntimeSession.legacyDocument`: the legacy `--json` rendering of
+/// a result, or of a failure (`legacy_failure`), as
+/// `CanonicalJSONEncoders.canonicalPretty()` writes it, then one LF. Not the
+/// versioned envelope, and never carrying `meta`.
+pub fn legacy_document(value: &Value) -> Vec<u8> {
+    match arkdeck_contract::foundation_json::pretty(value, false) {
+        Ok(mut bytes) => {
+            bytes.push(b'\n');
+            bytes
+        }
+        Err(_) => b"{\"error\":{\"code\":\"internalError\",\"message\":\"the daemon reply could not be encoded as JSON\"}}\n".to_vec(),
+    }
+}
+
+/// Swift `CLIResultEnvelope.legacyFailure`: a failure in the legacy `--json`
+/// rendering carries only its code and words.
+pub fn legacy_failure(error: &CliError) -> Value {
+    json!({"error": {"code": error.code, "message": error.message}})
+}
+
+/// Whether a refusal of `argv` is answered in the legacy `--json` rendering:
+/// Swift's registry accepts the argv, so its handler, not its parser, would
+/// refuse it, and the handler's session renders what `--json` asks for.
+/// Swift's parser refuses in prose on stderr, as this CLI does then.
+pub fn legacy_refusal(argv: &[String]) -> bool {
+    argv.iter().any(|argument| argument == "--json") && registry_parse::check(argv).is_ok()
 }
 
 pub fn render(value: &Value) -> Result<Vec<u8>, ContractError> {

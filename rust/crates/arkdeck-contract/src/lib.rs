@@ -10,6 +10,7 @@ mod catalog_pattern;
 mod cbor;
 mod control_generated;
 /// Foundation's path arithmetic for inputs read from disk.
+pub mod foundation_json;
 pub mod foundation_path;
 mod framing;
 mod imports;

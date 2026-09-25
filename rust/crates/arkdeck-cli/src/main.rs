@@ -69,7 +69,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         } else {
             arkdeck_cli::job_plan_params(invocation)?
         };
-        if submit && !invocation.json && arkdeck_cli::generates_identity(invocation) {
+        if submit && arkdeck_cli::announces_generated_identity(invocation) {
             eprintln!(
                 "note: no --idempotency-key was given, so this submit generated one and cannot be retried safely; pass one to make a repeat return the same job"
             );
@@ -466,7 +466,8 @@ fn observe_job(
                             .map_err(|_| {
                                 CliError::new("ioFailure", "the stream could not be written")
                             })?;
-                        } else if !invocation.json {
+                        } else if !invocation.json && !invocation.legacy_json {
+                            // Swift prints rows in the human rendering only.
                             println!(
                                 "{}",
                                 serde_json::to_string_pretty(&delivered).expect("a checked event")
@@ -965,6 +966,11 @@ fn main() -> std::process::ExitCode {
                 {
                     return 74.into();
                 }
+            } else if arkdeck_cli::legacy_refusal(&args) {
+                let document = arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(&error));
+                if io::stdout().lock().write_all(&document).is_err() {
+                    return 74.into();
+                }
             } else {
                 eprintln!("arkdeck: {}", error.message);
             }
@@ -1098,7 +1104,11 @@ fn main() -> std::process::ExitCode {
                     return 74.into();
                 }
             } else if invocation.legacy_json {
-                if write_document(&result).is_err() {
+                if io::stdout()
+                    .lock()
+                    .write_all(&arkdeck_cli::legacy_document(&result))
+                    .is_err()
+                {
                     return 74.into();
                 }
             } else if invocation.jsonl {
@@ -1131,6 +1141,13 @@ fn main() -> std::process::ExitCode {
                 ))
                 .is_err()
                 {
+                    return 74.into();
+                }
+            } else if invocation.legacy_json {
+                // Swift `CLIResultEnvelope.legacyFailure`, on stdout: its code
+                // and words only, and no prompt on stderr.
+                let document = arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(&error));
+                if io::stdout().lock().write_all(&document).is_err() {
                     return 74.into();
                 }
             } else {

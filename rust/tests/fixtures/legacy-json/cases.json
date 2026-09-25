@@ -1,0 +1,135 @@
+{
+  "documents" : [
+    {
+      "document" : "{\n\n}\n",
+      "name" : "emptyObject",
+      "value" : {
+
+      }
+    },
+    {
+      "document" : "[\n\n]\n",
+      "name" : "emptyArray",
+      "value" : [
+
+      ]
+    },
+    {
+      "document" : "{\n  \"false\" : false,\n  \"int64Max\" : 9223372036854775807,\n  \"int64Min\" : -9223372036854775808,\n  \"negative\" : -42,\n  \"null\" : null,\n  \"true\" : true,\n  \"uint64Max\" : 18446744073709551615,\n  \"zero\" : 0\n}\n",
+      "name" : "scalars",
+      "value" : {
+        "false" : false,
+        "int64Max" : 9223372036854775807,
+        "int64Min" : -9223372036854775808,
+        "negative" : -42,
+        "null" : null,
+        "true" : true,
+        "uint64Max" : 18446744073709551615,
+        "zero" : 0
+      }
+    },
+    {
+      "document" : "[\n  1.5,\n  -0.25,\n  0.1,\n  1e-07,\n  123456.789,\n  1e+21,\n  2.5e-05,\n  1e+16,\n  9.87654321e+15,\n  0.0001,\n  1000000000000000,\n  -1e-10\n]\n",
+      "name" : "numbers",
+      "value" : [
+        1.5,
+        -0.25,
+        0.1,
+        1e-07,
+        123456.789,
+        1e+21,
+        2.5e-05,
+        1e+16,
+        9.87654321e+15,
+        0.0001,
+        1000000000000000,
+        -1e-10
+      ]
+    },
+    {
+      "document" : "[\n  9007199254740991,\n  9007199254740992,\n  9.007199254740994e+15,\n  -9007199254740992,\n  1234567890123456.8,\n  9.999e-05,\n  -0.0001,\n  5e-324,\n  1.7976931348623157e+308\n]\n",
+      "name" : "boundaries",
+      "value" : [
+        9007199254740991,
+        9007199254740992,
+        9.007199254740994e+15,
+        -9007199254740992,
+        1234567890123456.8,
+        9.999e-05,
+        -0.0001,
+        5e-324,
+        1.7976931348623157e+308
+      ]
+    },
+    {
+      "document" : "{\n  \"backslash\" : \"back\\\\slash\",\n  \"controls\" : \"\\u0000\\u0001\\b\\t\\n\\f\\r\\u001f\",\n  \"del\" : \"\",\n  \"empty\" : \"\",\n  \"quote\" : \"say \\\"hi\\\"\",\n  \"separators\" : \"  \",\n  \"slash\" : \"a/b\",\n  \"unicode\" : \"é中文🙂\"\n}\n",
+      "name" : "strings",
+      "value" : {
+        "backslash" : "back\\slash",
+        "controls" : "\u0000\u0001\b\t\n\f\r\u001f",
+        "del" : "",
+        "empty" : "",
+        "quote" : "say \"hi\"",
+        "separators" : "  ",
+        "slash" : "a/b",
+        "unicode" : "é中文🙂"
+      }
+    },
+    {
+      "document" : "{\n  \"a\" : {\n    \"y\" : [\n      [\n        null\n      ]\n    ],\n    \"z\" : {\n\n    }\n  },\n  \"b\" : [\n    {\n      \"a\" : [\n\n      ],\n      \"k\" : \"v\"\n    },\n    2\n  ]\n}\n",
+      "name" : "nested",
+      "value" : {
+        "a" : {
+          "y" : [
+            [
+              null
+            ]
+          ],
+          "z" : {
+
+          }
+        },
+        "b" : [
+          {
+            "a" : [
+
+            ],
+            "k" : "v"
+          },
+          2
+        ]
+      }
+    },
+    {
+      "document" : "{\n  \"B\" : 2,\n  \"Z\" : 6,\n  \"_\" : 4,\n  \"a\" : 3,\n  \"a0\" : 8,\n  \"aa\" : 7,\n  \"b\" : 1,\n  \"é\" : 5\n}\n",
+      "name" : "keyOrder",
+      "value" : {
+        "B" : 2,
+        "Z" : 6,
+        "_" : 4,
+        "a" : 3,
+        "a0" : 8,
+        "aa" : 7,
+        "b" : 1,
+        "é" : 5
+      }
+    }
+  ],
+  "failures" : [
+    {
+      "code" : "resourceNotFound",
+      "document" : "{\n  \"error\" : {\n    \"code\" : \"resourceNotFound\",\n    \"message\" : \"target TGT-missing is not adopted\"\n  }\n}\n",
+      "message" : "target TGT-missing is not adopted"
+    },
+    {
+      "code" : "clientTimeout",
+      "document" : "{\n  \"error\" : {\n    \"code\" : \"clientTimeout\",\n    \"message\" : \"client stopped waiting; the Runtime execution and Job were not cancelled\"\n  }\n}\n",
+      "message" : "client stopped waiting; the Runtime execution and Job were not cancelled"
+    },
+    {
+      "code" : "invalidInput",
+      "document" : "{\n  \"error\" : {\n    \"code\" : \"invalidInput\",\n    \"message\" : \"a path /tmp/x and \\\"quoted\\\" é\"\n  }\n}\n",
+      "message" : "a path /tmp/x and \"quoted\" é"
+    }
+  ]
+}

@@ -15,11 +15,12 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The CLI, asked for the machine answer unless the test names its own output
-/// mode (the two streaming leaves serve `jsonl`, and one of them no `json`).
+/// mode (the two streaming leaves serve `jsonl`, and one of them no `json`),
+/// or the legacy `--json`, which excludes `--output`.
 fn invoke(argv: &[&str], socket: &PathBuf) -> Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_arkdeck"));
     command.args(argv);
-    if !argv.contains(&"--output") {
+    if !argv.contains(&"--output") && !argv.contains(&"--json") {
         command.args(["--output", "json"]);
     }
     command.arg("--socket").arg(socket).output().unwrap()

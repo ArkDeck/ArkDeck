@@ -108,6 +108,13 @@ fn actual_cli_verifies_identity_sends_one_target_only_probe_and_preserves_warnin
         let output = command.output().unwrap();
         server.join().unwrap();
         let answer: Value = serde_json::from_slice(&output.stdout).unwrap();
+        // The legacy `--json` answer is Swift's legacy document, byte for byte.
+        if case == "legacy" {
+            assert_eq!(
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&arkdeck_cli::legacy_document(&portrait()))
+            );
+        }
         if matches!(case, "json" | "human" | "legacy") {
             assert!(output.status.success(), "{case}: {answer}");
             assert_eq!(
