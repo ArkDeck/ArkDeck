@@ -187,6 +187,16 @@ fn serve(
     script: Vec<Value>,
     exited: Arc<AtomicBool>,
 ) -> std::thread::JoinHandle<Seen> {
+    serve_answering(socket, script, exited, health())
+}
+
+/// `serve`, answering each preflight with `health`.
+fn serve_answering(
+    socket: &Path,
+    script: Vec<Value>,
+    exited: Arc<AtomicBool>,
+    health: Value,
+) -> std::thread::JoinHandle<Seen> {
     let listener = UnixListener::bind(socket).unwrap();
     std::fs::set_permissions(socket, std::fs::Permissions::from_mode(0o600)).unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -242,7 +252,7 @@ fn serve(
                             .front()
                             .is_some_and(|next| next["method"] == "health"))
                 {
-                    Some(json!({"id": id, "ok": true, "result": health()}))
+                    Some(json!({"id": id, "ok": true, "result": health}))
                 } else if script.front().is_some_and(|next| next["method"] == method) {
                     let entry = script.pop_front().unwrap();
                     if let Some(result) = entry.get("result") {
@@ -776,4 +786,250 @@ fn unreadable_typed_inputs_are_refused_before_any_request() {
         );
     }
     assert!(listener.accept().is_err(), "nothing was sent");
+}
+
+fn resume_scenarios() -> Vec<Value> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/domain-executor-resume/scenarios.json");
+    serde_json::from_slice::<Value>(&std::fs::read(path).unwrap())
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .clone()
+}
+
+/// The pending records under `state`, labelled as the oracle records them.
+fn pending_records(state: &Path) -> Vec<Value> {
+    let mut pending: Vec<Value> = std::fs::read_dir(state)
+        .map(|entries| {
+            entries
+                .map(|entry| {
+                    let path = entry.unwrap().path();
+                    json!({"file": path.file_name().unwrap().to_str().unwrap(),
+                        "content": serde_json::from_slice::<Value>(&std::fs::read(&path).unwrap())
+                            .unwrap()})
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    pending.sort_by_key(|entry| entry["file"].to_string());
+    labelled(&Value::Array(pending)).as_array().unwrap().clone()
+}
+
+fn same_records(actual: &[Value], expected: &Value) -> bool {
+    let expected = expected.as_array().unwrap();
+    actual.len() == expected.len()
+        && actual
+            .iter()
+            .zip(expected)
+            .all(|(actual, expected)| &clocked(actual, expected) == expected)
+}
+
+/// One pause and its resume through the CLI, held to Swift's recording
+/// (`CLIDomainExecutorOracleContractTests`' resume scenarios, whose owners
+/// are `AgentRuntimeExecutor.run`, `AgentRuntimeExecutor.resume` and
+/// `RuntimeCLI.emitAgentOutcome`): the domain leaf pauses against one
+/// scripted Runtime, then `agent resume --resume-token` continues it against
+/// another over the same state directory.
+fn replay_resume(scenario: &Value) -> Result<(), String> {
+    let name = scenario["name"].as_str().unwrap();
+    let root = private_root();
+    let socket = root.0.join("a.sock");
+    let state = root.0.join("agent-runtime");
+    let check = |same: bool, what: &str, context: &str| {
+        if same {
+            Ok(())
+        } else {
+            Err(format!("{name}: {what} differs: {context}"))
+        }
+    };
+
+    // The pause.
+    let exited = Arc::new(AtomicBool::new(false));
+    let server = serve(
+        &socket,
+        scenario["pauseScript"].as_array().unwrap().clone(),
+        exited.clone(),
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args(argv("input.tap", &scenario["request"], &root.0))
+        .args(["--output", "json", "--socket"])
+        .arg(&socket)
+        .output()
+        .unwrap();
+    exited.store(true, Ordering::SeqCst);
+    server.join().unwrap();
+    std::fs::remove_file(&socket).unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
+    let error = labelled(&envelope["error"]);
+    let cli = &scenario["pause"]["cli"];
+    check(
+        error["code"] == cli["code"]
+            && error["message"] == cli["message"]
+            && error["details"] == cli["details"],
+        "pause",
+        &stdout,
+    )?;
+    check(
+        same_records(&pending_records(&state), &scenario["pendingAfterPause"]),
+        "pending records after the pause",
+        &format!("{:?}", pending_records(&state)),
+    )?;
+    let token = if scenario["tokenIsThePauses"] == true {
+        envelope["error"]["details"]["resumeToken"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    } else {
+        // The oracle labels every well-formed token; the scenario's own is an
+        // unknown one of that shape.
+        scenario["token"].as_str().unwrap().replace(
+            "resume-<uuid>",
+            "resume-00000000-0000-4000-8000-000000000000",
+        )
+    };
+
+    // The resume.
+    let exited = Arc::new(AtomicBool::new(false));
+    let server = serve_answering(
+        &socket,
+        scenario["resumeScript"].as_array().unwrap().clone(),
+        exited.clone(),
+        scenario["resumeHealth"].clone(),
+    );
+    let mut command = Command::new(env!("CARGO_BIN_EXE_arkdeck"));
+    command.args(["agent", "resume", "--resume-token", &token]);
+    if let Some(selection) = scenario["selection"].as_str() {
+        command.args(["--selection", selection]);
+    }
+    let output = command
+        .args(["--output", "json", "--socket"])
+        .arg(&socket)
+        .output()
+        .unwrap();
+    exited.store(true, Ordering::SeqCst);
+    let seen = server.join().unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
+    let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+    let context = format!("stdout {stdout} stderr {stderr}");
+    check(
+        labelled(&Value::Array(seen.sent.clone())) == scenario["resumeSent"],
+        "frames",
+        &format!("{:?} {context}", labelled(&Value::Array(seen.sent))),
+    )?;
+    check(
+        scenario["resumeConnections"].as_u64() == Some(seen.connections as u64),
+        "connections",
+        &context,
+    )?;
+    check(
+        same_records(&pending_records(&state), &scenario["pendingAfterResume"]),
+        "pending records after the resume",
+        &context,
+    )?;
+    let resume = &scenario["resume"];
+    let envelope: Value = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
+    if let Some(error) = resume.get("error") {
+        // An executor error escapes the handler: nothing on stdout.
+        return check(
+            output.stdout.is_empty()
+                && output.status.code() == Some(1)
+                && stderr == format!("arkdeck agent: {}\n", error["value"].as_str().unwrap()),
+            "plain failure",
+            &context,
+        );
+    }
+    if let Some(cli) = resume.get("cli") {
+        let error = labelled(&envelope["error"]);
+        let exit = arkdeck_cli::error_registry::category(cli["code"].as_str().unwrap())
+            .map(arkdeck_cli::error_registry::ExitCategory::exit_code);
+        return check(
+            error["code"] == cli["code"]
+                && error["message"] == cli["message"]
+                && error["details"] == cli["details"]
+                && output.status.code() == exit.map(i32::from),
+            "pause again",
+            &context,
+        );
+    }
+    let outcome = &resume["outcome"];
+    let receipt = clocked(&labelled(&envelope["result"]), &outcome["receipt"]);
+    check(
+        envelope["ok"] == true
+            && envelope["command"] == "agent.resume"
+            && receipt == outcome["receipt"],
+        "receipt",
+        &context,
+    )?;
+    match outcome["kind"].as_str().unwrap() {
+        "completed" => check(
+            output.status.code() == Some(0) && stderr.is_empty(),
+            "exit",
+            &context,
+        ),
+        "failed" => check(
+            output.status.code() == Some(1)
+                && stderr == format!("arkdeck agent: {}\n", outcome["reason"].as_str().unwrap()),
+            "failed run's exit",
+            &context,
+        ),
+        other => Err(format!("{name}: unexpected outcome {other}")),
+    }
+}
+
+/// Every recorded pause resumed through `agent resume --resume-token`, as
+/// Swift's client resumes it: continued, refused, paused again, or failed
+/// closed on a token, selection or catalog it cannot trust.
+#[test]
+fn every_recorded_pause_resumes_as_swift_resumes_it() {
+    let scenarios = resume_scenarios();
+    let failures: Vec<String> = scenarios
+        .iter()
+        .filter_map(|scenario| replay_resume(scenario).err())
+        .collect();
+    assert_eq!(scenarios.len(), 16);
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// A pending record that does not decode is Swift's unknown token: the
+/// resume fails closed with nothing connected and nothing replayed, and the
+/// record is left as it was.
+#[test]
+fn a_pending_record_that_does_not_decode_resumes_nothing() {
+    let root = private_root();
+    let socket = root.0.join("a.sock");
+    let state = root.0.join("agent-runtime");
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&state)
+        .unwrap();
+    let token = "resume-00000000-0000-4000-8000-000000000001";
+    let record = state.join(format!("{token}.json"));
+    std::fs::write(&record, b"{\"schemaVersion\":").unwrap();
+    let exited = Arc::new(AtomicBool::new(false));
+    let server = serve(&socket, Vec::new(), exited.clone());
+    let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args([
+            "agent",
+            "resume",
+            "--resume-token",
+            token,
+            "--output",
+            "json",
+        ])
+        .arg("--socket")
+        .arg(&socket)
+        .output()
+        .unwrap();
+    exited.store(true, Ordering::SeqCst);
+    let seen = server.join().unwrap();
+    assert!(output.stdout.is_empty());
+    assert_eq!(output.status.code(), Some(1));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "arkdeck agent: invalidResume(\"resume token is unknown or unreadable\")\n"
+    );
+    assert_eq!(seen.connections, 0);
+    assert_eq!(std::fs::read(&record).unwrap(), b"{\"schemaVersion\":");
 }

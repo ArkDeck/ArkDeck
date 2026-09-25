@@ -1088,6 +1088,50 @@ fn serve_domain_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCod
             },
         },
     };
+    render_agent_answer(invocation, id, answer)
+}
+
+/// Swift's client-side `agent resume --resume-token`: the executor's resume
+/// of the pending record beside the Runtime's socket, rendered as a domain
+/// leaf's run.
+fn serve_client_resume(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    use arkdeck_cli::domain_leaves::{self, Answer, LocalRuntime};
+    let params = invocation.params.clone().unwrap_or_default();
+    let text = |key: &str| params.get(key).and_then(Value::as_str);
+    let answer = match runtime_endpoint(invocation) {
+        Ok((endpoint, identity)) => domain_leaves::resume(
+            text("resumeToken").unwrap_or_default(),
+            text("selection"),
+            LocalRuntime {
+                endpoint: &endpoint,
+                identity: &identity,
+            },
+            domain_leaves::state_directory(&endpoint),
+        ),
+        Err(error) => Answer::Refused {
+            error,
+            progress: None,
+        },
+    };
+    render_agent_answer(invocation, id, answer)
+}
+
+/// Swift `emitAgentOutcome` and `dispatch`: how a client-side run ends, in
+/// the caller's rendering. A completed run is the receipt; a failed one is
+/// still the machine answer, then its reason and exit 1; a pause or a Runtime
+/// refusal is the failure envelope; anything else escapes Swift's handler as
+/// a diagnostic and its exit status, with nothing on stdout.
+fn render_agent_answer(
+    invocation: &Invocation,
+    id: &str,
+    answer: arkdeck_cli::domain_leaves::Answer,
+) -> std::process::ExitCode {
+    use arkdeck_cli::domain_leaves::{self, Answer};
+    let root = invocation.command.split('.').next().unwrap_or_default();
+    let plain = |failure: domain_leaves::Plain| -> std::process::ExitCode {
+        eprintln!("arkdeck {root}: {}", failure.message);
+        failure.exit_code.into()
+    };
     let human = !invocation.json && !invocation.legacy_json;
     let emit = |receipt: Value| -> io::Result<()> {
         if invocation.legacy_json {
@@ -1345,6 +1389,9 @@ fn main() -> std::process::ExitCode {
     }
     if arkdeck_cli::domain_leaves::serves(invocation.command) {
         return serve_domain_leaf(&invocation, id);
+    }
+    if arkdeck_cli::domain_leaves::resumes_client_side(&invocation) {
+        return serve_client_resume(&invocation, id);
     }
     // Swift `warnIfLegacy`: a compatibility leaf says so on stderr before
     // its request, in the human rendering only.
