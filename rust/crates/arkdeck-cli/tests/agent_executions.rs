@@ -2,11 +2,16 @@
 //! fixtures and the answers Swift's agent execution oracle recorded
 //! (`rust/tests/fixtures/agent-execution`): the parse outcomes, the intent a run
 //! sends, every recorded execution checked as Swift's `executionFields` checks
-//! it, how a run settles and exits, how refusals map, and an Artifact page.
+//! it, how a run settles and exits, how refusals map, an Artifact page, and
+//! how long a run waits for a Job that never moves.
 use arkdeck_cli::*;
 use arkdeck_client::ClientError;
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
+
+// The fake Runtime a run waits against is a Unix socket.
+#[cfg(target_os = "macos")]
+mod support;
 
 fn args(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_owned()).collect()
@@ -771,4 +776,69 @@ fn an_artifact_page_is_the_owner_s_snapshot_in_its_order() {
             ("pageSize".into(), json!(7)),
         ])
     );
+}
+
+/// A run whose owned Job never moves, as the GJ-5 rehearsal's analyzer run
+/// did before #2157, against a fake Runtime that answers Swift's recorded run
+/// and then Swift's recorded status each time the execution is read: the
+/// execution owns a running Job, and its deadline, five minutes after Swift
+/// recorded it at 2026-09-14T00:00Z, is long past. That deadline is the
+/// execution's `--maximum-wait` budget for orchestrating up to its Job, which
+/// Swift's `status` no longer reads once a Job is owned, so it ends nothing
+/// here. The run reads the execution again, backing off, until the caller's
+/// own `--timeout` ends the wait in Swift's words, naming the execution; it
+/// asks for nothing but the run and those reads, so nothing is abandoned or
+/// cancelled.
+#[cfg(target_os = "macos")]
+#[test]
+fn a_run_whose_job_never_moves_ends_at_the_callers_timeout_and_cancels_nothing() {
+    let target = oracle()["target"]["targetId"].as_str().unwrap().to_owned();
+    let reply = |name: &str| {
+        let recorded = exchange(name);
+        (
+            recorded["method"].as_str().unwrap().to_owned(),
+            recorded["params"].clone(),
+            json!({"ok": true, "result": unlabelled(recorded["answer"].clone())}),
+        )
+    };
+    let running = reply("observed.running");
+    let execution = &running.2["result"];
+    assert_eq!(
+        (&execution["state"], &execution["jobState"]),
+        (&json!("jobOwned"), &json!("running"))
+    );
+    assert_eq!(execution["deadline"], "2026-09-14T00:05:00.000Z");
+    let started = std::time::Instant::now();
+    let (output, envelope) = support::run_partial(
+        &[
+            "agent",
+            "run",
+            "--operation",
+            "observe.device@1",
+            "--target",
+            &target,
+            "--execution-id",
+            "gj1-observe",
+            "--timeout",
+            "2s",
+        ],
+        std::iter::once(reply("observed.run"))
+            .chain(std::iter::repeat_n(running, 30))
+            .collect(),
+    );
+    let waited = started.elapsed();
+    assert_eq!(output.status.code(), Some(75), "{envelope}");
+    assert_eq!(envelope["ok"], false, "{envelope}");
+    assert_eq!(envelope["command"], "agent.run", "{envelope}");
+    assert_eq!(envelope["error"]["code"], "clientTimeout", "{envelope}");
+    assert_eq!(
+        envelope["error"]["message"],
+        "client stopped waiting; the Runtime execution and Job were not cancelled"
+    );
+    assert_eq!(
+        envelope["error"]["details"],
+        json!({"executionId": "gj1-observe"})
+    );
+    // The run waited out the caller's deadline, not the execution's.
+    assert!(waited >= std::time::Duration::from_secs(2), "{waited:?}");
 }
