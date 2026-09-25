@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--build-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.evaluate",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "evaluate",
+          "--invocation",
+          "sample",
+          "--action-file",
+          "sample",
+          "--source-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--build-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--help"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.evaluate",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--build-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.evaluate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--build-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--invocation",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.evaluate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.evaluate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--build-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "recovery.flash-invocation.evaluate",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "recovery",
+        "flash-invocation",
+        "evaluate",
+        "--invocation",
+        "sample",
+        "--action-file",
+        "sample",
+        "--source-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--build-sha256",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "recovery.flash-invocation.evaluate",
+        "handlerArguments": [
+          "recovery",
+          "flash-invocation",
+          "evaluate",
+          "--invocation",
+          "sample",
+          "--action-file",
+          "sample",
+          "--source-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--build-sha256",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "recovery.flash-invocation.evaluate",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "recovery",
+    "flash-invocation",
+    "evaluate"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

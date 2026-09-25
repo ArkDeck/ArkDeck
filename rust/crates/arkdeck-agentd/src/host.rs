@@ -813,6 +813,45 @@ impl Host {
         self
     }
 
+    /// Runs `run` with this host's `job.plan` planner: the Job planner over
+    /// its owners, with the Flash composition and Swift's ArkForge facts
+    /// port — the Target store's, measured over this host's HDC when it has
+    /// one. None without the planning owner.
+    #[cfg(target_os = "macos")]
+    fn with_flash_planner<T>(
+        &self,
+        run: impl FnOnce(&arkdeck_hoststore::FlashPlanner<'_>) -> T,
+    ) -> Option<T> {
+        let (state_root, analyzer) = self.planning.as_ref()?;
+        let hdc = self.hdc();
+        let facts = match (&self.flash_facts, &self.targets) {
+            (Some(facts), Some(targets)) => Some(move |target_id: &str| {
+                facts.current_facts(
+                    targets,
+                    self.hdc
+                        .as_deref()
+                        .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+                    target_id,
+                )
+            }),
+            _ => None,
+        };
+        Some(run(&arkdeck_hoststore::FlashPlanner {
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
+                artifacts: self.artifacts.as_deref(),
+                analyzer: Some(analyzer),
+                state_root,
+                hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
+            },
+            flash: self.flash_planning.as_ref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
+        }))
+    }
+
     /// `flash.bind-current-loader` binds through this owner, against this
     /// host's Target store and Jobs.
     #[cfg(target_os = "macos")]
@@ -1485,52 +1524,21 @@ impl HostServices for Host {
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let Some((state_root, analyzer)) = &self.planning else {
-            return Err(WireError {
+        self.with_flash_planner(|planner| planner.handle(params))
+            .ok_or_else(|| WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
                 details: None,
-            });
-        };
-        let hdc = self.hdc();
-        // Swift's ArkForge facts port: the Target store's, measured over this
-        // host's HDC when it has one.
-        let facts = match (&self.flash_facts, &self.targets) {
-            (Some(facts), Some(targets)) => Some(move |target_id: &str| {
-                facts.current_facts(
-                    targets,
-                    self.hdc
-                        .as_deref()
-                        .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
-                    target_id,
-                )
-            }),
-            _ => None,
-        };
-        arkdeck_hoststore::FlashPlanner {
-            planner: arkdeck_hoststore::JobPlanner {
-                imports: self.imports.as_deref(),
-                artifacts: self.artifacts.as_deref(),
-                analyzer: Some(analyzer),
-                state_root,
-                hdc: hdc.as_ref(),
-                workspace: self.workspace.as_deref(),
-            },
-            flash: self.flash_planning.as_ref(),
-            facts: facts
-                .as_ref()
-                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
-        }
-        .handle(params)
-        // Planning never admits: every refusal is pre-admission with zero dispatch.
-        .map_err(|refusal| WireError {
-            code: refusal.code.into(),
-            message: refusal.message,
-            details: Some(serde_json::Map::from_iter([
-                ("phase".into(), serde_json::json!("preAdmission")),
-                ("newDispatchCount".into(), serde_json::json!(0)),
-            ])),
-        })
+            })?
+            // Planning never admits: every refusal is pre-admission with zero dispatch.
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })
     }
     /// `job.submit` admits into the Job owner the planner materializes for.
     #[cfg(target_os = "macos")]
@@ -2490,19 +2498,36 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        match &self.flash_invocations {
-            Some(owner) => owner.handle(method, params),
-            None => Err(WireError {
-                code: "internalError".into(),
-                message: if method == "debug.status" {
-                    "Runtime debug invocation is not configured"
-                } else {
-                    "Runtime Flash invocation owner is not configured"
-                }
-                .into(),
-                details: None,
-            }),
+        let unconfigured = || WireError {
+            code: "internalError".into(),
+            message: if method.starts_with("debug.") {
+                "Runtime debug invocation is not configured"
+            } else {
+                "Runtime Flash invocation owner is not configured"
+            }
+            .into(),
+            details: None,
+        };
+        let Some(owner) = &self.flash_invocations else {
+            return Err(unconfigured());
+        };
+        if !matches!(method, "debug.start" | "debug.evaluate") {
+            return owner.handle(method, params);
         }
+        // Swift's broker over its engine's `planOnly`: this host's planner,
+        // Flash composition and facts, the Runtime clock and a fresh identity.
+        self.with_flash_planner(|planner| {
+            owner.broker(
+                method,
+                params,
+                &arkdeck_hoststore::InvocationBroker {
+                    plan: &|request| planner.plan(request),
+                    now: &arkdeck_hoststore::runtime_now,
+                    mint: &|| fresh_id().ok().map(|id| format!("debug-{id}")),
+                },
+            )
+        })
+        .unwrap_or_else(|| Err(unconfigured()))
     }
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when

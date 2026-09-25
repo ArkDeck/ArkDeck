@@ -373,10 +373,10 @@ def main() -> None:
                         expected = "internalError"
                     # No composition here holds the Flash recovery broker's invocations, the
                     # post-flash alias, the Loader binding or the ArkForge lane's runtime
-                    # directory: as Swift's daemon without them, the reads answer that their owner
-                    # is not configured, and the reconciler and the binding read their parameters
-                    # first.
-                    if method in {"debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
+                    # directory: as Swift's daemon without them, the broker and the reads answer
+                    # that their owner is not configured, and the reconciler and the binding read
+                    # their parameters first.
+                    if method in {"debug.start", "debug.evaluate", "debug.status", "recovery.flash-invocation.list", "flash.bootloader-status", "flash.device-access"}:
                         expected = "internalError"
                     if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader"}:
                         expected = "invalidParams"

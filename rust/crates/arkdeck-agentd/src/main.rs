@@ -876,6 +876,8 @@ fn main() {
 }
 
 #[cfg(all(test, target_os = "macos"))]
+mod debug_invocation_control;
+#[cfg(all(test, target_os = "macos"))]
 mod device_access_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_reads_control;

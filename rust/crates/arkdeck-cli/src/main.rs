@@ -279,6 +279,25 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             .request(id, invocation.method, Some(params))
             .map_err(|error| CliError::from_client(error, invocation.method));
     }
+    if arkdeck_cli::is_broker_leaf(invocation.command) {
+        // Swift's leaf reads each named document whole before anything is
+        // sent, so an unreadable one refuses without a connection.
+        let params = Some(arkdeck_cli::broker_params(
+            invocation
+                .params
+                .as_ref()
+                .expect("parsed broker parameters"),
+        )?);
+        let request = match invocation.timeout_ms {
+            Some(timeout_ms) => {
+                Client::connect_bounded(&endpoint, &identity, Duration::from_millis(timeout_ms))
+                    .and_then(|mut client| client.request(id, invocation.method, params))
+            }
+            None => Client::connect(&endpoint, &identity, Duration::from_secs(20))
+                .and_then(|mut client| client.request(id, invocation.method, params)),
+        };
+        return request.map_err(|error| CliError::from_client(error, invocation.method));
+    }
     let request = if let Some(timeout_ms) = invocation.timeout_ms {
         Client::connect_bounded(&endpoint, &identity, Duration::from_millis(timeout_ms))
             .and_then(|mut client| client.request(id, invocation.method, invocation.params.clone()))

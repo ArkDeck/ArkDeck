@@ -14,9 +14,9 @@
 //! unreadable. The file must be the Runtime user's private single-link
 //! regular file, opened through no link, in a private directory.
 //!
-//! Nothing here starts, evaluates, expires or rewrites an invocation: those
-//! are the broker's own (`debug.start`, `debug.evaluate`), and a read never
-//! writes except the list's immutable snapshot.
+//! A read never writes except the list's immutable snapshot. Starting,
+//! evaluating and expiring an invocation are the broker's own
+//! (`debug.start`, `debug.evaluate`; `flash_invocation_broker.rs`).
 use crate::operation_request::OperationRequest;
 use crate::snapshot_pager::SnapshotPager;
 use crate::strict_json::{self, swift_quoted};
@@ -27,6 +27,10 @@ use std::io::{self, Read};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+
+#[path = "flash_invocation_broker.rs"]
+mod broker;
+pub use broker::InvocationBroker;
 
 /// Swift `RuntimeDebugInvocationController.maximumDestructiveEpochs`.
 pub const MAXIMUM_DESTRUCTIVE_EPOCHS: i64 = 16;
@@ -117,6 +121,8 @@ pub struct FlashInvocations {
     directory: PathBuf,
     pages: SnapshotPager,
     serial: Mutex<()>,
+    /// The invocations being evaluated now (Swift's `activeEvaluations`).
+    active: Mutex<std::collections::BTreeSet<String>>,
 }
 
 impl FlashInvocations {
@@ -142,6 +148,7 @@ impl FlashInvocations {
             directory,
             pages: SnapshotPager::open_serialized(&snapshots)?,
             serial: Mutex::new(()),
+            active: Mutex::new(std::collections::BTreeSet::new()),
         })
     }
 
@@ -436,7 +443,14 @@ fn decode(bytes: &[u8]) -> Option<(Document, (String, String))> {
     };
     let schema = text(object, "schemaVersion")?;
     let identity = text(object, "invocationID")?;
-    let current = json!({
+    let current = stored(&schema, &identity, &document);
+    (swift_value(&supplied) == current).then_some((document, (schema, identity)))
+}
+
+/// Swift `RuntimeDebugInvocationDocument` as it encodes: the value a read
+/// requires the stored JSON to be, and the one the broker writes.
+fn stored(schema: &str, identity: &str, document: &Document) -> Value {
+    json!({
         "schemaVersion": schema,
         "invocationID": identity,
         "state": document.state,
@@ -447,8 +461,7 @@ fn decode(bytes: &[u8]) -> Option<(Document, (String, String))> {
         "expiresAtUTC": document.expires,
         "destructiveEpochsUsed": document.epochs,
         "evaluations": document.evaluations,
-    });
-    (swift_value(&supplied) == current).then_some((document, (schema, identity)))
+    })
 }
 
 /// Swift `RuntimeDebugEvaluation`, re-encoded as Swift encodes it (a nil

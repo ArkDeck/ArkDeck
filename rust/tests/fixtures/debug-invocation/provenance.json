@@ -1,0 +1,10 @@
+{
+  "producer" : "DebugInvocationOracleContractTests",
+  "root" : "/private/tmp/arkdeck-debug-invocation-oracle",
+  "steps" : [
+    "artifact.import (flash-bundle, production policy)",
+    "RuntimeDebugInvocationController over a scripted driver (documents laid down)",
+    "RuntimeControlPlaneHandler debug.start, debug.evaluate, debug.status",
+    "RuntimeJobEngineDebugAttemptDriver over RuntimeJobEngine.planOnly"
+  ]
+}

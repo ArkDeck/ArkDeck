@@ -271,7 +271,11 @@ impl FlashPlanner<'_> {
         let reference = descriptor.reference();
         // Converted before anything else is read; a legacy request that
         // cannot be converted fails outside the typed preflight.
-        let inputs = canonical_inputs(&reference, &request.inputs).ok_or_else(internal_failure)?;
+        let inputs =
+            canonical_inputs(&reference, &request.inputs).map_err(|detail| PlanRefusal {
+                swift: Some(detail.into()),
+                ..internal_failure()
+            })?;
         let unavailable = |reason: &str| {
             refusal(
                 "invalidInput",
@@ -418,33 +422,43 @@ impl FlashPlanner<'_> {
 }
 
 /// Swift `ArkForgeFlashRequest.canonicalInputs`: the alias's inputs as the
-/// canonical request names them; none when they cannot be converted.
-fn canonical_inputs(reference: &str, inputs: &Map<String, Value>) -> Option<Map<String, Value>> {
+/// canonical request names them, or the `DeviceProviderError` detail Swift
+/// throws when they cannot be converted.
+fn canonical_inputs(
+    reference: &str,
+    inputs: &Map<String, Value>,
+) -> Result<Map<String, Value>, &'static str> {
     if reference == CANONICAL {
-        return Some(inputs.clone());
+        return Ok(inputs.clone());
     }
-    let lease = inputs
-        .get("imageBundleLease")?
-        .as_str()
-        .filter(|lease| !lease.is_empty())?;
-    let profile = inputs
-        .get("deviceProfile")?
-        .as_str()
-        .filter(|profile| *profile == "dayu200")?;
-    let partitions = inputs
-        .get("partitionPlan")?
-        .as_array()?
+    let (Some(lease), Some(profile), Some(partitions)) = (
+        inputs
+            .get("imageBundleLease")
+            .and_then(Value::as_str)
+            .filter(|lease| !lease.is_empty()),
+        inputs
+            .get("deviceProfile")
+            .and_then(Value::as_str)
+            .filter(|profile| *profile == "dayu200"),
+        inputs.get("partitionPlan").and_then(Value::as_array),
+    ) else {
+        return Err(
+            "legacy Flash alias inputs cannot be converted to the canonical full-restore request",
+        );
+    };
+    let partitions = partitions
         .iter()
-        .map(|partition| partition.as_str())
-        .collect::<Option<Vec<&str>>>()?;
+        .map(Value::as_str)
+        .collect::<Option<Vec<&str>>>()
+        .ok_or("legacy partitionPlan contains a non-string value")?;
     if partitions != PARTITIONS {
-        return None;
+        return Err("legacy partitionPlan must exactly match the selected published profile");
     }
     let verification = inputs
         .get("postFlashVerification")
         .cloned()
         .unwrap_or_else(|| json!("full"));
-    Some(Map::from_iter([
+    Ok(Map::from_iter([
         ("artifactLease".into(), json!(lease)),
         ("deviceProfileRef".into(), json!(profile)),
         ("intent".into(), json!("fullRestore")),
