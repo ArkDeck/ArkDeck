@@ -12,17 +12,13 @@ use crate::registry::{
     Owner, PendingSelection, Selection, SelectionOutcome, ToolIndex, identifier, read_tools,
     tool_projection,
 };
+use crate::store::{self, BUNDLES, MAX_INDEX, TOOLS};
 use crate::{ToolRegistryStore, decode_bundles};
 use arkdeck_contract::{WireError, canonical_json};
 use arkdeck_platform::{DocumentPublishError, HostReadLock};
 use serde_json::{Map, Value, json};
 use std::{io, path::Path, path::PathBuf};
 
-const MAX_INDEX: usize = 4 * 1024 * 1024;
-const BUNDLES: &str = "bundles.json";
-const TOOLS: &str = "tools.json";
-const EMPTY_BUNDLES: &[u8] = b"{\"records\":[],\"schemaVersion\":\"arkdeck.bootstrap-bundles/1\"}";
-const EMPTY_TOOLS: &[u8] = b"{\"records\":[],\"schemaVersion\":\"arkdeck.bootstrap-tools/2\"}";
 /// The one owner Swift pins the active tool for.
 const ACTIVE: &str = "runtime-hdc-selection";
 
@@ -168,60 +164,6 @@ pub fn cutover_pending_selection(path: &Path) -> Result<Option<String>, String> 
 }
 
 impl ToolRegistryStore {
-    fn binding(&self, lock: &HostReadLock) -> Result<(), WireError> {
-        lock.validate_link(&self.root, ".lock")
-            .map_err(|_| failure("fileIdentityChanged", "bootstrap lock was replaced"))?;
-        self.root
-            .validate_path(&self.path)
-            .map_err(|_| failure("fileIdentityChanged", "bootstrap store directory changed"))
-    }
-
-    /// Swift `readIndex(_:create:)` of either index: an absent one is created
-    /// empty only when nothing it would describe is in the store.
-    fn index_bytes(&self, lock: &HostReadLock, name: &str) -> Result<Vec<u8>, WireError> {
-        let (missing, unreadable) = if name == BUNDLES {
-            (
-                "bundle index is missing beside retained bootstrap state",
-                "bundle index failed bounded schema and identity validation",
-            )
-        } else {
-            (
-                "tool index is missing beside retained tool state",
-                "tool index failed bounded schema and identity validation",
-            )
-        };
-        match self.root.read(name, MAX_INDEX) {
-            Ok(bytes) => Ok(bytes),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {
-                let names = self
-                    .root
-                    .names(65_536)
-                    .map_err(|_| failure("recordUnreadable", unreadable))?;
-                let occupied = if name == BUNDLES {
-                    names.iter().any(|name| name != ".lock")
-                } else {
-                    names
-                        .iter()
-                        .any(|name| name.starts_with("tool-") || name.starts_with(".tool-"))
-                };
-                if occupied {
-                    return Err(failure("recordUnreadable", missing));
-                }
-                self.binding(lock)?;
-                let empty = if name == BUNDLES {
-                    EMPTY_BUNDLES
-                } else {
-                    EMPTY_TOOLS
-                };
-                self.root
-                    .publish_document(name, empty, MAX_INDEX)
-                    .map_err(publication)?;
-                Ok(empty.to_vec())
-            }
-            Err(_) => Err(failure("recordUnreadable", unreadable)),
-        }
-    }
-
     /// Swift `withSharedStore`: the lock taken without waiting, the shared
     /// bundle index and the tool index read, `body`, and the store still the
     /// one locked.
@@ -229,28 +171,15 @@ impl ToolRegistryStore {
         &self,
         body: impl FnOnce(&mut Ledger<'_>) -> Result<T, WireError>,
     ) -> Result<T, WireError> {
-        self.root
-            .validate_path(&self.path)
-            .map_err(|_| failure("fileIdentityChanged", "bootstrap store directory changed"))?;
-        let lock = self.root.lock_document(".lock").map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
-                failure(
-                    "resourceConflict",
-                    "another bootstrap operation holds the store; retry after it completes",
-                )
-            } else {
-                failure("recordUnreadable", "bootstrap owner lock is unsafe")
-            }
-        })?;
-        self.binding(&lock)?;
-        let bundles = self.index_bytes(&lock, BUNDLES)?;
+        let lock = store::lock(&self.root, &self.path)?;
+        let bundles = store::index_bytes(&self.root, &self.path, &lock, BUNDLES)?;
         decode_bundles(&bundles).map_err(|_| {
             failure(
                 "recordUnreadable",
                 "bundle index failed bounded schema and identity validation",
             )
         })?;
-        let tools = self.index_bytes(&lock, TOOLS)?;
+        let tools = store::index_bytes(&self.root, &self.path, &lock, TOOLS)?;
         let (index, _) = read_tools(&tools).map_err(|_| index_unreadable())?;
         let mut ledger = Ledger {
             store: self,
@@ -260,7 +189,7 @@ impl ToolRegistryStore {
             index,
         };
         let result = body(&mut ledger)?;
-        self.binding(&ledger.lock)?;
+        store::binding(&self.root, &self.path, &ledger.lock)?;
         Ok(result)
     }
 
@@ -795,7 +724,7 @@ impl Ledger<'_> {
         // Swift writes whatever its transition made; no transition here makes
         // a ledger the reader refuses, and none is published if one did.
         read_tools(&encoded).map_err(|_| index_unreadable())?;
-        self.store.binding(&self.lock)?;
+        store::binding(&self.store.root, &self.store.path, &self.lock)?;
         let root = &self.store.root;
         if root.read(BUNDLES, MAX_INDEX).ok().as_deref() != Some(&self.bundles[..])
             || root.read(TOOLS, MAX_INDEX).ok().as_deref() != Some(&self.tools[..])

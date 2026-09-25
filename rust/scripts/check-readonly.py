@@ -82,7 +82,11 @@ def assert_boundaries() -> None:
         # Keychain and the signer's terminal all come from the platform crate.
         "arkdeck-provider-workspace": {"arkdeck-platform"},
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
-        "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
+        # The zero-Runtime `runtime service install` pins its bundle and
+        # publishes the first HDC selection, and `uninstall` releases the pins,
+        # through the Bootstrap registry's one owner (协调会话 2026-09-26); the
+        # CLI links no Runtime store (never arkdeck-hoststore).
+        "arkdeck-cli": {"arkdeck-bootstrap", "arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore", "arkdeck-provider-arkforge"},
         # The ArkForge lane (lane D) speaks to `arkforged` only through
         # ArkForge's own client crate; no other ArkDeck crate reaches ArkForge.

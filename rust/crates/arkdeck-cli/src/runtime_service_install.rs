@@ -33,18 +33,25 @@
 //!   `LaunchAgent/cutover-snapshots/`, and the plist asks for the production
 //!   composition (ruling 1).
 //!
-//! `install` is Swift's zero-Runtime bootstrap path over the bootstrap
-//! registries' installation references, which have no Rust owner; it is
-//! refused by name. `uninstall` removes the service as Swift does, and is
-//! refused before anything changes while the bundle registry still pins a
-//! bundle for the service installation, which this CLI cannot release.
+//! `install` is Swift's zero-Runtime bootstrap path over the Bootstrap
+//! registry (`arkdeck-bootstrap`, the owner the Runtime writes it through
+//! too): it pins the exact bundle generation for `installation/
+//! runtime-service-installation` and publishes the first HDC selection from
+//! the exact tool generation, installs the retained bundle with the selected
+//! tool as `update` installs — the signing and analyzer refusals included —
+//! and then keeps only that bundle pinned. A failure after the pin leaves it
+//! (and the selection) for a retry, never dangling. `uninstall` removes the
+//! service as Swift does and then releases the installation's pins; a release
+//! that fails is reported after the removal, which is not undone.
 use crate::runtime_service::{
     ANALYZER_KEY, ARKFORGE_BUNDLE_KEY, ARKFORGE_CAMPAIGN_KEY, ARKTRACE_DESCRIPTOR_KEY,
-    ArkForgeLaneStatus, DAEMON_EXECUTABLE_NAME, DEVECO_SDK_KEY, HDC_KEY, LABEL, PlainFailure,
-    RECEIPT_SCHEMA, SWIFT_SHA256_KEY, ServiceAnswer, ServiceError, ServiceHost,
+    ArkForgeLaneStatus, CodedFailure, DAEMON_EXECUTABLE_NAME, DEVECO_SDK_KEY, HDC_KEY, LABEL,
+    PlainFailure, RECEIPT_SCHEMA, SWIFT_SHA256_KEY, ServiceAnswer, ServiceError, ServiceHost,
     ValidatedDescriptor, WATERFLOW_PROJECT_REF, WORKSPACE_ACTIVE_PROJECT_KEY, WORKSPACE_INSPECTOR,
     WORKSPACE_INSPECTOR_KEY, WORKSPACE_PROJECTS_KEY, Workspace, sha256_file, text,
 };
+use arkdeck_bootstrap::{BundleRegistryReadStore, ReferenceOwner, ToolRegistryStore};
+use arkdeck_contract::WireError;
 use arkdeck_platform::PropertyListValue;
 use arkdeck_platform::launchd;
 use serde_json::{Map, Value, json};
@@ -69,9 +76,12 @@ const COMPOSITION: &str = "ARKDECK_RUNTIME_COMPOSITION";
 /// file of the state directory.
 const PREFLIGHT_OUTPUT_MAXIMUM: u64 = 256 * 1024 * 1024;
 const PREFLIGHT_ERROR_MAXIMUM: u64 = 64 * 1024;
-const INSTALLATION_OWNER_KIND: &str = "installation";
-const INSTALLATION_OWNER_ID: &str = "runtime-service-installation";
-const BUNDLE_INDEX_SCHEMA: &str = "arkdeck.bootstrap-bundles/1";
+const INSTALLATION_SCHEMA: &str = "arkdeck.runtime-service-installation/1";
+/// What a refusal before any service change says changed: nothing, for the
+/// path installs; the pins and selection kept for a retry, for the typed one.
+const NOTHING_CHANGED: &str = "nothing was changed";
+const PINS_KEPT: &str =
+    "the service was not changed, and the bundle and HDC selection stay pinned for a retry";
 /// How many times the held pass is asked while another Runtime still holds
 /// the instance lock, one poll interval apart.
 const HELD_PASS_ATTEMPTS: u32 = 50;
@@ -92,6 +102,46 @@ fn usage(message: impl Into<String>) -> PlainFailure {
 
 fn failed(error: impl Into<ServiceError>) -> PlainFailure {
     PlainFailure::from(error.into())
+}
+
+/// Either failure a leaf answers: Swift's plain `CLIError` or its session's
+/// coded failure.
+enum Failure {
+    Plain(PlainFailure),
+    Coded(CodedFailure),
+}
+
+impl From<PlainFailure> for Failure {
+    fn from(failure: PlainFailure) -> Self {
+        Self::Plain(failure)
+    }
+}
+
+impl Failure {
+    fn answer(self) -> ServiceAnswer {
+        match self {
+            Self::Plain(failure) => ServiceAnswer::fail(failure),
+            Self::Coded(failure) => ServiceAnswer::refuse(failure),
+        }
+    }
+}
+
+/// Swift `session.fail(code, message, details: ["newDispatchCount": 0])`.
+fn coded(code: &'static str, message: impl Into<String>) -> Failure {
+    Failure::Coded(CodedFailure {
+        code,
+        message: message.into(),
+        details: Map::from_iter([("newDispatchCount".into(), json!(0))]),
+    })
+}
+
+/// A registry refusal as Swift's CLI reports it: its code when the error
+/// registry has it (else `recordUnreadable`), its words after `prefix`.
+fn registry_failure(error: WireError, prefix: &str) -> Failure {
+    coded(
+        crate::error_registry::code(&error.code).unwrap_or("recordUnreadable"),
+        format!("{prefix}{}", error.message),
+    )
 }
 
 // MARK: - The leaves
@@ -117,29 +167,122 @@ fn path_leaf(host: &ServiceHost, options: &Map<String, Value>, subcommand: &str)
     }
 }
 
-/// `runtime service install`: Swift's typed zero-Runtime install acquires the
-/// exact bundle generation and initializes the HDC selection through the
-/// bootstrap registries' installation references before it installs, and
-/// commits them after. Neither owner is Rust's yet, and this CLI does not
-/// link the store, so it is refused by name before anything is read.
-pub fn install_leaf(_host: &ServiceHost, _options: &Map<String, Value>) -> ServiceAnswer {
-    ServiceAnswer::fail(PlainFailure::new(
-        69,
-        "runtime service install pins its bundle and HDC tool generations as the bootstrap \
-         registries' installation references, which have no Rust owner yet; install with \
-         `arkdeck runtime service update --daemon <verified ArkDeckAgent.app> --hdc <absolute \
-         hdc>` or with the Swift CLI",
-    ))
+/// `runtime service install`: Swift's typed zero-Runtime install. Only with
+/// no service installed, loaded or listening, it pins the exact bundle
+/// generation for the service installation, publishes the first HDC selection
+/// from the exact tool generation, installs the retained bundle with the
+/// selected tool, and keeps only that bundle pinned; it answers
+/// `arkdeck.runtime-service-installation/1`.
+pub fn install_leaf(host: &ServiceHost, options: &Map<String, Value>) -> ServiceAnswer {
+    match typed_install(host, options) {
+        Ok(document) => ServiceAnswer::emit(document),
+        Err(failure) => failure.answer(),
+    }
 }
 
-/// `runtime service uninstall`: Swift's `uninstall()`, refused before
-/// anything changes while the bundle registry pins a bundle for the service
-/// installation (Swift then releases those references; this CLI cannot).
+/// `runtime service uninstall`: Swift's `uninstall()`, then the service
+/// installation's pins released (`releaseAll`).
 pub fn uninstall_leaf(host: &ServiceHost) -> ServiceAnswer {
     match uninstall(host) {
         Ok(document) => ServiceAnswer::emit(document),
-        Err(failure) => ServiceAnswer::fail(failure),
+        Err(failure) => failure.answer(),
     }
+}
+
+/// The Bootstrap registry's bundle and tool owners at this home, its missing
+/// directories created owner-only as Swift's registry creates them.
+fn bootstrap_stores(
+    host: &ServiceHost,
+) -> Result<(BundleRegistryReadStore, ToolRegistryStore), WireError> {
+    let root = &host.paths.bootstrap_registry;
+    arkdeck_bootstrap::create_store(root)?;
+    let unopened = |_| WireError {
+        code: "ioFailure".into(),
+        message: "directory is absent or inaccessible".into(),
+        details: None,
+    };
+    let bundles = BundleRegistryReadStore::open_existing(root)
+        .map_err(unopened)?
+        .with_bundle_validator(host.bundle_trust.clone());
+    let mut tools = ToolRegistryStore::open_existing(root).map_err(unopened)?;
+    if let Some(identities) = &host.hdc_identities {
+        tools = tools.with_published_identities(identities.clone());
+    }
+    Ok((bundles, tools))
+}
+
+/// Swift `runAgentDaemon`'s typed install, in its order.
+fn typed_install(host: &ServiceHost, options: &Map<String, Value>) -> Result<Value, Failure> {
+    let option = |key: &str| options.get(key).and_then(Value::as_str);
+    let command = format!("{} install", host.spelling);
+    let existing = host.status().map_err(failed)?;
+    if existing.installed || existing.loaded || existing.socket_present {
+        return Err(coded(
+            "resourceConflict",
+            "runtime service install is only the zero-Runtime bootstrap path; use the reviewed \
+             service update lifecycle for an existing installation",
+        ));
+    }
+    let (Some(bundle), Some(bundle_generation)) = (option("bundle"), option("bundleGeneration"))
+    else {
+        return Err(coded(
+            "invalidInput",
+            format!("{command} requires an exact bundle and bundle generation"),
+        ));
+    };
+    // Ruling 3: nothing is pinned while a signing receipt would need the new
+    // daemon's identity re-recorded (Swift does that before `bootstrap`).
+    refuse_while_signing(host, &command)?;
+    let (bundles, tools) = bootstrap_stores(host).map_err(|error| registry_failure(error, ""))?;
+    let installation = ReferenceOwner::service_installation();
+    // Pin and revalidate the exact bundle generation before publishing an
+    // initial tool selection. A later failure leaves this candidate retained
+    // for explicit retry/reconciliation, never dangling.
+    let retained = bundles
+        .acquire(bundle, bundle_generation, &installation)
+        .map_err(|error| registry_failure(error, ""))?;
+    let (Some(tool), Some(tool_generation)) = (option("tool"), option("toolGeneration")) else {
+        return Err(coded(
+            "invalidInput",
+            format!("{command} requires an exact tool and tool generation"),
+        ));
+    };
+    let selection = tools
+        .initialize_service_selection(tool, tool_generation)
+        .map_err(|error| registry_failure(error, ""))?;
+    let receipt = install(
+        host,
+        InstallRequest {
+            bundle: text(&retained),
+            hdc: text(&selection.executable),
+            workspace: None,
+            descriptor: None,
+            lane: None,
+            command,
+            unchanged: PINS_KEPT,
+        },
+    )?;
+    bundles
+        .retain_only(bundle, &installation)
+        .map_err(|error| {
+            registry_failure(
+                error,
+                "service started, but its durable bundle reference could not be finalized: ",
+            )
+        })?;
+    let mut document = json!({
+        "schemaVersion": INSTALLATION_SCHEMA,
+        "installed": true,
+        "bundleRef": bundle,
+        "bundleGeneration": bundle_generation,
+        "activeToolRef": selection.tool_ref,
+        "activeToolSelectionGeneration": selection.active_generation.to_string(),
+    });
+    // The Rust daemon's cutover summary, as `update` reports it.
+    if let Some(cutover) = receipt.get("cutover") {
+        document["cutover"] = cutover.clone();
+    }
+    Ok(document)
 }
 
 // MARK: - update's options, as Swift's `runAgentDaemon` reads them
@@ -153,6 +296,8 @@ struct InstallRequest {
     lane: Option<ArkForgeLaneStatus>,
     /// The command as the caller typed it, for its diagnostics.
     command: String,
+    /// What a refusal before any service change says changed.
+    unchanged: &'static str,
 }
 
 fn update_request(
@@ -279,8 +424,23 @@ fn update_request(
             .map_err(|refusal| PlainFailure::new(1, refusal.to_string()))?,
         None => None,
     };
-    // Ruling 3: Swift re-records the replacement daemon's identity in the
-    // signing receipt before launchd starts it (`refreshSigningAccessIfInstalled`).
+    refuse_while_signing(host, &command)?;
+    Ok(InstallRequest {
+        bundle,
+        hdc,
+        workspace: project.zip(sdk).map(|(p, s)| (p.to_owned(), s.to_owned())),
+        descriptor,
+        lane,
+        command,
+        unchanged: NOTHING_CHANGED,
+    })
+}
+
+/// Ruling 3: Swift re-records the replacement daemon's identity in the
+/// signing receipt before launchd starts it (`refreshSigningAccessIfInstalled`);
+/// with no Rust signing owner yet, an installed preset refuses the install
+/// before anything changes.
+fn refuse_while_signing(host: &ServiceHost, command: &str) -> Result<(), PlainFailure> {
     if host.paths.signing_receipt.exists() {
         return Err(PlainFailure::new(
             69,
@@ -293,14 +453,7 @@ fn update_request(
             ),
         ));
     }
-    Ok(InstallRequest {
-        bundle,
-        hdc,
-        workspace: project.zip(sdk).map(|(p, s)| (p.to_owned(), s.to_owned())),
-        descriptor,
-        lane,
-        command,
-    })
+    Ok(())
 }
 
 // MARK: - install, as Swift's `LaunchAgentService.install`
@@ -344,20 +497,23 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
                         "{} would point the LaunchAgent at the Rust daemon \
                          in {}, whose plist names it as ARKDECK_ANALYZER_PATH, but it does not \
                          answer --analyze-crash-ledger as the Runtime runs its analyzer ({reason}); \
-                         the analyzer is never pointed at the Swift daemon or left out; nothing \
-                         was changed",
+                         the analyzer is never pointed at the Swift daemon or left out; {}",
                         request.command,
-                        text(&source)
+                        text(&source),
+                        request.unchanged
                     ),
                 ));
             }
             if launch_source.file_name() != Some(std::ffi::OsStr::new(DAEMON_EXECUTABLE_NAME)) {
                 return Err(PlainFailure::new(
                     69,
-                    "a Rust daemon bundle carries no facade; nothing was changed",
+                    format!(
+                        "a Rust daemon bundle carries no facade; {}",
+                        request.unchanged
+                    ),
                 ));
             }
-            refuse_unless_clear(&first, &request.command, "nothing was changed")?;
+            refuse_unless_clear(&first, &request.command, request.unchanged)?;
             Some(first)
         }
     };
@@ -1127,30 +1283,10 @@ fn remove_if_present(path: &Path) -> io::Result<bool> {
 
 // MARK: - uninstall
 
-fn uninstall(host: &ServiceHost) -> Result<Value, PlainFailure> {
-    let pinned = installation_references(&host.paths.bootstrap_bundle_index).map_err(|reason| {
-        PlainFailure::new(
-            69,
-            format!(
-                "{} uninstall is refused: the bootstrap bundle index cannot be read \
-                 to prove it pins nothing for the service installation ({reason}); nothing was \
-                 changed",
-                host.spelling
-            ),
-        )
-    })?;
-    if !pinned.is_empty() {
-        return Err(PlainFailure::new(
-            69,
-            format!(
-                "{} uninstall is refused: the bootstrap bundle registry pins {} for \
-                 the service installation, and the Rust CLI has no owner to release those \
-                 references yet; uninstall with the Swift CLI; nothing was changed",
-                host.spelling,
-                pinned.join(", ")
-            ),
-        ));
-    }
+/// Swift `uninstall()`, then `releaseAll` of the service installation's pins
+/// once the service is confirmed removed. A release that fails is reported
+/// after the removal, which is not undone; the pins stay for a retry.
+fn uninstall(host: &ServiceHost) -> Result<Value, Failure> {
     if host.is_loaded().map_err(failed)? {
         let output = host
             .run_launchctl(&launchd::bootout_arguments(&host.launch_domain()))
@@ -1160,44 +1296,22 @@ fn uninstall(host: &ServiceHost) -> Result<Value, PlainFailure> {
     let removed_plist = remove_if_present(&host.paths.plist).map_err(failed)?;
     let removed_daemon = remove_if_present(&host.paths.installed_daemon_bundle).map_err(failed)?;
     let removed_receipt = remove_if_present(&host.paths.receipt).map_err(failed)?;
-    Ok(json!({
+    let removal = json!({
         "removedPlist": removed_plist,
         "removedDaemon": removed_daemon,
         "removedReceipt": removed_receipt,
         "preservedStateDirectory": text(&host.paths.state_directory),
         "preservedLogDirectory": text(&host.paths.log_directory),
-    }))
-}
-
-/// The bundle references the registry index holds for the service
-/// installation, read without its owner. An absent index holds none.
-fn installation_references(index: &Path) -> Result<Vec<String>, String> {
-    let bytes = match ServiceHost::read_bounded(index) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(error.to_string()),
-    };
-    let document = arkdeck_contract::strict_json(&bytes)
-        .map_err(|_| "the index is not one JSON document".to_owned())?;
-    let records = document["records"]
-        .as_array()
-        .filter(|_| document["schemaVersion"] == BUNDLE_INDEX_SCHEMA)
-        .ok_or("the index is not arkdeck.bootstrap-bundles/1")?;
-    let mut pinned = Vec::new();
-    for record in records {
-        let (Some(reference), Some(owners)) = (
-            record["reference"].as_str(),
-            record["references"].as_array(),
-        ) else {
-            return Err("a bundle record names no reference owners".into());
-        };
-        if owners.iter().any(|owner| {
-            owner["kind"] == INSTALLATION_OWNER_KIND && owner["id"] == INSTALLATION_OWNER_ID
-        }) {
-            pinned.push(reference.to_owned());
-        }
-    }
-    Ok(pinned)
+    });
+    bootstrap_stores(host)
+        .and_then(|(bundles, _)| bundles.release_all(&ReferenceOwner::service_installation()))
+        .map_err(|error| {
+            registry_failure(
+                error,
+                "service was removed, but its durable bundle references could not be released: ",
+            )
+        })?;
+    Ok(removal)
 }
 
 #[cfg(test)]

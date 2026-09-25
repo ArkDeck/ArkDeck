@@ -54,7 +54,7 @@ fn state(value: &str, generation: u64, references: &[Owner]) -> bool {
             || (value == "removed" && generation == 2 && references.is_empty()))
 }
 
-#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Owner {
     pub(crate) kind: String,
@@ -63,9 +63,9 @@ pub(crate) struct Owner {
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct BundleRecord {
-    reference: String,
-    digest: String,
+pub(crate) struct BundleRecord {
+    pub(crate) reference: String,
+    pub(crate) digest: String,
     #[serde(rename = "registeredAtUTC")]
     registered_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -74,41 +74,21 @@ struct BundleRecord {
     byte_count: i64,
     #[serde(rename = "entryCount")]
     entry_count: i64,
-    generation: u64,
-    state: String,
-    references: Vec<Owner>,
+    pub(crate) generation: u64,
+    pub(crate) state: String,
+    pub(crate) references: Vec<Owner>,
 }
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct BundleIndex {
+pub(crate) struct BundleIndex {
     #[serde(rename = "schemaVersion")]
     schema_version: String,
-    records: Vec<BundleRecord>,
+    pub(crate) records: Vec<BundleRecord>,
 }
 
 pub fn decode_bundles(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
-    let (index, document) = roundtrip::<BundleIndex>(bytes, 4 * 1024 * 1024, false)?;
-    if index.schema_version != "arkdeck.bootstrap-bundles/1"
-        || index.records.len() > 128
-        || !index
-            .records
-            .windows(2)
-            .all(|pair| pair[0].reference < pair[1].reference)
-        || index.records.iter().any(|r| {
-            !digest(&r.digest)
-                || r.reference != format!("bundle:sha256:{}", r.digest)
-                || !(0..=1_073_741_824).contains(&r.byte_count)
-                || !(1..=4096).contains(&r.entry_count)
-                || !timestamp(&r.registered_at)
-                || !r.version.as_deref().is_none_or(|v| {
-                    !v.is_empty() && v.len() <= 128 && v.bytes().all(|b| (32..127).contains(&b))
-                })
-                || !state(&r.state, r.generation, &r.references)
-        })
-    {
-        return Err(DecodeError::Header);
-    }
+    let (index, document) = read_bundles(bytes)?;
     let projection = Value::Array(
         index
             .records
@@ -133,6 +113,33 @@ pub fn decode_bundles(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
         document,
         projection,
     })
+}
+
+/// Swift `BootstrapBundleRegistry.readIndex`'s bounded schema and record
+/// checks over the strictly decoded index, and its re-encoded bytes.
+pub(crate) fn read_bundles(bytes: &[u8]) -> Result<(BundleIndex, Vec<u8>), DecodeError> {
+    let (index, document) = roundtrip::<BundleIndex>(bytes, 4 * 1024 * 1024, false)?;
+    if index.schema_version != "arkdeck.bootstrap-bundles/1"
+        || index.records.len() > 128
+        || !index
+            .records
+            .windows(2)
+            .all(|pair| pair[0].reference < pair[1].reference)
+        || index.records.iter().any(|r| {
+            !digest(&r.digest)
+                || r.reference != format!("bundle:sha256:{}", r.digest)
+                || !(0..=1_073_741_824).contains(&r.byte_count)
+                || !(1..=4096).contains(&r.entry_count)
+                || !timestamp(&r.registered_at)
+                || !r.version.as_deref().is_none_or(|v| {
+                    !v.is_empty() && v.len() <= 128 && v.bytes().all(|b| (32..127).contains(&b))
+                })
+                || !state(&r.state, r.generation, &r.references)
+        })
+    {
+        return Err(DecodeError::Header);
+    }
+    Ok((index, document))
 }
 
 #[derive(Clone, Deserialize, Serialize)]

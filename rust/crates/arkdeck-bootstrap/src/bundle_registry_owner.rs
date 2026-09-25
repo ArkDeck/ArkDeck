@@ -6,18 +6,24 @@ use crate::{
     bundle_content::{BundleContent, verify_bundle_content},
     decode_bundles,
 };
-use arkdeck_platform::HostDirectory;
+use arkdeck_platform::{HostDirectory, validate_production_daemon_bundle};
 use serde_json::Value;
 use std::{
     fs::Metadata,
     io,
     os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 const MAXIMUM_INDEX: usize = 4 * 1024 * 1024;
+/// Swift `validateBundle`: the trust a retained helper Bundle must pass, as
+/// its canonical path; a refusal is `PermissionDenied`.
+pub type BundleValidator = Arc<dyn Fn(&Path) -> io::Result<PathBuf> + Send + Sync>;
 pub struct BundleRegistryReadStore {
     pub(crate) root: HostDirectory,
     pub(crate) path: PathBuf,
+    /// The production helper policy unless a caller supplies its own.
+    pub(crate) validate: BundleValidator,
 }
 fn corrupt() -> io::Error {
     io::Error::new(
@@ -55,7 +61,14 @@ impl BundleRegistryReadStore {
         Ok(Self {
             root: HostDirectory::open(path)?,
             path: path.into(),
+            validate: Arc::new(validate_production_daemon_bundle),
         })
+    }
+    /// The trust this store holds retained Bundles to: the production helper
+    /// policy unless replaced here (Swift `init(validateBundle:)`).
+    pub fn with_bundle_validator(mut self, validate: BundleValidator) -> Self {
+        self.validate = validate;
+        self
     }
     /// Optional Runtime composition helper: create only a fixed private leaf
     /// below an already existing private state directory. Registry metadata is
@@ -76,6 +89,7 @@ impl BundleRegistryReadStore {
                 Ok(Self {
                     root,
                     path: path.into(),
+                    validate: Arc::new(validate_production_daemon_bundle),
                 })
             }
             Err(error) => Err(error),
@@ -176,7 +190,7 @@ impl BundleRegistryReadStore {
             .collect())
     }
     /// The record's retained content measured again and checked, natively,
-    /// against the production helper policy.
+    /// against this store's helper policy.
     pub fn verify_record(&self, record: &Value) -> io::Result<()> {
         let measured = BundleContent {
             digest: record["digest"].as_str().ok_or_else(corrupt)?.to_owned(),
@@ -192,6 +206,7 @@ impl BundleRegistryReadStore {
         verify_bundle_content(
             &self.path.join(format!("bundle-{}.app", measured.digest)),
             &measured,
+            &*self.validate,
         )
     }
 }

@@ -109,9 +109,9 @@ pub struct LaunchAgentPaths {
     pub cutover_snapshots: PathBuf,
     /// Swift `OpenHarmonySigningPresetStore.receiptPath`.
     pub signing_receipt: PathBuf,
-    /// The bootstrap bundle registry's index, whose installation references
-    /// a typed install pins.
-    pub bootstrap_bundle_index: PathBuf,
+    /// `…/ArkDeck/Bootstrap/v1`: the Bootstrap registry whose installation
+    /// reference a typed install pins and an uninstall releases.
+    pub bootstrap_registry: PathBuf,
 }
 
 impl LaunchAgentPaths {
@@ -126,7 +126,7 @@ impl LaunchAgentPaths {
             rollback_bundle: support.join("Helpers/.rollback").join(DAEMON_BUNDLE_NAME),
             cutover_snapshots: support.join("LaunchAgent/cutover-snapshots"),
             signing_receipt: support.join("Signing/OpenHarmony/preset-v1.json"),
-            bootstrap_bundle_index: support.join("Bootstrap/v1/bundles.json"),
+            bootstrap_registry: support.join("Bootstrap/v1"),
             plist: library.join(format!("LaunchAgents/{LABEL}.plist")),
             installed_daemon: installed_daemon_bundle
                 .join(format!("Contents/MacOS/{DAEMON_EXECUTABLE_NAME}")),
@@ -196,6 +196,17 @@ impl From<ServiceError> for PlainFailure {
     }
 }
 
+/// Swift's session failure (`CLIRuntimeSession.fail`): a code of the error
+/// registry, its words and details, answered as every coded refusal is — the
+/// failure envelope in machine output, `arkdeck: <message>` on stderr
+/// otherwise — with the code's exit status.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CodedFailure {
+    pub code: &'static str,
+    pub message: String,
+    pub details: Map<String, Value>,
+}
+
 /// What one `runtime service` invocation answers: the one document it emits,
 /// if any, and the failure that follows it, if any. A failure after a
 /// document keeps the document and reports itself only on stderr and in the
@@ -204,20 +215,29 @@ impl From<ServiceError> for PlainFailure {
 pub struct ServiceAnswer {
     pub document: Option<Value>,
     pub failure: Option<PlainFailure>,
+    /// A coded failure in place of a plain one (Swift `session.fail`).
+    pub refusal: Option<CodedFailure>,
 }
 
 impl ServiceAnswer {
     pub(crate) fn emit(document: Value) -> Self {
         Self {
             document: Some(document),
-            failure: None,
+            ..Self::default()
         }
     }
 
     pub(crate) fn fail(failure: PlainFailure) -> Self {
         Self {
-            document: None,
             failure: Some(failure),
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn refuse(refusal: CodedFailure) -> Self {
+        Self {
+            refusal: Some(refusal),
+            ..Self::default()
         }
     }
 
@@ -225,6 +245,7 @@ impl ServiceAnswer {
         Self {
             document: Some(document),
             failure: Some(failure),
+            refusal: None,
         }
     }
 }
@@ -527,6 +548,12 @@ pub struct ServiceHost<'a> {
     pub validate_daemon_bundle: &'a dyn Fn(&Path) -> Result<PathBuf, String>,
     /// The signature check of a helper's sibling facade.
     pub validate_facade: &'a dyn Fn(&Path) -> Result<(), String>,
+    /// The Bootstrap registry's trust in a retained helper bundle (Swift
+    /// `validateBundle`): the production helper policy, as for `--daemon`.
+    pub bundle_trust: arkdeck_bootstrap::BundleValidator,
+    /// The published HDC identities an initial tool selection admits (Swift
+    /// `knownIdentity`); `None` is the Runtime's own.
+    pub hdc_identities: Option<arkdeck_bootstrap::PublishedIdentities>,
     pub now_utc: &'a dyn Fn() -> String,
     /// How long one Runtime connection may wait.
     pub connection_timeout: Duration,
@@ -1669,6 +1696,8 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         launchctl: &launchctl,
         validate_daemon_bundle: &validate_daemon_bundle,
         validate_facade: &validate_facade,
+        bundle_trust: std::sync::Arc::new(arkdeck_platform::validate_production_daemon_bundle),
+        hdc_identities: None,
         now_utc: &utc_now,
         connection_timeout: Duration::from_secs(20),
         poll_interval: Duration::from_millis(100),

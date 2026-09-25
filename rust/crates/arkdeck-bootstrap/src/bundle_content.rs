@@ -8,7 +8,7 @@ use arkdeck_platform::{
 use serde_json::{Value, json};
 use std::{
     io::{self, Read},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +57,11 @@ fn content(tree: &BootstrapTree, version: Option<String>) -> io::Result<BundleCo
         version,
     })
 }
-fn inspect(path: &Path, expected: Option<&BundleContent>) -> io::Result<BundleContent> {
+fn inspect(
+    path: &Path,
+    expected: Option<&BundleContent>,
+    validate: &dyn Fn(&Path) -> io::Result<PathBuf>,
+) -> io::Result<BundleContent> {
     let before = inspect_bootstrap_tree(path).map_err(|_| unreadable())?;
     let measured = content(&before, version(&before, path)?)?;
     if expected.is_some_and(|value| value != &measured) {
@@ -65,7 +69,7 @@ fn inspect(path: &Path, expected: Option<&BundleContent>) -> io::Result<BundleCo
     }
     // Native Security checks the whole Bundle, with its exact production
     // requirement. A durable record cannot substitute for this fresh check.
-    if validate_production_daemon_bundle(path)? != path {
+    if validate(path)? != path {
         return Err(unreadable());
     }
     let after = inspect_bootstrap_tree(path).map_err(|_| unreadable())?;
@@ -74,9 +78,24 @@ fn inspect(path: &Path, expected: Option<&BundleContent>) -> io::Result<BundleCo
     }
     Ok(measured)
 }
+/// The Bundle's content measured and checked against the production helper
+/// policy (`validate_production_daemon_bundle`).
 pub fn inspect_bundle_content(path: &Path) -> io::Result<BundleContent> {
-    inspect(path, None)
+    inspect(path, None, &validate_production_daemon_bundle)
 }
-pub(crate) fn verify_bundle_content(path: &Path, expected: &BundleContent) -> io::Result<()> {
-    inspect(path, Some(expected)).map(|_| ())
+/// The same measurement, checked against `validate`: the policy a store
+/// holds its retained Bundles to (`BundleRegistryReadStore::
+/// with_bundle_validator`).
+pub fn inspect_bundle_content_with(
+    path: &Path,
+    validate: &dyn Fn(&Path) -> io::Result<PathBuf>,
+) -> io::Result<BundleContent> {
+    inspect(path, None, validate)
+}
+pub(crate) fn verify_bundle_content(
+    path: &Path,
+    expected: &BundleContent,
+    validate: &dyn Fn(&Path) -> io::Result<PathBuf>,
+) -> io::Result<()> {
+    inspect(path, Some(expected), validate).map(|_| ())
 }
