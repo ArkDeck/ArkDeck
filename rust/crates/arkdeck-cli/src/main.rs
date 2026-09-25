@@ -98,6 +98,23 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     ) {
         return run_agent(invocation, id, &endpoint, &identity);
     }
+    if invocation.command == "trace.inspect" {
+        // Swift's handler judges the identities, the grant and the time before
+        // it connects, and waits five seconds past the inspection's own bound.
+        let (request, wait) = arkdeck_cli::inspection_request(
+            invocation
+                .params
+                .as_ref()
+                .expect("parsed inspection parameters"),
+        )?;
+        let mut client = Client::connect_bounded(&endpoint, &identity, Duration::from_millis(wait))
+            .map_err(|error| CliError::from_client(error, "trace.inspect"))?;
+        let result = client
+            .request(id, "trace.inspect", Some(request.clone()))
+            .map_err(|error| CliError::from_client(error, "trace.inspect"))?;
+        arkdeck_cli::validate_inspection(&result, &request)?;
+        return Ok(result);
+    }
     if invocation.command == "runtime.health" {
         // The contract preflight is the call, as it is in Swift's client, so a
         // health document off the contract is this read's own malformed answer

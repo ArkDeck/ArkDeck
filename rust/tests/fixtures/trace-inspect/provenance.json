@@ -1,0 +1,10 @@
+{
+  "base" : "ControlFrames/trace.inspect.jsonl",
+  "owners" : [
+    "RuntimeTraceInspectionProjection",
+    "ArkTraceSummaryEnvelopeValidator.machineQualityScopes",
+    "CLIRuntimeSession.mapped",
+    "RuntimeCLI.runTrace"
+  ],
+  "producer" : "CLITraceInspectOracleContractTests"
+}
