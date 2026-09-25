@@ -92,6 +92,15 @@ impl VerifiedTool {
             _namespace: namespace,
         };
         tool.revalidate()?;
+        // A shim runs whichever developer tool the kernel names it by, which
+        // a launch from its inode leaves to chance; the tool it names is the
+        // one to pin (`resolve_tool_shim`).
+        #[cfg(target_os = "macos")]
+        if crate::tool_shim::file_is_tool_shim(&tool.file)? {
+            return Err(denied(
+                "executable is an xcode-select tool shim; pin the tool xcrun resolves for it",
+            ));
+        }
         Ok(tool)
     }
 

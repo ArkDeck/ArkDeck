@@ -87,12 +87,21 @@ package final class FileDerivedCache: Sendable {
   }
 }
 
-/// The process-wide memos. Both are keyed on file identity; they differ only
+/// The process-wide memos. All are keyed on file identity; they differ only
 /// in whether the value they hold can change while the file does not.
 package enum RuntimeFileDerivedCaches {
   /// A content hash is a pure function of the bytes, so file identity is the
   /// complete invalidation condition.
   package static let executableDigest = FileDerivedCache(expirySeconds: nil)
+
+  /// Whether an executable is an `xcode-select` tool shim: its signing
+  /// identifier, a pure function of the bytes too.
+  package static let executableToolShim = FileDerivedCache(expirySeconds: nil)
+
+  /// The tool each shim resolved to, stored with the developer directory
+  /// `xcode-select` had chosen then (`<choice>\n<tool>`): a new choice
+  /// resolves again, and a shim that resolved to nothing is never stored.
+  package static let xcodeToolResolution = FileDerivedCache(expirySeconds: nil)
 
   /// Code-signature validity is not a pure function of the bytes: a signing
   /// certificate can be revoked without the file moving. A short window keeps

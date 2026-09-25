@@ -342,6 +342,7 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
   case executableHashMismatch(expected: String, actual: String)
   case executableDescriptorInvalid
   case executableMappedIdentityMismatch
+  case executableIsToolShim
   case launchAuthorizationInvalidated
   case launchFailed(String)
 
@@ -381,6 +382,8 @@ public enum ProcessExecutionError: Error, Equatable, LocalizedError {
       "Process executable descriptor became invalid before spawn"
     case .executableMappedIdentityMismatch:
       "Suspended process executable mapping did not match the authorized descriptor identity"
+    case .executableIsToolShim:
+      "Process executable is an xcode-select tool shim; pin the tool xcrun resolves for it"
     case .launchAuthorizationInvalidated:
       "Process launch authorization was invalidated or already consumed"
     case .launchFailed(let message):
@@ -1198,6 +1201,12 @@ package final class VerifiedExecutableDescriptor {
       guard sha256 == expectedSHA256 else {
         throw ProcessExecutionError.executableHashMismatch(
           expected: expectedSHA256, actual: sha256)
+      }
+      // A shim runs whichever developer tool the kernel names it by, which a
+      // launch from its inode leaves to chance; the tool it names is the one
+      // to pin (`XcodeToolShim.resolve(tool:)`).
+      guard !XcodeToolShim.isToolShim(fileDescriptor: hashDescriptor) else {
+        throw ProcessExecutionError.executableIsToolShim
       }
       let device = UInt64(UInt32(bitPattern: descriptorMetadata.st_dev))
       let inode = UInt64(descriptorMetadata.st_ino)
