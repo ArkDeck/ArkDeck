@@ -13,10 +13,14 @@ mod bootstrap_resources;
 mod debug_probe;
 mod debug_templates;
 mod flash_leaves;
+mod trace_inspect;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
 mod device_wait;
 pub use debug_probe::validate_debug_probe;
+pub use trace_inspect::{
+    MACHINE_QUALITY_SCOPES, inspection_projection, inspection_request, validate_inspection,
+};
 mod operation_validation;
 mod read_only_resources;
 pub use read_only_resources::{
@@ -356,6 +360,12 @@ impl CliError {
                             && d.get("newDispatchCount") == Some(&json!(0))
                             && d.get("purgeScope") == Some(&json!("inactiveDerivedDatabases"))
                     });
+                // Swift's Trace inspection owner refused before anything ran.
+                let inspection_proof = method == "trace.inspect"
+                    && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("traceInspectionOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                    });
                 let workspace_proof = (method.starts_with("workspace.project.")
                     && error.details.as_ref().is_some_and(|d| {
                         d.get("phase") == Some(&json!("workspaceProjectOwner"))
@@ -373,6 +383,12 @@ impl CliError {
                     || trace_proof
                     || workspace_proof;
                 let code = match error.code.as_str() {
+                    "invalidInput" if inspection_proof => "invalidInput",
+                    "operationUnavailable" if inspection_proof => "operationUnavailable",
+                    "resourceNotFound" if inspection_proof => "resourceNotFound",
+                    "artifactIntegrityFailed" if inspection_proof => "artifactIntegrityFailed",
+                    "recordUnreadable" if inspection_proof => "recordUnreadable",
+                    "operationFailed" if inspection_proof => "operationFailed",
                     "artifactIntegrityFailed" if artifact_proof || import_proof => {
                         "artifactIntegrityFailed"
                     }
@@ -417,26 +433,24 @@ impl CliError {
                     }
                     "recordUnreadable" => "recordUnreadable",
                     "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
-                    // A plan's typed refusals carry the same pre-admission
-                    // proof as the Swift CLI requires before keeping them.
-                    "operationUnavailable" if proof && method == "job.plan" => {
-                        "operationUnavailable"
-                    }
-                    "inputTooLarge"
-                        if proof
-                            && matches!(method, "job.plan" | "job.result" | "job.evidence") =>
-                    {
-                        "inputTooLarge"
-                    }
-                    "admissionDenied" if proof && method == "job.plan" => "admissionDenied",
-                    "invalidInput" if proof => "invalidInput",
-                    "invalidCursor"
-                        if proof
-                            && matches!(method, "job.list" | "job.timeline" | "job.events") =>
-                    {
-                        "invalidCursor"
-                    }
+                    // Swift `CLIControlFailureMapper`: a named refusal whose
+                    // handler proved nothing was admitted keeps its code,
+                    // whatever the method.
                     "resourceConflict" if proof => "resourceConflict",
+                    "factsDrifted" if proof => "factsDrifted",
+                    "admissionDenied" if proof => "admissionDenied",
+                    "targetTrustPending" if proof => "targetTrustPending",
+                    "invalidInput" if proof => "invalidInput",
+                    "operationUnavailable" if proof => "operationUnavailable",
+                    "inputTooLarge" if proof => "inputTooLarge",
+                    "invalidCursor" if proof => "invalidCursor",
+                    "idempotencyConflict" if proof => "idempotencyConflict",
+                    "reviewedPlanMismatch" if proof => "reviewedPlanMismatch",
+                    "resourceNotFound" if proof => "resourceNotFound",
+                    "humanActionExpired" if proof => "humanActionExpired",
+                    "orchestrationBudgetExpired" if proof => "orchestrationBudgetExpired",
+                    "orchestrationClockUntrusted" if proof => "orchestrationClockUntrusted",
+                    "bindingRevisionStale" if proof => "bindingRevisionStale",
                     "rejected" if proof => "admissionDenied",
                     "rejected" => "operationFailed",
                     _ => "internalError",
@@ -825,6 +839,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "events"] => "job.events",
         ["debug", "probe"] => "debug.probe",
         ["trace", "probe"] => "trace.probe",
+        ["trace", "inspect"] => "trace.inspect",
         ["debug", "start"] => "debug.start",
         ["debug", "evaluate"] => "debug.evaluate",
         ["debug", "status"] => "debug.status",
@@ -1009,6 +1024,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     }
     let allowed: &[&str] = match command {
         "debug.probe" | "trace.probe" => &["targetId"],
+        "trace.inspect" => &["jobId", "artifactId", "allowSensitive", "timeout"],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
@@ -1570,6 +1586,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         None
     };
     debug_probe::configure(command, &method_options, help)?;
+    trace_inspect::configure(command, &method_options, help)?;
     // Swift's parser names the leaf a refused option belongs to.
     flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
         error.command = Some(command);
@@ -1688,6 +1705,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                     | "device.wait"
                     | "debug.probe"
                     | "trace.probe"
+                    | "trace.inspect"
                     | "job.status"
                     | "job.list"
                     | "job.show"

@@ -1,0 +1,320 @@
+[
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "name" : "valid",
+    "outcome" : "requested"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "withoutAllowSensitive",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "bad:id",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "jobColon",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "jobEmpty",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      ".job",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "jobLeadingDot",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "job129",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART:1",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "artifactColon",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "imp-123",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "an Import identity cannot select a Job",
+    "name" : "jobImportIdentity",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "1ms"
+    ],
+    "name" : "timeout-1ms",
+    "outcome" : "requested"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "10m"
+    ],
+    "name" : "timeout-10m",
+    "outcome" : "requested"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "600000ms"
+    ],
+    "name" : "timeout-600000ms",
+    "outcome" : "requested"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "600001ms"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-600001ms",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "11m"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-11m",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "0ms"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-0ms",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "2h"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-2h",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "soon"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-soon",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "1s"
+    ],
+    "name" : "timeout-1s",
+    "outcome" : "requested"
+  },
+  {
+    "argv" : [
+      "--job",
+      "job-trace-inspect",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "05s"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "timeout-05s",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "bad:id",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "11m"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "trace inspect requires exact --job/--artifact identities and --allow-sensitive",
+    "name" : "jobColonAndTimeout11m",
+    "outcome" : "refused"
+  },
+  {
+    "argv" : [
+      "--job",
+      "imp-123",
+      "--artifact",
+      "ART-9c914630ca801dc5e25b24667d40e4fe",
+      "--allow-sensitive",
+      "--timeout",
+      "11m"
+    ],
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "message" : "Trace inspection timeout must be 1ms...10m",
+    "name" : "jobImportIdentityAndTimeout11m",
+    "outcome" : "refused"
+  }
+]

@@ -1,0 +1,1266 @@
+[
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "invalidInput"
+    },
+    "message" : "the Runtime refused invalidInput",
+    "wireCode" : "invalidInput"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "invalidInput"
+    },
+    "message" : "the Runtime refused invalidInput",
+    "wireCode" : "invalidInput"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "invalidInput"
+    },
+    "message" : "the Runtime refused invalidInput",
+    "wireCode" : "invalidInput"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "invalidInput"
+    },
+    "message" : "the Runtime refused invalidInput",
+    "wireCode" : "invalidInput"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "invalidInput"
+    },
+    "message" : "the Runtime refused invalidInput",
+    "wireCode" : "invalidInput"
+  },
+  {
+    "code" : "operationUnavailable",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "operationUnavailable"
+    },
+    "message" : "the Runtime refused operationUnavailable",
+    "wireCode" : "operationUnavailable"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "operationUnavailable"
+    },
+    "message" : "the Runtime refused operationUnavailable",
+    "wireCode" : "operationUnavailable"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "operationUnavailable"
+    },
+    "message" : "the Runtime refused operationUnavailable",
+    "wireCode" : "operationUnavailable"
+  },
+  {
+    "code" : "operationUnavailable",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "operationUnavailable"
+    },
+    "message" : "the Runtime refused operationUnavailable",
+    "wireCode" : "operationUnavailable"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "operationUnavailable"
+    },
+    "message" : "the Runtime refused operationUnavailable",
+    "wireCode" : "operationUnavailable"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "resourceNotFound"
+    },
+    "message" : "the Runtime refused resourceNotFound",
+    "wireCode" : "resourceNotFound"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "resourceNotFound"
+    },
+    "message" : "the Runtime refused resourceNotFound",
+    "wireCode" : "resourceNotFound"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "resourceNotFound"
+    },
+    "message" : "the Runtime refused resourceNotFound",
+    "wireCode" : "resourceNotFound"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "resourceNotFound"
+    },
+    "message" : "the Runtime refused resourceNotFound",
+    "wireCode" : "resourceNotFound"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "resourceNotFound"
+    },
+    "message" : "the Runtime refused resourceNotFound",
+    "wireCode" : "resourceNotFound"
+  },
+  {
+    "code" : "artifactIntegrityFailed",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "artifactIntegrityFailed"
+    },
+    "message" : "the Runtime refused artifactIntegrityFailed",
+    "wireCode" : "artifactIntegrityFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "artifactIntegrityFailed"
+    },
+    "message" : "the Runtime refused artifactIntegrityFailed",
+    "wireCode" : "artifactIntegrityFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "artifactIntegrityFailed"
+    },
+    "message" : "the Runtime refused artifactIntegrityFailed",
+    "wireCode" : "artifactIntegrityFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "artifactIntegrityFailed"
+    },
+    "message" : "the Runtime refused artifactIntegrityFailed",
+    "wireCode" : "artifactIntegrityFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "artifactIntegrityFailed"
+    },
+    "message" : "the Runtime refused artifactIntegrityFailed",
+    "wireCode" : "artifactIntegrityFailed"
+  },
+  {
+    "code" : "recordUnreadable",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "recordUnreadable"
+    },
+    "message" : "the Runtime refused recordUnreadable",
+    "wireCode" : "recordUnreadable"
+  },
+  {
+    "code" : "recordUnreadable",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "recordUnreadable"
+    },
+    "message" : "the Runtime refused recordUnreadable",
+    "wireCode" : "recordUnreadable"
+  },
+  {
+    "code" : "recordUnreadable",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "recordUnreadable"
+    },
+    "message" : "the Runtime refused recordUnreadable",
+    "wireCode" : "recordUnreadable"
+  },
+  {
+    "code" : "recordUnreadable",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "recordUnreadable"
+    },
+    "message" : "the Runtime refused recordUnreadable",
+    "wireCode" : "recordUnreadable"
+  },
+  {
+    "code" : "recordUnreadable",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "recordUnreadable"
+    },
+    "message" : "the Runtime refused recordUnreadable",
+    "wireCode" : "recordUnreadable"
+  },
+  {
+    "code" : "operationFailed",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "operationFailed"
+    },
+    "message" : "the Runtime refused operationFailed",
+    "wireCode" : "operationFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "operationFailed"
+    },
+    "message" : "the Runtime refused operationFailed",
+    "wireCode" : "operationFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "operationFailed"
+    },
+    "message" : "the Runtime refused operationFailed",
+    "wireCode" : "operationFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "operationFailed"
+    },
+    "message" : "the Runtime refused operationFailed",
+    "wireCode" : "operationFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "operationFailed"
+    },
+    "message" : "the Runtime refused operationFailed",
+    "wireCode" : "operationFailed"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "resourceConflict"
+    },
+    "message" : "the Runtime refused resourceConflict",
+    "wireCode" : "resourceConflict"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "resourceConflict"
+    },
+    "message" : "the Runtime refused resourceConflict",
+    "wireCode" : "resourceConflict"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "resourceConflict"
+    },
+    "message" : "the Runtime refused resourceConflict",
+    "wireCode" : "resourceConflict"
+  },
+  {
+    "code" : "resourceConflict",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "resourceConflict"
+    },
+    "message" : "the Runtime refused resourceConflict",
+    "wireCode" : "resourceConflict"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "resourceConflict"
+    },
+    "message" : "the Runtime refused resourceConflict",
+    "wireCode" : "resourceConflict"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "internalError"
+    },
+    "message" : "the Runtime refused internalError",
+    "wireCode" : "internalError"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "internalError"
+    },
+    "message" : "the Runtime refused internalError",
+    "wireCode" : "internalError"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "internalError"
+    },
+    "message" : "the Runtime refused internalError",
+    "wireCode" : "internalError"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "internalError"
+    },
+    "message" : "the Runtime refused internalError",
+    "wireCode" : "internalError"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "internalError"
+    },
+    "message" : "the Runtime refused internalError",
+    "wireCode" : "internalError"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "notFound"
+    },
+    "message" : "the Runtime refused notFound",
+    "wireCode" : "notFound"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "notFound"
+    },
+    "message" : "the Runtime refused notFound",
+    "wireCode" : "notFound"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "notFound"
+    },
+    "message" : "the Runtime refused notFound",
+    "wireCode" : "notFound"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "notFound"
+    },
+    "message" : "the Runtime refused notFound",
+    "wireCode" : "notFound"
+  },
+  {
+    "code" : "resourceNotFound",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "notFound"
+    },
+    "message" : "the Runtime refused notFound",
+    "wireCode" : "notFound"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "invalidParams"
+    },
+    "message" : "the Runtime refused invalidParams",
+    "wireCode" : "invalidParams"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "invalidParams"
+    },
+    "message" : "the Runtime refused invalidParams",
+    "wireCode" : "invalidParams"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "invalidParams"
+    },
+    "message" : "the Runtime refused invalidParams",
+    "wireCode" : "invalidParams"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "invalidParams"
+    },
+    "message" : "the Runtime refused invalidParams",
+    "wireCode" : "invalidParams"
+  },
+  {
+    "code" : "invalidInput",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "invalidParams"
+    },
+    "message" : "the Runtime refused invalidParams",
+    "wireCode" : "invalidParams"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "sensitiveAccessDenied"
+    },
+    "message" : "the Runtime refused sensitiveAccessDenied",
+    "wireCode" : "sensitiveAccessDenied"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "sensitiveAccessDenied"
+    },
+    "message" : "the Runtime refused sensitiveAccessDenied",
+    "wireCode" : "sensitiveAccessDenied"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "sensitiveAccessDenied"
+    },
+    "message" : "the Runtime refused sensitiveAccessDenied",
+    "wireCode" : "sensitiveAccessDenied"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "sensitiveAccessDenied"
+    },
+    "message" : "the Runtime refused sensitiveAccessDenied",
+    "wireCode" : "sensitiveAccessDenied"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "sensitiveAccessDenied"
+    },
+    "message" : "the Runtime refused sensitiveAccessDenied",
+    "wireCode" : "sensitiveAccessDenied"
+  },
+  {
+    "code" : "controlMethodUnavailable",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "unknownMethod"
+    },
+    "message" : "the Runtime refused unknownMethod",
+    "wireCode" : "unknownMethod"
+  },
+  {
+    "code" : "controlMethodUnavailable",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "unknownMethod"
+    },
+    "message" : "the Runtime refused unknownMethod",
+    "wireCode" : "unknownMethod"
+  },
+  {
+    "code" : "controlMethodUnavailable",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "unknownMethod"
+    },
+    "message" : "the Runtime refused unknownMethod",
+    "wireCode" : "unknownMethod"
+  },
+  {
+    "code" : "controlMethodUnavailable",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "unknownMethod"
+    },
+    "message" : "the Runtime refused unknownMethod",
+    "wireCode" : "unknownMethod"
+  },
+  {
+    "code" : "controlMethodUnavailable",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "unknownMethod"
+    },
+    "message" : "the Runtime refused unknownMethod",
+    "wireCode" : "unknownMethod"
+  },
+  {
+    "code" : "protocolMalformed",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "malformedFrame"
+    },
+    "message" : "the Runtime refused malformedFrame",
+    "wireCode" : "malformedFrame"
+  },
+  {
+    "code" : "protocolMalformed",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "malformedFrame"
+    },
+    "message" : "the Runtime refused malformedFrame",
+    "wireCode" : "malformedFrame"
+  },
+  {
+    "code" : "protocolMalformed",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "malformedFrame"
+    },
+    "message" : "the Runtime refused malformedFrame",
+    "wireCode" : "malformedFrame"
+  },
+  {
+    "code" : "protocolMalformed",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "malformedFrame"
+    },
+    "message" : "the Runtime refused malformedFrame",
+    "wireCode" : "malformedFrame"
+  },
+  {
+    "code" : "protocolMalformed",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "malformedFrame"
+    },
+    "message" : "the Runtime refused malformedFrame",
+    "wireCode" : "malformedFrame"
+  },
+  {
+    "code" : "operationFailed",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "rejected"
+    },
+    "message" : "the Runtime refused rejected",
+    "wireCode" : "rejected"
+  },
+  {
+    "code" : "operationFailed",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "rejected"
+    },
+    "message" : "the Runtime refused rejected",
+    "wireCode" : "rejected"
+  },
+  {
+    "code" : "operationFailed",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "rejected"
+    },
+    "message" : "the Runtime refused rejected",
+    "wireCode" : "rejected"
+  },
+  {
+    "code" : "admissionDenied",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "rejected"
+    },
+    "message" : "the Runtime refused rejected",
+    "wireCode" : "rejected"
+  },
+  {
+    "code" : "operationFailed",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "rejected"
+    },
+    "message" : "the Runtime refused rejected",
+    "wireCode" : "rejected"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "inputTooLarge"
+    },
+    "message" : "the Runtime refused inputTooLarge",
+    "wireCode" : "inputTooLarge"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "inputTooLarge"
+    },
+    "message" : "the Runtime refused inputTooLarge",
+    "wireCode" : "inputTooLarge"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "inputTooLarge"
+    },
+    "message" : "the Runtime refused inputTooLarge",
+    "wireCode" : "inputTooLarge"
+  },
+  {
+    "code" : "inputTooLarge",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "inputTooLarge"
+    },
+    "message" : "the Runtime refused inputTooLarge",
+    "wireCode" : "inputTooLarge"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "inputTooLarge"
+    },
+    "message" : "the Runtime refused inputTooLarge",
+    "wireCode" : "inputTooLarge"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "deviceEvidenceCreated" : false,
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "proof",
+    "mappedDetails" : {
+      "deviceEvidenceCreated" : false,
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "timedOut"
+    },
+    "message" : "the Runtime refused timedOut",
+    "wireCode" : "timedOut"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner"
+    },
+    "evidence" : "otherPhase",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "artifactOwner",
+      "wireCode" : "timedOut"
+    },
+    "message" : "the Runtime refused timedOut",
+    "wireCode" : "timedOut"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner"
+    },
+    "evidence" : "dispatched",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 1,
+      "phase" : "traceInspectionOwner",
+      "wireCode" : "timedOut"
+    },
+    "message" : "the Runtime refused timedOut",
+    "wireCode" : "timedOut"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission"
+    },
+    "evidence" : "preAdmission",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "newDispatchCount" : 0,
+      "phase" : "preAdmission",
+      "wireCode" : "timedOut"
+    },
+    "message" : "the Runtime refused timedOut",
+    "wireCode" : "timedOut"
+  },
+  {
+    "code" : "internalError",
+    "details" : {
+
+    },
+    "evidence" : "none",
+    "mappedDetails" : {
+      "method" : "trace.inspect",
+      "wireCode" : "timedOut"
+    },
+    "message" : "the Runtime refused timedOut",
+    "wireCode" : "timedOut"
+  }
+]
