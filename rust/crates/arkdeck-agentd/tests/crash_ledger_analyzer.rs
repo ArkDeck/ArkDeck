@@ -331,6 +331,16 @@ impl Drop for Runtime {
     }
 }
 
+/// The published contract view runs this checkout's tests against the merge
+/// base's inputs, which name their commit and may predate the widened
+/// `agent.run` and `agent.status` results. The checkout and candidate views
+/// carry them.
+fn published_view() -> bool {
+    let inputs =
+        arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
 /// One control frame, answered with its result.
 fn request(root: &Path, method: &str, params: Value) -> Value {
     let mut stream = UnixStream::connect(root.join("control.sock")).unwrap();
@@ -506,7 +516,8 @@ fn exchange(root: &Path, method: &str, params: Value) -> Value {
 /// background run is composed with the same analyzer as the admission, so the
 /// execution completes instead of owning a Job no run can finish (its journal
 /// already past `steps-start`, its record still `preflight`, so no later
-/// `job.run` could take it either).
+/// `job.run` could take it either). The completed execution is then read as
+/// `agent run` reads it, through the daemon's own conformance check.
 #[test]
 fn an_agent_execution_of_the_analyzer_runs_its_job_to_the_end() {
     let oracle = oracle();
@@ -560,6 +571,41 @@ fn an_agent_execution_of_the_analyzer_runs_its_job_to_the_end() {
     let status = request(root, "job.status", json!({"jobId": job}));
     assert_eq!(status["state"], "succeeded", "{status}");
     assert_eq!(status["outcomeUnknown"], false, "{status}");
+    // The completed execution reads back through the published contract,
+    // its host-only Artifact and evidence without a binding revision or a
+    // stable identity, as Swift answers them; the same intent sent again is
+    // answered from it.
+    let intent = json!({
+        "schemaVersion": "arkdeck.agent-execution-request/1",
+        "executionId": execution,
+        "operation": "analyzer.extract-crash-signature@1",
+        "inputs": {"sourceArtifactRef": seeded.lease},
+        "target": {"targetId": seeded.target},
+        "maximumWaitMilliseconds": "300000",
+    });
+    for (method, params) in [
+        ("agent.status", json!({"executionId": execution})),
+        ("agent.run", intent),
+    ] {
+        let answered = exchange(root, method, params);
+        if published_view() {
+            // The merge base's `agent.run` and `agent.status` results predate
+            // a host-only execution: the daemon refuses its own answer.
+            assert_eq!(answered["error"]["code"], "internalError", "{answered}");
+            continue;
+        }
+        assert_eq!(answered["ok"], true, "{method}: {answered}");
+        let completed = &answered["result"];
+        assert_eq!(completed["state"], "completed", "{completed}");
+        assert_eq!(completed["jobState"], "succeeded", "{completed}");
+        assert_eq!(completed["artifacts"][0]["bindingRevision"], Value::Null);
+        assert_eq!(
+            completed["artifacts"][0]["stableIdentitySha256"],
+            Value::Null
+        );
+        assert_eq!(completed["evidence"]["bindingRevision"], Value::Null);
+        assert_eq!(completed["evidence"]["status"], "verified", "{completed}");
+    }
     seeded.assert_published(root, &job, expected);
     // The finished Job is never run again.
     let refused = exchange(root, "job.run", json!({"jobId": job}));
