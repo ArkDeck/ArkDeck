@@ -48,6 +48,7 @@ import re
 import shlex
 import shutil
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -349,6 +350,40 @@ def check_signatures(report: Report, cli: Path, versions: tuple[str, str] | None
         )
 
 
+MH_MAGIC_64 = 0xFEEDFACF
+LC_SEGMENT_64 = 0x19
+
+
+def unsigned_image(data: bytes) -> bytes | None:
+    """A thin 64-bit Mach-O image after `codesign --remove-signature`, with
+    `__LINKEDIT`'s vmsize zeroed; `None` when the bytes are not such an image.
+
+    Removing a signature truncates the file and restores `__LINKEDIT`'s file
+    size, but keeps the vmsize its largest signature was rounded up to, a page
+    at a time. The packaged program carries a larger signature (its
+    entitlements) than its runnable copy, so the two unsigned images can differ
+    in that one field, by a page, depending on where the program's size falls.
+    Every other byte must still match."""
+    if len(data) < 32:
+        return None
+    magic, _cpu, _subtype, _filetype, commands, _size = struct.unpack_from("<IiiIII", data, 0)
+    if magic != MH_MAGIC_64:
+        return None
+    image = bytearray(data)
+    offset = 32
+    for _ in range(commands):
+        if offset + 8 > len(data):
+            return None
+        command, size = struct.unpack_from("<II", data, offset)
+        if size < 8 or offset + size > len(data):
+            return None
+        if command == LC_SEGMENT_64 and data[offset + 8 : offset + 24].rstrip(b"\0") == b"__LINKEDIT":
+            struct.pack_into("<Q", image, offset + 32, 0)
+            return bytes(image)
+        offset += size
+    return None
+
+
 def runnable_copy(report: Report, program: Path, work: Path) -> Path | None:
     """`program` re-signed ad hoc without entitlements, so the kernel runs it."""
     if not report.check(program.is_file(), f"{program.name} is missing, so it cannot be run"):
@@ -367,9 +402,9 @@ def runnable_copy(report: Report, program: Path, work: Path) -> Path | None:
         target = work / f"{program.name}.{len(stripped)}.unsigned"
         shutil.copyfile(source, target)
         run([CODESIGN, "--remove-signature", str(target)])
-        stripped.append(target.read_bytes())
+        stripped.append(unsigned_image(target.read_bytes()))
     report.check(
-        stripped[0] == stripped[1],
+        stripped[0] is not None and stripped[0] == stripped[1],
         f"the runnable {program.name} is not the packaged one with its signature replaced",
     )
     return copy
