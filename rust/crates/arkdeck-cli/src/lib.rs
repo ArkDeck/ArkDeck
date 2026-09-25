@@ -5,8 +5,8 @@ use serde_json::{Map, Value, json};
 mod artifact_resources;
 mod import_resources;
 pub use artifact_resources::{
-    artifact_bytes, artifact_export_params, require_trace_artifact, validate_artifact_export,
-    validate_artifact_metadata, validate_artifact_read,
+    artifact_bytes, artifact_export_params, require_diagnostics_artifact, require_trace_artifact,
+    validate_artifact_export, validate_artifact_metadata, validate_artifact_read,
 };
 pub use import_resources::execute_import;
 mod bootstrap_resources;
@@ -692,6 +692,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "read"] => "artifact.read",
         ["artifact", "export"] => "artifact.export",
         ["trace", "export"] => "trace.export",
+        ["diagnostics", "export"] => "diagnostics.export",
         ["recovery", "cleanup", "list"] => "recovery.cleanup.list",
         ["cleanup-debt", "list"] => "cleanup-debt.list",
         ["recovery", "cleanup", "continue"] => "recovery.cleanup.continue",
@@ -1029,8 +1030,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "allowSensitive",
             "timeout",
         ],
-        // Swift's registry gives the trace leaf a Job owner only.
-        "trace.export" => &[
+        // Swift's registry gives the trace and diagnostics leaves a Job owner
+        // only.
+        "trace.export" | "diagnostics.export" => &[
             "jobId",
             "artifactId",
             "destinationPath",
@@ -1612,9 +1614,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "recovery.cleanup.continue" | "cleanup-debt.continue"
         ) {
             "cleanupDebt.continue"
-        } else if command == "trace.export" {
-            // `artifact export` of the one Trace a diagnostics capture
-            // publishes, after its `artifact.inspect` (`main.rs`).
+        } else if matches!(command, "trace.export" | "diagnostics.export") {
+            // `artifact export` of what a diagnostics capture published: the
+            // one Trace, or any of its Artifacts, after its `artifact.inspect`
+            // (`main.rs`).
             "artifact.export"
         } else if command == "flash.lane-preview" {
             // Swift's handler keeps the 1.x wire spelling: CLI spec §12
@@ -1672,7 +1675,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             )
             // Swift sends a quota request without parameters.
             || (command.starts_with("artifact.") && command != "artifact.quota")
-            || command == "trace.export"
+            || matches!(command, "trace.export" | "diagnostics.export")
             || command.starts_with("target.")
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")
