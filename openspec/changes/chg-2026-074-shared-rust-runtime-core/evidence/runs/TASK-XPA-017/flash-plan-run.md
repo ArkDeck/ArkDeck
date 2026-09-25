@@ -213,13 +213,27 @@ target `/private/tmp/arkdeck-m4-rust-target`, logs
 | Crate tests | `cargo test --no-fail-fast -p <crate>` for the same five, on `44774d58` | exit 0 each: contract 52, control 30, hoststore 585, agentd 159, soak 4 (`rebase2-test-<crate>.log`); `arkdeck-cli`, which this change does not touch, 252 on `9ae1e499` |
 | Read-only host check | `rust/scripts/check-readonly.py --bin-dir <this build>` (validation venv), on `44774d58` | PASS on macOS; 135 control responses (`rebase2-readonly.log`) |
 | Records | `ARKDECK_PYTHON=<validation venv> sh scripts/check-sdd.sh`, on `44774d58` | exit 0 (`rebase2-sdd.log`) |
+| #2161's analyzer test | `cargo test -p arkdeck-agentd --test crash_ledger_analyzer`, in this checkout's view and in a published view simulated before #2161 (9ae1e499's `agent.run` and `agent.status` schemas, the view forced; `published-view-sim-agent.sh`) | 5 passed in each; restored by digest (`pubsim-agent.log`) |
 
 **CI.**
 
 - *First push, head `8caf6c1a` on `9ae1e499`.* Every check passed: SDD
   Guard run 36079454931, and Swift CI run 36079455136, whose `swift`
   aggregate and Rust lanes on ubuntu, macos-26 and windows passed.
-- *Rebased onto `44774d58`.* Pending.
+- *Rebased onto `44774d58`, head `e823a407`.* SDD Guard run 36084192398
+  passed. Swift CI run 36084192613 was red only in the macos-26 Rust lane's
+  published contract view (job 107912369882). The failing test was
+  `crash_ledger_analyzer.rs` `an_agent_execution_of_the_analyzer_runs_its_job_to_the_end`,
+  #2161's own. It expected the daemon to refuse its host-only `agent.status`
+  and `agent.run` answers whenever the view is the published one, on the
+  assumption that the merge base predates #2161's widening. This change's
+  merge base includes that widening, so the view published the answers.
+- *The test fixed here.* It now reads which contract the build compiled
+  (`publishes_host_only`: the five members #2161 made nullable). It expects
+  the refusal only where that contract refuses them, and asserts that this
+  happens only in a published view. Nothing is loosened: a checkout that
+  refused them would now fail loudly.
+- *Pushed again, same base.* Pending.
 
 **#2159 (M4-4b2), recorded here.**
 
