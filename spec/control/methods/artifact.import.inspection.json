@@ -75,7 +75,10 @@
                   "type": "string"
                 },
                 "deviceProfile": {
-                  "type": "null"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "importRequestId": {
                   "type": "string"
@@ -185,6 +188,9 @@
                           "type": "string"
                         },
                         "container": {
+                          "type": "string"
+                        },
+                        "deviceProfile": {
                           "type": "string"
                         },
                         "elfClassBits": {
@@ -309,7 +315,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 11,
-    "result": 9
+    "request": 12,
+    "result": 10
   }
 }

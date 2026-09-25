@@ -179,6 +179,139 @@ fn app_uploads_publish_once_as_app_owned_and_keep_their_owner_across_restart() {
     assert_eq!(reopened.dispatches.load(Ordering::Relaxed), 1);
 }
 
+/// One of the synthetic DAYU200 bundles of the Swift archive oracle.
+fn bundle(name: &str) -> Vec<u8> {
+    fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/flash-archive/archives")
+            .join(name),
+    )
+    .unwrap()
+}
+
+/// check-contracts' published view: this build with the contract inputs of
+/// the merge base, whose Import schemas predate the flash bundle's views.
+fn published_view() -> bool {
+    let inputs =
+        arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// A flash bundle's Import view: its result, which the current contract must
+/// publish, or none in the published view, where the control layer refuses
+/// it as not conforming to the older schema.
+fn flash_view(bytes: &[u8], method: &str) -> Option<Value> {
+    match decode_response(bytes.trim_ascii_end(), "request-1", method)
+        .unwrap()
+        .outcome
+    {
+        Ok(result) => Some(result),
+        Err(error) if published_view() && error.code == "internalError" => None,
+        Err(error) => panic!("{method}: {error:?}"),
+    }
+}
+
+#[test]
+fn the_apps_flash_bundle_upload_is_validated_as_swifts_policy_validates_it() {
+    let root = uploads();
+    let (control, _) = compose(&root, None);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    let call = |method, params| ingress.handle(&frame(method, params), root.peer());
+    // What `FlashApplicationFacade` uploads before it plans a Flash: the
+    // archive, bound to the board's Target, under the one DAYU200 profile.
+    let begin = |request: &str, bytes: &[u8]| {
+        let began = result(
+            &call(
+                "artifact.import.begin",
+                json!({"schemaVersion":"arkdeck.import-intent/1","importRequestId":request,
+                    "kind":"flash-bundle","targetId":TARGET,"bindingRevision":"1",
+                    "deviceProfile":"dayu200","name":"images.tar.gz",
+                    "byteCount":bytes.len().to_string(),"sha256":sha256_hex(bytes)}),
+            ),
+            "artifact.import.begin",
+        );
+        assert_eq!(record(&root, request)["appOwned"], true);
+        began["importId"].as_str().unwrap().to_owned()
+    };
+    let upload = |request: &str, bytes: &[u8]| {
+        let id = begin(request, bytes);
+        result(
+            &call(
+                "artifact.import.append",
+                json!({"importId":id,"generation":"1","offset":"0",
+                    "byteCount":bytes.len().to_string(),"sha256":sha256_hex(bytes),
+                    "base64":encode_import_chunk(bytes).unwrap()}),
+            ),
+            "artifact.import.append",
+        );
+        (id.clone(), call("artifact.import.commit", selector(&id)))
+    };
+    let local = |method, params| control.handle_frame(&frame(method, params));
+    let complete = bundle("complete.tar.gz");
+    let (id, committed) = upload("app-flash", &complete);
+    let committed = result(&committed, "artifact.import.commit");
+    assert_eq!(committed["state"], "committed");
+    let receipt = &committed["receipt"];
+    let facts = json!({"kind":"flash-bundle","deviceProfile":"dayu200"});
+    assert_eq!(receipt["validation"], facts);
+    assert_eq!(
+        fs::read(
+            root.0
+                .join("artifacts")
+                .join(&id)
+                .join(receipt["artifactId"].as_str().unwrap())
+        )
+        .unwrap(),
+        complete
+    );
+    // Every view of it the local client reads carries the profile and its
+    // facts, as Swift's daemon answers them.
+    let params = json!({"importId": id});
+    if let Some(inspected) = flash_view(
+        &local("artifact.import.inspect", params.clone()),
+        "artifact.import.inspect",
+    ) {
+        assert_eq!(inspected["metadata"]["deviceProfile"], "dayu200");
+        assert_eq!(inspected["receipt"]["validation"], facts);
+    }
+    if let Some(inspection) = flash_view(
+        &local("artifact.import.inspection", params),
+        "artifact.import.inspection",
+    ) {
+        assert_eq!(inspection["import"]["receipt"]["validation"], facts);
+    }
+    if let Some(listed) = flash_view(
+        &local("artifact.import.list", json!({})),
+        "artifact.import.list",
+    ) {
+        assert_eq!(listed["items"][0]["metadata"]["deviceProfile"], "dayu200");
+    }
+    // A bundle that does not fit the board is refused by the owner, as Swift
+    // refuses it, and stays in progress with nothing published; the App may
+    // abort its own.
+    let (unfit, refused) = upload("app-flash-unfit", &bundle("nonconforming.tar.gz"));
+    let error = refusal(&refused, "artifact.import.commit");
+    assert_eq!(
+        (error.code.as_str(), error.message.as_str()),
+        (
+            "invalidInput",
+            "Import content failed its registered format validator"
+        )
+    );
+    assert_eq!(record(&root, "app-flash-unfit")["state"], "inProgress");
+    assert!(!root.0.join("artifacts").join(&unfit).exists());
+    if let Some(aborted) = flash_view(
+        &call(
+            "artifact.import.abort",
+            json!({"importRequestId":"app-flash-unfit","generation":"1"}),
+        ),
+        "artifact.import.abort",
+    ) {
+        assert_eq!(aborted["state"], "aborted");
+        assert_eq!(aborted["metadata"]["deviceProfile"], "dayu200");
+    }
+}
+
 #[test]
 fn the_app_operates_no_import_it_did_not_begin_and_writes_nothing_trying() {
     let root = uploads();
@@ -356,9 +489,8 @@ fn malformed_uploads_other_kinds_and_foreign_peers_never_enter_the_owner() {
         let reply = ingress.handle(&frame(method, params.clone()), root.peer());
         assert_eq!(code(&reply), "invalidParams", "{method} {params}");
     }
-    // Swift's App transport refuses other kinds before the owner; the Flash
-    // bundle upload is not admitted by this ingress yet.
-    for kind in ["flash-bundle", "workspace-patch", "fixture"] {
+    // Swift's App transport refuses other kinds before the owner.
+    for kind in ["workspace-patch", "fixture"] {
         let method = "artifact.import.begin";
         let error = refusal(
             &ingress.handle(&frame(method, begin("app-kind", kind)), root.peer()),
