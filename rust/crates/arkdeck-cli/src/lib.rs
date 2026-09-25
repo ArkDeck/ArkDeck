@@ -24,6 +24,7 @@ mod flash_leaves;
 pub mod support_bundle;
 mod trace_inspect;
 pub mod ui_dump;
+pub mod update_feed;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
 mod device_wait;
@@ -378,6 +379,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         return answer;
     }
     if let Some(answer) = blocked_leaves::answer(argv) {
+        return answer;
+    }
+    if let Some(answer) = update_feed::answer(argv) {
         return answer;
     }
     parse_argv(argv).map_err(|error| reported(argv, error))

@@ -1,6 +1,6 @@
 //! The registry leaves whose subsystem the Rust CLI has not ported —
-//! `runtime update *`, `maintainer update-feed *` and the deprecated
-//! `update-feed *` — answered by name (`arkdeck_cli::blocked_leaves`): Swift's
+//! `runtime update *`, `maintainer update-feed assemble` and the deprecated
+//! `update-feed assemble` — answered by name (`arkdeck_cli::blocked_leaves`): Swift's
 //! registry pass judges the argv (its refusals, the leaf's help), and an argv
 //! Swift would dispatch is `blockedByProductDefect`, exit 69, with nothing
 //! read, written or connected. Swift's argv fixtures for these leaves replay
@@ -19,23 +19,6 @@ fn cli(argv: &[&str]) -> std::process::Output {
 /// Each blocked leaf, with the options its registry entry requires.
 fn leaves(out: &str) -> Vec<(&'static str, Vec<String>)> {
     let owned = |tokens: &[&str]| tokens.iter().map(|token| (*token).to_owned()).collect();
-    let prepare = |path: &[&str]| -> Vec<String> {
-        let mut argv: Vec<String> = owned(path);
-        for (flag, value) in [
-            ("--sequence", "1"),
-            ("--version", "1.0.0"),
-            ("--minimum-system", "15.0"),
-            ("--issued-at", "2026-09-26T00:00:00Z"),
-            ("--expires-at", "2026-10-26T00:00:00Z"),
-            ("--artifact", "/nonexistent/ArkDeck.zip"),
-            ("--artifact-url", "https://example.invalid/ArkDeck.zip"),
-            ("--notes", "notes"),
-            ("--out", out),
-        ] {
-            argv.extend([flag.to_owned(), value.to_owned()]);
-        }
-        argv
-    };
     let assemble = |path: &[&str]| -> Vec<String> {
         let mut argv: Vec<String> = owned(path);
         argv.extend(
@@ -83,14 +66,9 @@ fn leaves(out: &str) -> Vec<(&'static str, Vec<String>)> {
             owned(&["runtime", "update", "cleanup"]),
         ),
         (
-            "maintainer.update-feed.prepare",
-            prepare(&["maintainer", "update-feed", "prepare"]),
-        ),
-        (
             "maintainer.update-feed.assemble",
             assemble(&["maintainer", "update-feed", "assemble"]),
         ),
-        ("update-feed.prepare", prepare(&["update-feed", "prepare"])),
         (
             "update-feed.assemble",
             assemble(&["update-feed", "assemble"]),
@@ -108,7 +86,7 @@ fn a_blocked_leaf_is_blocked_by_a_product_defect_and_dispatches_nothing() {
     let out = root.join("out.json");
     let out = out.to_str().unwrap();
     let leaves = leaves(out);
-    assert_eq!(leaves.len(), 10);
+    assert_eq!(leaves.len(), 8);
     for (command, argv) in &leaves {
         let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
         let deprecated = command.starts_with("update-feed.");
