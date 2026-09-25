@@ -13,6 +13,7 @@ mod bootstrap_resources;
 mod failure_mapping;
 use failure_mapping::Transport;
 pub use failure_mapping::{BOUNDED_READ_ONLY_METHODS, bounded_read_only};
+pub mod blocked_leaves;
 mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
@@ -356,6 +357,9 @@ pub fn valid_correlation(id: &str) -> bool {
 /// narrows what is accepted.
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if let Some(answer) = command_registry::answer_by_name(argv) {
+        return answer;
+    }
+    if let Some(answer) = blocked_leaves::answer(argv) {
         return answer;
     }
     parse_argv(argv).map_err(|error| reported(argv, error))
