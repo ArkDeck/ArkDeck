@@ -476,10 +476,12 @@ impl TargetStore {
                     target.target_id == intent.target_id
                         && target.binding_revision == intent.binding_revision
                 })
+                // Swift `RuntimeImportControlHandler.binding`'s text, which
+                // its commit answers as it is.
                 .ok_or_else(|| {
                     failure(
                         "resourceConflict",
-                        "The exact Target binding is no longer current",
+                        "the exact target binding is no longer current",
                         phase,
                     )
                 })?;

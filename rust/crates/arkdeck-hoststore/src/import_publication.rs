@@ -180,12 +180,17 @@ impl ImportUploadStore {
         {
             return Ok(record.projection());
         }
+        // Swift `RuntimeArtifactStore.commitImport`'s own text for an upload
+        // that is incomplete, of another generation, or no longer uploadable.
         if record.generation != generation
             || !matches!(record.state.as_str(), "inProgress" | "committing")
             || record.next_offset != record.intent.byte_count
             || generation == i64::MAX as u64
         {
-            return Err(conflict());
+            return Err(failure(
+                "resourceConflict",
+                "Import is incomplete or no longer uploadable",
+            ));
         }
         if !matches!(
             record.intent.kind.as_str(),
@@ -212,8 +217,13 @@ impl ImportUploadStore {
         let facts = if let Some(facts) = &record.validation {
             facts.clone()
         } else {
+            // Swift's commit validator: the Target owner's refusal as it
+            // answers it, then a binding other than the upload began under.
             if resolve_binding(&record.intent)? != record.binding {
-                return Err(conflict());
+                return Err(failure(
+                    "resourceConflict",
+                    "target binding changed during Import",
+                ));
             }
             validate_content(&file, &record.intent)?
         };

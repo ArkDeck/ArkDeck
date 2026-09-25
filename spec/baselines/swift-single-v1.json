@@ -49,8 +49,8 @@
       "successes": 4
     },
     "artifact.import.commit": {
-      "errors": 3,
-      "requests": 7,
+      "errors": 10,
+      "requests": 14,
       "successes": 4
     },
     "artifact.import.inspect": {
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 456,
-    "requests": 1020,
+    "errors": 463,
+    "requests": 1027,
     "successes": 564
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "cef213eee61c4158d432d97a2c8034acce43f374331dcbb120d6d5a140bca7d6",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "2b2d27cdd902ba0be1c74eabb89789cd271dd963483fb0b4defb99af29d5d2b0",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "5f592bc61c4803950cb86ff4920ea5060cebf55f66c0120d2f29b3a554cd2211"
+    "spec/control/methods": "98489442d49e7d7f2e978e1edc4ee6482accdf8a9bf5d86b019f1eca1f144637"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -751,8 +751,8 @@
       "sha256": "25c29ecc62aa91d81ca9a527b15d0f9eea0daaf6b1df2be4b7ca120ccbb95775"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl": {
-      "blob": "82a727ece199992a60c53b029d41980924a319a0",
-      "sha256": "707c262019a174f81cfeebd12cd9a2610dbccf39a46c39211ffee649bbca183e"
+      "blob": "7e1becd79a08a5eb5c1ebca08b64339f65e6c3c0",
+      "sha256": "15598b88c02ee07c141a9e588ed1ccfd9e43f710e5e9697b4724dcea556bad00"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspect.jsonl": {
       "blob": "9fee10f1294e648197530cabedfe9d76793af077",
@@ -1347,8 +1347,8 @@
       "sha256": "e31c9703121ac96de9fd3f493b3765d7074097ed95ebe5bc999163f2dbc522dd"
     },
     "spec/control/methods/artifact.import.commit.json": {
-      "blob": "0703c774d41039f9dceaf8e603e393baf9d5d671",
-      "sha256": "b81cb339825fd78384d453732ced50c2c2cbd2479682f3b471f39db9ab9b76be"
+      "blob": "051fb3137e0cfc8a7d31939a10d22a6b0560fa4c",
+      "sha256": "6580493dd8aad1f0d03ae699f0c3cef30ce8b4a7e8daab3cde64beb8e9a2162e"
     },
     "spec/control/methods/artifact.import.inspect.json": {
       "blob": "84c1542724a522611adf779026383e455791334b",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "87baf88be24efdf05b80bb76b2a3a266f4324d56a43c6bfca12299ec3a5b54e9",
+  "inputDigest": "c3b0391123d7cc165762482a9c9262584e4417ce801280448628e1fbbd0ddc17",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

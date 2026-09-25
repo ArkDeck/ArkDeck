@@ -926,9 +926,58 @@ fn native_import_requires_registered_code_sign_structure_and_preserves_validatio
         }
     }
 }
+/// Each refusal as Swift's daemon answers it
+/// (`DurableImportContractTests.testCommitRefusalsCarryTheImportOwnersCodeMessageAndEvidence`
+/// records them into `artifact.import.commit`'s corpus): the owner's code and
+/// message with its zero-dispatch evidence, a Target owner's refusal passed on
+/// as that owner answered it, and no receipt. The HAP format refusal keeps
+/// only Swift's code here; its text is not Swift's
+/// ("Import is not a ZIP-based HAP/HSP container").
 #[test]
 fn publication_refuses_partial_digest_binding_and_quota_without_a_receipt() {
-    for case in ["partial", "digest", "binding", "quota", "format"] {
+    let evidence = || {
+        json!({"phase":"importOwner","newDispatchCount":0})
+            .as_object()
+            .cloned()
+    };
+    let target_moved = || WireError {
+        code: "resourceConflict".into(),
+        message: "the exact target binding is no longer current".into(),
+        details: evidence(),
+    };
+    for (case, code, message) in [
+        (
+            "partial",
+            "resourceConflict",
+            "Import is incomplete or no longer uploadable",
+        ),
+        (
+            "generation",
+            "resourceConflict",
+            "Import is incomplete or no longer uploadable",
+        ),
+        (
+            "digest",
+            "artifactIntegrityFailed",
+            "Import source digest does not match its metadata",
+        ),
+        (
+            "target",
+            "resourceConflict",
+            "the exact target binding is no longer current",
+        ),
+        (
+            "binding",
+            "resourceConflict",
+            "target binding changed during Import",
+        ),
+        (
+            "quota",
+            "quotaExceeded",
+            "Artifact capacity is exhausted; the Import remains discoverable",
+        ),
+        ("format", "invalidInput", ""),
+    ] {
         let fixture = Fixture::new();
         let store = fixture.store();
         let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
@@ -954,35 +1003,60 @@ fn publication_refuses_partial_digest_binding_and_quota_without_a_receipt() {
             },
         )
         .unwrap();
+        let generation = if case == "generation" { "2" } else { "1" };
         let error = store
             .commit(
-                json!({"importId":id,"generation":"1"}).as_object().unwrap(),
+                json!({"importId":id,"generation":generation})
+                    .as_object()
+                    .unwrap(),
                 NOW,
                 false,
                 &artifacts,
                 if case == "quota" { 1 } else { 1024 },
                 |intent| {
                     let mut b = binding(intent)?;
-                    if case == "binding" {
-                        b.binding_revision = Some(8);
+                    match case {
+                        "target" => return Err(target_moved()),
+                        "binding" => b.stable_identity_sha256 = Some("b".repeat(64)),
+                        _ => {}
                     }
                     Ok(b)
                 },
             )
             .unwrap_err();
+        assert_eq!(error.code, code, "{case}");
+        if case != "format" {
+            assert_eq!(error.message, message, "{case}");
+        }
+        assert_eq!(error.details, evidence(), "{case}");
+        let inspected = call(&store, "inspect", json!({"importId":id})).unwrap();
+        assert!(inspected["receipt"].is_null());
         assert_eq!(
-            error.code,
-            match case {
-                "partial" | "binding" => "resourceConflict",
-                "digest" => "artifactIntegrityFailed",
-                "quota" => "quotaExceeded",
-                _ => "invalidInput",
+            inspected["state"],
+            if case == "quota" {
+                "committing"
+            } else {
+                "inProgress"
             },
             "{case}"
         );
-        let inspected = call(&store, "inspect", json!({"importId":id})).unwrap();
-        assert!(inspected["receipt"].is_null());
     }
+    let fixture = Fixture::new();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let error = commit(
+        &fixture.store(),
+        &artifacts,
+        "imp-00000000-0000-0000-0000-000000000001",
+    )
+    .unwrap_err();
+    assert_eq!(
+        error,
+        WireError {
+            code: "resourceNotFound".into(),
+            message: "Import does not exist".into(),
+            details: evidence(),
+        }
+    );
 }
 #[test]
 fn import_discovery_snapshot_export_and_receipt_metadata_poisoning() {

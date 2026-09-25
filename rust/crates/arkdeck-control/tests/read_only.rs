@@ -1173,6 +1173,72 @@ fn import_upload_methods_use_only_the_typed_import_owner() {
     }
 }
 
+/// Every refusal of `artifact.import.commit` in its recorded corpus is Swift's
+/// daemon's answer, and an Import owner answering it reaches the caller as it
+/// was answered: code, message and zero-dispatch evidence, never rewritten as
+/// `internalError`. The corpus and the schema compiled in are one view's, so
+/// this holds in each of check-contracts' views. The Import owner's four
+/// codes (`TASK-XPA-017`) are published exactly where the view's corpus holds
+/// a frame of them: in the published view the merge base's schema and corpus
+/// predate both.
+#[test]
+fn every_recorded_commit_refusal_reaches_the_caller_as_the_import_owner_answered_it() {
+    type Answer = Arc<std::sync::Mutex<Option<WireError>>>;
+    struct ImportOwner(Answer);
+    impl HostServices for ImportOwner {
+        fn observed_at(&self) -> String {
+            panic!("an Import commit read the unrelated clock")
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("an Import commit touched HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("an Import commit touched device observations")
+        }
+        fn import_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert_eq!(method, "artifact.import.commit");
+            Err(self
+                .0
+                .lock()
+                .unwrap()
+                .take()
+                .expect("one answer per request"))
+        }
+    }
+    let answer = Answer::default();
+    let control = Control::new(ImportOwner(Arc::clone(&answer))).unwrap();
+    let mut recorded_codes = std::collections::BTreeSet::new();
+    for line in include_str!(
+        "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl"
+    )
+    .lines()
+    {
+        let row: Value = serde_json::from_str(line).unwrap();
+        if row["ok"] == true {
+            continue;
+        }
+        let recorded: WireError = serde_json::from_value(row["error"].clone()).unwrap();
+        *answer.lock().unwrap() = Some(recorded.clone());
+        let response = call(&control, "artifact.import.commit", row["params"].clone());
+        assert_eq!(response.outcome.unwrap_err(), recorded, "{line}");
+        recorded_codes.insert(recorded.code);
+    }
+    for code in [
+        "resourceNotFound",
+        "resourceConflict",
+        "artifactIntegrityFailed",
+        "quotaExceeded",
+    ] {
+        let published =
+            validate_method_value("artifact.import.commit", "errorCode", &json!(code)).is_ok();
+        assert_eq!(recorded_codes.contains(code), published, "{code}");
+    }
+}
+
 #[test]
 fn only_app_frames_reach_the_app_import_owner_and_never_a_console() {
     type Calls = Arc<std::sync::Mutex<Vec<(&'static str, String)>>>;

@@ -4,7 +4,7 @@
 //! maintenance and Debug probe over the production owners, whose probe runs a
 //! fake HDC, are `tests/spawning`'s (see `app_ingress_fake_hdc.rs` there).
 use super::*;
-use arkdeck_contract::{WireError, encode_import_chunk, sha256_hex};
+use arkdeck_contract::{WireError, encode_import_chunk, sha256_hex, validate_method_value};
 use arkdeck_hoststore::{
     ArtifactReadStore, ImportUploadFault, ImportUploadStore, JobStore, TargetStore,
 };
@@ -417,6 +417,141 @@ fn a_lost_commit_answer_reaches_the_owner_once_and_is_never_rewritten() {
         })
         .count();
     assert_eq!(published, 1);
+}
+
+/// Swift's frame of one of `artifact.import.commit`'s refusals, as the
+/// method's recorded corpus holds it: `DurableImportContractTests
+/// .testCommitRefusalsCarryTheImportOwnersCodeMessageAndEvidence` records
+/// Swift's daemon answering each with the Import owner's code, message and
+/// zero-dispatch evidence.
+fn swift_commit_refusal(code: &str, message: &str) -> Option<WireError> {
+    let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl",
+    ))
+    .unwrap();
+    corpus
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|row| {
+            row["ok"] == false && row["error"]["code"] == code && row["error"]["message"] == message
+        })
+        .map(|row| serde_json::from_value(row["error"].clone()).unwrap())
+}
+
+/// Each commit refusal the production Host's Import owner answers reaches the
+/// local client and the App as Swift's daemon answers it, wherever this
+/// build's commit schema publishes its code. check-contracts' published view
+/// compiles the merge base's schema, which predates the owner's four codes;
+/// there the control layer still rewrites them as `internalError`. (A full
+/// Artifact store's refusal is the owner's own test: this Host's quota is
+/// eight gigabytes.)
+#[test]
+fn commit_refusals_reach_the_local_client_and_the_app_as_swifts_daemon_answers_them() {
+    let root = uploads();
+    let (control, _) = compose(&root, None);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    let local = |method, params| control.handle_frame(&frame(method, params));
+    let app = |method, params| ingress.handle(&frame(method, params), root.peer());
+    let answered = |reply: Vec<u8>, code: &str, message: &str| {
+        let error = refusal(&reply, "artifact.import.commit");
+        if validate_method_value("artifact.import.commit", "errorCode", &json!(code)).is_ok() {
+            let swift = swift_commit_refusal(code, message)
+                .unwrap_or_else(|| panic!("no Swift frame answers {code}: {message}"));
+            assert_eq!(error, swift);
+        } else {
+            assert!(
+                published_view(),
+                "only the merge base's schema predates {code}"
+            );
+            assert_eq!(
+                (error.code.as_str(), error.message.as_str()),
+                (
+                    "internalError",
+                    "the result does not conform to the current contract"
+                )
+            );
+        }
+    };
+    let begun = |reply: Vec<u8>| {
+        result(&reply, "artifact.import.begin")["importId"]
+            .as_str()
+            .unwrap()
+            .to_owned()
+    };
+    // The one adopted Target of the fixture, as its owner will next read it.
+    let rebind = |change: &dyn Fn(&mut Value)| {
+        let path = root.0.join("targets/targets.json");
+        let mut document: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        change(&mut document["targets"][0]);
+        fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+    };
+
+    // An Import this Runtime never began.
+    answered(
+        local(
+            "artifact.import.commit",
+            selector("imp-00000000-0000-0000-0000-000000000001"),
+        ),
+        "resourceNotFound",
+        "Import does not exist",
+    );
+    // The App's upload, whose bytes have not all arrived.
+    let incomplete = begun(app("artifact.import.begin", begin("app-incomplete", "hap")));
+    answered(
+        app("artifact.import.commit", selector(&incomplete)),
+        "resourceConflict",
+        "Import is incomplete or no longer uploadable",
+    );
+    // The App's complete upload, whose bytes are not the ones it named.
+    let mut mismatched = begin("app-digest", "hap");
+    mismatched["sha256"] = json!(sha256_hex(&[b'b'; HAP.len()]));
+    let digest = begun(app("artifact.import.begin", mismatched));
+    result(
+        &app("artifact.import.append", append(&digest)),
+        "artifact.import.append",
+    );
+    answered(
+        app("artifact.import.commit", selector(&digest)),
+        "artifactIntegrityFailed",
+        "Import source digest does not match its metadata",
+    );
+    // A complete upload whose Target the owner now proves through another
+    // connect key: the binding it began under names another identity.
+    let rebound = begun(local("artifact.import.begin", begin("cli-rebound", "hap")));
+    result(
+        &local("artifact.import.append", append(&rebound)),
+        "artifact.import.append",
+    );
+    rebind(&|target| target["connectKey"] = json!("another-hdc-address"));
+    answered(
+        local("artifact.import.commit", selector(&rebound)),
+        "resourceConflict",
+        "target binding changed during Import",
+    );
+    // A complete upload whose Target binding has since advanced.
+    let advanced = begun(local("artifact.import.begin", begin("cli-advanced", "hap")));
+    result(
+        &local("artifact.import.append", append(&advanced)),
+        "artifact.import.append",
+    );
+    rebind(&|target| target["bindingRevision"] = json!(2));
+    answered(
+        local("artifact.import.commit", selector(&advanced)),
+        "resourceConflict",
+        "the exact target binding is no longer current",
+    );
+    // Each stays in progress, and nothing was published for it.
+    for request in [
+        "app-incomplete",
+        "app-digest",
+        "cli-rebound",
+        "cli-advanced",
+    ] {
+        let durable = record(&root, request);
+        assert_eq!(durable["state"], "inProgress", "{request}");
+        let id = durable["importID"].as_str().unwrap();
+        assert!(!root.0.join("artifacts").join(id).exists(), "{request}");
+    }
 }
 
 #[test]
