@@ -477,6 +477,98 @@ fn every_scenario_replays_through_its_own_leaf() {
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
 
+/// The leaves Swift gives a capture preset.
+const PRESETS: [&str; 5] = [
+    "screen.capture",
+    "ui-dump.capture",
+    "ui-dump.component-detail",
+    "debug.logs",
+    "trace.capture",
+];
+
+fn preset_cases() -> Vec<Value> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/capture-presets/cases.json");
+    serde_json::from_slice::<Value>(&std::fs::read(path).unwrap())
+        .unwrap()
+        .as_array()
+        .unwrap()
+        .clone()
+}
+
+/// Swift's recorded capture presets (`CLICapturePresetOracleContractTests`,
+/// `rust/tests/fixtures/capture-presets`), through the CLI. An accepted case
+/// runs a recorded device capture whose submitted inputs are the preset's own,
+/// never the caller's; everything else it sends and answers is the recording.
+/// A refused case is `invalidInput` with Swift's words, before any connection.
+#[test]
+fn a_capture_preset_submits_swifts_preset_inputs() {
+    let cases = preset_cases();
+    assert!(cases.len() > 50);
+    let mut accepted = 0;
+    for case in &cases {
+        let leaf = case["path"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|token| token.as_str().unwrap())
+            .collect::<Vec<_>>()
+            .join(".");
+        if !PRESETS.contains(&leaf.as_str()) {
+            // A leaf without a preset keeps the caller's inputs.
+            assert_eq!(case["presetInputs"], case["inputs"], "{}", case["name"]);
+            continue;
+        }
+        let mut scenario = retargeted(&scenario("explicitTargetConnected"), &leaf);
+        scenario["request"]["inputs"] = case["inputs"].clone();
+        let name = case["name"].as_str().unwrap();
+        if let Some(refusal) = case.get("refusal") {
+            let run = run(&scenario, &leaf, &["--output", "json"]);
+            let envelope: Value = serde_json::from_slice(&run.output.stdout).unwrap();
+            assert_eq!(run.output.status.code(), Some(65), "{name}");
+            assert_eq!(envelope["error"]["code"], "invalidInput", "{name}");
+            assert_eq!(&envelope["error"]["message"], refusal, "{name}");
+            assert_eq!(run.seen.connections, 0, "{name}");
+            continue;
+        }
+        accepted += 1;
+        // The recording, with the preset's inputs in the submitted request.
+        let mut sent = scenario["sent"].as_array().unwrap().clone();
+        for frame in &mut sent {
+            if frame["method"] == "job.submit" {
+                let mut request: Value =
+                    serde_json::from_str(frame["params"]["requestJson"].as_str().unwrap()).unwrap();
+                request["inputs"] = case["presetInputs"].clone();
+                frame["params"]["requestJson"] = json!(request.to_string());
+            }
+        }
+        let run = run(&scenario, &leaf, &["--output", "json"]);
+        assert_eq!(run.output.status.code(), Some(0), "{name}");
+        let parsed = |frames: &[Value]| -> Vec<Value> {
+            frames
+                .iter()
+                .map(|frame| {
+                    let mut frame = frame.clone();
+                    if let Some(text) = frame["params"]["requestJson"].as_str() {
+                        frame["params"]["requestJson"] = serde_json::from_str(text).unwrap();
+                    }
+                    frame
+                })
+                .collect()
+        };
+        assert_eq!(
+            parsed(
+                labelled(&Value::Array(run.seen.sent.clone()))
+                    .as_array()
+                    .unwrap()
+            ),
+            parsed(&sent),
+            "{name}"
+        );
+    }
+    assert!(accepted >= 10, "{accepted}");
+}
+
 /// Every served leaf, each driving the scenarios whose ending the operation's
 /// own name does not decide, in turn: the executor's path is chosen by what
 /// `operation.describe` answers (host scope or device target), so a recorded
@@ -486,7 +578,13 @@ fn every_scenario_replays_through_its_own_leaf() {
 /// `capabilityWithoutVersion` names no version.
 #[test]
 fn every_leaf_replays_swifts_recorded_runs() {
-    let leaves = arkdeck_cli::domain_leaves::SERVED;
+    // A capture preset replaces the recorded inputs with its own, so its
+    // leaves replay in `a_capture_preset_submits_swifts_preset_inputs`.
+    let leaves: Vec<&str> = arkdeck_cli::domain_leaves::SERVED
+        .iter()
+        .copied()
+        .filter(|leaf| !PRESETS.contains(leaf))
+        .collect();
     let scenarios: Vec<Value> = scenarios()
         .into_iter()
         .filter(|scenario| {

@@ -18,8 +18,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// The domain leaves this CLI serves: every leaf Swift routes through
-/// `runDomainOperation` without a capture preset, each over the registry's
-/// `catalogOperation`.
+/// `runDomainOperation`, each over the registry's `catalogOperation`, five of
+/// them through a capture preset (`preset`).
 pub const SERVED: &[&str] = &[
     "workspace.status",
     "workspace.diff",
@@ -49,6 +49,12 @@ pub const SERVED: &[&str] = &[
     "debug.hap",
     "debug.template.run",
     "debug.native.deploy",
+    // Swift's product-owned capture presets (`capturePresetExecutionRequest`).
+    "screen.capture",
+    "ui-dump.capture",
+    "ui-dump.component-detail",
+    "debug.logs",
+    "trace.capture",
 ];
 
 /// Whether `command` is a served domain leaf.
@@ -151,6 +157,210 @@ pub fn execution_request(invocation: &Invocation) -> Result<ExecutionRequest, Pl
         maximum_wait_seconds: 900,
         execution_id,
     })
+}
+
+/// Swift `RuntimeCLI.capturePresetExecutionRequest`: the fixed, product-owned
+/// inputs a capture preset leaf submits in place of the caller's, from the few
+/// fields that preset accepts. Every other leaf keeps the caller's inputs.
+/// `Err` is the preset's refusal, in Swift's words (`invalidInput`).
+pub fn preset(command: &str, inputs: &Map<String, Value>) -> Result<Map<String, Value>, String> {
+    let path = command.replace('.', " ");
+    let only = |keys: &[&str]| -> Result<(), String> {
+        let mut extra: Vec<&str> = inputs
+            .keys()
+            .map(String::as_str)
+            .filter(|key| !keys.contains(key))
+            .collect();
+        extra.sort_unstable();
+        if extra.is_empty() {
+            Ok(())
+        } else {
+            Err(format!(
+                "{path} preset does not accept input fields: {}",
+                extra.join(", ")
+            ))
+        }
+    };
+    let string = |key: &str| -> Result<String, String> {
+        inputs
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| format!("{key} must be a string"))
+    };
+    let optional_string = |key: &str| -> Result<Option<String>, String> {
+        inputs.get(key).map(|_| string(key)).transpose()
+    };
+    let int = |key: &str| -> Result<i64, String> {
+        inputs
+            .get(key)
+            .and_then(Value::as_i64)
+            .ok_or_else(|| format!("{key} must be an integer"))
+    };
+    let strings = |key: &str| -> Result<Vec<String>, String> {
+        let failure = || format!("{key} must be a string array");
+        inputs
+            .get(key)
+            .and_then(Value::as_array)
+            .ok_or_else(failure)?
+            .iter()
+            .map(|value| value.as_str().map(str::to_owned).ok_or_else(failure))
+            .collect()
+    };
+    match command {
+        "screen.capture" => {
+            only(&["screenshotImageType"])?;
+            let image = optional_string("screenshotImageType")?;
+            if image
+                .as_deref()
+                .is_some_and(|image| !["png", "jpeg"].contains(&image))
+            {
+                return Err("screenshotImageType must be png or jpeg".into());
+            }
+            let mut inputs = capture_base(false, true, false);
+            if let Some(image) = image {
+                inputs.insert("screenshotImageType".into(), json!(image));
+            }
+            Ok(inputs)
+        }
+        "ui-dump.capture" => {
+            only(&[])?;
+            Ok(capture_base(true, true, true))
+        }
+        "ui-dump.component-detail" => {
+            only(&["windowId", "componentId"])?;
+            let (window, component) = (string("windowId")?, string("componentId")?);
+            let identifier = |value: &str| {
+                (1..=20).contains(&value.len()) && value.bytes().all(|byte| byte.is_ascii_digit())
+            };
+            if !identifier(&window) || !identifier(&component) {
+                return Err("windowId and componentId must be 1...20 ASCII decimal digits".into());
+            }
+            let mut inputs = capture_base(false, false, false);
+            inputs.insert("advancedDump".into(), json!(true));
+            inputs.insert("windowId".into(), json!(window));
+            inputs.insert("componentId".into(), json!(component));
+            Ok(inputs)
+        }
+        "debug.logs" => {
+            only(&["durationSeconds", "hilogFilters"])?;
+            let duration = int("durationSeconds")?;
+            let filters = match inputs.get("hilogFilters") {
+                Some(_) => strings("hilogFilters")?,
+                None => Vec::new(),
+            };
+            if !(1..=600).contains(&duration) {
+                return Err("durationSeconds must be in 1...600".into());
+            }
+            if filters.len() > 16 || !filters.iter().all(|filter| hilog_component(filter)) {
+                return Err(
+                    "hilogFilters must contain at most 16 typed component filters of at most 200 \
+                     alphanumeric, dot, underscore, colon or hyphen characters"
+                        .into(),
+                );
+            }
+            Ok(Map::from_iter([
+                ("durationSeconds".to_owned(), json!(duration)),
+                ("hilogFilters".to_owned(), json!(filters)),
+                ("uiDump".to_owned(), json!(false)),
+                ("crashLogs".to_owned(), json!(false)),
+                ("uiScreenshot".to_owned(), json!(false)),
+                ("uiComponentTree".to_owned(), json!(false)),
+                ("redactionProfile".to_owned(), json!("standard")),
+            ]))
+        }
+        "trace.capture" => {
+            only(&[
+                "durationSeconds",
+                "traceCategories",
+                "traceBufferKB",
+                "ringBuffered",
+            ])?;
+            let duration = int("durationSeconds")?;
+            let categories = strings("traceCategories")?;
+            let buffer = int("traceBufferKB")?;
+            let ring = match inputs.get("ringBuffered") {
+                None => false,
+                Some(value) => value
+                    .as_bool()
+                    .ok_or_else(|| "ringBuffered must be a boolean".to_owned())?,
+            };
+            if !(1..=600).contains(&duration) {
+                return Err("durationSeconds must be in 1...600".into());
+            }
+            if !(1_024..=65_536).contains(&buffer) {
+                return Err("traceBufferKB must be in 1024...65536".into());
+            }
+            let unique: std::collections::BTreeSet<&String> = categories.iter().collect();
+            let category = |value: &String| {
+                !value.is_empty()
+                    && value.len() <= 64
+                    && value
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            };
+            if categories.is_empty()
+                || categories.len() > 24
+                || unique.len() != categories.len()
+                || !categories.iter().all(category)
+            {
+                return Err(
+                    "traceCategories must contain 1...24 unique ASCII letter, digit, or \
+                     underscore values of at most 64 bytes"
+                        .into(),
+                );
+            }
+            let mut inputs = Map::from_iter([
+                ("durationSeconds".to_owned(), json!(duration)),
+                ("hilogFilters".to_owned(), json!([])),
+                ("traceCategories".to_owned(), json!(categories)),
+                ("traceBufferKB".to_owned(), json!(buffer)),
+                ("uiDump".to_owned(), json!(false)),
+                ("crashLogs".to_owned(), json!(false)),
+                ("uiScreenshot".to_owned(), json!(false)),
+                ("uiComponentTree".to_owned(), json!(false)),
+                ("redactionProfile".to_owned(), json!("standard")),
+            ]);
+            if ring {
+                inputs.insert("ringBuffered".into(), json!(true));
+            }
+            Ok(inputs)
+        }
+        _ => Ok(inputs.clone()),
+    }
+}
+
+/// Swift `DiagnosticCapturePreset.base`: a one-second capture of the named
+/// UI legs and nothing else.
+fn capture_base(ui_dump: bool, screenshot: bool, tree: bool) -> Map<String, Value> {
+    Map::from_iter([
+        ("durationSeconds".to_owned(), json!(1)),
+        ("captureHilog".to_owned(), json!(false)),
+        ("hilogFilters".to_owned(), json!([])),
+        ("uiDump".to_owned(), json!(ui_dump)),
+        ("crashLogs".to_owned(), json!(false)),
+        ("uiScreenshot".to_owned(), json!(screenshot)),
+        ("uiComponentTree".to_owned(), json!(tree)),
+        ("redactionProfile".to_owned(), json!("standard")),
+    ])
+}
+
+/// Swift `DebugTypedValueValidator.isSafeHilogComponent`: 1…200 characters
+/// (grapheme clusters), each scalar in Foundation's `alphanumerics` (general
+/// categories L*, M*, N*) or one of `._:-`. Off macOS, where Swift has no CLI
+/// and CoreFoundation's table is not linked, a scalar is alphanumeric as Rust
+/// classifies it (a declared difference for marks).
+fn hilog_component(value: &str) -> bool {
+    use unicode_segmentation::UnicodeSegmentation;
+    #[cfg(target_os = "macos")]
+    let alphanumeric = arkdeck_platform::host_alphanumeric;
+    #[cfg(not(target_os = "macos"))]
+    let alphanumeric = char::is_alphanumeric;
+    !value.is_empty()
+        && value.graphemes(true).count() <= 200
+        && value
+            .chars()
+            .all(|scalar| alphanumeric(scalar) || "._:-".contains(scalar))
 }
 
 /// The path as Swift's `URL(filePath:).path` prints it: a relative path
