@@ -2,37 +2,58 @@
 //! held byte for byte to the committed bundle.
 //!
 //! The committed bundle lives outside `rust/` (`openspec/contracts/` and the
-//! contract tests' `Fixtures/CLI/`), where the contract views do not reach,
-//! so each owned product's SHA-256 is kept in
-//! `rust/tests/fixtures/contracts-bundle/owned.json`, and
+//! contract tests' `Fixtures/CLI/`). A contract view carries only the few
+//! files of it the contract inputs list, so each owned product's SHA-256 is
+//! kept in `rust/tests/fixtures/contracts-bundle/owned.json`, and
 //! `rust/scripts/check-contracts.py` holds that table to the committed files.
 use arkdeck_cli::CliError;
 use arkdeck_cli::error_registry::{self, CODES, ExitCategory};
 use arkdeck_cli::machine_contracts::{
-    CANONICAL_REJECTIONS, contract_products, fixture_products, json_document, yaml_document,
+    CANONICAL_REJECTIONS, contract_products, coverage_problems, fixture_products, json_document,
+    yaml_document,
 };
 use arkdeck_contract::sha256_hex;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The products built from the compiled contract: the command registry
-/// carries the Catalog's digest, the result schema the protocol version, and
-/// the control-plane schema the contract identity and the method set. A contract-input change regenerates them, so a fixed
-/// digest cannot hold them. Instead they are compared with the committed
-/// files, wherever a checkout has them. The contract views carry only `rust/`
-/// and the contract inputs, never `openspec/contracts`, so there the
-/// comparison is skipped by design.
-const FROM_THE_CONTRACT: [&str; 3] = [
+/// The products built from the compiled contract: the command registry and
+/// the feature coverage carry the Catalog's digest (the coverage also the
+/// Catalog and the method set), the result schema the protocol version, and
+/// the control-plane schema the contract identity and the method set. A
+/// contract-input change regenerates them, so a fixed digest cannot hold
+/// them. Instead each is compared with its committed file, file by file where
+/// the file is there: a checkout has all four, and a contract view only the
+/// ones the contract inputs list (`generate-contract.py`'s `INPUTS`), the
+/// result and control-plane schemas. The view of the published inputs
+/// compiles the merge base's contract into this tree's code, whose rendering
+/// is by design not the committed one, so there none is compared.
+const FROM_THE_CONTRACT: [&str; 4] = [
     "contracts/cli-command-registry.yaml",
+    "contracts/cli-feature-coverage.json",
     "contracts/cli-result.schema.json",
     "contracts/runtime-control-plane.schema.json",
 ];
 
-/// The committed bundle's `openspec/contracts`, in a checkout.
-fn committed_contracts() -> Option<PathBuf> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../openspec/contracts");
-    root.is_dir().then_some(root)
+/// The published contract view runs this checkout's tests against the merge
+/// base's inputs, which name their commit. The checkout and candidate views
+/// carry this checkout's.
+fn published_view() -> bool {
+    let inputs: Value = serde_json::from_str(arkdeck_contract::CONTRACT_INPUTS).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// A product's committed file (`contracts/…` under `openspec/`), if this tree
+/// has it.
+fn committed(path: &str) -> Option<Vec<u8>> {
+    let file: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../openspec")
+        .join(path);
+    match std::fs::read(&file) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(error) => panic!("{}: {error}", file.display()),
+    }
 }
 
 fn owned() -> BTreeMap<String, String> {
@@ -65,7 +86,7 @@ fn every_owned_product_is_the_published_bytes() {
         produced.keys().map(String::as_str).collect::<Vec<_>>(),
         accounted
     );
-    let committed = committed_contracts();
+    let published_view = published_view();
     for (path, bytes) in &produced {
         if let Some(digest) = owned.get(path) {
             assert_eq!(
@@ -74,10 +95,7 @@ fn every_owned_product_is_the_published_bytes() {
                 "{path} as rendered:\n{}",
                 String::from_utf8_lossy(bytes)
             );
-        } else if let Some(root) = &committed {
-            let file = root.join(path.trim_start_matches("contracts/"));
-            let published =
-                std::fs::read(&file).unwrap_or_else(|error| panic!("{}: {error}", file.display()));
+        } else if let Some(published) = committed(path).filter(|_| !published_view) {
             assert!(
                 published == *bytes,
                 "{path} as rendered:\n{}",
@@ -85,12 +103,19 @@ fn every_owned_product_is_the_published_bytes() {
             );
         }
     }
-    // The command and error registries, the canonical vectors, the result,
-    // page, event, next-action and control-plane schemas, the eight samples,
-    // the seven envelopes, the 209 argv fixtures and their index: 233 of the
-    // bundle's 235 products. The feature coverage and the App's capability
-    // registry are still Swift's.
-    assert_eq!(produced.len(), 233);
+    // Every product of the bundle: the ten contracts, and the eight samples,
+    // the seven envelopes, the 209 argv fixtures and their index.
+    assert_eq!(produced.len(), 235);
+}
+
+/// Every compiled control method has one coverage ruling, and every ruling a
+/// method. The view of the published inputs may compile another method set
+/// than the rulings, so it leaves this to the checkout and the candidate.
+#[test]
+fn every_control_method_has_one_coverage_ruling() {
+    if !published_view() {
+        assert_eq!(coverage_problems(), Vec::<String>::new());
+    }
 }
 
 #[test]

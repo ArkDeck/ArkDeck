@@ -1,10 +1,10 @@
 //! Swift `CLIMachineContracts`: the §14 machine-contract bundle, rendered
 //! by the build that publishes it.
 //!
-//! The products listed here are the ones this CLI owns so far; each is held
-//! byte for byte to the committed bundle
-//! (`rust/tests/fixtures/contracts-bundle/owned.json`). The rest stay Swift's
-//! until their slices move them.
+//! Every product of the bundle is rendered here, and each is held byte for
+//! byte to the committed bundle: by its digest
+//! (`rust/tests/fixtures/contracts-bundle/owned.json`), or, where it carries a
+//! contract input, by the committed file itself.
 use crate::registry_parse::Accepted;
 use crate::{CliError, command_registry, error_registry, registry_parse};
 use arkdeck_contract::{
@@ -68,6 +68,14 @@ pub fn contract_products() -> Vec<Product> {
             "cli-canonical-json-vectors.json",
             &canonical_vectors_document(),
         ),
+        Product::json(
+            "cli-feature-coverage.json",
+            &crate::feature_coverage::document(),
+        ),
+        Product {
+            relative_path: "app-product-capability-registry.yaml".into(),
+            bytes: yaml_document(&crate::feature_coverage::app_registry_document()),
+        },
         Product::json("cli-result.schema.json", &result_schema()),
         Product::json("cli-page.schema.json", &page_schema()),
         Product::json("cli-event.schema.json", &event_schema()),
@@ -110,6 +118,15 @@ pub fn fixture_products() -> Vec<Product> {
     products.push(Product::json("index.json", &index));
     products.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     products
+}
+
+/// What keeps the feature coverage from covering the compiled control
+/// methods exactly: a method without a coverage ruling, or a ruling for no
+/// method. A contract view compiles the methods at another revision than the
+/// rulings, so the coverage takes the methods it has a ruling for; the
+/// checkout's test requires this empty.
+pub fn coverage_problems() -> Vec<String> {
+    crate::feature_coverage::problems()
 }
 
 /// One leaf's argv fixture (`argv/<command>.json`) as this CLI renders it,

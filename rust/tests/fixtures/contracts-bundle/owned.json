@@ -1,4 +1,5 @@
 {
+  "contracts/app-product-capability-registry.yaml": "a500401fc60271b04a859f792b857bc8699fa960c7c34d4e2b8840850607100c",
   "contracts/cli-canonical-json-vectors.json": "6afe05fefcd447a0b9f196461da40a13cf255a3342f275a62748468cc57b6685",
   "contracts/cli-error-registry.yaml": "5be3fe55249639c33e9bacbbcefa521df3fc9ae5bb45ab6d7df81f2bb2269891",
   "contracts/cli-event.schema.json": "fbdd5b019abb27cea4c0df35a17951578d02f5a6765130cec8418dfa668f134c",
