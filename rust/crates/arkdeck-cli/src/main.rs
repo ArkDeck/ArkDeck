@@ -8,13 +8,20 @@ use std::io::{self, IsTerminal, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+/// Swift `CLIControlRequestID.generated()`: `ctl-` and a random version 4
+/// UUID in lowercase text.
 fn correlation() -> io::Result<String> {
+    let mut bytes = random_bytes::<16>()?;
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
     Ok(format!(
-        "ctl-{}",
-        random_bytes::<16>()?
-            .iter()
-            .map(|b| format!("{b:02x}"))
-            .collect::<String>()
+        "ctl-{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
     ))
 }
 
@@ -913,6 +920,59 @@ fn write_document(value: &Value) -> io::Result<()> {
 /// document when there is one, then a plain failure's diagnostic on stderr
 /// and its exit status — never a failure envelope, so a refusal leaves stdout
 /// empty.
+/// `runtime signing status` and its deprecated `signing status` spelling:
+/// Swift `runSigning`, which answers through its session as the runtime
+/// service leaves do.
+fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    if !invocation.json
+        && !invocation.legacy_json
+        && let Some(warning) = arkdeck_cli::legacy_warning(invocation.command)
+    {
+        eprintln!("{warning}");
+    }
+    #[cfg(target_os = "macos")]
+    let answer = arkdeck_cli::signing_leaves::status().ok_or_else(|| {
+        CliError::new(
+            "ioFailure",
+            "this account has no Application Support directory for the signing preset",
+        )
+    });
+    #[cfg(not(target_os = "macos"))]
+    let answer: Result<Value, CliError> = Err(CliError::new(
+        "unsupportedOnPlatform",
+        "OpenHarmony signing presets live in the macOS Keychain",
+    ));
+    let written = match &answer {
+        Ok(document) if invocation.legacy_json => io::stdout()
+            .lock()
+            .write_all(&arkdeck_cli::legacy_document(document)),
+        Ok(document) if invocation.json => write_document(&arkdeck_cli::with_lifecycle(
+            success_envelope(invocation.command, document.clone(), id),
+            invocation.command,
+        )),
+        Ok(document) => writeln!(
+            io::stdout().lock(),
+            "{}",
+            serde_json::to_string_pretty(document).expect("a JSON document")
+        ),
+        Err(error) if invocation.json => write_document(&arkdeck_cli::with_lifecycle(
+            failure_envelope(invocation.command, error, id, true),
+            invocation.command,
+        )),
+        Err(error) => {
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        }
+    };
+    if written.is_err() {
+        return 74.into();
+    }
+    match answer {
+        Ok(_) => 0.into(),
+        Err(error) => error.exit_code().into(),
+    }
+}
+
 fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::ExitCode {
     // Swift `warnIfLegacy`: the `agentd` spelling says so on stderr before
     // anything runs, in the human rendering only; a machine answer carries it
@@ -1303,6 +1363,9 @@ fn main() -> std::process::ExitCode {
     }
     if arkdeck_cli::is_runtime_service(invocation.command) {
         return serve_runtime_service(&invocation, id);
+    }
+    if arkdeck_cli::signing_leaves::serves(invocation.command) {
+        return serve_signing(&invocation, id);
     }
     if invocation.command.starts_with("maintainer.contracts.") {
         return serve_maintainer_contracts(&invocation, id);

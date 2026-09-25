@@ -70,6 +70,7 @@ dependencies = [
  "arkdeck-client",
  "arkdeck-contract",
  "arkdeck-platform",
+ "arkdeck-provider-workspace",
  "serde_json",
  "unicode-segmentation",
 ]
