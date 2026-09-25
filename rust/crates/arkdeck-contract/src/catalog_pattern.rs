@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn every_catalog_pattern_is_evaluated() {
         let catalog: Vec<serde_json::Value> =
-            serde_json::from_str(arkdeck_contract::CATALOG_CANONICAL_JSON).unwrap();
+            serde_json::from_str(crate::CATALOG_CANONICAL_JSON).unwrap();
         let mut patterns = 0;
         for operation in &catalog {
             for field in operation["inputs"]["fields"]

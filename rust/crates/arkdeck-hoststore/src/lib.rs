@@ -210,10 +210,11 @@ mod session_publication;
 pub use session_publication::{
     SessionPublisher, StorageClaims, StorageProbe, StorageSnapshot, SystemStorageProbe,
 };
+// The Catalog's operation model, its input matching (with the Catalog's
+// pattern subset) and its effect resolution live in `arkdeck-contract`, shared
+// with the CLI; `crate::operation_catalog` keeps naming them here.
 #[cfg(target_os = "macos")]
-mod catalog_pattern;
-#[cfg(target_os = "macos")]
-mod operation_catalog;
+use arkdeck_contract::operation_catalog;
 #[cfg(target_os = "macos")]
 mod operation_request;
 #[cfg(target_os = "macos")]
