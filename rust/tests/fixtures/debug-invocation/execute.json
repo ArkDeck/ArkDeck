@@ -1,0 +1,60 @@
+{
+  "answer" : {
+    "ok" : true,
+    "result" : {
+      "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+      "bindingRevision" : 1,
+      "createdAtUTC" : "2026-09-25T00:00:15Z",
+      "destructiveEpochsUsed" : 1,
+      "evaluations" : [
+        {
+          "candidateAction" : "executePinnedRequest",
+          "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+          "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+          "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+          "destructiveEpoch" : 1,
+          "detail" : "Runtime Job terminal state failed",
+          "disposition" : "nextCandidateAllowed",
+          "evaluatedAtUTC" : "2026-09-25T00:40:00Z",
+          "idempotencyKey" : "runtime-debug-<invocation-4-suffix>-e1-2d2b943b3079",
+          "jobID" : "<job>",
+          "ordinal" : 1,
+          "outcome" : "safeToReflash",
+          "requestID" : "debug-<invocation-4-suffix>-e1"
+        }
+      ],
+      "expiresAtUTC" : "2026-09-25T04:00:15Z",
+      "invocationID" : "<invocation-4>",
+      "maximumDestructiveEpochs" : 16,
+      "operationReference" : "flash.full-restore@1",
+      "seedRequestFingerprintSHA256" : "b7471d1883a3d107dca3b35fd294ae72798a95a2db55bf256e35dffdb12c2b55",
+      "state" : "active",
+      "targetID" : "TGT-83405c84ff74"
+    }
+  },
+  "params" : {
+    "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
+    "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+    "invocationId" : "<invocation-4>",
+    "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+  },
+  "setup" : {
+    "dispatchUnavailable" : null,
+    "facts" : {
+      "bindingRevision" : 1,
+      "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+      "executionConnectKey" : "post-flash-hdc-address",
+      "serverFacts" : {
+        "arkForgeToolchainID" : "arkforged-native-rockusb",
+        "dayu200CrossModeBinding" : "satisfied",
+        "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+        "dayu200HDCNormalAliasUSBTopology" : "42",
+        "rockusbBackend" : "native"
+      },
+      "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "now" : "2026-09-25T00:40:00Z",
+    "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "unavailable" : null
+  }
+}

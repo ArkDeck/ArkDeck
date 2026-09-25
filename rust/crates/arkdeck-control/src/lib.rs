@@ -447,10 +447,11 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
-    /// `debug.status` and `recovery.flash-invocation.list`: the reads of the
-    /// Runtime Flash invocation owner, which checks their parameters itself
-    /// once it is composed, as Swift's handler does. A host without the owner
-    /// answers as Swift's daemon without it does, whatever the parameters.
+    /// `debug.start`, `debug.evaluate`, `debug.status` and
+    /// `recovery.flash-invocation.list`: the Runtime Flash invocation owner,
+    /// which checks their parameters itself once it is composed, as Swift's
+    /// handler does. A host without the owner answers as Swift's daemon
+    /// without it does, whatever the parameters.
     fn flash_invocation(
         &self,
         method: &str,
@@ -458,7 +459,7 @@ pub trait HostServices: Send + Sync {
     ) -> Result<Value, WireError> {
         Err(WireError {
             code: "internalError".into(),
-            message: if method == "debug.status" {
+            message: if method.starts_with("debug.") {
                 "Runtime debug invocation is not configured"
             } else {
                 "Runtime Flash invocation owner is not configured"
@@ -1460,7 +1461,10 @@ impl<H: HostServices> Control<H> {
             },
             // As Swift's handler: the owner before the parameters, which the
             // owner checks itself.
-            "debug.status" | "recovery.flash-invocation.list" => Response {
+            "debug.start"
+            | "debug.evaluate"
+            | "debug.status"
+            | "recovery.flash-invocation.list" => Response {
                 id: request.id.clone(),
                 outcome: self.host.flash_invocation(&request.method, &params),
             },

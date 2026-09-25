@@ -14,6 +14,7 @@ mod debug_probe;
 mod debug_templates;
 mod flash_leaves;
 pub use debug_templates::debug_template_list;
+pub use flash_leaves::{broker_params, is_broker_leaf};
 mod device_wait;
 pub use debug_probe::validate_debug_probe;
 mod operation_validation;
@@ -559,6 +560,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--thread"
                 | "--after-cursor"
                 | "--request-file"
+                | "--action-file"
+                | "--source-sha256"
+                | "--build-sha256"
                 | "--inputs-file"
                 | "--expected-binding-revision"
                 | "--request-id"
@@ -628,6 +632,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--target" => "targetId",
                         "--time" => "timeRange",
                         "--request-file" => "requestFile",
+                        "--action-file" => "actionFile",
+                        "--source-sha256" => "sourceSha256",
+                        "--build-sha256" => "buildSha256",
                         "--inputs-file" => "inputsFile",
                         "--expected-binding-revision" => "expectedBindingRevision",
                         "--request-id" => "requestId",
@@ -769,6 +776,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["debug", "probe"] => "debug.probe",
+        ["debug", "start"] => "debug.start",
+        ["debug", "evaluate"] => "debug.evaluate",
         ["debug", "status"] => "debug.status",
         ["flash", "reconcile-alias"] => "flash.reconcile-alias",
         ["flash", "bind-loader"] => "flash.bind-loader",
@@ -776,6 +785,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "device-access"] => "flash.device-access",
         ["flash", "prerequisites"] => "flash.prerequisites",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
+        ["recovery", "flash-invocation", "start"] => "recovery.flash-invocation.start",
+        ["recovery", "flash-invocation", "evaluate"] => "recovery.flash-invocation.evaluate",
         ["recovery", "flash-invocation", "status"] => "recovery.flash-invocation.status",
         ["debug", "template", "list"] => "debug.template.list",
         ["job", "watch"] => "job.watch",
@@ -948,6 +959,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
+        "recovery.flash-invocation.start" | "debug.start" => &["requestFile"],
+        "recovery.flash-invocation.evaluate" | "debug.evaluate" => {
+            &["invocationId", "actionFile", "sourceSha256", "buildSha256"]
+        }
         "artifact.import.hap"
         | "artifact.import.native-library"
         | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
@@ -1523,6 +1538,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             // Swift's handler reads the invocation through `debug.status`, the
             // wire method `debug status` also sends.
             "debug.status"
+        } else if command == "recovery.flash-invocation.start" {
+            "debug.start"
+        } else if command == "recovery.flash-invocation.evaluate" {
+            "debug.evaluate"
         } else if command == "flash.bind-loader" {
             "flash.bind-current-loader"
         } else {
@@ -1603,7 +1622,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "flash.bind-loader"
                     | "flash.prerequisites"
                     | "recovery.flash-invocation.list"
+                    | "recovery.flash-invocation.start"
+                    | "recovery.flash-invocation.evaluate"
                     | "recovery.flash-invocation.status"
+                    | "debug.start"
+                    | "debug.evaluate"
                     | "debug.status"
             )
         {

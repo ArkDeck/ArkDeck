@@ -215,12 +215,43 @@ impl AnalyzerProfile {
 pub struct PlanRefusal {
     pub code: &'static str,
     pub message: String,
+    /// Swift's own rendering of the error its planner threw, where the
+    /// control-plane answer does not determine it.
+    pub swift: Option<String>,
+}
+
+impl PlanRefusal {
+    /// Swift's `"\(error)"` of the error `planOnly` threw, as the Flash
+    /// recovery broker answers it (`debug.start`, `debug.evaluate`). Swift's
+    /// Job lifecycle handler maps `RuntimeJobEngineError.rejected(code, _)`
+    /// onto its control-plane code many to one; the case a code stands for
+    /// here is the one this planner's refusals raise in Swift. A refusal only
+    /// this Runtime makes is its own message.
+    pub fn swift_description(&self) -> String {
+        if let Some(swift) = &self.swift {
+            return swift.clone();
+        }
+        let case = match self.code {
+            "invalidInput" => "invalidInput",
+            "operationUnavailable" => "unknownOperation",
+            "inputTooLarge" => "requestTooLarge",
+            "resourceNotFound" => "targetNotFound",
+            "admissionDenied" => "authorizationRequired",
+            "resourceConflict" => "conflict",
+            _ => return self.message.clone(),
+        };
+        format!(
+            "rejected(ArkDeckCore.RuntimeOperationErrorCode.{case}, {})",
+            crate::strict_json::swift_quoted(&self.message)
+        )
+    }
 }
 
 fn refusal(code: &'static str, message: impl Into<String>) -> PlanRefusal {
     PlanRefusal {
         code,
         message: message.into(),
+        swift: None,
     }
 }
 

@@ -22,8 +22,14 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "extra": {
+          "type": "boolean"
+        },
         "requestJson": {
-          "type": "string"
+          "type": [
+            "integer",
+            "string"
+          ]
         }
       },
       "type": "object"
@@ -93,8 +99,8 @@
   "x-arkdeck-method": "debug.start",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
+    "error": 5,
+    "request": 7,
     "result": 2
   }
 }

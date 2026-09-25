@@ -1,8 +1,8 @@
 //! The Flash leaves that read or repair what the Runtime keeps about a board
 //! without changing the board: `flash bootloader-status`, `flash
 //! prerequisites`, `flash reconcile-alias`, `flash bind-loader` and `recovery
-//! flash-invocation list|status`, with `debug status`, the legacy spelling of
-//! the last. Each is one request, answered as the Runtime answers it (Swift
+//! flash-invocation list|start|evaluate|status`, with `debug
+//! start|evaluate|status`, the legacy spelling of the last three. Each is one request, answered as the Runtime answers it (Swift
 //! `runFlashObservation` and `emitFlashInvocation`); every judgement of the
 //! board, the binding, the alias and the invocation documents is the
 //! Runtime's.
@@ -80,7 +80,61 @@ pub(crate) fn configure(
                 "flash-invocation status requires --invocation <id>",
             ));
         }
+        "recovery.flash-invocation.start" | "debug.start"
+            if !fields.contains_key("requestFile") =>
+        {
+            return Err(invalid("flash-invocation requires --request-file"));
+        }
+        "recovery.flash-invocation.evaluate" | "debug.evaluate" => {
+            if ["invocationId", "sourceSha256", "buildSha256"]
+                .iter()
+                .any(|key| !fields.contains_key(*key))
+            {
+                return Err(invalid(
+                    "flash-invocation evaluate requires --invocation, --action-file, \
+                     --source-sha256 and --build-sha256",
+                ));
+            }
+            if !fields.contains_key("actionFile") {
+                return Err(invalid("flash-invocation requires --action-file"));
+            }
+        }
         _ => {}
     }
     Ok(())
+}
+
+/// Whether `command` is one of the Flash recovery broker's two leaves, each
+/// spelled as its current and its legacy path.
+pub fn is_broker_leaf(command: &str) -> bool {
+    matches!(
+        command,
+        "recovery.flash-invocation.start"
+            | "debug.start"
+            | "recovery.flash-invocation.evaluate"
+            | "debug.evaluate"
+    )
+}
+
+/// The broker leaf's request, as Swift's `emitFlashInvocation` sends it:
+/// each named document read whole, as UTF-8 text, before anything is sent.
+pub fn broker_params(fields: &Map<String, Value>) -> Result<Map<String, Value>, CliError> {
+    let document = |key: &str| -> Result<Value, CliError> {
+        let path = fields.get(key).and_then(Value::as_str).unwrap_or_default();
+        std::fs::read_to_string(path)
+            .map(Value::String)
+            .map_err(|_| CliError::new("ioFailure", format!("cannot read {path}")))
+    };
+    if fields.contains_key("requestFile") {
+        return Ok(Map::from_iter([(
+            "requestJson".to_owned(),
+            document("requestFile")?,
+        )]));
+    }
+    let mut params = Map::new();
+    for key in ["invocationId", "sourceSha256", "buildSha256"] {
+        params.insert(key.into(), fields[key].clone());
+    }
+    params.insert("actionJson".into(), document("actionFile")?);
+    Ok(params)
 }

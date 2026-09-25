@@ -1,0 +1,3169 @@
+{
+  "documents" : {
+    "blocked" : "debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b",
+    "exhausted" : "debug-f9b672a1-601e-4a15-8863-e5320a8ce76a",
+    "interrupted" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad",
+    "succeeded" : "debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c"
+  },
+  "exchanges" : [
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "details" : null,
+          "message" : "debug.start accepts exactly requestJson"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.params.extra",
+      "params" : {
+        "extra" : true,
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "details" : null,
+          "message" : "debug.start accepts exactly requestJson"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.params.none",
+      "params" : {
+
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "details" : null,
+          "message" : "debug.start accepts exactly requestJson"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.params.notText",
+      "params" : {
+        "requestJson" : 1
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidSeedRequest(\"RuntimeOperationRequestRejection(code: ArkDeckCore.RuntimeOperationErrorCode.invalidRequest, path: \\\"$\\\", message: \\\"malformed or duplicate-key JSON\\\")\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.seed.malformed",
+      "params" : {
+        "requestJson" : "{\"requestId\":"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidSeedRequest(\"RuntimeOperationRequestRejection(code: ArkDeckCore.RuntimeOperationErrorCode.invalidRequest, path: \\\"$\\\", message: \\\"malformed or duplicate-key JSON\\\")\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.seed.duplicate",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"requestId\":\"again\"}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidSeedRequest(\"RuntimeOperationRequestRejection(code: ArkDeckCore.RuntimeOperationErrorCode.invalidRequest, path: \\\"$.trustedFacts\\\", message: \\\"unknown field in the current Runtime contract\\\")\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.seed.governance",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"},\"trustedFacts\":{}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidSeedRequest(\"debug invocation requires one unprivileged typed request without caller provenance\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.seed.authorization",
+      "params" : {
+        "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidSeedRequest(\"debug invocation requires one unprivileged typed request without caller provenance\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.seed.client",
+      "params" : {
+        "requestJson" : "{\"clientContext\":{\"clientName\":\"ArkDeckApp.FlashWorkspace\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.unknownOperation, \"operation flash.nothing@1 is not in the catalog\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.plan.unknownOperation",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.nothing\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"flash.full-restore@1 is runtime unavailable: ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign.\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.plan.hardwareGated",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "legacy partitionPlan must exactly match the selected published profile"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.plan.aliasNotConvertible",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"target facts cannot materialize the typed plan before authorization: failed(\\\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\\\")\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.plan.noRevision",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"provider hdc is not registered\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.start",
+      "name" : "start.plan.otherProvider",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-observe\",\"inputs\":{},\"operation\":{\"id\":\"observe.device\",\"version\":1},\"requestId\":\"seed-observe\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "<invocation-1>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.start",
+      "name" : "start.canonical",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:05Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:05Z",
+          "invocationID" : "<invocation-2>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "f121d32981bd919a2393262c5b0e671302efa1d4f3f50eac9c1ddbc3efd63f22",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.start",
+      "name" : "start.alias",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:05Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:10Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:10Z",
+          "invocationID" : "<invocation-3>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "59f29d4d293ce4c5d5ec8ac2fca07f2ff23f4daad66ba2bb4dca4cd9e4944114",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.start",
+      "name" : "start.expiring",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:10Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:15Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:15Z",
+          "invocationID" : "<invocation-4>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "b7471d1883a3d107dca3b35fd294ae72798a95a2db55bf256e35dffdb12c2b55",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.start",
+      "name" : "start.executing",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:15Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "details" : null,
+          "message" : "debug.evaluate accepts exactly invocationId, actionJson, sourceSha256 and buildSha256"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.params.missing",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "invocationId" : "<invocation-1>"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "details" : null,
+          "message" : "debug.evaluate accepts exactly invocationId, actionJson, sourceSha256 and buildSha256"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.params.notText",
+      "params" : {
+        "actionJson" : 1,
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidProvenance(\"candidate source and build provenance must be lowercase SHA-256\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.provenance.uppercase",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidProvenance(\"candidate source and build provenance must be lowercase SHA-256\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.provenance.short",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "abc",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotFound(\"debug-00000000-0000-4000-8000-000000000000\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.invocation.unknown",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-00000000-0000-4000-8000-000000000000",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotFound(\"Debug!\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.invocation.invalid",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "Debug!",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.empty",
+      "params" : {
+        "actionJson" : "",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.emptyObject",
+      "params" : {
+        "actionJson" : "{}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.array",
+      "params" : {
+        "actionJson" : "[]",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.notJSON",
+      "params" : {
+        "actionJson" : "observe",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.trailing",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"} x",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.duplicate",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"action\":\"stop\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidDocument\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.tooLarge",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\",\"pad\":\"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"unsupportedSchemaVersion\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.schemaVersion",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"2.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"unsupportedSchemaVersion\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.schemaVersionNumber",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":1,\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"unsupportedAction\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.noAction",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"unsupportedAction\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.actionNumber",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":7}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"unsupportedAction\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.unknownAction",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"reboot\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"closedShapeViolation\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.observeExtra",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\",\"x\":1}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"closedShapeViolation\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.executeExtra",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\",\"x\":1}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"closedShapeViolation\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopNoReason",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonNumber",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":1}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonUpper",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"Stop\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonSpace",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"a b\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonEmpty",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonLong",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"abbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonTwoNewlines",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"ok\\n\\n\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.action.stopReasonNewlineInside",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"o\\nk\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:10:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "<invocation-1>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.observe",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:10:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:10:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            },
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000066",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000002",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:11:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 2
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "<invocation-1>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.observe.blocker",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000066",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000002"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "unprepared",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:11:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"flash.full-restore@1 is runtime unavailable: ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign.\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.observe.hardwareGated",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:12:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : null,
+          "message" : "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"target facts cannot materialize the typed plan before authorization: production ArkForge target facts are not registered\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.observe.factsError",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "error" : "production ArkForge target facts are not registered"
+        },
+        "now" : "2026-09-25T00:12:30Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:05Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:13:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:05Z",
+          "invocationID" : "<invocation-2>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "f121d32981bd919a2393262c5b0e671302efa1d4f3f50eac9c1ddbc3efd63f22",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.observe.alias",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-2>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:13:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:10:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            },
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000066",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000002",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:11:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 2
+            },
+            {
+              "candidateAction" : "stop",
+              "candidateActionSHA256" : "39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000067",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000003",
+              "detail" : "operator.cancelled",
+              "disposition" : "stopped",
+              "evaluatedAtUTC" : "2026-09-25T00:30:00Z",
+              "ordinal" : 3
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "<invocation-1>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829",
+          "state" : "stopped",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.stop",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"operator.cancelled\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000067",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000003"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:30:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotActive(\"stopped\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.afterStop",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-1>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:30:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invalidCandidate(\"invalidReasonCode\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.stop.trailingNewline",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"stop\",\"reasonCode\":\"ok\\n\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-2>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:30:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationExpired"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.expired",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-3>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T04:00:11Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotActive(\"expired\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.afterExpiry",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "<invocation-3>",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T04:00:11Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotActive(\"blocked\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.blocked",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "invocationNotActive(\"succeeded\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.succeeded",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "epochBudgetExhausted"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.exhausted",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-f9b672a1-601e-4a15-8863-e5320a8ce76a",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "predecessorBlocksContinuation(\"an interrupted attempt must resume its exact candidate and provenance\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.interrupted.otherCandidate",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"executePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000009"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "details" : null,
+          "message" : "predecessorBlocksContinuation(\"an interrupted attempt must resume its exact candidate and provenance\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.evaluate",
+      "name" : "evaluate.interrupted.otherAction",
+      "params" : {
+        "actionJson" : "{\"schemaVersion\":\"1.0.0\",\"action\":\"observePinnedRequest\"}",
+        "buildSha256" : "0000000000000000000000000000000000000000000000000000000000000065",
+        "invocationId" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad",
+        "sourceSha256" : "0000000000000000000000000000000000000000000000000000000000000001"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:00Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:10:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            },
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000066",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000002",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:11:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 2
+            },
+            {
+              "candidateAction" : "stop",
+              "candidateActionSHA256" : "39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000067",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000003",
+              "detail" : "operator.cancelled",
+              "disposition" : "stopped",
+              "evaluatedAtUTC" : "2026-09-25T00:30:00Z",
+              "ordinal" : 3
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:00Z",
+          "invocationID" : "<invocation-1>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829",
+          "state" : "stopped",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.invocation-1",
+      "params" : {
+        "invocationId" : "<invocation-1>"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:05Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+            {
+              "candidateAction" : "observePinnedRequest",
+              "candidateActionSHA256" : "2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "detail" : "fresh Runtime plan-only observation",
+              "disposition" : "observed",
+              "evaluatedAtUTC" : "2026-09-25T00:13:00Z",
+              "observation" : {
+                "bindingRevision" : 1,
+                "dispatchDisposition" : "notDispatched",
+                "materializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+                "observationID" : "pinnedRequest",
+                "stableIdentitySHA256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+                "targetID" : "TGT-83405c84ff74"
+              },
+              "ordinal" : 1
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:05Z",
+          "invocationID" : "<invocation-2>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.dayu200",
+          "seedRequestFingerprintSHA256" : "f121d32981bd919a2393262c5b0e671302efa1d4f3f50eac9c1ddbc3efd63f22",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.invocation-2",
+      "params" : {
+        "invocationId" : "<invocation-2>"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:10Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:10Z",
+          "invocationID" : "<invocation-3>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "59f29d4d293ce4c5d5ec8ac2fca07f2ff23f4daad66ba2bb4dca4cd9e4944114",
+          "state" : "expired",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.invocation-3",
+      "params" : {
+        "invocationId" : "<invocation-3>"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-25T00:00:15Z",
+          "destructiveEpochsUsed" : 0,
+          "evaluations" : [
+
+          ],
+          "expiresAtUTC" : "2026-09-25T04:00:15Z",
+          "invocationID" : "<invocation-4>",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "b7471d1883a3d107dca3b35fd294ae72798a95a2db55bf256e35dffdb12c2b55",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.invocation-4",
+      "params" : {
+        "invocationId" : "<invocation-4>"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-24T23:00:00Z",
+          "destructiveEpochsUsed" : 1,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome failedKnown",
+              "disposition" : "blockedKnownFailure",
+              "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
+              "idempotencyKey" : "runtime-debug-5d3c3f0f966b-e1-2d2b943b3079",
+              "jobID" : "job-oracle-1",
+              "ordinal" : 1,
+              "outcome" : "failedKnown",
+              "requestID" : "debug-5d3c3f0f966b-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T03:00:00Z",
+          "invocationID" : "debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314",
+          "state" : "blocked",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.blocked",
+      "params" : {
+        "invocationId" : "debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-24T23:00:00Z",
+          "destructiveEpochsUsed" : 16,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e1-2d2b943b3079",
+              "jobID" : "job-oracle-3",
+              "ordinal" : 1,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e1"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000066",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000002",
+              "destructiveEpoch" : 2,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:02:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e2-df8a51a73b18",
+              "jobID" : "job-oracle-4",
+              "ordinal" : 2,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e2"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000067",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000003",
+              "destructiveEpoch" : 3,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:03:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e3-c87418821e00",
+              "jobID" : "job-oracle-5",
+              "ordinal" : 3,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e3"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000068",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000004",
+              "destructiveEpoch" : 4,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:04:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e4-4a38125fbc75",
+              "jobID" : "job-oracle-6",
+              "ordinal" : 4,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e4"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000069",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000005",
+              "destructiveEpoch" : 5,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:05:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e5-41640eeb9c39",
+              "jobID" : "job-oracle-7",
+              "ordinal" : 5,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e5"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006a",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000006",
+              "destructiveEpoch" : 6,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:06:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e6-1c53991cf88a",
+              "jobID" : "job-oracle-8",
+              "ordinal" : 6,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e6"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006b",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000007",
+              "destructiveEpoch" : 7,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:07:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e7-81de1ffd7a71",
+              "jobID" : "job-oracle-9",
+              "ordinal" : 7,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e7"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006c",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000008",
+              "destructiveEpoch" : 8,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:08:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e8-4184e39a8c9c",
+              "jobID" : "job-oracle-10",
+              "ordinal" : 8,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e8"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006d",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000009",
+              "destructiveEpoch" : 9,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:09:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e9-27c2690c75b0",
+              "jobID" : "job-oracle-11",
+              "ordinal" : 9,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e9"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006e",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000a",
+              "destructiveEpoch" : 10,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:10:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e10-531ff0f59f67",
+              "jobID" : "job-oracle-12",
+              "ordinal" : 10,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e10"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "000000000000000000000000000000000000000000000000000000000000006f",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000b",
+              "destructiveEpoch" : 11,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:11:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e11-795730c8f5f5",
+              "jobID" : "job-oracle-13",
+              "ordinal" : 11,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e11"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000070",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000c",
+              "destructiveEpoch" : 12,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:12:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e12-0b727990a30e",
+              "jobID" : "job-oracle-14",
+              "ordinal" : 12,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e12"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000071",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000d",
+              "destructiveEpoch" : 13,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:13:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e13-21e6752852ca",
+              "jobID" : "job-oracle-15",
+              "ordinal" : 13,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e13"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000072",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000e",
+              "destructiveEpoch" : 14,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:14:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e14-c3507539c7d5",
+              "jobID" : "job-oracle-16",
+              "ordinal" : 14,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e14"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000073",
+              "candidateSourceSHA256" : "000000000000000000000000000000000000000000000000000000000000000f",
+              "destructiveEpoch" : 15,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:15:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e15-4cf563283496",
+              "jobID" : "job-oracle-17",
+              "ordinal" : 15,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e15"
+            },
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000074",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000010",
+              "destructiveEpoch" : 16,
+              "detail" : "oracle driver outcome safeToReflash",
+              "disposition" : "nextCandidateAllowed",
+              "evaluatedAtUTC" : "2026-09-24T23:16:00Z",
+              "idempotencyKey" : "runtime-debug-e5320a8ce76a-e16-1a65c61a3058",
+              "jobID" : "job-oracle-18",
+              "ordinal" : 16,
+              "outcome" : "safeToReflash",
+              "requestID" : "debug-e5320a8ce76a-e16"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T03:00:00Z",
+          "invocationID" : "debug-f9b672a1-601e-4a15-8863-e5320a8ce76a",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.exhausted",
+      "params" : {
+        "invocationId" : "debug-f9b672a1-601e-4a15-8863-e5320a8ce76a"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-24T23:00:00Z",
+          "destructiveEpochsUsed" : 1,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "destructiveEpoch" : 1,
+              "detail" : "Runtime attempt durably prepared",
+              "disposition" : "executing",
+              "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
+              "idempotencyKey" : "runtime-debug-28576d176cad-e1-2d2b943b3079",
+              "ordinal" : 1,
+              "requestID" : "debug-28576d176cad-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T03:00:00Z",
+          "invocationID" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314",
+          "state" : "active",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.interrupted",
+      "params" : {
+        "invocationId" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "baselineMaterializedPlanDigest" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "bindingRevision" : 1,
+          "createdAtUTC" : "2026-09-24T23:00:00Z",
+          "destructiveEpochsUsed" : 1,
+          "evaluations" : [
+            {
+              "candidateAction" : "executePinnedRequest",
+              "candidateActionSHA256" : "1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7",
+              "candidateBuildSHA256" : "0000000000000000000000000000000000000000000000000000000000000065",
+              "candidateSourceSHA256" : "0000000000000000000000000000000000000000000000000000000000000001",
+              "destructiveEpoch" : 1,
+              "detail" : "oracle driver outcome succeeded",
+              "disposition" : "succeeded",
+              "evaluatedAtUTC" : "2026-09-24T23:01:00Z",
+              "idempotencyKey" : "runtime-debug-3ccf44a3fc1c-e1-2d2b943b3079",
+              "jobID" : "job-oracle-2",
+              "ordinal" : 1,
+              "outcome" : "succeeded",
+              "requestID" : "debug-3ccf44a3fc1c-e1"
+            }
+          ],
+          "expiresAtUTC" : "2026-09-25T03:00:00Z",
+          "invocationID" : "debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c",
+          "maximumDestructiveEpochs" : 16,
+          "operationReference" : "flash.full-restore@1",
+          "seedRequestFingerprintSHA256" : "ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314",
+          "state" : "succeeded",
+          "targetID" : "TGT-83405c84ff74"
+        }
+      },
+      "method" : "debug.status",
+      "name" : "status.succeeded",
+      "params" : {
+        "invocationId" : "debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c"
+      },
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "now" : "2026-09-25T00:00:00Z",
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    }
+  ],
+  "inputs" : [
+    {
+      "mode" : "600",
+      "path" : "artifacts/.imports-v1/identities/imp-c188fce9-79cd-47ec-a58f-1fb46b442063.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "artifacts/.imports-v1/records/0ca4a4867b80cf2c9e87861a65a886e9e0572b168876d25abb5674a7b2e7ebab.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "artifacts/imp-c188fce9-79cd-47ec-a58f-1fb46b442063/.payload-verification-v1.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "artifacts/imp-c188fce9-79cd-47ec-a58f-1fb46b442063/ART-26fb16ad4847376a31120aedcf6ba450"
+    },
+    {
+      "mode" : "600",
+      "path" : "artifacts/imp-c188fce9-79cd-47ec-a58f-1fb46b442063/index.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "targets/.target-display-names.lock"
+    },
+    {
+      "mode" : "600",
+      "path" : "targets/.targets.lock"
+    },
+    {
+      "mode" : "600",
+      "path" : "targets/target-display-names.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "targets/targets.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "runtime-debug-invocations/debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "runtime-debug-invocations/debug-8d72aabb-351b-45ef-ac7c-28576d176cad.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "runtime-debug-invocations/debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "runtime-debug-invocations/debug-f9b672a1-601e-4a15-8863-e5320a8ce76a.json"
+    }
+  ],
+  "lease" : "lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450",
+  "left" : [
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"createdAtUTC\":\"2026-09-25T00:00:00Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:10:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1},{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:11:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":2},{\"candidateAction\":\"stop\",\"candidateActionSHA256\":\"39093484c035f0eb6f46493daabcd2ac754dd751033e76db05536b18f007ce63\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"detail\":\"operator.cancelled\",\"disposition\":\"stopped\",\"evaluatedAtUTC\":\"2026-09-25T00:30:00Z\",\"ordinal\":3}],\"expiresAtUTC\":\"2026-09-25T04:00:00Z\",\"invocationID\":\"<invocation-1>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-a\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-a\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"9a012e6886118e5d93d2977f18b1224f4dd528fd45eab97a1f1e2950eb46a829\",\"state\":\"stopped\"}",
+      "mode" : "600",
+      "path" : "<invocation-1>.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"createdAtUTC\":\"2026-09-25T00:00:05Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[{\"candidateAction\":\"observePinnedRequest\",\"candidateActionSHA256\":\"2b22c1a9b5ef628f6568abf7bdc7b80a72418e5602772feb6dc6e6922efbd35c\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"detail\":\"fresh Runtime plan-only observation\",\"disposition\":\"observed\",\"evaluatedAtUTC\":\"2026-09-25T00:13:00Z\",\"observation\":{\"bindingRevision\":1,\"dispatchDisposition\":\"notDispatched\",\"materializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"observationID\":\"pinnedRequest\",\"stableIdentitySHA256\":\"83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\",\"targetID\":\"TGT-83405c84ff74\"},\"ordinal\":1}],\"expiresAtUTC\":\"2026-09-25T04:00:05Z\",\"invocationID\":\"<invocation-2>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-b\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"seed-b\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"f121d32981bd919a2393262c5b0e671302efa1d4f3f50eac9c1ddbc3efd63f22\",\"state\":\"active\"}",
+      "mode" : "600",
+      "path" : "<invocation-2>.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"createdAtUTC\":\"2026-09-25T00:00:10Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:10Z\",\"invocationID\":\"<invocation-3>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-c\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-c\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"59f29d4d293ce4c5d5ec8ac2fca07f2ff23f4daad66ba2bb4dca4cd9e4944114\",\"state\":\"expired\"}",
+      "mode" : "600",
+      "path" : "<invocation-3>.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"81fa8c2db8b037710c3002beaa5838385d26b1d299058a4b2e7ef2811f8282d8\",\"createdAtUTC\":\"2026-09-25T00:00:15Z\",\"destructiveEpochsUsed\":0,\"evaluations\":[],\"expiresAtUTC\":\"2026-09-25T04:00:15Z\",\"invocationID\":\"<invocation-4>\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-d\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-d\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"b7471d1883a3d107dca3b35fd294ae72798a95a2db55bf256e35dffdb12c2b55\",\"state\":\"active\"}",
+      "mode" : "600",
+      "path" : "<invocation-4>.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome failedKnown\",\"disposition\":\"blockedKnownFailure\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-5d3c3f0f966b-e1-2d2b943b3079\",\"jobID\":\"job-oracle-1\",\"ordinal\":1,\"outcome\":\"failedKnown\",\"requestID\":\"debug-5d3c3f0f966b-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314\",\"state\":\"blocked\"}",
+      "mode" : "600",
+      "path" : "debug-5e1f7433-1f5b-4107-9478-5d3c3f0f966b.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"Runtime attempt durably prepared\",\"disposition\":\"executing\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-28576d176cad-e1-2d2b943b3079\",\"ordinal\":1,\"requestID\":\"debug-28576d176cad-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-8d72aabb-351b-45ef-ac7c-28576d176cad\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314\",\"state\":\"active\"}",
+      "mode" : "600",
+      "path" : "debug-8d72aabb-351b-45ef-ac7c-28576d176cad.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":1,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome succeeded\",\"disposition\":\"succeeded\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-3ccf44a3fc1c-e1-2d2b943b3079\",\"jobID\":\"job-oracle-2\",\"ordinal\":1,\"outcome\":\"succeeded\",\"requestID\":\"debug-3ccf44a3fc1c-e1\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314\",\"state\":\"succeeded\"}",
+      "mode" : "600",
+      "path" : "debug-c66c0137-ac69-411c-bd2f-3ccf44a3fc1c.json"
+    },
+    {
+      "document" : "{\"baselineMaterializedPlanDigest\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"createdAtUTC\":\"2026-09-24T23:00:00Z\",\"destructiveEpochsUsed\":16,\"evaluations\":[{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000065\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000001\",\"destructiveEpoch\":1,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:01:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e1-2d2b943b3079\",\"jobID\":\"job-oracle-3\",\"ordinal\":1,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e1\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000066\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000002\",\"destructiveEpoch\":2,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:02:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e2-df8a51a73b18\",\"jobID\":\"job-oracle-4\",\"ordinal\":2,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e2\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000067\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000003\",\"destructiveEpoch\":3,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:03:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e3-c87418821e00\",\"jobID\":\"job-oracle-5\",\"ordinal\":3,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e3\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000068\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000004\",\"destructiveEpoch\":4,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:04:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e4-4a38125fbc75\",\"jobID\":\"job-oracle-6\",\"ordinal\":4,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e4\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000069\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000005\",\"destructiveEpoch\":5,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:05:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e5-41640eeb9c39\",\"jobID\":\"job-oracle-7\",\"ordinal\":5,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e5\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006a\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000006\",\"destructiveEpoch\":6,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:06:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e6-1c53991cf88a\",\"jobID\":\"job-oracle-8\",\"ordinal\":6,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e6\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006b\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000007\",\"destructiveEpoch\":7,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:07:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e7-81de1ffd7a71\",\"jobID\":\"job-oracle-9\",\"ordinal\":7,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e7\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006c\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000008\",\"destructiveEpoch\":8,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:08:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e8-4184e39a8c9c\",\"jobID\":\"job-oracle-10\",\"ordinal\":8,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e8\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006d\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000009\",\"destructiveEpoch\":9,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:09:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e9-27c2690c75b0\",\"jobID\":\"job-oracle-11\",\"ordinal\":9,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e9\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006e\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000a\",\"destructiveEpoch\":10,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:10:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e10-531ff0f59f67\",\"jobID\":\"job-oracle-12\",\"ordinal\":10,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e10\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"000000000000000000000000000000000000000000000000000000000000006f\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000b\",\"destructiveEpoch\":11,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:11:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e11-795730c8f5f5\",\"jobID\":\"job-oracle-13\",\"ordinal\":11,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e11\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000070\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000c\",\"destructiveEpoch\":12,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:12:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e12-0b727990a30e\",\"jobID\":\"job-oracle-14\",\"ordinal\":12,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e12\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000071\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000d\",\"destructiveEpoch\":13,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:13:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e13-21e6752852ca\",\"jobID\":\"job-oracle-15\",\"ordinal\":13,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e13\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000072\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000e\",\"destructiveEpoch\":14,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:14:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e14-c3507539c7d5\",\"jobID\":\"job-oracle-16\",\"ordinal\":14,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e14\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000073\",\"candidateSourceSHA256\":\"000000000000000000000000000000000000000000000000000000000000000f\",\"destructiveEpoch\":15,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:15:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e15-4cf563283496\",\"jobID\":\"job-oracle-17\",\"ordinal\":15,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e15\"},{\"candidateAction\":\"executePinnedRequest\",\"candidateActionSHA256\":\"1c12f0e885d7e6c2748b1b0d84db4386e6d3884c04cb7c8d4049d209789edca7\",\"candidateBuildSHA256\":\"0000000000000000000000000000000000000000000000000000000000000074\",\"candidateSourceSHA256\":\"0000000000000000000000000000000000000000000000000000000000000010\",\"destructiveEpoch\":16,\"detail\":\"oracle driver outcome safeToReflash\",\"disposition\":\"nextCandidateAllowed\",\"evaluatedAtUTC\":\"2026-09-24T23:16:00Z\",\"idempotencyKey\":\"runtime-debug-e5320a8ce76a-e16-1a65c61a3058\",\"jobID\":\"job-oracle-18\",\"ordinal\":16,\"outcome\":\"safeToReflash\",\"requestID\":\"debug-e5320a8ce76a-e16\"}],\"expiresAtUTC\":\"2026-09-25T03:00:00Z\",\"invocationID\":\"debug-f9b672a1-601e-4a15-8863-e5320a8ce76a\",\"schemaVersion\":\"1.0.0\",\"seedRequest\":{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-seed-laid-down\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-c188fce9-79cd-47ec-a58f-1fb46b442063:ART-26fb16ad4847376a31120aedcf6ba450\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"seed-laid-down\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}},\"seedRequestFingerprintSHA256\":\"ac71de84fd8fa87d061fe08803d7c7bc47404ef51a838c8042ca44e957933314\",\"state\":\"active\"}",
+      "mode" : "600",
+      "path" : "debug-f9b672a1-601e-4a15-8863-e5320a8ce76a.json"
+    }
+  ],
+  "targetId" : "TGT-83405c84ff74"
+}

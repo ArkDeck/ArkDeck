@@ -64,6 +64,23 @@ pub enum RequestErrorCode {
 }
 
 impl RequestErrorCode {
+    /// The Swift case's own name, as Swift prints the value.
+    pub fn swift_case(self) -> &'static str {
+        match self {
+            Self::InvalidRequest => "invalidRequest",
+            Self::UnknownOperation => "unknownOperation",
+            Self::InvalidInput => "invalidInput",
+            Self::TargetNotFound => "targetNotFound",
+            Self::AuthorizationRequired => "authorizationRequired",
+            Self::Conflict => "conflict",
+            Self::UnsupportedProfile => "unsupportedProfile",
+            Self::UnsupportedVersion => "unsupportedVersion",
+            Self::GovernanceFieldRejected => "governanceFieldRejected",
+            Self::RequestTooLarge => "requestTooLarge",
+            Self::DeviceBusyBySession => "deviceBusyBySession",
+        }
+    }
+
     /// The control-plane code Swift's Job lifecycle handler maps it to.
     pub fn wire_code(self) -> &'static str {
         match self {

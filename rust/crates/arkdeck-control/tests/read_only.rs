@@ -162,6 +162,8 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
                 | "device.display-name.clear"
                 // Swift's daemon without its Flash invocation owner, its
                 // bootloader status observer or its device access observer.
+                | "debug.start"
+                | "debug.evaluate"
                 | "debug.status"
                 | "recovery.flash-invocation.list"
                 | "flash.bootloader-status"
