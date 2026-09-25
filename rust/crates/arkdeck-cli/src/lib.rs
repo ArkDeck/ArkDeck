@@ -38,6 +38,7 @@ mod job_plan;
 mod job_resources;
 mod job_wait;
 pub mod machine_contracts;
+pub mod maintainer_contracts;
 pub use job_plan::{
     announces_generated_identity, generates_identity, job_plan_params, job_submit_params, run_exit,
     validate_acceptance, validate_cancellation, validate_plan,
@@ -490,6 +491,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--tool-generation"
                 | "--source-job"
                 | "--continuation-request-id"
+                | "--contracts-directory"
+                | "--fixtures-directory"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -500,6 +503,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         })?;
                     let key = match argument.as_str() {
                         "--observation" => "observationId",
+                        "--contracts-directory" => "contractsDirectory",
+                        "--fixtures-directory" => "fixturesDirectory",
                         "--observation-generation" => "observationGeneration",
                         "--expected-generation" => "expectedGeneration",
                         "--import-request-id" => "importRequestId",
@@ -753,6 +758,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
         ["commands"] => "commands",
+        ["maintainer", "contracts", "export"] => "maintainer.contracts.export",
+        ["maintainer", "contracts", "check"] => "maintainer.contracts.check",
         ["completion", _] => "completion",
         ["completion"] => "completion",
         ["help", ..] => "help",
@@ -854,6 +861,20 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         error.command = Some(command);
         return Err(error);
     }
+    // The contract bundle's leaves take their two directories and `--output`,
+    // and never reach a Runtime.
+    if command.starts_with("maintainer.contracts.")
+        && (id.is_some()
+            || socket.is_some()
+            || (!help
+                && !(method_options.contains_key("contractsDirectory")
+                    && method_options.contains_key("fixturesDirectory"))))
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "the contract bundle's leaves take --contracts-directory, --fixtures-directory and --output",
+        ));
+    }
     // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
     if command == "commands" && (id.is_some() || socket.is_some()) {
         return Err(CliError::new(
@@ -875,6 +896,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     }
     let allowed: &[&str] = match command {
         "debug.probe" | "trace.probe" => &["targetId"],
+        "maintainer.contracts.export" | "maintainer.contracts.check" => {
+            &["contractsDirectory", "fixturesDirectory"]
+        }
         "trace.inspect" => &["jobId", "artifactId", "allowSensitive", "timeout"],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
@@ -1548,6 +1572,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("session.")
             || command.starts_with("human-action.")
             || command.starts_with("runtime.service.")
+            || command.starts_with("maintainer.contracts.")
             || matches!(
                 command,
                 "operation.describe"
@@ -1681,6 +1706,48 @@ pub fn legacy_document(value: &Value) -> Vec<u8> {
 
 /// Swift `CLIResultEnvelope.legacyFailure`: a failure in the legacy `--json`
 /// rendering carries only its code and words.
+/// Swift `RuntimeCLI.humanRendering(of:)`: a document as `key: value` lines
+/// in key order, an array as `- item` lines or `(none)`, null as `-`, each
+/// nested rendering indented two spaces a level and trimmed of spaces at its
+/// ends (Swift's `.whitespaces`, which spares line breaks).
+pub fn human_rendering(value: &Value) -> String {
+    fn trimmed(text: &str) -> &str {
+        text.trim_matches(|c: char| {
+            matches!(
+                c,
+                '\t' | ' ' | '\u{a0}' | '\u{1680}' | '\u{2000}'
+                    ..='\u{200a}' | '\u{202f}' | '\u{205f}' | '\u{3000}'
+            )
+        })
+    }
+    fn render(value: &Value, indent: usize) -> String {
+        let pad = "  ".repeat(indent);
+        match value {
+            Value::Object(fields) => {
+                let mut keys: Vec<&String> = fields.keys().collect();
+                keys.sort();
+                keys.into_iter()
+                    .map(|key| {
+                        format!("{pad}{key}: {}", trimmed(&render(&fields[key], indent + 1)))
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            }
+            Value::Array(items) if items.is_empty() => format!("{pad}(none)"),
+            Value::Array(items) => items
+                .iter()
+                .map(|item| format!("{pad}- {}", trimmed(&render(item, indent + 1))))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Value::String(text) => format!("{pad}{text}"),
+            Value::Number(number) => format!("{pad}{number}"),
+            Value::Bool(flag) => format!("{pad}{flag}"),
+            Value::Null => format!("{pad}-"),
+        }
+    }
+    render(value, 0)
+}
+
 pub fn legacy_failure(error: &CliError) -> Value {
     json!({"error": {"code": error.code, "message": error.message}})
 }
@@ -1701,7 +1768,29 @@ pub fn render(value: &Value) -> Result<Vec<u8>, ContractError> {
 
 #[cfg(test)]
 mod tests {
-    use super::{CliError, reported};
+    use super::{CliError, human_rendering, reported};
+    use serde_json::json;
+
+    /// Swift `RuntimeCLI.humanRendering(of:)`, whose nested renderings keep
+    /// their inner indentation: only the spaces at their two ends are trimmed.
+    #[test]
+    fn the_human_rendering_is_swifts_generic_one() {
+        let document = json!({
+            "name": "  padded  ",
+            "count": 3,
+            "flag": false,
+            "none": null,
+            "empty": [],
+            "list": ["a", {"k": "v", "j": 1}],
+            "nested": {"b": [], "a": {"deep": true}},
+        });
+        assert_eq!(
+            human_rendering(&document),
+            "count: 3\nempty: (none)\nflag: false\nlist: - a\n  - j: 1\n    k: v\nname: padded\nnested: a: deep: true\n  b: (none)\nnone: -"
+        );
+        assert_eq!(human_rendering(&json!("text")), "text");
+        assert_eq!(human_rendering(&json!([])), "(none)");
+    }
 
     /// Off macOS this parser refuses `--socket` as the platform's
     /// (`unsupportedOnPlatform`), and that stands where Swift's registry pass
