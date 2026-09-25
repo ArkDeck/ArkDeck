@@ -139,4 +139,9 @@ runnable `arkdeck` was not the packaged one with its signature replaced. That wa
 #2218's new check, and every PR on `33c161b19` or later failed it. #2236 fixed the check. This
 slice was then rebased onto `587127475`.
 
-Pending for the rebased head.
+Run 36201192211, on the rebased head `c559b931f`: every selected lane passed.
+- Rust workspace: macOS 14m35s, Ubuntu 1m53s, Windows 4m12s. Host-independent checks: 36s.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `21fcfa99f`. Recorded by a later slice (TASK-XPA-014, the failed publication's
+Session), as AGENTS.md has it.

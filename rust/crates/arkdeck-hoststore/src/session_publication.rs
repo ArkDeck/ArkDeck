@@ -1317,7 +1317,7 @@ fn last_sequence(events: &[Value]) -> i64 {
 }
 
 /// The UTC `yyyy` and `mm` of an ISO 8601 time: Swift's Session partition.
-fn utc_month(at: &str) -> Option<(String, String)> {
+pub(crate) fn utc_month(at: &str) -> Option<(String, String)> {
     let text = host_gregorian_timestamp(crate::session_time::session_timestamp(at)?)?;
     Some((text.get(..4)?.to_owned(), text.get(5..7)?.to_owned()))
 }
