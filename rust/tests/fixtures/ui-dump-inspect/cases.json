@@ -1,0 +1,4082 @@
+[
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-inspect"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "inspect",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-inspect\"},\"ok\":true,\"result\":{\"capture\":{\"coordinatesAreVerified\":true,\"nodeCount\":9,\"nodes\":[{\"bounds\":{\"height\":800,\"width\":400,\"x\":0,\"y\":0},\"children\":[\"device:2\",\"device:5\",\"device:6\",\"path:0.3\"],\"clickable\":null,\"clipsChildren\":false,\"depth\":0,\"deviceId\":\"1\",\"enabled\":null,\"focusable\":null,\"focused\":true,\"hitTestBehavior\":null,\"identity\":\"path:0\",\"inspectorId\":null,\"parentIdentity\":null,\"text\":null,\"type\":\"Window\",\"visible\":true,\"zIndex\":0},{\"bounds\":{\"height\":400,\"width\":400,\"x\":0,\"y\":100},\"children\":[\"device:3.5\",\"device:4\"],\"clickable\":null,\"clipsChildren\":true,\"depth\":1,\"deviceId\":\"2\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:2\",\"inspectorId\":null,\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"List\",\"visible\":true,\"zIndex\":null},{\"bounds\":{\"height\":60,\"width\":400,\"x\":0,\"y\":80},\"children\":[],\"clickable\":true,\"clipsChildren\":false,\"depth\":2,\"deviceId\":\"3.5\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:3.5\",\"inspectorId\":null,\"parentIdentity\":\"device:2\",\"text\":\"first\",\"type\":\"Row\",\"visible\":true,\"zIndex\":null},{\"bounds\":{\"height\":60,\"width\":400,\"x\":0,\"y\":160},\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":2,\"deviceId\":\"4\",\"enabled\":false,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:4\",\"inspectorId\":null,\"parentIdentity\":\"device:2\",\"text\":\"second\",\"type\":\"Row\",\"visible\":true,\"zIndex\":null},{\"bounds\":{\"height\":800,\"width\":400,\"x\":0,\"y\":0},\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"5\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":\"HitTestMode.Transparent\",\"identity\":\"device:5\",\"inspectorId\":null,\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"Overlay\",\"visible\":true,\"zIndex\":9},{\"bounds\":{\"height\":60,\"width\":80,\"x\":300,\"y\":700},\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"6\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:6\",\"inspectorId\":\"ok\",\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"Button\",\"visible\":true,\"zIndex\":2},{\"bounds\":{\"height\":40,\"width\":100,\"x\":250,\"y\":690},\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"1\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"path:0.3\",\"inspectorId\":null,\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"Floating\",\"visible\":true,\"zIndex\":1},{\"bounds\":{\"height\":40,\"width\":400,\"x\":0,\"y\":0},\"children\":[\"path:1.0\"],\"clickable\":null,\"clipsChildren\":false,\"depth\":0,\"deviceId\":\"7\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"path:1\",\"inspectorId\":null,\"parentIdentity\":null,\"text\":null,\"type\":\"StatusBar\",\"visible\":true,\"zIndex\":null},{\"bounds\":null,\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"7\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"path:1.0\",\"inspectorId\":null,\"parentIdentity\":\"path:1\",\"text\":\"12\",\"type\":\"Clock\",\"visible\":true,\"zIndex\":null}],\"roots\":[\"path:0\",\"path:1\"],\"screenshot\":{\"height\":800,\"width\":400}},\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"schemaVersion\":\"arkdeck.ui-dump-inspection/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "inspectHuman",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "capture: coordinatesAreVerified: true\n  nodeCount: 9\n  nodes: - bounds: height: 800.0\n        width: 400.0\n        x: 0.0\n        y: 0.0\n      children: - device:2\n        - device:5\n        - device:6\n        - path:0.3\n      clickable: -\n      clipsChildren: false\n      depth: 0\n      deviceId: 1\n      enabled: -\n      focusable: -\n      focused: true\n      hitTestBehavior: -\n      identity: path:0\n      inspectorId: -\n      parentIdentity: -\n      text: -\n      type: Window\n      visible: true\n      zIndex: 0.0\n    - bounds: height: 400.0\n        width: 400.0\n        x: 0.0\n        y: 100.0\n      children: - device:3.5\n        - device:4\n      clickable: -\n      clipsChildren: true\n      depth: 1\n      deviceId: 2\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: device:2\n      inspectorId: -\n      parentIdentity: path:0\n      text: -\n      type: List\n      visible: true\n      zIndex: -\n    - bounds: height: 60.0\n        width: 400.0\n        x: 0.0\n        y: 80.0\n      children: (none)\n      clickable: true\n      clipsChildren: false\n      depth: 2\n      deviceId: 3.5\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: device:3.5\n      inspectorId: -\n      parentIdentity: device:2\n      text: first\n      type: Row\n      visible: true\n      zIndex: -\n    - bounds: height: 60.0\n        width: 400.0\n        x: 0.0\n        y: 160.0\n      children: (none)\n      clickable: -\n      clipsChildren: false\n      depth: 2\n      deviceId: 4\n      enabled: false\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: device:4\n      inspectorId: -\n      parentIdentity: device:2\n      text: second\n      type: Row\n      visible: true\n      zIndex: -\n    - bounds: height: 800.0\n        width: 400.0\n        x: 0.0\n        y: 0.0\n      children: (none)\n      clickable: -\n      clipsChildren: false\n      depth: 1\n      deviceId: 5\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: HitTestMode.Transparent\n      identity: device:5\n      inspectorId: -\n      parentIdentity: path:0\n      text: -\n      type: Overlay\n      visible: true\n      zIndex: 9.0\n    - bounds: height: 60.0\n        width: 80.0\n        x: 300.0\n        y: 700.0\n      children: (none)\n      clickable: -\n      clipsChildren: false\n      depth: 1\n      deviceId: 6\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: device:6\n      inspectorId: ok\n      parentIdentity: path:0\n      text: -\n      type: Button\n      visible: true\n      zIndex: 2.0\n    - bounds: height: 40.0\n        width: 100.0\n        x: 250.0\n        y: 690.0\n      children: (none)\n      clickable: -\n      clipsChildren: false\n      depth: 1\n      deviceId: 1\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: path:0.3\n      inspectorId: -\n      parentIdentity: path:0\n      text: -\n      type: Floating\n      visible: true\n      zIndex: 1.0\n    - bounds: height: 40.0\n        width: 400.0\n        x: 0.0\n        y: 0.0\n      children: - path:1.0\n      clickable: -\n      clipsChildren: false\n      depth: 0\n      deviceId: 7\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: path:1\n      inspectorId: -\n      parentIdentity: -\n      text: -\n      type: StatusBar\n      visible: true\n      zIndex: -\n    - bounds: -\n      children: (none)\n      clickable: -\n      clipsChildren: false\n      depth: 1\n      deviceId: 7\n      enabled: -\n      focusable: -\n      focused: -\n      hitTestBehavior: -\n      identity: path:1.0\n      inspectorId: -\n      parentIdentity: path:1\n      text: 12\n      type: Clock\n      visible: true\n      zIndex: -\n  roots: - path:0\n    - path:1\n  screenshot: height: 800\n    width: 400\nderivation: kind: offlineDerived\n  observedFromUtc: 2026-09-14T00:00:00.000Z\n  observedToUtc: 2026-09-14T00:00:00.000Z\n  parser: arkdeck.viewer.ui-dump-parser\n  parserVersion: 1.0.0\n  sources: - artifactId: ART-00000000000000000000000000000e01\n      byteCount: 29\n      mediaType: image/png\n      name: screenshot.png\n      sha256: 9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\n    - artifactId: ART-00000000000000000000000000000e02\n      byteCount: 9\n      mediaType: application/json\n      name: ui-dump.json\n      sha256: 1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\n    - artifactId: ART-00000000000000000000000000000e03\n      byteCount: 1147\n      mediaType: application/json\n      name: ui-tree.json\n      sha256: 6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\nschemaVersion: arkdeck.ui-dump-inspection/1\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "10",
+      "--y",
+      "150",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitRowInsideClip"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitRowInsideClip",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitRowInsideClip\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":{\"bounds\":{\"height\":400,\"width\":400,\"x\":0,\"y\":100},\"children\":[\"device:3.5\",\"device:4\"],\"clickable\":null,\"clipsChildren\":true,\"depth\":1,\"deviceId\":\"2\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:2\",\"inspectorId\":null,\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"List\",\"visible\":true,\"zIndex\":null},\"point\":{\"x\":10,\"y\":150},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "10",
+      "--y",
+      "90",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitClippedAway"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitClippedAway",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitClippedAway\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":{\"bounds\":{\"height\":800,\"width\":400,\"x\":0,\"y\":0},\"children\":[\"device:2\",\"device:5\",\"device:6\",\"path:0.3\"],\"clickable\":null,\"clipsChildren\":false,\"depth\":0,\"deviceId\":\"1\",\"enabled\":null,\"focusable\":null,\"focused\":true,\"hitTestBehavior\":null,\"identity\":\"path:0\",\"inspectorId\":null,\"parentIdentity\":null,\"text\":null,\"type\":\"Window\",\"visible\":true,\"zIndex\":0},\"point\":{\"x\":10,\"y\":90},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "310",
+      "--y",
+      "710",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitButtonOverFloating"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitButtonOverFloating",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitButtonOverFloating\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":{\"bounds\":{\"height\":60,\"width\":80,\"x\":300,\"y\":700},\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"6\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:6\",\"inspectorId\":\"ok\",\"parentIdentity\":\"path:0\",\"text\":null,\"type\":\"Button\",\"visible\":true,\"zIndex\":2},\"point\":{\"x\":310,\"y\":710},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "5",
+      "--y",
+      "5",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitStatusBar"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitStatusBar",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitStatusBar\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":{\"bounds\":{\"height\":40,\"width\":400,\"x\":0,\"y\":0},\"children\":[\"path:1.0\"],\"clickable\":null,\"clipsChildren\":false,\"depth\":0,\"deviceId\":\"7\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"path:1\",\"inspectorId\":null,\"parentIdentity\":null,\"text\":null,\"type\":\"StatusBar\",\"visible\":true,\"zIndex\":null},\"point\":{\"x\":5,\"y\":5},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "5",
+      "--y",
+      "5",
+      "--root",
+      "device:1",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitUnderRoot"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitUnderRoot",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitUnderRoot\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":null,\"point\":{\"x\":5,\"y\":5},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "5",
+      "--y",
+      "5",
+      "--root",
+      "device:none",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitUnknownRoot"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitUnknownRoot",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitUnknownRoot\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":null,\"point\":{\"x\":5,\"y\":5},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "900",
+      "--y",
+      "900",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitOffScreen"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitOffScreen",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitOffScreen\"},\"ok\":true,\"result\":{\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e02\",\"byteCount\":9,\"mediaType\":\"application/json\",\"name\":\"ui-dump.json\",\"sha256\":\"1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":1147,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\"}]},\"node\":null,\"point\":{\"x\":900,\"y\":900},\"schemaVersion\":\"arkdeck.ui-dump-hit-test/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "10",
+      "--y",
+      "150"
+    ],
+    "connections" : 4,
+    "exit" : 0,
+    "name" : "hitHuman",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+              "artifactId" : "ART-00000000000000000000000000000e02",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 9,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e02",
+              "mediaType" : "application/json",
+              "name" : "ui-dump.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3",
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "base64" : "d2luZG93IDEK",
+          "byteCount" : 9,
+          "eof" : true,
+          "nextOffset" : 9,
+          "offset" : 0,
+          "totalByteCount" : 9
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e02",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "derivation: kind: offlineDerived\n  observedFromUtc: 2026-09-14T00:00:00.000Z\n  observedToUtc: 2026-09-14T00:00:00.000Z\n  parser: arkdeck.viewer.ui-dump-parser\n  parserVersion: 1.0.0\n  sources: - artifactId: ART-00000000000000000000000000000e01\n      byteCount: 29\n      mediaType: image/png\n      name: screenshot.png\n      sha256: 9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\n    - artifactId: ART-00000000000000000000000000000e02\n      byteCount: 9\n      mediaType: application/json\n      name: ui-dump.json\n      sha256: 1b47d8cdadac65f8dbe0ff871f64d0426244508317c67d0dcd939ec830d825b3\n    - artifactId: ART-00000000000000000000000000000e03\n      byteCount: 1147\n      mediaType: application/json\n      name: ui-tree.json\n      sha256: 6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a\nnode: bounds: height: 400.0\n    width: 400.0\n    x: 0.0\n    y: 100.0\n  children: - device:3.5\n    - device:4\n  clickable: -\n  clipsChildren: true\n  depth: 1\n  deviceId: 2\n  enabled: -\n  focusable: -\n  focused: -\n  hitTestBehavior: -\n  identity: device:2\n  inspectorId: -\n  parentIdentity: path:0\n  text: -\n  type: List\n  visible: true\n  zIndex: -\npoint: x: 10.0\n  y: 150.0\nschemaVersion: arkdeck.ui-dump-hit-test/1\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "hit-test",
+      "--job",
+      "job-ui-dump-oracle",
+      "--x",
+      "1",
+      "--y",
+      "1",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-hitUnverified"
+    ],
+    "connections" : 3,
+    "exit" : 77,
+    "name" : "hitUnverified",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "3c754dbd78929a1d909e5d2fc45e83220edf91e8f4b586677314fdfdb1eadc17",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 87,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "3c754dbd78929a1d909e5d2fc45e83220edf91e8f4b586677314fdfdb1eadc17",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJ0eXBlIjoiV2luZG93IiwiaWQiOiJ3IiwiYm91bmRzIjpbMCwwLDEwMCwxMDBdLCJjaGlsZHJlbiI6W3sidHlwZSI6IlRleHQiLCJpZCI6InQifV19",
+          "byteCount" : 87,
+          "eof" : true,
+          "nextOffset" : 87,
+          "offset" : 0,
+          "totalByteCount" : 87
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.hit-test\",\"error\":{\"attentionRequired\":true,\"code\":\"factsDrifted\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"this capture's coordinate mapping was never verified, so a point cannot be resolved to a node\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-hitUnverified\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-inspectUnverified"
+    ],
+    "connections" : 3,
+    "exit" : 0,
+    "name" : "inspectUnverified",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "3c754dbd78929a1d909e5d2fc45e83220edf91e8f4b586677314fdfdb1eadc17",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 87,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "3c754dbd78929a1d909e5d2fc45e83220edf91e8f4b586677314fdfdb1eadc17",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJ0eXBlIjoiV2luZG93IiwiaWQiOiJ3IiwiYm91bmRzIjpbMCwwLDEwMCwxMDBdLCJjaGlsZHJlbiI6W3sidHlwZSI6IlRleHQiLCJpZCI6InQifV19",
+          "byteCount" : 87,
+          "eof" : true,
+          "nextOffset" : 87,
+          "offset" : 0,
+          "totalByteCount" : 87
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-inspectUnverified\"},\"ok\":true,\"result\":{\"capture\":{\"coordinatesAreVerified\":false,\"nodeCount\":2,\"nodes\":[{\"bounds\":{\"height\":100,\"width\":100,\"x\":0,\"y\":0},\"children\":[\"device:t\"],\"clickable\":null,\"clipsChildren\":false,\"depth\":0,\"deviceId\":\"w\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:w\",\"inspectorId\":null,\"parentIdentity\":null,\"text\":null,\"type\":\"Window\",\"visible\":true,\"zIndex\":null},{\"bounds\":null,\"children\":[],\"clickable\":null,\"clipsChildren\":false,\"depth\":1,\"deviceId\":\"t\",\"enabled\":null,\"focusable\":null,\"focused\":null,\"hitTestBehavior\":null,\"identity\":\"device:t\",\"inspectorId\":null,\"parentIdentity\":\"device:w\",\"text\":null,\"type\":\"Text\",\"visible\":true,\"zIndex\":null}],\"roots\":[\"device:w\"],\"screenshot\":{\"height\":800,\"width\":400}},\"derivation\":{\"kind\":\"offlineDerived\",\"observedFromUtc\":\"2026-09-14T00:00:00.000Z\",\"observedToUtc\":\"2026-09-14T00:00:00.000Z\",\"parser\":\"arkdeck.viewer.ui-dump-parser\",\"parserVersion\":\"1.0.0\",\"sources\":[{\"artifactId\":\"ART-00000000000000000000000000000e01\",\"byteCount\":29,\"mediaType\":\"image/png\",\"name\":\"screenshot.png\",\"sha256\":\"9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c\"},{\"artifactId\":\"ART-00000000000000000000000000000e03\",\"byteCount\":87,\"mediaType\":\"application/json\",\"name\":\"ui-tree.json\",\"sha256\":\"3c754dbd78929a1d909e5d2fc45e83220edf91e8f4b586677314fdfdb1eadc17\"}]},\"schemaVersion\":\"arkdeck.ui-dump-inspection/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-noTree"
+    ],
+    "connections" : 1,
+    "exit" : 65,
+    "name" : "noTree",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":false,\"code\":\"resourceNotFound\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"job job-ui-dump-oracle published no `ui-tree.json`, so it is not a UI dump capture\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-noTree\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-noScreenshot"
+    ],
+    "connections" : 1,
+    "exit" : 65,
+    "name" : "noScreenshot",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "9b75290f6a6359a2a3471022cbba4b724e45105b313ae8f6c103a2f79e82a857",
+              "artifactId" : "ART-00000000000000000000000000000e04",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 4,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e04",
+              "mediaType" : "text/plain",
+              "name" : "hilog.txt",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":false,\"code\":\"resourceNotFound\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"job job-ui-dump-oracle published no screenshot to derive against\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-noScreenshot\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-treeNotSensitive"
+    ],
+    "connections" : 1,
+    "exit" : 2,
+    "name" : "treeNotSensitive",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "standard",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":true,\"code\":\"recordUnreadable\",\"controlRequestRetryable\":false,\"message\":\"job job-ui-dump-oracle published `ui-tree.json` with invalid status, media type, or privacy\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-treeNotSensitive\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-duplicateTree"
+    ],
+    "connections" : 1,
+    "exit" : 2,
+    "name" : "duplicateTree",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e05",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e05",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":true,\"code\":\"recordUnreadable\",\"controlRequestRetryable\":false,\"message\":\"job job-ui-dump-oracle published duplicate `ui-tree.json` Artifacts\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-duplicateTree\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-screenshotNotPNG"
+    ],
+    "connections" : 3,
+    "exit" : 2,
+    "name" : "screenshotNotPNG",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "509f762ea06ef0afff8d958053e93e0c73e3ba9917b9b6cc02f1f7f29cce0d73",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 27,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "eyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "509f762ea06ef0afff8d958053e93e0c73e3ba9917b9b6cc02f1f7f29cce0d73",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "bm90IGEgcG5nIGF0IGFsbCwgc3RpbGwgbm90",
+          "byteCount" : 27,
+          "eof" : true,
+          "nextOffset" : 27,
+          "offset" : 0,
+          "totalByteCount" : 27
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":true,\"code\":\"recordUnreadable\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"the capture artifacts did not parse: invalidPNG\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-screenshotNotPNG\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-treeBytesDiffer"
+    ],
+    "connections" : 3,
+    "exit" : 2,
+    "name" : "treeBytesDiffer",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+              "artifactId" : "ART-00000000000000000000000000000e01",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 29,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e01",
+              "mediaType" : "image/png",
+              "name" : "screenshot.png",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            },
+            {
+              "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+              "artifactId" : "ART-00000000000000000000000000000e03",
+              "binding" : {
+                "bindingRevision" : 1,
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              "byteCount" : 1147,
+              "createdAtUtc" : "2026-09-14T00:00:00Z",
+              "lease" : "lease-v1:job-ui-dump-oracle:ART-00000000000000000000000000000e03",
+              "mediaType" : "application/json",
+              "name" : "ui-tree.json",
+              "observationWindow" : {
+                "endUtc" : "2026-09-14T00:00:00.000Z",
+                "startUtc" : "2026-09-14T00:00:00.000Z"
+              },
+              "owner" : {
+                "id" : "job-ui-dump-oracle",
+                "kind" : "job"
+              },
+              "privacy" : "sensitive",
+              "providerId" : "hdc",
+              "redactionApplied" : false,
+              "retention" : {
+                "class" : "default",
+                "deadlineUtc" : "2026-09-21T00:00:00Z",
+                "pinned" : false
+              },
+              "schemaVersion" : "arkdeck.artifact/1",
+              "sourceOperation" : "capture.diagnostics@1",
+              "status" : "published"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "6bde2d8996241007195b87598e8d239fd28135747efd3c6b18c610b392c4c34a",
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "base64" : "WyJhdHRyaWJ1dGVzIjp7ImJvdW5kcyI6IlswLDBdWzQwMCw4MDBdIn0sImNoaWxkcmVuIjpbCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IldpbmRvdyIsImFjY2Vzc2liaWxpdHlJZCI6MSwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAiZm9jdXNlZCI6InRydWUiLCJ6SW5kZXgiOjB9LCJjaGlsZHJlbiI6WwogICB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6Ikxpc3QiLCJhY2Nlc3NpYmlsaXR5SWQiOiIyIiwiY2xpcCI6dHJ1ZSwKICAgICAiYm91bmRzIjp7ImxlZnQiOjAsInRvcCI6MTAwLCJyaWdodCI6NDAwLCJib3R0b20iOjUwMH19LCJjaGlsZHJlbiI6WwogICAgIHsiYXR0cmlidXRlcyI6eyJ0eXBlIjoiUm93IiwiYWNjZXNzaWJpbGl0eUlkIjozLjUsInRleHQiOiJmaXJzdCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjgwLCJ3aWR0aCI6NDAwLCJoZWlnaHQiOjYwfSwiY2xpY2thYmxlIjoxfX0sCiAgICAgeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJSb3ciLCJub2RlSWQiOiI0IiwidGV4dCI6InNlY29uZCIsCiAgICAgICAiYm91bmRzIjp7IngiOjAsInkiOjE2MCwid2lkdGgiOjQwMCwiaGVpZ2h0Ijo2MH0sImVuYWJsZWQiOmZhbHNlfX1dfSwKICAgeyJhdHRyaWJ1dGVzIjp7ImNvbXBvbmVudFR5cGUiOiJPdmVybGF5IiwiaWQiOiI1IiwiYm91bmRzIjpbMCwwLDQwMCw4MDBdLAogICAgICJoaXRUZXN0QmVoYXZpb3IiOiJIaXRUZXN0TW9kZS5UcmFuc3BhcmVudCIsInpJbmRleCI6IjkifX0sCiAgIHsiYXR0cmlidXRlcyI6eyJjbGFzcyI6IkJ1dHRvbiIsImNvbXBvbmVudElkIjoiNiIsImluc3BlY3RvcklkIjoib2siLAogICAgICJib3VuZHMiOiJbMzAwLDcwMF1bMzgwLDc2MF0iLCJ6T3JkZXIiOjIsImZvY3VzYWJsZSI6InllcyIsInZpc2libGUiOiJ0cnVlIn19LAogICB7InR5cGUiOiJGbG9hdGluZyIsImFjY2Vzc2liaWxpdHlJZCI6dHJ1ZSwiYm91bmRzIjpbMjUwLDY5MCwxMDAsNDBdLCJ6SW5kZXgiOjF9XX0sCiB7ImF0dHJpYnV0ZXMiOnsidHlwZSI6IlN0YXR1c0JhciIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJib3VuZHMiOlswLDAsNDAwLDQwXX0sCiAgImNoaWxkcmVuIjpbeyJhdHRyaWJ1dGVzIjp7InR5cGUiOiJDbG9jayIsImFjY2Vzc2liaWxpdHlJZCI6IjciLCJ0ZXh0IjoxMn19XX1dfQ==",
+          "byteCount" : 1147,
+          "eof" : true,
+          "nextOffset" : 1147,
+          "offset" : 0,
+          "totalByteCount" : 1147
+        }
+      },
+      {
+        "method" : "artifact.read",
+        "result" : {
+          "artifactDigest" : "9c38bb129cbea9c7a50f58d7f1fc391819ce6dfd563f2ab2edade702d0f9ae6c",
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "base64" : "iVBORw0KGgoAAAANSUhEUgAAAZAAAAMgCAYAAAA=",
+          "byteCount" : 29,
+          "eof" : true,
+          "nextOffset" : 29,
+          "offset" : 0,
+          "totalByteCount" : 29
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e03",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.read",
+        "params" : {
+          "allowSensitive" : true,
+          "artifactId" : "ART-00000000000000000000000000000e01",
+          "maxBytes" : 4194304,
+          "offset" : 0,
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          }
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":true,\"code\":\"artifactIntegrityFailed\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"artifact `ui-tree.json` SHA-256 does not match its Runtime metadata\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-treeBytesDiffer\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  },
+  {
+    "argv" : [
+      "ui-dump",
+      "inspect",
+      "--job",
+      "job-ui-dump-oracle",
+      "--output",
+      "json",
+      "--control-request-id",
+      "ctl-ui-dump-emptyInventory"
+    ],
+    "connections" : 1,
+    "exit" : 65,
+    "name" : "emptyInventory",
+    "script" : [
+      {
+        "method" : "artifact.list",
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescArtifactIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "00000000-0000-4000-8000-0000000000d7"
+        }
+      }
+    ],
+    "sent" : [
+      {
+        "id" : "<UUID>",
+        "method" : "health"
+      },
+      {
+        "id" : "<UUID>",
+        "method" : "artifact.list",
+        "params" : {
+          "owner" : {
+            "id" : "job-ui-dump-oracle",
+            "kind" : "job"
+          },
+          "pageSize" : 1000
+        }
+      }
+    ],
+    "stderr" : "",
+    "stdout" : "{\"command\":\"ui-dump.inspect\",\"error\":{\"attentionRequired\":false,\"code\":\"resourceNotFound\",\"controlRequestRetryable\":false,\"details\":{\"jobId\":\"job-ui-dump-oracle\"},\"message\":\"job job-ui-dump-oracle has published no artifacts; check the job identity and that it reached a terminal state\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-ui-dump-emptyInventory\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+    "unusedScript" : [
+
+    ]
+  }
+]

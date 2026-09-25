@@ -22,6 +22,7 @@ pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
 mod trace_inspect;
+pub mod ui_dump;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
 mod device_wait;
@@ -444,6 +445,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--page-size"
                 | "--cursor"
                 | "--root"
+                | "--x"
+                | "--y"
                 | "--destination"
                 | "--preview-id"
                 | "--preview-digest"
@@ -553,6 +556,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--device-profile" => "deviceProfile",
                         "--page-size" => "pageSize",
                         "--root" => "rootPath",
+                        "--x" => "x",
+                        "--y" => "y",
                         "--destination" => "destinationPath",
                         "--preview-id" => "previewId",
                         "--preview-digest" => "previewDigest",
@@ -735,6 +740,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["debug", "probe"] => "debug.probe",
         ["trace", "probe"] => "trace.probe",
         ["trace", "inspect"] => "trace.inspect",
+        ["ui-dump", "inspect"] => "ui-dump.inspect",
+        ["ui-dump", "hit-test"] => "ui-dump.hit-test",
         ["debug", "start"] => "debug.start",
         ["debug", "evaluate"] => "debug.evaluate",
         ["debug", "status"] => "debug.status",
@@ -1003,6 +1010,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "allowSensitive",
             "timeout",
         ],
+        "ui-dump.inspect" => &["jobId"],
+        "ui-dump.hit-test" => &["jobId", "x", "y", "rootPath"],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
@@ -1589,6 +1598,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     debug_probe::configure(command, &method_options, help)?;
     trace_inspect::configure(command, &method_options, help)?;
     let diagnostics_timeout = diagnostics_resources::configure(command, &mut method_options, help)?;
+    ui_dump::configure(command, &method_options, help)?;
     // Swift's parser names the leaf a refused option belongs to.
     flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
         error.command = Some(command);
@@ -1726,6 +1736,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || command == "trace.export"
             || command.starts_with("diagnostics.")
             || command.starts_with("target.")
+            || matches!(command, "ui-dump.inspect" | "ui-dump.hit-test")
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")
             || command.starts_with("human-action.")

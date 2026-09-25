@@ -1,0 +1,11 @@
+{
+  "answers" : "Fixtures/ControlFrames",
+  "owners" : [
+    "RuntimeCLI.emitUIDumpDerivation",
+    "UIDumpOfflineInspector",
+    "ViewerCaptureParser",
+    "ViewerHitTesting",
+    "CLIOfflineDerivation"
+  ],
+  "producer" : "CLIUIDumpInspectOracleContractTests"
+}
