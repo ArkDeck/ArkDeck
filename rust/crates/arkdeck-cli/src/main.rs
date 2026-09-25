@@ -1171,6 +1171,49 @@ fn serve_blocked_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCo
     error.exit_code().into()
 }
 
+/// `runtime support-bundle preview|export`: the preview or the export
+/// receipt, or the refusal, in the caller's rendering. Nothing reaches a
+/// Runtime.
+fn serve_support_bundle(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    let empty = Map::new();
+    let options = invocation.params.as_ref().unwrap_or(&empty);
+    let answer = if invocation.command.ends_with(".preview") {
+        arkdeck_cli::support_bundle::preview(options)
+    } else {
+        arkdeck_cli::support_bundle::export(options)
+    };
+    let written = match &answer {
+        Ok(result) if invocation.legacy_json => io::stdout()
+            .lock()
+            .write_all(&arkdeck_cli::legacy_document(result)),
+        Ok(result) if invocation.json => {
+            write_document(&success_envelope(invocation.command, result.clone(), id))
+        }
+        Ok(result) => writeln!(
+            io::stdout().lock(),
+            "{}",
+            serde_json::to_string_pretty(result).expect("a JSON document")
+        ),
+        Err(error) if invocation.json => {
+            write_document(&failure_envelope(invocation.command, error, id, true))
+        }
+        Err(error) if invocation.legacy_json => io::stdout().lock().write_all(
+            &arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(error)),
+        ),
+        Err(error) => {
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        }
+    };
+    if written.is_err() {
+        return 74.into();
+    }
+    match answer {
+        Ok(_) => 0.into(),
+        Err(error) => error.exit_code().into(),
+    }
+}
+
 /// `maintainer contracts export|check`: its one document, then its failure, if
 /// any, which after a document is only a diagnostic and the exit status
 /// (Swift `suppressesMachineRendering`).
@@ -1333,6 +1376,9 @@ fn main() -> std::process::ExitCode {
     }
     if arkdeck_cli::blocked_leaves::blocks(invocation.command) {
         return serve_blocked_leaf(&invocation, id);
+    }
+    if invocation.command.starts_with("runtime.support-bundle.") {
+        return serve_support_bundle(&invocation, id);
     }
     if arkdeck_cli::domain_leaves::serves(invocation.command) {
         return serve_domain_leaf(&invocation, id);

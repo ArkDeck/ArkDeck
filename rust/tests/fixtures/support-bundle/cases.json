@@ -1,0 +1,300 @@
+{
+  "digest" : {
+    "destination" : "<root>/support",
+    "parentDevice" : 16777233,
+    "parentInode" : 249647265,
+    "value" : "2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d"
+  },
+  "exportedFiles" : [
+    {
+      "kind" : "directory",
+      "mode" : 448,
+      "path" : ""
+    },
+    {
+      "kind" : "file",
+      "mode" : 384,
+      "path" : "bundle.json",
+      "text" : "{\"automaticUploadEnabled\":false,\"generatedAt\":\"2026-09-25T21:34:38.589Z\",\"preview\":{\"deviceRawExcluded\":true,\"estimatedBytes\":784,\"includedEntries\":[\"bundle.json\",\"hdc/tool-placeholder.json\",\"metadata.json\"],\"scopeSHA256\":\"2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d\",\"sensitiveDataWarning\":\"诊断包包含 App 日志和结构化 Job 摘要；设备 raw 默认排除，分享前仍应检查预览。\"},\"schemaVersion\":\"1.0.0\",\"tool\":{\"path\":\"redacted\",\"serverEndpoint\":\"redacted\",\"serverOwnership\":\"unverified\",\"version\":\"unverified\"}}"
+    },
+    {
+      "kind" : "directory",
+      "mode" : 448,
+      "path" : "hdc"
+    },
+    {
+      "kind" : "file",
+      "mode" : 384,
+      "path" : "hdc/tool-placeholder.json",
+      "text" : "{\"path\":\"redacted\",\"serverEndpoint\":\"redacted\",\"serverOwnership\":\"unverified\",\"version\":\"unverified\"}"
+    },
+    {
+      "kind" : "file",
+      "mode" : 384,
+      "path" : "metadata.json",
+      "text" : "{\"appName\":\"ArkDeck\",\"appVersion\":\"development\",\"architecture\":\"arm64\",\"buildVersion\":\"development\",\"platform\":\"macOS 27.0.0\"}"
+    }
+  ],
+  "host" : {
+    "architecture" : "arm64",
+    "platform" : "macOS 27.0.0"
+  },
+  "runs" : [
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/support",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-preview"
+      ],
+      "exit" : 0,
+      "name" : "previewJson",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-preview\"},\"ok\":true,\"result\":{\"deviceRawExcluded\":true,\"estimatedBytes\":784,\"includedEntries\":[\"bundle.json\",\"hdc/tool-placeholder.json\",\"metadata.json\"],\"schemaVersion\":\"arkdeck.runtime-support-bundle-preview/1\",\"scopeSHA256\":\"2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d\",\"sensitiveDataWarning\":\"诊断包包含 App 日志和结构化 Job 摘要；设备 raw 默认排除，分享前仍应检查预览。\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/support",
+        "--json"
+      ],
+      "exit" : 0,
+      "name" : "previewLegacy",
+      "stderr" : "",
+      "stdout" : "{\n  \"deviceRawExcluded\" : true,\n  \"estimatedBytes\" : 784,\n  \"includedEntries\" : [\n    \"bundle.json\",\n    \"hdc/tool-placeholder.json\",\n    \"metadata.json\"\n  ],\n  \"schemaVersion\" : \"arkdeck.runtime-support-bundle-preview/1\",\n  \"scopeSHA256\" : \"2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d\",\n  \"sensitiveDataWarning\" : \"诊断包包含 App 日志和结构化 Job 摘要；设备 raw 默认排除，分享前仍应检查预览。\"\n}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/support"
+      ],
+      "exit" : 0,
+      "name" : "previewHuman",
+      "stderr" : "",
+      "stdout" : "deviceRawExcluded: true\nestimatedBytes: 784\nincludedEntries: - bundle.json\n  - hdc/tool-placeholder.json\n  - metadata.json\nschemaVersion: arkdeck.runtime-support-bundle-preview/1\nscopeSHA256: 2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d\nsensitiveDataWarning: 诊断包包含 App 日志和结构化 Job 摘要；设备 raw 默认排除，分享前仍应检查预览。\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "<root>/support",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-wrong"
+      ],
+      "exit" : 77,
+      "name" : "exportWrongDigest",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.export\",\"error\":{\"attentionRequired\":true,\"code\":\"previewDrifted\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle scope differs from the approved preview; preview it again\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-wrong\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "<root>/elsewhere",
+        "--preview-digest",
+        "2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-else"
+      ],
+      "exit" : 77,
+      "name" : "exportElsewhere",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.export\",\"error\":{\"attentionRequired\":true,\"code\":\"previewDrifted\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle scope differs from the approved preview; preview it again\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-else\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "<root>/support",
+        "--preview-digest",
+        "2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-export"
+      ],
+      "exit" : 0,
+      "name" : "export",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.export\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-export\"},\"ok\":true,\"result\":{\"destination\":\"<root>/support\",\"deviceRawExcluded\":true,\"exportedBytes\":784,\"schemaVersion\":\"arkdeck.runtime-support-bundle-export/1\",\"scopeSHA256\":\"2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d\",\"status\":\"exported\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "export",
+        "--destination",
+        "<root>/support",
+        "--preview-digest",
+        "2368988eae094705d3696a0de1cabf7a6e232df35f97c4f8a0732039cf00f34d",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-again"
+      ],
+      "exit" : 65,
+      "name" : "exportAgain",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.export\",\"error\":{\"attentionRequired\":false,\"code\":\"resourceConflict\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle destination already exists\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-again\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/support",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-existing"
+      ],
+      "exit" : 65,
+      "name" : "previewExisting",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"resourceConflict\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle destination already exists\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-existing\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "support",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewRelative"
+      ],
+      "exit" : 65,
+      "name" : "previewRelative",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidInput\",\"controlRequestRetryable\":false,\"message\":\"runtime support-bundle requires a canonical absolute --destination\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewRelative\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<private-root>/support-2",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewPrivateSpelling"
+      ],
+      "exit" : 0,
+      "name" : "previewPrivateSpelling",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewPrivateSpelling\"},\"ok\":true,\"result\":{\"deviceRawExcluded\":true,\"estimatedBytes\":784,\"includedEntries\":[\"bundle.json\",\"hdc/tool-placeholder.json\",\"metadata.json\"],\"schemaVersion\":\"arkdeck.runtime-support-bundle-preview/1\",\"scopeSHA256\":\"3c775e4893d20dee142a3b3b61579df6c0876973b44585746715bff2a96ff8cb\",\"sensitiveDataWarning\":\"诊断包包含 App 日志和结构化 Job 摘要；设备 raw 默认排除，分享前仍应检查预览。\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/support-3/",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewTrailingSlash"
+      ],
+      "exit" : 65,
+      "name" : "previewTrailingSlash",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidInput\",\"controlRequestRetryable\":false,\"message\":\"runtime support-bundle requires a canonical absolute --destination\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewTrailingSlash\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/writable/../support-4",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewDotDot"
+      ],
+      "exit" : 65,
+      "name" : "previewDotDot",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidInput\",\"controlRequestRetryable\":false,\"message\":\"runtime support-bundle requires a canonical absolute --destination\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewDotDot\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/missing/support",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewMissingParent"
+      ],
+      "exit" : 74,
+      "name" : "previewMissingParent",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"ioFailure\",\"controlRequestRetryable\":false,\"message\":\"the support bundle could not be read or written safely\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewMissingParent\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "<root>/writable/support",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewWritableParent"
+      ],
+      "exit" : 65,
+      "name" : "previewWritableParent",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidInput\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle destination is unsafe or invalid\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewWritableParent\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    },
+    {
+      "argv" : [
+        "runtime",
+        "support-bundle",
+        "preview",
+        "--destination",
+        "/",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-support-previewRootItself"
+      ],
+      "exit" : 65,
+      "name" : "previewRootItself",
+      "stderr" : "",
+      "stdout" : "{\"command\":\"runtime.support-bundle.preview\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidInput\",\"controlRequestRetryable\":false,\"message\":\"the support-bundle destination is unsafe or invalid\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlProtocolVersion\":\"1.0.0\",\"controlRequestId\":\"ctl-support-previewRootItself\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n"
+    }
+  ]
+}

@@ -270,6 +270,14 @@ mod static_code;
 pub use static_code::{StaticCodeExpectation, static_code_holds};
 
 #[cfg(target_os = "macos")]
+mod diagnostic_bundle;
+#[cfg(target_os = "macos")]
+pub use diagnostic_bundle::{
+    BundleFailure, BundleFaultPoint, BundleParent, bundle_parent, operating_system_version,
+    publish_bundle, valid_relative_path,
+};
+
+#[cfg(target_os = "macos")]
 mod distribution_tree;
 #[cfg(target_os = "macos")]
 pub use distribution_tree::{

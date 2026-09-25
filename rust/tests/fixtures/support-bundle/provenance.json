@@ -1,0 +1,8 @@
+{
+  "owners" : [
+    "RuntimeCLI.runRuntimeSupportBundle",
+    "RuntimeSupportBundleApplicationFacade",
+    "LocalDiagnosticBundle"
+  ],
+  "producer" : "CLISupportBundleOracleContractTests"
+}

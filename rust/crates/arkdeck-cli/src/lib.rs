@@ -21,6 +21,7 @@ pub mod domain_leaves;
 pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
+pub mod support_bundle;
 mod trace_inspect;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
@@ -312,10 +313,16 @@ fn unconfirmed(method: &str, error: &ClientError) -> String {
 
 /// Swift `ISO8601Timestamps.string(from:)`: whole seconds, UTC, `Z`.
 pub(crate) fn utc_now() -> String {
-    let seconds = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    utc_now_at(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    )
+}
+
+/// `utc_now` of the instant `seconds` after the epoch.
+pub(crate) fn utc_now_at(seconds: u64) -> String {
     let days = (seconds / 86_400) as i64 + 719_468;
     let era = days / 146_097;
     let day_of_era = days - era * 146_097;
@@ -822,6 +829,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "service", "status"] => "runtime.service.status",
         ["runtime", "service", "verify"] => "runtime.service.verify",
         ["runtime", "service", "uninstall"] => "runtime.service.uninstall",
+        ["runtime", "support-bundle", "preview"] => "runtime.support-bundle.preview",
+        ["runtime", "support-bundle", "export"] => "runtime.support-bundle.export",
         // §12's superseded spelling of `runtime service`: the same handler,
         // reporting the name the caller typed (Swift `runAgentDaemon`).
         ["agentd", "install"] => "agentd.install",
@@ -964,6 +973,31 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "invalidOption",
             "the contract bundle's leaves take --contracts-directory, --fixtures-directory and --output",
         ));
+    }
+    // The support bundle is local: it reaches no Runtime, so it takes no
+    // `--socket`, and its registry requires the destination and, to export,
+    // the lowercase digest of an approved preview.
+    if command.starts_with("runtime.support-bundle.")
+        && !help
+        && (socket.is_some()
+            || !method_options.contains_key("destinationPath")
+            || (command.ends_with(".export")
+                && !method_options
+                    .get("previewDigest")
+                    .and_then(Value::as_str)
+                    .is_some_and(|digest| {
+                        digest.len() == 64
+                            && digest
+                                .bytes()
+                                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+                    })))
+    {
+        let mut error = CliError::new(
+            "invalidOption",
+            "runtime support-bundle takes --destination, and to export --preview-digest",
+        );
+        error.command = Some(command);
+        return Err(error);
     }
     // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
     if command == "commands" && (id.is_some() || socket.is_some()) {
@@ -1264,6 +1298,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
         "session.export.apply" | "session.cleanup.apply" => &["previewId", "previewDigest"],
+        "runtime.support-bundle.preview" => &["destinationPath"],
+        "runtime.support-bundle.export" => &["destinationPath", "previewDigest"],
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
         "runtime.service.verify" | "agentd.verify" => {
             &["targetId", "maximumWaitSeconds", "executionId", "jobId"]
@@ -1727,6 +1763,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || is_runtime_service(command)
             || domain_leaves::serves(command)
             || command.starts_with("maintainer.contracts.")
+            || command.starts_with("runtime.support-bundle.")
             || matches!(
                 command,
                 "operation.describe"
