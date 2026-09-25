@@ -199,4 +199,130 @@ impl HostDirectory {
             .sync_all()
             .map_err(DocumentPublishError::OutcomeUnknown)
     }
+
+    /// This directory's child `name` renamed to `to` in `destination` with
+    /// `renameatx_np(RENAME_EXCL)`: `true` once moved, `false` when `to`
+    /// already exists. A Session written aside reaches its published name in
+    /// one step and never replaces another entry there.
+    pub fn move_exclusive(
+        &self,
+        name: &str,
+        destination: &HostDirectory,
+        to: &str,
+    ) -> io::Result<bool> {
+        if !matches!(self.1, Ownership::Private) || !matches!(destination.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let from = segment(name)?;
+        let to = segment(to)?;
+        // SAFETY: two held directory descriptors and two checked segments.
+        let moved = unsafe {
+            libc::renameatx_np(
+                self.0.as_raw_fd(),
+                from.as_ptr(),
+                destination.0.as_raw_fd(),
+                to.as_ptr(),
+                libc::RENAME_EXCL,
+            )
+        };
+        if moved == 0 {
+            return Ok(true);
+        }
+        let error = io::Error::last_os_error();
+        if error.raw_os_error() == Some(libc::EEXIST) {
+            return Ok(false);
+        }
+        Err(error)
+    }
+
+    /// The tree `name` below this directory, removed through descriptors
+    /// only: its directories and regular files, and never a link or any
+    /// other kind of entry, which refuses. An absent tree is already removed.
+    pub fn remove_tree(&self, name: &str) -> io::Result<()> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        crate::distribution_tree::remove_tree_snapshot(&self.0, name).map_err(|_| fail())
+    }
+
+    /// The directory `name` below this one removed if it is empty: `true`
+    /// once removed, `false` when it still holds an entry or is gone.
+    pub fn remove_if_empty(&self, name: &str) -> io::Result<bool> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let name_c = segment(name)?;
+        // SAFETY: the held directory descriptor and one checked segment.
+        if unsafe { libc::unlinkat(self.0.as_raw_fd(), name_c.as_ptr(), libc::AT_REMOVEDIR) } == 0 {
+            return Ok(true);
+        }
+        let error = io::Error::last_os_error();
+        match error.raw_os_error() {
+            Some(libc::ENOTEMPTY | libc::EEXIST | libc::ENOENT) => Ok(false),
+            _ => Err(error),
+        }
+    }
+}
+
+#[cfg(test)]
+mod staging_tests {
+    use super::*;
+    use std::os::unix::fs::{DirBuilderExt, symlink};
+    use std::path::PathBuf;
+
+    struct Scratch(PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    fn private(path: &std::path::Path) {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+            .unwrap();
+    }
+
+    #[test]
+    fn a_staged_tree_moves_once_never_over_an_entry_and_is_removed_by_descriptor() {
+        let nonce = u128::from_ne_bytes(crate::random_bytes::<16>().unwrap());
+        let scratch = Scratch(
+            std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("staging-{nonce:032x}")),
+        );
+        for path in [
+            "root/.staging/first/nested",
+            "root/.staging/second",
+            "root/2026/09",
+        ] {
+            private(&scratch.0.join(path));
+        }
+        std::fs::write(scratch.0.join("root/.staging/first/nested/file"), b"x").unwrap();
+        let root = HostDirectory::open(&scratch.0.join("root")).unwrap();
+        let staging = root.child(".staging").unwrap();
+        let month = root.child("2026").unwrap().child("09").unwrap();
+
+        assert!(staging.move_exclusive("first", &month, "session").unwrap());
+        assert!(scratch.0.join("root/2026/09/session/nested/file").exists());
+        assert!(!scratch.0.join("root/.staging/first").exists());
+        // Never over an entry: the second stays where it was.
+        assert!(!staging.move_exclusive("second", &month, "session").unwrap());
+        assert!(scratch.0.join("root/.staging/second").exists());
+
+        assert!(!root.remove_if_empty(".staging").unwrap());
+        staging.remove_tree("second").unwrap();
+        staging.remove_tree("second").unwrap();
+        assert!(root.remove_if_empty(".staging").unwrap());
+        assert!(!root.remove_if_empty(".staging").unwrap());
+
+        // A link is never followed or removed.
+        private(&scratch.0.join("root/.staging/linked"));
+        symlink("/", scratch.0.join("root/.staging/linked/escape")).unwrap();
+        let staging = root.child(".staging").unwrap();
+        assert!(staging.remove_tree("linked").is_err());
+        assert!(scratch.0.join("root/.staging/linked/escape").is_symlink());
+    }
 }

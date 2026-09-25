@@ -141,6 +141,8 @@ impl HostServices for Recorded {
                     found.pop().unwrap_or((0, Vec::new()))
                 })
                 .filter(|(total, _)| *total > 0),
+            // Swift stages no Session: no recorded report names one.
+            staged_sessions_kept: Vec::new(),
         }
     }
 }
@@ -355,5 +357,89 @@ fn a_quarantined_job_record_is_a_blocker_before_the_catalog_findings() {
         );
         assert_eq!(report["ready"], false, "{report}");
         assert_eq!(report["findingCounts"]["blocker"], 1);
+    }
+}
+
+/// `Managed`, with the staged Session entries the Runtime's start kept.
+struct KeptStaging(Managed, Vec<(String, String)>);
+impl HostServices for KeptStaging {
+    fn observed_at(&self) -> String {
+        self.0.observed_at()
+    }
+    fn hdc_status(&self, deep: bool) -> HdcStatus {
+        self.0.hdc_status(deep)
+    }
+    fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+        self.0.observations()
+    }
+    fn operation_availability(
+        &self,
+        reference: &str,
+        provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        self.0.operation_availability(reference, provider)
+    }
+    fn doctor_facts(&self, deep: bool) -> DoctorFacts {
+        DoctorFacts {
+            staged_sessions_kept: self.1.clone(),
+            ..self.0.doctor_facts(deep)
+        }
+    }
+}
+
+/// Not Swift's, which stages no Session: each staged Session entry the
+/// Runtime's start kept is a storage warning naming it and why, after the
+/// Session output finding. Nothing reads such an entry, so a report is as
+/// ready as it would be without it.
+#[test]
+fn a_kept_staged_session_is_a_storage_warning() {
+    let managed = || {
+        Managed(
+            "available",
+            "arkDeckManaged",
+            "hdc.identityObserved",
+            Vec::new(),
+        )
+    };
+    let clean = Control::new(managed()).unwrap();
+    let kept = Control::new(KeptStaging(
+        managed(),
+        vec![(
+            "00000000-0000-4000-8000-000000000000".into(),
+            "its Session identity is not one a publication creates".into(),
+        )],
+    ))
+    .unwrap();
+    for deep in [false, true] {
+        let params = Some(json!({"deep": deep}));
+        let before = call(&clean, params.clone()).outcome.unwrap();
+        let report = call(&kept, params).outcome.unwrap();
+        let findings = report["findings"].as_array().unwrap();
+        let at = findings
+            .iter()
+            .position(|finding| finding["code"] == "storage.stagedSessionQuarantined")
+            .unwrap();
+        assert_eq!(
+            findings[at - 1]["code"],
+            "storage.sessionOutputOwnerUnavailable"
+        );
+        assert_eq!(
+            findings[at],
+            json!({"code": "storage.stagedSessionQuarantined", "severity": "warning",
+                   "scope": "storage",
+                   "summary": "a staged Session entry in the active Sessions root's .staging was kept as it is at the Runtime's start: 00000000-0000-4000-8000-000000000000 — its Session identity is not one a publication creates. No admission or answer reads it"})
+        );
+        let mut without = findings.clone();
+        without.remove(at);
+        assert_eq!(&without, before["findings"].as_array().unwrap());
+        assert_eq!(report["ready"], before["ready"]);
+        assert_eq!(
+            report["findingCounts"]["warning"],
+            before["findingCounts"]["warning"].as_u64().unwrap() + 1
+        );
+        assert_eq!(
+            report["findingCounts"]["blocker"],
+            before["findingCounts"]["blocker"]
+        );
     }
 }

@@ -120,7 +120,14 @@ fn inspect_session_children(
     depth: usize,
     remaining: &mut usize,
 ) -> Result<(), WireError> {
-    let names = root.names(*remaining).map_err(|_| refused())?;
+    let mut names = root.names(*remaining).map_err(|_| refused())?;
+    // A publication writes its Session aside in the Sessions root's own
+    // `.staging` and renames it, whole, to its published name: what staging
+    // holds is a terminal Job's Journal copied in part or in full, never a
+    // retained Session. Only that exact entry of the root is passed over.
+    if depth == 0 {
+        names.retain(|name| name != crate::session_inventory::STAGING);
+    }
     inspect_named_children(root, path, depth, remaining, names)
 }
 

@@ -330,15 +330,13 @@ impl SessionStore {
         Ok(root)
     }
     /// Swift `RuntimeSessionStorageStore.status()` as the Runtime reads it for
-    /// itself, for a publication or a device mutation's admission: the status
-    /// once the read has reconciled (and the first time initialized) the
-    /// catalog. Swift's status read waits for the storage lock, so a request or
-    /// a publication holding it at this instant delays the read rather than
-    /// refusing it, as `runtime.storage.status` waits.
+    /// a device mutation's admission: the status once the read has reconciled
+    /// (and the first time initialized) the catalog. Swift's status read waits
+    /// for the storage lock, so a request or a publication holding it at this
+    /// instant delays the read rather than refusing it, as
+    /// `runtime.storage.status` waits. The lock is held for the read alone.
     pub(crate) fn waited_status(&self) -> Result<Value, WireError> {
-        self.root.validate_path(&self.path).map_err(unreadable)?;
-        let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
-        self.locked_storage(&lock, None, None, None)
+        self.hold()?.status()
     }
 
     /// The same read without waiting, for the operation availability report,
@@ -357,68 +355,13 @@ impl SessionStore {
         self.locked_storage(&lock, None, None, None)
     }
 
-    /// The waited status as the publication writer reads it: the active
-    /// Session root, the settings generation and the retention days. A refusal
-    /// is spelled `code: message`.
-    pub(crate) fn publication_status(&self) -> Result<(PathBuf, u64, u64), String> {
-        let status = self
-            .waited_status()
-            .map_err(|error| format!("{}: {}", error.code, error.message))?;
-        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
-        match (
-            status["rootPath"].as_str(),
-            number(&status["generation"]),
-            number(&status["policy"]["retentionDays"]),
-        ) {
-            (Some(root), Some(generation), Some(days)) => {
-                Ok((PathBuf::from(root), generation, days))
-            }
-            _ => Err("recordUnreadable: Session storage status is unreadable".into()),
-        }
-    }
-
-    /// Swift `registerPublishedSession`: under the storage lock, the catalog
-    /// registers the published Session at `location` (`yyyy`, `mm`, Session
-    /// identity) with the configured retention and generation, and reads the
-    /// entry back. Answers the catalog generation.
-    pub(crate) fn register_published_session(
-        &self,
-        root: &Path,
-        location: [&str; 3],
-    ) -> Result<u64, String> {
-        fn unreadable<E>(_: E) -> String {
-            "recordUnreadable: Session storage is unavailable or unsafe".to_owned()
-        }
+    /// The storage lock, waited for as Swift's `withLockedDocument` waits for
+    /// it: a request or a publication holding it at this instant delays the
+    /// holder rather than refusing it.
+    pub(crate) fn hold(&self) -> Result<StorageHold<'_>, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
-        let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
-            Ok(value) => value,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
-                "schemaVersion":"arkdeck.session-storage-store/1", "generation":1,
-                "rootKind":"default", "rootPath":self.default_sessions,
-                "policy":{"totalQuotaBytes":21474836480_u64,"safetyMarginBytes":2147483648_u64,"retentionDays":90}}))
-            .map_err(unreadable)?,
-            Err(error) => return Err(unreadable(error)),
-        };
-        let projection = decode_session_configuration(&loaded)
-            .map_err(unreadable)?
-            .projection;
-        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
-        let (Some(generation), Some(days)) = (
-            number(&projection["generation"]),
-            number(&projection["policy"]["retentionDays"]),
-        ) else {
-            return Err(unreadable(()));
-        };
-        let registered = crate::session_inventory::register_session(
-            root, location, days, generation,
-        )
-        .map_err(|_| {
-            "recordUnreadable: the Session catalog does not hold the entry it just registered"
-                .to_owned()
-        })?;
-        lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
-        Ok(registered)
+        Ok(StorageHold { store: self, lock })
     }
 
     pub fn handle(&self, method: &str, params: &Map<String, Value>) -> Result<Value, WireError> {
@@ -613,6 +556,110 @@ impl SessionStore {
     }
 }
 
+/// The Session storage lock, held for reads and writes nothing may come
+/// between: a publication renames its staged Session to its published name
+/// and registers the catalog entry under one hold (`SessionPublisher::attempt`).
+/// Each read and write here works under the lock already held, which a
+/// second `flock` on another descriptor would wait for.
+pub(crate) struct StorageHold<'a> {
+    store: &'a SessionStore,
+    lock: HostReadLock,
+}
+
+impl StorageHold<'_> {
+    /// Swift `RuntimeSessionStorageStore.status()`: the status once the read
+    /// has reconciled (and the first time initialized) the catalog.
+    pub(crate) fn status(&self) -> Result<Value, WireError> {
+        self.store.locked_storage(&self.lock, None, None, None)
+    }
+
+    /// The Session root the settings select, read without the status's
+    /// reconciliation of the catalog, which writes one where there is none:
+    /// the daemon's start reads it and writes nothing.
+    pub(crate) fn configured_root(&self) -> Result<PathBuf, WireError> {
+        let store = self.store;
+        let loaded = match store.root.read(DOCUMENT, MAXIMUM) {
+            Ok(value) => value,
+            Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                return Ok(store.default_sessions.clone());
+            }
+            Err(e) => return Err(unreadable(e)),
+        };
+        let decoded = decode_session_configuration(&loaded).map_err(unreadable)?;
+        let document: Value = serde_json::from_slice(&decoded.document).map_err(unreadable)?;
+        document["rootPath"]
+            .as_str()
+            .map(PathBuf::from)
+            .ok_or_else(|| unreadable(()))
+    }
+
+    /// The status as the publication writer reads it: the active Session
+    /// root, the settings generation and the retention days. A refusal is
+    /// spelled `code: message`.
+    pub(crate) fn publication_status(&self) -> Result<(PathBuf, u64, u64), String> {
+        let status = self
+            .status()
+            .map_err(|error| format!("{}: {}", error.code, error.message))?;
+        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
+        match (
+            status["rootPath"].as_str(),
+            number(&status["generation"]),
+            number(&status["policy"]["retentionDays"]),
+        ) {
+            (Some(root), Some(generation), Some(days)) => {
+                Ok((PathBuf::from(root), generation, days))
+            }
+            _ => Err("recordUnreadable: Session storage status is unreadable".into()),
+        }
+    }
+
+    /// Swift `registerPublishedSession`: under the storage lock, the catalog
+    /// registers the published Session at `location` (`yyyy`, `mm`, Session
+    /// identity) with the configured retention and generation, and reads the
+    /// entry back. Answers the catalog generation.
+    pub(crate) fn register_published_session(
+        &self,
+        root: &Path,
+        location: [&str; 3],
+    ) -> Result<u64, String> {
+        fn unreadable<E>(_: E) -> String {
+            "recordUnreadable: Session storage is unavailable or unsafe".to_owned()
+        }
+        let store = self.store;
+        store.root.validate_path(&store.path).map_err(unreadable)?;
+        let loaded = match store.root.read(DOCUMENT, MAXIMUM) {
+            Ok(value) => value,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
+                "schemaVersion":"arkdeck.session-storage-store/1", "generation":1,
+                "rootKind":"default", "rootPath":store.default_sessions,
+                "policy":{"totalQuotaBytes":21474836480_u64,"safetyMarginBytes":2147483648_u64,"retentionDays":90}}))
+            .map_err(unreadable)?,
+            Err(error) => return Err(unreadable(error)),
+        };
+        let projection = decode_session_configuration(&loaded)
+            .map_err(unreadable)?
+            .projection;
+        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
+        let (Some(generation), Some(days)) = (
+            number(&projection["generation"]),
+            number(&projection["policy"]["retentionDays"]),
+        ) else {
+            return Err(unreadable(()));
+        };
+        let registered = crate::session_inventory::register_session(
+            root, location, days, generation,
+        )
+        .map_err(|_| {
+            "recordUnreadable: the Session catalog does not hold the entry it just registered"
+                .to_owned()
+        })?;
+        self.lock
+            .validate_link(&store.root, LOCK)
+            .map_err(unreadable)?;
+        Ok(registered)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -646,6 +693,13 @@ mod tests {
     fn params(value: Value) -> Map<String, Value> {
         value.as_object().unwrap().clone()
     }
+    /// The status a publication reads, once it holds the storage lock.
+    fn publication_status(store: &SessionStore) -> Result<(PathBuf, u64, u64), String> {
+        store
+            .hold()
+            .map_err(|error| format!("{}: {}", error.code, error.message))?
+            .publication_status()
+    }
     fn policy(generation: &str) -> Map<String, Value> {
         params(
             json!({"expectedGeneration":generation,"totalQuotaBytes":"500000","safetyMarginBytes":"1000","retentionDays":"30"}),
@@ -659,7 +713,7 @@ mod tests {
         let (sender, receiver) = std::sync::mpsc::channel();
         std::thread::scope(|scope| {
             let store = &store;
-            scope.spawn(move || sender.send(store.publication_status()).unwrap());
+            scope.spawn(move || sender.send(publication_status(store)).unwrap());
             // The publication's read, as Swift's, is still waiting for it.
             assert!(
                 receiver
@@ -735,7 +789,7 @@ mod tests {
                 (0..64)
                     .map(|_| {
                         barrier.wait();
-                        store.publication_status()
+                        publication_status(&store)
                     })
                     .collect::<Vec<_>>()
             });
@@ -829,7 +883,7 @@ mod tests {
                 (0..64)
                     .map(|_| {
                         barrier.wait();
-                        store.publication_status()
+                        publication_status(&store)
                     })
                     .collect::<Vec<_>>()
             });

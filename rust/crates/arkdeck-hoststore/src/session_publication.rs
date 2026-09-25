@@ -9,11 +9,24 @@
 //! As in Swift, a restart never resumes a publication; only `job.reconcile`
 //! starts one again, after the writer's confirmed refusal of an unbound
 //! source (`job_reconcile.rs`).
+//!
+//! Unlike Swift, the Session is written aside, in the Sessions root's own
+//! `.staging`, and renamed whole to its published name under the storage
+//! lock. This Runtime's continuity scan reads every retained Session's
+//! Journal and takes no storage lock, so it must never meet a Session before
+//! it is complete: it passes staging over, and the rename is atomic. The
+//! storage lock is held only to read the status, to create and remove
+//! staging, and to rename and register, never while the Session is written.
+//! What is published, and every answer, is Swift's. A staged Session a crash
+//! left is removed at the daemon's next start once it is proved this
+//! Runtime's (`recover_staged`), and nothing is published again.
 use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_replay::ReplayFacts;
 use crate::job_journal_writer::JournalWriter;
+use crate::job_owner::JobStore;
 use crate::job_record::JobRecord;
-use crate::session_owner::SessionStore;
+use crate::session_inventory::STAGING;
+use crate::session_owner::{SessionStore, StorageHold};
 use arkdeck_contract::sha256_hex;
 use arkdeck_platform::{DocumentPublishError, HostDirectory, host_gregorian_timestamp};
 use serde_json::{Map, Value, json};
@@ -40,9 +53,30 @@ pub struct StorageSnapshot {
     pub read_only: bool,
 }
 
-/// Swift `HostStorageProbing`.
+/// Swift `HostStorageProbing`, and where a publication stands, which only a
+/// test observes, to stop the publication there or to time it.
 pub trait StorageProbe: Sync {
     fn snapshot(&self, root: &HostDirectory) -> io::Result<StorageSnapshot>;
+    /// The publication has reached `point`.
+    fn reached(&self, _point: PublicationPoint) {}
+}
+
+/// Where a Session publication stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PublicationPoint {
+    /// The staged Session's directories and identity file exist, and nothing
+    /// else.
+    SessionCreated,
+    /// `copied` of the Job Journal's `of` records are in the staged Session's
+    /// Journal.
+    JournalCopied { copied: usize, of: usize },
+    /// The staged Session's Manifest is published.
+    ManifestPublished,
+    /// The storage lock is held, and the staged Session is still to be
+    /// renamed to its published name.
+    Moving,
+    /// The storage lock was released, having been held for `held`.
+    StorageReleased { held: std::time::Duration },
 }
 
 /// Swift `SystemHostStorageProbe`: the held root's file system.
@@ -169,7 +203,7 @@ impl SessionPublisher<'_> {
         now: &str,
     ) -> Result<Value, Stop> {
         let (root_path, policy_generation, _) =
-            self.sessions.publication_status().map_err(storage)?;
+            self.under_storage_lock(|held| held.publication_status().map_err(storage))?;
         let root = HostDirectory::open(&root_path).map_err(|e| write_failed(&root_path, &e))?;
         let facts = root
             .export_facts()
@@ -282,7 +316,8 @@ impl SessionPublisher<'_> {
         let sealed = std::fs::read(&journal_path).map_err(|e| write_failed(&journal_path, &e))?;
         let sealed_events = events_of(&sealed)?;
 
-        // 5. The Session tree, created once.
+        // 5. The Session tree, created once: aside, in the Sessions root's
+        //    `.staging`, and renamed whole to its published name in step 8.
         let session_path = root_path.join(&year).join(&month).join(&session_id);
         let year_root = root
             .private_child(&year)
@@ -290,17 +325,34 @@ impl SessionPublisher<'_> {
         let month_root = year_root
             .private_child(&month)
             .map_err(|e| write_failed(&root_path.join(&year).join(&month), &e))?;
-        let session = month_root
-            .create_private_child(&session_id)
-            .map_err(|error| {
-                if error.kind() == io::ErrorKind::AlreadyExists {
-                    storage(format!(
-                        "invalidRecord(\"Session already exists: {session_id}\")"
-                    ))
-                } else {
-                    write_failed(&session_path, &error)
-                }
-            })?;
+        match month_root.kind_and_size(&session_id) {
+            Ok(_) => return Err(already_exists(&session_id)),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+            Err(error) => return Err(write_failed(&session_path, &error)),
+        }
+        // Staging is created and removed under the storage lock, so that no
+        // publication removes it while another creates its Session there.
+        let staging_path = root_path.join(STAGING);
+        let (parent, name, session) = self.under_storage_lock(|_| {
+            let parent = root
+                .private_child(STAGING)
+                .map_err(|e| write_failed(&staging_path, &e))?;
+            let name = uuid().map_err(|e| write_failed(&staging_path, &e))?;
+            let session = parent
+                .create_private_child(&name)
+                .map_err(|e| write_failed(&staging_path.join(&name), &e))?;
+            root.sync().map_err(|e| write_failed(&root_path, &e))?;
+            Ok((parent, name, session))
+        })?;
+        let staged_path = staging_path.join(&name);
+        let mut staged = Staged {
+            publisher: self,
+            root: &root,
+            parent,
+            name,
+            location: [year.clone(), month.clone(), session_id.clone()],
+            moved: false,
+        };
         let child = |parent: &HostDirectory, name: &str, path: &Path| {
             parent
                 .private_child(name)
@@ -325,9 +377,7 @@ impl SessionPublisher<'_> {
             &partial,
             &artifacts,
             &session,
-            &month_root,
-            &year_root,
-            &root,
+            &staged.parent,
         ] {
             directory
                 .sync()
@@ -341,14 +391,19 @@ impl SessionPublisher<'_> {
             json!({"device": bound.device.to_string(), "inode": bound.inode.to_string()}),
         );
         marker.insert("phase".into(), json!("prepared"));
+        self.probe.reached(PublicationPoint::SessionCreated);
 
         // 6. The Session's Journal, byte for byte the Job's.
         {
-            let mut copy = JournalWriter::open(&session_path, true)
+            let mut copy = JournalWriter::open(&staged_path, true)
                 .map_err(|error| storage(error.to_string()))?;
-            for event in &sealed_events {
+            for (index, event) in sealed_events.iter().enumerate() {
                 copy.append(event)
                     .map_err(|error| storage(error.to_string()))?;
+                self.probe.reached(PublicationPoint::JournalCopied {
+                    copied: index + 1,
+                    of: sealed_events.len(),
+                });
             }
         }
         let copied = session
@@ -422,12 +477,40 @@ impl SessionPublisher<'_> {
             ));
         }
         marker.insert("phase".into(), json!("manifestPublished"));
+        self.probe.reached(PublicationPoint::ManifestPublished);
 
-        // 8. The catalog's own entry, read back, is the receipt.
-        let generation = self
-            .sessions
-            .register_published_session(&root_path, [&year, &month, &session_id])
-            .map_err(storage)?;
+        // 8. Under the storage lock, the complete Session renamed to its
+        //    published name, never over another entry, staging removed once
+        //    it is empty, and the catalog's own entry, read back, as the
+        //    receipt.
+        let generation = self.under_storage_lock(|held| {
+            self.probe.reached(PublicationPoint::Moving);
+            // A cleanup may have removed a container that was empty since.
+            let year_root = root
+                .private_child(&year)
+                .map_err(|e| write_failed(&root_path.join(&year), &e))?;
+            let month_root = year_root
+                .private_child(&month)
+                .map_err(|e| write_failed(&root_path.join(&year).join(&month), &e))?;
+            if !staged
+                .parent
+                .move_exclusive(&staged.name, &month_root, &session_id)
+                .map_err(|e| write_failed(&session_path, &e))?
+            {
+                return Err(already_exists(&session_id));
+            }
+            staged.moved = true;
+            for directory in [&month_root, &year_root, &staged.parent] {
+                directory
+                    .sync()
+                    .map_err(|e| write_failed(&session_path, &e))?;
+            }
+            root.remove_if_empty(STAGING)
+                .and_then(|_| root.sync())
+                .map_err(|e| write_failed(&staging_path, &e))?;
+            held.register_published_session(&root_path, [&year, &month, &session_id])
+                .map_err(storage)
+        })?;
         marker.insert(
             "receipt".into(),
             json!({"manifestSHA256": digest, "catalogGeneration": generation.to_string(),
@@ -437,6 +520,207 @@ impl SessionPublisher<'_> {
         self.claims.release(&claim);
         Ok(Value::Object(marker))
     }
+}
+
+impl SessionPublisher<'_> {
+    /// `work` under the storage lock, and how long it was held reported once
+    /// it is released.
+    fn under_storage_lock<T>(
+        &self,
+        work: impl FnOnce(&StorageHold<'_>) -> Result<T, Stop>,
+    ) -> Result<T, Stop> {
+        let held = self
+            .sessions
+            .hold()
+            .map_err(|error| storage(format!("{}: {}", error.code, error.message)))?;
+        let taken = std::time::Instant::now();
+        let result = work(&held);
+        drop(held);
+        self.probe.reached(PublicationPoint::StorageReleased {
+            held: taken.elapsed(),
+        });
+        result
+    }
+}
+
+/// What the daemon's start found in the active Sessions root's `.staging`
+/// (`SessionPublisher::recover_staged`), each entry with its Job or why it
+/// was kept.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct StagedRecovery {
+    /// Staged Sessions removed, each proved this Runtime's: a publication a
+    /// crash stopped before its rename, and the Job it was publishing.
+    pub removed: Vec<(String, String)>,
+    /// Staged entries kept exactly as they are, and why: nothing proved them
+    /// this Runtime's, or they could not be removed. No admission or answer
+    /// reads them.
+    pub kept: Vec<(String, String)>,
+}
+
+impl SessionPublisher<'_> {
+    /// At the daemon's start, before it serves: the staged Sessions a
+    /// publication stopped by a crash left in the active Sessions root, between
+    /// its staging and its rename. Swift has none: it writes a Session in
+    /// place, and a crash leaves what it had written there.
+    ///
+    /// As in Swift, a restart never resumes a publication: nothing is
+    /// published again. An entry is removed only when it is proved this
+    /// Runtime's: a staged name, a private directory of this Runtime's, and
+    /// the Session identity a publication creates, canonical, naming a Job
+    /// this Runtime holds. Anything else is kept exactly as it is and named.
+    pub fn recover_staged(&self, jobs: &JobStore) -> Result<StagedRecovery, String> {
+        let root_path = self
+            .under_storage_lock(|held| {
+                held.configured_root()
+                    .map_err(|error| storage(format!("{}: {}", error.code, error.message)))
+            })
+            .map_err(|stopped| stopped.detail)?;
+        let mut recovery = StagedRecovery::default();
+        let root = match HostDirectory::open(&root_path) {
+            Ok(root) => root,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(recovery),
+            Err(error) => return Err(error.to_string()),
+        };
+        let staging = match root.kind_and_size(STAGING) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(recovery),
+            Ok((arkdeck_platform::HostEntryKind::Directory, _)) => root.child(STAGING),
+            Ok(_) => Err(io::Error::other("not a directory")),
+            Err(error) => Err(error),
+        };
+        let staging = match staging {
+            Ok(staging) => staging,
+            Err(error) => {
+                recovery.kept.push((
+                    STAGING.into(),
+                    format!("staging is not this Runtime's: {error}"),
+                ));
+                return Ok(recovery);
+            }
+        };
+        let names = staging
+            .names(STAGED_LISTING_BOUND)
+            .map_err(|error| error.to_string())?;
+        for name in names {
+            let job_id = match owned(jobs, &staging, &name) {
+                Ok(job_id) => job_id,
+                Err(reason) => {
+                    recovery.kept.push((name, reason));
+                    continue;
+                }
+            };
+            match staging.remove_tree(&name) {
+                Ok(()) => recovery.removed.push((name, job_id)),
+                Err(error) => recovery
+                    .kept
+                    .push((name, format!("it could not be removed: {error}"))),
+            }
+        }
+        // Staging goes once it is empty, under the storage lock, as a
+        // publication removes it.
+        self.under_storage_lock(|_| {
+            staging
+                .sync()
+                .and_then(|()| root.remove_if_empty(STAGING))
+                .and_then(|_| root.sync())
+                .map_err(|e| write_failed(&root_path.join(STAGING), &e))
+        })
+        .map_err(|stopped| stopped.detail)?;
+        Ok(recovery)
+    }
+}
+
+const STAGED_LISTING_BOUND: usize = 4096;
+
+/// The Job whose staged Session `name` is, if the entry is proved this
+/// Runtime's; otherwise why not.
+fn owned(jobs: &JobStore, staging: &HostDirectory, name: &str) -> Result<String, String> {
+    if !staged_name(name) {
+        return Err("its name is not one a publication stages".into());
+    }
+    let session = staging
+        .child(name)
+        .map_err(|_| "it is not a private directory of this Runtime's".to_owned())?;
+    let identity = session
+        .read(".session-identity.json", 4096)
+        .map_err(|_| "it holds no readable Session identity".to_owned())?;
+    let job_id = serde_json::from_slice::<Value>(&identity)
+        .ok()
+        .and_then(|value| {
+            let job_id = value["jobId"].as_str()?.to_owned();
+            let expected = json!({"jobId": job_id, "schemaVersion": "1.0.0",
+                "sessionId": format!("session-{job_id}")});
+            (crate::session_json::encode(&expected).ok()? == identity).then_some(job_id)
+        })
+        .ok_or_else(|| "its Session identity is not one a publication creates".to_owned())?;
+    jobs.read_snapshot(&job_id).map_err(|error| {
+        format!(
+            "its Job {job_id} is not one this Runtime holds: {}",
+            error.message
+        )
+    })?;
+    Ok(job_id)
+}
+
+/// A name `uuid` gives a staged Session: Swift's `UUID().uuidString`.
+fn staged_name(name: &str) -> bool {
+    let parts: Vec<&str> = name.split('-').collect();
+    parts.iter().map(|part| part.len()).eq([8, 4, 4, 4, 12])
+        && parts.iter().all(|part| {
+            part.bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'A'..=b'F'))
+        })
+}
+
+/// A staged Session. One whose publication stopped short of its rename is
+/// renamed to its published name as it stands, as Swift, which writes a
+/// Session in place, leaves what it had written; removed only when that name
+/// is taken. Staging goes once it is empty.
+struct Staged<'s, 'p> {
+    publisher: &'s SessionPublisher<'p>,
+    root: &'s HostDirectory,
+    parent: HostDirectory,
+    name: String,
+    /// `yyyy`, `mm` and the Session identity.
+    location: [String; 3],
+    moved: bool,
+}
+
+impl Drop for Staged<'_, '_> {
+    fn drop(&mut self) {
+        if self.moved {
+            return;
+        }
+        let _ = self.publisher.under_storage_lock(|_| {
+            let [year, month, session_id] = &self.location;
+            let moved = self
+                .root
+                .private_child(year)
+                .and_then(|year| {
+                    let month = year.private_child(month)?;
+                    let moved = self.parent.move_exclusive(&self.name, &month, session_id)?;
+                    if moved {
+                        month.sync()?;
+                        year.sync()?;
+                    }
+                    Ok(moved)
+                })
+                .unwrap_or(false);
+            if !moved {
+                let _ = self.parent.remove_tree(&self.name);
+            }
+            let _ = self.parent.sync();
+            let _ = self.root.remove_if_empty(STAGING);
+            let _ = self.root.sync();
+            Ok(())
+        });
+    }
+}
+
+/// Swift's refusal of a Session path something already holds.
+fn already_exists(session_id: &str) -> Stop {
+    storage(format!(
+        "invalidRecord(\"Session already exists: {session_id}\")"
+    ))
 }
 
 /// Swift `refusedRecord`: an unbound marker carrying the confirmed reason.
@@ -1069,4 +1353,221 @@ fn uuid() -> io::Result<String> {
         &hex[16..20],
         &hex[20..]
     ))
+}
+
+#[cfg(test)]
+mod measurement {
+    //! What a Session publication whose Journal holds more than ten thousand
+    //! records holds the storage lock for, and what proving a device
+    //! mutation's state waits meanwhile (TASK-XPA-014). A measurement for a
+    //! quiet host, not a check:
+    //! `cargo test -p arkdeck-hoststore --lib session_publication::measurement -- --ignored --nocapture`.
+    //!
+    //! The Journal is the Swift pointer oracle's tap with its evidence-model
+    //! read retried 5,000 more times (10,013 records). Each sample publishes
+    //! it for another Job into a Sessions root of its own, while another
+    //! thread proves the mutation state over and over; none may be refused.
+    //! The proof is then timed once more with nothing else running, over the
+    //! one Session the sample retained. A root of its own per sample keeps
+    //! each proof to one retained Session: the proof's Journal replay grows
+    //! with the square of a Journal's length.
+    use super::*;
+    use crate::{CapabilityStore, DeviceHolds, JobStore, MutationAuthority};
+    use std::os::unix::fs::DirBuilderExt;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+
+    const JOB: &str = "4ac2c3640786ad0e831952ab62bb71bc";
+    const RETRIES: i64 = 5_000;
+    const SAMPLES: usize = 12;
+
+    struct Timing(Mutex<Vec<Duration>>);
+    impl StorageProbe for Timing {
+        fn snapshot(&self, root: &HostDirectory) -> io::Result<StorageSnapshot> {
+            Ok(StorageSnapshot {
+                volume_identity: root.export_facts()?.volume_identity,
+                available_bytes: u64::MAX / 4,
+                read_only: false,
+            })
+        }
+        fn reached(&self, point: PublicationPoint) {
+            if let PublicationPoint::StorageReleased { held } = point {
+                self.0.lock().unwrap().push(held);
+            }
+        }
+    }
+
+    fn fixture(name: &str) -> String {
+        std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../tests/fixtures/pointer-input/store/jobs")
+                .join(format!("job-{JOB}"))
+                .join(name),
+        )
+        .unwrap()
+    }
+
+    /// The tap's Journal without its `finalized` record, its evidence-model
+    /// read retried `RETRIES` times more.
+    fn long_journal() -> String {
+        let events: Vec<Value> = fixture("journal.jsonl")
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .filter(|event| event["kind"] != "finalized")
+            .collect();
+        let find = |kind: &str| {
+            events
+                .iter()
+                .find(|event| event["kind"] == kind && event["stepId"] == "read-evidence-model")
+                .unwrap()
+                .clone()
+        };
+        let (intent, outcome) = (find("stepIntent"), find("stepOutcome"));
+        let mut all = Vec::new();
+        for event in events {
+            let last = event["eventId"] == outcome["eventId"];
+            all.push(event);
+            if last {
+                for attempt in 2..=RETRIES + 1 {
+                    let id =
+                        |event: &Value| format!("{}-{attempt}", event["eventId"].as_str().unwrap());
+                    let (mut retried, mut answered) = (intent.clone(), outcome.clone());
+                    retried["eventId"] = json!(id(&intent));
+                    retried["attempt"] = json!(attempt);
+                    answered["eventId"] = json!(id(&outcome));
+                    answered["attempt"] = json!(attempt);
+                    answered["payload"]["correlatesToIntentEventId"] = json!(id(&intent));
+                    all.push(retried);
+                    all.push(answered);
+                }
+            }
+        }
+        let mut journal = String::new();
+        for (sequence, mut event) in all.into_iter().enumerate() {
+            event["sequence"] = json!(sequence);
+            journal.push_str(
+                std::str::from_utf8(&crate::session_json::encode(&event).unwrap()).unwrap(),
+            );
+            journal.push('\n');
+        }
+        journal
+    }
+
+    fn private(path: &Path) {
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)
+            .unwrap();
+    }
+
+    fn summary(name: &str, mut samples: Vec<Duration>) {
+        samples.sort();
+        let at = |fraction: f64| samples[((samples.len() - 1) as f64 * fraction).round() as usize];
+        println!(
+            "{name}: n={} min={:?} median={:?} p95={:?} p99={:?} max={:?}",
+            samples.len(),
+            samples[0],
+            at(0.5),
+            at(0.95),
+            at(0.99),
+            samples[samples.len() - 1]
+        );
+    }
+
+    #[test]
+    #[ignore = "a measurement for a quiet host"]
+    fn a_publication_of_a_ten_thousand_record_journal_holds_the_storage_lock_briefly() {
+        let journal = long_journal();
+        let record = {
+            let mut record: Value = serde_json::from_str(&fixture("job-record.json")).unwrap();
+            record
+                .as_object_mut()
+                .unwrap()
+                .remove("sessionPublicationRecord");
+            serde_json::to_string(&record).unwrap()
+        };
+        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("publication-measure-{nonce:032x}"));
+        for name in ["store", "jobs"] {
+            private(&root.join(name));
+        }
+        let jobs = JobStore::open_owner(&root.join("store")).unwrap();
+        let capabilities = CapabilityStore::open(&root.join("store/capabilities")).unwrap();
+        let holds = DeviceHolds::default();
+        println!(
+            "journal: {} records, {} bytes; {SAMPLES} samples",
+            journal.lines().count(),
+            journal.len()
+        );
+        let (mut storage, mut totals, mut waits, mut proofs) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+        for sample in 1..=SAMPLES {
+            let owner = root.join(format!("sample-{sample}"));
+            private(&owner.join("session-owner"));
+            private(&owner.join("Sessions"));
+            let sessions =
+                SessionStore::open(&owner.join("session-owner"), &owner.join("Sessions")).unwrap();
+            let authority = MutationAuthority {
+                default_root: &root.join("store"),
+                sessions: Some(&sessions),
+                capabilities: &capabilities,
+                holds: &holds,
+            };
+            let id = format!("{sample:032x}");
+            let directory = root.join("jobs").join(format!("job-{id}"));
+            private(&directory);
+            std::fs::write(directory.join("journal.jsonl"), journal.replace(JOB, &id)).unwrap();
+            let record = JobRecord::decode(record.replace(JOB, &id).as_bytes()).unwrap();
+            let mut writer = JournalWriter::open(&directory, false).unwrap();
+            let probe = Timing(Mutex::new(Vec::new()));
+            let claims = StorageClaims::default();
+            let publisher = SessionPublisher {
+                sessions: &sessions,
+                claims: &claims,
+                probe: &probe,
+            };
+            let done = AtomicBool::new(false);
+            let (marker, total, sample_waits) = std::thread::scope(|scope| {
+                let proving = scope.spawn(|| {
+                    let mut waited = Vec::new();
+                    while !done.load(Ordering::SeqCst) {
+                        let started = Instant::now();
+                        authority.require_state(&jobs).unwrap();
+                        waited.push(started.elapsed());
+                    }
+                    waited
+                });
+                let started = Instant::now();
+                let marker =
+                    publisher.publish(&record, &mut writer, &directory, "2026-09-14T00:00:01Z");
+                let total = started.elapsed();
+                done.store(true, Ordering::SeqCst);
+                (marker, total, proving.join().unwrap())
+            });
+            assert!(marker.get("receipt").is_some(), "{marker}");
+            let held = probe.0.lock().unwrap().clone();
+            let started = Instant::now();
+            authority.require_state(&jobs).unwrap();
+            let proof = started.elapsed();
+            println!(
+                "sample {sample}: publication {total:?}; storage lock held {held:?}; \
+                 {} proofs meanwhile, longest {:?}; proof alone over 1 retained {proof:?}",
+                sample_waits.len(),
+                sample_waits.iter().max().unwrap()
+            );
+            storage.extend(held);
+            totals.push(total);
+            waits.extend(sample_waits);
+            proofs.push(proof);
+        }
+        summary("storage lock held by a publication", storage);
+        summary("a whole publication", totals);
+        summary("a proof during a publication", waits);
+        summary("a proof alone", proofs);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
 }
