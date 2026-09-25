@@ -522,6 +522,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--tool-generation"
                 | "--source-job"
                 | "--continuation-request-id"
+                | "--remote-path"
                 | "--contracts-directory"
                 | "--fixtures-directory"
                 | "--timeout" => {
@@ -607,6 +608,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--tool-generation" => "toolGeneration",
                         "--source-job" => "sourceJob",
                         "--continuation-request-id" => "continuationRequestId",
+                        "--remote-path" => "remotePath",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -692,6 +694,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["trace", "export"] => "trace.export",
         ["recovery", "cleanup", "list"] => "recovery.cleanup.list",
         ["cleanup-debt", "list"] => "cleanup-debt.list",
+        ["recovery", "cleanup", "continue"] => "recovery.cleanup.continue",
+        ["cleanup-debt", "continue"] => "cleanup-debt.continue",
         ["artifact", "quota"] => "artifact.quota",
         ["artifact", "list"] => "artifact.list",
         ["agent", "run"] => "agent.run",
@@ -1225,6 +1229,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         command if domain_leaves::serves(command) => {
             &["targetId", "inputsFile", "capabilityId", "executionId"]
         }
+        "recovery.cleanup.continue" | "cleanup-debt.continue" => &["jobId", "remotePath", "bundle"],
         "runtime.service.install" => &["bundle", "bundleGeneration", "tool", "toolGeneration"],
         // `agentd install` is Swift's compatibility install from path inputs:
         // `update`'s options, never the typed bootstrap's.
@@ -1319,6 +1324,20 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         return Err(CliError::new(
             "invalidOption",
             "the mutation requires --expected-generation",
+        ));
+    }
+    if !help
+        && matches!(
+            command,
+            "recovery.cleanup.continue" | "cleanup-debt.continue"
+        )
+        && (!method_options.contains_key("jobId")
+            || method_options.contains_key("remotePath") == method_options.contains_key("bundle"))
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "cleanup continue requires --job <id> and one of --remote-path <recorded path> / \
+             --bundle <recorded bundle>",
         ));
     }
     if !help && command == "capability.inspect" && !method_options.contains_key("capabilityId") {
@@ -1588,6 +1607,11 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         } else if matches!(command, "recovery.cleanup.list" | "cleanup-debt.list") {
             // Both spellings share Swift's one handler and its one method.
             "cleanupDebt.list"
+        } else if matches!(
+            command,
+            "recovery.cleanup.continue" | "cleanup-debt.continue"
+        ) {
+            "cleanupDebt.continue"
         } else if command == "trace.export" {
             // `artifact export` of the one Trace a diagnostics capture
             // publishes, after its `artifact.inspect` (`main.rs`).
@@ -1615,6 +1639,21 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             )]))
         } else if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
+        } else if matches!(
+            command,
+            "recovery.cleanup.continue" | "cleanup-debt.continue"
+        ) {
+            // Swift's `emitCleanupDebt`: the Job and the one recorded residue
+            // it names, a remote path or an installed bundle.
+            Some(
+                method_options
+                    .into_iter()
+                    .map(|(key, value)| match key.as_str() {
+                        "bundle" => ("bundleName".to_owned(), value),
+                        _ => (key, value),
+                    })
+                    .collect(),
+            )
         } else if command.starts_with("workspace.project.")
             || command.starts_with("workspace.preset.")
             || command.starts_with("workspace.continuation.")
