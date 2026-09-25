@@ -11,6 +11,7 @@
 //! `/.vol/<device>/<inode>`, opened whole and bound to that device and inode.
 //! The classification belongs to the caller, which reads the string as Swift
 //! does; this module only opens and reads.
+use sha2::Digest;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{self, Read};
@@ -168,6 +169,185 @@ pub fn read_profile_file(
     })
 }
 
+/// Swift `ArkTraceProfileFileReader.matches`: the file reads as above, has
+/// `byte_count` bytes when one is named, the SHA-256 `sha256` (as Swift's
+/// lowercase text compares), and an execute bit when one is required.
+pub fn profile_file_matches(
+    path: &ProfilePath,
+    sha256: &str,
+    byte_count: Option<u64>,
+    maximum: u64,
+    require_executable: bool,
+) -> bool {
+    let Ok(snapshot) = read_profile_file(path, maximum) else {
+        return false;
+    };
+    byte_count.is_none_or(|count| snapshot.bytes.len() as u64 == count)
+        && format!("{:x}", sha2::Sha256::digest(&snapshot.bytes)) == sha256
+        && (!require_executable || snapshot.mode & 0o111 != 0)
+}
+
+/// Swift `openPhysicalDirectoryDescriptor`: the directory, opened through
+/// its physical path.
+pub fn open_physical_directory(path: &ProfilePath) -> Result<File, ProfileReadError> {
+    open_profile_path(path, libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NONBLOCK)
+}
+
+/// Swift `isPhysicalDirectory`: the path opens as a directory through its
+/// physical path.
+pub fn is_physical_directory(path: &ProfilePath) -> bool {
+    open_physical_directory(path)
+        .and_then(|directory| {
+            directory
+                .metadata()
+                .map_err(|_| ProfileReadError::InitialMetadata)
+        })
+        .is_ok_and(|metadata| metadata.file_type().is_dir())
+}
+
+/// Swift `hasNoSymlinkComponent`: the path opens, whatever it names, with
+/// no link anywhere along it.
+pub fn has_no_symlink_component(path: &ProfilePath) -> bool {
+    open_profile_path(path, libc::O_RDONLY | libc::O_NONBLOCK).is_ok()
+}
+
+fn open_component(parent: &File, name: &str, flags: i32) -> Option<File> {
+    let name = CString::new(name).ok()?;
+    // SAFETY: the live parent descriptor and component are valid here.
+    let fd = unsafe { libc::openat(parent.as_raw_fd(), name.as_ptr(), flags) };
+    // SAFETY: a newly opened descriptor has exactly one owner.
+    (fd >= 0).then(|| unsafe { File::from_raw_fd(fd) })
+}
+
+fn errno() -> i32 {
+    std::io::Error::last_os_error().raw_os_error().unwrap_or(0)
+}
+
+/// Swift `openOrCreateOwnerPrivateDirectory` over the components of its
+/// physical path (`/var`, `/tmp` and `/etc` already read below `/private`):
+/// every component opened relative to its parent without following a link,
+/// a missing one created `0700`, each owned by this user or root and
+/// writable by no one else unless it is a root-owned sticky directory; the
+/// leaf this user's and made `0700` through its descriptor. Nothing is
+/// changed through a path name before it is bound to a descriptor.
+pub fn open_or_create_owner_private_directory(
+    components: &[String],
+) -> Result<File, ProfileReadError> {
+    if components.is_empty()
+        || components
+            .iter()
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(ProfileReadError::PhysicalPath);
+    }
+    let flags =
+        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK;
+    let mut directory = open_at(
+        None,
+        "/",
+        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+    )?;
+    // SAFETY: geteuid has no preconditions.
+    let euid = unsafe { libc::geteuid() };
+    for (index, component) in components.iter().enumerate() {
+        let leaf = index == components.len() - 1;
+        let next = match open_component(&directory, component, flags) {
+            Some(next) => next,
+            None if errno() == libc::ENOENT => {
+                let name = CString::new(component.as_str()).map_err(|_| ProfileReadError::Open)?;
+                // SAFETY: the live parent descriptor and component are valid.
+                let created = unsafe { libc::mkdirat(directory.as_raw_fd(), name.as_ptr(), 0o700) };
+                if created != 0 && errno() != libc::EEXIST {
+                    return Err(ProfileReadError::Open);
+                }
+                open_component(&directory, component, flags).ok_or(ProfileReadError::Open)?
+            }
+            None => return Err(ProfileReadError::Open),
+        };
+        let metadata = next
+            .metadata()
+            .map_err(|_| ProfileReadError::PhysicalPath)?;
+        if !metadata.file_type().is_dir() || (metadata.uid() != euid && metadata.uid() != 0) {
+            return Err(ProfileReadError::PhysicalPath);
+        }
+        let root_sticky = metadata.uid() == 0 && metadata.mode() & libc::S_ISVTX as u32 != 0;
+        if metadata.mode() & 0o022 != 0 && !root_sticky {
+            return Err(ProfileReadError::PhysicalPath);
+        }
+        if leaf {
+            if metadata.uid() != euid {
+                return Err(ProfileReadError::PhysicalPath);
+            }
+            // SAFETY: the live descriptor this component was bound to.
+            if unsafe { libc::fchmod(next.as_raw_fd(), 0o700) } != 0 {
+                return Err(ProfileReadError::PhysicalPath);
+            }
+            let changed = next
+                .metadata()
+                .map_err(|_| ProfileReadError::PhysicalPath)?;
+            if changed.uid() != euid || changed.mode() & 0o777 != 0o700 {
+                return Err(ProfileReadError::PhysicalPath);
+            }
+        }
+        directory = next;
+    }
+    Ok(directory)
+}
+
+/// Swift `validateOwnerOnlyAuthority` over the components of the physical
+/// path (`/var`, `/tmp` and `/etc` already read below `/private`): each one
+/// opened relative to its parent without following a link, a directory but
+/// for a regular-file leaf when `leaf_is_directory` is false, owned by this
+/// user or root, and writable by no one else unless it is a root-owned
+/// sticky directory.
+pub fn validate_owner_only_authority(
+    components: &[String],
+    leaf_is_directory: bool,
+) -> Result<(), ProfileReadError> {
+    if components.is_empty()
+        || components
+            .iter()
+            .any(|part| part.is_empty() || part == "." || part == "..")
+    {
+        return Err(ProfileReadError::PhysicalPath);
+    }
+    let mut directory = open_at(
+        None,
+        "/",
+        libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+    )?;
+    // SAFETY: geteuid has no preconditions.
+    let euid = unsafe { libc::geteuid() };
+    for (index, component) in components.iter().enumerate() {
+        let file_leaf = index == components.len() - 1 && !leaf_is_directory;
+        let flags = if file_leaf {
+            libc::O_RDONLY | libc::O_NONBLOCK | libc::O_CLOEXEC | libc::O_NOFOLLOW
+        } else {
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW
+        };
+        let next = open_component(&directory, component, flags).ok_or(ProfileReadError::Open)?;
+        let metadata = next
+            .metadata()
+            .map_err(|_| ProfileReadError::InitialMetadata)?;
+        let kind_matches = if file_leaf {
+            metadata.file_type().is_file()
+        } else {
+            metadata.file_type().is_dir()
+        };
+        let root_sticky = metadata.uid() == 0
+            && metadata.file_type().is_dir()
+            && metadata.mode() & libc::S_ISVTX as u32 != 0;
+        if !kind_matches
+            || (metadata.uid() != euid && metadata.uid() != 0)
+            || (metadata.mode() & 0o022 != 0 && !root_sticky)
+        {
+            return Err(ProfileReadError::PhysicalPath);
+        }
+        directory = next;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,6 +457,82 @@ mod tests {
         assert_eq!(
             read_profile_file(&ProfilePath::Components(Vec::new()), 1 << 20),
             Err(ProfileReadError::PhysicalPath)
+        );
+    }
+
+    #[test]
+    fn owner_only_authority_admits_root_sticky_ancestors_and_refuses_writable_ones() {
+        let scratch = scratch();
+        let file = scratch.0.join("descriptor.json");
+        std::fs::write(&file, b"{}").unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o644)).unwrap();
+        std::fs::set_permissions(&scratch.0, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let parts = |path: &Path| match components(path) {
+            ProfilePath::Components(parts) => parts,
+            ProfilePath::InodeAlias { .. } => unreachable!(),
+        };
+        // `/private/tmp` is root's sticky directory, writable by everyone.
+        assert_eq!(validate_owner_only_authority(&parts(&file), false), Ok(()));
+        assert_eq!(
+            validate_owner_only_authority(&parts(&scratch.0), true),
+            Ok(())
+        );
+        // A leaf of the other kind, or a writable ancestor of this user's.
+        assert!(validate_owner_only_authority(&parts(&file), true).is_err());
+        std::fs::set_permissions(&scratch.0, std::fs::Permissions::from_mode(0o777)).unwrap();
+        assert_eq!(
+            validate_owner_only_authority(&parts(&file), false),
+            Err(ProfileReadError::PhysicalPath)
+        );
+        std::fs::set_permissions(&scratch.0, std::fs::Permissions::from_mode(0o755)).unwrap();
+        std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o666)).unwrap();
+        assert_eq!(
+            validate_owner_only_authority(&parts(&file), false),
+            Err(ProfileReadError::PhysicalPath)
+        );
+        assert!(is_physical_directory(&components(&scratch.0)));
+        assert!(!is_physical_directory(&components(&file)));
+        assert!(has_no_symlink_component(&components(&file)));
+        symlink(&scratch.0, scratch.0.join("link")).unwrap();
+        assert!(!has_no_symlink_component(&components(
+            &scratch.0.join("link/descriptor.json")
+        )));
+    }
+
+    #[test]
+    fn a_private_directory_is_created_owner_only_and_never_through_a_link() {
+        let scratch = scratch();
+        std::fs::set_permissions(&scratch.0, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let parts = |path: &Path| match components(path) {
+            ProfilePath::Components(parts) => parts,
+            ProfilePath::InodeAlias { .. } => unreachable!(),
+        };
+        let private = scratch.0.join("state/snapshots");
+        let directory = open_or_create_owner_private_directory(&parts(&private)).unwrap();
+        assert!(directory.metadata().unwrap().is_dir());
+        for path in [scratch.0.join("state"), private.clone()] {
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+        }
+        // An existing leaf is made owner-only through its descriptor.
+        std::fs::set_permissions(&private, std::fs::Permissions::from_mode(0o755)).unwrap();
+        open_or_create_owner_private_directory(&parts(&private)).unwrap();
+        assert_eq!(
+            std::fs::metadata(&private).unwrap().permissions().mode() & 0o777,
+            0o700
+        );
+        let foreign = scratch.0.join("foreign");
+        std::fs::create_dir(&foreign).unwrap();
+        symlink(&foreign, scratch.0.join("linked")).unwrap();
+        assert_eq!(
+            open_or_create_owner_private_directory(&parts(&scratch.0.join("linked"))).err(),
+            Some(ProfileReadError::Open)
+        );
+        assert_eq!(
+            std::fs::metadata(&foreign).unwrap().permissions().mode() & 0o777,
+            0o755
         );
     }
 }

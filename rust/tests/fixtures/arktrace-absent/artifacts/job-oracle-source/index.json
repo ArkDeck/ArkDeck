@@ -1,0 +1,35 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-f78f28e3d5d6d689f5058740d02fcdc0",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 35,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "application\/octet-stream",
+      "name" : "trace.htrace",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-ARKTRACEABSENT",
+      "sha256" : "bb3389345c26715a2537d05fe626d4c77f3f226a38feee8cf51795f71edd37e6",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-trace"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

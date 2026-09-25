@@ -1,0 +1,11 @@
+{
+  "files" : {
+    "analyzer" : "050035b4c3fb856ac982e8bcf72dbdc26600d05df5a9413ab44ca008d19ba37b",
+    "artifacts/job-oracle-source/ART-f78f28e3d5d6d689f5058740d02fcdc0" : "bb3389345c26715a2537d05fe626d4c77f3f226a38feee8cf51795f71edd37e6",
+    "artifacts/job-oracle-source/index.json" : "3ca9dc960bc47fe0c573fdeffc8c0d036bfbd63dbfa3cb60eb62169157008f37",
+    "cases.json" : "c56097fdf99181c6d9625d2070abfa6b41fb5f808d780b91e1b750a35060eae6"
+  },
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "ArkTraceAbsentOracleContractTests.testSwiftAnswersTheArkTraceAnalyzersWithoutArkTrace",
+  "root" : "/private/tmp/arkdeck-job-plan-oracle"
+}

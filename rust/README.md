@@ -2318,6 +2318,32 @@ an isolated Runtime, by `job.run` and by `agent.run`;
 for byte
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
 
+## ArkTrace analyzers and distribution loader (TASK-XPA-015)
+
+`analyzer.summarize-trace@1` and `analyzer.analyze-trace@1` run the reviewed
+ArkTrace CLI a host names with `ARKDECK_ARKTRACE_DESCRIPTOR`. Without one, the
+daemon's composition (`hilog_summary_analyzer::composed`) names both analyzers
+unavailable as Swift's does, `analyzer.arktraceNotFound`, and `job.plan` and
+`job.submit` refuse them by that reason before admission
+(`JobPlanner::unmaterialized_analyzer`). A named descriptor is not loaded yet.
+
+The loader is ported: `arkdeck_hoststore::ArkTraceProfileLoader` reads the
+descriptor and the distribution manifest as Swift's bounded physical reader
+and JSON readers read them, checks every executable, parser file and receipt
+against the manifest, copies the distribution into a private generation named
+by its tree digest (`arkdeck_platform::tree_snapshot`, `copy_tree_snapshot`:
+Swift's `ArkTraceDistributionTreeHasher`), and returns the two profiles with
+their pinned files and trees, after a trust checker and a doctor probe
+(`DistributionTrust`, `DoctorProbe`). `runtime_availability` measures every
+profile's pins again at each read (`analyzer.profileIdentityDrift`).
+
+`rust/tests/fixtures/arktrace-profile-loader/` is Swift's loader over 46
+distributions (`ArkTraceProfileLoaderOracleContractTests`) and
+`rust/tests/fixtures/arktrace-absent/` Swift's answers without a descriptor
+(`ArkTraceAbsentOracleContractTests`). `cargo test -p arkdeck-hoststore --test
+arktrace_profile_loader --test arktrace_absent` replays both byte for byte
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

@@ -60,17 +60,30 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
 /// HiLog summary too when it is this daemon's own executable, hashed as
 /// Swift's `FixedExecutableResolver` hashes `Bundle.main.executableURL`;
 /// otherwise the HiLog summary is unavailable by name.
-pub(crate) fn composed(path: Option<&Path>) -> io::Result<Option<AnalyzerProfiles>> {
-    let Some(path) = path else {
-        return Ok(None);
+///
+/// Without `ARKDECK_ARKTRACE_DESCRIPTOR` (`arktrace_descriptor` false), the
+/// two ArkTrace analyzers are unavailable as Swift names them,
+/// `analyzer.arktraceNotFound`. A named descriptor is not loaded here yet:
+/// its analyzers stay without a profile and their operations without an
+/// executor, and the production start names the variable as unread.
+pub(crate) fn composed(
+    path: Option<&Path>,
+    arktrace_descriptor: bool,
+) -> io::Result<Option<AnalyzerProfiles>> {
+    let profiles = match path {
+        None => AnalyzerProfiles::default(),
+        Some(path) => {
+            let analyzer = AnalyzerProfile::crash_signature(path)?;
+            let own = std::env::current_exe()
+                .ok()
+                .and_then(|own| AnalyzerProfile::hilog_summary(&own).ok())
+                .map(|own| own.executable_sha256);
+            AnalyzerProfiles::for_daemon_analyzer(analyzer, own.as_deref())
+        }
     };
-    let analyzer = AnalyzerProfile::crash_signature(path)?;
-    let own = std::env::current_exe()
-        .ok()
-        .and_then(|own| AnalyzerProfile::hilog_summary(&own).ok())
-        .map(|own| own.executable_sha256);
-    Ok(Some(AnalyzerProfiles::for_daemon_analyzer(
-        analyzer,
-        own.as_deref(),
-    )))
+    Ok(Some(if arktrace_descriptor {
+        profiles
+    } else {
+        profiles.without_arktrace()
+    }))
 }

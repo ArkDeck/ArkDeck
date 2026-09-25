@@ -1,0 +1,2649 @@
+[
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/valid/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "valid",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/valid/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 59,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Info.plist",
+              "requireExecutable" : false,
+              "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+            },
+            {
+              "byteCount" : 61,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+              "requireExecutable" : true,
+              "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+              "requireExecutable" : false,
+              "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "validTreeTrust",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "tree",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/validTreeTrust/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 59,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+              "requireExecutable" : false,
+              "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+            },
+            {
+              "byteCount" : 61,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+              "requireExecutable" : true,
+              "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+              "requireExecutable" : false,
+              "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      },
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 59,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+              "requireExecutable" : false,
+              "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+            },
+            {
+              "byteCount" : 61,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+              "requireExecutable" : true,
+              "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+              "requireExecutable" : false,
+              "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "snapshot",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      },
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 59,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Info.plist",
+                "requireExecutable" : false,
+                "sha256" : "da9e000e775cea9af553cf3f3435b75e1075e0ea3e169c50d59f1f11212b8b85"
+              },
+              {
+                "byteCount" : 61,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/MacOS/arktrace",
+                "requireExecutable" : true,
+                "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources/license-inventory.json",
+                "requireExecutable" : false,
+                "sha256" : "c7cd6b30bc50053f32aa9d15c3bd6ba99538caf601f3ca02c98d4630ba687672"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : "state/arktrace-profile-snapshots",
+    "trust" : "tree",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      },
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      },
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      },
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshot/state/arktrace-profile-snapshots/e93067e0dda8fdb729889e3f243a341eb32cf5eeb7dfab36c83df0f471efaca8/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootLink/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "snapshotRootLink",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "other"
+      }
+    ],
+    "snapshotRoot" : "arktrace-profile-snapshots",
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootLink/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootLink/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootLink/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootReplaced/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : "replaceBoundSnapshotRoot",
+    "name" : "snapshotRootReplaced",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : "bound-snapshot-root",
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootReplaced/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootReplaced/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/snapshotRootReplaced/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : "collideFinalGeneration",
+    "name" : "publicationCollision",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      },
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : "collision-snapshot-root",
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      },
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/publicationCollision/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorMissing/missing.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorMissing",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceNotFound",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorWritable/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorWritable",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorLinkedRoot/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorLinkedRoot",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceNotFound",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorNotJSON/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorNotJSON",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorArray/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorArray",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorExtraKey/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorExtraKey",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormat2/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorFormat2",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatString/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorFormatString",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "descriptorFormatFloat",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatFloat/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "descriptorFormatTrue",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3238,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFormatTrue/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorRelativeRoot/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorRelativeRoot",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorUppercaseDigest/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorUppercaseDigest",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorFullwidthDigest/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorFullwidthDigest",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceManifestDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorDuplicateKey/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorDuplicateKey",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/descriptorTooLarge/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "descriptorTooLarge",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/rootMissing/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "rootMissing",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceNotFound",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/rootWritable/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "rootWritable",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestMissing/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestMissing",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceManifestDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestAppended/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestAppended",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceManifestDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestDuplicateKey/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestDuplicateKey",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestExtraKey/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestExtraKey",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestProductVersion/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestProductVersion",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3240,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "e92068d4e6877fb4875808e92b837a753e30d7dbc1069ba9416e388e2da3e550"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "manifestByteCountFloat",
+    "outcomes" : [
+      {
+        "profiles" : [
+          {
+            "analyzerRef" : "trace-summary@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : null,
+            "arkTraceSummaryContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+              "summary",
+              "--json",
+              "--no-cache",
+              "--timeout-ms",
+              "30000",
+              "--max-rows",
+              "1000",
+              "--max-events",
+              "10000",
+              "--max-output-bytes",
+              "8388608"
+            ],
+            "outputByteBudget" : 8388608,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3240,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "e92068d4e6877fb4875808e92b837a753e30d7dbc1069ba9416e388e2da3e550"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 30
+          },
+          {
+            "analyzerRef" : "trace-analysis@1",
+            "analyzerVersion" : "0.1.0+1",
+            "arkTraceAnalysisContract" : {
+              "indexSchemaVersion" : 3,
+              "parserAdapterVersion" : "1",
+              "parserBuildRecipeVersion" : "7777777777777777777777777777777777777777777777777777777777777777",
+              "parserSHA256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586",
+              "parserUpstreamRevision" : "6666666666666666666666666666666666666666",
+              "parserVersion" : "4.3.7",
+              "schemaAdapterVersion" : "2",
+              "toolVersion" : "0.1.0"
+            },
+            "arkTraceSummaryContract" : null,
+            "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+            "executablePath" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+            "executableSHA256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+            "fixedArguments" : [
+
+            ],
+            "outputByteBudget" : 67108864,
+            "pinnedFiles" : [
+              {
+                "byteCount" : 63,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+                "requireExecutable" : true,
+                "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+              },
+              {
+                "byteCount" : 16,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+                "requireExecutable" : false,
+                "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+              },
+              {
+                "byteCount" : 20,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+              },
+              {
+                "byteCount" : 3240,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/distribution-manifest.json",
+                "requireExecutable" : false,
+                "sha256" : "e92068d4e6877fb4875808e92b837a753e30d7dbc1069ba9416e388e2da3e550"
+              },
+              {
+                "byteCount" : 22,
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/notarization-receipt.json",
+                "requireExecutable" : false,
+                "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+              }
+            ],
+            "pinnedTrees" : [
+              {
+                "path" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+                "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+              }
+            ],
+            "preflightAvailable" : true,
+            "timeoutSeconds" : 120
+          }
+        ]
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountFloat/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestByteCountString/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestByteCountString",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestStapledNumber/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestStapledNumber",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestReceiptTraversal/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestReceiptTraversal",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/manifestResourceBundleAbsolute/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "manifestResourceBundleAbsolute",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/toolDrift/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "toolDrift",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceToolDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/toolNotExecutable/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "toolNotExecutable",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceToolDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/parserDrift/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "parserDrift",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceParserDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/parserManifestDrift/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "parserManifestDrift",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceParserDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/signingRecordDrift/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "signingRecordDrift",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceParserDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/receiptMissing/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "receiptMissing",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/receiptDrift/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "receiptDrift",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceParserDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/trustRefused/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "trustRefused",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "refuse",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/trustRefused/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/trustRefused/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/trustRefused/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/trustReplacesRoot/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "trustReplacesRoot",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceManifestDrift",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "replaceRoot",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/trustReplacesRoot/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/trustReplacesRoot/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/trustReplacesRoot/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/descriptor.json",
+    "doctor" : false,
+    "doctorContracts" : [
+      {
+        "executable" : {
+          "canonicalNamespaceRoot" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app",
+          "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/MacOS/arktrace",
+          "sha256" : "575a8a7d3b8d072103f174c073ebe61a947536ca4221ed6218dc716145d152c5",
+          "verifiedResources" : [
+            {
+              "byteCount" : 63,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+              "requireExecutable" : true,
+              "sha256" : "9e9c5cff421b9f080b1d8cd4bcdfcc34c5cae516dcd7e5628be6be47b9e58586"
+            },
+            {
+              "byteCount" : 16,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/distribution-signing.json",
+              "requireExecutable" : false,
+              "sha256" : "c8fb5fce1986f98b2ea49ce8ad2d64c70c2d00a6a6c30aa797a51275ff1bb7f0"
+            },
+            {
+              "byteCount" : 20,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/Resources/TraceStreamer/manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "7d17b886999f1d25a24b22afa8333771c33e8166116813aa5a0b86bf6f3607d4"
+            },
+            {
+              "byteCount" : 3238,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/distribution-manifest.json",
+              "requireExecutable" : false,
+              "sha256" : "48c3ccd4632c7ab8dce8d3710de911368d8bbbb96b9228953b7c35c076755bf7"
+            },
+            {
+              "byteCount" : 22,
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/notarization-receipt.json",
+              "requireExecutable" : false,
+              "sha256" : "bc72546274ce63789440246f147bafadfc2fd39ea9c594ee2cbe2f2c35b84a7a"
+            }
+          ],
+          "verifiedTrees" : [
+            {
+              "path" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app",
+              "sha256" : "8c7bc06bac6bcddd402180f0df107ea6b1e4eeb4a4ccb6e1fbe3d428cee4102a"
+            }
+          ]
+        },
+        "outputByteBudget" : 262144,
+        "productVersion" : "0.1.0",
+        "timeoutSeconds" : 120
+      }
+    ],
+    "hook" : null,
+    "name" : "doctorFails",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceSelfTestFailed",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/doctorFails/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/layoutLinkedHelpers/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "layoutLinkedHelpers",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/ancestorWritable/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "ancestorWritable",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceDescriptorInvalid",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+
+    ]
+  },
+  {
+    "descriptor" : "/private/tmp/arkdeck-arktrace-oracle/treeEntryWritable/descriptor.json",
+    "doctor" : true,
+    "doctorContracts" : [
+
+    ],
+    "hook" : null,
+    "name" : "treeEntryWritable",
+    "outcomes" : [
+      {
+        "error" : "analyzer.arktraceContractMismatch",
+        "thrown" : "profile"
+      }
+    ],
+    "snapshotRoot" : null,
+    "trust" : "digest",
+    "trustContracts" : [
+      {
+        "appCodeDirectoryHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "appPath" : "/private/tmp/arkdeck-arktrace-oracle/treeEntryWritable/distribution/ArkTraceCLI.app",
+        "appTreeSHA256" : "8888888888888888888888888888888888888888888888888888888888888888",
+        "bundleIdentifier" : "com.arktrace.ArkTrace.CLI",
+        "certificateSHA1" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "helperCodeDirectoryHash" : "5555555555555555555555555555555555555555",
+        "helperPath" : "/private/tmp/arkdeck-arktrace-oracle/treeEntryWritable/distribution/ArkTraceCLI.app/Contents/Helpers/trace_streamer",
+        "productBuild" : "1",
+        "productVersion" : "0.1.0",
+        "resourcePath" : "/private/tmp/arkdeck-arktrace-oracle/treeEntryWritable/distribution/ArkTraceCLI.app/Contents/Resources/ArkTraceCLIResources",
+        "resourceTreeSHA256" : "9999999999999999999999999999999999999999999999999999999999999999",
+        "signingIdentity" : "Developer ID Application: Oracle",
+        "teamIdentifier" : "TEAM123456"
+      }
+    ]
+  }
+]

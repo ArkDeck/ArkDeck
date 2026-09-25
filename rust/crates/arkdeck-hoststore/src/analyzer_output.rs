@@ -247,6 +247,11 @@ mod tests {
             fixed_arguments: Vec::new(),
             timeout_seconds: 30,
             output_byte_budget: budget,
+            canonical_namespace_root: None,
+            pinned_files: Vec::new(),
+            pinned_trees: Vec::new(),
+            arktrace_summary: None,
+            arktrace_analysis: None,
         }
     }
 
