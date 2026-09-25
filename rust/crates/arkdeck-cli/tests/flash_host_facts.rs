@@ -1,9 +1,9 @@
-//! `arkdeck flash bootloader-status`, `arkdeck flash prerequisites` and
-//! `arkdeck flash device-access` against a fake Runtime that answers what
-//! Swift's daemon answered (the Flash host facts oracle,
-//! `rust/tests/fixtures/flash-host-facts`, and the committed control frames):
-//! each leaf sends exactly its one request, the profile under the Runtime's
-//! name for it, and emits the Runtime's answer.
+//! `arkdeck flash bootloader-status`, `arkdeck flash prerequisites`,
+//! `arkdeck flash lane-preview` and `arkdeck flash device-access` against a
+//! fake Runtime that answers what Swift's daemon answered (the Flash host
+//! facts oracle, `rust/tests/fixtures/flash-host-facts`, and the committed
+//! control frames): each leaf sends exactly its one request, the profile under
+//! the Runtime's name for it, and emits the Runtime's answer.
 // The fake Runtime these leaves are driven against is a Unix socket.
 #[cfg(target_os = "macos")]
 mod support;
@@ -207,6 +207,129 @@ mod runtime {
             assert_eq!(output.status.code(), Some(64), "{argv:?}");
             let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
             assert_eq!(envelope["command"], "flash.prerequisites");
+            assert_eq!(envelope["error"]["code"], "invalidOption");
+            assert_eq!(envelope["error"]["message"], message);
+        }
+    }
+
+    /// `flash lane-preview` sends the profile as the Runtime's
+    /// `profileReference` and the archive digest as given, under the 1.x
+    /// wire method Swift's handler keeps, and emits every state the Runtime
+    /// answers (the answers of Swift's committed control frames).
+    #[test]
+    fn lane_preview_sends_its_three_parameters_under_the_1x_method() {
+        let digest = "e".repeat(64);
+        let argv = [
+            "flash",
+            "lane-preview",
+            "--target",
+            "TGT-aaaaaaaaaaaa",
+            "--device-profile",
+            "dayu200",
+            "--archive-sha256",
+            &digest,
+        ];
+        let params = json!({"targetId":"TGT-aaaaaaaaaaaa","profileReference":"dayu200",
+            "archiveSha256":digest});
+        for result in [
+            json!({"availability":"unavailable","bindingRevision":1,
+                "reason":"maturity is hardwareGated","state":"planNotExecutable",
+                "targetId":"TGT-aaaaaaaaaaaa","unknowns":["RK-M02: combination is hardwareGated"]}),
+            json!({"bindingRevision":1,"observationMode":"hdc-normal","planId":"PLAN-preview",
+                "planSha256":"d".repeat(64),"state":"available","targetId":"TGT-aaaaaaaaaaaa"}),
+            json!({"bindingRevision":1,"state":"laneNotComposed","targetId":"TGT-aaaaaaaaaaaa"}),
+        ] {
+            let (output, envelope) = support::run_session(
+                &argv,
+                vec![
+                    health(),
+                    (
+                        "flash.lanePlanPreview".to_owned(),
+                        params.clone(),
+                        json!({"ok":true,"result":result}),
+                    ),
+                ],
+            );
+            assert_eq!(output.status.code(), Some(0), "{envelope}");
+            assert_eq!(envelope["command"], "flash.lane-preview");
+            assert_eq!(envelope["result"], result);
+            assert!(envelope["meta"].get("lifecycle").is_none());
+        }
+
+        // Which Target and archive the preview names is the Runtime's to
+        // judge; its refusal reaches the caller with its words.
+        let (output, envelope) = support::run_session(
+            &argv,
+            vec![
+                health(),
+                (
+                    "flash.lanePlanPreview".to_owned(),
+                    params,
+                    json!({"ok":false,"error":{"code":"notFound",
+                        "message":"target is not adopted"}}),
+                ),
+            ],
+        );
+        assert_ne!(output.status.code(), Some(0));
+        assert_eq!(envelope["error"]["code"], "resourceNotFound");
+        assert_eq!(envelope["error"]["message"], "target is not adopted");
+    }
+
+    /// What Swift's registry parser refuses never reaches the Runtime: each
+    /// required option in the registry's order, then the digest's grammar,
+    /// 64 lowercase hex digits (stricter than the Runtime, which takes any
+    /// case).
+    #[test]
+    fn lane_preview_refuses_at_parse_what_swifts_registry_refuses() {
+        let digest = "e".repeat(64);
+        let upper = "E".repeat(64);
+        let short = "e".repeat(63);
+        let grammar = "`flash lane-preview` --archive-sha256 must be 64 lowercase hex digits";
+        for (options, message) in [
+            (
+                vec!["--device-profile", "dayu200", "--archive-sha256", &digest],
+                "flash lane-preview requires --target",
+            ),
+            (
+                vec!["--target", "TGT-HOST", "--archive-sha256", &digest],
+                "flash lane-preview requires --device-profile",
+            ),
+            (
+                vec!["--target", "TGT-HOST", "--device-profile", "dayu200"],
+                "flash lane-preview requires --archive-sha256",
+            ),
+            (
+                vec![
+                    "--target",
+                    "TGT-HOST",
+                    "--device-profile",
+                    "dayu200",
+                    "--archive-sha256",
+                    &upper,
+                ],
+                grammar,
+            ),
+            (
+                vec![
+                    "--target",
+                    "TGT-HOST",
+                    "--device-profile",
+                    "dayu200",
+                    "--archive-sha256",
+                    &short,
+                ],
+                grammar,
+            ),
+        ] {
+            let output = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+                .args(["flash", "lane-preview"])
+                .args(&options)
+                .args(["--output", "json", "--socket", "/nonexistent/arkdeck.sock"])
+                .output()
+                .unwrap();
+            assert_eq!(output.status.code(), Some(64), "{options:?}");
+            let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(envelope["command"], "flash.lane-preview");
             assert_eq!(envelope["error"]["code"], "invalidOption");
             assert_eq!(envelope["error"]["message"], message);
         }

@@ -322,8 +322,9 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         assert!(script.contains("runtime tool select"), "{shell}");
         assert!(script.contains("debug probe"), "{shell}");
         assert!(script.contains("--expected-active-generation"), "{shell}");
+        assert!(script.contains("flash lane-preview"), "{shell}");
         assert!(
-            !script.contains("flash lane-preview"),
+            !script.contains("flash install-binding"),
             "{shell} names a leaf this CLI refuses"
         );
     }
