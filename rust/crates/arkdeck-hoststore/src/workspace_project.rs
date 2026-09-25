@@ -312,19 +312,6 @@ fn validate_records(document: &Value) -> Result<Vec<Record>, WireError> {
     presets::validate(document, &refs)?;
     Ok(records)
 }
-/// `workspace.project.show` as the published contract still has it: an
-/// operation's reason and code are `null`, available or not. Swift answers
-/// them as `list` does; the widened schema is its own change (#2197), and
-/// until it lands a `show` carrying them would be rewritten.
-fn without_operation_reasons(mut value: Value) -> Value {
-    if let Some(operations) = value["operations"].as_array_mut() {
-        for operation in operations {
-            operation["reason"] = Value::Null;
-            operation["reasonCode"] = Value::Null;
-        }
-    }
-    value
-}
 /// A registration's projection awaiting a restart: nothing composed for it.
 fn resource(r: &Record) -> Value {
     json!({"schemaVersion":"arkdeck.workspace-project/1","projectRef":r.project_ref,"generation":r.generation.to_string(),"kind":r.kind,"registeredAtUtc":r.registered_at,"updatedAtUtc":r.updated_at,"configurationStatus":"runtimeRestartRequired","availability":"unavailable","reasonCode":"workspace_runtime_restart_required","reason":"restart the Runtime to compose the registered root before submitting a workspace Job","allowedFileGlobs":[],"presetRefs":[],"operations":[]})
@@ -770,7 +757,7 @@ impl WorkspaceProjectStore {
                     next.records
                         .iter()
                         .find(|r| Some(r.project_ref.as_str()) == params["projectRef"].as_str())
-                        .map(|record| without_operation_reasons(self.projection(record)))
+                        .map(|record| self.projection(record))
                         .ok_or_else(|| {
                             failure(
                                 "workspaceReferenceNotFound",

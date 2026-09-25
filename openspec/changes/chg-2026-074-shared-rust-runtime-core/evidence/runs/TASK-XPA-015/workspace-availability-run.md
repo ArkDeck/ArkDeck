@@ -193,4 +193,12 @@ With `CARGO_BUILD_JOBS=2` and this tree's own target; logs are
 
 ## CI
 
-Pending.
+PR #2199, merged as `e10bc6898`: at `d8d71d49f` Agent PR 36155414321
+(`open-pr`), SDD Guard 36155414458 (`guard`, `ds-tokens`) and Swift CI
+36155414634 (`plan`, `swift-tests`, `ds-interactions`, the Rust
+host-independent checks, the Rust workspace on ubuntu-latest, macos-26 and
+windows-latest, and the `swift` aggregate; `app-build` skipped by the plan)
+all succeeded. The independent review that followed found no blocking
+defect; its F1 and F2 went into #2204, its F3 into its own change, and the
+declared `show` difference is removed once #2197 lands
+(`workspace-project-show-reasons-run.md`).
