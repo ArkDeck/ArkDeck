@@ -59,7 +59,11 @@ pub(crate) fn configure(
     if help
         || !matches!(
             command,
-            "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export"
+            "artifact.list"
+                | "artifact.inspect"
+                | "artifact.read"
+                | "artifact.export"
+                | "trace.export"
         )
     {
         return Ok(None);
@@ -155,7 +159,7 @@ pub(crate) fn configure(
         }
         fields.entry("allowSensitive").or_insert(json!(false));
     }
-    if command == "artifact.export" {
+    if matches!(command, "artifact.export" | "trace.export") {
         let destination = fields.remove("destinationPath").ok_or_else(|| {
             CliError::new("invalidOption", "Artifact export requires --destination")
         })?;
@@ -437,6 +441,28 @@ fn export_destination(input: &str) -> Result<String, CliError> {
         .ok_or_else(invalid)?;
     Ok(text.into())
 }
+/// Swift `trace export`: `artifact export` of a Job's Artifact that must be
+/// the one Trace a diagnostics capture publishes. Judged on the inspected
+/// metadata, before anything is exported.
+pub fn require_trace_artifact(metadata: &Value) -> Result<(), CliError> {
+    if metadata["sourceOperation"] != "capture.diagnostics@1" {
+        return Err(CliError::new(
+            "invalidInput",
+            "selected Artifact does not belong to capture.diagnostics@1",
+        ));
+    }
+    if metadata["name"] != "trace.htrace"
+        || metadata["mediaType"] != "application/octet-stream"
+        || metadata["privacy"] != "sensitive"
+    {
+        return Err(CliError::new(
+            "invalidInput",
+            "selected Artifact does not match the required typed resource",
+        ));
+    }
+    Ok(())
+}
+
 /// Resolve the user's explicit local destination without probing or creating it.
 /// The owner still authenticates the directory and performs all publication.
 pub fn artifact_export_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {

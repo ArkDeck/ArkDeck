@@ -221,7 +221,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     }
     if matches!(
         invocation.command,
-        "artifact.inspect" | "artifact.read" | "artifact.export"
+        "artifact.inspect" | "artifact.read" | "artifact.export" | "trace.export"
     ) {
         let mut client = Client::connect_bounded(
             &endpoint,
@@ -241,10 +241,13 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             .request(id, "artifact.inspect", Some(inspect_params))
             .map_err(|error| CliError::from_client(error, "artifact.inspect"))?;
         arkdeck_cli::validate_artifact_metadata(params, &metadata)?;
+        if invocation.command == "trace.export" {
+            arkdeck_cli::require_trace_artifact(&metadata)?;
+        }
         if invocation.command == "artifact.inspect" {
             return Ok(metadata);
         }
-        if invocation.command == "artifact.export" {
+        if matches!(invocation.command, "artifact.export" | "trace.export") {
             let params = arkdeck_cli::artifact_export_params(invocation)?;
             let result = client
                 .request(id, "artifact.export", Some(params))
