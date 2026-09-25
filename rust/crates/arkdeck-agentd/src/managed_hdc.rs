@@ -27,7 +27,9 @@
 //! Occupied`), so a replacement a crashed Runtime left keeps the next start
 //! refused until that server ends.
 use arkdeck_control::ManagedToolFacts;
-use arkdeck_platform::{LoopbackServerLease, ServerStop, VerifiedTool, end_proved_process};
+use arkdeck_platform::{
+    LoopbackServerLease, ServerExit, ServerStop, VerifiedTool, end_proved_process,
+};
 use arkdeck_provider_hdc::{
     CommandlessIdentity, DispatchFailure, EndpointSelection, HdcDispatch, HdcStatusObserver,
     ManagedHdcServer, ManagedLaunch, NativeSignature, ProcessDispatch, ProcessPlan, Receipt,
@@ -298,6 +300,7 @@ impl ManagedHdc {
         );
         *self.supervisor.lock().ok()? = None;
         let server = self.server.lock().ok()?.take()?;
+        let pid = server.launch().pid;
         let server = server.stop();
         let replacement = match ownership {
             DispatchOwnership::Replacement(lease) => self.end_replacement(&lease),
@@ -305,6 +308,7 @@ impl ManagedHdc {
             DispatchOwnership::Original | DispatchOwnership::Stopped => ReplacementStop::None,
         };
         Some(Stop {
+            pid,
             server,
             replacement,
         })
@@ -360,10 +364,94 @@ const KILL_GRACE: Duration = Duration::from_secs(1);
 /// What the daemon's stop ended.
 #[derive(Debug)]
 pub(crate) struct Stop {
+    /// The original foreground child's PID, as its launch recorded it.
+    pub(crate) pid: i32,
     /// The original foreground child, as its stop collected it.
     pub(crate) server: io::Result<ServerStop>,
     /// What became of a server a confirmed restart started.
     pub(crate) replacement: ReplacementStop,
+}
+
+impl Stop {
+    /// What the daemon reports of this stop, a line each. After its drain it
+    /// names only a failure; a daemon exiting without its drain names the
+    /// server it stopped, by PID, and how that server ended. Both name what
+    /// became of a replacement.
+    pub(crate) fn report(&self, drained: bool) -> Vec<String> {
+        let mut lines = Vec::new();
+        match (&self.server, drained) {
+            (Ok(_), true) => {}
+            (Err(error), true) => {
+                lines.push(format!("the managed HDC server's stop failed: {error}"));
+            }
+            (Ok(stopped), false) => lines.push(format!(
+                "stopped the managed HDC server this daemon launched (pid {}), which {}",
+                self.pid,
+                match stopped.exit {
+                    ServerExit::Exited(status) => format!("exited with status {status}"),
+                    ServerExit::Signalled(signal) => format!("ended on signal {signal}"),
+                }
+            )),
+            (Err(error), false) => lines.push(format!(
+                "the managed HDC server this daemon launched (pid {}) did not stop: {error}",
+                self.pid
+            )),
+        }
+        match &self.replacement {
+            ReplacementStop::None => {}
+            ReplacementStop::Ended => {
+                lines.push("ended the replacement HDC server a confirmed restart proved".into());
+            }
+            ReplacementStop::Uncertain => lines.push(
+                "an HDC restart's outcome is uncertain; whatever it left on the endpoint was not \
+                 stopped"
+                    .into(),
+            ),
+            ReplacementStop::Unproved(reason) | ReplacementStop::Survived(reason) => {
+                lines.push(reason.clone());
+            }
+        }
+        lines
+    }
+}
+
+/// The managed server a daemon launched, which the daemon stops after its
+/// drain (`stop`). A daemon that ends before then — a start failing after the
+/// launch, or serving ending in an error — drops this, and the drop stops the
+/// server there and then, in the thread that drops it, whoever else still
+/// holds it: the foreground-exit monitor holds it for a moment every time it
+/// looks, and a daemon that exited while only the monitor held it would
+/// leave the server running as nobody's child, keeping the endpoint from the
+/// next start (TASK-XPA-014). The drop reports what it stopped on stderr.
+pub(crate) struct Launched {
+    server: Arc<ManagedHdc>,
+}
+
+impl Launched {
+    pub(crate) fn new(server: ManagedHdc) -> Self {
+        Self {
+            server: Arc::new(server),
+        }
+    }
+
+    pub(crate) fn server(&self) -> &Arc<ManagedHdc> {
+        &self.server
+    }
+
+    /// The daemon's stop after its drain (`ManagedHdc::stop`); once only.
+    pub(crate) fn stop(&self) -> Option<Stop> {
+        self.server.stop()
+    }
+}
+
+impl Drop for Launched {
+    fn drop(&mut self) {
+        if let Some(stopped) = self.server.stop() {
+            for line in stopped.report(false) {
+                eprintln!("arkdeck-agentd: {line}");
+            }
+        }
+    }
 }
 
 /// What the daemon's stop did about a server a confirmed restart started.

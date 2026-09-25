@@ -29,6 +29,8 @@ mod crash_symbolizer_mode;
 #[cfg(target_os = "macos")]
 mod cutover_preflight;
 #[cfg(target_os = "macos")]
+mod development_admission;
+#[cfg(target_os = "macos")]
 mod development_mutation;
 #[cfg(target_os = "macos")]
 mod development_usb;
@@ -80,16 +82,32 @@ struct DevelopmentHdc {
     dispatch: arkdeck_provider_hdc::ProcessDispatch,
     /// Its measured digest: the managed-control tool an ArkForge lane binds.
     sha256: String,
-    managed: Option<Arc<managed_hdc::ManagedHdc>>,
+    /// The managed server this owner launched, which it stops last.
+    managed: Option<managed_hdc::Launched>,
     /// Whether its digest is a registered HDC's, which it then is only as
     /// the managed server this owner started.
     registered: bool,
 }
 
+/// The development HDC the admission names, measured and admitted, and not
+/// started yet.
+#[cfg(target_os = "macos")]
+struct MeasuredHdc {
+    path: std::path::PathBuf,
+    sha256: String,
+    registered: bool,
+    /// The tool the managed server is launched from, and its endpoint.
+    managed: Option<(
+        arkdeck_platform::VerifiedTool,
+        arkdeck_provider_hdc::EndpointSelection,
+    )>,
+    dispatch: arkdeck_platform::VerifiedTool,
+}
+
 /// The isolated owner's development HDC, named by
-/// `ARKDECK_DEVELOPMENT_HDC_PATH`, pinned by the digest of its bytes at
-/// startup and dispatched as every HDC plan is (`ProcessDispatch`, with the
-/// server port the daemon inherited).
+/// `ARKDECK_DEVELOPMENT_HDC_PATH` (`development_admission`), pinned by the
+/// digest of its bytes at startup and dispatched as every HDC plan is
+/// (`ProcessDispatch`, with the server port the daemon inherited).
 ///
 /// On its own it must be a fixture: a registered HDC executable would
 /// address a real server and device, which needs the existing-server identity
@@ -102,76 +120,63 @@ struct DevelopmentHdc {
 ///
 /// Development USB relations are read beside a fixture; beside a registered
 /// HDC only when the owner starts it as its managed server and the caller
-/// acknowledges them (`development_usb::admit`). Without them, the owner reads
-/// the Runtime's own USB relations beside that registered HDC and none beside
-/// a fixture (`development_usb::relation_source`).
+/// acknowledges them (`development_usb::admit`): a harness's relations would
+/// otherwise be a trusted fact about a real device that no physical relation
+/// proved (the maintainer's option A of 2026-09-19, whose results are
+/// development-root evidence, never REAL_DEVICE_PASS). Without them, the
+/// owner reads the Runtime's own USB relations beside that registered HDC
+/// and none beside a fixture (`development_usb::relation_source`).
+///
+/// All of it is decided here, before anything is launched: whatever could
+/// refuse the HDC refuses it, and every tool it needs is verified, so that
+/// only the launch itself ([`MeasuredHdc::start`]) remains.
 #[cfg(target_os = "macos")]
-fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error>> {
-    let managed = match std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER") {
-        None => false,
-        Some(mode) if mode == "managed" => true,
-        Some(_) => return Err("ARKDECK_DEVELOPMENT_HDC_SERVER accepts only managed".into()),
-    };
-    let relations = std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some();
-    let acknowledged = development_usb::acknowledged(
-        std::env::var_os(development_usb::REGISTERED_HDC_ACKNOWLEDGMENT).as_deref(),
-    )?;
-    let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH") else {
-        if managed {
-            return Err(
-                "a managed development HDC server needs ARKDECK_DEVELOPMENT_HDC_PATH".into(),
-            );
-        }
-        development_usb::admit(false, false, relations, acknowledged)?;
+fn measured_hdc(
+    admission: &development_admission::Admission,
+) -> Result<Option<MeasuredHdc>, Box<dyn std::error::Error>> {
+    let Some(hdc) = &admission.hdc else {
         return Ok(None);
     };
-    let path = std::path::PathBuf::from(path);
-    if !path.is_absolute() {
-        return Err("ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path".into());
-    }
-    let digest = arkdeck_contract::sha256_hex(&std::fs::read(&path)?);
-    let registered = arkdeck_provider_hdc::HdcReadOnlyProvider::new(
-        arkdeck_platform::VerifiedTool::open(&path, &digest)?,
-    )
-    .is_ok();
-    if registered && !managed {
-        return Err(
-            "the isolated Rust development owner runs a fixture HDC only; a registered HDC \
-             needs the existing-server identity proof"
-                .into(),
-        );
-    }
-    // A harness's relations stand in for the Runtime's own reader beside a
-    // fixture. For a registered HDC they would be a trusted fact about a real
-    // device that no physical relation proved, so they are refused there
-    // unless the owner starts that HDC as its managed server and the caller
-    // acknowledges them: the maintainer's option A of 2026-09-19, whose
-    // results are development-root evidence, never REAL_DEVICE_PASS. Decided
-    // before any server is started.
-    development_usb::admit(registered, managed, relations, acknowledged)?;
-    let managed = if managed {
-        let selection = arkdeck_provider_hdc::EndpointSelection::select(
-            std::env::var_os(arkdeck_provider_hdc::SERVER_PORT_VARIABLE)
-                .map(|port| port.to_string_lossy().into_owned())
-                .as_deref(),
-        )?;
-        Some(Arc::new(managed_hdc::ManagedHdc::start(
-            &arkdeck_platform::VerifiedTool::open(&path, &digest)?,
-            &path.to_string_lossy(),
-            selection,
-        )?))
-    } else {
-        None
+    let sha256 = arkdeck_contract::sha256_hex(&std::fs::read(&hdc.path)?);
+    let tool = || arkdeck_platform::VerifiedTool::open(&hdc.path, &sha256);
+    let registered = arkdeck_provider_hdc::HdcReadOnlyProvider::new(tool()?).is_ok();
+    admission.admit_registration(registered)?;
+    let managed = match hdc.managed {
+        Some(selection) => Some((tool()?, selection)),
+        None => None,
     };
-    Ok(Some(DevelopmentHdc {
-        dispatch: arkdeck_provider_hdc::ProcessDispatch::new(
-            arkdeck_platform::VerifiedTool::open(&path, &digest)?,
-            arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
-        ),
-        sha256: digest,
-        managed,
+    let dispatch = tool()?;
+    Ok(Some(MeasuredHdc {
+        path: hdc.path.clone(),
+        sha256,
         registered,
+        managed,
+        dispatch,
     }))
+}
+
+#[cfg(target_os = "macos")]
+impl MeasuredHdc {
+    /// Launches the managed server, if the admission names one: the first
+    /// thing an isolated start launches. From here the start owns it
+    /// (`managed_hdc::Launched`), and a start that fails stops it.
+    fn start(self) -> Result<DevelopmentHdc, Box<dyn std::error::Error>> {
+        let managed = match self.managed {
+            Some((tool, selection)) => Some(managed_hdc::Launched::new(
+                managed_hdc::ManagedHdc::start(&tool, &self.path.to_string_lossy(), selection)?,
+            )),
+            None => None,
+        };
+        Ok(DevelopmentHdc {
+            dispatch: arkdeck_provider_hdc::ProcessDispatch::new(
+                self.dispatch,
+                arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
+            ),
+            sha256: self.sha256,
+            managed,
+            registered: self.registered,
+        })
+    }
 }
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
@@ -254,6 +259,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
+    // The isolated owner's state root and its development inputs, every
+    // value and every combination of which is decided here, from the
+    // environment, before anything is opened or started: a start they refuse
+    // launches nothing (`development_admission.rs`).
+    #[cfg(target_os = "macos")]
+    let isolated = match &development {
+        Some(root) => Some((
+            root.clone(),
+            development_admission::admit(&|name| std::env::var_os(name))?,
+        )),
+        None => None,
+    };
     #[cfg(target_os = "macos")]
     if development.is_none()
         && let Some(swift) = facade::swift_executable()
@@ -267,9 +284,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // SIGINT are recorded, and the serving loop drains and stops for them.
     #[cfg(unix)]
     let stop = arkdeck_platform::StopSignal::install()?;
-    // The managed server the isolated owner starts, which it stops last.
+    // The managed server the isolated or the production owner starts, which
+    // it stops last; any failure once it is started stops it on the way out
+    // (`managed_hdc::Launched`).
     #[cfg(target_os = "macos")]
-    let mut managed_hdc = None;
+    let mut managed_hdc: Option<managed_hdc::Launched> = None;
     // The ArkForge lane either owner composes, whose daemon it stops after
     // its drain and before the managed server.
     #[cfg(target_os = "macos")]
@@ -294,7 +313,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     #[cfg(target_os = "macos")]
-    let host = if let Some(root) = development {
+    let host = if let Some((root, admission)) = isolated {
         let root = std::path::PathBuf::from(root);
         // LocalListener already authenticates the same-user peer. Require a
         // separate socket beside the explicit development document, never the
@@ -331,8 +350,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         }
         // The managed HDC server this owner is asked to start, whose HDC
         // control-action owner keeps its actions in `hdc-control-actions`.
-        let managed_server = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER")
-            .is_some_and(|mode| mode == "managed");
+        let managed_server = admission.managed();
         directory.validate_path(&root)?;
         let artifacts = root.join("artifacts");
         let trace_parent = directory.child("trace-cache")?;
@@ -462,7 +480,21 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                     &root,
                 )?,
             );
-        let development_hdc = development_hdc()?;
+        // What the development inputs' files decide, before anything is
+        // launched: the HDC's registration against what the admission allows,
+        // and a helper the caller names, whose bytes fail the start if they do
+        // not verify rather than leave native deployment quietly unavailable
+        // (its facts are then exactly this file's).
+        let development_hdc = measured_hdc(&admission)?;
+        let code_sign_helper = admission
+            .code_sign_helper
+            .as_deref()
+            .map(code_sign_helper::verified)
+            .transpose()?;
+        // The managed server, the first thing this owner launches. Nothing
+        // after it refuses an input; a start that fails after it (its Job
+        // recovery, say) stops it on the way out.
+        let development_hdc = development_hdc.map(MeasuredHdc::start).transpose()?;
         let (registered, managed) = development_hdc.as_ref().map_or((false, false), |hdc| {
             (hdc.registered, hdc.managed.is_some())
         });
@@ -473,9 +505,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 managed: Some(managed),
                 ..
             }) => {
-                managed.monitor_foreground_exit()?;
-                managed_hdc = Some(Arc::clone(&managed));
-                host.with_managed_development_hdc(dispatch, managed)
+                let server = Arc::clone(managed.server());
+                managed_hdc = Some(managed);
+                server.monitor_foreground_exit()?;
+                host.with_managed_development_hdc(dispatch, server)
             }
             Some(DevelopmentHdc { dispatch, .. }) => host.with_development_hdc(Some(dispatch)),
             None => host.with_development_hdc(None),
@@ -483,11 +516,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // The USB relations the Target observations read
         // (`development_usb::relation_source`): the file the caller names,
         // beside the fixture or acknowledged beside the registered HDC
-        // (`development_hdc`); without one, beside the registered HDC this
+        // (`measured_hdc`); without one, beside the registered HDC this
         // owner started as its managed server, the Runtime's own census of the
         // host's I/O Registry, Swift's source (the maintainer's decision Q1=B
         // of 2026-09-24); otherwise none.
-        let file = development_usb::DevelopmentUsbRelations::from_environment()?.map(Arc::new);
+        let file = admission
+            .relations
+            .clone()
+            .map(|path| Arc::new(development_usb::DevelopmentUsbRelations::at(path)));
         let source = development_usb::relation_source(registered, managed, file.is_some());
         let host = match source {
             development_usb::RelationSource::File => host.with_usb_relations(
@@ -550,30 +586,21 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 ),
             ));
         arkforge = Some(composed);
-        // Acknowledged, and with the development HDC started as the managed
-        // server, this owner proves a device mutation's state continuity
-        // against its own Job state instead of the installed Runtime's root,
-        // which it can never be (maintainer decision 2026-09-20, as option A
-        // of 2026-09-19). Everything else about that proof, the capability and
-        // the device hold is unchanged, and what it proves about a real device
-        // is development-root evidence, never REAL_DEVICE_PASS.
-        // An isolated development root may name the helper outright; its
-        // bytes are verified here, so the facts a deployment carries are
-        // exactly this file's. A named helper that does not verify fails
-        // startup rather than leaving the operation quietly unavailable.
-        let host = match code_sign_helper::development(
-            std::env::var_os(code_sign_helper::DEVELOPMENT_HELPER).as_deref(),
-        )? {
-            Some(path) => host.with_code_sign_helper(code_sign_helper::verified(&path)?),
+        // The helper an isolated development root names outright, verified
+        // above, in place of the bundle's.
+        let host = match code_sign_helper {
+            Some(helper) => host.with_code_sign_helper(helper),
             None => host,
         };
-        if development_mutation::admit(
-            true,
-            managed_server,
-            development_mutation::acknowledged(
-                std::env::var_os(development_mutation::ACKNOWLEDGMENT).as_deref(),
-            )?,
-        )? {
+        // Acknowledged, and with the development HDC started as the managed
+        // server (`development_admission`), this owner proves a device
+        // mutation's state continuity against its own Job state instead of
+        // the installed Runtime's root, which it can never be (maintainer
+        // decision 2026-09-20, as option A of 2026-09-19). Everything else
+        // about that proof, the capability and the device hold is unchanged,
+        // and what it proves about a real device is development-root
+        // evidence, never REAL_DEVICE_PASS.
+        if admission.mutation_authority {
             host.with_development_mutation_root(root.join("jobs-state"))
         } else {
             host
@@ -834,22 +861,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(managed) = managed_hdc
             && let Some(stopped) = managed.stop()
         {
-            use managed_hdc::ReplacementStop;
-            if let Err(error) = &stopped.server {
-                eprintln!("arkdeck-agentd: the managed HDC server's stop failed: {error}");
-            }
-            match stopped.replacement {
-                ReplacementStop::None => {}
-                ReplacementStop::Ended => eprintln!(
-                    "arkdeck-agentd: ended the replacement HDC server a confirmed restart proved"
-                ),
-                ReplacementStop::Uncertain => eprintln!(
-                    "arkdeck-agentd: an HDC restart's outcome is uncertain; whatever it left on \
-                     the endpoint was not stopped"
-                ),
-                ReplacementStop::Unproved(reason) | ReplacementStop::Survived(reason) => {
-                    eprintln!("arkdeck-agentd: {reason}")
-                }
+            for line in stopped.report(true) {
+                eprintln!("arkdeck-agentd: {line}");
             }
         }
         println!("arkdeck-agentd stopped");

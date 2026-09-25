@@ -457,8 +457,9 @@ where
 /// What [`compose`] composed.
 pub(crate) struct Composition {
     pub(crate) host: Host,
-    /// The managed HDC server it started, which the daemon stops last.
-    pub(crate) managed: Option<Arc<crate::managed_hdc::ManagedHdc>>,
+    /// The managed HDC server it started, which the daemon stops last; a
+    /// start that fails once it is started stops it (`Launched`).
+    pub(crate) managed: Option<crate::managed_hdc::Launched>,
     /// The ArkForge lane, or why there is none; its daemon is stopped after
     /// the drain, before the managed HDC server.
     pub(crate) arkforge: crate::arkforge_lane::Composed,
@@ -636,12 +637,12 @@ pub(crate) fn compose(
             };
             let endpoint =
                 arkdeck_provider_hdc::EndpointSelection::select(inputs.server_port.as_deref())?;
-            let managed = Arc::new(crate::managed_hdc::ManagedHdc::start(
+            let managed = crate::managed_hdc::Launched::new(crate::managed_hdc::ManagedHdc::start(
                 &tool()?,
                 &selection.executable.to_string_lossy(),
                 endpoint,
             )?);
-            managed.monitor_foreground_exit()?;
+            managed.server().monitor_foreground_exit()?;
             state
                 .private_child("hdc-control-actions")?
                 .validate_path(&layout.hdc_control_actions)?;
@@ -653,7 +654,7 @@ pub(crate) fn compose(
                 arkdeck_provider_hdc::ProcessDispatch::new(tool()?, inputs.server_port.as_deref());
             (
                 host.with_control_actions(controls)
-                    .with_managed_development_hdc(dispatch, Arc::clone(&managed)),
+                    .with_managed_development_hdc(dispatch, Arc::clone(managed.server())),
                 Some(managed),
             )
         }
