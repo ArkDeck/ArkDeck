@@ -253,6 +253,39 @@ pub fn run<R: Runtime>(request: &ExecutionRequest, runtime: R, state_directory: 
     }
 }
 
+/// Swift's `agent resume --resume-token <token> [--selection <choice>]`
+/// without a Runtime execution option (`runAgent`): the client-side
+/// executor's `resume` of its pending record, rendered as `emitAgentOutcome`
+/// renders a run. Swift's `runAgent` maps no error of the executor, so any
+/// error, a client one included, escapes as its description and exit 1.
+pub fn resume<R: Runtime>(
+    token: &str,
+    selection: Option<&str>,
+    runtime: R,
+    state_directory: PathBuf,
+) -> Answer {
+    let mut executor = Executor::new(runtime, crate::utc_now, state_directory);
+    match executor.resume(token, selection) {
+        Ok(Outcome::Completed(receipt)) => Answer::Completed(receipt),
+        Ok(Outcome::Failed { reason, receipt }) => Answer::Failed { reason, receipt },
+        Ok(Outcome::Paused { action, receipt }) => paused(&action, &receipt),
+        Err(error) => Answer::Plain(Plain {
+            exit_code: 1,
+            message: error.description(),
+        }),
+    }
+}
+
+/// Whether `invocation` is Swift's client-side `agent resume`: its token was
+/// kept as given (`agent_executions::configure`).
+pub fn resumes_client_side(invocation: &Invocation) -> bool {
+    invocation.command == "agent.resume"
+        && invocation
+            .params
+            .as_ref()
+            .is_some_and(|params| params.contains_key("resumeToken"))
+}
+
 /// Swift `emitAgentOutcome`'s pause: `humanActionRequired` with the action's
 /// kind, prompt, resume token, selection options and Job in its details, and
 /// in the human rendering the action and how to resume it.

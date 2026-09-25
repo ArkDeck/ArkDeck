@@ -193,7 +193,14 @@ pub(super) fn configure(
         if fields.contains_key("selection") && fields.contains_key("selectionFile") {
             return Err(usage("selection sources are exclusive"));
         }
-        if let Some(token) = fields.remove("resumeToken") {
+        // Swift `usesRuntimeExecution`: a bare `agent resume --resume-token`
+        // resumes the client-side executor's pending record
+        // (`domain_leaves::resume`); with `--selection-file` or `--timeout` the
+        // token is the Runtime execution's resume reference.
+        let client_side = command == "agent.resume"
+            && !fields.contains_key("selectionFile")
+            && !fields.contains_key("timeout");
+        if !client_side && let Some(token) = fields.remove("resumeToken") {
             fields.insert("resumeReference".into(), token);
         }
     } else if matches!(command, "agent.status" | "agent.abandon") {

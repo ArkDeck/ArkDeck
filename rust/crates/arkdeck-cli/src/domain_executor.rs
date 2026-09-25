@@ -274,6 +274,9 @@ pub enum ExecutorFailure {
     MalformedResponse(String),
     Persistence(String),
     Timeout(String),
+    /// A resume Swift's executor refuses: a malformed or unknown token, a
+    /// changed catalog, or a selection the pause does not take.
+    InvalidResume(String),
 }
 
 impl ExecutorFailure {
@@ -284,6 +287,7 @@ impl ExecutorFailure {
             Self::MalformedResponse(message) => format!("malformedResponse({})", quoted(message)),
             Self::Persistence(message) => format!("persistence({})", quoted(message)),
             Self::Timeout(message) => format!("timeout({})", quoted(message)),
+            Self::InvalidResume(message) => format!("invalidResume({})", quoted(message)),
         }
     }
 }
@@ -409,6 +413,91 @@ impl ResumeMode {
     }
 }
 
+impl ResumeMode {
+    fn named(name: &str) -> Option<Self> {
+        [
+            Self::RetryAdoption,
+            Self::AdoptedTarget,
+            Self::BootstrapCandidate,
+            Self::ReconnectTarget,
+        ]
+        .into_iter()
+        .find(|mode| mode.name() == name)
+    }
+}
+
+/// Swift `PendingExecution`, as `JSONDecoder` reads a pending record: the
+/// request, the catalog digest and start it was admitted under, the human
+/// actions so far and how to resume.
+struct Pending {
+    request: ExecutionRequest,
+    catalog_digest: String,
+    started: String,
+    actions: Vec<Value>,
+    mode: ResumeMode,
+}
+
+impl Pending {
+    fn decode(value: &Value) -> Option<Self> {
+        let text = |value: &Value| value.as_str().map(str::to_owned);
+        // Swift's optional members: absent or null.
+        let optional = |value: &Value, key: &str| -> Option<Option<Value>> {
+            match value.get(key) {
+                None | Some(Value::Null) => Some(None),
+                Some(present) => Some(Some(present.clone())),
+            }
+        };
+        let request = &value["request"];
+        let version = match optional(request, "operationVersion")? {
+            None => None,
+            Some(version) => Some(version.as_i64()?),
+        };
+        let optional_text = |key: &str| -> Option<Option<String>> {
+            match optional(request, key)? {
+                None => Some(None),
+                Some(value) => Some(Some(text(&value)?)),
+            }
+        };
+        let request = ExecutionRequest {
+            operation_id: text(&request["operationID"])?,
+            operation_version: version,
+            inputs: request["inputs"].as_object()?.clone(),
+            capability: optional_text("capabilityReference")?,
+            target: optional_text("targetID")?,
+            maximum_wait_seconds: u64::try_from(request["maximumWaitSeconds"].as_i64()?).ok()?,
+            execution_id: text(&request["executionID"])?,
+        };
+        let actions = value["humanActions"].as_array()?.clone();
+        for action in &actions {
+            if !["trustDevice", "selectTarget", "physicalReconnect"]
+                .contains(&action["kind"].as_str()?)
+                || action["prompt"].as_str().is_none()
+                || action["resumeToken"].as_str().is_none()
+                || action["raisedAtUTC"].as_str().is_none()
+            {
+                return None;
+            }
+            for key in ["resolvedAtUTC"] {
+                if let Some(Some(value)) = optional(action, key) {
+                    value.as_str()?;
+                }
+            }
+            if let Some(Some(options)) = optional(action, "selectionOptions")
+                && !options.as_array()?.iter().all(Value::is_string)
+            {
+                return None;
+            }
+        }
+        Some(Self {
+            request,
+            catalog_digest: text(&value["catalogDigest"])?,
+            started: text(&value["startedAtUTC"])?,
+            actions,
+            mode: ResumeMode::named(value["resumeMode"].as_str()?)?,
+        })
+    }
+}
+
 /// Swift `AgentRuntimeExecutor`.
 pub struct Executor<R: Runtime, C: FnMut() -> String> {
     runtime: R,
@@ -450,7 +539,91 @@ impl<R: Runtime, C: FnMut() -> String> Executor<R, C> {
             started,
             actions: Vec::new(),
         };
-        self.continue_run(run, &deadline)
+        self.continue_run(run, None, &deadline)
+    }
+
+    /// Swift `resume(resumeToken:selection:)`: continues a persisted pause
+    /// under its own request, catalog digest and start, never fresh caller
+    /// input. A selection is taken only by the pause that asked for one. The
+    /// pending record is removed once the run ends or pauses again, and kept
+    /// when the resume is refused.
+    pub fn resume(
+        &mut self,
+        token: &str,
+        selection: Option<&str>,
+    ) -> Result<Outcome, ExecutorError> {
+        let refused =
+            |reason: &str| ExecutorError::from(ExecutorFailure::InvalidResume(reason.into()));
+        if !safe_identifier(token) || !token.starts_with("resume-") {
+            return Err(refused("resume token is malformed"));
+        }
+        let pending_path = self.state_directory.join(format!("{token}.json"));
+        let pending = std::fs::read(&pending_path)
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+            .and_then(|value| Pending::decode(&value))
+            .ok_or_else(|| refused("resume token is unknown or unreadable"))?;
+        let deadline = Deadline::new(pending.request.maximum_wait_seconds.max(1));
+        let digest = self.health_digest(&deadline)?;
+        if digest != pending.catalog_digest {
+            return Err(refused(
+                "catalog digest changed while the execution was paused",
+            ));
+        }
+        let mut actions = pending.actions;
+        if let Some(Value::Object(last)) = actions.last_mut() {
+            last.insert("resolvedAtUTC".into(), json!((self.clock)()));
+        }
+        let run = Run {
+            request: &pending.request,
+            digest: pending.catalog_digest,
+            started: pending.started,
+            actions,
+        };
+        let selected = match pending.mode {
+            ResumeMode::AdoptedTarget => {
+                let Some(selection) = selection else {
+                    return Err(refused(
+                        "this pause requires an adopted target ID selection",
+                    ));
+                };
+                let selected = self
+                    .list_targets(&deadline)?
+                    .into_iter()
+                    .find(|target| target.id == selection);
+                Some(selected.ok_or_else(|| refused("selected target is not adopted"))?)
+            }
+            ResumeMode::BootstrapCandidate => {
+                let Some(selection) = selection else {
+                    return Err(refused("this pause requires a device candidate selection"));
+                };
+                if !safe_selection(selection) {
+                    return Err(refused("device candidate selection is malformed"));
+                }
+                match self.adopt(Some(selection), &deadline)? {
+                    Adoption::Target(target) => Some(target),
+                    Adoption::Pause {
+                        kind,
+                        prompt,
+                        mode,
+                        options,
+                    } => {
+                        let outcome = self.pause(run, kind, prompt, mode, options);
+                        let _ = std::fs::remove_file(&pending_path);
+                        return outcome;
+                    }
+                }
+            }
+            ResumeMode::RetryAdoption | ResumeMode::ReconnectTarget => {
+                if selection.is_some() {
+                    return Err(refused("this pause does not accept a target selection"));
+                }
+                None
+            }
+        };
+        let outcome = self.continue_run(run, selected, &deadline)?;
+        let _ = std::fs::remove_file(&pending_path);
+        Ok(outcome)
     }
 
     fn health_digest(&mut self, deadline: &Deadline) -> Result<String, ExecutorError> {
@@ -465,11 +638,41 @@ impl<R: Runtime, C: FnMut() -> String> Executor<R, C> {
         }
     }
 
-    fn continue_run(&mut self, run: Run, deadline: &Deadline) -> Result<Outcome, ExecutorError> {
+    fn continue_run(
+        &mut self,
+        run: Run,
+        selected: Option<Target>,
+        deadline: &Deadline,
+    ) -> Result<Outcome, ExecutorError> {
         let request = run.request;
         let reference = request.reference();
         let scope = self.operation_scope(&reference, deadline)?;
         let target = match scope {
+            Scope::Host(_) if selected.is_some() => {
+                let receipt = self.receipt(&run, None, None, "rejected", None, Vec::new());
+                return Ok(Outcome::Failed {
+                    reason: format!("{reference} resumed with an invalid device selection"),
+                    receipt,
+                });
+            }
+            Scope::Device if selected.is_some() => {
+                let selected = selected.expect("a selected target");
+                if request
+                    .target
+                    .as_ref()
+                    .is_some_and(|expected| *expected != selected.id)
+                {
+                    return self.pause(
+                        run,
+                        "physicalReconnect",
+                        "The selected physical device is not the requested target; reconnect the \
+                         requested target before resuming this execution.",
+                        ResumeMode::ReconnectTarget,
+                        None,
+                    );
+                }
+                selected
+            }
             Scope::Host(provider) => {
                 let declared = request.inputs.get("projectRef").and_then(Value::as_str);
                 let keeps_artifact_scope =
@@ -572,7 +775,7 @@ impl<R: Runtime, C: FnMut() -> String> Executor<R, C> {
                     let mut listed = self.list_targets(deadline)?;
                     match listed.len() {
                         1 => listed.remove(0),
-                        0 => match self.adopt(deadline)? {
+                        0 => match self.adopt(None, deadline)? {
                             Adoption::Target(target) => target,
                             Adoption::Pause {
                                 kind,
@@ -728,8 +931,17 @@ impl<R: Runtime, C: FnMut() -> String> Executor<R, C> {
         })
     }
 
-    fn adopt(&mut self, deadline: &Deadline) -> Result<Adoption, ExecutorError> {
+    /// Swift `adopt(request:candidate:...)`: the one visible candidate, or the
+    /// one the caller selected by its connect key.
+    fn adopt(
+        &mut self,
+        candidate: Option<&str>,
+        deadline: &Deadline,
+    ) -> Result<Adoption, ExecutorError> {
         let mut visible = self.list_candidates(deadline)?;
+        if let Some(key) = candidate {
+            visible.retain(|visible| visible.key == key);
+        }
         if visible.len() != 1 {
             let options: Vec<String> = visible.into_iter().map(|candidate| candidate.key).collect();
             return Ok(if options.is_empty() {

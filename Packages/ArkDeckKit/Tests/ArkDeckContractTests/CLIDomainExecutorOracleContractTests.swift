@@ -646,6 +646,255 @@ final class CLIDomainExecutorOracleContractTests: XCTestCase {
   }
 }
 
+// MARK: - Resuming a pause
+
+extension CLIDomainExecutorOracleContractTests {
+  private static let resumeOracle = repository.appending(
+    path: "rust/tests/fixtures/domain-executor-resume", directoryHint: .isDirectory)
+  private static let resumeRecordVariable = "ARKDECK_RUST_DOMAIN_EXECUTOR_RESUME_RECORD"
+
+  /// One pause and its resume: the run that paused, then
+  /// `agent resume --resume-token` of its token (or of `token`, when the
+  /// scenario names another) with `selection`, each phase against its own
+  /// scripted Runtime over the one state directory.
+  private struct ResumeScenario {
+    let name: String
+    let request: RuntimeAgentExecutionRequest
+    let pause: Script
+    let resume: Script
+    var token: String? = nil
+    var selection: String? = nil
+    var resumeHealth: JSONValue = ScriptedRuntime.health
+  }
+
+  private static func resumeScenarios() throws -> [ResumeScenario] {
+    let tap: JSONValue = try describe("input.tap@1")
+    let tapInputs: [String: JSONValue] = [
+      "x": .integer(0), "y": .integer(0), "displayWidth": .integer(1),
+      "displayHeight": .integer(1),
+    ]
+    let owned = Candidate(key: "AAA", state: "Connected", target: (targetID, 1))
+    let free = Candidate(key: "BBB", state: "Connected", target: nil)
+    let ownedOnly: JSONValue = try observations([owned])
+    let freeOnly: JSONValue = try observations([free])
+    let noCandidates: JSONValue = try observations([])
+    let twoFree: JSONValue = try observations([
+      free, Candidate(key: "CCC", state: "Connected", target: nil),
+    ])
+    let adoptedAnswer: JSONValue = try adopted()
+    let succeeded: JSONValue = try status("succeeded")
+    let failed: JSONValue = try status("failed", failure: true)
+    let oneTarget: JSONValue = targets([(targetID, 1)])
+    let twoTargets: JSONValue = targets([(targetID, 1), (otherTargetID, 3)])
+    let finished: Script = [
+      ("job.evidence", .result(try evidence())), ("artifact.list", .result(try emptyPage())),
+    ]
+    let submitted: Script = [("job.submit", .result(accepted())), ("job.run", .result(succeeded))]
+    let notListed: Script = [
+      ("operation.describe", .result(tap)), ("target.list", .result(targets([]))),
+    ]
+    let listed: Script = [
+      ("operation.describe", .result(tap)), ("target.list", .result(oneTarget)),
+      ("device.observations", .result(ownedOnly)),
+    ]
+    let explicit = { (name: String) in
+      request(name, "input.tap", inputs: tapInputs, target: targetID)
+    }
+    let anyTarget = { (name: String) in request(name, "input.tap", inputs: tapInputs) }
+    let severalTargets: Script = [
+      ("operation.describe", .result(tap)), ("target.list", .result(twoTargets)),
+    ]
+    let twoCandidates: Script = notListed + [("device.observations", .result(twoFree))]
+    let changedCatalog: JSONValue = with(
+      ScriptedRuntime.health, ["catalogDigest"], .string(String(repeating: "1", count: 64)))
+    return [
+      ResumeScenario(
+        name: "reconnectResumesAndCompletes", request: explicit("reconnectResumesAndCompletes"),
+        pause: notListed, resume: listed + submitted + finished),
+      ResumeScenario(
+        name: "reconnectResumesToAFailedJob", request: explicit("reconnectResumesToAFailedJob"),
+        pause: notListed,
+        resume: listed + [("job.submit", .result(accepted())), ("job.run", .result(failed))]
+          + finished),
+      ResumeScenario(
+        name: "reconnectRefusesASelection", request: explicit("reconnectRefusesASelection"),
+        pause: notListed, resume: [], selection: targetID),
+      ResumeScenario(
+        name: "reconnectPausesAgain", request: explicit("reconnectPausesAgain"),
+        pause: notListed, resume: notListed),
+      ResumeScenario(
+        name: "selectedAdoptedTargetResumes", request: anyTarget("selectedAdoptedTargetResumes"),
+        pause: severalTargets,
+        resume: [("target.list", .result(twoTargets)), ("operation.describe", .result(tap))]
+          + submitted + finished,
+        selection: otherTargetID),
+      ResumeScenario(
+        name: "adoptedTargetNeedsASelection", request: anyTarget("adoptedTargetNeedsASelection"),
+        pause: severalTargets, resume: []),
+      ResumeScenario(
+        name: "selectedTargetIsNotAdopted", request: anyTarget("selectedTargetIsNotAdopted"),
+        pause: severalTargets, resume: [("target.list", .result(twoTargets))],
+        selection: "TGT-cccccccccccc"),
+      ResumeScenario(
+        name: "selectedCandidateIsAdopted", request: anyTarget("selectedCandidateIsAdopted"),
+        pause: twoCandidates,
+        resume: [
+          ("device.observations", .result(twoFree)), ("target.adopt", .result(adoptedAnswer)),
+          ("operation.describe", .result(tap)),
+        ] + submitted + finished,
+        selection: "BBB"),
+      ResumeScenario(
+        name: "candidateNeedsASelection", request: anyTarget("candidateNeedsASelection"),
+        pause: twoCandidates, resume: []),
+      ResumeScenario(
+        name: "candidateSelectionIsMalformed", request: anyTarget("candidateSelectionIsMalformed"),
+        pause: twoCandidates, resume: [], selection: "BB\nB"),
+      ResumeScenario(
+        name: "selectedCandidateIsGone", request: anyTarget("selectedCandidateIsGone"),
+        pause: twoCandidates, resume: [("device.observations", .result(twoFree))],
+        selection: "ZZZ"),
+      ResumeScenario(
+        name: "retryAdoptionResumes", request: anyTarget("retryAdoptionResumes"),
+        pause: notListed + [("device.observations", .result(noCandidates))],
+        resume: notListed + [
+          ("device.observations", .result(freeOnly)), ("target.adopt", .result(adoptedAnswer)),
+        ] + submitted + finished),
+      ResumeScenario(
+        name: "catalogChangedWhilePaused", request: explicit("catalogChangedWhilePaused"),
+        pause: notListed, resume: [], resumeHealth: changedCatalog),
+      ResumeScenario(
+        name: "malformedToken", request: explicit("malformedToken"), pause: notListed,
+        resume: [], token: "resume-not a token"),
+      ResumeScenario(
+        name: "unknownToken", request: explicit("unknownToken"), pause: notListed, resume: [],
+        token: "resume-00000000-0000-4000-8000-000000000000"),
+      ResumeScenario(
+        name: "tokenWithoutItsPrefix", request: explicit("tokenWithoutItsPrefix"),
+        pause: notListed, resume: [], token: "token-00000000-0000-4000-8000-000000000000"),
+    ]
+  }
+
+  private static func pendingRecords(_ state: URL) throws -> [JSONValue] {
+    let names = (try? FileManager.default.contentsOfDirectory(atPath: state.path)) ?? []
+    return try names.sorted().map { name in
+      .object([
+        "file": .string(name),
+        "content": try JSONDecoder().decode(
+          JSONValue.self, from: Data(contentsOf: state.appending(path: name))),
+      ])
+    }
+  }
+
+  private static func outcomeRecord(
+    _ outcome: RuntimeAgentExecutionOutcome, command: String
+  ) throws -> [String: JSONValue] {
+    var fields: [String: JSONValue] = [:]
+    switch outcome {
+    case .completed(let receipt):
+      fields["outcome"] = .object(["kind": .string("completed"), "receipt": try encoded(receipt)])
+    case .awaitingHumanAction(let action, let receipt):
+      fields["outcome"] = .object([
+        "kind": .string("awaitingHumanAction"), "action": try encoded(action),
+        "receipt": try encoded(receipt),
+      ])
+      do {
+        try RuntimeCLI.emitAgentOutcome(outcome, session: session(command))
+        fields["cli"] = .string("emitted")
+      } catch let error as CLIRegistryError {
+        fields["cli"] = .object([
+          "code": .string(error.code.rawValue), "message": .string(error.message),
+          "details": .object(error.details),
+        ])
+      }
+    case .failed(let reason, let receipt):
+      fields["outcome"] = .object([
+        "kind": .string("failed"), "reason": .string(reason), "receipt": try encoded(receipt),
+      ])
+    }
+    return fields
+  }
+
+  private static func resume(_ scenario: ResumeScenario) throws -> JSONValue {
+    let clock = CountingClock()
+    let root = FileManager.default.temporaryDirectory.appending(
+      path: "adr-\(UUID().uuidString.prefix(8))", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let state = root.appending(path: "agent-runtime", directoryHint: .isDirectory)
+    var fields: [String: JSONValue] = [
+      "name": .string(scenario.name), "request": try encoded(scenario.request),
+      "pauseScript": .array(scenario.pause.map { method, reply in reply.recorded(method) }),
+      "resumeScript": .array(scenario.resume.map { method, reply in reply.recorded(method) }),
+      "resumeHealth": scenario.resumeHealth,
+      "selection": scenario.selection.map(JSONValue.string) ?? .null,
+    ]
+
+    let pauseRuntime = try ScriptedRuntime(scenario.pause)
+    let paused = try AgentRuntimeExecutor(
+      client: AgentClient(socketPath: pauseRuntime.socketPath), stateDirectory: state,
+      nowUTC: { clock.now() }
+    ).run(scenario.request)
+    _ = pauseRuntime.stop()
+    guard case .awaitingHumanAction(let action, _) = paused else {
+      XCTFail("\(scenario.name) did not pause")
+      return .null
+    }
+    fields["pause"] = .object(try outcomeRecord(paused, command: "input.tap"))
+    fields["pendingAfterPause"] = .array(try pendingRecords(state))
+    let token = scenario.token ?? action.resumeToken
+    fields["token"] = .string(token)
+    fields["tokenIsThePauses"] = .bool(scenario.token == nil)
+
+    let runtime = try ScriptedRuntime(scenario.resume, health: scenario.resumeHealth)
+    let executor = AgentRuntimeExecutor(
+      client: AgentClient(socketPath: runtime.socketPath), stateDirectory: state,
+      nowUTC: { clock.now() })
+    do {
+      let outcome = try executor.resume(resumeToken: token, selection: scenario.selection)
+      fields["resume"] = .object(try outcomeRecord(outcome, command: "agent.resume"))
+    } catch let error as AgentClientError {
+      fields["resume"] = .object([
+        "error": .object(["type": .string("AgentClientError"), "value": clientError(error)])
+      ])
+    } catch let error as RuntimeAgentExecutorError {
+      fields["resume"] = .object([
+        "error": .object([
+          "type": .string("RuntimeAgentExecutorError"),
+          "value": .string(String(describing: error)),
+        ])
+      ])
+    }
+    fields["pendingAfterResume"] = .array(try pendingRecords(state))
+    let served = runtime.stop()
+    fields["resumeSent"] = .array(served.sent)
+    fields["resumeConnections"] = .integer(Int64(served.connections))
+    fields["unusedScript"] = .array(served.unused.map(JSONValue.string))
+    fields["clockReads"] = .integer(Int64(clock.reads))
+    return labelled(.object(fields), directory: root.path)
+  }
+
+  func testSwiftDomainExecutorResumesTheRustCLIReplays() throws {
+    let cases = try Self.resumeScenarios().map(Self.resume)
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    var files: [String: Data] = [:]
+    files["scenarios.json"] = try encoder.encode(JSONValue.array(cases)) + Data("\n".utf8)
+    files["provenance.json"] =
+      try encoder.encode(
+        JSONValue.object([
+          "producer": .string("CLIDomainExecutorOracleContractTests"),
+          "owners": .array([
+            .string("AgentRuntimeExecutor.run"), .string("AgentRuntimeExecutor.resume"),
+            .string("RuntimeCLI.emitAgentOutcome"),
+          ]),
+          "answers": .string("Fixtures/ControlFrames"),
+          "catalogDigest": .string(ScriptedRuntime.catalogDigest),
+        ])) + Data("\n".utf8)
+    try HDCOracleHarness.recordOrCompare(
+      files, variable: Self.resumeRecordVariable, oracle: Self.resumeOracle)
+  }
+}
+
 /// Reads of a fixed clock, one second apart.
 private final class CountingClock: @unchecked Sendable {
   private let lock = NSLock()
@@ -696,6 +945,8 @@ private final class ScriptedRuntime: @unchecked Sendable {
 
   let directory: URL
   let socketPath: String
+  /// What this Runtime answers a `health` the script does not name.
+  private let healthAnswer: JSONValue
   private let listener: Int32
   private let lock = NSLock()
   private var script: [(String, Reply)]
@@ -704,8 +955,9 @@ private final class ScriptedRuntime: @unchecked Sendable {
   private var stopping = false
   private let finished = DispatchSemaphore(value: 0)
 
-  init(_ script: [(String, Reply)]) throws {
+  init(_ script: [(String, Reply)], health: JSONValue = ScriptedRuntime.health) throws {
     self.script = script
+    healthAnswer = health
     directory = FileManager.default.temporaryDirectory.appending(
       path: "ade-\(UUID().uuidString.prefix(8))")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -787,7 +1039,7 @@ private final class ScriptedRuntime: @unchecked Sendable {
         sent.append(.object(logged))
         let preflight = method == "health" && label == "<UUID>"
         if method == "health", !(preflight && script.first?.0 == "health") {
-          return .result(Self.health)
+          return .result(healthAnswer)
         }
         guard let next = script.first, next.0 == method else {
           sent.append(.object(["unscripted": .string(method)]))

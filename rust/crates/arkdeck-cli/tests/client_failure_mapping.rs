@@ -511,6 +511,9 @@ mod leaves {
 
     /// A connection that never opened sent nothing, so every leaf, whatever its
     /// method can do, is `runtimeUnavailable`, retryable and in Swift's words.
+    /// (`agent resume --resume-token` resumes on the client, as Swift's
+    /// `usesRuntimeExecution` routes it, and opens no connection before its
+    /// pending record is read: `domain_leaves.rs` replays it.)
     #[test]
     fn a_connection_that_never_opened_is_unavailable_whatever_the_method() {
         let root = std::fs::canonicalize("/tmp").unwrap().join(format!(
@@ -528,10 +531,6 @@ mod leaves {
             (vec!["job", "reconcile", "--job", "job-a"], "job.reconcile"),
             (vec!["job", "status", "--job", "job-a"], "job.status"),
             (vec!["runtime", "health"], "health"),
-            (
-                vec!["agent", "resume", "--resume-token", "resume-1"],
-                "agent.resume",
-            ),
             (
                 vec!["agent", "status", "--execution-id", "execution-a"],
                 "agent.status",
