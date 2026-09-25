@@ -714,7 +714,9 @@ fn a_named_capability_is_forwarded_as_its_reference() {
 /// the caller names: `workspace sign` of the main tree names a capability a
 /// person had the Runtime issue, and it is forwarded as that reference; an
 /// isolated copy's sign, and any leaf without `--capability`, submits no
-/// authorization at all and leaves the decision to the Runtime. The CLI never
+/// authorization at all and leaves the decision to the Runtime. `flash run`,
+/// destructive, is no different: without `--capability` the Runtime issues
+/// its own one-use capability for the exact plan, or refuses. The CLI never
 /// builds one.
 #[test]
 fn a_mutation_leaf_forwards_only_the_capability_it_is_given() {
@@ -733,6 +735,7 @@ fn a_mutation_leaf_forwards_only_the_capability_it_is_given() {
     for (leaf, recorded) in [
         ("workspace.sign", "hostOnlyBuild"),
         ("input.tap", "explicitTargetConnected"),
+        ("flash.run", "explicitTargetConnected"),
     ] {
         let named = {
             let mut scenario = retargeted(&scenario(recorded), leaf);

@@ -49,6 +49,7 @@ pub const SERVED: &[&str] = &[
     "debug.hap",
     "debug.template.run",
     "debug.native.deploy",
+    "flash.run",
     // Swift's product-owned capture presets (`capturePresetExecutionRequest`).
     "screen.capture",
     "ui-dump.capture",
