@@ -238,4 +238,9 @@ With `CARGO_BUILD_JOBS=2` and this tree's own target; logs are
 
 ## CI
 
-Pending.
+PR #2195, merged as `f7a3b73f7`: at `e9f400e14` Agent PR 36149034640
+(`open-pr`), SDD Guard 36149034470 (`guard`, `ds-tokens`) and Swift CI
+36149034615 (`plan`, `swift-tests`, `ds-interactions`, the Rust
+host-independent checks, the Rust workspace on ubuntu-latest, macos-26 and
+windows-latest, and the `swift` aggregate; `app-build` skipped by the plan)
+all succeeded.

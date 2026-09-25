@@ -212,4 +212,8 @@ rebase onto `b954874f2` with F1 and F2 in.
 
 ## CI
 
-Pending.
+PR #2204, merged as `9bd452b55`: at `ede5152f5` Agent PR 36163294491
+(`open-pr`), SDD Guard 36163294539 (`guard`, `ds-tokens`) and Swift CI
+36163294944 (`plan`, `swift-tests`, `app-build`, `ds-interactions`, the Rust
+host-independent checks, the Rust workspace on ubuntu-latest, macos-26 and
+windows-latest, and the `swift` aggregate) all succeeded.

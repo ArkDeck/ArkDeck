@@ -5,10 +5,6 @@
 //! starts: every `operation.list` workspace row — its availability, reasons,
 //! codes and their origins — and every project and preset answer must be
 //! Swift's, and each answer admitted by the published method schemas.
-//!
-//! One declared difference: `workspace.project.show` answers an operation's
-//! reason and code as `null`, as its published schema still has them; Swift
-//! answers them as `list` does (the widening is its own change).
 #![cfg(target_os = "macos")]
 
 mod support;
@@ -246,14 +242,6 @@ fn assert_answer(frames: &mut Frames, store: &WorkspaceProjectStore, method: &st
     let mut expected = json!({"ok": frame["ok"]});
     if frame["ok"] == true {
         expected["result"] = frame["result"].clone();
-        if method == "workspace.project.show" {
-            // Declared: the published `show` has an operation's reason and
-            // code as `null`.
-            for operation in expected["result"]["operations"].as_array_mut().unwrap() {
-                operation["reason"] = Value::Null;
-                operation["reasonCode"] = Value::Null;
-            }
-        }
     } else {
         expected["error"] = frame["error"].clone();
     }
