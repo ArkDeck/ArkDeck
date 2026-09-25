@@ -122,6 +122,17 @@ impl JobPlanner<'_> {
                 format!("{reference} is runtime unavailable: {reason}"),
             ));
         }
+        // Swift's `materializeTypedPlanBeforeAuthorization` asks the
+        // dispatcher next: with every executable the start-up profiles pinned
+        // changed, it refuses even an operation its provider offers — the
+        // source inspection, whose provider asks only for an inspector and a
+        // registered root.
+        if let Some(reason) = workspace.dispatcher_unavailability() {
+            return Err(refusal(
+                "invalidInput",
+                format!("{reference} is runtime unavailable: {reason}"),
+            ));
+        }
         if self.artifacts.is_none() {
             return Err(refusal(
                 "invalidInput",
