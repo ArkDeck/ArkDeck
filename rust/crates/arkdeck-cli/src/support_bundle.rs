@@ -28,13 +28,33 @@ fn fail(code: &'static str, message: &str) -> CliError {
     CliError::new(code, message)
 }
 
-/// Swift `URL(filePath:).standardizedFileURL.path` for an absolute path
-/// (`arkdeck_contract::foundation_path::standardized`): lexical, and a leading
-/// `/private` dropped only where what remains exists.
+/// Swift `URL(filePath:).standardizedFileURL.path` for an absolute path, as
+/// POSIX text on every host: `.` and `..` resolved, empty components and a
+/// trailing slash dropped, then a leading `/private/var/automount`,
+/// `/var/automount` or `/private` removed only where what remains exists
+/// (`arkdeck_contract::foundation_path`'s rule).
 pub fn standardized(path: &str) -> String {
-    arkdeck_contract::foundation_path::standardized(std::path::Path::new(path))
-        .to_string_lossy()
-        .into_owned()
+    let mut components: Vec<&str> = Vec::new();
+    for component in path.split('/') {
+        match component {
+            "" | "." => {}
+            ".." => {
+                components.pop();
+            }
+            name => components.push(name),
+        }
+    }
+    let lexical = format!("/{}", components.join("/"));
+    for prefix in ["/private/var/automount", "/var/automount", "/private"] {
+        if let Some(rest) = lexical.strip_prefix(prefix)
+            && rest.len() > 1
+            && rest.starts_with('/')
+            && std::fs::symlink_metadata(rest).is_ok()
+        {
+            return rest.to_owned();
+        }
+    }
+    lexical
 }
 
 /// The document `metadata.json` holds: Swift's `DiagnosticBundleMetadata`
@@ -321,12 +341,18 @@ mod tests {
                 "/private/tmp/arkdeck-absent-2c1f/x",
             ),
             ("/private/other/x", "/private/other/x"),
-            // And goes where it does.
-            ("/private/tmp", "/tmp"),
             ("//tmp//x", "/tmp/x"),
             ("/", "/"),
         ] {
             assert_eq!(standardized(path), standard, "{path}");
         }
+    }
+
+    /// And goes where it does, which only macOS's `/tmp` shows.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn private_is_dropped_where_the_rest_exists() {
+        assert_eq!(standardized("/private/tmp"), "/tmp");
+        assert_eq!(standardized("/private/tmp/../var"), "/var");
     }
 }

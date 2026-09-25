@@ -18,8 +18,9 @@ Host evidence only, in private temporary roots.
     constants and host facts: no Runtime storage, log, file, device data, Session, journal,
     Artifact, secret or user path is read or written into it.
   - The destination is only ever the one the caller names: an absolute path Foundation would
-    call canonical (`standardizedFileURL`, whose `/private` rule is now the shared
-    `arkdeck_contract::foundation_path` one), under a parent that exists, belongs to this user and
+    call canonical (`standardizedFileURL`: lexical, and `/private` dropped only where the rest
+    exists — `arkdeck_contract::foundation_path`'s rule, computed as POSIX text so a Windows host
+    reads the same path), under a parent that exists, belongs to this user and
     no group or other can write; it must not exist.
   - `preview` writes nothing and names the scope's digest, over the destination, its parent's
     device and inode, and every entry's bytes; `export` recomputes it, and publishes only when the
@@ -50,7 +51,9 @@ Host evidence only, in private temporary roots.
 
 The replay found that Foundation keeps `/private` in a path whose remainder does not exist (a
 destination spelled `/private/tmp/…/support` is canonical); the earlier port dropped it
-unconditionally, and now uses the shared rule.
+unconditionally, and now uses the shared rule. The first push computed it through `Path`, which
+spells a Windows path; CI's Windows lane refused the POSIX unit test (job 108272327455), and it is
+now POSIX text on every host.
 
 ## Counts
 
