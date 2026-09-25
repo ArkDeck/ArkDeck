@@ -276,6 +276,45 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         releaseScript.contains(releaseOnlyStep),
         "release helper pipeline must retain \(releaseOnlyStep)")
     }
+
+    // CHG-2026-074 M5 (G5 slice 20a): the Rust helper release, behind
+    // ARKDECK_HELPER_RUNTIME=rust in the same script, notarizes, staples and
+    // assesses the pair and its retained Swift helper as the Swift release
+    // does, through the layout step it shares with the unsigned structure
+    // check. Neither that step nor the check reaches a release step.
+    for releaseStep in [
+      "xcrun notarytool submit", "xcrun stapler staple", "spctl --assess --type execute",
+    ] {
+      XCTAssertEqual(
+        releaseScript.components(separatedBy: releaseStep).count - 1, 4,
+        "both helper releases must retain \(releaseStep) for the pair and its rollback helper")
+    }
+    let rustLayoutStep = "bash \"$distribution_root/package-rust-helpers.sh\""
+    XCTAssertTrue(
+      releaseScript.contains(rustLayoutStep),
+      "the Rust helper release must lay out the pair through the shared step")
+    let unsignedScript = try String(
+      contentsOf: distribution.appending(path: "build-unsigned-rust-helpers.sh"), encoding: .utf8)
+    for requiredStep in [
+      rustLayoutStep, "- --timestamp=none", "UNSIGNED-STRUCTURE-CHECK-ONLY.txt",
+    ] {
+      XCTAssertTrue(
+        unsignedScript.contains(requiredStep),
+        "the unsigned structure check must retain \(requiredStep)")
+    }
+    let layoutScript = try String(
+      contentsOf: distribution.appending(path: "package-rust-helpers.sh"), encoding: .utf8)
+    for releaseOnlyStep in [
+      "ARKDECK_NOTARY_KEYCHAIN_PROFILE", "ARKDECK_CODESIGN_IDENTITY", "notarytool", "stapler",
+      "spctl",
+    ] {
+      XCTAssertFalse(
+        unsignedScript.contains(releaseOnlyStep),
+        "the unsigned structure check must never reach release step \(releaseOnlyStep)")
+      XCTAssertFalse(
+        layoutScript.contains(releaseOnlyStep),
+        "the shared Rust layout step must leave release step \(releaseOnlyStep) to its caller")
+    }
   }
 
   func testProductionInstallerRejectsAnUnsignedHelperBeforeLaunchctl() throws {
