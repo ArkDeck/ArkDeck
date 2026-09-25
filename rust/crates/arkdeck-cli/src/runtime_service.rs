@@ -564,6 +564,10 @@ pub struct ServiceHost<'a> {
     pub relocated_home: bool,
     /// How long one cutover preflight pass may run.
     pub preflight_timeout: Duration,
+    /// The spelling the caller typed, `runtime service` or its superseded
+    /// `agentd` (CLI spec §12): Swift writes every diagnostic of these leaves
+    /// in it, so a message never names a command the caller did not run.
+    pub spelling: &'static str,
 }
 
 impl ServiceHost<'_> {
@@ -1440,7 +1444,10 @@ pub fn restart_leaf(
     if !(1..=300).contains(&maximum_wait_seconds) {
         return ServiceAnswer::fail(PlainFailure::new(
             64,
-            "runtime service restart --maximum-wait-seconds must be between 1 and 300",
+            format!(
+                "{} restart --maximum-wait-seconds must be between 1 and 300",
+                host.spelling
+            ),
         ));
     }
     let run = || -> Result<Value, PlainFailure> {
@@ -1464,7 +1471,8 @@ pub fn restart_leaf(
             return Err(PlainFailure::new(
                 75,
                 format!(
-                    "runtime service restart refused while Runtime Jobs are active or unclosed: {}",
+                    "{} restart refused while Runtime Jobs are active or unclosed: {}",
+                    host.spelling,
                     jobs_before.blocking_job_ids.join(", ")
                 ),
             ));
@@ -1518,7 +1526,10 @@ pub fn verify_leaf(host: &ServiceHost, id: &str, options: &Map<String, Value>) -
     {
         return ServiceAnswer::fail(PlainFailure::new(
             64,
-            "runtime service verify --job cannot be combined with execution options",
+            format!(
+                "{} verify --job cannot be combined with execution options",
+                host.spelling
+            ),
         ));
     }
     if let Some(raw) = options.get("maximumWaitSeconds") {
@@ -1529,7 +1540,10 @@ pub fn verify_leaf(host: &ServiceHost, id: &str, options: &Map<String, Value>) -
         if !within {
             return ServiceAnswer::fail(PlainFailure::new(
                 64,
-                "runtime service verify --maximum-wait-seconds must be between 1 and 300",
+                format!(
+                    "{} verify --maximum-wait-seconds must be between 1 and 300",
+                    host.spelling
+                ),
             ));
         }
     }
@@ -1685,16 +1699,28 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         default_daemon_bundle: default_daemon_bundle(),
         relocated_home: std::env::var_os("CFFIXED_USER_HOME").is_some_and(|home| !home.is_empty()),
         preflight_timeout: Duration::from_secs(600),
+        spelling: if invocation.command.starts_with("agentd.") {
+            "agentd"
+        } else {
+            "runtime service"
+        },
     };
     let empty = Map::new();
     let options = invocation.params.as_ref().unwrap_or(&empty);
     match invocation.command {
-        "runtime.service.update" => runtime_service_install::update_leaf(&host, options),
+        "runtime.service.update" | "agentd.update" => {
+            runtime_service_install::update_leaf(&host, options)
+        }
         "runtime.service.install" => runtime_service_install::install_leaf(&host, options),
-        "runtime.service.uninstall" => runtime_service_install::uninstall_leaf(&host),
-        "runtime.service.status" => status_leaf(&host, id),
-        "runtime.service.verify" => verify_leaf(&host, id, options),
-        "runtime.service.restart" => restart_leaf(
+        // Swift's compatibility install from path inputs, never the typed
+        // bootstrap: `update`'s path without what an update carries over.
+        "agentd.install" => runtime_service_install::path_install_leaf(&host, options),
+        "runtime.service.uninstall" | "agentd.uninstall" => {
+            runtime_service_install::uninstall_leaf(&host)
+        }
+        "runtime.service.status" | "agentd.status" => status_leaf(&host, id),
+        "runtime.service.verify" | "agentd.verify" => verify_leaf(&host, id, options),
+        "runtime.service.restart" | "agentd.restart" => restart_leaf(
             &host,
             id,
             options
@@ -1704,7 +1730,7 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         ),
         _ => ServiceAnswer::fail(PlainFailure::new(
             64,
-            "unsupported runtime service subcommand",
+            format!("unsupported {} subcommand", host.spelling),
         )),
     }
 }

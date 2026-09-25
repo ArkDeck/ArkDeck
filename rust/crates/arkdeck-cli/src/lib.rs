@@ -710,6 +710,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
+        // Legacy spellings: both read the target list (Swift `runDevice`).
+        ["device", "list"] => "device.list",
+        ["device", "show"] => "device.show",
         ["device", "wait"] => "device.wait",
         ["target", "adopt"] => "target.adopt",
         ["target", "list"] => "target.list",
@@ -740,6 +743,14 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "service", "status"] => "runtime.service.status",
         ["runtime", "service", "verify"] => "runtime.service.verify",
         ["runtime", "service", "uninstall"] => "runtime.service.uninstall",
+        // §12's superseded spelling of `runtime service`: the same handler,
+        // reporting the name the caller typed (Swift `runAgentDaemon`).
+        ["agentd", "install"] => "agentd.install",
+        ["agentd", "update"] => "agentd.update",
+        ["agentd", "restart"] => "agentd.restart",
+        ["agentd", "status"] => "agentd.status",
+        ["agentd", "verify"] => "agentd.verify",
+        ["agentd", "uninstall"] => "agentd.uninstall",
         ["control-action", "list"] => "control-action.list",
         ["control-action", "show"] => "control-action.show",
         ["control-action", "reconcile"] => "control-action.reconcile",
@@ -785,7 +796,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     };
     // The LaunchAgent leaves connect to no caller-named Runtime and take no
     // correlation identity.
-    let service = command.starts_with("runtime.service.");
+    let service = is_runtime_service(command);
     // The legacy `--json` is the leaf's where the registry declares it, as
     // Swift's registry does on nearly every leaf, and never beside `--output`.
     if legacy_json && (!command_registry::declares(command, "--json") || mode.is_some()) {
@@ -1166,10 +1177,14 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
         "session.export.apply" | "session.cleanup.apply" => &["previewId", "previewDigest"],
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
-        "runtime.service.verify" => &["targetId", "maximumWaitSeconds", "executionId", "jobId"],
-        "runtime.service.restart" => &["maximumWaitSeconds"],
+        "runtime.service.verify" | "agentd.verify" => {
+            &["targetId", "maximumWaitSeconds", "executionId", "jobId"]
+        }
+        "runtime.service.restart" | "agentd.restart" => &["maximumWaitSeconds"],
         "runtime.service.install" => &["bundle", "bundleGeneration", "tool", "toolGeneration"],
-        "runtime.service.update" => &[
+        // `agentd install` is Swift's compatibility install from path inputs:
+        // `update`'s options, never the typed bootstrap's.
+        "runtime.service.update" | "agentd.install" | "agentd.update" => &[
             "daemon",
             "hdc",
             "workspaceProject",
@@ -1518,6 +1533,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "debug.evaluate"
         } else if command == "flash.bind-loader" {
             "flash.bind-current-loader"
+        } else if matches!(command, "device.list" | "device.show") {
+            // Swift's `runDevice` answers both legacy leaves with the target
+            // list, without parameters.
+            "target.list"
         } else if matches!(command, "recovery.cleanup.list" | "cleanup-debt.list") {
             // Both spellings share Swift's one handler and its one method.
             "cleanupDebt.list"
@@ -1571,7 +1590,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")
             || command.starts_with("human-action.")
-            || command.starts_with("runtime.service.")
+            || is_runtime_service(command)
             || command.starts_with("maintainer.contracts.")
             || matches!(
                 command,
@@ -1636,6 +1655,12 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         socket,
         timeout_ms,
     })
+}
+
+/// Whether `command` is a LaunchAgent leaf: `runtime service …`, or its
+/// superseded `agentd …` spelling.
+pub fn is_runtime_service(command: &str) -> bool {
+    command.starts_with("runtime.service.") || command.starts_with("agentd.")
 }
 
 /// Swift `CLIResultEnvelope.withLifecycle`: a leaf the registry does not

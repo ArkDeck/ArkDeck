@@ -99,7 +99,19 @@ fn failed(error: impl Into<ServiceError>) -> PlainFailure {
 /// `runtime service update`: Swift's options and `install`, with the
 /// rulings' retention, signing refusal and cutover.
 pub fn update_leaf(host: &ServiceHost, options: &Map<String, Value>) -> ServiceAnswer {
-    match update_request(host, options).and_then(|request| install(host, request)) {
+    path_leaf(host, options, "update")
+}
+
+/// `agentd install`: Swift's compatibility install from path inputs. It is
+/// `update`'s path, except that nothing of an installed service is carried
+/// over: `--hdc` is required, and an omitted descriptor or ArkForge lane is
+/// none.
+pub fn path_install_leaf(host: &ServiceHost, options: &Map<String, Value>) -> ServiceAnswer {
+    path_leaf(host, options, "install")
+}
+
+fn path_leaf(host: &ServiceHost, options: &Map<String, Value>, subcommand: &str) -> ServiceAnswer {
+    match update_request(host, options, subcommand).and_then(|request| install(host, request)) {
         Ok(document) => ServiceAnswer::emit(document),
         Err(failure) => ServiceAnswer::fail(failure),
     }
@@ -139,12 +151,17 @@ struct InstallRequest {
     workspace: Option<(String, String)>,
     descriptor: Option<String>,
     lane: Option<ArkForgeLaneStatus>,
+    /// The command as the caller typed it, for its diagnostics.
+    command: String,
 }
 
 fn update_request(
     host: &ServiceHost,
     options: &Map<String, Value>,
+    subcommand: &str,
 ) -> Result<InstallRequest, PlainFailure> {
+    let command = format!("{} {subcommand}", host.spelling);
+    let update = subcommand == "update";
     let option = |key: &str| options.get(key).and_then(Value::as_str);
     let bundle = match option("daemon") {
         Some(bundle) => bundle.to_owned(),
@@ -154,25 +171,40 @@ fn update_request(
             .map(text)
             .unwrap_or_else(|| crate::runtime_service::DAEMON_BUNDLE_NAME.to_owned()),
     };
-    let previous = host.status().ok();
+    let previous = if update { host.status().ok() } else { None };
     let hdc = option("hdc")
         .map(str::to_owned)
-        .or_else(|| previous.and_then(|status| status.hdc_path))
+        .or_else(|| previous.as_ref().and_then(|status| status.hdc_path.clone()))
         .filter(|hdc| hdc.starts_with('/'))
         .ok_or_else(|| {
-            usage("runtime service update requires --hdc with an absolute executable path")
+            usage(format!(
+                "{command} requires --hdc with an absolute executable path"
+            ))
         })?;
     if !bundle.starts_with('/') {
-        return Err(usage(
-            "runtime service update requires an absolute ArkDeckAgent.app path",
-        ));
+        return Err(usage(format!(
+            "{command} requires an absolute ArkDeckAgent.app path"
+        )));
     }
-    // The `runtime service` spelling never keeps the legacy pair it omits.
-    let (project, sdk) = (option("workspaceProject"), option("devecoSdk"));
+    // The `runtime service` spelling never keeps the legacy pair it omits;
+    // the frozen `agentd update` keeps the installed one.
+    let preserved = |pick: fn(&crate::runtime_service::LaunchAgentStatus) -> Option<String>| {
+        previous
+            .as_ref()
+            .filter(|_| host.spelling == "agentd")
+            .and_then(pick)
+    };
+    let project = option("workspaceProject")
+        .map(str::to_owned)
+        .or_else(|| preserved(|status| status.workspace_project_path.clone()));
+    let sdk = option("devecoSdk")
+        .map(str::to_owned)
+        .or_else(|| preserved(|status| status.deveco_sdk_path.clone()));
+    let (project, sdk) = (project.as_deref(), sdk.as_deref());
     if project.is_some() != sdk.is_some() {
-        return Err(usage(
-            "runtime service update requires --workspace-project and --deveco-sdk together",
-        ));
+        return Err(usage(format!(
+            "{command} requires --workspace-project and --deveco-sdk together"
+        )));
     }
     if project.is_some_and(|project| !project.starts_with('/')) {
         return Err(usage("--workspace-project must be an absolute path"));
@@ -202,9 +234,10 @@ fn update_request(
                 "--arktrace-descriptor must be an absolute path or none",
             ));
         }
-        None => host
+        None if update => host
             .ark_trace_descriptor_for_preserving_update()
             .map_err(failed)?,
+        None => None,
     };
     for (key, flag) in [
         ("arkforged", "--arkforged"),
@@ -241,9 +274,10 @@ fn update_request(
                 "--arkforge-campaign requires an explicit --arkforge-bundle",
             ));
         }
-        None => host
+        None if update => host
             .ark_forge_lane_for_preserving_update()
             .map_err(|refusal| PlainFailure::new(1, refusal.to_string()))?,
+        None => None,
     };
     // Ruling 3: Swift re-records the replacement daemon's identity in the
     // signing receipt before launchd starts it (`refreshSigningAccessIfInstalled`).
@@ -251,7 +285,7 @@ fn update_request(
         return Err(PlainFailure::new(
             69,
             format!(
-                "runtime service update is refused while an OpenHarmony signing preset is \
+                "{command} is refused while an OpenHarmony signing preset is \
                  installed ({}): the replacement daemon's identity must be re-recorded in that \
                  receipt before launchd starts it, and the Rust CLI has no signing-credential \
                  owner yet (Q8); nothing was changed",
@@ -265,6 +299,7 @@ fn update_request(
         workspace: project.zip(sdk).map(|(p, s)| (p.to_owned(), s.to_owned())),
         descriptor,
         lane,
+        command,
     })
 }
 
@@ -306,11 +341,12 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
                 return Err(PlainFailure::new(
                     69,
                     format!(
-                        "runtime service update would point the LaunchAgent at the Rust daemon \
+                        "{} would point the LaunchAgent at the Rust daemon \
                          in {}, whose plist names it as ARKDECK_ANALYZER_PATH, but it does not \
                          answer --analyze-crash-ledger as the Runtime runs its analyzer ({reason}); \
                          the analyzer is never pointed at the Swift daemon or left out; nothing \
                          was changed",
+                        request.command,
                         text(&source)
                     ),
                 ));
@@ -321,7 +357,7 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
                     "a Rust daemon bundle carries no facade; nothing was changed",
                 ));
             }
-            refuse_unless_clear(&first, "nothing was changed")?;
+            refuse_unless_clear(&first, &request.command, "nothing was changed")?;
             Some(first)
         }
     };
@@ -346,7 +382,7 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
     }
     let cutover = match first {
         None => None,
-        Some(_) => Some(cutover(host, &source, loaded)?),
+        Some(_) => Some(cutover(host, &source, loaded, &request.command)?),
     };
 
     let rollback = replace_bundle(host, &source).map_err(failed)?;
@@ -398,7 +434,12 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
 /// taken, the state measured and the facts read again. A refusal starts the
 /// old service again from its unchanged plist. The snapshot summary is then
 /// written, and the answer's `cutover` member returned.
-fn cutover(host: &ServiceHost, source: &Path, loaded: bool) -> Result<Value, PlainFailure> {
+fn cutover(
+    host: &ServiceHost,
+    source: &Path,
+    loaded: bool,
+    command: &str,
+) -> Result<Value, PlainFailure> {
     let restore = |failure: PlainFailure| -> PlainFailure {
         if !loaded {
             return PlainFailure::new(
@@ -449,7 +490,7 @@ fn cutover(host: &ServiceHost, source: &Path, loaded: bool) -> Result<Value, Pla
         }
         std::thread::sleep(host.poll_interval);
     };
-    refuse_unless_clear(&held, "the state was left as it is").map_err(&restore)?;
+    refuse_unless_clear(&held, command, "the state was left as it is").map_err(&restore)?;
     let snapshot = &held["snapshot"];
     let present = snapshot["stateDirectoryPresent"].as_bool();
     if snapshot["schemaVersion"] != SNAPSHOT_SCHEMA
@@ -473,7 +514,11 @@ fn cutover(host: &ServiceHost, source: &Path, loaded: bool) -> Result<Value, Pla
 }
 
 /// Refuses unless the preflight document is clear, naming each block.
-fn refuse_unless_clear(document: &Value, unchanged: &str) -> Result<(), PlainFailure> {
+fn refuse_unless_clear(
+    document: &Value,
+    command: &str,
+    unchanged: &str,
+) -> Result<(), PlainFailure> {
     if document["clear"] == true {
         return Ok(());
     }
@@ -486,7 +531,7 @@ fn refuse_unless_clear(document: &Value, unchanged: &str) -> Result<(), PlainFai
     Err(PlainFailure::new(
         75,
         format!(
-            "runtime service update refused: the Runtime state cannot be carried over as it is \
+            "{command} refused: the Runtime state cannot be carried over as it is \
              ({}); {unchanged}",
             blocks.join("; ")
         ),
@@ -1087,9 +1132,10 @@ fn uninstall(host: &ServiceHost) -> Result<Value, PlainFailure> {
         PlainFailure::new(
             69,
             format!(
-                "runtime service uninstall is refused: the bootstrap bundle index cannot be read \
+                "{} uninstall is refused: the bootstrap bundle index cannot be read \
                  to prove it pins nothing for the service installation ({reason}); nothing was \
-                 changed"
+                 changed",
+                host.spelling
             ),
         )
     })?;
@@ -1097,9 +1143,10 @@ fn uninstall(host: &ServiceHost) -> Result<Value, PlainFailure> {
         return Err(PlainFailure::new(
             69,
             format!(
-                "runtime service uninstall is refused: the bootstrap bundle registry pins {} for \
+                "{} uninstall is refused: the bootstrap bundle registry pins {} for \
                  the service installation, and the Rust CLI has no owner to release those \
                  references yet; uninstall with the Swift CLI; nothing was changed",
+                host.spelling,
                 pinned.join(", ")
             ),
         ));

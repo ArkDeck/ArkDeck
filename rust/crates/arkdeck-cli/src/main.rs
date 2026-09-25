@@ -897,6 +897,15 @@ fn write_document(value: &Value) -> io::Result<()> {
 /// and its exit status — never a failure envelope, so a refusal leaves stdout
 /// empty.
 fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    // Swift `warnIfLegacy`: the `agentd` spelling says so on stderr before
+    // anything runs, in the human rendering only; a machine answer carries it
+    // in `meta.lifecycle`.
+    if !invocation.json
+        && !invocation.legacy_json
+        && let Some(warning) = arkdeck_cli::legacy_warning(invocation.command)
+    {
+        eprintln!("{warning}");
+    }
     #[cfg(target_os = "macos")]
     {
         let answer = arkdeck_cli::runtime_service::run(invocation, id);
@@ -904,7 +913,10 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
             let written = if invocation.legacy_json {
                 write_document(document)
             } else if invocation.json {
-                write_document(&success_envelope(invocation.command, document.clone(), id))
+                write_document(&arkdeck_cli::with_lifecycle(
+                    success_envelope(invocation.command, document.clone(), id),
+                    invocation.command,
+                ))
             } else {
                 writeln!(
                     io::stdout().lock(),
@@ -931,7 +943,12 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
             "the runtime service is the macOS user-domain LaunchAgent",
         );
         if invocation.json {
-            if write_document(&failure_envelope(invocation.command, &error, id, true)).is_err() {
+            if write_document(&arkdeck_cli::with_lifecycle(
+                failure_envelope(invocation.command, &error, id, true),
+                invocation.command,
+            ))
+            .is_err()
+            {
                 return 74.into();
             }
         } else {
@@ -1095,7 +1112,7 @@ fn main() -> std::process::ExitCode {
         }
         return 0.into();
     }
-    if invocation.command.starts_with("runtime.service.") {
+    if arkdeck_cli::is_runtime_service(invocation.command) {
         return serve_runtime_service(&invocation, id);
     }
     if invocation.command.starts_with("maintainer.contracts.") {
