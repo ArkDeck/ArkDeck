@@ -941,6 +941,41 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
     }
 }
 
+/// `maintainer contracts export|check`: its one document, then its failure, if
+/// any, which after a document is only a diagnostic and the exit status
+/// (Swift `suppressesMachineRendering`).
+fn serve_maintainer_contracts(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    let answer = arkdeck_cli::maintainer_contracts::run(invocation);
+    if let Some(document) = &answer.document {
+        let written = if invocation.json {
+            write_document(&success_envelope(invocation.command, document.clone(), id))
+        } else {
+            writeln!(
+                io::stdout().lock(),
+                "{}",
+                arkdeck_cli::human_rendering(document)
+            )
+        };
+        if written.is_err() {
+            return 74.into();
+        }
+    }
+    match answer.failure {
+        Some(error) => {
+            if answer.document.is_none() && invocation.json {
+                if write_document(&failure_envelope(invocation.command, &error, id, true)).is_err()
+                {
+                    return 74.into();
+                }
+            } else {
+                eprintln!("arkdeck: {}", error.message);
+            }
+            error.exit_code().into()
+        }
+        None => 0.into(),
+    }
+}
+
 fn main() -> std::process::ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let fallback_id = correlation().unwrap_or_else(|_| "ctl-unavailable".into());
@@ -1062,6 +1097,9 @@ fn main() -> std::process::ExitCode {
     }
     if invocation.command.starts_with("runtime.service.") {
         return serve_runtime_service(&invocation, id);
+    }
+    if invocation.command.starts_with("maintainer.contracts.") {
+        return serve_maintainer_contracts(&invocation, id);
     }
     // Swift `warnIfLegacy`: a compatibility leaf says so on stderr before
     // its request, in the human rendering only.

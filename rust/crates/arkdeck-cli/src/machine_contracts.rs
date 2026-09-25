@@ -12,6 +12,9 @@ use arkdeck_contract::{
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
+use std::fs;
+use std::io;
+use std::path::Path;
 
 /// Swift `CLIProductVersion.machineContract`.
 pub const BUNDLE_VERSION: &str = "arkdeck.cli.contracts/1";
@@ -140,6 +143,184 @@ pub fn argv_fixture(command: &str) -> Option<Value> {
         serde_json::from_slice(&json_document(&argv_document(leaf)))
             .expect("a rendered fixture is JSON"),
     )
+}
+
+// MARK: Export and drift
+
+/// Swift `CLIMachineContracts.ExportReport`: what an export wrote and
+/// removed, as `contracts/…` and `fixtures/…` paths.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ExportReport {
+    pub written: Vec<String>,
+    pub removed: Vec<String>,
+}
+
+/// Swift `CLIMachineContracts.CheckReport`: the products a checked bundle
+/// holds otherwise than this build renders them, lacks, or holds besides.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct CheckReport {
+    pub drifted: Vec<String>,
+    pub missing: Vec<String>,
+    pub unexpected: Vec<String>,
+    pub checked: u64,
+}
+
+impl CheckReport {
+    pub fn is_clean(&self) -> bool {
+        self.drifted.is_empty() && self.missing.is_empty() && self.unexpected.is_empty()
+    }
+
+    /// Swift `CheckReport.document`.
+    pub fn document(&self) -> Value {
+        json!({
+            "clean": self.is_clean(),
+            "checked": self.checked,
+            "drifted": self.drifted,
+            "missing": self.missing,
+            "unexpected": self.unexpected,
+        })
+    }
+}
+
+/// Swift `CLIMachineContracts.export(contractsDirectory:fixturesDirectory:)`:
+/// every contract product under `contracts`; under `fixtures`, each regular,
+/// visible file no fixture product names removed, then every fixture
+/// product.
+pub fn export(contracts: &Path, fixtures: &Path) -> io::Result<ExportReport> {
+    let contract = contract_products();
+    let fixture = fixture_products();
+    let mut report = ExportReport::default();
+    for product in &contract {
+        write(product, contracts)?;
+        report
+            .written
+            .push(format!("contracts/{}", product.relative_path));
+    }
+    let expected: BTreeSet<&str> = fixture
+        .iter()
+        .map(|product| product.relative_path.as_str())
+        .collect();
+    for stale in regular_files(fixtures)? {
+        if !expected.contains(stale.as_str()) {
+            fs::remove_file(fixtures.join(&stale))?;
+            report.removed.push(format!("fixtures/{stale}"));
+        }
+    }
+    for product in &fixture {
+        write(product, fixtures)?;
+        report
+            .written
+            .push(format!("fixtures/{}", product.relative_path));
+    }
+    Ok(report)
+}
+
+/// Swift `CLIMachineContracts.check(contractsDirectory:fixturesDirectory:)`:
+/// each product against its file, and the fixture directory's regular,
+/// visible files no fixture product names.
+pub fn check(contracts: &Path, fixtures: &Path) -> io::Result<CheckReport> {
+    let mut report = CheckReport::default();
+    for product in contract_products() {
+        compare(&product, contracts, "contracts", &mut report);
+    }
+    let fixture = fixture_products();
+    for product in &fixture {
+        compare(product, fixtures, "fixtures", &mut report);
+    }
+    let expected: BTreeSet<&str> = fixture
+        .iter()
+        .map(|product| product.relative_path.as_str())
+        .collect();
+    for extra in regular_files(fixtures)? {
+        if !expected.contains(extra.as_str()) {
+            report.unexpected.push(format!("fixtures/{extra}"));
+        }
+    }
+    report.unexpected.sort();
+    Ok(report)
+}
+
+/// Swift `compare(_:under:label:into:)`: a file that cannot be read is
+/// missing.
+fn compare(product: &Product, root: &Path, label: &str, report: &mut CheckReport) {
+    report.checked += 1;
+    match fs::read(root.join(&product.relative_path)) {
+        Err(_) => report
+            .missing
+            .push(format!("{label}/{}", product.relative_path)),
+        Ok(existing) if existing != product.bytes => report
+            .drifted
+            .push(format!("{label}/{}", product.relative_path)),
+        Ok(_) => {}
+    }
+}
+
+/// Swift `write(_:under:)`: the product's directories, then its bytes
+/// written atomically, through a hidden sibling renamed into place.
+fn write(product: &Product, root: &Path) -> io::Result<()> {
+    let path = root.join(&product.relative_path);
+    let parent = path.parent().unwrap_or(root);
+    fs::create_dir_all(parent)?;
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("product");
+    let staged = parent.join(format!(".{name}.{}.export", std::process::id()));
+    fs::write(&staged, &product.bytes)?;
+    fs::rename(&staged, &path).inspect_err(|_| {
+        let _ = fs::remove_file(&staged);
+    })
+}
+
+/// Swift `regularFiles(under:)`: every regular, visible file below `root`
+/// (a hidden directory is not entered, and a symbolic link is neither
+/// followed nor listed), by its path relative to `root`, in order; none when
+/// `root` is not a directory.
+fn regular_files(root: &Path) -> io::Result<Vec<String>> {
+    fn walk(directory: &Path, prefix: &str, found: &mut Vec<String>) -> io::Result<()> {
+        for entry in fs::read_dir(directory)? {
+            let entry = entry?;
+            let Ok(name) = entry.file_name().into_string() else {
+                continue;
+            };
+            let kind = entry.file_type()?;
+            if hidden(&entry.path(), &name, kind.is_dir())? {
+                continue;
+            }
+            let relative = if prefix.is_empty() {
+                name
+            } else {
+                format!("{prefix}/{name}")
+            };
+            if kind.is_dir() {
+                walk(&entry.path(), &relative, found)?;
+            } else if kind.is_file() {
+                found.push(relative);
+            }
+        }
+        Ok(())
+    }
+    let mut found = Vec::new();
+    if root.is_dir() {
+        walk(root, "", &mut found)?;
+    }
+    found.sort();
+    Ok(found)
+}
+
+/// Foundation's hidden key, which `.skipsHiddenFiles` reads: a leading dot,
+/// or on macOS the hidden flag too.
+fn hidden(path: &Path, name: &str, directory: bool) -> io::Result<bool> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = name;
+        arkdeck_platform::host_entry_presentation(path, directory).map(|entry| entry.hidden)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (path, directory);
+        Ok(name.starts_with('.'))
+    }
 }
 
 // MARK: Rendering
