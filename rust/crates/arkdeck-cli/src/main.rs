@@ -244,6 +244,28 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
                 .map_err(|error| CliError::from_client(error, method))
         });
     }
+    if let Some(verb) = invocation.command.strip_prefix("ui-dump.")
+        && matches!(verb, "inspect" | "hit-test")
+    {
+        // Swift's session sends each request on its own bounded exchange.
+        let mut options = invocation
+            .params
+            .clone()
+            .expect("parsed ui-dump parameters");
+        if let Some(root) = options.remove("rootPath") {
+            options.insert("root".into(), root);
+        }
+        return arkdeck_cli::ui_dump::run(verb, &options, &mut |method, params| {
+            let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(30))
+                .map_err(|error| CliError::from_connect(error, method))?;
+            client
+                .health(&arkdeck_cli::client_frame_id())
+                .map_err(|error| CliError::from_client(error, method))?;
+            client
+                .request(&arkdeck_cli::client_frame_id(), method, Some(params))
+                .map_err(|error| CliError::from_client(error, method))
+        });
+    }
     if let Some(verb) = invocation.command.strip_prefix("diagnostics.")
         && verb != "export"
     {
