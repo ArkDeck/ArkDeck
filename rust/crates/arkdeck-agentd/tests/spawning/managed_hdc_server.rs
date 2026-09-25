@@ -320,6 +320,34 @@ fn no_plan_is_dispatched_once_the_managed_server_is_not_the_one_launched() {
     );
 }
 
+/// A daemon that ends before its drain drops the `Launched` it holds, and
+/// the drop stops the server there and then, while another reference to it
+/// still lives: the foreground-exit monitor's, which it holds for a moment
+/// every time it looks (TASK-XPA-014). The server is reaped before the drop
+/// returns, and the monitor then finds it stopped, not ended unexpectedly.
+#[test]
+fn a_launched_server_is_stopped_when_dropped_while_the_monitor_holds_it() {
+    let _turn = crate::turn();
+    let (_fake, tool) = fake();
+    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+    let launched = Launched::new(daemon_start(&tool, endpoint).unwrap());
+    let pid = launched
+        .server()
+        .active_launch()
+        .expect("a running server")
+        .pid;
+    assert!(reachable(endpoint));
+    let monitor = Arc::clone(launched.server());
+    drop(launched);
+    assert!(
+        arkdeck_platform::process_argument_record(pid).is_none(),
+        "the server (pid {pid}) outlived the drop"
+    );
+    assert!(monitor.active_launch().is_none());
+    assert_eq!(monitor.foreground_exit(), Some(false));
+    assert!(monitor.stop().is_none(), "a server is stopped once");
+}
+
 /// Real Host/control routing and isolated fake processes, including durable
 /// audit failure after launch. This is not real-device evidence.
 #[test]

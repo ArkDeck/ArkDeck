@@ -135,21 +135,8 @@ pub(crate) struct DevelopmentUsbRelations {
 }
 
 impl DevelopmentUsbRelations {
-    /// The source `ARKDECK_DEVELOPMENT_USB_RELATIONS` names, if it names
-    /// one: an explicit absolute path.
-    pub(crate) fn from_environment() -> Result<Option<Self>, Box<dyn std::error::Error>> {
-        let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS") else {
-            return Ok(None);
-        };
-        let path = PathBuf::from(path);
-        if !path.is_absolute() {
-            return Err(
-                "ARKDECK_DEVELOPMENT_USB_RELATIONS must be an explicit absolute path".into(),
-            );
-        }
-        Ok(Some(Self::at(path)))
-    }
-
+    /// The source `ARKDECK_DEVELOPMENT_USB_RELATIONS` names, an explicit
+    /// absolute path (`development_admission`).
     pub(crate) fn at(path: PathBuf) -> Self {
         Self {
             path,

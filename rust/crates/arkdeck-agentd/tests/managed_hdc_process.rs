@@ -174,6 +174,33 @@ impl Runtime {
             .count()
     }
 
+    /// Every run of this fake, whatever it ran as: a server, a readiness
+    /// `checkserver`, a client.
+    fn runs(&self) -> Vec<String> {
+        fs::read_to_string(self.root.join("tools/calls"))
+            .unwrap_or_default()
+            .lines()
+            .map(str::to_owned)
+            .collect()
+    }
+
+    /// A start the daemon refuses on its environment: refused before
+    /// anything is launched, so this fake never ran — no server, not even a
+    /// readiness probe — and nothing of it is left running.
+    fn refused_before_any_launch(&self, environment: &[(&str, &str)]) -> Output {
+        let output = self.refused(environment);
+        assert_eq!(
+            self.runs(),
+            Vec::<String>::new(),
+            "{environment:?}: the HDC ran before the start was refused"
+        );
+        assert!(
+            !self.fake_running(),
+            "{environment:?}: no managed server was started"
+        );
+        output
+    }
+
     /// The servers a `kill -r` of this fake started, by PID.
     fn recorded_servers(&self) -> Vec<i32> {
         fs::read_to_string(self.root.join("tools/servers"))
@@ -746,7 +773,7 @@ fn a_managed_server_is_configured_only_as_the_isolated_owner_names_it() {
             "OHOS_HDC_SERVER_PORT is not a port in 1...65535",
         ),
     ] {
-        let output = runtime.refused(&environment);
+        let output = runtime.refused_before_any_launch(&environment);
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains(message), "{environment:?}: {stderr}");
     }
@@ -773,6 +800,8 @@ fn a_managed_server_is_configured_only_as_the_isolated_owner_names_it() {
         String::from_utf8_lossy(&output.stderr)
             .contains("a development HDC is configured only for an isolated development root")
     );
+    assert_eq!(runtime.runs(), Vec::<String>::new());
+    assert!(!runtime.fake_running());
 }
 
 #[test]
@@ -829,15 +858,21 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
             ],
             acknowledged_only,
         ),
+        // A relation file named by anything but an explicit absolute path,
+        // beside the fixture this owner would start as its managed server.
+        (
+            vec![
+                ("ARKDECK_DEVELOPMENT_USB_RELATIONS", "usb-relations.json"),
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", port.as_str()),
+            ],
+            "ARKDECK_DEVELOPMENT_USB_RELATIONS must be an explicit absolute path",
+        ),
     ] {
-        let output = runtime.refused(&environment);
+        let output = runtime.refused_before_any_launch(&environment);
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains(message), "{environment:?}: {stderr}");
         assert!(output.stdout.is_empty(), "{environment:?}");
-        assert!(
-            !runtime.fake_running(),
-            "{environment:?}: no managed server was started"
-        );
     }
     // No development HDC in the isolated root.
     let output = runtime
@@ -847,6 +882,7 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
         .unwrap();
     assert_eq!(output.status.code(), Some(69));
     assert!(String::from_utf8_lossy(&output.stderr).contains(acknowledged_only));
+    assert_eq!(runtime.runs(), Vec::<String>::new());
     // The standalone daemon never reads development relations, acknowledged
     // or not. Its endpoint is one no daemon could bind, so a daemon that
     // did not refuse would fail on another message, never serve.
@@ -862,6 +898,7 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
         "development USB relations beside a registered HDC are acknowledged only for an \
              isolated development root"
     ));
+    assert_eq!(runtime.runs(), Vec::<String>::new());
     assert!(!runtime.fake_running());
 }
 
@@ -871,7 +908,9 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
     // The acknowledgment (maintainer decision 2026-09-20, as option A of
     // 2026-09-19) lets the isolated owner prove a device mutation's state
     // continuity against its own root. Every composition it does not name
-    // fails startup before any server starts.
+    // fails startup before any server starts: the fake never runs, not even
+    // for a readiness probe (TASK-XPA-014; a refusal after the managed
+    // server's launch once left that server running as nobody's child).
     const ACKNOWLEDGMENT: &str = "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY";
     let mut runtime = Runtime::new();
     let port = runtime.port.to_string();
@@ -891,14 +930,10 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
         // for the device it then mutates.
         (vec![(ACKNOWLEDGMENT, "acknowledged")], acknowledged_only),
     ] {
-        let output = runtime.refused(&environment);
+        let output = runtime.refused_before_any_launch(&environment);
         let stderr = String::from_utf8_lossy(&output.stderr);
         assert!(stderr.contains(message), "{environment:?}: {stderr}");
         assert!(output.stdout.is_empty(), "{environment:?}");
-        assert!(
-            !runtime.fake_running(),
-            "{environment:?}: no managed server was started"
-        );
     }
     // The standalone daemon proves its continuity against the installed
     // Runtime's root and never takes this authority. Its endpoint here is one
@@ -916,6 +951,7 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
         "a development mutation authority is acknowledged only for an isolated development \
              root"
     ));
+    assert_eq!(runtime.runs(), Vec::<String>::new());
     assert!(!runtime.fake_running());
     // The one composition it names serves, with its managed server.
     runtime.start_with(&[(ACKNOWLEDGMENT, "acknowledged")]);
@@ -924,28 +960,108 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
     assert_eq!(status.code(), Some(0));
 }
 
+/// A start that fails once its managed server is launched — here its Job
+/// recovery, refusing an admitted Job whose record outlived its journal —
+/// stops that server before the daemon exits and names it by PID: that very
+/// process is gone and nothing of the fake runs (TASK-XPA-014). A daemon that
+/// left its end to whoever dropped the server last could exit while only the
+/// foreground-exit monitor held it, leaving the server as nobody's child.
+#[test]
+fn a_start_that_fails_after_its_launch_stops_the_managed_server() {
+    let _turn = turn();
+    const JOB: &str = "job-082b8363fce0462b4571a62147751099";
+    let runtime = Runtime::new();
+    {
+        let state = runtime.state().join("jobs-state");
+        fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+        let jobs = arkdeck_hoststore::JobStore::open_owner(&state).unwrap();
+        let record = arkdeck_hoststore::JobRecord::decode(
+            &fs::read(fixture(&format!(
+                "job-reconcile-analyzer/before/jobs/{JOB}/job-record.json"
+            )))
+            .unwrap(),
+        )
+        .unwrap();
+        jobs.admit(&record, &"a".repeat(64)).unwrap();
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .recursive(true)
+            .create(state.join("jobs").join(JOB))
+            .unwrap();
+        jobs.persist(&record, "2026-09-26T00:00:00Z").unwrap();
+    }
+    let port = runtime.port.to_string();
+    let output = runtime.refused(&[
+        ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+        ("OHOS_HDC_SERVER_PORT", &port),
+    ]);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.ends_with(&format!(
+            "arkdeck-agentd: internalFailure(\"admitted job {JOB} has a partial durable \
+             projection\")\n"
+        )),
+        "{stderr}"
+    );
+    assert!(output.stdout.is_empty(), "{stderr}");
+    // The start failed after its launch: the server ran, and was ready.
+    assert_eq!(runtime.launches(), 1, "{stderr}");
+    let reported = stderr
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix(
+                "arkdeck-agentd: stopped the managed HDC server this daemon launched (pid ",
+            )
+        })
+        .unwrap_or_else(|| panic!("the daemon named no server it stopped: {stderr}"));
+    let (pid, end) = reported.split_once("), which ").unwrap();
+    let pid: i32 = pid.parse().unwrap();
+    assert!(
+        matches!(end, "ended on signal 15" | "ended on signal 9"),
+        "{stderr}"
+    );
+    assert!(
+        arkdeck_platform::process_argument_record(pid).is_none(),
+        "the server the daemon reported stopped (pid {pid}) still runs"
+    );
+    assert!(
+        !runtime.fake_running(),
+        "the managed server was left running"
+    );
+}
+
 #[test]
 fn the_development_code_sign_helper_is_named_only_where_it_may_be() {
     let _turn = turn();
     // The helper a native deployment stages is the one this bundle carries;
     // an isolated development root may name another, and every composition
-    // that may not, or names one that does not verify, fails startup.
+    // that may not, or names one that does not verify, fails startup, before
+    // the managed server this owner would start is launched.
     const HELPER: &str = "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER";
     let runtime = Runtime::new();
     let junk = runtime.root.join("not-a-helper");
     std::fs::write(&junk, b"not an ELF at all").unwrap();
     let junk = junk.to_str().unwrap();
-    for (environment, message) in [
+    let port = runtime.port.to_string();
+    let managed = [
+        ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+        ("OHOS_HDC_SERVER_PORT", port.as_str()),
+    ];
+    for (helper, message) in [
         (
-            vec![(HELPER, "arkdeck-code-sign-enable")],
+            "arkdeck-code-sign-enable",
             "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER must be an explicit absolute path",
         ),
-        (vec![(HELPER, junk)], "bundled code-sign helper is invalid"),
+        (junk, "bundled code-sign helper is invalid"),
     ] {
-        let output = runtime.refused(&environment);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains(message), "{environment:?}: {stderr}");
-        assert!(!runtime.fake_running(), "{environment:?}");
+        for environment in [
+            vec![(HELPER, helper)],
+            [(HELPER, helper)].iter().chain(&managed).copied().collect(),
+        ] {
+            let output = runtime.refused_before_any_launch(&environment);
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(stderr.contains(message), "{environment:?}: {stderr}");
+        }
     }
     // The standalone daemon and the facade compose only their own bundle's.
     // The endpoint here is one no daemon could bind, so a daemon that did not
@@ -963,5 +1079,6 @@ fn the_development_code_sign_helper_is_named_only_where_it_may_be() {
             "a development code-sign helper is named only for an isolated development root"
         )
     );
+    assert_eq!(runtime.runs(), Vec::<String>::new());
     assert!(!runtime.fake_running());
 }
