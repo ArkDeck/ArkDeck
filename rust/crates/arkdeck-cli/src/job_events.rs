@@ -364,13 +364,14 @@ pub fn event_line(command: &str, sequence: u64, row: &Value, id: &str) -> Value 
     Value::Object(value)
 }
 
-/// The one terminal line every stream ends with, whichever way it ended.
+/// The one terminal line every stream ends with, whichever way it ended: a
+/// success carries its result and the exit status it gives the process.
 pub fn terminal_line(
     command: &str,
     sequence: u64,
     id: &str,
     last_cursor: Option<&str>,
-    outcome: Result<&Value, &CliError>,
+    outcome: Result<(&Value, u8), &CliError>,
 ) -> Value {
     let mut value = Map::from_iter([
         ("schemaVersion".to_owned(), json!(EVENT_SCHEMA)),
@@ -384,9 +385,9 @@ pub fn terminal_line(
         ),
     ]);
     match outcome {
-        Ok(result) => {
+        Ok((result, exit)) => {
             value.insert("ok".to_owned(), json!(true));
-            value.insert("exitCode".to_owned(), json!(0));
+            value.insert("exitCode".to_owned(), json!(exit));
             value.insert("result".to_owned(), result.clone());
         }
         Err(error) => {
@@ -624,9 +625,17 @@ mod stream_tests {
         let terminal = terminal_line("job.watch", 1, "ctl-a", quiet.last_cursor(), Err(&failure));
         assert_eq!(terminal["lastCursor"], Value::Null);
         let done = json!({"state":"succeeded"});
-        let terminal = terminal_line("job.wait", 3, "ctl-a", Some("cursor-e1"), Ok(&done));
+        let terminal = terminal_line("job.wait", 3, "ctl-a", Some("cursor-e1"), Ok((&done, 0)));
         assert_eq!(terminal["ok"], true);
         assert_eq!(terminal["exitCode"], 0);
         assert_eq!(terminal["result"], done);
+        // A settled Job that failed still ends the stream successfully: the
+        // read succeeded, and the exit status says what the Job did.
+        let failed = json!({"state":"failed"});
+        let terminal = terminal_line("job.wait", 4, "ctl-a", None, Ok((&failed, 1)));
+        assert_eq!(
+            (&terminal["ok"], &terminal["exitCode"]),
+            (&json!(true), &json!(1))
+        );
     }
 }

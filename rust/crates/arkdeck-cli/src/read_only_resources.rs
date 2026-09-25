@@ -202,7 +202,7 @@ pub(super) fn publication(v: &Value) -> bool {
             _ => false,
         }
 }
-fn typed_failure(v: &Value) -> bool {
+pub(super) fn typed_failure(v: &Value) -> bool {
     keys(
         v,
         &[
