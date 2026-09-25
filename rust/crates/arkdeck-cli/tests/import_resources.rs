@@ -84,31 +84,35 @@ fn imports_keep_current_swift_leaf_argv_and_inspect_uses_reference_inspection() 
 }
 #[test]
 fn import_owner_errors_remain_distinct_and_lost_mutation_responses_are_unknown() {
-    for (code, exit) in [
-        ("invalidInput", 65),
-        ("idempotencyConflict", 65),
-        ("resourceConflict", 65),
-        ("resourceNotFound", 65),
-        ("artifactIntegrityFailed", 2),
-        ("recordUnreadable", 2),
-        ("quotaExceeded", 69),
-        ("operationUnavailable", 69),
-    ] {
-        let actual = CliError::from_client(
-            ClientError::Remote(WireError {
-                code: code.into(),
-                message: "fixture".into(),
-                details: Some(
-                    json!({"phase":"importOwner","newDispatchCount":0})
-                        .as_object()
-                        .unwrap()
-                        .clone(),
-                ),
-            }),
-            "artifact.import.append",
-        );
-        assert_eq!(actual.code, code);
-        assert_eq!(actual.exit_code(), exit);
+    // The upload's mutations keep each Import owner code its evidence proves,
+    // commit's four owner refusals among them (§8.4, as Swift's mapper).
+    for method in ["artifact.import.append", "artifact.import.commit"] {
+        for (code, exit) in [
+            ("invalidInput", 65),
+            ("idempotencyConflict", 65),
+            ("resourceConflict", 65),
+            ("resourceNotFound", 65),
+            ("artifactIntegrityFailed", 2),
+            ("recordUnreadable", 2),
+            ("quotaExceeded", 69),
+            ("operationUnavailable", 69),
+        ] {
+            let actual = CliError::from_client(
+                ClientError::Remote(WireError {
+                    code: code.into(),
+                    message: "fixture".into(),
+                    details: Some(
+                        json!({"phase":"importOwner","newDispatchCount":0})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                    ),
+                }),
+                method,
+            );
+            assert_eq!(actual.code, code, "{method}");
+            assert_eq!(actual.exit_code(), exit, "{method}");
+        }
     }
     for method in [
         "artifact.import.begin",

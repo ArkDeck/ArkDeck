@@ -199,6 +199,137 @@ final class DurableImportContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  /// `TASK-XPA-017`: `artifact.import.commit` refused by the Import owner, as
+  /// Swift's daemon answers each refusal through its handler — the owner's
+  /// code and message, its `importOwner` zero-dispatch evidence, and nothing
+  /// published. Run with `ARKDECK_CONTROL_FRAME_LOG`, these are the frames the
+  /// method's contract publishes `resourceNotFound`, `resourceConflict`,
+  /// `artifactIntegrityFailed` and `quotaExceeded` from, so a Runtime held to
+  /// that contract answers them instead of rewriting them.
+  func testCommitRefusalsCarryTheImportOwnersCodeMessageAndEvidence() async throws {
+    try startServer()
+    let configured = try XCTUnwrap(handler)
+    func send(
+      _ method: String, _ params: [String: JSONValue], through owner: RuntimeControlPlaneHandler
+    ) async throws -> AgentWireProtocol.Response {
+      let request = try ArkDeckAgentXPC.requestFrame(
+        method: method, params: params, requestID: "import-commit-refusal")
+      return try JSONDecoder().decode(
+        AgentWireProtocol.Response.self, from: await owner.handleLine(request))
+    }
+    func begin(
+      _ fields: [String: JSONValue], through owner: RuntimeControlPlaneHandler
+    ) async throws -> String {
+      let response = try await send("artifact.import.begin", fields, through: owner)
+      return try ArtifactImportProjection(XCTUnwrap(response.result)).id
+    }
+    // One chunk, as the App and the CLI send an upload this small.
+    func append(
+      _ id: String, _ bytes: Data, through owner: RuntimeControlPlaneHandler
+    ) async throws {
+      let response = try await send(
+        "artifact.import.append",
+        [
+          "importId": .string(id), "generation": .string("1"), "offset": .string("0"),
+          "byteCount": .string(String(bytes.count)),
+          "sha256": .string(SHA256Hex.string(of: bytes)),
+          "base64": .string(bytes.base64EncodedString()),
+        ], through: owner)
+      XCTAssertNil(response.error)
+    }
+    func refused(
+      _ id: String, through owner: RuntimeControlPlaneHandler, code: String, message: String,
+      file: StaticString = #filePath, line: UInt = #line
+    ) async throws {
+      let response = try await send(
+        "artifact.import.commit", ["importId": .string(id), "generation": .string("1")],
+        through: owner)
+      XCTAssertFalse(response.ok, file: file, line: line)
+      XCTAssertNil(response.result, file: file, line: line)
+      XCTAssertEqual(
+        response.error,
+        AgentWireProtocol.WireError(
+          code: code, message: message,
+          details: ["phase": .string("importOwner"), "newDispatchCount": .integer(0)]),
+        file: file, line: line)
+    }
+
+    // An Import this Runtime never began.
+    try await refused(
+      "imp-00000000-0000-0000-0000-000000000001", through: configured,
+      code: "resourceNotFound", message: "Import does not exist")
+
+    // An upload whose bytes have not all arrived.
+    let incomplete = try await begin(
+      object(intent("commit-incomplete").projection), through: configured)
+    try await append(incomplete, Data(hap.prefix(2048)), through: configured)
+    try await refused(
+      incomplete, through: configured,
+      code: "resourceConflict", message: "Import is incomplete or no longer uploadable")
+
+    // A complete upload whose Target this Runtime no longer holds.
+    let unadopted = try await begin(
+      object(intent("commit-unadopted").projection), through: configured)
+    try await append(unadopted, hap, through: configured)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: root.appending(path: "refusal-capabilities"))
+    let noTargets = try RuntimeTargetStore(directoryURL: root.appending(path: "unadopted-targets"))
+    let withoutTarget = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"],
+      nowUTC: { "2026-09-01T00:00:00Z" }, targetStore: noTargets, artifactStore: artifacts)
+    try await refused(
+      unadopted, through: withoutTarget,
+      code: "resourceConflict", message: "the exact target binding is no longer current")
+
+    // A complete upload bound, when it began, to another identity of its Target.
+    let rebound = try ArtifactImportProjection(
+      await artifacts.beginImport(
+        intent("commit-rebound"),
+        binding: .init(
+          targetID: target.targetID, bindingRevision: target.bindingRevision,
+          stableIdentitySHA256: String(repeating: "a", count: 64)))
+    ).id
+    try await append(rebound, hap, through: configured)
+    try await refused(
+      rebound, through: configured,
+      code: "resourceConflict", message: "target binding changed during Import")
+
+    // A complete upload whose bytes are not the ones its metadata names.
+    var mismatched = try object(intent("commit-digest").projection)
+    mismatched["sha256"] = .string(SHA256Hex.string(of: Data(repeating: 0x62, count: hap.count)))
+    let digest = try await begin(mismatched, through: configured)
+    try await append(digest, hap, through: configured)
+    try await refused(
+      digest, through: configured,
+      code: "artifactIntegrityFailed", message: "Import source digest does not match its metadata")
+
+    // A complete, valid upload the Artifact store has no room to publish.
+    let crowdedStore = try RuntimeArtifactStore(
+      rootURL: root.appending(path: "crowded-artifacts"), quota: ArtifactQuota(totalBytes: 1024),
+      nowUTC: { "2026-09-01T00:00:00Z" })
+    let crowdedHandler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"],
+      nowUTC: { "2026-09-01T00:00:00Z" }, targetStore: targets, artifactStore: crowdedStore)
+    let crowded = try await begin(
+      object(intent("commit-quota").projection), through: crowdedHandler)
+    try await append(crowded, hap, through: crowdedHandler)
+    try await refused(
+      crowded, through: crowdedHandler,
+      code: "quotaExceeded", message: "Artifact capacity is exhausted; the Import remains discoverable")
+
+    // Every refused upload stays where it was, with no receipt; the one the
+    // store had no room for keeps its durable commit intent.
+    for id in [incomplete, unadopted, rebound, digest] {
+      let record = try await artifacts.inspectImport(id: id)
+      XCTAssertEqual(record.state, "inProgress", id)
+      XCTAssertNil(record.receipt, id)
+    }
+    let pending = try await crowdedStore.inspectImport(id: crowded)
+    XCTAssertEqual(pending.state, "committing")
+    XCTAssertNil(pending.receipt)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testAppAndCLIUseTheSameTypedImportWithoutSharingUploadOwnership() async throws {
     try startServer()
     let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())
