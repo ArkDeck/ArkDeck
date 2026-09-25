@@ -1,0 +1,8 @@
+{
+  "answers" : "Fixtures/ControlFrames/job.evidence.jsonl",
+  "owners" : [
+    "CurrentRuntimeResourceReads.evidence",
+    "RuntimeHardwareEvidenceTrustedFacts"
+  ],
+  "producer" : "CLIDomainExecutorEvidenceOracleContractTests"
+}
