@@ -563,6 +563,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--action-file"
                 | "--source-sha256"
                 | "--build-sha256"
+                | "--archive-sha256"
                 | "--inputs-file"
                 | "--expected-binding-revision"
                 | "--request-id"
@@ -635,6 +636,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--action-file" => "actionFile",
                         "--source-sha256" => "sourceSha256",
                         "--build-sha256" => "buildSha256",
+                        "--archive-sha256" => "archiveSha256",
                         "--inputs-file" => "inputsFile",
                         "--expected-binding-revision" => "expectedBindingRevision",
                         "--request-id" => "requestId",
@@ -784,6 +786,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "bootloader-status"] => "flash.bootloader-status",
         ["flash", "device-access"] => "flash.device-access",
         ["flash", "prerequisites"] => "flash.prerequisites",
+        ["flash", "lane-preview"] => "flash.lane-preview",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
         ["recovery", "flash-invocation", "start"] => "recovery.flash-invocation.start",
         ["recovery", "flash-invocation", "evaluate"] => "recovery.flash-invocation.evaluate",
@@ -957,6 +960,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "debug.probe" => &["targetId"],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
+        "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
         "recovery.flash-invocation.start" | "debug.start" => &["requestFile"],
@@ -1544,6 +1548,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "debug.evaluate"
         } else if command == "flash.bind-loader" {
             "flash.bind-current-loader"
+        } else if command == "flash.lane-preview" {
+            // Swift's handler keeps the 1.x wire spelling: CLI spec §12
+            // freezes the method tokens, so the command name is a mapping.
+            "flash.lanePlanPreview"
         } else {
             command
         },
@@ -1621,6 +1629,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "flash.reconcile-alias"
                     | "flash.bind-loader"
                     | "flash.prerequisites"
+                    | "flash.lane-preview"
                     | "recovery.flash-invocation.list"
                     | "recovery.flash-invocation.start"
                     | "recovery.flash-invocation.evaluate"

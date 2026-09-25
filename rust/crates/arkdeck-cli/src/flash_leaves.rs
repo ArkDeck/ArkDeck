@@ -1,16 +1,38 @@
 //! The Flash leaves that read or repair what the Runtime keeps about a board
 //! without changing the board: `flash bootloader-status`, `flash
-//! prerequisites`, `flash reconcile-alias`, `flash bind-loader` and `recovery
-//! flash-invocation list|start|evaluate|status`, with `debug
-//! start|evaluate|status`, the legacy spelling of the last three. Each is one request, answered as the Runtime answers it (Swift
+//! prerequisites`, `flash lane-preview`, `flash reconcile-alias`, `flash
+//! bind-loader` and `recovery flash-invocation list|start|evaluate|status`,
+//! with `debug start|evaluate|status`, the legacy spelling of the last three.
+//! Each is one request, answered as the Runtime answers it (Swift
 //! `runFlashObservation` and `emitFlashInvocation`); every judgement of the
-//! board, the binding, the alias and the invocation documents is the
-//! Runtime's.
+//! board, the binding, the alias, the archive and the invocation documents is
+//! the Runtime's.
 use crate::CliError;
 use serde_json::{Map, Value, json};
 
 fn invalid(message: &str) -> CliError {
     CliError::new("invalidOption", message)
+}
+
+/// The registry's `hexDigest(length: 64)` grammar, which Swift's parser
+/// judges before the handler runs: the refusal names the leaf's path and the
+/// option.
+fn digest(
+    command: &str,
+    fields: &Map<String, Value>,
+    key: &str,
+    option: &str,
+) -> Result<(), CliError> {
+    if fields
+        .get(key)
+        .is_some_and(crate::session_resources::digest)
+    {
+        return Ok(());
+    }
+    Err(invalid(&format!(
+        "`{}` {option} must be 64 lowercase hex digits",
+        command.replace('.', " ")
+    )))
 }
 
 /// The registry's grammar of each leaf's options, judged before any request:
@@ -35,6 +57,22 @@ pub(crate) fn configure(
                 .remove("deviceProfile")
                 .ok_or_else(|| invalid("flash prerequisites requires --device-profile"))?;
             fields.insert("profileReference".into(), profile);
+        }
+        // The same two, and the imported archive's digest, which the
+        // registry requires as 64 lowercase hex digits (Swift's daemon itself
+        // takes any 64 hex digits); which archive it names is the Runtime's.
+        "flash.lane-preview" => {
+            if !fields.contains_key("targetId") {
+                return Err(invalid("flash lane-preview requires --target"));
+            }
+            let profile = fields
+                .remove("deviceProfile")
+                .ok_or_else(|| invalid("flash lane-preview requires --device-profile"))?;
+            fields.insert("profileReference".into(), profile);
+            if !fields.contains_key("archiveSha256") {
+                return Err(invalid("flash lane-preview requires --archive-sha256"));
+            }
+            digest(command, fields, "archiveSha256", "--archive-sha256")?;
         }
         // Both name a Target and the revision the caller saw; Swift sends
         // the revision as an integer.
@@ -97,6 +135,13 @@ pub(crate) fn configure(
             }
             if !fields.contains_key("actionFile") {
                 return Err(invalid("flash-invocation requires --action-file"));
+            }
+            // The current spelling's registry takes both digests as 64
+            // lowercase hex digits; the legacy one takes them opaque, and
+            // the Runtime judges what it is sent.
+            if command == "recovery.flash-invocation.evaluate" {
+                digest(command, fields, "sourceSha256", "--source-sha256")?;
+                digest(command, fields, "buildSha256", "--build-sha256")?;
             }
         }
         _ => {}

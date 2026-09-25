@@ -222,6 +222,89 @@ mod runtime {
         );
     }
 
+    /// The current spelling's registry takes both pinned digests as 64
+    /// lowercase hex digits, judged at parse, before the action is read; the
+    /// legacy spelling takes them opaque and sends them, and the Runtime's
+    /// refusal is Swift's (the oracle's two provenance exchanges).
+    #[test]
+    fn a_pinned_digest_outside_the_current_grammar_is_refused_at_parse() {
+        let invocation = "debug-00000000-0000-4000-8000-000000000000";
+        for (name, option) in [
+            ("evaluate.provenance.uppercase", "--source-sha256"),
+            ("evaluate.provenance.short", "--build-sha256"),
+        ] {
+            let mut recorded = exchange(name);
+            recorded["answer"]["error"]
+                .as_object_mut()
+                .unwrap()
+                .remove("details");
+            let params = &recorded["params"];
+            let (source, build) = (
+                params["sourceSha256"].as_str().unwrap(),
+                params["buildSha256"].as_str().unwrap(),
+            );
+            let output = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+                .args(["recovery", "flash-invocation", "evaluate"])
+                .args(["--invocation", invocation])
+                .args([
+                    "--action-file",
+                    "/nonexistent/arkdeck-cli-broker-action.json",
+                ])
+                .args(["--source-sha256", source, "--build-sha256", build])
+                .args([
+                    "--socket",
+                    "/nonexistent/arkdeck-cli-broker.sock",
+                    "--output",
+                    "json",
+                ])
+                .output()
+                .unwrap();
+            let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(output.status.code(), Some(64), "{name}: {envelope}");
+            assert_eq!(envelope["command"], "recovery.flash-invocation.evaluate");
+            assert_eq!(envelope["error"]["code"], "invalidOption");
+            assert_eq!(
+                envelope["error"]["message"],
+                format!(
+                    "`recovery flash-invocation evaluate` {option} must be 64 lowercase hex digits"
+                )
+            );
+
+            let action = Document::new(params["actionJson"].as_str().unwrap());
+            let (output, envelope) = support::run_session(
+                &[
+                    "debug",
+                    "evaluate",
+                    "--invocation",
+                    invocation,
+                    "--action-file",
+                    action.path(),
+                    "--source-sha256",
+                    source,
+                    "--build-sha256",
+                    build,
+                ],
+                vec![
+                    health(),
+                    (
+                        "debug.evaluate".to_owned(),
+                        json!({
+                            "invocationId": invocation, "actionJson": params["actionJson"],
+                            "sourceSha256": source, "buildSha256": build,
+                        }),
+                        recorded["answer"].clone(),
+                    ),
+                ],
+            );
+            assert_ne!(output.status.code(), Some(0), "{name}");
+            assert_eq!(envelope["command"], "debug.evaluate");
+            assert_eq!(
+                envelope["error"]["message"], recorded["answer"]["error"]["message"],
+                "{name}: {envelope}"
+            );
+        }
+    }
+
     #[test]
     fn a_document_the_leaf_cannot_read_is_refused_before_any_connection() {
         let missing = std::env::temp_dir()
