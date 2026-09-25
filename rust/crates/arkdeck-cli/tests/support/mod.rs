@@ -11,6 +11,8 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::process::{Command, Output};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// The CLI, asked for the machine answer unless the test names its own output
 /// mode (the two streaming leaves serve `jsonl`, and one of them no `json`).
@@ -124,7 +126,9 @@ pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Valu
 
 /// The same, for a leaf whose own deadline may end its wait before it asks for
 /// every answer the test offers: the trailing exchanges it never asks for are
-/// allowed.
+/// allowed. How many it asks for is the leaf's own deadline's to decide, so
+/// the fake Runtime waits for the next exchange until the CLI has exited, never
+/// for a guess at its pace.
 pub fn run_partial(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
     connections(argv, replies, false)
 }
@@ -147,6 +151,8 @@ fn connections(
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let acceptor = listener.try_clone().unwrap();
     acceptor.set_nonblocking(true).unwrap();
+    let exited = Arc::new(AtomicBool::new(false));
+    let cli_exited = Arc::clone(&exited);
     let server = std::thread::spawn(move || {
         let mut unserved = Vec::new();
         let mut ended = false;
@@ -155,17 +161,20 @@ fn connections(
                 unserved.push(method);
                 continue;
             }
-            // The CLI may have ended before this exchange: never wait for it
-            // past a bound, and where its own deadline decides how many
-            // exchanges there are, stop waiting as soon as one does not come.
-            let deadline = std::time::Instant::now()
-                + std::time::Duration::from_secs(if exact { 10 } else { 1 });
+            // The CLI may have ended before this exchange. Once it has exited,
+            // every connection it made is already queued, so an accept that
+            // finds none after that is the end of its exchanges; the bound
+            // only keeps a CLI that hangs from hanging the test.
+            let bound = std::time::Instant::now()
+                + std::time::Duration::from_secs(if exact { 10 } else { 60 });
             let stream = loop {
+                let gone = cli_exited.load(Ordering::SeqCst);
                 match acceptor.accept() {
                     Ok((stream, _)) => break Some(stream),
                     Err(error)
                         if error.kind() == std::io::ErrorKind::WouldBlock
-                            && std::time::Instant::now() < deadline =>
+                            && !gone
+                            && std::time::Instant::now() < bound =>
                     {
                         std::thread::sleep(std::time::Duration::from_millis(10));
                     }
@@ -228,6 +237,7 @@ fn connections(
         unserved
     });
     let output = invoke(argv, &path);
+    exited.store(true, Ordering::SeqCst);
     let unserved = server.join().unwrap();
     assert!(
         !exact || unserved.is_empty(),

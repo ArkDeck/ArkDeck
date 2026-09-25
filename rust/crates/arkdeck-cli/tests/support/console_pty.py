@@ -63,8 +63,8 @@ try:
     command = [config["binary"], "human-action", "resume", "--human-action",
                config["params"]["humanAction"], "--resume-reference",
                config["params"]["resumeReference"], "--output", "json", "--socket", path]
-    if config.get("timeout"):
-        command += ["--timeout", config["timeout"]]
+    if config.get("timeout_ms"):
+        command += ["--timeout", "%dms" % config["timeout_ms"]]
     process = subprocess.Popen(command, stdin=slave, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     os.close(slave)
     slave = None
@@ -75,9 +75,15 @@ try:
         ready, _, _ = select.select([process.stderr], [], [], 0.1)
         if ready:
             diagnostics += os.read(process.stderr.fileno(), 65536)
+    prompted = time.monotonic()
     if b"\n> " in diagnostics:
-        if config.get("delay_ms"):
-            time.sleep(config["delay_ms"] / 1000)
+        if config.get("timeout_ms"):
+            # The CLI's deadline began before its first request, so before it
+            # prompted: once the whole budget has passed since the prompt was
+            # seen, it has expired, however slowly the CLI started.
+            expired = prompted + config["timeout_ms"] / 1000 + 0.05
+            while time.monotonic() < expired:
+                time.sleep(max(0.0, expired - time.monotonic()))
         os.write(master, bytes(config["input"]))
     stdout, stderr = process.communicate(timeout=8)
     print(json.dumps({"exit": process.returncode, "stdout": stdout.decode(),

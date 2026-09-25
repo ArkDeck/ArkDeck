@@ -87,12 +87,16 @@ impl LoopbackServerLease {
     }
 }
 
-/// How [`end_proved_process`] left the process a receipt names.
+/// How [`end_proved_process`] left the process a receipt names. Every answer
+/// means that process's exit has finished: the kernel has closed its
+/// descriptors, so no listener of its own accepts any more.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProvedProcessEnd {
-    /// The kernel no longer reported its birth: nothing was signalled.
+    /// Its exit had begun, or finished, before the call (the kernel no longer
+    /// reported its birth): nothing was signalled.
     AlreadyEnded,
-    /// SIGTERM ended it within the grace.
+    /// SIGTERM ended it: within the grace, or its exit was under way when the
+    /// grace ran out.
     Terminated,
     /// It outlived the grace, and SIGKILL ended it.
     Killed,
@@ -103,11 +107,16 @@ const END_PROBE: std::time::Duration = std::time::Duration::from_millis(10);
 
 /// Ends the one process an identity receipt names, as a daemon's own stop
 /// ends its server: SIGTERM, then SIGKILL once `grace` has passed, returning
-/// when the kernel no longer reports the receipt's birth for the PID (an
-/// exited process has none, reaped or not). The birth, and that the calling
-/// user runs it, are read again immediately before each signal, and nothing
-/// is signalled once they differ: no descriptor pins a process that is not
-/// this one's child, so this is how a PID recycled since the receipt is never
+/// once the kernel lists that process's exit as finished (`exit_progress`).
+/// The birth `proc_pidinfo` reports cannot say so: the kernel stops reporting
+/// it the moment the exit begins, while the process still holds its
+/// descriptors and a listener of its own still accepts, so an answer taken
+/// from it could leave the endpoint served after its server was reported
+/// ended. An exit under way is given `kill_grace` to finish, and one that
+/// does not is an error, never an end. The birth, and that the calling user
+/// runs it, are read again immediately before each signal, and nothing is
+/// signalled once they differ: no descriptor pins a process that is not this
+/// one's child, so this is how a PID recycled since the receipt is never
 /// signalled (the kernel hands PIDs out in turn). Only that PID is signalled,
 /// never a group. Whether the process is the caller's to end is the caller's
 /// proof; this never decides it.
@@ -127,15 +136,29 @@ pub fn end_proved_process(
                     == (receipt.start_seconds, receipt.start_microseconds)
         })
     };
-    let gone_within = |within: std::time::Duration| {
+    // A process list the kernel will not give is no proof of an end.
+    let finished = || matches!(exit_progress(receipt), Ok(ExitProgress::Finished));
+    let finished_within = |within: std::time::Duration| {
         let deadline = std::time::Instant::now() + within;
         while std::time::Instant::now() < deadline {
-            if !alive() {
+            if finished() {
                 return true;
             }
             std::thread::sleep(END_PROBE);
         }
-        !alive()
+        finished()
+    };
+    // An exit under way that nothing more can hasten: SIGTERM's once SIGKILL
+    // would be moot, or one that began before this call.
+    let under_way = |end: ProvedProcessEnd| {
+        if finished_within(kill_grace) {
+            Ok(end)
+        } else {
+            Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "the proved process did not finish exiting",
+            ))
+        }
     };
     // Signals the PID only while it still has the receipt's birth; true once
     // the signal was delivered.
@@ -152,21 +175,104 @@ pub fn end_proved_process(
         if alive() { Err(error) } else { Ok(false) }
     };
     if !signal(libc::SIGTERM)? {
-        return Ok(ProvedProcessEnd::AlreadyEnded);
+        return under_way(ProvedProcessEnd::AlreadyEnded);
     }
-    if gone_within(grace) {
+    if finished_within(grace) {
         return Ok(ProvedProcessEnd::Terminated);
     }
     if !signal(libc::SIGKILL)? {
-        return Ok(ProvedProcessEnd::Terminated);
+        return under_way(ProvedProcessEnd::Terminated);
     }
-    if gone_within(kill_grace) {
+    if finished_within(kill_grace) {
         return Ok(ProvedProcessEnd::Killed);
     }
     Err(io::Error::new(
         io::ErrorKind::TimedOut,
         "the proved process outlived SIGKILL",
     ))
+}
+
+/// How far the exit of the process a receipt names has come, as the kernel's
+/// process list (`sysctl` `KERN_PROC_PID`) has it. Unlike `proc_pidinfo`,
+/// which stops reporting a process as soon as its exit begins, the list keeps
+/// it while its threads end and the kernel closes its descriptors, marked as
+/// exiting, and names it a zombie only once that is done, until its parent
+/// reaps it and the PID leaves the list.
+#[derive(Debug, PartialEq, Eq)]
+enum ExitProgress {
+    /// Listed with the receipt's birth, and not yet a zombie.
+    Unfinished,
+    /// A zombie with the receipt's birth, or no longer listed with it: the
+    /// PID is unlisted, or listed with another birth (reaped, then handed
+    /// out again).
+    Finished,
+}
+
+/// `struct kinfo_proc` (<sys/sysctl.h>) as far as this reads it: its
+/// `kp_proc` (`struct extern_proc`) opens with the start time
+/// (`p_un.__p_starttime`), two pointers, `p_flag`, `p_stat` and `p_pid`; the
+/// rest is carried unread, to the size the kernel writes.
+#[repr(C)]
+struct ListedProcess {
+    start: libc::timeval,
+    _vmspace: *mut libc::c_void,
+    _sigacts: *mut libc::c_void,
+    _flag: libc::c_int,
+    stat: libc::c_char,
+    pid: libc::pid_t,
+    _rest: [u8; 604],
+}
+
+const _: () = {
+    assert!(std::mem::size_of::<ListedProcess>() == 648);
+    assert!(std::mem::offset_of!(ListedProcess, stat) == 36);
+    assert!(std::mem::offset_of!(ListedProcess, pid) == 40);
+};
+
+fn exit_progress(receipt: &ServerIdentityReceipt) -> io::Result<ExitProgress> {
+    // SAFETY: all zeroes is a valid ListedProcess (integers, bytes and null
+    // pointers, none of which is ever dereferenced).
+    let mut listed: ListedProcess = unsafe { std::mem::zeroed() };
+    let mut size = std::mem::size_of::<ListedProcess>();
+    let mut name = [
+        libc::CTL_KERN,
+        libc::KERN_PROC,
+        libc::KERN_PROC_PID,
+        receipt.pid,
+    ];
+    // SAFETY: the name is a live four-entry MIB and the out pointer a live,
+    // writable ListedProcess of the declared size, `struct kinfo_proc`'s;
+    // the kernel reports how much it wrote.
+    let status = unsafe {
+        libc::sysctl(
+            name.as_mut_ptr(),
+            4,
+            (&mut listed as *mut ListedProcess).cast(),
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if status != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    if size == 0 {
+        return Ok(ExitProgress::Finished);
+    }
+    if size != std::mem::size_of::<ListedProcess>() || listed.pid != receipt.pid {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "the kernel's process list answered another shape",
+        ));
+    }
+    let same_birth = u64::try_from(listed.start.tv_sec).ok() == Some(receipt.start_seconds)
+        && u64::try_from(listed.start.tv_usec).ok() == Some(receipt.start_microseconds);
+    let zombie = u32::try_from(listed.stat).ok() == Some(libc::SZOMB);
+    Ok(if same_birth && !zombie {
+        ExitProgress::Unfinished
+    } else {
+        ExitProgress::Finished
+    })
 }
 
 /// Swift `scan`: every process running the verified executable is examined;

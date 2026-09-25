@@ -319,11 +319,12 @@ fn the_endpoint_must_be_the_exact_ipv4_loopback() {
 
 /// What a daemon may do with a proof (TASK-XPA-014): end the one server
 /// process it names and nothing else. SIGTERM ends a server that heeds it,
-/// SIGKILL after the grace one that ignores it; a receipt whose birth the
-/// kernel does not report for its PID — a recycled PID's, here one
-/// microsecond off — signals nothing, and neither does a receipt of a
-/// process that has already ended. A PID kill(2) would read as a group or as
-/// every process is refused outright.
+/// SIGKILL after the grace one that ignores it, and either is answered only
+/// once the process's exit has finished (TASK-XPA-016): its listener is gone
+/// even before it is reaped. A receipt whose birth the kernel does not report
+/// for its PID — a recycled PID's, here one microsecond off — signals
+/// nothing, and neither does a receipt of a process that has already ended. A
+/// PID kill(2) would read as a group or as every process is refused outright.
 #[test]
 fn only_the_proved_process_is_ended_and_one_that_ignores_sigterm_is_killed() {
     use arkdeck_platform::{ProvedProcessEnd, ServerIdentityReceipt, end_proved_process};
@@ -359,6 +360,12 @@ fn only_the_proved_process_is_ended_and_one_that_ignores_sigterm_is_killed() {
         assert_eq!(
             end_proved_process(lease.identity(), grace, kill_grace).unwrap(),
             expected
+        );
+        // Answered only once its exit finished, not when its birth went (as
+        // its exit began): not yet reaped, it holds its endpoint no longer.
+        assert!(
+            TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok(),
+            "the ended server still holds its endpoint"
         );
         // This test's own child: ended (a zombie has no birth), reaped here.
         assert_eq!(listener.0.wait().unwrap().signal(), Some(signal));
