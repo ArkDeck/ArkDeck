@@ -104,6 +104,24 @@ impl AnalyzerProfiles {
     pub fn profiles(&self) -> &[AnalyzerProfile] {
         &self.profiles
     }
+
+    /// Swift's daemon composition of the two ArkTrace analyzers when no
+    /// descriptor is named (`ARKDECK_ARKTRACE_DESCRIPTOR` unset): both
+    /// unavailable as `analyzer.arktraceNotFound`.
+    pub fn without_arktrace(mut self) -> Self {
+        for analyzer_ref in [
+            crate::arktrace_profile::SUMMARY_REF,
+            crate::arktrace_profile::ANALYSIS_REF,
+        ] {
+            self.unavailable.insert(
+                analyzer_ref.to_owned(),
+                crate::arktrace_profile::ArkTraceProfileError::NotFound
+                    .reason()
+                    .to_owned(),
+            );
+        }
+        self
+    }
 }
 
 impl AnalyzerComposition for AnalyzerProfiles {
@@ -144,7 +162,29 @@ pub(crate) fn runtime_availability<'a>(
     if !profile.still_matches() {
         return Err(("tool_identity_drift", "analyzer.toolIdentityDrift".into()));
     }
+    if !profile.pins_still_match() {
+        return Err((
+            "tool_identity_drift",
+            "analyzer.profileIdentityDrift".into(),
+        ));
+    }
     Ok(profile)
+}
+
+/// The reason the host gave for an analyzer operation's analyzer it has no
+/// profile for — Swift's own answer for it, whatever this Runtime executes.
+pub(crate) fn host_unavailable_reason(
+    composition: Option<&dyn AnalyzerComposition>,
+    reference: &str,
+) -> Option<(&'static str, String)> {
+    let analyzer_ref = analyzer_for_operation(reference)?;
+    let composition = composition?;
+    if composition.profile(analyzer_ref).is_some() {
+        return None;
+    }
+    composition
+        .unavailable_reason(analyzer_ref)
+        .map(|reason| ("provider_tool_unavailable", reason.to_owned()))
 }
 
 #[cfg(test)]
@@ -176,5 +216,121 @@ mod tests {
                 [derived_artifact_name(analyzer_ref)]
             );
         }
+    }
+
+    struct Scratch(std::path::PathBuf);
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn scratch() -> Scratch {
+        let path = std::path::PathBuf::from(format!(
+            "/private/tmp/arkdeck-analyzer-composition-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        std::fs::create_dir(&path).unwrap();
+        Scratch(path)
+    }
+
+    fn write(path: &std::path::Path, bytes: &[u8], mode: u32) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::write(path, bytes).unwrap();
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+    }
+
+    #[test]
+    fn without_arktrace_names_both_trace_analyzers_not_found() {
+        let composition = AnalyzerProfiles::default().without_arktrace();
+        for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
+            assert_eq!(
+                host_unavailable_reason(Some(&composition), reference),
+                Some((
+                    "provider_tool_unavailable",
+                    "analyzer.arktraceNotFound".to_owned()
+                ))
+            );
+            assert_eq!(
+                runtime_availability(Some(&composition), reference).err(),
+                Some((
+                    "provider_tool_unavailable",
+                    "analyzer.arktraceNotFound".to_owned()
+                ))
+            );
+        }
+        // No reason for an analyzer the host said nothing about.
+        assert_eq!(
+            host_unavailable_reason(Some(&composition), CRASH_SIGNATURE),
+            None
+        );
+        assert_eq!(
+            host_unavailable_reason(
+                Some(&AnalyzerProfiles::default()),
+                "analyzer.summarize-trace@1"
+            ),
+            None
+        );
+        assert_eq!(
+            host_unavailable_reason(None, "analyzer.summarize-trace@1"),
+            None
+        );
+    }
+
+    /// Swift `runtimeAvailability`: the executable, then every pinned file
+    /// and tree, each measured again at every read.
+    #[test]
+    fn pinned_files_and_trees_drift_by_name() {
+        let scratch = scratch();
+        let root = &scratch.0;
+        let analyzer = root.join("analyzer");
+        write(&analyzer, b"#!/bin/sh\nexit 64\n", 0o755);
+        let pinned = root.join("pinned.json");
+        write(&pinned, b"{}\n", 0o644);
+        let tree = root.join("tree");
+        std::fs::create_dir(&tree).unwrap();
+        write(&tree.join("leaf"), b"leaf\n", 0o644);
+        let tree_path = tree.to_str().unwrap().to_owned();
+        let tree_digest = arkdeck_platform::tree_snapshot(
+            &crate::hilog_summary::profile_path(&tree_path, false).unwrap(),
+            &tree_path,
+        )
+        .unwrap()
+        .sha256;
+        let mut profile = AnalyzerProfile::crash_signature(&analyzer).unwrap();
+        profile.pinned_files = vec![crate::arktrace_profile::PinnedFile {
+            path: pinned.to_str().unwrap().to_owned(),
+            sha256: arkdeck_contract::sha256_hex(b"{}\n"),
+            byte_count: 3,
+            require_executable: false,
+        }];
+        profile.pinned_trees = vec![crate::arktrace_profile::PinnedTree {
+            path: tree_path,
+            sha256: tree_digest,
+        }];
+        let available = |profile: &AnalyzerProfile| {
+            runtime_availability(Some(profile), CRASH_SIGNATURE)
+                .map(|_| ())
+                .map_err(|(code, reason)| format!("{code} {reason}"))
+        };
+        assert_eq!(available(&profile), Ok(()));
+        write(&pinned, b"[]\n", 0o644);
+        assert_eq!(
+            available(&profile),
+            Err("tool_identity_drift analyzer.profileIdentityDrift".into())
+        );
+        write(&pinned, b"{}\n", 0o644);
+        write(&tree.join("leaf"), b"drift\n", 0o644);
+        assert_eq!(
+            available(&profile),
+            Err("tool_identity_drift analyzer.profileIdentityDrift".into())
+        );
+        write(&tree.join("leaf"), b"leaf\n", 0o644);
+        assert_eq!(available(&profile), Ok(()));
+        write(&analyzer, b"#!/bin/sh\nexit 65\n", 0o755);
+        assert_eq!(
+            available(&profile),
+            Err("tool_identity_drift analyzer.toolIdentityDrift".into())
+        );
     }
 }

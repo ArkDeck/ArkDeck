@@ -217,7 +217,11 @@ impl JobAdmitter<'_> {
     pub fn submit(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
         let request = OperationRequest::decode(request_json)
             .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
-        let descriptor = JobPlanner::descriptor(&request)?;
+        let descriptor = JobPlanner::descriptor(&request).map_err(|refused| {
+            self.planner
+                .unmaterialized_analyzer(&request)
+                .unwrap_or(refused)
+        })?;
         JobPlanner::validate_inputs(&request, descriptor)?;
         // A retry or a conflict is decided before anything is materialized.
         let fingerprint = request.fingerprint();

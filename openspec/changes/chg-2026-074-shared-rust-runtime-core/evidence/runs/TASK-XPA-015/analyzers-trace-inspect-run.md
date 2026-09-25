@@ -512,4 +512,167 @@ documented as the reviewed distribution's revision; (c) until then.
 
 ### CI
 
+PR #2163, merged as `44774d58c`: Agent PR 36082355422, SDD Guard 36082355614
+and Swift CI 36082355706 all succeeded at `db6f633a5` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).
+
+## 5. The ArkTrace analyzers: Swift's answers without ArkTrace, and the distribution loader
+
+Base: protected `main` `44774d58c` (#2163); developed on `9612b00c0` (#2161)
+and rebased without conflict. No contract input changes.
+
+### What a caller sees
+
+- Without `ARKDECK_ARKTRACE_DESCRIPTOR`, `analyzer.summarize-trace@1` and
+  `analyzer.analyze-trace@1` answer as Swift's daemon does: `operation.list`
+  and `operation.describe` unavailable, `provider_tool_unavailable`,
+  `analyzer.arktraceNotFound`, `host_configuration`; `job.plan` and
+  `job.submit` refused before admission, `invalidInput` "… is runtime
+  unavailable: analyzer.arktraceNotFound", nothing admitted. Until now the
+  Rust daemon said it had no executor for them (`operation_not_supported`)
+  and refused their plans as `rejected` "not materialized".
+- With a descriptor named, nothing changes yet: the production start names
+  the variable as unread, and the operations say this Runtime has no executor
+  for them. Loading it needs the production trust checker and doctor probe
+  (next slice).
+- Every analyzer profile's pinned files and trees are measured again at each
+  availability read, as Swift's `runtimeAvailability` measures them:
+  `tool_identity_drift`, `analyzer.profileIdentityDrift`. The crash-ledger
+  and HiLog profiles pin none; their executable is now measured with Swift's
+  bounded physical reader (`analyzer.toolIdentityDrift`, as before).
+
+### Swift, the oracles
+
+- `ArkTraceProfileLoaderOracleContractTests` (new,
+  `rust/tests/fixtures/arktrace-profile-loader/`): Swift's
+  `ArkTraceSummaryAnalyzerProfileLoader.loadProfiles` over 46 distributions
+  built at one fixed root, with stub trust checkers (the App tree's digest;
+  its files and digest, as the production checker returns them; a refusal; a
+  root replaced during the check), a stub doctor and the loader's two hooks.
+  It records every input entry, each case's outcome by the reason the daemon
+  composes from it, every trust and doctor contract, and every entry left
+  afterwards. The cases: two loaded profiles, from the install, with tree
+  evidence, and from a private snapshot generation made and then reused; and
+  every refusal — a missing, writable or malformed descriptor, a linked,
+  missing or writable root, a missing, drifted, duplicated or open manifest,
+  one of another contract or type or naming a path out of its root, a
+  drifted tool, parser, parser manifest, signing record or receipt, a refused
+  or replaced trust check, a failed doctor, a linked layout directory, a
+  writable ancestor or tree entry, a linked snapshot root, one replaced once
+  bound and a colliding final generation. It pins what Swift's readers accept
+  at the edges: a descriptor format version `1.0` or `true` loads
+  (`JSONSerialization` bridging), a manifest byte count `64.0` loads, a
+  stapled flag `1` does not (`JSONDecoder`), a fullwidth manifest digest
+  passes `Character.isHexDigit` and then drifts, malformed descriptor JSON is
+  a contract mismatch, and a missing receipt is one too (its path must
+  open). Every mode it records is one the oracle or the loader sets, never
+  the test process's mask (`run-swiftpm.sh` runs under `077`).
+- `ArkTraceAbsentOracleContractTests` (new,
+  `rust/tests/fixtures/arktrace-absent/`): Swift's daemon composition with
+  the crash-ledger analyzer an installed daemon's `ARKDECK_ANALYZER_PATH`
+  names and no descriptor; each operation's descriptor, and the plan and
+  submission of a complete request over a raw Trace Artifact.
+
+### Rust
+
+- `arkdeck-platform`: `profile_file_reader.rs` gains Swift's `matches`,
+  `isPhysicalDirectory`, `hasNoSymlinkComponent`,
+  `openPhysicalDirectoryDescriptor`, `openOrCreateOwnerPrivateDirectory` and
+  `validateOwnerOnlyAuthority`; `distribution_tree.rs` (new) is
+  `ArkTraceDistributionTreeHasher` (digest, pins, the descriptor-bound copy,
+  removal) with `openRelativeDirectoryIfPresent` and the exclusive rename.
+- `arkdeck-hoststore`: `arktrace_profile.rs` (new) is the loader, over three
+  seams — `DistributionTrust`, `DoctorProbe` and `LoaderHooks` — with
+  Swift's string, digest and number readings; `AnalyzerProfile` carries the
+  canonical namespace root, pinned files and trees and the reviewed ArkTrace
+  contracts; `AnalyzerProfiles::without_arktrace`;
+  `runtime_availability` measures the pins; `job.plan` and `job.submit`
+  refuse an analyzer operation this Runtime does not materialize by the
+  host's reason for its analyzer, after its inputs, as Swift's
+  `materializeTypedPlanBeforeAuthorization` does.
+- `arkdeck-agentd`: the daemon's composition names both ArkTrace analyzers
+  not found when no descriptor is named, in the isolated and the production
+  root.
+
+### Evidence
+
+- `cargo test -p arkdeck-hoststore --test arktrace_profile_loader`: all 46
+  cases — outcomes, 17 trust contracts, 8 doctor contracts — and the 870
+  entries left afterwards (833 before), byte for byte. The first run matched
+  every case and differed only in the modes of links and of the collision
+  hook's entries, which the Swift test's `077` mask had set; the oracle now
+  records neither.
+- `cargo test -p arkdeck-hoststore --test arktrace_absent`: the four plan and
+  submission answers, nothing admitted, the source untouched.
+- `operation_availability_control` (agentd bin): each ArkTrace operation's
+  descriptor equals Swift's whole `operation.describe` answer; a named
+  descriptor leaves them without an executor.
+- Unit tests: the tree digest's layout and byte order (`a-b` before `a/b`),
+  empty, linked, group-writable and missing entries, the copy's modes and
+  removal, the exclusive rename; owner-only authority below `/private/tmp`
+  and refused for a writable ancestor or leaf; the private directory created
+  `0700` and never through a link; pins drifting by name.
+- Mutations: 9 of 11 caught, each restored by SHA-256 (the tree's mode in
+  decimal, its files unsorted, group-writable entries admitted, a Boolean
+  format version refused, fullwidth digits not hexadecimal, the trust pins
+  unsorted, pins that never drift, another reason for an absent ArkTrace,
+  an unmaterialized analyzer refused as unported). The two survivors are
+  equivalent for the recorded cases: the snapshot root's identity check
+  (twice weakened) is backed by the layout's own physical path check, which
+  refuses the same replaced root with the same reason. Log
+  `/private/tmp/arkdeck-s25-d-mutations.log`.
+
+### Differences from Swift (declared)
+
+- A named descriptor is not loaded (above).
+- A daemon with no `ARKDECK_ANALYZER_PATH` has no analyzer dispatcher in
+  Swift, which adds "provider executable is unavailable: no dispatcher route
+  is registered for provider analyzer" to every analyzer operation's
+  reasons; the Rust daemon gives the first reason only. This predates this
+  slice and holds for all four analyzer operations.
+- `URL(filePath:)`'s own normalization of a descriptor or root path (a
+  repeated or trailing solidus beyond one) is not ported; a trailing solidus
+  is dropped, as the loader's directory URLs drop it.
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-d-*.log`:
+
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-platform -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak -p arkdeck-cli -p arkdeck-client -p arkdeck-provider-hdc
+  -p arkdeck-provider-arkforge -p arkdeck-provider-workspace --all-targets
+  -- -D warnings`: exit 0; the platform, host store, control and daemon
+  again for `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: exit 0.
+- `cargo test -p arkdeck-platform -p arkdeck-hoststore --no-fail-fast`:
+  exit 0, 770 passed, 18 ignored (existing).
+- `cargo test -p arkdeck-agentd -p arkdeck-soak --no-fail-fast`: exit 0, 163
+  passed. No fake HDC or test daemon left running.
+- Swift: `run-swiftpm.sh test --filter
+  'ArkTraceProfileLoaderOracleContractTests|ArkTraceAbsentOracleContractTests'`,
+  exit 0 (recorded, then compared).
+- `sh scripts/check-sdd.sh`: exit 0.
+- Again on `44774d58c` (`/private/tmp/arkdeck-s25-d-r-*.log`): fmt 0; the two
+  replays, `operation_availability_control` and `read_only` exit 0;
+  `check-readonly.py` over the built daemon and CLI: PASS.
+- Not run: the other dependents' tests (CLI, client, providers: they use
+  nothing that changed), `generate-contract.py`/`check-contracts.py` (no
+  contract input changes), the App, a device.
+
+### Next
+
+The production trust checker (`SecStaticCode` validity against the Developer
+ID and notarization requirement, signing information, leaf certificate,
+CDHashes, Info.plist, stapled ticket), the production doctor probe (the CLI's
+`doctor --self-test` through a verified canonical-path launch, with its
+pinned files and trees held and its envelope validated), and the daemon
+loading the named descriptor into a private snapshot root; then
+`trace-summary@1` and `trace-analysis@1` planned, run and verified
+(`ArkTraceSummaryEnvelopeValidator`, `ArkTraceAnalysisEnvelopeValidator`).
+
+### CI
+
 Pending.

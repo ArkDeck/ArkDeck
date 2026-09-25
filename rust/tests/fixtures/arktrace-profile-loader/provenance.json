@@ -1,0 +1,11 @@
+{
+  "files" : {
+    "after.json" : "1351ccf2f4687a8dedfda0144e6c0fff4d5dab7e141327fd19e7119efa3ec466",
+    "blobs.json" : "162f0c62086c62518717c6e6fc8e2326a905700fba442812e172bbe0800413a6",
+    "cases.json" : "95331a2b6ac39d5a4fa7dd93401664231672403f0c14dce1a86d1dbd0c8d951a",
+    "inputs.json" : "497b649ed0b17d67db49d01b2cad4085638c3fa6fb4b1f6e83395c6a6012c242"
+  },
+  "producer" : "ArkTraceProfileLoaderOracleContractTests.testSwiftLoadsTheSharedArkTraceDistributions",
+  "root" : "/private/tmp/arkdeck-arktrace-oracle",
+  "umask" : "77"
+}

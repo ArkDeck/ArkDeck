@@ -104,14 +104,19 @@ impl Fixture {
     }
 
     fn host(&self, artifacts: bool, jobs: bool) -> crate::host::Host {
+        self.host_with(artifacts, jobs, false)
+    }
+    fn host_with(&self, artifacts: bool, jobs: bool, arktrace: bool) -> crate::host::Host {
         let mut host = crate::host::Host::from_environment()
             .with_targets(TargetStore::open(&self.0.join("targets")).unwrap())
             // The daemon's own composition of the analyzer it is named: the
             // crash-ledger analyzer, and no HiLog summary, since that
-            // executable is not this one.
+            // executable is not this one; with or without an ArkTrace
+            // descriptor named.
             .with_planning(
                 &self.0,
-                crate::hilog_summary_analyzer::composed(Some(&self.0.join("analyzer"))).unwrap(),
+                crate::hilog_summary_analyzer::composed(Some(&self.0.join("analyzer")), arktrace)
+                    .unwrap(),
             )
             .with_development_hdc(Some(ProcessDispatch::new(
                 VerifiedTool::open(
@@ -250,6 +255,30 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         json!(["analyzer.hilogRequiresCurrentDaemon"])
     );
     assert_eq!(hilog["reasonOrigins"], json!(["host_configuration"]));
+    // Without an ArkTrace descriptor, both ArkTrace analyzers are described
+    // as Swift's composition describes them (the `arktrace-absent` oracle).
+    let absent: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/arktrace-absent/cases.json"
+    ))
+    .unwrap();
+    let mut described = 0;
+    for exchange in absent["exchanges"].as_array().unwrap() {
+        if exchange["method"] != "operation.describe" {
+            continue;
+        }
+        let reference = exchange["params"]["reference"].as_str().unwrap();
+        let descriptor = call(
+            &control,
+            "operation.describe",
+            json!({"reference": reference}),
+        );
+        assert_eq!(descriptor, exchange["answer"]["result"], "{reference}");
+        let row = entry(&rows, reference);
+        assert_eq!(row["reasons"], json!(["analyzer.arktraceNotFound"]));
+        assert_eq!(row["reasonCodes"], json!(["provider_tool_unavailable"]));
+        described += 1;
+    }
+    assert_eq!(described, 2);
     // A native library deployment also needs the verified code-sign helper,
     // which this composition does not carry.
     let native = entry(&rows, "deploy.native-library.app-owned@1");
@@ -334,6 +363,27 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         );
     }
 }
+/// A named ArkTrace descriptor is not loaded by this Runtime yet: its two
+/// analyzers keep no profile and their operations no executor, which is what
+/// they say.
+#[test]
+fn a_named_arktrace_descriptor_leaves_its_analyzers_without_an_executor() {
+    let fixture = Fixture::new();
+    let control = Control::new(fixture.host_with(true, true, true)).unwrap();
+    let rows = call(&control, "operation.list", json!({}));
+    for reference in ["analyzer.summarize-trace@1", "analyzer.analyze-trace@1"] {
+        let row = entry(&rows, reference);
+        assert_eq!(row["availability"], "unavailable");
+        assert_eq!(row["reasonCodes"], json!(["operation_not_supported"]));
+        assert_eq!(
+            row["reasons"],
+            json!([format!(
+                "Rust analyzer provider has no complete production executor for {reference}"
+            )])
+        );
+    }
+}
+
 #[test]
 fn absent_artifact_and_job_owners_are_configuration_failures_not_available() {
     let fixture = Fixture::new();

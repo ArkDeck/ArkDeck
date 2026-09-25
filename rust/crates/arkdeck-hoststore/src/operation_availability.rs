@@ -65,7 +65,14 @@ pub fn operation_unavailability(
             "bundled arm64 OpenHarmony code-sign helper cannot be verified".into(),
         ));
     }
-    if !supported {
+    // An analyzer the host says it has no profile for answers as Swift's
+    // composition does, whatever this Runtime executes.
+    let host_reason = (provider == "analyzer")
+        .then(|| crate::analyzer_composition::host_unavailable_reason(context.analyzer, reference))
+        .flatten();
+    if let (false, Some(reason)) = (supported, host_reason) {
+        reasons.push(reason);
+    } else if !supported {
         reasons.push((
             "operation_not_supported",
             format!("Rust {provider} provider has no complete production executor for {reference}"),

@@ -79,7 +79,15 @@ pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
 #[cfg(target_os = "macos")]
+mod arktrace_profile;
+#[cfg(target_os = "macos")]
 pub use analyzer_composition::{AnalyzerComposition, AnalyzerProfiles};
+#[cfg(target_os = "macos")]
+pub use arktrace_profile::{
+    ArkTraceContract, ArkTraceLoadError, ArkTraceProfileError, ArkTraceProfileLoader,
+    DistributionTrust, DoctorContract, DoctorProbe, LoaderHooks, PinnedFile, PinnedTree,
+    ResolvedExecutable, TrustContract, TrustEvidence,
+};
 #[cfg(target_os = "macos")]
 pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
 #[cfg(target_os = "macos")]

@@ -1,0 +1,394 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "aliasFor" : null,
+          "artifacts" : [
+            {
+              "mediaType" : "application/json",
+              "name" : "trace-summary.json",
+              "privacy" : "standard",
+              "required" : true,
+              "retentionClass" : "default",
+              "role" : "derived"
+            }
+          ],
+          "authorization" : {
+            "hostOnly" : "defaultReadOnly"
+          },
+          "availability" : "unavailable",
+          "availabilityReasonCodes" : [
+            "provider_tool_unavailable"
+          ],
+          "availabilityReasonOrigins" : [
+            "host_configuration"
+          ],
+          "availabilityReasons" : [
+            "analyzer.arktraceNotFound"
+          ],
+          "binding" : "none",
+          "completeOverwriteRecovery" : null,
+          "concurrencyKey" : "hostExclusive",
+          "defaultPolicyIssuanceEnabled" : true,
+          "exampleRequest" : {
+            "documentType" : "runtime-operation-request",
+            "idempotencyKey" : "idem-example-0001",
+            "inputs" : {
+              "sourceArtifactRef" : "lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME"
+            },
+            "operation" : {
+              "id" : "analyzer.summarize-trace",
+              "version" : 1
+            },
+            "requestId" : "req-example",
+            "requestedOutputs" : [
+              "derivedArtifacts"
+            ],
+            "schemaVersion" : "1.0.0",
+            "target" : {
+              "targetId" : "TGT-REPLACE-ME"
+            }
+          },
+          "inputs" : [
+            {
+              "description" : "Existing artifact this analysis reads; the engine resolves its lease.",
+              "name" : "sourceArtifactRef",
+              "required" : true,
+              "type" : "artifactLease"
+            }
+          ],
+          "minimumEffect" : "hostOnly",
+          "outputByteBudget" : 67108864,
+          "outputs" : [
+            {
+              "name" : "analysis",
+              "required" : true,
+              "type" : "artifactReference"
+            }
+          ],
+          "permittedEffects" : [
+            "hostOnly"
+          ],
+          "preflightAttempts" : 1,
+          "profiles" : [
+            "workspace-host@1"
+          ],
+          "provider" : "analyzer",
+          "reference" : "analyzer.summarize-trace@1",
+          "stepCount" : 1,
+          "steps" : [
+            {
+              "action" : null,
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "compensation" : "none",
+              "effect" : "hostOnly",
+              "kind" : "runDeterministicAnalyzer",
+              "optional" : false,
+              "stepId" : "summarize-trace"
+            }
+          ],
+          "timeoutSeconds" : 120,
+          "title" : "Summarize a collected trace artifact"
+        }
+      },
+      "method" : "operation.describe",
+      "name" : "analyzer.summarize-trace.describe",
+      "params" : {
+        "reference" : "analyzer.summarize-trace@1"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "analyzer.summarize-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+        },
+        "ok" : false
+      },
+      "method" : "job.plan",
+      "name" : "analyzer.summarize-trace.plan",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analyzer.summarize-trace-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-f78f28e3d5d6d689f5058740d02fcdc0\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-analyzer.summarize-trace\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "analyzer.summarize-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+        },
+        "ok" : false
+      },
+      "method" : "job.submit",
+      "name" : "analyzer.summarize-trace.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analyzer.summarize-trace-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-f78f28e3d5d6d689f5058740d02fcdc0\"},\"operation\":{\"id\":\"analyzer.summarize-trace\",\"version\":1},\"requestId\":\"req-oracle-analyzer.summarize-trace\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "aliasFor" : null,
+          "artifacts" : [
+            {
+              "mediaType" : "application/json",
+              "name" : "trace-analysis.json",
+              "privacy" : "standard",
+              "required" : true,
+              "retentionClass" : "default",
+              "role" : "derived"
+            }
+          ],
+          "authorization" : {
+            "hostOnly" : "defaultReadOnly"
+          },
+          "availability" : "unavailable",
+          "availabilityReasonCodes" : [
+            "provider_tool_unavailable"
+          ],
+          "availabilityReasonOrigins" : [
+            "host_configuration"
+          ],
+          "availabilityReasons" : [
+            "analyzer.arktraceNotFound"
+          ],
+          "binding" : "none",
+          "completeOverwriteRecovery" : null,
+          "concurrencyKey" : "hostExclusive",
+          "defaultPolicyIssuanceEnabled" : true,
+          "exampleRequest" : {
+            "documentType" : "runtime-operation-request",
+            "idempotencyKey" : "idem-example-0001",
+            "inputs" : {
+              "kind" : "context",
+              "maxEvents" : 1,
+              "maxOutputBytes" : 1024,
+              "maxRows" : 1,
+              "sourceArtifactRef" : "lease-v1:JOB-REPLACE-ME:ART-REPLACE-ME",
+              "timeoutMs" : 100
+            },
+            "operation" : {
+              "id" : "analyzer.analyze-trace",
+              "version" : 1
+            },
+            "requestId" : "req-example",
+            "requestedOutputs" : [
+              "derivedArtifacts"
+            ],
+            "schemaVersion" : "1.0.0",
+            "target" : {
+              "targetId" : "TGT-REPLACE-ME"
+            }
+          },
+          "inputs" : [
+            {
+              "description" : "Exclusive range end; required together with startNs and greater than startNs.",
+              "minimum" : 1,
+              "name" : "endNs",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Closed ArkTrace context or deterministic analysis family.",
+              "enum" : [
+                "context",
+                "cpu",
+                "scheduling",
+                "slices",
+                "range",
+                "hot-intervals"
+              ],
+              "name" : "kind",
+              "required" : true,
+              "type" : "string"
+            },
+            {
+              "description" : "Per-analysis section limit, additionally bounded by maxRows and maxEvents.",
+              "maximum" : 1000,
+              "minimum" : 1,
+              "name" : "limit",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Upper bound on trace events the analyzer may read while producing the answer. Bounds the work, where maxRows bounds the result.",
+              "maximum" : 100000,
+              "minimum" : 1,
+              "name" : "maxEvents",
+              "required" : true,
+              "type" : "integer"
+            },
+            {
+              "description" : "Upper bound on the analysis document's size in bytes. The analyzer fails rather than truncating, so a bound this small for the requested kind is a refusal, not a shorter answer.",
+              "maximum" : 67108864,
+              "minimum" : 1024,
+              "name" : "maxOutputBytes",
+              "required" : true,
+              "type" : "integer"
+            },
+            {
+              "description" : "Upper bound on rows the analyzer may return, applied on top of `limit`. Bounds the answer's size independently of how many the query would match.",
+              "maximum" : 100000,
+              "minimum" : 1,
+              "name" : "maxRows",
+              "required" : true,
+              "type" : "integer"
+            },
+            {
+              "description" : "Operating-system process id to filter to, as recorded in the trace; omit for every process. Distinct from processKey, which is the trace's own internal identity.",
+              "minimum" : 0,
+              "name" : "pid",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Stable process internal identity; zero is the absent sentinel and is rejected.",
+              "name" : "processKey",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Existing immutable trace artifact resolved by the Runtime lease boundary.",
+              "name" : "sourceArtifactRef",
+              "required" : true,
+              "type" : "artifactLease"
+            },
+            {
+              "description" : "Inclusive range start; required together with endNs and mutually exclusive with timestampNs.",
+              "minimum" : 0,
+              "name" : "startNs",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Stable thread internal identity; zero is the absent sentinel and is rejected.",
+              "name" : "threadKey",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Minimum long-slice duration for analysis kinds; absent means zero.",
+              "minimum" : 0,
+              "name" : "thresholdNs",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Operating-system thread id to filter to, as recorded in the trace; omit for every thread. Distinct from threadKey, which is the trace's own internal identity.",
+              "minimum" : 0,
+              "name" : "tid",
+              "required" : false,
+              "type" : "integer"
+            },
+            {
+              "description" : "Wall-clock budget for the analyzer process. The provider also derives its own process deadline from this, rounded up to whole seconds and capped at 120.",
+              "maximum" : 120000,
+              "minimum" : 100,
+              "name" : "timeoutMs",
+              "required" : true,
+              "type" : "integer"
+            },
+            {
+              "description" : "Center timestamp for the reviewed 100 ms context/range window; mutually exclusive with startNs/endNs.",
+              "minimum" : 0,
+              "name" : "timestampNs",
+              "required" : false,
+              "type" : "integer"
+            }
+          ],
+          "minimumEffect" : "hostOnly",
+          "outputByteBudget" : 67108864,
+          "outputs" : [
+            {
+              "name" : "analysis",
+              "required" : true,
+              "type" : "artifactReference"
+            }
+          ],
+          "permittedEffects" : [
+            "hostOnly"
+          ],
+          "preflightAttempts" : 1,
+          "profiles" : [
+            "workspace-host@1"
+          ],
+          "provider" : "analyzer",
+          "reference" : "analyzer.analyze-trace@1",
+          "stepCount" : 1,
+          "steps" : [
+            {
+              "action" : null,
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "compensation" : "none",
+              "effect" : "hostOnly",
+              "kind" : "runDeterministicAnalyzer",
+              "optional" : false,
+              "stepId" : "analyze-trace"
+            }
+          ],
+          "timeoutSeconds" : 120,
+          "title" : "Run bounded typed context or deterministic analysis over a trace artifact"
+        }
+      },
+      "method" : "operation.describe",
+      "name" : "analyzer.analyze-trace.describe",
+      "params" : {
+        "reference" : "analyzer.analyze-trace@1"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "analyzer.analyze-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+        },
+        "ok" : false
+      },
+      "method" : "job.plan",
+      "name" : "analyzer.analyze-trace.plan",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analyzer.analyze-trace-0001\",\"inputs\":{\"endNs\":1000000,\"kind\":\"cpu\",\"maxEvents\":100,\"maxOutputBytes\":65536,\"maxRows\":100,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-f78f28e3d5d6d689f5058740d02fcdc0\",\"startNs\":0,\"timeoutMs\":10000},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analyzer.analyze-trace\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "analyzer.analyze-trace@1 is runtime unavailable: analyzer.arktraceNotFound"
+        },
+        "ok" : false
+      },
+      "method" : "job.submit",
+      "name" : "analyzer.analyze-trace.submit",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-analyzer.analyze-trace-0001\",\"inputs\":{\"endNs\":1000000,\"kind\":\"cpu\",\"maxEvents\":100,\"maxOutputBytes\":65536,\"maxRows\":100,\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-f78f28e3d5d6d689f5058740d02fcdc0\",\"startNs\":0,\"timeoutMs\":10000},\"operation\":{\"id\":\"analyzer.analyze-trace\",\"version\":1},\"requestId\":\"req-oracle-analyzer.analyze-trace\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      }
+    }
+  ],
+  "source" : {
+    "artifactId" : "ART-f78f28e3d5d6d689f5058740d02fcdc0",
+    "jobId" : "job-oracle-source",
+    "lease" : "lease-v1:job-oracle-source:ART-f78f28e3d5d6d689f5058740d02fcdc0"
+  }
+}

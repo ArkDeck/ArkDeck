@@ -1,0 +1,3 @@
+#!/bin/sh
+# ArkTrace-absent oracle analyzer; never run.
+exit 64

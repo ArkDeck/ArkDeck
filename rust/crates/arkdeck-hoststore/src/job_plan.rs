@@ -70,6 +70,16 @@ pub struct AnalyzerProfile {
     pub timeout_seconds: i64,
     /// The most a verified answer may hold (Swift `outputByteBudget`).
     pub output_byte_budget: usize,
+    /// The signed bundle whose canonical path the executable runs at.
+    pub canonical_namespace_root: Option<String>,
+    /// The files and trees held, digest-bound, while the executable runs,
+    /// and measured again at every availability read.
+    pub pinned_files: Vec<crate::arktrace_profile::PinnedFile>,
+    pub pinned_trees: Vec<crate::arktrace_profile::PinnedTree>,
+    /// The reviewed ArkTrace contract of a `trace-summary@1` profile.
+    pub arktrace_summary: Option<crate::arktrace_profile::ArkTraceContract>,
+    /// The same of a `trace-analysis@1` profile.
+    pub arktrace_analysis: Option<crate::arktrace_profile::ArkTraceContract>,
 }
 
 fn invalid(message: &'static str) -> io::Error {
@@ -108,6 +118,11 @@ impl AnalyzerProfile {
             fixed_arguments: vec!["--analyze-crash-ledger".into()],
             timeout_seconds: 30,
             output_byte_budget: 8 * 1024 * 1024,
+            canonical_namespace_root: None,
+            pinned_files: Vec::new(),
+            pinned_trees: Vec::new(),
+            arktrace_summary: None,
+            arktrace_analysis: None,
         })
     }
 
@@ -136,27 +151,50 @@ impl AnalyzerProfile {
             fixed_arguments: vec!["--summarize-hilog".into()],
             timeout_seconds: 120,
             output_byte_budget: crate::hilog_summary::MAXIMUM_OUTPUT_BYTES,
+            canonical_namespace_root: None,
+            pinned_files: Vec::new(),
+            pinned_trees: Vec::new(),
+            arktrace_summary: None,
+            arktrace_analysis: None,
         }
     }
 
     /// Swift `ArkTraceProfileFileReader.matches(requireExecutable: true)` at
     /// every plan: the profiled path still names these exact executable bytes,
-    /// through no symbolic link.
+    /// through no symbolic link, as Swift's bounded physical reader reads it.
     pub(crate) fn still_matches(&self) -> bool {
-        let current = || -> io::Result<bool> {
-            if std::fs::canonicalize(&self.executable_path)? != self.executable_path {
-                return Ok(false);
-            }
-            let metadata = std::fs::symlink_metadata(&self.executable_path)?;
-            if !metadata.is_file() || metadata.len() > MAXIMUM_ANALYZER_BYTES {
-                return Ok(false);
-            }
-            let bytes = std::fs::read(&self.executable_path)?;
-            Ok(bytes.len() as u64 == metadata.len()
-                && metadata.mode() & 0o111 != 0
-                && sha256_hex(&bytes) == self.executable_sha256)
-        };
-        current().unwrap_or(false)
+        self.executable_path
+            .to_str()
+            .and_then(|path| crate::hilog_summary::profile_path(path, false).ok())
+            .is_some_and(|path| {
+                arkdeck_platform::profile_file_matches(
+                    &path,
+                    &self.executable_sha256,
+                    None,
+                    MAXIMUM_ANALYZER_BYTES,
+                    true,
+                )
+            })
+    }
+
+    /// Swift `runtimeAvailability`'s pins: every pinned file still reads with
+    /// its digest, length and execute bit, and every pinned tree with its
+    /// digest.
+    pub(crate) fn pins_still_match(&self) -> bool {
+        self.pinned_files.iter().all(|pin| {
+            crate::hilog_summary::profile_path(&pin.path, false).is_ok_and(|path| {
+                arkdeck_platform::profile_file_matches(
+                    &path,
+                    &pin.sha256,
+                    Some(pin.byte_count),
+                    MAXIMUM_ANALYZER_BYTES,
+                    pin.require_executable,
+                )
+            })
+        }) && self.pinned_trees.iter().all(|tree| {
+            crate::hilog_summary::profile_path(&tree.path, false)
+                .is_ok_and(|path| arkdeck_platform::tree_matches(&path, &tree.path, &tree.sha256))
+        })
     }
 }
 
@@ -263,7 +301,8 @@ impl<'a> JobPlanner<'a> {
                 "planOnly does not accept or consume a Runtime capability",
             ));
         }
-        let descriptor = Self::descriptor(&request)?;
+        let descriptor = Self::descriptor(&request)
+            .map_err(|refused| self.unmaterialized_analyzer(&request).unwrap_or(refused))?;
         Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
         let materialized = self.materialized(&request, descriptor)?;
@@ -291,6 +330,33 @@ impl<'a> JobPlanner<'a> {
             "jobAdmitted": false,
             "dispatchDisposition": "notDispatched",
         }))
+    }
+
+    /// Swift's refusal of an analyzer operation this Runtime does not
+    /// materialize, when the host says it has no profile for its analyzer
+    /// (the ArkTrace analyzers without a descriptor): its inputs judged
+    /// first, then the host's reason, as `materializeTypedPlanBeforeAuthorization`
+    /// refuses an analyzer the provider calls unavailable, before anything is
+    /// admitted.
+    pub(crate) fn unmaterialized_analyzer(
+        &self,
+        request: &OperationRequest,
+    ) -> Option<PlanRefusal> {
+        let descriptor =
+            CatalogOperation::lookup(&request.operation_id, request.operation_version)?;
+        let reference = descriptor.reference();
+        if descriptor.provider != "analyzer" || MATERIALIZED.contains(&reference.as_str()) {
+            return None;
+        }
+        let (_, reason) =
+            crate::analyzer_composition::host_unavailable_reason(self.analyzer, &reference)?;
+        Some(match Self::validate_inputs(request, descriptor) {
+            Err(refused) => refused,
+            Ok(()) => refusal(
+                "invalidInput",
+                format!("{reference} is runtime unavailable: {reason}"),
+            ),
+        })
     }
 
     /// The exact catalog operation a request names, when this Runtime

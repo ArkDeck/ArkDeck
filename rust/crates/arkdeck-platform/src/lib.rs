@@ -246,7 +246,18 @@ pub use tree_snapshot::{TreeEntry, TreeEntryKind, snapshot_tree};
 mod profile_file_reader;
 #[cfg(target_os = "macos")]
 pub use profile_file_reader::{
-    ProfilePath, ProfileReadError, ProfileSnapshot, open_profile_path, read_profile_file,
+    ProfilePath, ProfileReadError, ProfileSnapshot, has_no_symlink_component,
+    is_physical_directory, open_or_create_owner_private_directory, open_physical_directory,
+    open_profile_path, profile_file_matches, read_profile_file, validate_owner_only_authority,
+};
+
+#[cfg(target_os = "macos")]
+mod distribution_tree;
+#[cfg(target_os = "macos")]
+pub use distribution_tree::{
+    DistributionTree, TreeError, TreePin, copy_tree_snapshot, open_relative_directory,
+    remove_tree_snapshot, rename_exclusive, tree_matches, tree_matches_at, tree_snapshot,
+    tree_snapshot_at,
 };
 
 #[cfg(target_os = "macos")]
