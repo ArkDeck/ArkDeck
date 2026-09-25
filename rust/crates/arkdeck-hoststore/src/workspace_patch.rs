@@ -867,8 +867,9 @@ pub struct ToolInvocation<'a> {
     /// before the spawn and held until the child is gone (Swift's verified
     /// resources for this executable).
     pub resources: &'a [crate::workspace_profile::VerifiedResource],
-    /// The project root the argv names; the child runs in it.
-    pub working_directory: &'a str,
+    /// Where the child runs: the project root the argv names, or — for
+    /// Swift's inspection, whose plan names none — where the Runtime runs.
+    pub working_directory: Option<&'a str>,
     pub timeout_seconds: i64,
 }
 
@@ -943,8 +944,11 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
             .collect();
         // The child runs in the directory the argv names; the spawn needs its
         // physical spelling.
-        let directory =
-            fs::canonicalize(invocation.working_directory).map_err(|error| refused(&error))?;
+        let directory = invocation
+            .working_directory
+            .map(fs::canonicalize)
+            .transpose()
+            .map_err(|error| refused(&error))?;
         let arguments: Vec<std::ffi::OsString> = invocation
             .arguments
             .iter()
@@ -954,7 +958,7 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         let request = ToolRequest {
             arguments: &arguments,
             environment: &environment,
-            working_directory: Some(&directory),
+            working_directory: directory.as_deref(),
             limits: ToolLimits {
                 timeout: std::time::Duration::from_secs(timeout),
                 capture_bytes: CAPTURE_BYTES,

@@ -40,7 +40,11 @@ mod workspace_signing;
 #[cfg(target_os = "macos")]
 pub use workspace_signing::{SigningSetup, credential_pinning, keychain_credential_pinning};
 #[cfg(target_os = "macos")]
+mod workspace_read;
+#[cfg(target_os = "macos")]
 mod workspace_support;
+#[cfg(target_os = "macos")]
+pub use workspace_read::Inspector as WorkspaceInspector;
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 

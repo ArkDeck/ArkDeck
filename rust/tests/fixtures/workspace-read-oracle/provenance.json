@@ -1,0 +1,24 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_READ_RECORD=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspaceReadOracleContractTests",
+  "determinism": "the clock is fixed, the root is fixed, the working copy is committed with a fixed author and date, and the requests are canonical JSON, so every Job and Artifact identity repeats; grep.sh, sed.sh and git.sh stand in for /usr/bin/grep, /usr/bin/sed and /usr/bin/git with fixed bytes, so the plans name the same executables on every host, and each runs the host's own tool in a closed environment; two recordings were identical",
+  "durable": "artifacts/<job>/ART-* are the payloads the six reads that succeeded published (none of the others published anything); parked-inspection-record.json and parked-status-record.json are the durable records of the inspection and the status whose receipt was lost after their child ran, as they stood when parked",
+  "files": {
+    "artifacts/job-202a696b201b6d684c9db049dda2ace9/ART-dd3b7a1af9c849db70aec3f8a748a59d": "cd527d1343bb0875005ae286c40c1fbf83b3d98bd80ff076b87feda6bb86d78b",
+    "artifacts/job-9b91bfa850784cfb95575a9b0c6d3a87/ART-b829d467ed05633a789e0bb798510a6f": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "artifacts/job-b251bccf0f2961c228d30c14e715e44b/ART-e5420e0ef01c3fedc9aed9080185fc03": "6a489e9e2ea87d3656ee6ec2993cd197caa24f32c59672991cb876fa896c81f0",
+    "artifacts/job-d11a5281790ab1960775ee86373ea5c8/ART-f91e7099f413f6a4b127451b3dfffd0b": "20e2e3f2e222225ba19f005dd40dc24f5e6ecad43753b9279a2d3fea0ecd308e",
+    "artifacts/job-e60cc8ed9c88d8867cc74ae26ddca822/ART-bbf589c2b5c2f20394bfee2ab66a5fbf": "90f3e324db9b64836b72d601cf499df6617ea5b9b272197621630b03c636fdd6",
+    "artifacts/job-eccf9ed81bc6383ca17b2b88e045927d/ART-fa31367e668ed2909bbf4c6e141339aa": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "frames.jsonl": "6e1ed048f85f95ec6c7c06bd0404507b2536a0982917c5804bdfc101ad97a869",
+    "git.sh": "46b6d652f38335a5f78ea2b8428e4f8ed8344071b8f33c0f14fb6431779aa832",
+    "grep.sh": "4d8887f201c0aaa996e4a78b2321c185bb82efcbd44e259bcf83c59809265f3c",
+    "parked-inspection-record.json": "50b0d4d93caea483324f23828fe2f30331d054be81156877ccfaf44ea22b05d3",
+    "parked-status-record.json": "0812f6672e831a80234d84a28d47768ec957ea10fb9467c5cf3677006e871c83",
+    "sed.sh": "94b4b0480f2b61b625ce1e27cff1c8cd2052ee0d75d2a63fcc1999524d0f43ba"
+  },
+  "frames": "job.plan, job.submit, job.run, job.reconcile and job.result of every workspace.inspect-source@1, workspace.read-source-range@1, workspace.inspect-git-status@1 and workspace.inspect-diff@1 Job, in the order the control plane answered them",
+  "recordedBy": "WorkspaceReadOracleContractTests.testTheControlPlaneAnswersTheWorkspaceReadsAsRecorded",
+  "replayedBy": "the Rust port of the four read-only workspace operations (TASK-XPA-015, M3)",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceProvider over the registered roots and the configured inspector, delegating to WorkspaceOperationsProvider over both resolved profiles, with EvolutionWorkspaceManager as its isolation manager and DescriptorBoundProcessDispatcher over CombinedWorkspaceExecutableResolver, over two fabricated source trees under /private/tmp/arkdeck-workspace-read-oracle, one of them a git working copy; the read dispatch loses its receipt only where the sequence says so",
+  "why": "the job.* corpora carry no frame of these operations and are deduplicated by shape, so they cannot be replayed as one sequence"
+}

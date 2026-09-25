@@ -16,6 +16,12 @@
 //! - `workspace.build-openharmony@1` is one process too: the build preset's
 //!   pinned executable with the preset's own closed argv, in the project root;
 //!   the request names the preset and supplies no argument.
+//! - the four reads (`workspace.inspect-source@1`,
+//!   `workspace.read-source-range@1`, `workspace.inspect-git-status@1`,
+//!   `workspace.inspect-diff@1`) are one process each: the configured
+//!   inspector over a registered root, with no working directory, or the
+//!   profile's pinned reader or source-control tool in its root, each with
+//!   the argv the provider built from the screened inputs.
 //!
 //! Swift materializes every plan for the authorization envelope's Job, so the
 //! plan names what that Job would do — the copy it would make, the attempt it
@@ -99,7 +105,7 @@ impl JobPlanner<'_> {
                 format!("provider {} is not registered", descriptor.provider),
             ));
         };
-        if let Some(reason) = workspace.provider_unavailability(&reference) {
+        if let Some((_, reason)) = workspace.provider_unavailability(&reference) {
             return Err(refusal(
                 "invalidInput",
                 format!("{reference} is runtime unavailable: {reason}"),
@@ -225,6 +231,18 @@ impl JobPlanner<'_> {
                         process["argumentZero"] = json!(zero);
                     }
                     process
+                }
+                (read_reference, kind)
+                    if crate::workspace_read::read_step(read_reference)
+                        .is_some_and(|read| read.kind == kind) =>
+                {
+                    let action = workspace
+                        .read_action(&reference, &request.inputs)
+                        .map_err(preflight)?;
+                    workspace
+                        .lower_read(&action)
+                        .map_err(preflight)?
+                        .plan_step(action.journal_arguments(&request.inputs))
                 }
                 ("workspace.build-openharmony@1", "buildWorkspaceOpenHarmony") => {
                     let action = workspace

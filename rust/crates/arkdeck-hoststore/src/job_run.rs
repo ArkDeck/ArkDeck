@@ -467,6 +467,11 @@ impl JobRunner<'_> {
             {
                 self.execute_workspace_sign(&mut run, workspace)?
             }
+            (None, Some(workspace))
+                if crate::workspace_read::read_step(run.record.operation()).is_some() =>
+            {
+                self.execute_workspace_read(&mut run, workspace)?
+            }
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }

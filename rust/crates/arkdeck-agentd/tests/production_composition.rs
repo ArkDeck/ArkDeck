@@ -305,11 +305,6 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
             ))
     );
     assert_eq!(
-        daemon.line("arkdeck-agentd composes no workspace source inspector"),
-        "arkdeck-agentd composes no workspace source inspector: ARKDECK_WORKSPACE_INSPECTOR is \
-         set, but this Runtime has not ported that owner yet"
-    );
-    assert_eq!(
         daemon.line("arkdeck-agentd composes no App ingress"),
         "arkdeck-agentd composes no App ingress com.arkdeck.agentd: the account home is \
          overridden (CFFIXED_USER_HOME), so the account's Mach service is not this Runtime's"
@@ -322,6 +317,16 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
          flashHostFacts, deviceAccess, loaderBinding"
     );
     let daemon = daemon.serving(&home);
+    // The configured inspector is composed, as Swift composes it: nothing
+    // is reported as left unread.
+    assert!(
+        !daemon
+            .stdout
+            .iter()
+            .any(|line| line.contains("workspace source inspector")),
+        "{:?}",
+        daemon.stdout
+    );
     assert!(
         !daemon
             .stdout

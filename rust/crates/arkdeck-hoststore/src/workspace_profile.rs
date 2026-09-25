@@ -20,6 +20,13 @@ use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::sync::{Mutex, OnceLock};
 
+/// Why an operation is unavailable: the `operation.list` reason code Swift's
+/// `RuntimeAvailabilityReasonCode` spells, and Swift's reason.
+pub(crate) type Unavailability = (&'static str, String);
+
+/// Swift `RuntimeAvailabilityReasonCode.workspacePresetUnavailable`.
+pub(crate) const PRESET_UNAVAILABLE: &str = "workspace_preset_unavailable";
+
 /// Swift `WorkspaceExecutableIdentity`: a canonical absolute path and the
 /// SHA-256 of its bytes.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -668,16 +675,46 @@ impl WorkspaceProfile {
         identities
     }
 
-    /// Swift `runtimeAvailability(for:profile:)` for the operations this
-    /// Runtime materializes: the reason it is unavailable, if it is. Signing
-    /// is judged by the composition, which holds the credential owner.
-    pub(crate) fn unavailability(&self, reference: &str, isolation: bool) -> Option<String> {
+    /// Swift `runtimeAvailability(for:profile:)`: why the operation cannot
+    /// run in this profile, as `operation.list` codes it, if it cannot.
+    /// Signing is judged by the composition, which holds the credential
+    /// owner.
+    pub(crate) fn unavailability(
+        &self,
+        reference: &str,
+        isolation: bool,
+    ) -> Option<Unavailability> {
         let has_preset = match reference {
-            "workspace.prepare-isolated-copy@1" => isolation && self.kind == ProfileKind::Primary,
+            "workspace.prepare-isolated-copy@1" | "workspace.sweep-isolated-copies@1" => {
+                isolation && self.kind == ProfileKind::Primary
+            }
             // Every profile carries its patch preset.
             "workspace.apply-patch@1" | "workspace.revert-patch@1" => true,
             "workspace.build-openharmony@1" => !self.build.is_empty(),
-            _ => return Some("workspace.unsupportedOperation".into()),
+            "workspace.run-tests@1" => !self.test.is_empty(),
+            "workspace.symbolize-crash@1" => {
+                if self.symbol.is_empty() {
+                    return Some((
+                        PRESET_UNAVAILABLE,
+                        "workspace.symbolPresetUnavailable".into(),
+                    ));
+                }
+                true
+            }
+            "workspace.inspect-git-status@1" | "workspace.inspect-diff@1" => {
+                self.source_control.is_some()
+            }
+            "workspace.create-checkpoint@1" => {
+                self.source_control.is_some() || self.archive_checkpoint.is_some()
+            }
+            "workspace.inspect-source@1" => true,
+            "workspace.read-source-range@1" => self.source_reader.is_some(),
+            _ => {
+                return Some((
+                    "operation_not_supported",
+                    "workspace.unsupportedOperation".into(),
+                ));
+            }
         };
         self.preset_unavailability(has_preset)
     }
@@ -685,41 +722,80 @@ impl WorkspaceProfile {
     /// The rest of Swift's `runtimeAvailability(for:profile:)` once whether
     /// the profile has a preset for the operation is known: a preset, then
     /// every pinned executable measuring as pinned.
-    pub(crate) fn preset_unavailability(&self, has_preset: bool) -> Option<String> {
+    pub(crate) fn preset_unavailability(&self, has_preset: bool) -> Option<Unavailability> {
         if !has_preset {
-            return Some("workspace.presetUnavailable".into());
+            return Some((PRESET_UNAVAILABLE, "workspace.presetUnavailable".into()));
         }
         for identity in self.executable_identities() {
             match ExecutableIdentity::hashing(&identity.path) {
                 Ok(measured) if measured.sha256 == identity.sha256 => {}
-                Ok(_) => return Some("workspace.toolIdentityDrift".into()),
-                Err(_) => return Some("workspace.toolchainUnavailable".into()),
+                Ok(_) => {
+                    return Some(("tool_identity_drift", "workspace.toolIdentityDrift".into()));
+                }
+                Err(_) => {
+                    return Some((
+                        "provider_tool_unavailable",
+                        "workspace.toolchainUnavailable".into(),
+                    ));
+                }
             }
         }
         None
     }
 
-    /// Swift `resolved(operation:preset:arguments:)` over the patch preset:
-    /// the preset's fixed arguments, then `arguments`, run by the executable
-    /// the profile pinned.
-    pub(crate) fn patch_invocation(
+    /// Swift `resolved(operation:preset:arguments:)`: the preset's fixed
+    /// arguments, then `arguments`, run by the executable the preset pinned,
+    /// in this profile's root.
+    fn invocation_of(
         &self,
+        preset: &WorkspaceCommandPreset,
         operation: &str,
         arguments: &[&str],
     ) -> crate::workspace_patch::Invocation {
-        let mut argv = self.patch.fixed_arguments.clone();
+        let mut argv = preset.fixed_arguments.clone();
         argv.extend(arguments.iter().map(|&argument| argument.to_owned()));
         crate::workspace_patch::Invocation {
             operation: operation.into(),
             project_ref: self.project_ref.clone(),
             project_root: self.project_root.clone(),
-            preset_id: self.patch.preset_id.clone(),
-            executable_path: self.patch.executable.path.clone(),
-            executable_sha256: self.patch.executable.sha256.clone(),
-            argument_zero: self.patch.argument_zero.clone(),
+            preset_id: preset.preset_id.clone(),
+            executable_path: preset.executable.path.clone(),
+            executable_sha256: preset.executable.sha256.clone(),
+            argument_zero: preset.argument_zero.clone(),
             arguments: argv,
-            timeout_seconds: self.patch.timeout_seconds,
+            timeout_seconds: preset.timeout_seconds,
         }
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over the patch preset.
+    pub(crate) fn patch_invocation(
+        &self,
+        operation: &str,
+        arguments: &[&str],
+    ) -> crate::workspace_patch::Invocation {
+        self.invocation_of(&self.patch, operation, arguments)
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over the pinned
+    /// source-control tool; `None` when the profile has none.
+    pub(crate) fn source_control_invocation(
+        &self,
+        operation: &str,
+        arguments: &[&str],
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.source_control.as_ref()?;
+        Some(self.invocation_of(preset, operation, arguments))
+    }
+
+    /// Swift `resolved(operation:preset:arguments:)` over the pinned source
+    /// reader; `None` when the profile has none.
+    pub(crate) fn source_reader_invocation(
+        &self,
+        operation: &str,
+        arguments: &[&str],
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.source_reader.as_ref()?;
+        Some(self.invocation_of(preset, operation, arguments))
     }
 
     /// Swift `resolved(operation:preset:arguments:)` over a build preset: its
@@ -1048,17 +1124,45 @@ mod tests {
             primary.unavailability("workspace.prepare-isolated-copy@1", true),
             None
         );
+        let preset_unavailable =
+            Some((PRESET_UNAVAILABLE, "workspace.presetUnavailable".to_owned()));
         assert_eq!(
-            copy.unavailability("workspace.prepare-isolated-copy@1", true)
-                .as_deref(),
-            Some("workspace.presetUnavailable"),
+            copy.unavailability("workspace.prepare-isolated-copy@1", true),
+            preset_unavailable,
             "a copy is never copied again"
         );
         assert_eq!(
-            primary
-                .unavailability("workspace.prepare-isolated-copy@1", false)
-                .as_deref(),
-            Some("workspace.presetUnavailable")
+            primary.unavailability("workspace.prepare-isolated-copy@1", false),
+            preset_unavailable
+        );
+        // A copy has no source control: its git reads are not offered, while
+        // the primary tree's are.
+        assert_eq!(
+            primary.unavailability("workspace.inspect-git-status@1", true),
+            None
+        );
+        assert_eq!(
+            copy.unavailability("workspace.inspect-diff@1", true),
+            preset_unavailable
+        );
+        assert_eq!(
+            copy.unavailability("workspace.read-source-range@1", true),
+            preset_unavailable,
+            "no source reader"
+        );
+        assert_eq!(
+            primary.unavailability("workspace.symbolize-crash@1", true),
+            Some((
+                PRESET_UNAVAILABLE,
+                "workspace.symbolPresetUnavailable".to_owned()
+            ))
+        );
+        assert_eq!(
+            primary.unavailability("workspace.nothing@1", true),
+            Some((
+                "operation_not_supported",
+                "workspace.unsupportedOperation".to_owned()
+            ))
         );
         fs::remove_dir_all(&root).unwrap();
         fs::remove_dir_all(&copy_root).unwrap();

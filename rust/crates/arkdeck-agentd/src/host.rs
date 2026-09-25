@@ -727,17 +727,28 @@ impl Host {
     /// toolchain it names — the Runtime-owned copies under `state_root`
     /// adopted again, the registered generations marked applied. A copy that
     /// cannot be vouched for is reported, as Swift reports it, and stays
-    /// unresolvable. Without the project owner nothing is composed.
+    /// unresolvable. The source inspection reads the registered roots with
+    /// the `inspector` a host configured (`ARKDECK_WORKSPACE_INSPECTOR`),
+    /// pinned now; one that is not a regular executable fails the start, as
+    /// Swift's composition fails it. Without the project owner nothing is
+    /// composed.
     #[cfg(target_os = "macos")]
     pub fn with_workspace_operations(
         mut self,
         state_root: &std::path::Path,
         bootstrap: &std::path::Path,
         signing: Option<arkdeck_hoststore::SigningSetup>,
+        inspector: Option<&std::ffi::OsStr>,
     ) -> Result<Self, String> {
         let Some(projects) = self.workspace_projects.clone() else {
             return Ok(self);
         };
+        let inspector = inspector
+            .map(|path| {
+                arkdeck_hoststore::WorkspaceInspector::hashing(&path.to_string_lossy())
+                    .map_err(|error| format!("workspace inspector: {error}"))
+            })
+            .transpose()?;
         let registry = arkdeck_hoststore::DevEcoRegistryStore::open_existing(bootstrap)
             .map_err(|error| error.to_string())?;
         let resolve = |reference: &str, generation: u64, preset: &str| {
@@ -775,7 +786,7 @@ impl Host {
         if !notes.unadopted.is_empty() {
             let _ = std::io::stdout().flush();
         }
-        self.workspace = Some(std::sync::Arc::new(composition));
+        self.workspace = Some(std::sync::Arc::new(composition.with_inspector(inspector)));
         Ok(self)
     }
     #[cfg(target_os = "macos")]
