@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.export",
+        "handlerArguments": [
+          "trace",
+          "export",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--destination",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--help"
+      ],
+      "expected": {
+        "command": "trace.export",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "export"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.export",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "trace",
+        "export",
+        "--job",
+        "sample",
+        "--artifact",
+        "sample",
+        "--destination",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.export",
+        "handlerArguments": [
+          "trace",
+          "export",
+          "--job",
+          "sample",
+          "--artifact",
+          "sample",
+          "--destination",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "trace.export",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "trace",
+    "export"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
