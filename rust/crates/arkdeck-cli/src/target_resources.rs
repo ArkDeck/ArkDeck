@@ -137,7 +137,10 @@ fn row(v: &Value) -> bool {
 }
 pub fn validate_target_response(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
     let method = invocation.method;
-    if !(method.starts_with("target.") || method.starts_with("device.display-name.")) {
+    // Judged per leaf: the legacy `device list|show` send `target.list` too,
+    // and Swift's `runDevice` emits that reply as the Runtime answered it.
+    let command = invocation.command;
+    if !(command.starts_with("target.") || command.starts_with("device.display-name.")) {
         return Ok(());
     }
     let invalid = || {

@@ -16,7 +16,8 @@ use arkdeck_cli::runtime_service::{
     verify_leaf,
 };
 use arkdeck_cli::runtime_service_install::{
-    ANALYZER_PROBE_ANSWER, ANALYZER_PROBE_LISTING, install_leaf, uninstall_leaf, update_leaf,
+    ANALYZER_PROBE_ANSWER, ANALYZER_PROBE_LISTING, install_leaf, path_install_leaf, uninstall_leaf,
+    update_leaf,
 };
 use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, validate_method_value};
 use arkdeck_platform::launchd::{LaunchctlOutput, LaunchctlRunner};
@@ -498,6 +499,7 @@ fn host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
         default_daemon_bundle: None,
         relocated_home: true,
         preflight_timeout: Duration::from_secs(30),
+        spelling: "runtime service",
     }
 }
 
@@ -2061,6 +2063,180 @@ fn update_refuses_a_helper_whose_daemon_is_neither_runtime() {
     assert_eq!(tree(&home.paths.home), before);
 }
 
+/// An installation that carries the closed demo workspace pair, one ArkForge
+/// release unit and an ArkTrace descriptor, as the status tests write them.
+/// The descriptor lies in `descriptors`, an owner-controlled directory the
+/// caller removes.
+fn install_with_workspace_and_lane(home: &Home, descriptors: &Path) -> (PathBuf, PathBuf) {
+    let mut environment = home.install();
+    let descriptor = descriptors.join(format!("arktrace-{}.json", nonce()));
+    let bytes = format!(
+        "{{\"distributionRoot\":\"/Applications/ArkTrace.app\",\"formatVersion\":1,\"manifestSHA256\":\"{DIGEST}\"}}"
+    );
+    fs::write(&descriptor, &bytes).unwrap();
+    fs::set_permissions(&descriptor, fs::Permissions::from_mode(0o600)).unwrap();
+    environment.insert("ARKDECK_ARKTRACE_DESCRIPTOR".into(), text(&descriptor));
+    let project = home.root.join("Developer/WaterFlow");
+    directory(&project.join("entry/src/main"));
+    fs::write(project.join("build-profile.json5"), b"{}").unwrap();
+    fs::write(project.join("entry/src/main/module.json5"), b"{}").unwrap();
+    let sdk = home.root.join("sdk");
+    directory(&sdk.join("default/openharmony"));
+    environment.insert(
+        "ARKDECK_WORKSPACE_PROJECTS".into(),
+        format!("demo-app={}", text(&project)),
+    );
+    environment.insert("ARKDECK_WORKSPACE_ACTIVE_PROJECT".into(), "demo-app".into());
+    environment.insert("ARKDECK_DEVECO_SDK_HOME".into(), text(&sdk));
+    let bundle = arkforge_bundle(&home.root);
+    environment.insert("ARKDECK_ARKFORGE_BUNDLE_PATH".into(), text(&bundle));
+    environment.insert("ARKDECK_ARKFORGE_CAMPAIGN".into(), "AFA-AC-7".into());
+    home.write_plist(&text(&home.paths.installed_daemon), &environment);
+    let mut receipt = home.receipt();
+    receipt["workspaceProjectPath"] = json!(text(&project));
+    receipt["devecoSDKPath"] = json!(text(&sdk));
+    receipt["arkTraceDescriptor"] = json!({"descriptorPath": text(&descriptor),
+        "descriptorSHA256": arkdeck_contract::sha256_hex(bytes.as_bytes()),
+        "descriptorByteCount": bytes.len()});
+    home.write_receipt(&receipt);
+    (project, sdk)
+}
+
+fn agentd_host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
+    ServiceHost {
+        spelling: "agentd",
+        ..host(home, launchd)
+    }
+}
+
+fn installed_receipt(home: &Home) -> Value {
+    serde_json::from_slice(&fs::read(&home.paths.receipt).unwrap()).unwrap()
+}
+
+/// Swift `runAgentDaemon` spelled `agentd`: `update` keeps the installed
+/// legacy workspace pair the `runtime service` spelling drops, and `install`
+/// is the path install that carries nothing of an installed service over.
+#[test]
+fn agentd_update_keeps_the_legacy_workspace_pair_and_agentd_install_carries_nothing_over() {
+    // The system temporary directory's ancestors are owner-controlled, as a
+    // pinned descriptor's must be.
+    let descriptors = Removed(
+        std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("arkdeck-agentd-descriptors-{}", nonce())),
+    );
+    directory(&descriptors.0);
+    // `runtime service update` without the pair installs none.
+    let home = Home::new();
+    install_with_workspace_and_lane(&home, &descriptors.0);
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+    assert_eq!(answer.failure, None);
+    let receipt = installed_receipt(&home);
+    assert_eq!(receipt.get("workspaceProjectPath"), None);
+    assert!(receipt.get("arkForgeLane").is_some(), "{receipt}");
+
+    // `agentd update` without `--hdc` or the pair keeps both, and the lane.
+    let home = Home::new();
+    let (project, sdk) = install_with_workspace_and_lane(&home, &descriptors.0);
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let launchd = Launchd::loaded();
+    let options = Map::from_iter([("daemon".to_owned(), json!(text(&helper.bundle)))]);
+    let answer = update_leaf(&agentd_host(&home, &launchd), &options);
+    assert_eq!(answer.failure, None);
+    let receipt = installed_receipt(&home);
+    assert_eq!(receipt["hdcPath"], text(&home.hdc()));
+    assert_eq!(receipt["workspaceProjectPath"], text(&project));
+    assert_eq!(receipt["devecoSDKPath"], text(&sdk));
+    assert!(receipt.get("arkForgeLane").is_some(), "{receipt}");
+    assert!(receipt.get("arkTraceDescriptor").is_some(), "{receipt}");
+
+    // `agentd install` never reads the installed service: without `--hdc` it
+    // is refused before launchd is asked anything.
+    let home = Home::new();
+    install_with_workspace_and_lane(&home, &descriptors.0);
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = path_install_leaf(&agentd_host(&home, &launchd), &options);
+    assert_eq!(answer.document, None);
+    assert_eq!(
+        answer.failure,
+        Some(PlainFailure {
+            exit_code: 64,
+            message: "agentd install requires --hdc with an absolute executable path".into()
+        })
+    );
+    assert!(launchd.calls().is_empty());
+    assert_eq!(tree(&home.paths.home), before);
+    // With it, the installation is the named inputs only: no workspace pair,
+    // no ArkForge lane.
+    let answer = path_install_leaf(
+        &agentd_host(&home, &launchd),
+        &update_options(&helper, &home),
+    );
+    assert_eq!(answer.failure, None);
+    let receipt = installed_receipt(&home);
+    assert_eq!(receipt.get("workspaceProjectPath"), None);
+    assert_eq!(receipt.get("arkForgeLane"), None);
+    assert_eq!(receipt.get("arkTraceDescriptor"), None);
+    let plist = fs::read_to_string(&home.paths.plist).unwrap();
+    assert!(!plist.contains("ARKDECK_ARKFORGE_BUNDLE_PATH"), "{plist}");
+    assert!(!plist.contains("ARKDECK_ARKTRACE_DESCRIPTOR"), "{plist}");
+}
+
+/// A directory removed however the test ends.
+struct Removed(PathBuf);
+
+impl Drop for Removed {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+/// Every diagnostic of the `agentd` spelling names the command the caller
+/// typed.
+#[test]
+fn agentd_diagnostics_name_the_agentd_spelling() {
+    let home = Home::new();
+    home.install();
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    let launchd = Launchd::loaded();
+    let mut options = update_options(&helper, &home);
+    options.insert("workspaceProject".to_owned(), json!("/p"));
+    assert_eq!(
+        update_leaf(&agentd_host(&home, &launchd), &options).failure,
+        Some(PlainFailure {
+            exit_code: 64,
+            message: "agentd update requires --workspace-project and --deveco-sdk together".into()
+        })
+    );
+    assert_eq!(
+        verify_leaf(
+            &agentd_host(&home, &launchd),
+            "ctl-1",
+            &job_options(JOB)
+                .into_iter()
+                .chain([("targetId".to_owned(), json!("TGT-1"))])
+                .collect()
+        )
+        .failure,
+        Some(PlainFailure {
+            exit_code: 64,
+            message: "agentd verify --job cannot be combined with execution options".into()
+        })
+    );
+    assert_eq!(
+        restart_leaf(&agentd_host(&home, &launchd), "ctl-1", Some(0)).failure,
+        Some(PlainFailure {
+            exit_code: 64,
+            message: "agentd restart --maximum-wait-seconds must be between 1 and 300".into()
+        })
+    );
+}
+
 /// The update's analyzer probe is the Swift oracle's `runtime-service-probe`
 /// case: the listing it hands the daemon, and the answer it requires.
 #[test]
@@ -2760,6 +2936,87 @@ fn the_cli_installs_nothing_it_cannot_validate_and_uninstalls_an_absent_service(
             "runtime.service.status",
             "runtime.service.verify",
             "runtime.service.uninstall"
+        ]
+    );
+}
+
+/// `agentd …` is `runtime service …` under its superseded name: the same
+/// answers, reported as the leaf the caller typed, deprecated in
+/// `meta.lifecycle` or, in the human rendering, on stderr.
+#[test]
+fn the_cli_answers_the_agentd_spelling_as_deprecated() {
+    let home = Home::new();
+    let output = cli(&home, None, &["agentd", "status", "--output", "json"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert!(output.stderr.is_empty());
+    let envelope = stdout_json(&output);
+    assert_eq!(envelope["command"], "agentd.status");
+    assert_eq!(
+        envelope["meta"]["lifecycle"],
+        json!({"status": "deprecated",
+            "replacementArgvPattern": "arkdeck runtime service status", "removalVersion": null})
+    );
+    assert_eq!(envelope["result"]["launchAgent"]["installed"], false);
+    // The current spelling carries no lifecycle.
+    let output = cli(
+        &home,
+        None,
+        &["runtime", "service", "status", "--output", "json"],
+    );
+    assert_eq!(stdout_json(&output)["meta"].get("lifecycle"), None);
+    // Human: the warning first, then the document.
+    let output = cli(&home, None, &["agentd", "status"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stderr),
+        "warning: `agentd status` is deprecated; use `arkdeck runtime service status`\n"
+    );
+    assert_eq!(
+        stdout_json(&output)["daemonHealth"]["status"],
+        "socket_absent"
+    );
+    // The legacy rendering is the bare document, and warns nowhere.
+    let output = cli(&home, None, &["agentd", "status", "--json"]);
+    assert!(output.stderr.is_empty());
+    assert_eq!(stdout_json(&output).get("schemaVersion"), None);
+    // `agentd install` takes `update`'s path inputs, never the typed
+    // bootstrap's, and refuses a missing `--hdc` as a usage error.
+    let output = cli(&home, None, &["agentd", "install", "--output", "json"]);
+    assert_eq!(output.status.code(), Some(64));
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("agentd install requires --hdc with an absolute executable path"),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    for argv in [
+        &["agentd", "install", "--bundle", "b"][..],
+        &["agentd", "status", "--control-request-id", "ctl-1"][..],
+        &["agentd", "restart", "--maximum-wait-seconds", "0"][..],
+    ] {
+        let output = cli(&home, None, argv);
+        assert_eq!(output.status.code(), Some(64), "{argv:?}");
+        assert!(output.stdout.is_empty(), "{argv:?}");
+    }
+    // All six are listed.
+    let output = cli(&home, None, &["commands", "--output", "json"]);
+    let listed: Vec<String> = stdout_json(&output)["result"]["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| entry["command"].as_str().unwrap().to_owned())
+        .filter(|command| command.starts_with("agentd."))
+        .collect();
+    assert_eq!(
+        listed,
+        [
+            "agentd.install",
+            "agentd.update",
+            "agentd.restart",
+            "agentd.status",
+            "agentd.verify",
+            "agentd.uninstall"
         ]
     );
 }

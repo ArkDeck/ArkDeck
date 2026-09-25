@@ -5,6 +5,8 @@
 //!
 //! - Both cleanup spellings send one `cleanupDebt.list` and print its answer.
 //!   The deprecated one says so in `meta.lifecycle`.
+//! - `device list` and `device show`, legacy, both send one parameterless
+//!   `target.list` (Swift `runDevice`) and say what replaces them.
 //! - `trace export` is `artifact export` of the one Trace a diagnostics
 //!   capture publishes. The inspected Artifact must be that Trace before
 //!   anything is exported.
@@ -80,6 +82,60 @@ mod runtime {
                 envelope["meta"].get("lifecycle").cloned(),
                 lifecycle,
                 "{command}"
+            );
+        }
+    }
+
+    #[test]
+    fn both_legacy_device_spellings_read_the_target_list() {
+        let answer = frames("target.list")
+            .into_iter()
+            .find(|frame| {
+                frame["ok"] == true
+                    && frame["result"]
+                        .as_array()
+                        .is_some_and(|targets| !targets.is_empty())
+            })
+            .expect("Swift recorded a target");
+        let answer = json!({"ok": true, "result": answer["result"]});
+        for (verb, replacement) in [
+            ("list", "arkdeck target list"),
+            ("show", "arkdeck target show --target <id>"),
+        ] {
+            let command = format!("device.{verb}");
+            let (output, envelope) = support::run_session(
+                &["device", verb],
+                vec![
+                    health(),
+                    ("target.list".to_owned(), Value::Null, answer.clone()),
+                ],
+            );
+            assert_eq!(output.status.code(), Some(0), "{envelope}");
+            assert_eq!(envelope["command"], command.as_str());
+            assert_eq!(envelope["result"], answer["result"]);
+            assert_eq!(
+                envelope["meta"]["lifecycle"],
+                json!({"status": "legacy", "replacementArgvPattern": replacement,
+                    "removalVersion": null})
+            );
+            assert!(output.stderr.is_empty(), "{command}");
+            // In the human rendering the warning is on stderr, before the
+            // answer on stdout.
+            let (output, _) = support::run_session(
+                &["device", verb, "--output", "human"],
+                vec![
+                    health(),
+                    ("target.list".to_owned(), Value::Null, answer.clone()),
+                ],
+            );
+            assert_eq!(output.status.code(), Some(0));
+            assert_eq!(
+                String::from_utf8(output.stderr).unwrap(),
+                format!("warning: `device {verb}` is legacy; use `{replacement}`\n")
+            );
+            assert_eq!(
+                serde_json::from_slice::<Value>(&output.stdout).unwrap(),
+                answer["result"]
             );
         }
     }
