@@ -12,6 +12,7 @@ pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod debug_probe;
 mod debug_templates;
+pub mod domain_executor;
 mod flash_leaves;
 mod trace_inspect;
 pub use debug_templates::debug_template_list;
