@@ -647,6 +647,57 @@ fn a_tool_that_changed_after_admission_is_never_run() {
     }
 }
 
+/// Swift's admission asks the workspace dispatcher after the provider. With
+/// every executable the start-up profiles pinned changed, the source
+/// inspection — which its provider offers whenever an inspector and a
+/// registered root exist — is refused at plan and at submit as Swift refuses
+/// it; the other reads are refused by the provider first, as before.
+#[test]
+fn an_inspection_with_no_pinned_executable_left_is_refused_at_admission() {
+    let fixture = support::fixture("workspace-read-oracle");
+    let root = Root::temporary("dispatcher");
+    let setup = oracle(&root, &fixture);
+    let workspace = composition(
+        &root,
+        setup.profiles(),
+        setup.roots(),
+        &setup.tools.grep,
+        Box::new(VerifiedToolDispatch),
+    );
+    let owners = Owners::new(root, workspace);
+    let inspect = || {
+        read_request(
+            "dispatcher",
+            "workspace.inspect-source",
+            json!({"projectRef": PLAIN, "symbol": "build", "fileScope": "*.ets"}),
+        )
+    };
+    assert_eq!(owners.plan(&inspect())["ok"], true);
+    for tool in [&setup.tools.grep, &setup.tools.sed, &setup.tools.git] {
+        let mut bytes = fs::read(tool).unwrap();
+        bytes.extend_from_slice(b"# changed after its pin\n");
+        fs::write(tool, bytes).unwrap();
+    }
+    let reason = "workspace.inspect-source@1 is runtime unavailable: provider executable is \
+                  unavailable: failed(\"workspace registry has no available executable preset\")";
+    for answer in [owners.plan(&inspect()), owners.submit(&inspect())] {
+        assert_eq!(answer["ok"], false, "{answer}");
+        assert_eq!(answer["error"]["code"], "invalidInput", "{answer}");
+        assert_eq!(answer["error"]["message"], reason, "{answer}");
+    }
+    let status = owners.plan(&read_request(
+        "dispatcher-status",
+        "workspace.inspect-git-status",
+        json!({"projectRef": PROJECT}),
+    ));
+    assert_eq!(
+        status["error"]["message"],
+        // The first start-up profile's reason, as Swift's provider answers
+        // when none serves the read: the plain tree has no source control.
+        "workspace.inspect-git-status@1 is runtime unavailable: workspace.presetUnavailable"
+    );
+}
+
 /// The reads over a production-shaped profile run the host's own tools —
 /// `/usr/bin/grep` as the inspector, `/usr/bin/sed`, `/usr/bin/git` — in the
 /// clean base environment, and publish exactly what each prints when run
