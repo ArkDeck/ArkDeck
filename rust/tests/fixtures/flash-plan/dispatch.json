@@ -1,0 +1,72 @@
+[
+  {
+    "createdMode" : null,
+    "identityConfigured" : false,
+    "name" : "identity.unconfigured",
+    "reason" : "ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")",
+    "records" : null
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "host.withoutHDC",
+    "reason" : "the per-action RockUSB host requires descriptor-bound HDC and a product state directory",
+    "records" : null
+  },
+  {
+    "createdMode" : "700",
+    "identityConfigured" : true,
+    "name" : "records.absent",
+    "reason" : null,
+    "records" : "absent"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.ownerOnly",
+    "reason" : null,
+    "records" : "ownerOnly"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.groupReadable",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"Rockchip record directory is not an owner-only real directory\")",
+    "records" : "groupReadable"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.symlink",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"Rockchip record directory is not an owner-only real directory\")",
+    "records" : "symlink"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.file",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"Rockchip record directory is not an owner-only real directory\")",
+    "records" : "file"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.ownerOnlyFile",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"Rockchip record directory is not an owner-only real directory\")",
+    "records" : "ownerOnlyFile"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.stateMissing",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"cannot create Rockchip record directory (errno 2)\")",
+    "records" : "stateMissing"
+  },
+  {
+    "createdMode" : null,
+    "identityConfigured" : true,
+    "name" : "records.privatePrefix",
+    "reason" : "durable Rockchip host record root is unavailable: failed(\"Rockchip record path is not canonical\")",
+    "records" : "ownerOnly"
+  }
+]

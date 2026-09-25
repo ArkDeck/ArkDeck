@@ -20,12 +20,17 @@ use std::path::{Path, PathBuf};
 
 #[path = "debug_hap_plan.rs"]
 mod debug_hap_plan;
+#[path = "flash_plan.rs"]
+mod flash_plan;
 #[path = "native_library_plan.rs"]
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
+pub use flash_plan::{
+    FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
+};
 pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
@@ -339,24 +344,7 @@ impl<'a> JobPlanner<'a> {
         request: &OperationRequest,
         descriptor: &CatalogOperation,
     ) -> Result<Materialized<'a>, PlanRefusal> {
-        let references = crate::job_owner::import_references::ImportReference::inputs(
-            &request.inputs,
-            descriptor,
-        )
-        .map_err(|_| refusal("invalidInput", "Import input references are malformed"))?;
-        let hold = if references.is_empty() {
-            None
-        } else {
-            let owner = self
-                .imports
-                .ok_or_else(|| refusal("invalidInput", "Import input owner is unavailable"))?;
-            let artifacts = self
-                .artifacts
-                .ok_or_else(|| refusal("invalidInput", "Artifact owner is unavailable"))?;
-            owner
-                .acquire_inputs(artifacts, &references)
-                .map_err(|error| refusal("invalidInput", error.message))?
-        };
+        let hold = self.import_hold(request, descriptor)?;
         // Swift `acquireWorkspaceProjectInput`, after the Import holds and
         // before anything is materialized.
         let workspace_use = match self.workspace {
@@ -383,6 +371,32 @@ impl<'a> JobPlanner<'a> {
             identity: None,
             binding_revision: None,
         })
+    }
+
+    /// Swift `acquireImportInputs`: the holds a request's Import inputs take
+    /// before anything is materialized, released when the plan is done.
+    pub(crate) fn import_hold(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<Option<crate::import_upload::ImportUse<'a>>, PlanRefusal> {
+        let references = crate::job_owner::import_references::ImportReference::inputs(
+            &request.inputs,
+            descriptor,
+        )
+        .map_err(|_| refusal("invalidInput", "Import input references are malformed"))?;
+        if references.is_empty() {
+            return Ok(None);
+        }
+        let owner = self
+            .imports
+            .ok_or_else(|| refusal("invalidInput", "Import input owner is unavailable"))?;
+        let artifacts = self
+            .artifacts
+            .ok_or_else(|| refusal("invalidInput", "Artifact owner is unavailable"))?;
+        owner
+            .acquire_inputs(artifacts, &references)
+            .map_err(|error| refusal("invalidInput", error.message))
     }
 
     /// Swift consults a Runtime debug attempt permit for every plan; this

@@ -8,6 +8,12 @@ use crate::job_owner::import_references::ImportReference;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_USE: AtomicU64 = AtomicU64::new(1);
+fn released() -> WireError {
+    failure(
+        "invalidInput",
+        "Import input is released, missing or unreadable; use a valid committed import before submitting a new Job",
+    )
+}
 pub(crate) struct ImportUse<'a> {
     owner: &'a ImportUploadStore,
     token: String,
@@ -71,7 +77,11 @@ impl ImportUploadStore {
             ));
         }
         for reference in references {
-            self.resolve_guarded(artifacts, reference, &mut cache)?;
+            // Swift `requireUsableImportInputs`: whatever keeps a lease from
+            // resolving, an unknown Import included, refuses alike before
+            // admission.
+            self.resolve_guarded(artifacts, reference, &mut cache)
+                .map_err(|_| released())?;
         }
         let token = NEXT_USE
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
@@ -100,10 +110,7 @@ impl ImportUploadStore {
                     || receipt["lease"] != reference.value
             })
         {
-            return Err(failure(
-                "invalidInput",
-                "Import input is released, missing or unreadable; use a valid committed import before submitting a new Job",
-            ));
+            return Err(released());
         }
         let leased = artifacts
             .owned_lease(&reference.import_id, &reference.artifact_id)

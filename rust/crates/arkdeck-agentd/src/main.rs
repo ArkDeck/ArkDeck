@@ -511,6 +511,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         );
         composed.report();
         let host = host
+            // Swift's Flash planning over that lane, its record root beside
+            // the Job state, which stands for Swift's state directory.
+            .with_flash_planning(composed.planning(&root.join("jobs-state"), hdc_sha256.is_some()))
             // Swift's bootloader status observer and Rockchip facts over the
             // same root and census.
             .with_flash_host_facts(
@@ -875,5 +878,7 @@ fn main() {
 mod device_access_control;
 #[cfg(all(test, target_os = "macos"))]
 mod flash_host_reads_control;
+#[cfg(all(test, target_os = "macos"))]
+mod flash_plan_control;
 #[cfg(all(test, target_os = "macos"))]
 mod loader_binding_control;

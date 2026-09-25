@@ -1,0 +1,1606 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "deviceProfileRef" : "dayu200",
+            "intent" : "fullRestore",
+            "verification" : "full"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operation" : "flash.full-restore@1",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "20faa1e04f53352c05ba99647901366b8ea19d1dd310f34a6fa2d67d5c70b207",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "canonical.full",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-full\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "deviceProfileRef" : "dayu200",
+            "intent" : "fullRestore",
+            "verification" : "basic"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "adcb0ae5318110a39af05ee5cd1218f9f51377094dcdc5f64e51f7e599097b72",
+          "operation" : "flash.full-restore@1",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "4453c3827e623d21441607da5cd71d40f88c8f4fa0927f56deed7b3146e69536",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "canonical.basic",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-canonical-basic\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"basic\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"canonical-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "deviceProfile" : "dayu200",
+            "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "partitionPlan" : [
+              "uboot",
+              "resource",
+              "boot_linux",
+              "ramdisk",
+              "system",
+              "vendor",
+              "updater",
+              "chip_ckm",
+              "userdata"
+            ],
+            "postFlashVerification" : "full"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operation" : "flash.dayu200",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "d410f923e77c96dec4d5021751d488f89124631ef252b32120005ffbe5a7aae6",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "alias.full",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-full\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-full\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "deviceProfile" : "dayu200",
+            "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "partitionPlan" : [
+              "uboot",
+              "resource",
+              "boot_linux",
+              "ramdisk",
+              "system",
+              "vendor",
+              "updater",
+              "chip_ckm",
+              "userdata"
+            ],
+            "postFlashVerification" : "basic"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "db6ffb3285f9565eb76b10bdae7dde903fe437f81f965318343f82f96947d2f7",
+          "operation" : "flash.dayu200",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "c9bb829a204597878ca98b22cf749e19f65ea8ea88de50437706d85d89f97a1f",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "alias.basic",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-basic\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"basic\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-basic\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "deviceProfile" : "dayu200",
+            "imageBundleLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "partitionPlan" : [
+              "uboot",
+              "resource",
+              "boot_linux",
+              "ramdisk",
+              "system",
+              "vendor",
+              "updater",
+              "chip_ckm",
+              "userdata"
+            ]
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operation" : "flash.dayu200",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "15f5cd3d15cd7917c78f0b12f0b673a9ec0d0477382e19c9b9b4137ad7ce7460",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "alias.defaultVerification",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-default\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"]},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-default\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the Runtime could not complete the Job lifecycle request"
+        },
+        "ok" : false
+      },
+      "name" : "alias.reorderedPlan",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-reordered\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"userdata\",\"chip_ckm\",\"updater\",\"vendor\",\"system\",\"ramdisk\",\"boot_linux\",\"resource\",\"uboot\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-reordered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "internalError",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the Runtime could not complete the Job lifecycle request"
+        },
+        "ok" : false
+      },
+      "name" : "alias.shortPlan",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-short\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"alias-short\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash.full-restore@1 is runtime unavailable: production ArkForge Flash lane is not registered"
+        },
+        "ok" : false
+      },
+      "name" : "availability.notRegistered",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-not-registered\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"not-registered\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : "production ArkForge Flash lane is not registered"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash.dayu200 is runtime unavailable: ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+        },
+        "ok" : false
+      },
+      "name" : "availability.hardwareGated",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hardware-gated\",\"inputs\":{\"deviceProfile\":\"dayu200\",\"imageBundleLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"partitionPlan\":[\"uboot\",\"resource\",\"boot_linux\",\"ramdisk\",\"system\",\"vendor\",\"updater\",\"chip_ckm\",\"userdata\"],\"postFlashVerification\":\"full\"},\"operation\":{\"id\":\"flash.dayu200\"},\"requestId\":\"hardware-gated\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : "ArkForge is connected for assessment only (hardwareGated). Flash is unavailable: this configuration has no reviewed production support record or named hardware acceptance campaign."
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash.full-restore@1 is runtime unavailable: ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")"
+        },
+        "ok" : false
+      },
+      "name" : "dispatcher.unavailable",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-dispatcher\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"dispatcher\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : "ArkForge native RockUSB identity is unavailable: failed(\"ArkForge native RockUSB lane is not configured\")",
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash.full-restore@1 is runtime unavailable: ArkForge lane is not configured"
+        },
+        "ok" : false
+      },
+      "name" : "lane.absent",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-lane\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-lane\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : null,
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: production ArkForge target facts are not registered"
+        },
+        "ok" : false
+      },
+      "name" : "facts.error",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-error\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-error\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "error" : "production ArkForge target facts are not registered"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "name" : "facts.staleRevision",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-stale\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-stale\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 2,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "name" : "facts.emptyConnectKey",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-empty-key\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-empty-key\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "name" : "facts.identityNotDigest",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-identity\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-identity\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "NOT-A-DIGEST",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "name" : "facts.toolNotDigest",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-facts-tool\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"facts-tool\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "arkforged"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "runtimeCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "destructive",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+            "deviceProfileRef" : "dayu200",
+            "intent" : "fullRestore",
+            "verification" : "full"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operation" : "flash.full-restore@1",
+          "providerAdmissionBlocker" : "flash.crossModeBindingUnprepared: target TGT-83405c84ff74 is not covered by the durable DAYU200 cross-mode binding",
+          "providerId" : "arkforge",
+          "requestFingerprintSha256" : "53495728c8166ac20457b61de121f9c0caa95714d73f54859f0d0334bfdbd20b",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-image-bundle"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "hashFile",
+              "optional" : false,
+              "stepId" : "hash-images"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "requestConfirmation",
+              "optional" : false,
+              "stepId" : "confirm-flash-intent"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "enterUpdater",
+              "optional" : false,
+              "stepId" : "enter-loader-mode"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForDisconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-disconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-loader-reconnect"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-loader-identity"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "criticalNonInterruptible",
+              "effect" : "destructive",
+              "kind" : "flashPartition",
+              "optional" : false,
+              "stepId" : "flash-partitions"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "verify-flash-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "rebootDevice",
+              "optional" : false,
+              "stepId" : "reboot-device"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "waitForReconnect",
+              "optional" : false,
+              "stepId" : "wait-for-hdc"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "rebind-and-verify-build"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-post-flash-diagnostics"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-83405c84ff74"
+        }
+      },
+      "name" : "facts.crossModeUnprepared",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-cross-mode\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"cross-mode\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "unprepared",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "typed plan preflight failed before authorization: post-flash HDC binding expectation is absent or malformed"
+        },
+        "ok" : false
+      },
+      "name" : "facts.noAlias",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-alias\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-alias\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "typed plan preflight failed before authorization: post-flash HDC binding expectation is absent or malformed"
+        },
+        "ok" : false
+      },
+      "name" : "facts.aliasIdentityMismatch",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-alias-mismatch\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"alias-mismatch\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "Import input is released, missing or unreadable; use a valid committed import before submitting a new Job"
+        },
+        "ok" : false
+      },
+      "name" : "lease.unknown",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-unknown-lease\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-00000000-0000-4000-8000-000000000000:ART-0123456789abcdef0123456789abcdef\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"unknown-lease\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "planOnly does not accept or consume a Runtime capability"
+        },
+        "ok" : false
+      },
+      "name" : "request.capability",
+      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-X\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-capability\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"capability\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "target facts cannot materialize the typed plan before authorization: failed(\"evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched\")"
+        },
+        "ok" : false
+      },
+      "name" : "request.noRevision",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-no-revision\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"no-revision\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "flash bundle Artifact lease is not resolvable: rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"Artifact lease target/binding/identity does not match the materialized request\")"
+        },
+        "ok" : false
+      },
+      "name" : "lease.otherTarget",
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-other-target\",\"inputs\":{\"artifactLease\":\"lease-v1:imp-a8f9d0aa-7806-489c-923c-05a32656b475:ART-8426324c63866659ed9ebc8ce1ef7ae3\",\"deviceProfileRef\":\"dayu200\",\"intent\":\"fullRestore\",\"verification\":\"full\"},\"operation\":{\"id\":\"flash.full-restore\",\"version\":1},\"requestId\":\"other-target\",\"requestedOutputs\":[\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-83405c84ff74\"}}",
+      "setup" : {
+        "dispatchUnavailable" : null,
+        "facts" : {
+          "bindingRevision" : 1,
+          "deviceIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "executionConnectKey" : "post-flash-hdc-address",
+          "serverFacts" : {
+            "arkForgeToolchainID" : "arkforged-native-rockusb",
+            "dayu200CrossModeBinding" : "satisfied",
+            "dayu200HDCNormalAliasSHA256" : "815c2c2e87c5ef02d834dbfcba12d9e39c7134c49dfb4de35fbd29f710c2b724",
+            "dayu200HDCNormalAliasUSBTopology" : "42",
+            "rockusbBackend" : "native"
+          },
+          "toolSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "toolchainSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unavailable" : null
+      }
+    }
+  ],
+  "inputs" : [
+    {
+      "mode" : "600",
+      "path" : ".imports-v1/identities/imp-7bc9fbc7-3979-4440-9771-d78172a5119f.json"
+    },
+    {
+      "mode" : "600",
+      "path" : ".imports-v1/identities/imp-a8f9d0aa-7806-489c-923c-05a32656b475.json"
+    },
+    {
+      "mode" : "600",
+      "path" : ".imports-v1/records/a395fa591aee0d71c83dfa0d5e8e101b9724a798df010c1176553e8723fc44de.json"
+    },
+    {
+      "mode" : "600",
+      "path" : ".imports-v1/records/c9fb7ddac13d397e993e9adc231b0c276f673f514b60f4c8d5eca446aa06cdc6.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "imp-7bc9fbc7-3979-4440-9771-d78172a5119f/.payload-verification-v1.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "imp-7bc9fbc7-3979-4440-9771-d78172a5119f/ART-8048c074232554064150238f1bf20a3f"
+    },
+    {
+      "mode" : "600",
+      "path" : "imp-7bc9fbc7-3979-4440-9771-d78172a5119f/index.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "imp-a8f9d0aa-7806-489c-923c-05a32656b475/.payload-verification-v1.json"
+    },
+    {
+      "mode" : "400",
+      "path" : "imp-a8f9d0aa-7806-489c-923c-05a32656b475/ART-8426324c63866659ed9ebc8ce1ef7ae3"
+    },
+    {
+      "mode" : "600",
+      "path" : "imp-a8f9d0aa-7806-489c-923c-05a32656b475/index.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "../targets/.target-display-names.lock"
+    },
+    {
+      "mode" : "600",
+      "path" : "../targets/.targets.lock"
+    },
+    {
+      "mode" : "600",
+      "path" : "../targets/target-display-names.json"
+    },
+    {
+      "mode" : "600",
+      "path" : "../targets/targets.json"
+    }
+  ],
+  "lease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+  "targetId" : "TGT-83405c84ff74"
+}
