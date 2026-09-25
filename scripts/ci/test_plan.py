@@ -141,13 +141,9 @@ class PathClassificationTests(unittest.TestCase):
                 self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
 
     def test_contract_schema_catalog_and_generator_only_changes_select_rust(self):
+        # The contract schemas under openspec/contracts also select Swift:
+        # test_every_bundle_contract_selects_rust_and_swift.
         for path in (
-            "openspec/contracts/runtime-control-plane.schema.json",
-            "openspec/contracts/cli-canonical-json-vectors.json",
-            "openspec/contracts/cli-result.schema.json",
-            "openspec/contracts/cli-error-registry.yaml",
-            "openspec/contracts/journal-event.schema.json",
-            "openspec/contracts/workflow-step.schema.json",
             "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
             "Catalog/operations/observe.device.json",
             "Catalog/profiles/default.json",
@@ -157,9 +153,9 @@ class PathClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
 
-    def test_every_bundle_contract_selects_rust(self):
-        # Swift's export can rewrite any of them without touching rust/, and
-        # the Rust export's test holds each one.
+    def test_every_bundle_contract_selects_rust_and_swift(self):
+        # Swift's export can rewrite any of them without touching rust/, the
+        # Rust export's test holds each one, and so do Swift's contract tests.
         root = SCRIPT.resolve().parents[2]
         paths = sorted(
             path.relative_to(root).as_posix()
@@ -170,7 +166,7 @@ class PathClassificationTests(unittest.TestCase):
         self.assertIn("openspec/contracts/cli-feature-coverage.json", paths)
         for path in paths + ["openspec/contracts/a-future-product.json"]:
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+                self.assert_lanes([path], swift=True, app=False, ds=False, rust=True)
 
     def test_source_only_canonical_control_and_journal_changes_select_rust(self):
         for name in (

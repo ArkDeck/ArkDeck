@@ -44,7 +44,10 @@ RUST_CONTRACT_INPUT_PREFIXES = (
 # bundle. A PR can regenerate products without touching rust/: Swift's export
 # rewrites them when a registry or the App's capability table changes. Such a
 # PR still runs the Rust lane, so the table and the Rust copies cannot drift
-# into main and fail the next unrelated Rust PR.
+# into main and fail the next unrelated Rust PR. The Swift contract tests read
+# the bundle too (its zero-drift check, the registry copy's check and the
+# schema tests), so such a change runs the Swift lane as well: a bundle-only
+# edit kept consistent with the Rust copies must not skip Swift's drift check.
 RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
@@ -160,7 +163,11 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         ):
             rust = True
 
-        if path.startswith("Packages/ArkDeckKit/") or path.startswith("Package."):
+        if (
+            path.startswith("Packages/ArkDeckKit/")
+            or path.startswith("Package.")
+            or path.startswith(RUST_BUNDLE_PREFIXES)
+        ):
             swift = True
 
         if any(path.startswith(prefix) for prefix in DS_INTERACTION_INPUT_PREFIXES):
