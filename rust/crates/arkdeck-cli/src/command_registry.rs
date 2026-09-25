@@ -200,6 +200,12 @@ fn pad(text: &str, width: usize) -> String {
     )
 }
 
+/// Swift's registry projection as this CLI carries it: the
+/// `commandRegistrySchemaVersion` and the `commands` of every leaf.
+pub(crate) fn projection() -> Value {
+    serde_json::from_str(REGISTRY).expect("the checked-in command registry")
+}
+
 /// A leaf's lifecycle when the registry publishes it as a compatibility
 /// surface, legacy or deprecated: its status and the argv pattern that
 /// replaces it, if one does. A removed leaf answers by name with its own

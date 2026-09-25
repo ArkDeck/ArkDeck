@@ -5,7 +5,9 @@
 //! byte for byte to the committed bundle
 //! (`rust/tests/fixtures/contracts-bundle/owned.json`). The rest stay Swift's
 //! until their slices move them.
-use arkdeck_contract::{CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, canonical_json};
+use arkdeck_contract::{
+    CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION, canonical_json,
+};
 use serde_json::{Map, Value, json};
 
 /// Swift `CLIProductVersion.machineContract`.
@@ -52,6 +54,10 @@ impl Product {
 pub fn contract_products() -> Vec<Product> {
     vec![
         Product {
+            relative_path: "cli-command-registry.yaml".into(),
+            bytes: yaml_document(&command_registry_document()),
+        },
+        Product {
             relative_path: "cli-error-registry.yaml".into(),
             bytes: yaml_document(&error_registry_document()),
         },
@@ -80,6 +86,7 @@ pub fn fixture_products() -> Vec<Product> {
         "page/event-stream.json",
         &event_stream_page(),
     ));
+    products.extend(envelope_products());
     products.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
     products
 }
@@ -222,6 +229,20 @@ fn yaml_lines(value: &Value) -> Vec<String> {
 }
 
 // MARK: Registries
+
+/// Swift `commandRegistryDocument`: the registry's projection, as this CLI
+/// carries it (`command_registry.json`), with the bundle's versions and the
+/// Catalog's digest.
+fn command_registry_document() -> Value {
+    let registry = crate::command_registry::projection();
+    json!({
+        "schemaVersion": registry["commandRegistrySchemaVersion"],
+        "bundleVersion": BUNDLE_VERSION,
+        "cliVersion": crate::CLI_VERSION,
+        "catalogDigest": CATALOG_DIGEST,
+        "commands": registry["commands"],
+    })
+}
 
 /// Swift `errorRegistryDocument`: every exit category with its codes, and
 /// every code with its category, exit status, retryability and attention.
@@ -901,6 +922,136 @@ fn next_actions() -> Vec<(&'static str, Value)> {
     ]
 }
 
+/// Swift `fixtureControlRequestID`: fixed, so the committed envelopes are a
+/// function of the build alone.
+const FIXTURE_CONTROL_REQUEST_ID: &str = "ctl-fixture-0001";
+
+fn wait_action() -> Value {
+    next_actions()
+        .into_iter()
+        .find(|(kind, _)| *kind == "wait")
+        .map(|(_, action)| action)
+        .expect("the wait sample")
+}
+
+/// Swift `SampleDocuments.jobStatus`.
+fn job_status() -> Value {
+    json!({
+        "jobId": JOB_ID,
+        "state": "running",
+        "operation": "observe.device@1",
+        "runtimeRevision": "12",
+        "nextAction": wait_action(),
+    })
+}
+
+/// Swift `SampleDocuments.eventRow`.
+fn event_row() -> Value {
+    json!({
+        "eventId": "evt-6c5b4a39-2817-4f0e-9d8c-7b6a5f4e3d2c",
+        "streamPosition": "12",
+        "runtimeRevision": "12",
+        "cursor": EVENT_CURSOR,
+        "type": "job.stepCompleted",
+        "data": {"stepId": "observe-device", "outcome": "verified"},
+    })
+}
+
+/// Swift `SampleDocuments.emptySnapshotPage`.
+fn empty_snapshot_page() -> Value {
+    json!({
+        "schemaVersion": PAGE_SCHEMA_VERSION,
+        "pageKind": "snapshot",
+        "items": [],
+        "order": "createdAtDescJobIdAsc",
+        "snapshotRevision": "rev-000000000012",
+        "hasMore": false,
+        "nextCursor": null,
+    })
+}
+
+/// Swift `EnvelopeFixtures.products`: one of each machine answer, each
+/// written by the code this CLI answers with. The two refusals are its
+/// parser's own, for `job status` without `--job` and for the retired
+/// `agent chat`.
+fn envelope_products() -> Vec<Product> {
+    let id = FIXTURE_CONTROL_REQUEST_ID;
+    let argv = |words: &[&str]| {
+        words
+            .iter()
+            .map(|word| word.to_string())
+            .collect::<Vec<_>>()
+    };
+    let Err(missing) = crate::parse(&argv(&["job", "status"])) else {
+        panic!("`job status` without --job fails at parse time");
+    };
+    let Err(removed) = crate::parse(&argv(&["agent", "chat"])) else {
+        panic!("`agent chat` is a tombstone");
+    };
+    let mut unavailable =
+        crate::CliError::new("runtimeUnavailable", "the local Runtime did not answer");
+    unavailable
+        .details
+        .insert("endpoint".into(), json!("local"));
+    unavailable
+        .details
+        .insert("newDispatchCount".into(), json!(0));
+    let status = job_status();
+    let answers = [
+        (
+            "envelopes/result-success.json",
+            crate::local_success_envelope("job.status", status.clone(), id),
+        ),
+        (
+            "envelopes/result-deprecated-alias.json",
+            crate::with_lifecycle(
+                crate::local_success_envelope("cleanup-debt.list", empty_snapshot_page(), id),
+                "cleanup-debt.list",
+            ),
+        ),
+        (
+            "envelopes/result-argv-failure.json",
+            crate::failure_envelope(
+                missing.command.unwrap_or("registry.parse"),
+                &missing,
+                id,
+                false,
+            ),
+        ),
+        (
+            "envelopes/result-removed-command.json",
+            crate::with_lifecycle(
+                crate::failure_envelope(
+                    removed.command.unwrap_or("registry.parse"),
+                    &removed,
+                    id,
+                    false,
+                ),
+                removed.command.unwrap_or("registry.parse"),
+            ),
+        ),
+        (
+            "envelopes/event-runtime-event.jsonl",
+            crate::event_line("job.watch", 1, &event_row(), id),
+        ),
+        (
+            "envelopes/event-terminal-success.jsonl",
+            crate::terminal_line("job.wait", 2, id, Some(EVENT_CURSOR), Ok((&status, 0))),
+        ),
+        (
+            "envelopes/event-terminal-failure.jsonl",
+            crate::terminal_line("job.wait", 1, id, None, Err(&unavailable)),
+        ),
+    ];
+    answers
+        .into_iter()
+        .map(|(path, answer)| Product {
+            relative_path: path.into(),
+            bytes: crate::render(&answer).expect("every envelope is canonical JSON"),
+        })
+        .collect()
+}
+
 fn snapshot_page() -> Value {
     json!({
         "schemaVersion": PAGE_SCHEMA_VERSION,
@@ -917,14 +1068,7 @@ fn event_stream_page() -> Value {
     json!({
         "schemaVersion": PAGE_SCHEMA_VERSION,
         "pageKind": "eventStream",
-        "items": [{
-            "eventId": "evt-6c5b4a39-2817-4f0e-9d8c-7b6a5f4e3d2c",
-            "streamPosition": "12",
-            "runtimeRevision": "12",
-            "cursor": EVENT_CURSOR,
-            "type": "job.stepCompleted",
-            "data": {"stepId": "observe-device", "outcome": "verified"},
-        }],
+        "items": [event_row()],
         "order": "streamPositionAsc",
         "snapshotRevision": "12",
         "hasMore": false,

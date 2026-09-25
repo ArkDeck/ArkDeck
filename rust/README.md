@@ -127,6 +127,8 @@ registry projection (`CLIRegistryProjection`, published as
 `openspec/contracts/cli-command-registry.yaml`) for exactly the leaves this CLI
 serves, from `crates/arkdeck-cli/src/command_registry.json`, which
 `CLIRustCommandRegistryCopyContractTests` holds to Swift's projection.
+`scripts/copy-command-registry.py` refreshes that copy from the published registry
+(`--check` only reports drift).
 `crates/arkdeck-cli/tests/argv_fixtures.rs` replays the Swift argv fixture of every
 served leaf, copied unchanged into `tests/fixtures/current-cli-argv`, and pins the
 cases this parser still answers otherwise; TASK-XPA-018's `cli-parity-audit.py`
