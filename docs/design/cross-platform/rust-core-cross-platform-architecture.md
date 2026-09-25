@@ -118,7 +118,7 @@ P4/P5 不在题目要求的三方案之内，但它们是「不做 Rust」的两
 | ABI/API/协议契约 | ◎ 消费 SVC 完成后的单 v1 JSON-lines 契约与拒绝无效帧测试，不协商版本 | △ C ABI 需定义固定 v1 标识、buffer 所有权和错误结构；Swift/C# binding 同步生成 | ○ 协议同 P1；FFI 面极窄（JSON in/out + 固定 v1 ABI） | ○ 协议同 P1 | ○ 协议同 P1，但两套 handler 实现 |
 | async stream / 取消 / backpressure / 订阅 | ○ 现行 pull 分页（`job.events`）保持 CLI-REQ-025；可在同一当前契约内追加有界 long-poll unary（一请求一响应） | △ 进程内回调看似方便，实则要在 UI 进程内实现取消与背压，且和「一响应」契约无关 | ○ 同 P1 | ○ 同 P1 | ○ 同 P1 |
 | 大 Artifact 传输、复制次数、内存 | ○ 今日 `artifact.read` 内联 base64 分页 4 MiB（`AgentDaemon.swift:2040-2096`，`ArtifactResourceContract.swift:29`）≈3–4 次拷贝；可追加 fd/handle 传递做零拷贝（UDS `SCM_RIGHTS`、XPC `xpc_fd_create`、Windows `DuplicateHandle`） | ◎ 零拷贝天然，但代价是 authority 进程内 | ○ 同 P1；Viewer 大树若走 FFI 则索引在 UI 进程内零拷贝 | ○ | ○ |
-| App Sandbox / 签名 / 公证 / MSIX 与更新 | ◎ macOS：daemon 是 LaunchAgent nested code（AFD-0003 先例，空 entitlements，Developer ID+Hardened Runtime）；Windows：daemon 与 CLI 可 xcopy/自包含，App 走 MSIX；Rust 二进制只需 Authenticode/Developer ID | △ cdylib 必须随 App 一起签名/公证，dylib 进沙箱；Windows 上 NativeAOT/trim 与 P/Invoke 组合尚需验证 | ○ 同 P1；FFI 静态库进 App 一起签名，面窄 | △ Swift 运行时在 Windows 的分发与签名体验不成熟 | ○ |
+| App Sandbox / 签名 / 公证 / MSIX 与更新 | ◎ macOS：daemon 是 LaunchAgent nested code（Developer ID+Hardened Runtime；entitlements 沿用现行 Swift daemon 的三项——`com.apple.application-identifier`、`com.apple.developer.team-identifier`、`keychain-access-groups` 的 `8AQTYW5FKR.com.arkdeck.shared`，不新增：Rust 签名凭据 owner 读 Data Protection Keychain 共享组，缺组即 -34018，见 SPK-10；空 entitlements 的 AFD-0003 先例只适用于它 spawn 的 `arkforged`）；Windows：daemon 与 CLI 可 xcopy/自包含，App 走 MSIX；Rust 二进制只需 Authenticode/Developer ID | △ cdylib 必须随 App 一起签名/公证，dylib 进沙箱；Windows 上 NativeAOT/trim 与 P/Invoke 组合尚需验证 | ○ 同 P1；FFI 静态库进 App 一起签名，面窄 | △ Swift 运行时在 Windows 的分发与签名体验不成熟 | ○ |
 | Swift、C#、Rust 调试与测试成本 | ○ 三种语言但边界清晰：Rust 单元/契约测试 + 黑盒 daemon 测试；Swift/C# 只测 UI 与 SDK | ✕ 崩溃在 UI 进程内跨语言栈；符号化、内存所有权问题最难调 | ○ 同 P1；FFI 有独立 fuzz 与向量 | △ Swift on Windows 的调试/覆盖率工具链弱 | ○ 两套 Runtime 测试全套翻倍 |
 | x64 / ARM64 / Apple silicon | ◎ Rust `aarch64-apple-darwin`、`x86_64/aarch64-pc-windows-msvc` 均 Tier 1（后者自 1.91） | ◎ 同 | ◎ 同 | △ Swift Windows ARM64 支持成熟度低于 Rust | ◎ .NET 全支持 |
 | 部署、回滚、旧客户端兼容 | ◎ 回滚 = LaunchAgent/服务指回旧二进制；旧 Swift CLI 与 App 对新 daemon 仍走同一协议 | ✕ 回滚要重发 App/CLI 全部包；旧客户端内嵌旧 Runtime 与新 daemon 并存 = 两个写者 | ◎ 同 P1；FFI kernel 与 daemon 版本独立（纯函数） | ○ | ○ |
@@ -1019,7 +1019,7 @@ flowchart TD
 - 平台/GJ：macOS GJ-4 re-pass；GJ-1～5 全部在纯 Rust daemon 上 PASS。
 - 依赖：XPA-016、XPA-018、XPA-019、XPA-025（r5：`rust-perf.yml` 构建的正是本任务要删的 SwiftPM 产品而本任务无权改它，性能车道须先切到 Rust daemon）（r3：两个客户端先脱钩——`ArkDeckCLI` 链接 `ArkDeckWorkflows/AgentComposition`（`Package.swift:112-116`），App 链接 `ArkDeckWorkflows` 产品（`project.pbxproj:889`）；r1/r2 只依赖 XPA-016，会出现客户端仍链接已删模块的不可发布中间态）。
 - 要点：删除 `ArkDeckAgentDaemon/DaemonMain/Workflows(引擎部分)/Storage/Process/OpenHarmony` targets 与其 Swift fixtures（`JournalCrashFixture/EngineCrashFixture/RuntimeSoakFixture`，其 Rust 等价物由 XPA-014/023 先行）；macOS 列 traceability 与 lock 在此翻转；LaunchAgent 永久指向 Rust；ArkForge Swift SDK 从 `Package.swift` 移除；`ArchitectureBoundaryContractTests` 改为守卫「Swift 无 Runtime 语义」。
-- AC：仓内无第二份 Runtime 语义实现；ArkForge codec 只有 Rust 一份；GJ 全 PASS；发布 DMG 含 Rust daemon（nested code，空 entitlements，Developer ID+Hardened Runtime，AFD-0003 先例）。
+- AC：仓内无第二份 Runtime 语义实现；ArkForge codec 只有 Rust 一份；GJ 全 PASS；发布 DMG 含 Rust daemon（nested code，Developer ID+Hardened Runtime；entitlements 与现行 Swift daemon 相同的三项、不新增，`arkforged` 按 AFD-0003 为空）。
 - 规模：L。
 
 #### TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
