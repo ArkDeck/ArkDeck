@@ -17,6 +17,7 @@ mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
 pub mod error_registry;
+mod feature_coverage;
 mod flash_leaves;
 mod trace_inspect;
 pub use debug_templates::debug_template_list;

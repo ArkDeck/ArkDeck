@@ -135,8 +135,12 @@ machine-contract bundle (`machine_contracts::argv_fixture`); `tests/machine_cont
 holds them byte for byte to the documents Swift publishes, through the digest table
 `tests/fixtures/contracts-bundle/owned.json`. After an export changes the bundle,
 `scripts/refresh-contract-digests.py` rewrites that table from the committed files
-(`--check` only reports drift). TASK-XPA-018's `cli-parity-audit.py` classifies the
-256 coverage entries from the leaves the CLI serves.
+(`--check` only reports drift). The export renders every product of the bundle; the
+feature coverage and the App's capability registry read the App's table from
+`crates/arkdeck-cli/src/app_capability_registry.json`, which
+`scripts/copy-app-capability-registry.py` refreshes from the published registry
+(`--check` likewise). TASK-XPA-018's `cli-parity-audit.py` classifies the 256
+coverage entries from the leaves the CLI serves.
 
 The Unix default endpoint is a private development socket under the temporary
 directory, separate from the published Swift socket. Windows uses a local
