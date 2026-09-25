@@ -500,8 +500,8 @@ struct ArkDeckCommandLine {
       try FileManager.default.createDirectory(
         at: output, withIntermediateDirectories: true,
         attributes: [.posixPermissions: 0o700])
-      try canonicalPayload.write(to: payloadURL, options: [.atomic, .completeFileProtection])
-      try signatureInput.write(to: inputURL, options: [.atomic, .completeFileProtection])
+      try writeUpdateFeedFile(canonicalPayload, to: payloadURL)
+      try writeUpdateFeedFile(signatureInput, to: inputURL)
     } catch {
       throw updateFeedFailure(error, session, "preparing the payload")
     }
@@ -595,7 +595,7 @@ struct ArkDeckCommandLine {
             "\(system.majorVersion).\(system.minorVersion).\(system.patchVersion)",
           architecture: "arm64"),
         now: Date())
-      try envelope.write(to: output, options: [.atomic, .completeFileProtection])
+      try writeUpdateFeedFile(envelope, to: output)
     } catch {
       throw updateFeedFailure(error, session, "verifying and writing the feed")
     }
@@ -616,6 +616,15 @@ struct ArkDeckCommandLine {
         "keyId": .string(UpdateFeedTrust.productionKeyID),
         "selfVerified": .bool(true),
       ]))
+  }
+
+  /// Writes one file of update-feed material — the payload, the signature
+  /// input or the assembled feed — atomically and with no Data Protection
+  /// class. The material is public, and what vouches for it is the Ed25519
+  /// signature, not a protection class; macOS 27 refuses a complete-protection
+  /// write here (NSCocoaError 513, EPERM), which failed every release.
+  static func writeUpdateFeedFile(_ data: Data, to url: URL) throws {
+    try data.write(to: url, options: [.atomic])
   }
 
   static func measureArtifact(_ url: URL) throws -> (byteLength: UInt64, sha256: String) {
