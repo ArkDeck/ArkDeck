@@ -101,8 +101,12 @@ const BUILD: &str = crate::workspace_build::BUILD;
 const SIGN: &str = crate::workspace_composition::SIGN;
 const CHECKPOINT: &str = crate::workspace_checkpoint::CHECKPOINT;
 const SWEEP: &str = crate::workspace_sweep::SWEEP;
+const TESTS: &str = crate::workspace_tests_symbolize::TESTS;
+const SYMBOLIZE: &str = crate::workspace_tests_symbolize::SYMBOLIZE;
 /// The workspace mutations: none has a dedicated readback.
-const WORKSPACE_MUTATIONS: [&str; 4] = [APPLY, REVERT, BUILD, CHECKPOINT];
+const WORKSPACE_MUTATIONS: [&str; 5] = [APPLY, REVERT, BUILD, CHECKPOINT, TESTS];
+/// Swift's provider answer for a symbolization whose receipt was lost.
+const PROCESS_UNKNOWN: &str = "read/build process completion is not inferable after receipt loss";
 /// Swift's provider answer for a sweep whose receipt was lost: which trees
 /// it destroyed is readable only from its findings, and an interrupted
 /// teardown resumes safely on the next sweep.
@@ -474,6 +478,7 @@ fn reconciled(operation: &str, state: &str) -> bool {
     analyzer(operation)
         || workspace_read(operation)
         || operation == SWEEP
+        || operation == SYMBOLIZE
         || operation == SIGN
         || WORKSPACE_MUTATIONS.contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
@@ -511,6 +516,7 @@ impl JobReconciler<'_> {
         if analyzer(operation)
             || workspace_read(operation)
             || operation == SWEEP
+            || operation == SYMBOLIZE
             || (!record.outcome_unknown() && !hap_finalizing)
         {
             return Ok(None);
@@ -973,6 +979,10 @@ impl JobReconciler<'_> {
                 crate::workspace_checkpoint::CheckpointAction::materialize(&action)
                     .map(|_| ())
                     .map_err(|detail| unsupported(&detail))?;
+            } else if operation == TESTS {
+                crate::workspace_tests_symbolize::PresetAction::materialize(&action)
+                    .map(|_| ())
+                    .map_err(|detail| unsupported(&detail))?;
             } else {
                 crate::workspace_patch::PatchAction::materialize(&action)
                     .map(|_| ())
@@ -991,6 +1001,17 @@ impl JobReconciler<'_> {
                 .map_err(|detail| unsupported(&detail))?;
             exact(&events)?;
             let decision = durable.unwrap_or(Decision::NotExecuted);
+            return self.finish(held, &events, &intent, &step, &attempt, decision, None);
+        }
+        if operation == SYMBOLIZE {
+            // A symbolization's child left nothing behind to read: Swift's
+            // provider cannot infer whether it completed, so the intent stays
+            // unknown and nothing is resent.
+            self.resolve_source(&held.run.record)?;
+            crate::workspace_tests_symbolize::PresetAction::materialize(&action)
+                .map_err(|detail| unsupported(&detail))?;
+            exact(&events)?;
+            let decision = durable.unwrap_or_else(|| Decision::Unknown(PROCESS_UNKNOWN.into()));
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
         if operation == SWEEP {
@@ -1128,6 +1149,7 @@ impl JobReconciler<'_> {
             NATIVE => "libraryArtifactLease",
             APPLY => "patchArtifactRef",
             SIGN => "unsignedHapArtifactLease",
+            SYMBOLIZE => "dumpArtifactRef",
             _ => return Ok(None),
         };
         let Some(lease) = record.request["inputs"][input].as_str() else {
@@ -1142,7 +1164,19 @@ impl JobReconciler<'_> {
             Ok(None) => self.artifacts.lease(lease).map_err(other)?,
             Err(error) => return Err(other(error.message)),
         };
-        if let Some(reason) = binding_refusal(&leased, record) {
+        // A symbolization reads a crash another target captured: Swift checks
+        // that exact product instead of the request's own binding.
+        let refusal = if record.operation() == SYMBOLIZE {
+            let target = &record.request["target"];
+            crate::workspace_tests_symbolize::dump_refusal(
+                &leased.row,
+                target["targetId"].as_str().unwrap_or_default(),
+                target["expectedBindingRevision"].as_i64(),
+            )
+        } else {
+            binding_refusal(&leased, record)
+        };
+        if let Some(reason) = refusal {
             return Err(refused("rejected", reason));
         }
         Ok(Some(Source {

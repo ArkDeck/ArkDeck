@@ -480,6 +480,16 @@ impl JobRunner<'_> {
             (None, Some(workspace)) if run.record.operation() == crate::workspace_sweep::SWEEP => {
                 self.execute_workspace_sweep(&mut run, workspace)?
             }
+            (None, Some(workspace))
+                if run.record.operation() == crate::workspace_tests_symbolize::TESTS =>
+            {
+                self.execute_workspace_tests(&mut run, workspace)?
+            }
+            (None, Some(workspace))
+                if run.record.operation() == crate::workspace_tests_symbolize::SYMBOLIZE =>
+            {
+                self.execute_workspace_symbolize(&mut run, workspace)?
+            }
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }

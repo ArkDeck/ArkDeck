@@ -739,6 +739,7 @@ impl Host {
         bootstrap: &std::path::Path,
         signing: Option<arkdeck_hoststore::SigningSetup>,
         inspector: Option<&std::ffi::OsStr>,
+        symbolizer: Option<&std::ffi::OsStr>,
     ) -> Result<Self, String> {
         let Some(projects) = self.workspace_projects.clone() else {
             return Ok(self);
@@ -763,6 +764,7 @@ impl Host {
             arkdeck_hoststore::runtime_now,
             &resolve,
             signing,
+            symbolizer.map(|path| path.to_string_lossy()).as_deref(),
         )?;
         use std::io::Write;
         match &notes.released_credential_owners {

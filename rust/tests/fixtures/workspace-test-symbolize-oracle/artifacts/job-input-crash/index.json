@@ -1,0 +1,65 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-3fd720ed38ecd545cd0874367461239f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "abababababababababababababababababababababababababababababababab",
+        "targetID" : "device-oracle-target"
+      },
+      "byteCount" : 142,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-crash",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-input-crash",
+      "sha256" : "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "collect-crash-log"
+    },
+    {
+      "artifactID" : "ART-19e8ad32ad93f2109aa472b57f54ad87",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "abababababababababababababababababababababababababababababababab",
+        "targetID" : "device-oracle-target"
+      },
+      "byteCount" : 142,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-crash",
+      "mediaType" : "text\/plain",
+      "name" : "crash-index.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-input-crash",
+      "sha256" : "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "collect-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

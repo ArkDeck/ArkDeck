@@ -1,0 +1,4 @@
+> hvigor Starting task test for broken@default
+DEVECO_SDK_HOME=/private/tmp/arkdeck-workspace-test-symbolize-oracle/sdk
+TESTS FAILED
+hvigor ERROR: module broken is not declared in build-profile.json5

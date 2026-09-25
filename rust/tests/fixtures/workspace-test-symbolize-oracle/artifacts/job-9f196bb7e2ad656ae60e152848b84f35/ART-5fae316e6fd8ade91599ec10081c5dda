@@ -1,0 +1,6 @@
+> hvigor Starting task test for entry@default
+DEVECO_SDK_HOME=/private/tmp/arkdeck-workspace-test-symbolize-oracle/sdk
+PASS entry/src/main/ets/entryability/EntryAbility.ets
+PASS entry/src/main/ets/pages/Index.ets
+> hvigor Finished task test
+TESTS PASSED

@@ -1,0 +1,35 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-95b04c40eac2d2504d1244a3f0c5be0a",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "abababababababababababababababababababababababababababababababab",
+        "targetID" : "workspace-host"
+      },
+      "byteCount" : 142,
+      "createdAtUTC" : "2026-09-25T00:00:00Z",
+      "jobID" : "job-input-host-crash",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log.txt",
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-10-02T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-input-host-crash",
+      "sha256" : "861af16021f6d9e470087ec96616137c657d715fcae88f0983e47fe3c77d860c",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "collect-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

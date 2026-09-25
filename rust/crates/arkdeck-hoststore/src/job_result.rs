@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 26] = [
+const READABLE: [&str; 28] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -50,6 +50,8 @@ const READABLE: [&str; 26] = [
     "workspace.inspect-diff@1",
     "workspace.create-checkpoint@1",
     "workspace.sweep-isolated-copies@1",
+    "workspace.run-tests@1",
+    "workspace.symbolize-crash@1",
 ];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;
 /// Swift `RuntimeJobReadProjection.bounded`.

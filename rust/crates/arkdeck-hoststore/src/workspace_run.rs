@@ -68,6 +68,8 @@ pub(crate) fn runs(operation: &str) -> bool {
         crate::workspace_composition::SIGN,
         crate::workspace_checkpoint::CHECKPOINT,
         crate::workspace_sweep::SWEEP,
+        crate::workspace_tests_symbolize::TESTS,
+        crate::workspace_tests_symbolize::SYMBOLIZE,
     ]
     .contains(&operation)
         || crate::workspace_read::READS.contains(&operation)
@@ -1881,5 +1883,316 @@ impl JobRunner<'_> {
         run.transition("finalizing", "succeeded", "finalized")?;
         run.finish()?;
         run.persist(self.jobs)
+    }
+}
+
+impl JobRunner<'_> {
+    /// Swift `resolvedInputArtifact` for a symbolization, before its step:
+    /// the dump's lease resolved again and still the device-bound crash log
+    /// the request may read. The refusal is the reason the Job fails with.
+    fn dump_lease(&self, run: &Run) -> Result<LeasedInput, String> {
+        use crate::workspace_tests_symbolize::{SYMBOLIZE_STEP, dump_refusal};
+        let unreadable = |error: &dyn std::fmt::Display| {
+            format!("input Artifact lease became unreadable before {SYMBOLIZE_STEP}: {error}")
+        };
+        let Some(reference) = run.record.request["inputs"]["dumpArtifactRef"].as_str() else {
+            return Err(unreadable(&"the crash dump lease is absent"));
+        };
+        let resolved = match crate::job_owner::import_references::ImportReference::parse(reference)
+        {
+            Ok(Some(reference)) => self
+                .imports
+                .ok_or_else(|| "Import owner is unavailable".to_owned())
+                .and_then(|owner| {
+                    owner
+                        .resolve_input(self.artifacts, &reference)
+                        .map_err(|error| error.message)
+                }),
+            Ok(None) => self.artifacts.lease(reference),
+            Err(error) => Err(error.message),
+        };
+        let leased = resolved.map_err(|error| unreadable(&error))?;
+        let target = &run.record.request["target"];
+        if let Some(refusal) = dump_refusal(
+            &leased.row,
+            target["targetId"].as_str().unwrap_or_default(),
+            target["expectedBindingRevision"].as_i64(),
+        ) {
+            return Err(refusal);
+        }
+        let (Some(path), Some(sha256), Some(byte_count)) = (
+            leased.path.to_str(),
+            leased.row["sha256"].as_str(),
+            leased.row["byteCount"].as_u64(),
+        ) else {
+            return Err(unreadable(&"the crash dump lease is unreadable"));
+        };
+        Ok(LeasedInput {
+            artifact_id: leased.artifact_id.clone(),
+            path: path.to_owned(),
+            sha256: sha256.to_owned(),
+            byte_count,
+        })
+    }
+
+    /// Swift `runOwned` for a test Job's one step, then
+    /// `recordCapabilityOutcome` for the standing capability it ran under:
+    /// unknown while the Job is parked, confirmed with the Job's state
+    /// otherwise.
+    pub(super) fn execute_workspace_tests(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        self.preset_step(run, workspace, true)?;
+        let outcome = if run.record.state == "waitingForRecovery" {
+            UseOutcome::OutcomeUnknown
+        } else {
+            UseOutcome::Confirmed
+        };
+        self.settle_mutation(run, outcome)
+    }
+
+    /// Swift `runOwned` for a symbolization Job's one host-only step.
+    pub(super) fn execute_workspace_symbolize(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        self.preset_step(run, workspace, false)
+    }
+
+    /// One preset step, as Swift's `executeAdmittedSteps` runs it: a test run
+    /// in the host target's mutation lane, its use consumed before the
+    /// write-ahead intent; a symbolization with its dump's lease resolved
+    /// again first. The typed action materialized and lowered again, persisted
+    /// before its intent, then the pinned tool; its receipt decides the
+    /// correlated outcome. A test run's output is published whatever its
+    /// verdict (a failure keeps its diagnostics); a symbolization's report —
+    /// sensitive text — only when it verifies. A child whose outcome cannot be
+    /// observed parks the Job, never to run again.
+    fn preset_step(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+        tests: bool,
+    ) -> Result<(), RunRefusal> {
+        use crate::workspace_tests_symbolize::{
+            SYMBOLIZE, SYMBOLIZE_KIND, SYMBOLIZE_PRODUCT, SYMBOLIZE_STEP, TESTS, TESTS_KIND,
+            TESTS_PRODUCT, TESTS_STEP,
+        };
+        let (operation, step_id, kind, effect) = if tests {
+            (TESTS, TESTS_STEP, TESTS_KIND, "deviceMutation")
+        } else {
+            (SYMBOLIZE, SYMBOLIZE_STEP, SYMBOLIZE_KIND, "hostOnly")
+        };
+        let Some(descriptor) = operation
+            .rsplit_once('@')
+            .and_then(|(id, version)| CatalogOperation::lookup(id, version.parse().ok()))
+        else {
+            return Err(uncertain());
+        };
+        let started = run.clock()?;
+        run.record.start(&started);
+        run.transition("preflight", "running", "steps-start")?;
+        // A test run reads the tree a patch writes: it waits for the lane.
+        let _lane = if tests {
+            match workspace.lane.lock() {
+                Ok(lane) => Some(lane),
+                Err(_) => return self.fail(run, "workspace mutation lane is unavailable"),
+            }
+        } else {
+            None
+        };
+        // Swift's safe boundary before the step.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let leased = if tests {
+            None
+        } else {
+            match self.dump_lease(run) {
+                Ok(leased) => Some(leased),
+                Err(reason) => return self.fail(run, &reason),
+            }
+        };
+        // A provider refusal before any intent fails the Job: the tree moved
+        // since admission, or the profile, its preset or its tool changed.
+        let action = if tests {
+            workspace.tests_action(operation, &inputs)
+        } else {
+            workspace.symbolize_action(operation, &inputs, leased.as_ref())
+        };
+        let action = match action {
+            Ok(action) => action,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        let lowering = match workspace.lower_preset(&action) {
+            Ok(lowering) => lowering,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        if tests {
+            match self.consume_workspace_authority(run, descriptor, workspace, None) {
+                Ok(MutationConsumption::Consumed | MutationConsumption::Held) => {}
+                Ok(MutationConsumption::Cancelled) => {
+                    self.carry(run)?;
+                    return self.close_cancelled(run, None);
+                }
+                Ok(MutationConsumption::PersistenceUncertain) => return Err(uncertain()),
+                Err(reason) => return self.fail(run, &reason),
+            }
+        }
+        // Swift `dispatchWithWAL`'s last boundary before an intent.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, None);
+        }
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let dump = leased
+            .as_ref()
+            .map(|leased| (leased.artifact_id.as_str(), leased.sha256.as_str()));
+        let step = json!({
+            "id": step_id, "kind": kind, "effect": effect,
+            "bindingRequirement": "none", "cancellation": "immediate",
+            "compensationDescriptors": [], "arguments": action.journal_arguments(&inputs, dump),
+        });
+        let intent_id = format!("intent-{step_id}");
+        let event = events::step_intent(
+            &run.envelope(intent_id.clone())?,
+            &step,
+            &Target {
+                scope: "host".into(),
+                target_id: target.clone(),
+                connect_key: None,
+                identity_snapshot_hash: None,
+            },
+            1,
+            None,
+        )
+        .map_err(|_| uncertain())?;
+        // The exact typed action is durable before its intent can be.
+        let persisted = action.persisted().map_err(|_| uncertain())?;
+        run.record
+            .set_recovery(Some(step_id), Some(&intent_id), Some(persisted));
+        run.persist(self.jobs)?;
+        if run.append(event).is_err() {
+            run.record.set_recovery(None, None, None);
+            let _ = run.persist(self.jobs);
+            return Err(uncertain());
+        }
+        run.record.timeline.push(format!("intent {step_id}"));
+        run.record.add_step_kind(kind);
+        // Only now may the tool start.
+        let invocation = action.invocation();
+        let opened = (self.precise_now)();
+        let dispatched = match opened {
+            Some(_) => workspace.tool.dispatch(&ToolInvocation {
+                executable_path: &invocation.executable_path,
+                executable_sha256: &invocation.executable_sha256,
+                argument_zero: invocation.argument_zero.as_deref(),
+                arguments: &invocation.arguments,
+                environment: &lowering.environment,
+                resources: &lowering.resources,
+                working_directory: Some(&invocation.project_root),
+                timeout_seconds: invocation.timeout_seconds,
+            }),
+            None => Err(ToolFailure::Failed(
+                "dispatch refused: the Runtime clock is unavailable".into(),
+            )),
+        };
+        let window = opened.zip((self.precise_now)());
+        let receipt = match dispatched {
+            Ok(receipt) => receipt,
+            Err(ToolFailure::OutcomeUnknown(reason)) => {
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {step_id}; durable intent left outstanding"
+                ));
+                return self.park(run, &reason);
+            }
+            Err(ToolFailure::Failed(reason)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(step_id, &intent_id, "failed", None, &at)?;
+                run.record.timeline.push(format!("failed {step_id}"));
+                run.record.set_recovery(None, None, None);
+                return self.fail(run, &reason);
+            }
+        };
+        // Swift `publishDeclaredArtifacts`: a test run's output is its stdout
+        // then its stderr; a symbolization's report its stdout.
+        let job_id = run.record.job_id.clone();
+        let session_id = format!("session-{job_id}");
+        let (name, contents, privacy) = if tests {
+            let mut output = receipt.stdout.clone();
+            output.extend_from_slice(&receipt.stderr);
+            (TESTS_PRODUCT, output, "standard")
+        } else {
+            (SYMBOLIZE_PRODUCT, receipt.stdout.clone(), "sensitive")
+        };
+        let product = Product {
+            job_id: &job_id,
+            session_id: &session_id,
+            step_id,
+            name,
+            media_type: "text/plain",
+            privacy,
+            retention_class: "default",
+            source_operation: operation,
+            provider_id: "workspace",
+            binding: Self::workspace_binding(run, &target),
+            observation_window: window,
+        };
+        match workspace.verify_preset(&action, &receipt) {
+            PatchVerdict::Verified(summary) => {
+                let at = run.clock()?;
+                run.step_outcome_at(step_id, &intent_id, "succeeded", None, &at)?;
+                run.record
+                    .timeline
+                    .push(format!("verified {step_id} {}", swift_keys(&summary)));
+                run.record.set_recovery(None, None, None);
+                let published = self.workspace_publisher().publish(&product, &contents);
+                if let Err(reason) = self.settle_publication(run, &product, published) {
+                    return self.close(run, &reason);
+                }
+                if self.cancellation.is_some_and(RunCancellation::pending) {
+                    self.carry(run)?;
+                    return self.drain(run);
+                }
+                run.transition("running", "finalizing", "steps-complete")?;
+                run.record.set_operation_failure(None);
+                run.transition("finalizing", "succeeded", "finalized")?;
+                run.finish()?;
+                run.persist(self.jobs)
+            }
+            PatchVerdict::Failed(code, detail) => {
+                let at = run.clock()?;
+                run.step_outcome_at(step_id, &intent_id, "failed", None, &at)?;
+                run.record.set_recovery(None, None, None);
+                run.record
+                    .timeline
+                    .push(format!("failed {step_id}: {code}: {detail}"));
+                // A confirmed test failure still owns its diagnostics.
+                if tests {
+                    let published = self.workspace_publisher().publish(&product, &contents);
+                    if let Err(reason) = self.settle_publication(run, &product, published) {
+                        return self.close(run, &reason);
+                    }
+                }
+                self.fail(run, &format!("{code}: {detail}"))
+            }
+            PatchVerdict::Unknown(reason) => {
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {step_id}; durable intent left outstanding"
+                ));
+                self.park(run, &reason)
+            }
+        }
     }
 }

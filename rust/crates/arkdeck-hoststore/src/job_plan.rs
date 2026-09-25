@@ -39,7 +39,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 26] = [
+const MATERIALIZED: [&str; 28] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -66,6 +66,8 @@ const MATERIALIZED: [&str; 26] = [
     "workspace.inspect-diff@1",
     "workspace.create-checkpoint@1",
     "workspace.sweep-isolated-copies@1",
+    "workspace.run-tests@1",
+    "workspace.symbolize-crash@1",
 ];
 
 /// Swift `AnalyzerProfile`: one analyzer a host configured, its pinned
@@ -708,6 +710,19 @@ impl<'a> JobPlanner<'a> {
         } else {
             artifacts.lease(lease)?
         };
+        // `workspace.symbolize-crash@1` reads a crash a device capture
+        // collected from another target; Swift checks that product exactly.
+        #[cfg(target_os = "macos")]
+        if request.operation_id == "workspace.symbolize-crash" {
+            return match crate::workspace_tests_symbolize::dump_refusal(
+                &leased.row,
+                &request.target_id,
+                request.expected_binding_revision,
+            ) {
+                Some(refusal) => Err(refusal),
+                None => Ok(leased),
+            };
+        }
         // Swift `validateArtifactBinding` lets a host-only analyzer read an
         // Artifact collected from exactly its own target.
         if leased.row["bindingSnapshot"]["targetID"] != request.target_id.as_str() {

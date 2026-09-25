@@ -862,6 +862,7 @@ fn a_registered_project_is_copied_and_its_copy_adopted_after_restart() {
         oracle_now,
         &no_toolchains,
         None,
+        None,
     )
     .unwrap();
     let unadopted = unadopted.unadopted;
@@ -930,6 +931,7 @@ fn a_registered_project_is_copied_and_its_copy_adopted_after_restart() {
         "/nonexistent-home",
         oracle_now,
         &no_toolchains,
+        None,
         None,
     )
     .unwrap();

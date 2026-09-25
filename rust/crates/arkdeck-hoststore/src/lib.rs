@@ -30,13 +30,17 @@ pub use workspace_patch::{
 mod workspace_profile;
 #[cfg(target_os = "macos")]
 pub use workspace_profile::{
-    ProfilePresets, RegisteredBuildPreset, RegisteredKind, SigningPresetRef, VerifiedResource,
-    WorkspaceCommandPreset, WorkspaceProfile,
+    ProfilePresets, RegisteredBuildPreset, RegisteredKind, RegisteredSymbolPreset,
+    SigningPresetRef, VerifiedResource, WorkspaceCommandPreset, WorkspaceProfile,
 };
+#[cfg(target_os = "macos")]
+mod crash_symbolizer;
 #[cfg(target_os = "macos")]
 mod workspace_build;
 #[cfg(target_os = "macos")]
 mod workspace_checkpoint;
+#[cfg(target_os = "macos")]
+pub use crash_symbolizer::{SymbolizeError, symbolize_crash};
 #[cfg(target_os = "macos")]
 mod workspace_signing;
 #[cfg(target_os = "macos")]
@@ -47,6 +51,8 @@ mod workspace_read;
 mod workspace_support;
 #[cfg(target_os = "macos")]
 mod workspace_sweep;
+#[cfg(target_os = "macos")]
+mod workspace_tests_symbolize;
 #[cfg(target_os = "macos")]
 pub use workspace_read::Inspector as WorkspaceInspector;
 

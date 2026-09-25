@@ -751,6 +751,7 @@ fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
         oracle_now,
         &toolchains,
         None,
+        None,
     )
     .unwrap();
     assert_eq!(notes.released_credential_owners, None);
@@ -790,6 +791,7 @@ fn a_registered_signing_preset_pins_its_credential_and_signs_after_a_restart() {
             )
             .releasing_orphaned_owners(),
         ),
+        None,
     )
     .unwrap();
     assert_eq!(
