@@ -192,11 +192,11 @@ mod runtime {
         for (argv, message) in [
             (
                 vec!["flash", "prerequisites", "--device-profile", "dayu200"],
-                "flash prerequisites requires --target",
+                "`flash prerequisites` requires --target <target-id>",
             ),
             (
                 vec!["flash", "prerequisites", "--target", "TGT-HOST"],
-                "flash prerequisites requires --device-profile",
+                "`flash prerequisites` requires --device-profile <dayu200>",
             ),
         ] {
             let output = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"))
@@ -275,10 +275,10 @@ mod runtime {
         assert_eq!(envelope["error"]["message"], "target is not adopted");
     }
 
-    /// What Swift's registry parser refuses never reaches the Runtime: each
-    /// required option in the registry's order, then the digest's grammar,
-    /// 64 lowercase hex digits (stricter than the Runtime, which takes any
-    /// case).
+    /// What Swift's registry parser refuses never reaches the Runtime, and is
+    /// refused in its words: each required option in the registry's order,
+    /// then the digest's grammar, 64 lowercase hex digits (stricter than the
+    /// Runtime, which takes any case).
     #[test]
     fn lane_preview_refuses_at_parse_what_swifts_registry_refuses() {
         let digest = "e".repeat(64);
@@ -288,15 +288,15 @@ mod runtime {
         for (options, message) in [
             (
                 vec!["--device-profile", "dayu200", "--archive-sha256", &digest],
-                "flash lane-preview requires --target",
+                "`flash lane-preview` requires --target <target-id>",
             ),
             (
                 vec!["--target", "TGT-HOST", "--archive-sha256", &digest],
-                "flash lane-preview requires --device-profile",
+                "`flash lane-preview` requires --device-profile <dayu200>",
             ),
             (
                 vec!["--target", "TGT-HOST", "--device-profile", "dayu200"],
-                "flash lane-preview requires --archive-sha256",
+                "`flash lane-preview` requires --archive-sha256 <sha256>",
             ),
             (
                 vec![

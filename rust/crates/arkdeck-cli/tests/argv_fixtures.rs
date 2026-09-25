@@ -58,9 +58,12 @@ fn deviation(case: &Value) -> Option<String> {
         _ if socket && !cfg!(target_os = "macos") => {
             matches!(&parsed, Err(error) if error.code == "unsupportedOnPlatform")
         }
+        // Swift's fixture names the leaf a refusal belongs to exactly when
+        // its `CLIRegistryError` does (TASK-XPA-018 a3).
         ("failure", Err(error)) => {
             json!(error.code) == expected["code"]
                 && json!(error.exit_code()) == expected["exitCode"]
+                && error.command.map(|command| json!(command)) == expected.get("command").cloned()
         }
         ("dispatch", Ok(invocation)) => {
             json!(invocation.command) == expected["command"] && !invocation.help
@@ -87,7 +90,12 @@ fn deviation(case: &Value) -> Option<String> {
     };
     (!matches).then(|| match &parsed {
         Ok(invocation) => format!("{} help={}", invocation.command, invocation.help),
-        Err(error) => format!("{} ({})", error.code, error.exit_code()),
+        Err(error) => format!(
+            "{} ({}) naming {:?}",
+            error.code,
+            error.exit_code(),
+            error.command
+        ),
     })
 }
 
@@ -351,4 +359,140 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         String::from_utf8(script.stdout).unwrap(),
         completion_script("zsh").unwrap()
     );
+}
+
+/// TASK-XPA-018 a3: a refusal is reported as Swift's CLI reports it. Where
+/// Swift's registry pass refuses too, its words, details and leaf are the
+/// answer; a refusal only this parser makes (what a value means) names the
+/// leaf; and what this parser accepts, Swift's registry notwithstanding,
+/// stays accepted.
+#[test]
+fn a_refusal_is_reported_as_swifts_parser_reports_it() {
+    let refused = |tokens: &[&str]| {
+        let argv: Vec<String> = tokens.iter().map(|token| (*token).to_owned()).collect();
+        parse(&argv).expect_err("refused")
+    };
+    for (tokens, message, details) in [
+        (
+            &["job", "status"][..],
+            "`job status` requires --job <job-id>",
+            json!({"command": "job.status", "option": "--job"}),
+        ),
+        (
+            &["job", "status", "--job", "a", "--job", "b"],
+            "--job was given more than once",
+            json!({"option": "--job"}),
+        ),
+        (
+            &["job", "status", "--job", "a", "--bogus"],
+            "`job status` does not accept --bogus; run `arkdeck help job status` for its options",
+            json!({"command": "job.status", "option": "--bogus"}),
+        ),
+        (
+            &["job", "status", "--job", "a", "--output", "jsonl"],
+            "--output must be one of human|json",
+            json!({"command": "job.status", "value": "jsonl"}),
+        ),
+        (
+            &["job", "list", "--page-size", "0"],
+            "`job list` --page-size must be 1...1000",
+            json!({"command": "job.list", "option": "--page-size", "value": "0"}),
+        ),
+        (
+            &["job", "list", "--order", "newest"],
+            "`job list` --order must be one of oldestFirst|newestFirst|createdAtDescJobIdAsc|createdAtAscJobIdAsc",
+            json!({"command": "job.list", "option": "--order", "value": "newest"}),
+        ),
+    ] {
+        let error = refused(tokens);
+        assert_eq!(
+            (error.code, error.message.as_str()),
+            ("invalidOption", message),
+            "{tokens:?}"
+        );
+        assert_eq!(Value::Object(error.details), details, "{tokens:?}");
+        assert_eq!(
+            error.command,
+            tokens.first().map(|_| {
+                if tokens[1] == "list" {
+                    "job.list"
+                } else {
+                    "job.status"
+                }
+            }),
+            "{tokens:?}"
+        );
+    }
+    // What a value means is this parser's to judge, as Swift's handler does;
+    // the refusal still names the leaf.
+    let error = refused(&["job", "watch", "--job", "job:1"]);
+    assert_eq!(
+        (error.code, error.command),
+        ("invalidInput", Some("job.watch"))
+    );
+    // An unknown path names no leaf, in Swift's words.
+    let error = refused(&["nope"]);
+    assert_eq!(
+        (error.code, error.message.as_str(), error.command),
+        (
+            "invalidCommand",
+            "unknown command `nope`; run `arkdeck commands` to list the published surface",
+            None
+        )
+    );
+    // An option this parser serves beyond Swift's registry stays served.
+    let argv: Vec<String> = [
+        "target",
+        "display-name",
+        "set",
+        "--target",
+        "TGT-1",
+        "--expected-generation",
+        "1",
+        "--name",
+        "Bench",
+        "--timeout",
+        "5s",
+    ]
+    .iter()
+    .map(|token| (*token).to_owned())
+    .collect();
+    assert!(parse(&argv).is_ok());
+    // A global option ahead of the path (CLI spec §5.1) stays served, and a
+    // refusal is about what is wrong after it, as the read-only host check
+    // asks: its argv lead with `--output` and `--control-request-id`.
+    let error = refused(&[
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-unknown-command",
+        "job",
+        "no-such-command",
+    ]);
+    assert_eq!((error.code, error.command), ("invalidCommand", None));
+    let error = refused(&[
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-bad-option",
+        "doctor",
+        "--shell",
+        "x",
+    ]);
+    assert_eq!(
+        (error.code, error.command),
+        ("invalidOption", Some("doctor"))
+    );
+    let argv: Vec<String> = [
+        "--control-request-id",
+        "ctl-1",
+        "job",
+        "status",
+        "--job",
+        "j",
+    ]
+    .iter()
+    .map(|token| (*token).to_owned())
+    .collect();
+    assert!(parse(&argv).is_ok());
 }
