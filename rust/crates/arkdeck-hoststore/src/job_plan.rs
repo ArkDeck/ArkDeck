@@ -177,6 +177,12 @@ impl AnalyzerProfile {
             })
     }
 
+    /// Swift `runtimeAvailability`'s identity checks: the executable and
+    /// every pin still what the profile was loaded with.
+    pub fn holds(&self) -> bool {
+        self.still_matches() && self.pins_still_match()
+    }
+
     /// Swift `runtimeAvailability`'s pins: every pinned file still reads with
     /// its digest, length and execute bit, and every pinned tree with its
     /// digest.

@@ -675,4 +675,151 @@ loading the named descriptor into a private snapshot root; then
 
 ### CI
 
+PR #2164, merged as `3d878b183`: Agent PR 36083721545, SDD Guard 36083721495
+and Swift CI 36083721718 all succeeded at `eb6483f38` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).
+
+## 6. The ArkTrace production trust checker, doctor probe and verified launch
+
+Base: protected `main` `3d878b183` (#2164). No contract input changes.
+
+### What changes
+
+Nothing a caller reads yet: the daemon still composes no loader (§5). This
+slice ports the three production pieces the loader needs to load a named
+descriptor — the trust checker, the doctor probe and the verified launch the
+probe (and later the analyzers) runs the CLI with — and proves them on the
+maintainer's host against the reviewed, signed and notarized ArkTrace
+distribution the installed Swift daemon names.
+
+### Swift, the oracles
+
+- `ArkTraceDoctorOracleContractTests` (new,
+  `rust/tests/fixtures/arktrace-doctor/`): Swift's
+  `ProductionArkTraceDoctorProbe.probe` over a stand-in CLI compiled from
+  `fake-arktrace.c` into a bundle at one fixed root (a Mach-O, so the
+  verified canonical-path launch can prove its first mapping), which logs its
+  argument zero, arguments and two home variables and answers with the
+  oracle's bytes. 37 cases: the reviewed envelope (and with trailing
+  whitespace, and a check name of exactly 128 bytes) accepted; every
+  member of another value, set or type (the tool's name, version and build
+  revision, the command, the self-test parameter as `false` or `1`, the
+  schema version, a non-null trace, the limits, a warning, the quality
+  status, a truncation, the result's self-test), eight or reordered checks, a
+  failed one, a check name empty, too long, or holding a control or format
+  character, an extra or duplicate member, a fractional or Boolean timeout, a
+  non-zero exit, a diagnostic, output past the 256 KiB kept, none, or not
+  JSON — each refused after one launch; a drifted tree, a drifted pinned file
+  and a namespace another user could write — each refused before anything
+  runs. It records every verdict, every launch and the private home made.
+  The envelope names the executable's own digest, which depends on the
+  compiler, so it is recorded as `SHA`.
+- `ArkTraceReviewedDistributionOracleContractTests` (new, host acceptance):
+  Swift's production load of a reviewed distribution at a fixed root, run
+  only when `ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR` names one; nothing is
+  checked in, since a reviewed distribution is a host's.
+
+### Rust
+
+- `arkdeck-platform`: `verified_launch.rs` (Swift's
+  `VerifiedRegularFileDescriptor` and `VerifiedDirectoryDescriptor`:
+  pinned files held open and bound to their digests, the bundle's owner-only
+  directory held open, both checked again by descriptor and by path);
+  `VerifiedTool::run_tool_at_canonical_path` (Swift's
+  `.verifiedCanonicalPath`: the child spawned suspended at the canonical
+  path, its first executable mapping — `proc_pidinfo`
+  `PROC_PIDREGIONPATHINFO` — proved to be the retained inode, the caller's
+  bindings checked before and after the spawn, killed before it runs on any
+  failure); `static_code.rs` (the Security framework's `SecStaticCode`
+  validity against a requirement, strict, all architectures, nested code,
+  then the team, hardened runtime, code directory hash, leaf certificate
+  subject summary and SHA-1 — CommonCrypto — and identifier).
+- `arkdeck-hoststore`: `arktrace_doctor.rs` (`ProductionDoctorProbe`, its
+  private home, and Swift's closed envelope validator with
+  `StrictJSONIntegerTokenValidator`; names are judged against the host's
+  control set, Cc and Cf, as `CharacterSet.controlCharacters`);
+  `arktrace_trust.rs` (`ProductionDistributionTrust`: formats, the Developer
+  ID and notarization requirement for App and helper, both tree digests,
+  `Info.plist`'s bundle, version and build, the stapled `CodeResources`);
+  `AnalyzerProfile::holds`.
+
+### Evidence
+
+- `cargo test -p arkdeck-hoststore --test arktrace_doctor`: all 37 verdicts,
+  every launch (argument zero, arguments, home) and the private home, as
+  Swift's, on the first run.
+- Host acceptance on this Mac (`ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR` = the
+  descriptor the installed daemon names): Swift's production load recorded
+  at `/private/tmp/arkdeck-arktrace-reviewed` (1.7 s: trust, the real CLI's
+  `doctor --self-test`, the snapshot generation), then `cargo test -p
+  arkdeck-hoststore --test arktrace_reviewed` with
+  `ARKDECK_REVIEWED_ARKTRACE_SWIFT` pointing at it: the Rust load (2.4 s)
+  gives the same two profiles byte for byte — 52 pinned files, the App tree
+  `5f9ff8b3…` the manifest reviews — and both hold. Nothing installed was
+  written; the snapshot and the doctor's home were under `/private/tmp`.
+  Logs `/private/tmp/arkdeck-s25-e-reviewed-{swift,rust}.log`.
+- Unit tests: a resource bound to its digest and path (the `/tmp` alias
+  read below `/private`, a replacement at its path refused, a linked path
+  refused); a namespace that stays owner-only and itself; the integer token
+  validator; the trust formats and `CFBundleVersion`'s description; unsigned
+  bytes refused whatever the manifest says.
+- Mutations: 7 of 8 caught, each restored by SHA-256 (format characters
+  allowed in check names, `maxRows` unchecked, truncated output accepted,
+  diagnostics accepted, the private home left `0755`, a writable namespace
+  admitted — by the unit test, the replay's tree check refusing it first —,
+  a lowercase team admitted). The survivor, the bindings not checked again
+  after the spawn, is equivalent for the recorded cases, which change
+  nothing inside the spawn window. Log `/private/tmp/arkdeck-s25-e-mutations.log`.
+
+### Differences from Swift (declared)
+
+- A child's base environment: Swift passes the daemon's own `PATH`, `HOME`,
+  `TMPDIR` and `LANG`; the Rust daemon's tool runs get `PATH=/usr/bin:/bin`,
+  `LANG=C` and `LC_ALL=C` (every Rust tool run, as declared before). The
+  doctor's `HOME` and `CFFIXED_USER_HOME` are the private home in both.
+- `String(describing:)` of `CFBundleVersion` is ported for the scalar values
+  (a string, an integer, a Boolean, an integral real); no collection can be a
+  reviewed build.
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-e-*.log`:
+
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-platform -p arkdeck-hoststore -p arkdeck-agentd
+  -p arkdeck-soak -p arkdeck-cli -p arkdeck-client -p arkdeck-provider-hdc
+  -p arkdeck-provider-arkforge -p arkdeck-provider-workspace --all-targets
+  -- -D warnings`: exit 0; the platform, host store and daemon again for
+  `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: exit 0.
+- `cargo test -p arkdeck-platform -p arkdeck-hoststore --no-fail-fast`:
+  exit 0, 784 passed, 18 ignored (existing).
+- `cargo test -p arkdeck-agentd -p arkdeck-soak -p arkdeck-provider-hdc -p
+  arkdeck-provider-workspace --no-fail-fast`: exit 0, 371 passed (every tool
+  run goes through the refactored runner). No fake HDC or stand-in left
+  running.
+- Swift: `run-swiftpm.sh test --filter
+  'ArkTraceDoctorOracleContractTests|ArkTraceProfileLoaderOracleContractTests|ArkTraceReviewedDistributionOracleContractTests|ArkTraceAbsentOracleContractTests'`,
+  exit 0 (the reviewed one skipped without its variables; run with them
+  above).
+- `sh scripts/check-sdd.sh`: exit 0.
+- Not run: the CLI's and client's tests (they use no changed API),
+  `generate-contract.py`/`check-contracts.py` (no contract input changes),
+  the App, a device.
+
+### Next
+
+The daemon composing the loader for a named descriptor
+(`ProductionDistributionTrust`, `ProductionDoctorProbe` under
+`<state>/arktrace-availability-home`, snapshots under
+`<state>/arktrace-profile-snapshots`, Swift's reasons on failure), together
+with `trace-summary@1` planned, run through the verified canonical-path
+launch with the profile's pins, verified by `ArkTraceSummaryEnvelopeValidator`
+and published; then `trace-analysis@1` (`ArkTraceAnalysisRequest`,
+`ArkTraceAnalysisEnvelopeValidator`).
+
+### CI
+
 Pending.

@@ -79,6 +79,14 @@ pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
 #[cfg(target_os = "macos")]
+mod arktrace_doctor;
+#[cfg(target_os = "macos")]
+pub use arktrace_doctor::ProductionDoctorProbe;
+#[cfg(target_os = "macos")]
+mod arktrace_trust;
+#[cfg(target_os = "macos")]
+pub use arktrace_trust::ProductionDistributionTrust;
+#[cfg(target_os = "macos")]
 mod arktrace_profile;
 #[cfg(target_os = "macos")]
 pub use analyzer_composition::{AnalyzerComposition, AnalyzerProfiles};

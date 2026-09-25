@@ -1,0 +1,8 @@
+{
+  "files" : {
+    "cases.json" : "da6dd821408c53cd75af96fa617701e909c5dddf8630e0c7bd2d006d2bc15a2d",
+    "fake-arktrace.c" : "db3877ff3a665601e8ba5ddb505c569c4ca411fc93c04f5562d90466288bb9ba"
+  },
+  "producer" : "ArkTraceDoctorOracleContractTests.testSwiftProbesTheSharedArkTraceStandIn",
+  "root" : "/private/tmp/arkdeck-arktrace-oracle/doctor"
+}

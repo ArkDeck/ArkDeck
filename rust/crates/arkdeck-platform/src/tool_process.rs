@@ -101,6 +101,39 @@ impl VerifiedTool {
         request: &ToolRequest<'_>,
         cancelled: &dyn Fn() -> bool,
     ) -> Result<ToolExecution, ToolRunError> {
+        self.run_tool_with(request, cancelled, |arguments, environment, directory| {
+            super::spawn_in(self, arguments, environment, directory)
+        })
+    }
+
+    /// `run_tool` as Swift's `.verifiedCanonicalPath` launch runs a signed
+    /// bundle's tool: the child is spawned suspended at the tool's canonical
+    /// path, which its bundle needs to find its resources, and runs only once
+    /// its first executable mapping is proved to be the retained inode and
+    /// `bound` — the caller's retained namespace and resources, revalidated —
+    /// still holds, before and after the spawn. Any failure kills the child
+    /// before it ran tool code.
+    pub fn run_tool_at_canonical_path(
+        &self,
+        request: &ToolRequest<'_>,
+        bound: &dyn Fn() -> io::Result<()>,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ToolExecution, ToolRunError> {
+        self.run_tool_with(request, cancelled, |arguments, environment, directory| {
+            super::spawn_canonical(self, arguments, environment, directory, bound)
+        })
+    }
+
+    fn run_tool_with(
+        &self,
+        request: &ToolRequest<'_>,
+        cancelled: &dyn Fn() -> bool,
+        spawn: impl FnOnce(
+            &[OsString],
+            &[(OsString, OsString)],
+            Option<&std::ffi::CStr>,
+        ) -> io::Result<RunningChild>,
+    ) -> Result<ToolExecution, ToolRunError> {
         let limits = request.limits;
         if limits.timeout.is_zero()
             || limits.timeout > MAX_TIMEOUT
@@ -132,13 +165,8 @@ impl VerifiedTool {
         let started = Instant::now();
         // The child starts suspended and is killed unless the retained
         // executable still verifies, so any failure here ran no tool code.
-        let mut child = super::spawn_in(
-            self,
-            request.arguments,
-            request.environment,
-            directory.as_deref(),
-        )
-        .map_err(ToolRunError::Refused)?;
+        let mut child = spawn(request.arguments, request.environment, directory.as_deref())
+            .map_err(ToolRunError::Refused)?;
         let stdout = child.stdout.take().expect("spawn owns stdout");
         let stderr = child.stderr.take().expect("spawn owns stderr");
         let stop = Arc::new(AtomicBool::new(false));

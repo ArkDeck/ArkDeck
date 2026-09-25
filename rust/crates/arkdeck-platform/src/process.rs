@@ -699,7 +699,7 @@ use crate::windows::spawn;
 #[path = "macos_process.rs"]
 mod macos_process;
 #[cfg(target_os = "macos")]
-use macos_process::{spawn, spawn_in};
+use macos_process::{spawn, spawn_canonical, spawn_in};
 #[cfg(target_os = "macos")]
 #[path = "shell_channel.rs"]
 mod shell_channel;
@@ -760,6 +760,11 @@ impl VerifiedTool {
 #[cfg(target_os = "macos")]
 pub use managed_server::{ManagedServer, ServerExit, ServerLaunch, ServerStop};
 
+#[cfg(target_os = "macos")]
+#[path = "verified_launch.rs"]
+mod verified_launch;
+#[cfg(target_os = "macos")]
+pub use verified_launch::{VerifiedNamespace, VerifiedResource};
 #[cfg(target_os = "macos")]
 #[path = "analyzer_process.rs"]
 mod analyzer_process;
