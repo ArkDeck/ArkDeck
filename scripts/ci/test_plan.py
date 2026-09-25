@@ -157,6 +157,21 @@ class PathClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
 
+    def test_every_bundle_contract_selects_rust(self):
+        # Swift's export can rewrite any of them without touching rust/, and
+        # the Rust export's test holds each one.
+        root = SCRIPT.resolve().parents[2]
+        paths = sorted(
+            path.relative_to(root).as_posix()
+            for path in (root / "openspec/contracts").iterdir()
+            if path.is_file()
+        )
+        self.assertIn("openspec/contracts/app-product-capability-registry.yaml", paths)
+        self.assertIn("openspec/contracts/cli-feature-coverage.json", paths)
+        for path in paths + ["openspec/contracts/a-future-product.json"]:
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+
     def test_source_only_canonical_control_and_journal_changes_select_rust(self):
         for name in (
             "ArkDeckCore/PortableCanonicalJSON.swift",
