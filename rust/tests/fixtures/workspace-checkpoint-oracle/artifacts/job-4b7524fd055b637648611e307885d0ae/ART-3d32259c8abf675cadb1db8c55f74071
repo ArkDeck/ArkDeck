@@ -1,0 +1,31 @@
+{
+  "documentType" : "arkdeck-workspace-sweep",
+  "dryRun" : true,
+  "findings" : [
+    {
+      "allReferencesTerminal" : true,
+      "disposition" : "retainedByPolicy",
+      "newestReferenceTransitionUtc" : "2026-09-25T00:00:00Z",
+      "reclaimedBytes" : 0,
+      "referencingJobs" : 2,
+      "workspaceId" : "evo-354bc0bd1cd5874253eb657e"
+    },
+    {
+      "allReferencesTerminal" : false,
+      "disposition" : "activeRetained",
+      "newestReferenceTransitionUtc" : "2026-09-25T00:00:00Z",
+      "reclaimedBytes" : 0,
+      "referencingJobs" : 2,
+      "workspaceId" : "evo-7e16ae38695affb7c69c34c4"
+    },
+    {
+      "disposition" : "unknownTaskRetained",
+      "reclaimedBytes" : 0,
+      "workspaceId" : "evo-stranger"
+    }
+  ],
+  "minimumQuiescentSeconds" : 3600,
+  "retainLatestCount" : 0,
+  "schemaVersion" : "1.0.0",
+  "sweptAtUtc" : "2026-09-25T00:00:00Z"
+}

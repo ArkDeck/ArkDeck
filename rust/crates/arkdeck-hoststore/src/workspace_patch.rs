@@ -259,11 +259,11 @@ impl FileSnapshot {
     }
 }
 
-fn snapshot_values(snapshots: &[FileSnapshot]) -> Value {
+pub(crate) fn snapshot_values(snapshots: &[FileSnapshot]) -> Value {
     Value::Array(snapshots.iter().map(FileSnapshot::value).collect())
 }
 
-fn decode_snapshots(value: Option<&Value>) -> Option<Vec<FileSnapshot>> {
+pub(crate) fn decode_snapshots(value: Option<&Value>) -> Option<Vec<FileSnapshot>> {
     value?
         .as_array()?
         .iter()
@@ -705,6 +705,17 @@ impl AttemptStore {
         })
     }
 
+    /// Swift `checkpointArchiveURL(jobID:)`: one Job's archive destination
+    /// in this owner-only store; hashing the opaque Job id keeps it from
+    /// becoming a path surface.
+    pub(crate) fn checkpoint_archive_path(&self, job_id: &str) -> String {
+        format!(
+            "{}/checkpoint-{}.tar",
+            self.root,
+            support::sha256(job_id.as_bytes())
+        )
+    }
+
     fn record_path(&self, reference: &str) -> Result<String, Detail> {
         if !valid_reference(reference) {
             return Err(detail("workspace patch attempt ref is malformed"));
@@ -893,9 +904,19 @@ pub enum ToolFailure {
     OutcomeUnknown(String),
 }
 
-/// The dispatch port a workspace patch step runs its tool through.
+/// The dispatch port a workspace step runs its tool through.
 pub trait WorkspaceToolDispatch: Send + Sync {
     fn dispatch(&self, invocation: &ToolInvocation<'_>) -> Result<ToolReceipt, ToolFailure>;
+
+    /// Swift routes every workspace plan — a tool's process or a
+    /// Runtime-owned host action such as the sweep of the isolated copies —
+    /// through the one workspace dispatcher. This is what that dispatcher
+    /// hands back after the host action `step` ran: its receipt (`Ok`), or
+    /// why the receipt cannot be observed. The production dispatch always
+    /// hands it back.
+    fn host_receipt(&self, _step: &str) -> Result<(), ToolFailure> {
+        Ok(())
+    }
 }
 
 /// The production dispatch: the executable opened by the digest its profile

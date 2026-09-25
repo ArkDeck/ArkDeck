@@ -16,6 +16,13 @@
 //! - `workspace.build-openharmony@1` is one process too: the build preset's
 //!   pinned executable with the preset's own closed argv, in the project root;
 //!   the request names the preset and supplies no argument.
+//! - `workspace.create-checkpoint@1` is one process: `git -C <root> stash
+//!   create` through the pinned source-control tool, or the pinned archive
+//!   writer sealing the declared files into the Job's provider-owned
+//!   destination; the plan names the executable by its digest and the argv.
+//! - `workspace.sweep-isolated-copies@1` is a host workspace action pinned by
+//!   the digest of its typed intent, which records the engine clock as its
+//!   retention clock and runs no process.
 //! - the four reads (`workspace.inspect-source@1`,
 //!   `workspace.read-source-range@1`, `workspace.inspect-git-status@1`,
 //!   `workspace.inspect-diff@1`) are one process each: the configured
@@ -243,6 +250,46 @@ impl JobPlanner<'_> {
                         .lower_read(&action)
                         .map_err(preflight)?
                         .plan_step(action.journal_arguments(&request.inputs))
+                }
+                (
+                    crate::workspace_checkpoint::CHECKPOINT,
+                    crate::workspace_checkpoint::CHECKPOINT_KIND,
+                ) => {
+                    let action = workspace
+                        .checkpoint_action(&reference, &request.inputs, AUTHORIZATION_PLAN_JOB)
+                        .map_err(preflight)?;
+                    workspace
+                        .lower_checkpoint(&action, AUTHORIZATION_PLAN_JOB)
+                        .map_err(preflight)?;
+                    let invocation = action.invocation();
+                    let mut process = json!({
+                        "journalArguments": action.journal_arguments(),
+                        "processKind": "process",
+                        "executableSHA256": invocation.executable_sha256,
+                        "workingDirectory": invocation.project_root,
+                        "argumentSummary": invocation.arguments,
+                        "timeoutSeconds": invocation.timeout_seconds,
+                    });
+                    if let Some(zero) = &invocation.argument_zero {
+                        process["argumentZero"] = json!(zero);
+                    }
+                    process
+                }
+                (crate::workspace_sweep::SWEEP, crate::workspace_sweep::SWEEP_KIND) => {
+                    // The provider context's clock, which the typed intent
+                    // records as its retention clock.
+                    let now = (workspace.now)().ok_or_else(internal_failure)?;
+                    let intent = workspace
+                        .sweep_action(&request.inputs, AUTHORIZATION_PLAN_JOB, &now)
+                        .map_err(preflight)?;
+                    let descriptor = workspace
+                        .lower_sweep(&intent, AUTHORIZATION_PLAN_JOB)
+                        .map_err(preflight)?;
+                    json!({
+                        "journalArguments": intent.journal_arguments(),
+                        "processKind": "hostWorkspace",
+                        "hostManagedDescriptor": descriptor,
+                    })
                 }
                 ("workspace.build-openharmony@1", "buildWorkspaceOpenHarmony") => {
                     let action = workspace

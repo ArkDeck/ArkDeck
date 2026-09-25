@@ -798,6 +798,17 @@ impl WorkspaceProfile {
         Some(self.invocation_of(preset, operation, arguments))
     }
 
+    /// Swift `resolved(operation:preset:arguments:)` over the pinned archive
+    /// writer; `None` when the profile has none.
+    pub(crate) fn archive_checkpoint_invocation(
+        &self,
+        operation: &str,
+        arguments: &[&str],
+    ) -> Option<crate::workspace_patch::Invocation> {
+        let preset = self.archive_checkpoint.as_ref()?;
+        Some(self.invocation_of(preset, operation, arguments))
+    }
+
     /// Swift `resolved(operation:preset:arguments:)` over a build preset: its
     /// own closed argv, run by the executable it pinned; `None` when the
     /// profile declares no such preset.
@@ -989,6 +1000,22 @@ impl ProfileRegistry {
         }
         profiles.insert(profile.project_ref.clone(), profile);
         Ok(())
+    }
+
+    /// Swift `unregisterEvolutionProfile(projectRef:)`: a derived copy's
+    /// profile removed once its tree is destroyed, so a stale reference fails
+    /// at resolution instead of mid-operation. A primary profile is never
+    /// removed through here.
+    pub(crate) fn unregister_evolution(&self, reference: &str) {
+        let Ok(mut profiles) = self.profiles.lock() else {
+            return;
+        };
+        if profiles
+            .get(reference)
+            .is_some_and(|profile| profile.kind == ProfileKind::Evolution)
+        {
+            profiles.remove(reference);
+        }
     }
 }
 

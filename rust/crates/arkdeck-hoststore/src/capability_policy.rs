@@ -185,8 +185,10 @@ pub(crate) enum IssueFailure {
 }
 
 /// Swift `automaticRuntimeCapability` for an ordinary mutation under a
-/// standing capability policy: a device's, or a Runtime-owned workspace
-/// copy's. The Target binding's lineage is checked across every capability
+/// standing capability policy — a device's, or a Runtime-owned workspace
+/// copy's — or under a Runtime-owned policy (`runtimeCapability`), whose
+/// envelope admits one use of the exact plan. The Target binding's lineage
+/// is checked across every capability
 /// first (a workspace use names no binding, so none blocks it there). The
 /// answer is then the first generation of the policy's identity that is not
 /// spent, or that is spent but was revoked. That generation is installed when
@@ -243,6 +245,21 @@ pub(crate) fn issue(
             }),
             None => json!({"kind": "stablePhysicalIdentity", "sha256": identity}),
         };
+        // Swift `pinsExactPlan`: an envelope a Runtime-owned policy
+        // authorizes (or a destructive one, which this Runtime does not
+        // issue) admits one use of exactly the plan it was issued for.
+        let pins_exact_plan = query.effect == Effect::Destructive
+            || descriptor
+                .authorization
+                .get(query.effect.raw())
+                .is_some_and(|policy| policy == "runtimeCapability");
+        let maximum_uses = if pins_exact_plan {
+            1
+        } else if session_scoped {
+            SESSION_MAXIMUM_USES
+        } else {
+            STANDING_MAXIMUM_USES
+        };
         let mut envelope = json!({
             "capabilityID": capability_id,
             "targetScope": target_scope,
@@ -252,13 +269,16 @@ pub(crate) fn issue(
             "exactInputs": query.inputs,
             "issuedAtUTC": issued_at,
             "expiresAtUTC": expires_at,
-            "maximumUses": if session_scoped { SESSION_MAXIMUM_USES } else { STANDING_MAXIMUM_USES },
+            "maximumUses": maximum_uses,
             "issuer": {
                 "kind": "runtimeDefaultPolicy",
                 "reference": format!("catalog:{CATALOG_DIGEST}:{}", descriptor.reference()),
             },
             "revocation": {"state": "active"},
         });
+        if pins_exact_plan && let Some(plan) = &query.plan_digest {
+            envelope["exactPlanDigest"] = json!(plan);
+        }
         if let Some(revision) = query.target_binding_revision {
             envelope["exactBindingRevision"] = json!(revision);
         }

@@ -30,6 +30,15 @@
 //! child whose outcome cannot be observed, or whose effect cannot be read
 //! back, leaves its intent outstanding and parks the Job: a patch is never
 //! run twice. The use is then settled with the Job's state.
+//!
+//! `workspace.create-checkpoint@1` runs the same way under the Runtime's own
+//! one-use capability for its exact plan: `git stash create` or the archive
+//! writer, its object id or its archive and declared files read back, its
+//! envelope published. `workspace.sweep-isolated-copies@1` is a host step
+//! like the copy: its typed intent persisted before its write-ahead intent,
+//! then the sweep over this Runtime's own inventory and Job rows, its receipt
+//! judged against the intent and its findings published; a receipt that
+//! cannot be observed parks the Job, never to run again.
 use super::*;
 use crate::capability_store::UseOutcome;
 use crate::mutation_execution::MutationConsumption;
@@ -57,6 +66,8 @@ pub(crate) fn runs(operation: &str) -> bool {
         REVERT,
         BUILD,
         crate::workspace_composition::SIGN,
+        crate::workspace_checkpoint::CHECKPOINT,
+        crate::workspace_sweep::SWEEP,
     ]
     .contains(&operation)
         || crate::workspace_read::READS.contains(&operation)
@@ -270,6 +281,7 @@ impl JobRunner<'_> {
             name: PRODUCT,
             operation: WORKSPACE_OPERATION,
             step: WORKSPACE_STEP,
+            media_type: "application/json",
             retention: "pinnedUntilVerified",
         };
         self.publish_workspace_product(run, &product, target, summary, window)
@@ -378,7 +390,7 @@ impl JobRunner<'_> {
             session_id: &session_id,
             step_id: declared.step,
             name: declared.name,
-            media_type: "application/json",
+            media_type: declared.media_type,
             privacy: "standard",
             retention_class: declared.retention,
             source_operation: declared.operation,
@@ -419,6 +431,9 @@ struct WorkspaceProduct {
     name: &'static str,
     operation: &'static str,
     step: &'static str,
+    /// The catalog's media type: `checkpoint.txt` is the envelope too, as
+    /// Swift publishes it, but declared `text/plain`.
+    media_type: &'static str,
     retention: &'static str,
 }
 
@@ -656,6 +671,7 @@ impl JobRunner<'_> {
                     name: declared.product,
                     operation: declared.operation,
                     step: declared.step,
+                    media_type: "application/json",
                     retention: declared.retention,
                 };
                 if let Err(reason) =
@@ -1491,5 +1507,379 @@ impl JobRunner<'_> {
             .workspace_publisher()
             .publish(&product, &receipt.stdout);
         self.settle_publication(run, &product, published)
+    }
+}
+
+impl JobRunner<'_> {
+    /// Swift `runOwned` for a checkpoint Job's one step, then
+    /// `recordCapabilityOutcome` for the Runtime's own one-use capability it
+    /// ran under: unknown while the Job is parked, confirmed with the Job's
+    /// state otherwise.
+    pub(super) fn execute_workspace_checkpoint(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        self.checkpoint_step(run, workspace)?;
+        let outcome = if run.record.state == "waitingForRecovery" {
+            UseOutcome::OutcomeUnknown
+        } else {
+            UseOutcome::Confirmed
+        };
+        self.settle_mutation(run, outcome)
+    }
+
+    /// Swift `executeAdmittedSteps` for a checkpoint Job, in the host
+    /// target's mutation lane: the typed action materialized for this Job
+    /// and lowered against the tree as it is now, the Job's one use consumed
+    /// and made durable, the action persisted before its write-ahead intent,
+    /// and only then the pinned tool; its receipt — and, for an archive, the
+    /// archive and the declared files read back — decide the correlated
+    /// outcome, and the envelope is published after it. A child whose
+    /// outcome cannot be observed parks the Job: a checkpoint is never run
+    /// twice.
+    fn checkpoint_step(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        use crate::workspace_checkpoint::{
+            CHECKPOINT, CHECKPOINT_KIND, CHECKPOINT_PRODUCT, CHECKPOINT_STEP,
+        };
+        let Some(descriptor) = CHECKPOINT
+            .rsplit_once('@')
+            .and_then(|(id, version)| CatalogOperation::lookup(id, version.parse().ok()))
+        else {
+            return Err(uncertain());
+        };
+        let started = run.clock()?;
+        run.record.start(&started);
+        run.transition("preflight", "running", "steps-start")?;
+        let Ok(_lane) = workspace.lane.lock() else {
+            return self.fail(run, "workspace mutation lane is unavailable");
+        };
+        // Swift's safe boundary before the step.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        let job_id = run.record.job_id.clone();
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        // A provider refusal before any intent fails the Job: the tree moved
+        // since admission, or the profile or its tool changed.
+        let action = match workspace.checkpoint_action(CHECKPOINT, &inputs, &job_id) {
+            Ok(action) => action,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        if let Err(detail) = workspace.lower_checkpoint(&action, &job_id) {
+            return self.fail(run, &detail);
+        }
+        match self.consume_workspace_authority(run, descriptor, workspace, None) {
+            Ok(MutationConsumption::Consumed | MutationConsumption::Held) => {}
+            Ok(MutationConsumption::Cancelled) => {
+                self.carry(run)?;
+                return self.close_cancelled(run, None);
+            }
+            Ok(MutationConsumption::PersistenceUncertain) => return Err(uncertain()),
+            Err(reason) => return self.fail(run, &reason),
+        }
+        // Swift `dispatchWithWAL`'s last boundary before an intent.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, None);
+        }
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let step = json!({
+            "id": CHECKPOINT_STEP, "kind": CHECKPOINT_KIND, "effect": "deviceMutation",
+            "bindingRequirement": "none", "cancellation": "atSafeBoundary",
+            "compensationDescriptors": [], "arguments": action.journal_arguments(),
+        });
+        let intent_id = format!("intent-{CHECKPOINT_STEP}");
+        let event = events::step_intent(
+            &run.envelope(intent_id.clone())?,
+            &step,
+            &Target {
+                scope: "host".into(),
+                target_id: target.clone(),
+                connect_key: None,
+                identity_snapshot_hash: None,
+            },
+            1,
+            None,
+        )
+        .map_err(|_| uncertain())?;
+        // The exact typed action is durable before its intent can be.
+        let persisted = action.persisted().map_err(|_| uncertain())?;
+        run.record
+            .set_recovery(Some(CHECKPOINT_STEP), Some(&intent_id), Some(persisted));
+        run.persist(self.jobs)?;
+        if run.append(event).is_err() {
+            run.record.set_recovery(None, None, None);
+            let _ = run.persist(self.jobs);
+            return Err(uncertain());
+        }
+        run.record
+            .timeline
+            .push(format!("intent {CHECKPOINT_STEP}"));
+        run.record.add_step_kind(CHECKPOINT_KIND);
+        // Only now may the tool start.
+        let invocation = action.invocation();
+        let resources =
+            workspace.resources_for(&invocation.executable_path, &invocation.executable_sha256);
+        let opened = (self.precise_now)();
+        let dispatched = match opened {
+            Some(_) => workspace.tool.dispatch(&ToolInvocation {
+                executable_path: &invocation.executable_path,
+                executable_sha256: &invocation.executable_sha256,
+                argument_zero: invocation.argument_zero.as_deref(),
+                arguments: &invocation.arguments,
+                environment: &[],
+                resources: &resources,
+                working_directory: Some(&invocation.project_root),
+                timeout_seconds: invocation.timeout_seconds,
+            }),
+            None => Err(ToolFailure::Failed(
+                "dispatch refused: the Runtime clock is unavailable".into(),
+            )),
+        };
+        let window = opened.zip((self.precise_now)());
+        let receipt = match dispatched {
+            Ok(receipt) => receipt,
+            Err(ToolFailure::OutcomeUnknown(reason)) => {
+                // The intent stays outstanding: no outcome is invented, and
+                // the checkpoint is never started again.
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {CHECKPOINT_STEP}; durable intent left outstanding"
+                ));
+                return self.park(run, &reason);
+            }
+            Err(ToolFailure::Failed(reason)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(CHECKPOINT_STEP, &intent_id, "failed", None, &at)?;
+                run.record
+                    .timeline
+                    .push(format!("failed {CHECKPOINT_STEP}"));
+                run.record.set_recovery(None, None, None);
+                return self.fail(run, &reason);
+            }
+        };
+        match workspace.verify_checkpoint(&action, &receipt, &job_id) {
+            PatchVerdict::Verified(summary) => {
+                let at = run.clock()?;
+                run.step_outcome_at(CHECKPOINT_STEP, &intent_id, "succeeded", None, &at)?;
+                run.record.timeline.push(format!(
+                    "verified {CHECKPOINT_STEP} {}",
+                    swift_keys(&summary)
+                ));
+                run.record.set_recovery(None, None, None);
+                let product = WorkspaceProduct {
+                    name: CHECKPOINT_PRODUCT,
+                    operation: CHECKPOINT,
+                    step: CHECKPOINT_STEP,
+                    media_type: "text/plain",
+                    retention: "default",
+                };
+                if let Err(reason) =
+                    self.publish_workspace_product(run, &product, &target, &summary, window)
+                {
+                    return self.close(run, &reason);
+                }
+                if self.cancellation.is_some_and(RunCancellation::pending) {
+                    self.carry(run)?;
+                    return self.drain(run);
+                }
+                run.transition("running", "finalizing", "steps-complete")?;
+                run.record.set_operation_failure(None);
+                run.transition("finalizing", "succeeded", "finalized")?;
+                run.finish()?;
+                run.persist(self.jobs)
+            }
+            PatchVerdict::Failed(code, detail) => {
+                let at = run.clock()?;
+                run.step_outcome_at(CHECKPOINT_STEP, &intent_id, "failed", None, &at)?;
+                run.record.set_recovery(None, None, None);
+                run.record
+                    .timeline
+                    .push(format!("failed {CHECKPOINT_STEP}: {code}: {detail}"));
+                self.fail(run, &format!("{code}: {detail}"))
+            }
+            // The child ran but what it left cannot be judged: the intent
+            // stays outstanding for a readback, never for a second run.
+            PatchVerdict::Unknown(reason) => {
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {CHECKPOINT_STEP}; durable intent left outstanding"
+                ));
+                self.park(run, &reason)
+            }
+        }
+    }
+
+    /// Swift `runOwned` for a sweep Job's one host step: the typed intent
+    /// materialized for this Job — its retention clock the engine's now —
+    /// persisted before its write-ahead intent, and only then the sweep,
+    /// whose testimony is this Runtime's own inventory and Job rows; the
+    /// receipt judged against the typed action, the correlated outcome, then
+    /// the findings published as the product. A receipt that cannot be
+    /// observed parks the Job; its reconcile has nothing to read back — what
+    /// was destroyed is derivable only from the findings — so it stays
+    /// unknown and is never run again. A fresh sweep resumes whatever an
+    /// interrupted one left.
+    pub(super) fn execute_workspace_sweep(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        use crate::workspace_sweep::{SWEEP, SWEEP_KIND, SWEEP_PRODUCT, SWEEP_STEP, verify_sweep};
+        let started = run.clock()?;
+        run.record.start(&started);
+        run.transition("preflight", "running", "steps-start")?;
+        // Swift's safe boundary before the step.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        let job_id = run.record.job_id.clone();
+        let now = run.clock()?;
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let intent = match workspace
+            .sweep_action(&inputs, &job_id, &now)
+            .and_then(|intent| workspace.lower_sweep(&intent, &job_id).map(|_| intent))
+        {
+            Ok(intent) => intent,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        // Swift `dispatchWithWAL`'s last boundary before an intent.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, None);
+        }
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let step = json!({
+            "id": SWEEP_STEP, "kind": SWEEP_KIND, "effect": "hostOnly",
+            "bindingRequirement": "none", "cancellation": "atSafeBoundary",
+            "compensationDescriptors": [], "arguments": intent.journal_arguments(),
+        });
+        let intent_id = format!("intent-{SWEEP_STEP}");
+        let event = events::step_intent(
+            &run.envelope(intent_id.clone())?,
+            &step,
+            &Target {
+                scope: "host".into(),
+                target_id: target.clone(),
+                connect_key: None,
+                identity_snapshot_hash: None,
+            },
+            1,
+            None,
+        )
+        .map_err(|_| uncertain())?;
+        // The exact typed action is durable before its intent can be.
+        let persisted = intent.persisted().map_err(|_| uncertain())?;
+        run.record
+            .set_recovery(Some(SWEEP_STEP), Some(&intent_id), Some(persisted));
+        run.persist(self.jobs)?;
+        if run.append(event).is_err() {
+            run.record.set_recovery(None, None, None);
+            let _ = run.persist(self.jobs);
+            return Err(uncertain());
+        }
+        run.record.timeline.push(format!("intent {SWEEP_STEP}"));
+        run.record.add_step_kind(SWEEP_KIND);
+        // Only now may anything be destroyed.
+        let ledger = |owner: &str, derived: &str| {
+            self.jobs
+                .workspace_reference_facts(owner, derived)
+                .map_err(|error| error.to_string())
+        };
+        let opened = (self.precise_now)();
+        let dispatched = match opened {
+            Some(_) => workspace
+                .dispatch_sweep(&intent, &job_id, &ledger)
+                .map_err(ToolFailure::Failed)
+                .and_then(|receipt| workspace.tool.host_receipt(SWEEP_STEP).map(|()| receipt)),
+            None => Err(ToolFailure::Failed(
+                "dispatch refused: the Runtime clock is unavailable".into(),
+            )),
+        };
+        let window = opened.zip((self.precise_now)());
+        let receipt = match dispatched {
+            Ok(receipt) => receipt,
+            Err(ToolFailure::OutcomeUnknown(reason)) => {
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {SWEEP_STEP}; durable intent left outstanding"
+                ));
+                return self.park(run, &reason);
+            }
+            Err(ToolFailure::Failed(reason)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(SWEEP_STEP, &intent_id, "failed", None, &at)?;
+                run.record.timeline.push(format!("failed {SWEEP_STEP}"));
+                run.record.set_recovery(None, None, None);
+                return self.fail(run, &reason);
+            }
+        };
+        let summary = match verify_sweep(&intent, &receipt) {
+            Ok(summary) => summary,
+            Err((code, detail)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(SWEEP_STEP, &intent_id, "failed", None, &at)?;
+                run.record.set_recovery(None, None, None);
+                run.record
+                    .timeline
+                    .push(format!("failed {SWEEP_STEP}: {code}: {detail}"));
+                return self.fail(run, &format!("{code}: {detail}"));
+            }
+        };
+        let at = run.clock()?;
+        run.step_outcome_at(SWEEP_STEP, &intent_id, "succeeded", None, &at)?;
+        run.record
+            .timeline
+            .push(format!("verified {SWEEP_STEP} {}", swift_keys(&summary)));
+        run.record.set_recovery(None, None, None);
+        // The findings document is the product, its digest pinned by the
+        // verified summary.
+        let job_id = run.record.job_id.clone();
+        let session_id = format!("session-{job_id}");
+        let product = Product {
+            job_id: &job_id,
+            session_id: &session_id,
+            step_id: SWEEP_STEP,
+            name: SWEEP_PRODUCT,
+            media_type: "application/json",
+            privacy: "standard",
+            retention_class: "pinnedUntilVerified",
+            source_operation: SWEEP,
+            provider_id: "workspace",
+            binding: Self::workspace_binding(run, &target),
+            observation_window: window,
+        };
+        let published = self
+            .workspace_publisher()
+            .publish(&product, &receipt.stdout);
+        if let Err(reason) = self.settle_publication(run, &product, published) {
+            return self.close(run, &reason);
+        }
+        // Swift's step loop ends at a safe boundary.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        run.transition("running", "finalizing", "steps-complete")?;
+        run.record.set_operation_failure(None);
+        run.transition("finalizing", "succeeded", "finalized")?;
+        run.finish()?;
+        run.persist(self.jobs)
     }
 }

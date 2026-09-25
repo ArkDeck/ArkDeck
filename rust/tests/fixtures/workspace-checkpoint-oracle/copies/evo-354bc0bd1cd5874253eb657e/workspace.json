@@ -1,0 +1,14 @@
+{
+  "allowedPaths" : [
+    "entry/src/main/ets/pages/**"
+  ],
+  "workspace" : {
+    "allowedPathsDigest" : "6f573775e43831dce1522b549cd0bf0ab2d0c57ce61d0ded1b4324607ec79106",
+    "baseRevision" : "84a3ec3b992ecf3b4af6c868b5cbf356c37131576af9d8bd2d7b845b2911963d",
+    "createdAtUTC" : "2026-09-25T00:00:00Z",
+    "htaskID" : "runtime-job-44d089b6760c7a40f578ab47a675128b",
+    "projectRef" : "evolution-354bc0bd1cd5874253eb",
+    "sourceProjectRef" : "CheckpointOracleProject",
+    "workspaceID" : "evo-354bc0bd1cd5874253eb657e"
+  }
+}

@@ -974,6 +974,372 @@ impl WorkspaceComposition {
     }
 }
 
+// MARK: - The sweep of Runtime-owned copies
+
+/// Swift `EvolutionWorkspaceManager.RuntimeWorkspaceInventoryEntry`: one
+/// persisted Runtime-owned copy, and whether it is vouched for as adoption
+/// vouches (metadata, scopes, base-or-lineage revision).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct InventoryEntry {
+    pub(crate) workspace_id: String,
+    pub(crate) runtime_owner_id: String,
+    pub(crate) derived_project_ref: String,
+    pub(crate) created_at_utc: String,
+    pub(crate) vouched: bool,
+}
+
+/// Swift `EvolutionWorkspaceGCTaskReference` with its lifecycle attestation:
+/// what the sweep's caller vouches for about one copy.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct GcReference {
+    pub(crate) workspace_id: String,
+    pub(crate) htask_id: String,
+    /// The raw lifecycle word the teardown record keeps.
+    pub(crate) lifecycle: &'static str,
+    pub(crate) is_terminal: bool,
+    pub(crate) updated_at_utc: String,
+}
+
+/// Swift `EvolutionWorkspaceGCDisposition`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Disposition {
+    ActiveRetained,
+    RetainedByPolicy,
+    Destroyed,
+    WouldDestroy,
+    AlreadyDestroyed,
+    UnknownTaskRetained,
+}
+
+impl Disposition {
+    pub(crate) fn raw(self) -> &'static str {
+        match self {
+            Self::ActiveRetained => "activeRetained",
+            Self::RetainedByPolicy => "retainedByPolicy",
+            Self::Destroyed => "destroyed",
+            Self::WouldDestroy => "wouldDestroy",
+            Self::AlreadyDestroyed => "alreadyDestroyed",
+            Self::UnknownTaskRetained => "unknownTaskRetained",
+        }
+    }
+}
+
+/// Swift `EvolutionWorkspaceGCFinding`: one `evo-` entry's disposition and
+/// the bytes this sweep removed (or would remove, in a dry run).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Finding {
+    pub(crate) workspace_id: String,
+    pub(crate) disposition: Disposition,
+    pub(crate) reclaimed_bytes: u64,
+}
+
+/// Swift `destroyableEntries(under:)`: everything a sweep may remove under
+/// one task root. The workspace manifest, the attempt manifests and the
+/// teardown record are never here.
+const DESTROYABLE: [&str; 3] = ["workspace", ".workspace.doomed", ".workspace.tmp"];
+const TEARDOWN: &str = "teardown.json";
+
+/// Swift `measureBytes(_:)`: the regular files' sizes below every
+/// destroyable entry that exists, links not followed below it.
+fn measure_bytes(task_root: &str) -> u64 {
+    fn walk(directory: &Path) -> u64 {
+        let Ok(entries) = fs::read_dir(directory) else {
+            return 0;
+        };
+        entries
+            .filter_map(Result::ok)
+            .map(|entry| match fs::symlink_metadata(entry.path()) {
+                Ok(metadata) if metadata.is_dir() => walk(&entry.path()),
+                Ok(metadata) if metadata.is_file() => metadata.len(),
+                _ => 0,
+            })
+            .sum()
+    }
+    DESTROYABLE
+        .iter()
+        .map(|name| Path::new(task_root).join(name))
+        .filter(|path| path.exists())
+        .map(|path| walk(&path))
+        .sum()
+}
+
+/// Swift `FileManager.removeItem(at:)`: a directory with everything below
+/// it, anything else unlinked.
+fn remove_item(path: &str) -> io::Result<()> {
+    if fs::symlink_metadata(path)?.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    }
+}
+
+/// Swift `destroyIsolatedTree(under:)`: the tree first leaves its addressable
+/// path by one rename, so a crash mid-removal leaves a resumable
+/// `.workspace.doomed`, never a half-deleted `workspace/` that still looks
+/// reopenable; then every destroyable entry is removed.
+fn destroy_isolated_tree(task_root: &str) -> io::Result<()> {
+    let workspace = format!("{task_root}/workspace");
+    let doomed = format!("{task_root}/.workspace.doomed");
+    if exists(&workspace) {
+        if exists(&doomed) {
+            remove_item(&doomed)?;
+        }
+        fs::rename(&workspace, &doomed)?;
+    }
+    for name in DESTROYABLE {
+        let entry = format!("{task_root}/{name}");
+        if exists(&entry) {
+            remove_item(&entry)?;
+        }
+    }
+    Ok(())
+}
+
+impl WorkspaceComposition {
+    /// Whether this provider can sweep: Swift's provider profile is a
+    /// primary one and an isolation manager was composed beside it.
+    pub(crate) fn provides_isolation(&self) -> bool {
+        self.isolation.is_some()
+    }
+
+    /// Swift adoption's vouching of one persisted copy: its scopes' digest,
+    /// its primary source, and a tree whose revision is its base or what the
+    /// durable patch lineage derives from it.
+    fn vouches(&self, entry: &str, stored: &Manifest) -> bool {
+        let record = &stored.workspace;
+        let source = self
+            .registry
+            .profile(&record.source_project_ref)
+            .filter(|profile| profile.kind == ProfileKind::Primary);
+        let (Some(allowed_paths), Some(source)) = (&stored.allowed_paths, source) else {
+            return false;
+        };
+        if allowed_paths_digest(allowed_paths) != record.allowed_paths_digest {
+            return false;
+        }
+        let Ok(revision) = support::workspace_revision(
+            &format!("{entry}/workspace"),
+            &source.profile_id,
+            allowed_paths,
+        ) else {
+            return false;
+        };
+        revision == record.base_revision
+            || self
+                .patch_lineage(&record.project_ref)
+                .ok()
+                .and_then(|attempts| {
+                    crate::workspace_patch::lineage_derived_revision(
+                        &record.base_revision,
+                        &attempts,
+                    )
+                })
+                .as_deref()
+                == Some(revision.as_str())
+    }
+
+    /// Swift `EvolutionWorkspaceManager.runtimeWorkspaceInventory()`: one row
+    /// per persisted Runtime-owned copy, by name, with the vouching adoption
+    /// applies. More than 4,096 entries answer none.
+    pub(crate) fn runtime_workspace_inventory(&self) -> Vec<InventoryEntry> {
+        let Some(isolation) = self.isolation.as_ref() else {
+            return Vec::new();
+        };
+        let Ok(_held) = isolation.lock.lock() else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = match fs::read_dir(&isolation.root) {
+            Ok(entries) => entries
+                .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+                .collect(),
+            Err(_) => return Vec::new(),
+        };
+        if names.len() > 4_096 {
+            return Vec::new();
+        }
+        names.sort();
+        let mut inventory = Vec::new();
+        for name in names {
+            let entry = format!("{}/{name}", isolation.root);
+            let Some(stored) = read_manifest(&format!("{entry}/{MANIFEST}")) else {
+                continue;
+            };
+            if !stored.workspace.htask_id.starts_with("runtime-") {
+                continue;
+            }
+            let vouched = self.vouches(&entry, &stored);
+            let record = stored.workspace;
+            inventory.push(InventoryEntry {
+                workspace_id: record.workspace_id,
+                runtime_owner_id: record.htask_id,
+                derived_project_ref: record.project_ref,
+                created_at_utc: record.created_at_utc,
+                vouched,
+            });
+        }
+        inventory
+    }
+
+    /// Swift `EvolutionWorkspaceManager.sweepTerminalWorkspaces`: every `evo-`
+    /// directory of the store judged against the caller's references. One
+    /// with no reference, two references, or a manifest that disagrees is
+    /// kept as unknown; one whose Jobs are not all terminal is kept as
+    /// active; of the terminal ones still holding a tree, the newest
+    /// `retain_latest` and those younger than `minimum_age_seconds` at `now`
+    /// are kept by policy (an unreadable clock keeps); every other one is
+    /// destroyed — its tree renamed away and removed, its derived profile
+    /// unregistered, its teardown recorded once — or, in a dry run, measured.
+    /// A removal that fails stops the sweep.
+    pub(crate) fn sweep_terminal_workspaces(
+        &self,
+        tasks: &[GcReference],
+        minimum_age_seconds: i64,
+        retain_latest: i64,
+        dry_run: bool,
+        now: &str,
+    ) -> Result<Vec<Finding>, IsolationFailure> {
+        struct Candidate<'a> {
+            task_root: String,
+            reference: &'a GcReference,
+            project_ref: String,
+            has_material: bool,
+        }
+        let isolation = self.isolation.as_ref().ok_or(IsolationFailure::Other)?;
+        let _held = isolation.lock.lock().map_err(other)?;
+        // A workspace the references claim twice is vouched for by nobody.
+        let mut references: BTreeMap<&str, &GcReference> = BTreeMap::new();
+        let mut conflicted = std::collections::BTreeSet::new();
+        for task in tasks {
+            if references.insert(&task.workspace_id, task).is_some() {
+                conflicted.insert(task.workspace_id.as_str());
+            }
+        }
+        let mut names: Vec<String> = fs::read_dir(&isolation.root)
+            .map(|entries| {
+                entries
+                    .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+                    .collect()
+            })
+            .unwrap_or_default();
+        names.sort();
+        let finding = |workspace_id: &str, disposition, reclaimed_bytes| Finding {
+            workspace_id: workspace_id.into(),
+            disposition,
+            reclaimed_bytes,
+        };
+        let mut findings = Vec::new();
+        let mut candidates = Vec::new();
+        for name in &names {
+            let task_root = format!("{}/{name}", isolation.root);
+            if !name.starts_with("evo-")
+                || !fs::symlink_metadata(&task_root).is_ok_and(|metadata| metadata.is_dir())
+            {
+                continue;
+            }
+            let reference = references
+                .get(name.as_str())
+                .copied()
+                .filter(|_| !conflicted.contains(name.as_str()));
+            let stored = read_manifest(&format!("{task_root}/{MANIFEST}"));
+            let (Some(reference), Some(stored)) = (reference, stored) else {
+                findings.push(finding(name, Disposition::UnknownTaskRetained, 0));
+                continue;
+            };
+            if stored.workspace.workspace_id != *name
+                || stored.workspace.htask_id != reference.htask_id
+            {
+                findings.push(finding(name, Disposition::UnknownTaskRetained, 0));
+                continue;
+            }
+            if !reference.is_terminal {
+                findings.push(finding(name, Disposition::ActiveRetained, 0));
+                continue;
+            }
+            let has_material = DESTROYABLE
+                .iter()
+                .any(|entry| exists(&format!("{task_root}/{entry}")));
+            if !has_material && exists(&format!("{task_root}/{TEARDOWN}")) {
+                findings.push(finding(name, Disposition::AlreadyDestroyed, 0));
+                continue;
+            }
+            candidates.push(Candidate {
+                task_root,
+                reference,
+                project_ref: stored.workspace.project_ref,
+                has_material,
+            });
+        }
+        // Retention ranks only trees that still exist: an interrupted
+        // teardown must not occupy a post-mortem slot it can no longer give.
+        let mut ranked: Vec<&Candidate<'_>> = candidates
+            .iter()
+            .filter(|candidate| candidate.has_material)
+            .collect();
+        ranked.sort_by(|left, right| {
+            (
+                right.reference.updated_at_utc.as_str(),
+                right.reference.workspace_id.as_str(),
+            )
+                .cmp(&(
+                    left.reference.updated_at_utc.as_str(),
+                    left.reference.workspace_id.as_str(),
+                ))
+        });
+        let latest = usize::try_from(retain_latest).unwrap_or(0);
+        let mut retained: std::collections::BTreeSet<&str> = ranked
+            .iter()
+            .take(latest)
+            .map(|candidate| candidate.reference.workspace_id.as_str())
+            .collect();
+        let now_seconds = crate::format_time::format_timestamp_seconds(now);
+        for candidate in ranked.iter().skip(latest) {
+            let terminal_at =
+                crate::format_time::format_timestamp_seconds(&candidate.reference.updated_at_utc);
+            // An unreadable clock or timestamp can only fail toward keeping.
+            let old_enough = now_seconds
+                .zip(terminal_at)
+                .is_some_and(|(now, at)| now - at >= minimum_age_seconds as f64);
+            if !old_enough {
+                retained.insert(candidate.reference.workspace_id.as_str());
+            }
+        }
+        for candidate in &candidates {
+            let workspace_id = candidate.reference.workspace_id.as_str();
+            if candidate.has_material && retained.contains(workspace_id) {
+                findings.push(finding(workspace_id, Disposition::RetainedByPolicy, 0));
+                continue;
+            }
+            let reclaimed = measure_bytes(&candidate.task_root);
+            if dry_run {
+                findings.push(finding(workspace_id, Disposition::WouldDestroy, reclaimed));
+                continue;
+            }
+            destroy_isolated_tree(&candidate.task_root).map_err(other)?;
+            self.registry.unregister_evolution(&candidate.project_ref);
+            let teardown = format!("{}/{TEARDOWN}", candidate.task_root);
+            if !exists(&teardown) {
+                let record = json!({
+                    "documentType": "evolution-workspace-teardown",
+                    "schemaVersion": "1.0.0",
+                    "workspaceID": workspace_id,
+                    "htaskID": candidate.reference.htask_id,
+                    "projectRef": candidate.project_ref,
+                    "lifecycle": candidate.reference.lifecycle,
+                    "destroyedAtUTC": now,
+                    "reclaimedBytes": reclaimed,
+                    "minimumTerminalAgeSeconds": minimum_age_seconds,
+                    "retainLatestTerminalCount": retain_latest,
+                });
+                let bytes = crate::session_json::encode_canonical_pretty(&record).map_err(other)?;
+                write_manifest(&teardown, &bytes)?;
+            }
+            findings.push(finding(workspace_id, Disposition::Destroyed, reclaimed));
+        }
+        findings.sort_by(|left, right| left.workspace_id.cmp(&right.workspace_id));
+        Ok(findings)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

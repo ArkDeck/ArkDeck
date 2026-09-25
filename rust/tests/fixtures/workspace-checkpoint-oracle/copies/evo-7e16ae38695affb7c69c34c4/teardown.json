@@ -1,0 +1,12 @@
+{
+  "destroyedAtUTC" : "2026-09-25T00:00:00Z",
+  "documentType" : "evolution-workspace-teardown",
+  "htaskID" : "runtime-job-ee0d2c02ae92c8eae8af9bc9d6728c91",
+  "lifecycle" : "quiescent",
+  "minimumTerminalAgeSeconds" : 0,
+  "projectRef" : "evolution-7e16ae38695affb7c69c",
+  "reclaimedBytes" : 98,
+  "retainLatestTerminalCount" : 0,
+  "schemaVersion" : "1.0.0",
+  "workspaceID" : "evo-7e16ae38695affb7c69c34c4"
+}

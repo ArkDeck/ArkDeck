@@ -39,7 +39,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 24] = [
+const MATERIALIZED: [&str; 26] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -64,6 +64,8 @@ const MATERIALIZED: [&str; 24] = [
     "workspace.read-source-range@1",
     "workspace.inspect-git-status@1",
     "workspace.inspect-diff@1",
+    "workspace.create-checkpoint@1",
+    "workspace.sweep-isolated-copies@1",
 ];
 
 /// Swift `AnalyzerProfile`: one analyzer a host configured, its pinned
