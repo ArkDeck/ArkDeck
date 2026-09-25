@@ -557,6 +557,14 @@ the write began is `OutcomeUnknown` and poisons the writer until it is reopened.
 factories do. The writer records whatever its caller decides; it holds no Job
 authority, and no daemon path uses it yet.
 
+The replay keeps the intents still outstanding as it accepts each record, so
+checking a record never looks through every intent, and a replay grows with its
+Journal rather than with its square. A cold replay of a 10,013-record Journal
+takes 0.52 s in a debug build, where it took 12.2 s (a device mutation's proof
+over one retained Session holding it: 0.52 s, where it took 10.7 s).
+`job_journal_replay::tests` replays every fixture Journal record by record and
+checks the intents kept against every intent not completed after each one.
+
 `rust/tests/fixtures/journal-writer/` is the shared oracle: four scenarios
 (succeeded, outcome unknown with reconcile, confirmed compensation, plan-only)
 as Swift `FileDurableJournal` writes them, with the facts

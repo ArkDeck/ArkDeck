@@ -372,6 +372,10 @@ pub struct ReplayState {
     finalized: bool,
     intents: BTreeMap<String, Intent>,
     completed: BTreeSet<String>,
+    /// Every intent in `intents` not in `completed`, kept as each record is
+    /// accepted: a check of one record reads it without looking through
+    /// every intent, so a replay grows with its Journal, not with its square.
+    outstanding: BTreeSet<String>,
     unknown: Vec<Unknown>,
     latest_binding_revision: Option<i64>,
     last_confirmed_step_id: Option<String>,
@@ -425,10 +429,11 @@ impl ReplayState {
         self.events
     }
 
+    /// The intents not completed, in event identity order.
     fn outstanding(&self) -> impl Iterator<Item = &Intent> {
-        self.intents
-            .values()
-            .filter(|intent| !self.completed.contains(&intent.event_id))
+        self.outstanding
+            .iter()
+            .filter_map(|event_id| self.intents.get(event_id))
     }
 
     fn required_hazards(&self) -> Vec<String> {
@@ -497,7 +502,7 @@ impl ReplayState {
         }
         let (from, to) = (payload["from"].as_str(), payload["to"].as_str());
         let trigger = payload["triggerEventId"].as_str();
-        let outstanding = self.outstanding().next().is_some();
+        let outstanding = !self.outstanding.is_empty();
         if !self.unknown.is_empty() {
             if matches!(kind, "stepIntent" | "compensationIntent") {
                 return Err("outcomeUnknown blocks subsequent external-effect intent");
@@ -757,11 +762,15 @@ impl ReplayState {
                             binding_revision: e["bindingRevision"].as_i64(),
                         },
                     );
+                    if !self.completed.contains(event.event_id()) {
+                        self.outstanding.insert(event.event_id().into());
+                    }
                 }
             }
             "stepOutcome" | "compensationOutcome" => {
                 if let Some(correlation) = payload["correlatesToIntentEventId"].as_str() {
                     self.completed.insert(correlation.into());
+                    self.outstanding.remove(correlation);
                     if payload["outcomeCertainty"] == "confirmed" {
                         self.last_confirmed_step_id = text(&e["stepId"]);
                     } else if let Some(intent) = self.intents.get(correlation) {
@@ -912,5 +921,209 @@ impl ReplayState {
             finalized: self.finalized,
             requires_recovery,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::{Path, PathBuf};
+
+    fn fixtures() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures")
+    }
+
+    /// Every Journal the fixtures hold, most of them Swift's as its oracles
+    /// recorded them: each `.jsonl` file whose first record is a `jobCreated`.
+    fn fixture_journals() -> Vec<PathBuf> {
+        let mut found = Vec::new();
+        let mut pending = vec![fixtures()];
+        while let Some(directory) = pending.pop() {
+            for entry in std::fs::read_dir(&directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    pending.push(path);
+                    continue;
+                }
+                if path
+                    .extension()
+                    .is_none_or(|extension| extension != "jsonl")
+                {
+                    continue;
+                }
+                let bytes = std::fs::read(&path).unwrap();
+                let first = bytes
+                    .split(|byte| *byte == b'\n')
+                    .next()
+                    .unwrap_or_default();
+                if JournalEvent::decode(first).is_ok_and(|event| event.kind() == "jobCreated") {
+                    found.push(path);
+                }
+            }
+        }
+        found.sort();
+        found
+    }
+
+    /// The outstanding intents by their definition: every intent recorded and
+    /// not completed, in event identity order.
+    fn by_definition(state: &ReplayState) -> Vec<&str> {
+        state
+            .intents
+            .values()
+            .filter(|intent| !state.completed.contains(&intent.event_id))
+            .map(|intent| intent.event_id.as_str())
+            .collect()
+    }
+
+    /// The outstanding intents the replay keeps are, after every record of
+    /// every fixture Journal, exactly every intent not completed, in the same
+    /// order: each check and fact that reads them reads what it read when it
+    /// looked through every intent for each record.
+    #[test]
+    fn the_outstanding_intents_kept_are_every_intent_not_completed_after_each_record() {
+        let journals = fixture_journals();
+        assert!(journals.len() > 400, "{}", journals.len());
+        let (mut records, mut outstanding) = (0, 0);
+        for path in &journals {
+            let bytes = std::fs::read(path).unwrap();
+            let mut state = ReplayState::default();
+            for line in bytes.split(|byte| *byte == b'\n') {
+                // A torn tail, or a record a replay refuses, ends the Journal
+                // as a replay ends it.
+                let Ok(event) = JournalEvent::decode(line) else {
+                    break;
+                };
+                if state.validate(&event).is_err() {
+                    break;
+                }
+                state.accept(&event);
+                records += 1;
+                let kept: Vec<&str> = state
+                    .outstanding()
+                    .map(|intent| intent.event_id.as_str())
+                    .collect();
+                outstanding += kept.len();
+                assert_eq!(kept, by_definition(&state), "{}", path.display());
+            }
+        }
+        // The corpus exercises both: records that leave intents outstanding,
+        // and many records.
+        assert!(
+            records > 5_000 && outstanding > 0,
+            "{records} {outstanding}"
+        );
+    }
+
+    /// The Swift pointer oracle's tap Journal without its `finalized` record,
+    /// its evidence-model read retried `retries` times more.
+    fn long_journal(retries: i64) -> Vec<u8> {
+        let tap = fixtures()
+            .join("pointer-input/store/jobs/job-4ac2c3640786ad0e831952ab62bb71bc/journal.jsonl");
+        let events: Vec<Value> = std::fs::read_to_string(tap)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .filter(|event| event["kind"] != "finalized")
+            .collect();
+        let find = |kind: &str| {
+            events
+                .iter()
+                .find(|event| event["kind"] == kind && event["stepId"] == "read-evidence-model")
+                .unwrap()
+                .clone()
+        };
+        let (intent, outcome) = (find("stepIntent"), find("stepOutcome"));
+        let mut all = Vec::new();
+        for event in events {
+            let last = event["eventId"] == outcome["eventId"];
+            all.push(event);
+            if last {
+                for attempt in 2..=retries + 1 {
+                    let id = |event: &Value| {
+                        serde_json::json!(format!(
+                            "{}-{attempt}",
+                            event["eventId"].as_str().unwrap()
+                        ))
+                    };
+                    let (mut retried, mut answered) = (intent.clone(), outcome.clone());
+                    retried["eventId"] = id(&intent);
+                    retried["attempt"] = serde_json::json!(attempt);
+                    answered["eventId"] = id(&outcome);
+                    answered["attempt"] = serde_json::json!(attempt);
+                    answered["payload"]["correlatesToIntentEventId"] = id(&intent);
+                    all.push(retried);
+                    all.push(answered);
+                }
+            }
+        }
+        let mut journal = Vec::new();
+        for (sequence, mut event) in all.into_iter().enumerate() {
+            event["sequence"] = serde_json::json!(sequence);
+            journal.extend(crate::session_json::encode(&event).unwrap());
+            journal.push(b'\n');
+        }
+        journal
+    }
+
+    /// How long a replay of a Journal of about 2,500, 5,000 and 10,000
+    /// records takes, and a device mutation's proof over one retained Session
+    /// holding the longest. A measurement, not a check:
+    /// `cargo test -p arkdeck-hoststore --lib job_journal_replay::tests::a_replay -- --ignored --nocapture`.
+    #[test]
+    #[ignore = "a measurement"]
+    fn a_replay_of_ten_thousand_records_takes() {
+        use std::os::unix::fs::DirBuilderExt;
+        for retries in [1_250, 2_500, 5_000] {
+            let journal = long_journal(retries);
+            let records = journal.split(|byte| *byte == b'\n').count() - 1;
+            let mut samples: Vec<_> = (0..5)
+                .map(|_| {
+                    let started = std::time::Instant::now();
+                    let replay = ReplayState::replay(&journal).unwrap();
+                    assert_eq!(replay.state.event_count(), records);
+                    started.elapsed()
+                })
+                .collect();
+            samples.sort();
+            println!(
+                "replay of {records} records: median {:?}, max {:?}",
+                samples[2], samples[4]
+            );
+        }
+        let journal = long_journal(5_000);
+        let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+        let base = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("replay-measure-{nonce:032x}"));
+        let private = |path: &Path| {
+            std::fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(path)
+                .unwrap();
+        };
+        let session = base.join("Sessions/2026/09/session-job-4ac2c3640786ad0e831952ab62bb71bc");
+        private(&base.join("Runtime"));
+        private(&session);
+        std::fs::write(session.join("journal.jsonl"), &journal).unwrap();
+        let jobs = crate::JobStore::open_owner(&base.join("Runtime")).unwrap();
+        let mut samples: Vec<_> = (0..5)
+            .map(|_| {
+                let started = std::time::Instant::now();
+                jobs.require_mutation_state(&base.join("Runtime"), &[])
+                    .unwrap();
+                started.elapsed()
+            })
+            .collect();
+        samples.sort();
+        println!(
+            "proof over one retained Session of {} records: median {:?}, max {:?}",
+            journal.split(|byte| *byte == b'\n').count() - 1,
+            samples[2],
+            samples[4]
+        );
+        std::fs::remove_dir_all(&base).unwrap();
     }
 }
