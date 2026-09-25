@@ -98,7 +98,7 @@ TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
 SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
           'agent.run', 'agent.status', 'agent.list', 'agent.abandon', 'device.observations',
-          'target.adopt', 'trace.probe'}
+          'target.adopt', 'trace.probe', 'trace.inspect'}
 # The identities an owner mints at random, which an oracle labels by kind in
 # order of first appearance.
 MINTED = re.compile(r'\b(har|resume|candidate|obs)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-'

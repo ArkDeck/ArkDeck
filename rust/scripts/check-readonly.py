@@ -380,6 +380,10 @@ def main() -> None:
                         expected = "internalError"
                     if method in {"flash.reconcile-alias", "flash.prerequisites", "flash.bind-current-loader"}:
                         expected = "invalidParams"
+                    # No composition here holds a Trace inspector (Swift composes one only beside
+                    # a loaded ArkTrace distribution): its owner refuses before any parameter.
+                    if method == "trace.inspect":
+                        expected = "operationUnavailable"
                     # Without parameters, as Swift's handler, every workspace method but the
                     # project list is refused before its owner is asked.
                     if method in {"workspace.project.register", "workspace.project.show",

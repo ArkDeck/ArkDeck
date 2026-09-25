@@ -174,10 +174,55 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
         ) {
             // Swift reads these parameters before their owners.
             "invalidParams"
+        } else if *method == "trace.inspect" {
+            // Swift's owner without its Trace inspector, before any parameter.
+            "operationUnavailable"
         } else {
             "rejected"
         };
         assert_eq!(response.outcome.unwrap_err().code, expected, "{method}");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+/// Replays the Swift oracle `rust/tests/fixtures/trace-inspect-unavailable`
+/// (`TraceInspectOracleContractTests`): Swift's `trace.inspect` owner
+/// composed without a Trace inspector, as its daemon is where no ArkTrace
+/// distribution loaded a `trace-summary@1` profile, refuses every request
+/// before it reads a parameter, with its owner's details. Parameters the
+/// method's schema refuses reach the same owner and the same refusal, since
+/// neither daemon validates a request against that schema; none of them
+/// enters another owner.
+#[test]
+fn trace_inspection_without_an_inspector_answers_swift_s_refusal() {
+    let (control, reads) = setup();
+    let oracle: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/trace-inspect-unavailable/cases.json"
+    ))
+    .unwrap();
+    let answer = |params: Value| -> Value {
+        let error = call(&control, "trace.inspect", params).outcome.unwrap_err();
+        json!({"ok": false, "error": {"code": error.code, "message": error.message,
+            "details": error.details}})
+    };
+    let exchanges = oracle["exchanges"].as_array().unwrap();
+    assert_eq!(exchanges.len(), 7);
+    for exchange in exchanges {
+        assert_eq!(exchange["method"], "trace.inspect");
+        assert_eq!(
+            answer(exchange["params"].clone()),
+            exchange["answer"],
+            "{}",
+            exchange["name"]
+        );
+    }
+    let refused = &exchanges[0]["answer"];
+    for params in [
+        json!({"extra": true}),
+        json!({"artifactId": 1, "owner": "job", "timeoutMs": "1000"}),
+        json!({"owner": {"kind": "job", "id": "job-trace-inspect", "extra": 1}}),
+    ] {
+        assert_eq!(answer(params.clone()), *refused, "{params}");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
