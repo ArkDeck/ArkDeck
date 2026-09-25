@@ -314,7 +314,11 @@ impl ArtifactPublisher<'_> {
                 .map_err(|error| io_failure(&error.to_string()))
         };
         if !exists {
-            job.publish_document(&artifact_id, &payload, MAX_PAYLOAD)
+            // Swift's store publishes an empty product as it publishes any
+            // other (a search that found nothing, a clean working copy's
+            // status): the payload is written as a fresh document, which may
+            // be empty.
+            job.replace_document(&artifact_id, &payload, MAX_PAYLOAD)
                 .map_err(|error| {
                     let error = match error {
                         DocumentPublishError::BeforePublication(error)

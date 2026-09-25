@@ -326,10 +326,9 @@ pub(crate) fn claim(layout: &Layout, started_at_utc: &str) -> Result<Claim, Stri
 /// What Swift's LaunchAgent may hand its daemon for an owner this Runtime
 /// does not compose yet (`LaunchAgentService.renderTemplate`): each one set
 /// is named at the start rather than quietly ignored.
-const UNREAD: [(&str, &str); 4] = [
+const UNREAD: [(&str, &str); 3] = [
     // The workspace provider is composed over the registered projects; the
-    // inspector tool and the legacy environment roots are not read.
-    ("ARKDECK_WORKSPACE_INSPECTOR", "workspace source inspector"),
+    // legacy environment roots are not read.
     (
         "ARKDECK_WORKSPACE_PROJECTS",
         "legacy workspace project roots",
@@ -351,6 +350,8 @@ pub(crate) struct Inputs {
     pub(crate) analyzer: Option<PathBuf>,
     /// As it is set: Swift's loader judges it, a relative path included.
     pub(crate) arktrace_descriptor: Option<std::ffi::OsString>,
+    /// As it is set: Swift's resolver judges it, a relative path included.
+    pub(crate) workspace_inspector: Option<std::ffi::OsString>,
     pub(crate) server_port: Option<String>,
     pub(crate) unread: Vec<(&'static str, &'static str)>,
     /// The ArkForge lane's environment: its bundle, its campaign and the
@@ -371,6 +372,7 @@ impl Inputs {
             hdc: absolute("ARKDECK_HDC_PATH")?,
             analyzer: absolute("ARKDECK_ANALYZER_PATH")?,
             arktrace_descriptor: std::env::var_os("ARKDECK_ARKTRACE_DESCRIPTOR"),
+            workspace_inspector: std::env::var_os("ARKDECK_WORKSPACE_INSPECTOR"),
             server_port: arkdeck_provider_hdc::ProcessDispatch::inherited_server_port(),
             unread: UNREAD
                 .into_iter()
@@ -547,6 +549,7 @@ pub(crate) fn compose(
                 layout.installed_daemon.clone(),
                 true,
             )?),
+            inputs.workspace_inspector.as_deref(),
         )?
         .with_imports(arkdeck_hoststore::ImportUploadStore::open(
             &layout.artifacts,

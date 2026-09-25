@@ -21,10 +21,15 @@ use crate::workspace_patch::{
     PatchIntent, RevertIntent, ToolReceipt, VerifiedToolDispatch, WorkspaceToolDispatch,
 };
 use crate::workspace_profile::{
-    ProfileKind, ProfileRegistry, RegisteredBuildPreset, RegisteredKind, SigningPresetRef,
-    VerifiedResource, WorkspaceAuthorizationFacts, WorkspaceProfile,
+    PRESET_UNAVAILABLE, ProfileKind, ProfileRegistry, RegisteredBuildPreset, RegisteredKind,
+    SigningPresetRef, Unavailability, VerifiedResource, WorkspaceAuthorizationFacts,
+    WorkspaceProfile,
 };
 use crate::workspace_project::{WorkspaceProjectStore, WorkspaceUse};
+use crate::workspace_read::{
+    self as read, DIFF, INSPECT, Inspector, RANGE, ReadAction, ReadLowering, STATUS,
+    SourceInspection,
+};
 use crate::workspace_signing::SigningSetup;
 use crate::workspace_support::{self as support, foundation_standardized, is_narrower};
 use arkdeck_contract::WireError;
@@ -86,6 +91,12 @@ pub struct WorkspaceComposition {
     pub(crate) lane: Mutex<()>,
     /// The signing half of Swift's provider; without it nothing is signed.
     pub(crate) signing: Option<Signing>,
+    /// Swift `WorkspaceProvider`'s inspector: the one a host configured
+    /// (`ARKDECK_WORKSPACE_INSPECTOR`), pinned when the Runtime composed it.
+    inspector: Option<Inspector>,
+    /// Swift `WorkspaceProjectRegistry`: the root every registered project
+    /// still pins, whether or not its profile resolved, by reference.
+    inspection_roots: BTreeMap<String, String>,
 }
 
 /// Swift's `signingPresetStore`, `signingCredentialOwner` and
@@ -528,6 +539,15 @@ impl WorkspaceComposition {
             .filter(|(_, (project, _))| resolved.iter().any(|p| &p.project_ref == project))
             .map(|(preset, (_, generation))| (preset.clone(), *generation))
             .collect();
+        // Swift `WorkspaceProjectRegistry(roots:)`: every registered root the
+        // registration still pins, which the inspection reads.
+        let inspection_roots: BTreeMap<String, String> = records
+            .iter()
+            .filter_map(|record| {
+                let root = record.root.as_ref().ok()?;
+                Some((record.project_ref.clone(), root.clone()))
+            })
+            .collect();
         let composed = if resolved.is_empty() {
             let reason = if failures.is_empty() {
                 "workspace.projectProfileUnavailable: no registered project profile resolved"
@@ -550,6 +570,8 @@ impl WorkspaceComposition {
                     resources: BTreeMap::new(),
                     environment: BTreeMap::new(),
                     signing,
+                    inspector: None,
+                    inspection_roots,
                 },
                 notes,
             )
@@ -575,6 +597,8 @@ impl WorkspaceComposition {
                 resources: WorkspaceProfile::resources_by_executable(&resolved),
                 environment: presets.environment.clone(),
                 signing,
+                inspector: None,
+                inspection_roots,
             };
             notes.unadopted = composition.adopt_runtime_workspaces();
             (composition, notes)
@@ -613,7 +637,24 @@ impl WorkspaceComposition {
             resources: WorkspaceProfile::resources_by_executable(&profiles),
             environment: BTreeMap::new(),
             signing: None,
+            inspector: None,
+            inspection_roots: BTreeMap::new(),
         })
+    }
+
+    /// The same composition, inspecting source with the inspector a host
+    /// configured (Swift's `ARKDECK_WORKSPACE_INSPECTOR`), pinned now.
+    pub fn with_inspector(mut self, inspector: Option<Inspector>) -> Self {
+        self.inspector = inspector;
+        self
+    }
+
+    /// The same composition, the inspection reading the given registered
+    /// roots by project, as Swift's daemon hands `WorkspaceProvider` its
+    /// `WorkspaceProjectRegistry`.
+    pub fn with_inspection_roots(mut self, roots: BTreeMap<String, String>) -> Self {
+        self.inspection_roots = roots;
+        self
     }
 
     /// The same composition, its patch and build steps dispatched through
@@ -651,12 +692,26 @@ impl WorkspaceComposition {
         Ok(self)
     }
 
-    /// Swift's registered provider's `runtimeAvailability(for:)`: available
-    /// when some start-up profile serves the operation, otherwise the first
-    /// profile's reason.
-    pub(crate) fn provider_unavailability(&self, reference: &str) -> Option<String> {
+    /// Swift's registered provider's `runtimeAvailability(for:)`, as
+    /// `operation.list` codes it: the inspection is `WorkspaceProvider`'s
+    /// own — an inspector configured and some registered root; any other
+    /// operation is available when some start-up profile serves it,
+    /// otherwise it carries the first profile's reason.
+    pub(crate) fn provider_unavailability(&self, reference: &str) -> Option<Unavailability> {
+        if reference == INSPECT {
+            if self.inspector.is_none() {
+                return Some((
+                    "provider_tool_unavailable",
+                    "no_workspace_inspector_configured".into(),
+                ));
+            }
+            if self.inspection_roots.is_empty() {
+                return Some((PRESET_UNAVAILABLE, "no_workspace_project_registered".into()));
+            }
+            return None;
+        }
         if let Some(reason) = &self.unavailable {
-            return Some(reason.clone());
+            return Some(("provider_tool_unavailable", reason.clone()));
         }
         let mut first = None;
         for project_ref in &self.primaries {
@@ -667,20 +722,29 @@ impl WorkspaceComposition {
             let reason = self.unavailability_of(&profile, reference)?;
             first.get_or_insert(reason);
         }
-        Some(first.unwrap_or_else(|| "no_workspace_project_registered".into()))
+        Some(
+            first.unwrap_or_else(|| (PRESET_UNAVAILABLE, "no_workspace_project_registered".into())),
+        )
     }
 
     /// Swift `runtimeAvailability(for:profile:)`, signing included: a
     /// registered signing preset whose credential resolves for this project,
     /// or — only where the profile may fall back — the installed receipt of
     /// this project ready to sign.
-    fn unavailability_of(&self, profile: &WorkspaceProfile, reference: &str) -> Option<String> {
+    fn unavailability_of(
+        &self,
+        profile: &WorkspaceProfile,
+        reference: &str,
+    ) -> Option<Unavailability> {
         if reference != SIGN {
             return profile.unavailability(reference, self.isolation.is_some());
         }
         let has_preset = if !profile.signing.is_empty() {
             let Some(signing) = &self.signing else {
-                return Some("workspace.signingCredentialOwnerUnavailable".into());
+                return Some((
+                    PRESET_UNAVAILABLE,
+                    "workspace.signingCredentialOwnerUnavailable".into(),
+                ));
             };
             profile.signing.values().any(|preset| {
                 signing
@@ -695,7 +759,10 @@ impl WorkspaceComposition {
             })
         } else if profile.allows_legacy_signing {
             let Some(signing) = &self.signing else {
-                return Some("workspace.signingPresetUnavailable".into());
+                return Some((
+                    PRESET_UNAVAILABLE,
+                    "workspace.signingPresetUnavailable".into(),
+                ));
             };
             // Swift `status()`: ready when the fixed preset validates with
             // its secrets present.
@@ -797,7 +864,7 @@ impl WorkspaceComposition {
             .registry
             .profile(project_ref)
             .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?;
-        if let Some(reason) = self.unavailability_of(&profile, reference) {
+        if let Some((_, reason)) = self.unavailability_of(&profile, reference) {
             return Err(reason);
         }
         if let Some(declared) = inputs
@@ -891,6 +958,149 @@ impl WorkspaceComposition {
             .profile(project_ref)
             .ok_or_else(|| format!("workspace.projectProfileUnavailable:{project_ref}"))?
             .authorization_facts()
+    }
+
+    /// Swift `action(for:operation:inputs:context:)` for a read:
+    /// - an inspection by `WorkspaceProvider` — the root the project
+    ///   registered, the scope and the symbol screened;
+    /// - any other read by `WorkspaceOperationsProvider` — its preamble, then
+    ///   the pinned tool the profile offers for it and the argv built from
+    ///   the screened inputs.
+    ///
+    /// A refusal is the detail Swift's provider error describes itself by.
+    pub(crate) fn read_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+    ) -> Result<ReadAction, String> {
+        let text = |key: &str| inputs.get(key).and_then(Value::as_str);
+        if reference == INSPECT {
+            let (Some(project_ref), Some(symbol), Some(scope)) =
+                (text("projectRef"), text("symbol"), text("fileScope"))
+            else {
+                return Err(
+                    "inspect-workspace-source requires typed projectRef, symbol and fileScope \
+                     inputs"
+                        .into(),
+                );
+            };
+            let root = self
+                .inspection_roots
+                .get(project_ref)
+                .ok_or_else(|| read::unknown_project(project_ref))?;
+            read::validate_scope(scope)?;
+            read::validate_symbol(symbol)?;
+            return Ok(ReadAction::InspectSource(SourceInspection {
+                project_ref: project_ref.into(),
+                project_root: root.clone(),
+                symbol: symbol.into(),
+                file_scope: scope.into(),
+            }));
+        }
+        let string =
+            |key: &str| text(key).ok_or_else(|| format!("workspace input {key} is missing"));
+        let integer = |key: &str| {
+            inputs
+                .get(key)
+                .and_then(Value::as_i64)
+                .ok_or_else(|| format!("workspace input {key} is missing"))
+        };
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let root = profile.project_root.clone();
+        let control = || "workspace.sourceControlPresetUnavailable".to_owned();
+        match reference {
+            STATUS => profile
+                .source_control_invocation(
+                    reference,
+                    &[
+                        "-C",
+                        &root,
+                        "status",
+                        "--porcelain=v1",
+                        "--untracked-files=all",
+                        "--",
+                        ".",
+                    ],
+                )
+                .map(ReadAction::GitStatus)
+                .ok_or_else(control),
+            DIFF => {
+                if profile.source_control_invocation(reference, &[]).is_none() {
+                    return Err(control());
+                }
+                let base = string("baseRevision")?;
+                let scope = string("pathScope")?;
+                read::validate_revision_expression(base)?;
+                read::validate_path_scope(scope)?;
+                profile
+                    .source_control_invocation(
+                        reference,
+                        &["-C", &root, "diff", "--stat", base, "--", scope],
+                    )
+                    .map(ReadAction::Diff)
+                    .ok_or_else(control)
+            }
+            RANGE => {
+                let reader = || "workspace.sourceReaderPresetUnavailable".to_owned();
+                if profile.source_reader_invocation(reference, &[]).is_none() {
+                    return Err(reader());
+                }
+                let file = string("filePath")?;
+                let start = integer("lineStart")?;
+                let end = integer("lineEnd")?;
+                // An unbounded range is how a read becomes "ship the
+                // repository": the span is part of the contract.
+                if !(start >= 1 && end >= start && end - start < 2000) {
+                    return Err("workspace.malformedLineRange".into());
+                }
+                let path = read::resolved_readable_path(file, &root, &profile.allowed_file_globs)?;
+                profile
+                    .source_reader_invocation(reference, &["-n", &format!("{start},{end}p"), &path])
+                    .map(ReadAction::SourceRange)
+                    .ok_or_else(reader)
+            }
+            other => Err(format!("{other} is not a workspace read")),
+        }
+    }
+
+    /// Swift `lower(action:context:)` for a read: the inspection by the
+    /// inspector a host configured; any other read by the executable its
+    /// profile pinned, in that profile's root.
+    pub(crate) fn lower_read(&self, action: &ReadAction) -> Result<ReadLowering, String> {
+        let invocation = match action {
+            ReadAction::InspectSource(inspection) => {
+                let inspector = self
+                    .inspector
+                    .as_ref()
+                    .ok_or("no_workspace_inspector_configured")?;
+                return Ok(ReadLowering::inspection(inspection, inspector));
+            }
+            ReadAction::GitStatus(invocation)
+            | ReadAction::Diff(invocation)
+            | ReadAction::SourceRange(invocation) => invocation,
+        };
+        let profile = self
+            .registry
+            .profile(&invocation.project_ref)
+            .ok_or_else(|| {
+                format!(
+                    "workspace.projectProfileUnavailable:{}",
+                    invocation.project_ref
+                )
+            })?;
+        if !profile.owns_executable(&invocation.executable_path, &invocation.executable_sha256) {
+            return Err("workspace provider received a foreign action or executable".into());
+        }
+        Ok(ReadLowering::invocation(invocation))
+    }
+
+    /// Swift `WorkspaceActionExecutableResolver`'s verified resources for one
+    /// pinned executable: what its dispatch holds open while the child runs.
+    pub(crate) fn resources_for(&self, path: &str, sha256: &str) -> Vec<VerifiedResource> {
+        self.resources
+            .get(&(path.to_owned(), sha256.to_owned()))
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn attempt_store(&self) -> Result<&AttemptStore, String> {

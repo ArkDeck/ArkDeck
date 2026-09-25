@@ -26,6 +26,12 @@
 //! resident, as Swift's engine keeps it in memory, while the record file
 //! keeps its last durable state.
 //!
+//! A read-only workspace Job (`workspace.inspect-source@1`,
+//! `workspace.read-source-range@1`, `workspace.inspect-git-status@1`,
+//! `workspace.inspect-diff@1`) writes nothing: its persisted typed action is
+//! materialized and, as Swift's provider answers, confirmed not executed; the
+//! Job fails with `executionConfirmedNotPerformed` and is never run again.
+//!
 //! A workspace patch Job (`workspace.apply-patch@1`, `workspace.revert-patch@1`)
 //! is reconciled as Swift's engine reconciles it: its patch lease resolved
 //! again and its persisted typed action materialized, then — the workspace
@@ -76,6 +82,10 @@ mod device;
 /// The analyzer operations this Runtime runs, which it also reconciles.
 fn analyzer(operation: &str) -> bool {
     crate::analyzer_composition::EXECUTED.contains(&operation)
+}
+/// The read-only workspace operations, which write nothing.
+fn workspace_read(operation: &str) -> bool {
+    crate::workspace_read::READS.contains(&operation)
 }
 const HAP: &str = "debug.hap@1";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
@@ -449,6 +459,7 @@ pub struct JobReconciler<'a> {
 /// HAP, whose own lineage repair is not ported.
 fn reconciled(operation: &str, state: &str) -> bool {
     analyzer(operation)
+        || workspace_read(operation)
         || operation == SIGN
         || WORKSPACE_MUTATIONS.contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
@@ -483,7 +494,10 @@ impl JobReconciler<'_> {
         let operation = record.operation();
         let hap_finalizing =
             operation == HAP && record.state == "finalizing" && !record.outcome_unknown();
-        if analyzer(operation) || (!record.outcome_unknown() && !hap_finalizing) {
+        if analyzer(operation)
+            || workspace_read(operation)
+            || (!record.outcome_unknown() && !hap_finalizing)
+        {
             return Ok(None);
         }
         let refusal = |what: String| {
@@ -947,6 +961,17 @@ impl JobReconciler<'_> {
             }
             exact(&events)?;
             let decision = durable.unwrap_or_else(|| Decision::Unknown(NO_READBACK.into()));
+            return self.finish(held, &events, &intent, &step, &attempt, decision, None);
+        }
+        if workspace_read(&operation) {
+            // A read writes nothing, so there is no external effect for the
+            // reconcile to confirm: Swift's provider confirms it not executed,
+            // and it is never run again.
+            self.resolve_source(&held.run.record)?;
+            crate::workspace_read::ReadAction::materialize(&action)
+                .map_err(|detail| unsupported(&detail))?;
+            exact(&events)?;
+            let decision = durable.unwrap_or(Decision::NotExecuted);
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
         if descriptor.binding() == "none" {

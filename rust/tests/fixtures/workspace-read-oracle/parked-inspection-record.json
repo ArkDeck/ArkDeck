@@ -1,0 +1,93 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "inspectWorkspaceSource"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-259063835a5f42fef442a5eabe02582d",
+  "materializedPlanDigest" : "2ae014a56203eaadb43f48f99f223f1eb2d37f07e536661f75f266a4434cad1e",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.inspect-source@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-inspect-lost",
+    "inputs" : {
+      "fileScope" : "*.ets",
+      "projectRef" : "ReadOracleProject",
+      "symbol" : "Entry"
+    },
+    "operation" : {
+      "id" : "workspace.inspect-source",
+      "version" : 1
+    },
+    "requestId" : "request-inspect-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "fileScope" : "*.ets",
+      "projectRef" : "ReadOracleProject",
+      "symbol" : "Entry"
+    },
+    "kind" : "workspace.inspectSource"
+  },
+  "recoveryIntentEventID" : "intent-inspect-workspace-source",
+  "recoveryStepID" : "inspect-workspace-source",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-inspect-lost",
+    "inputs" : {
+      "fileScope" : "*.ets",
+      "projectRef" : "ReadOracleProject",
+      "symbol" : "Entry"
+    },
+    "operation" : {
+      "id" : "workspace.inspect-source",
+      "version" : 1
+    },
+    "requestId" : "request-inspect-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent inspect-workspace-source",
+    "outcomeUnknown inspect-workspace-source; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

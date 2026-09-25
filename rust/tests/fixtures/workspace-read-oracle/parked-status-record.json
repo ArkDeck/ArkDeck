@@ -1,0 +1,87 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "inspectWorkspaceGitStatus"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-4defcbee918448ae57d28f977ae5fddc",
+  "materializedPlanDigest" : "8b9ec65c8eb2e5580f1c2446e9c26eb9606976867681909a8c966b66006d51b4",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.inspect-git-status@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-status-lost",
+    "inputs" : {
+      "projectRef" : "ReadOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.inspect-git-status",
+      "version" : 1
+    },
+    "requestId" : "request-status-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJpbnNwZWN0R2l0U3RhdHVzIjp7Il8wIjp7ImFyZ3VtZW50cyI6WyItQyIsIi90bXAvYXJrZGVjay13b3Jrc3BhY2UtcmVhZC1vcmFjbGUvc291cmNlIiwic3RhdHVzIiwiLS1wb3JjZWxhaW49djEiLCItLXVudHJhY2tlZC1maWxlcz1hbGwiLCItLSIsIi4iXSwiZXhlY3V0YWJsZSI6eyJwYXRoIjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS1yZWFkLW9yYWNsZS90b29scy9naXQiLCJzaGEyNTYiOiI0NmI2ZDY1MmYzODMzNWE1Zjc4ZWEyYjg0MjhlNGY4ZWQ4MzQ0MDcxYjhmMzNjMGYxNGZiNjQzMTc3OWFhODMyIn0sIm9wZXJhdGlvbiI6IndvcmtzcGFjZS5pbnNwZWN0LWdpdC1zdGF0dXNAMSIsInByZXNldElEIjoiZ2l0IiwicHJvamVjdFJlZiI6IlJlYWRPcmFjbGVQcm9qZWN0IiwicHJvamVjdFJvb3QiOiIvdG1wL2Fya2RlY2std29ya3NwYWNlLXJlYWQtb3JhY2xlL3NvdXJjZSIsInRpbWVvdXRTZWNvbmRzIjozMH19fQ=="
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-inspect-git-status",
+  "recoveryStepID" : "inspect-git-status",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-status-lost",
+    "inputs" : {
+      "projectRef" : "ReadOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.inspect-git-status",
+      "version" : 1
+    },
+    "requestId" : "request-status-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent inspect-git-status",
+    "outcomeUnknown inspect-git-status; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

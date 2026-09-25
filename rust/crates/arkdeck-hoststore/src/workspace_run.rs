@@ -38,6 +38,7 @@ use crate::workspace_build::{BUILD, BuildAction, BuildVerdict, Landed};
 use crate::workspace_composition::{LeasedInput, PatchVerdict, WorkspaceComposition};
 use crate::workspace_isolation::{Inspection, IsolationIntent, IsolationResult};
 use crate::workspace_patch::{PatchAction, ToolFailure, ToolInvocation, ToolReceipt};
+use crate::workspace_read::{ReadVerdict, read_step};
 use std::collections::BTreeMap;
 
 pub(crate) const WORKSPACE_OPERATION: &str = "workspace.prepare-isolated-copy@1";
@@ -58,6 +59,7 @@ pub(crate) fn runs(operation: &str) -> bool {
         crate::workspace_composition::SIGN,
     ]
     .contains(&operation)
+        || crate::workspace_read::READS.contains(&operation)
 }
 
 /// One patch step's catalog identity and its product.
@@ -611,7 +613,7 @@ impl JobRunner<'_> {
                 arguments: &invocation.arguments,
                 environment: &[],
                 resources: &[],
-                working_directory: &invocation.project_root,
+                working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
             }),
             None => Err(ToolFailure::Failed(
@@ -826,7 +828,7 @@ impl JobRunner<'_> {
                 arguments: &invocation.arguments,
                 environment: &lowering.environment,
                 resources: &lowering.resources,
-                working_directory: &invocation.project_root,
+                working_directory: Some(&invocation.project_root),
                 timeout_seconds: invocation.timeout_seconds,
             }),
             None => Err(ToolFailure::Failed(
@@ -1285,5 +1287,209 @@ impl JobRunner<'_> {
             .map_err(|_| "artifact envelope could not be encoded".to_owned())
             .and_then(|contents| self.workspace_publisher().publish(&report, &contents));
         self.settle_publication(run, &report, published)
+    }
+}
+
+impl JobRunner<'_> {
+    /// Swift `runOwned` through `dispatchWithWAL` for a read's one host-only
+    /// step: the typed action materialized again and lowered, persisted
+    /// before its write-ahead intent, and only then the pinned tool — the
+    /// configured inspector, or the profile's reader or source-control tool;
+    /// its receipt judged as the provider judges it, the correlated outcome,
+    /// then the product (the tool's own output) published after it.
+    ///
+    /// Swift runs a workspace step in its safe-boundary cancellation mode
+    /// whatever the catalog declares, so a request that arrives while the
+    /// child runs is honoured at the boundary after it. A child whose outcome
+    /// cannot be observed parks the Job; a read writes nothing, so its
+    /// reconcile confirms it not executed and it is never run again.
+    pub(super) fn execute_workspace_read(
+        &self,
+        run: &mut Run,
+        workspace: &WorkspaceComposition,
+    ) -> Result<(), RunRefusal> {
+        let operation = run.record.operation().to_owned();
+        let Some(declared) = read_step(&operation) else {
+            return Err(uncertain());
+        };
+        let started = run.clock()?;
+        run.record.start(&started);
+        run.transition("preflight", "running", "steps-start")?;
+        // Swift's safe boundary before the step.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.drain(run);
+        }
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        // A provider refusal before any intent fails the Job: the profile or
+        // its tool changed since admission.
+        let action = match workspace.read_action(&operation, &inputs) {
+            Ok(action) => action,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        let lowering = match workspace.lower_read(&action) {
+            Ok(lowering) => lowering,
+            Err(detail) => return self.fail(run, &detail),
+        };
+        // Swift `dispatchWithWAL`'s last boundary before an intent.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, None);
+        }
+        let target = run.record.request["target"]["targetId"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let step = json!({
+            "id": declared.step, "kind": declared.kind, "effect": "hostOnly",
+            "bindingRequirement": "none", "cancellation": "immediate",
+            "compensationDescriptors": [], "arguments": action.journal_arguments(&inputs),
+        });
+        let intent_id = format!("intent-{}", declared.step);
+        let event = events::step_intent(
+            &run.envelope(intent_id.clone())?,
+            &step,
+            &Target {
+                scope: "host".into(),
+                target_id: target.clone(),
+                connect_key: None,
+                identity_snapshot_hash: None,
+            },
+            1,
+            None,
+        )
+        .map_err(|_| uncertain())?;
+        // The exact typed action is durable before its intent can be.
+        let persisted = action.persisted().map_err(|_| uncertain())?;
+        run.record
+            .set_recovery(Some(declared.step), Some(&intent_id), Some(persisted));
+        run.persist(self.jobs)?;
+        if run.append(event).is_err() {
+            run.record.set_recovery(None, None, None);
+            let _ = run.persist(self.jobs);
+            return Err(uncertain());
+        }
+        run.record
+            .timeline
+            .push(format!("intent {}", declared.step));
+        run.record.add_step_kind(declared.kind);
+        // Only now may the tool start.
+        let resources =
+            workspace.resources_for(&lowering.executable_path, &lowering.executable_sha256);
+        let opened = (self.precise_now)();
+        let dispatched = match opened {
+            Some(_) => workspace.tool.dispatch(&ToolInvocation {
+                executable_path: &lowering.executable_path,
+                executable_sha256: &lowering.executable_sha256,
+                argument_zero: lowering.argument_zero.as_deref(),
+                arguments: &lowering.arguments,
+                environment: &[],
+                resources: &resources,
+                working_directory: lowering.working_directory.as_deref(),
+                timeout_seconds: lowering.timeout_seconds,
+            }),
+            None => Err(ToolFailure::Failed(
+                "dispatch refused: the Runtime clock is unavailable".into(),
+            )),
+        };
+        let window = opened.zip((self.precise_now)());
+        let receipt = match dispatched {
+            Ok(receipt) => receipt,
+            Err(ToolFailure::OutcomeUnknown(reason)) => {
+                // The intent stays outstanding: no outcome is invented, and
+                // the read is never started again.
+                run.record.timeline.push(format!(
+                    "outcomeUnknown {}; durable intent left outstanding",
+                    declared.step
+                ));
+                return self.park(run, &reason);
+            }
+            Err(ToolFailure::Failed(reason)) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "failed", None, &at)?;
+                run.record
+                    .timeline
+                    .push(format!("failed {}", declared.step));
+                run.record.set_recovery(None, None, None);
+                return self.fail(run, &reason);
+            }
+        };
+        match action.verify(&receipt) {
+            ReadVerdict::Verified(summary) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "succeeded", None, &at)?;
+                run.record.timeline.push(format!(
+                    "verified {} {}",
+                    declared.step,
+                    swift_keys(&summary)
+                ));
+                run.record.set_recovery(None, None, None);
+                // The read itself is the product, not a summary of it.
+                if let Err(reason) = self.publish_read(
+                    run,
+                    declared.step,
+                    declared.product,
+                    &target,
+                    &receipt,
+                    window,
+                ) {
+                    return self.close(run, &reason);
+                }
+                if self.cancellation.is_some_and(RunCancellation::pending) {
+                    self.carry(run)?;
+                    return self.drain(run);
+                }
+                run.transition("running", "finalizing", "steps-complete")?;
+                run.record.set_operation_failure(None);
+                run.transition("finalizing", "succeeded", "finalized")?;
+                run.finish()?;
+                run.persist(self.jobs)
+            }
+            ReadVerdict::Failed(code, detail) => {
+                let at = run.clock()?;
+                run.step_outcome_at(declared.step, &intent_id, "failed", None, &at)?;
+                run.record.set_recovery(None, None, None);
+                run.record
+                    .timeline
+                    .push(format!("failed {}: {code}: {detail}", declared.step));
+                self.fail(run, &format!("{code}: {detail}"))
+            }
+        }
+    }
+
+    /// Swift `publishDeclaredArtifacts` for a read: the child's standard
+    /// output, exactly, under the product the catalog declares.
+    fn publish_read(
+        &self,
+        run: &mut Run,
+        step: &'static str,
+        name: &'static str,
+        target: &str,
+        receipt: &ToolReceipt,
+        window: Option<(String, String)>,
+    ) -> Result<(), String> {
+        let job_id = run.record.job_id.clone();
+        let session_id = format!("session-{job_id}");
+        let operation = run.record.operation().to_owned();
+        let product = Product {
+            job_id: &job_id,
+            session_id: &session_id,
+            step_id: step,
+            name,
+            media_type: "text/plain",
+            privacy: "standard",
+            retention_class: "default",
+            source_operation: &operation,
+            provider_id: "workspace",
+            binding: Self::workspace_binding(run, target),
+            observation_window: window,
+        };
+        let published = self
+            .workspace_publisher()
+            .publish(&product, &receipt.stdout);
+        self.settle_publication(run, &product, published)
     }
 }

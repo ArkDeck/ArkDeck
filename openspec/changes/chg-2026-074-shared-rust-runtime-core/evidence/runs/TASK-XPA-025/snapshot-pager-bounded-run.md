@@ -341,4 +341,11 @@ Not run:
 
 ## 7. CI
 
-Pending.
+PR #2185, merged as `e59e5a412`: at `a0a0d2892` Agent PR 36129933234
+(`open-pr`), SDD Guard 36129933215 (`guard`, `ds-tokens`) and Swift CI
+36129933371 all succeeded — `plan`, the Rust host-independent checks (42 s),
+the Rust workspace on macos-26 (9 min 31 s), ubuntu-latest (2 min 40 s) and
+windows-latest (4 min 21 s), and the `swift` aggregate; `swift-tests`,
+`ds-interactions` and `app-build` were skipped by the plan. The hosted soak
+the coordinating session dispatched (§5.5; Performance lanes run
+36130214960, `soak-hours=4`) was still in progress when this was written.

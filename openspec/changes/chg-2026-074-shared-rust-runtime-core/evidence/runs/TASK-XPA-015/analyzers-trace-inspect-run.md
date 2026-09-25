@@ -1324,4 +1324,43 @@ enum widened and `spec/baselines/**` regenerated.
 
 ### CI
 
-Pending (this PR).
+PR #2176, merged as `33d30079e`: Agent PR 36103816949 (`open-pr`), SDD Guard
+36103816908 (`guard`, `ds-tokens`) and Swift CI 36103817289 (`plan` and the
+`swift` aggregate; the Rust lanes, `swift-tests`, `ds-interactions` and
+`app-build` skipped by the plan for a change to documents alone) all
+succeeded at `2f2640c11`.
+
+## 10. The ruling on §9: 枢纽受维护者委托裁定（2026-09-25）
+
+The hub ruled on §9 as the maintainer delegated to it. The ruling as it was
+given, then in English; the conclusions are recorded as ruled.
+
+> 1. G5 内采用选项 (c)：Rust 维持 operationUnavailable，作为声明差异，不是 G5 阻塞项。依据是
+>    #2176 的实测：在本机，Swift 从 main 构建出的 daemon 同样答不出任何 Trace，因为配方 pin
+>    对不上，且凡是带 message 的质量 issue 一律被拒；App 不调用这个方法；所以实际没有退化。
+> 2. 「message 拒绝」定为 ArkTrace 侧的缺陷，不作为 ArkDeck 的契约移植。照契约移植的话，Rust
+>    会拒绝所有真实 Trace，这个方法就失去意义；ArkTrace 的 CLI 机器契约在这个边界上本来就丢弃
+>    message。
+> 3. 选项 (b) 挪到 G5 之后作为跟进项。前提是两件事都做完：ArkTrace 在边界处丢弃 message，并发布
+>    由 ArkDeck 链接的那个 revision 构建、签名、公证的 reviewed 分发。届时按 §9 的「下一刀」来做，
+>    包括 resourceNotFound 的录帧和 schema 加宽。
+> 4. 选项 (a)，也就是在 ArkDeck 内重新实现 ArkTrace 的解析，被否决：会造成第二份实现，还会和
+>    ArkTrace 漂移。
+
+1. Within G5, option (c): the Rust daemon keeps answering
+   `operationUnavailable`, recorded as a declared difference and not a G5
+   blocker. The ground is #2176's measurement: on this host a Swift daemon
+   built from `main` answers no Trace either, because the recipe pin does not
+   match and every data-quality issue that carries a message is refused; the
+   App does not call this method; so nothing actually regresses.
+2. The refusal of issues that carry a message is an ArkTrace defect, not an
+   ArkDeck contract to port. Ported as the contract, the Rust daemon would
+   refuse every real Trace and the method would lose its point; ArkTrace's
+   CLI machine contract already drops the message at that boundary.
+3. Option (b) moves after G5, as a follow-up, once both are done: ArkTrace
+   drops the message at the boundary, and a reviewed distribution built,
+   signed and notarized from the revision ArkDeck links is published. It is
+   then done as §9's "For the slice after those decisions" says, the
+   `resourceNotFound` frames and the schema widening included.
+4. Option (a), reimplementing ArkTrace's parsing inside ArkDeck, is rejected:
+   it would be a second implementation, and it would drift from ArkTrace.

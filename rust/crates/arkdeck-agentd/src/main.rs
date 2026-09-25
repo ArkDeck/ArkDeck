@@ -387,7 +387,12 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             )
             // Swift composes the registered projects over its state directory,
             // whose `evolution-workspaces` holds the Runtime-owned copies.
-            .with_workspace_operations(&root, &bootstrap, None)?
+            .with_workspace_operations(
+                &root,
+                &bootstrap,
+                None,
+                std::env::var_os("ARKDECK_WORKSPACE_INSPECTOR").as_deref(),
+            )?
             .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
             .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
             .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
