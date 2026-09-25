@@ -7,6 +7,13 @@ pub(crate) fn configure(
     fields: &Map<String, Value>,
     help: bool,
 ) -> Result<(), CliError> {
+    // Swift's `trace probe` handler sends its `--target` as given.
+    if command == "trace.probe" && !help && !fields.contains_key("targetId") {
+        return Err(CliError::new(
+            "invalidOption",
+            "trace probe requires --target <id>",
+        ));
+    }
     if command == "debug.probe" && !help {
         let target = fields
             .get("targetId")

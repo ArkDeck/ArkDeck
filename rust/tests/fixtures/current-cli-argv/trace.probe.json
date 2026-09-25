@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.probe",
+        "handlerArguments": [
+          "trace",
+          "probe",
+          "--target",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--help"
+      ],
+      "expected": {
+        "command": "trace.probe",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--target",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.probe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--target",
+        "sample",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.probe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.probe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--target",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "trace.probe",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "trace",
+        "probe",
+        "--target",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "trace.probe",
+        "handlerArguments": [
+          "trace",
+          "probe",
+          "--target",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "trace.probe",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "trace",
+    "probe"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
