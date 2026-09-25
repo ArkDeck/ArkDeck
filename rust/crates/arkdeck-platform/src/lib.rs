@@ -168,10 +168,10 @@ mod host_store;
 pub use host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
     HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
-    HostExportCapacity, HostImportSource, HostJournal, HostJournalAppender, HostReadLock,
-    HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure,
-    PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval, UploadChunkCheckpoint,
-    UploadWritePoint,
+    HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal, HostJournalAppender,
+    HostReadLock, HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint,
+    OwnerOnlyReadFailure, PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval,
+    UploadChunkCheckpoint, UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]

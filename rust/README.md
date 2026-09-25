@@ -716,6 +716,15 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   Swift, in when the files appear and in nothing else (r11 §3, incidental
   side-effect files); the crash-window replay, whose Jobs never publish a
   Session, is where it shows.
+- **The retained Sessions.** The proof replays each retained Session's Journal
+  and decodes its Manifest, where Swift's looks only at the Session root's
+  direct children. A Session the last complete proof let pass is not read again
+  while its files are the ones it read: the same device, inode and size, and the
+  same modification and change times to the nanosecond, each more than 2 s
+  before the proof (`SessionVerdicts`, in memory only; a refusal is never kept).
+  Over a thousand retained Sessions each holding a 9-record Swift pointer oracle
+  Journal, a proof that reads them all took 356 ms and one that reuses them
+  36 ms (debug build).
 - **Not served.** A descriptor without `defaultPolicyIssuance` counts as enabled,
   as Swift's generated catalog reads it. Destructive effects, the
   `runtimeCapability` policy and workspace subjects are still refused.
