@@ -1,6 +1,9 @@
 //! `job submit`: the request it sends, the identity note, the acceptance it
 //! accepts and the mutation-capable error mapping.
-use arkdeck_cli::{CliError, generates_identity, job_submit_params, parse, validate_acceptance};
+use arkdeck_cli::{
+    CliError, announces_generated_identity, generates_identity, job_submit_params, parse,
+    validate_acceptance,
+};
 use arkdeck_client::ClientError;
 use arkdeck_contract::WireError;
 use serde_json::{Value, json};
@@ -44,6 +47,23 @@ fn submit_builds_the_same_request_as_plan_and_names_itself() {
     ]))
     .unwrap();
     assert!(generates_identity(&generated));
+    // Swift says so once, to stderr, in the human rendering only.
+    assert!(announces_generated_identity(&generated));
+    for mode in [&["--output", "json"][..], &["--json"][..]] {
+        let mut argv = vec![
+            "job",
+            "submit",
+            "--target",
+            "TGT-A",
+            "--operation",
+            "analyzer.extract-crash-signature@1",
+        ];
+        argv.extend(mode);
+        let machine = parse(&args(&argv)).unwrap();
+        assert!(generates_identity(&machine), "{mode:?}");
+        assert!(!announces_generated_identity(&machine), "{mode:?}");
+    }
+    assert!(!announces_generated_identity(&invocation));
     assert_eq!(
         job_submit_params(&parse(&args(&["job", "submit"])).unwrap())
             .unwrap_err()

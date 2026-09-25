@@ -1,0 +1,7 @@
+{
+  "owners" : [
+    "CLIRuntimeSession.legacyDocument",
+    "CLIResultEnvelope.legacyFailure"
+  ],
+  "producer" : "CLILegacyJSONOracleContractTests"
+}

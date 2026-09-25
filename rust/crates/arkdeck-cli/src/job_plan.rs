@@ -253,6 +253,12 @@ pub fn generates_identity(invocation: &Invocation) -> bool {
     })
 }
 
+/// Whether a submit says it generated its identity: once, to stderr, and in
+/// the human rendering only, as Swift reports it.
+pub fn announces_generated_identity(invocation: &Invocation) -> bool {
+    !invocation.json && !invocation.legacy_json && generates_identity(invocation)
+}
+
 /// Swift `CLIJobLifecycleValidation.validateAcceptance`: an idempotent
 /// acceptance that dispatched nothing.
 pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {

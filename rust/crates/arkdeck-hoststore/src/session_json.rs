@@ -187,52 +187,7 @@ fn decimal_integer(text: &str) -> Option<Value> {
 }
 
 pub(super) fn float_text(number: &Number) -> Result<String> {
-    // serde's audited shortest-roundtrip digit generator is reused; only the
-    // Foundation presentation (fixed/scientific boundary and exponent sign/
-    // minimum width) differs. No CLI integer limit is applied.
-    let raw = number.to_string();
-    let negative = raw.starts_with('-');
-    let raw = raw.strip_prefix('-').unwrap_or(&raw);
-    let (coefficient, exponent) = raw.split_once(['e', 'E']).unwrap_or((raw, "0"));
-    let exp: i32 = exponent.parse().map_err(|_| DecodeError::Shape)?;
-    let decimal = coefficient.find('.').unwrap_or(coefficient.len());
-    let mut digits = coefficient.replace('.', "");
-    let leading = digits.bytes().take_while(|b| *b == b'0').count();
-    let power = exp + decimal as i32 - leading as i32 - 1;
-    digits.drain(..leading);
-    while digits.ends_with('0') {
-        digits.pop();
-    }
-    if digits.is_empty() {
-        return Ok(if negative { "-0" } else { "0" }.into());
-    }
-    let sign = if negative { "-" } else { "" };
-    if !(-4..16).contains(&power) {
-        let tail = if digits.len() > 1 {
-            format!(".{}", &digits[1..])
-        } else {
-            String::new()
-        };
-        return Ok(format!(
-            "{sign}{}{tail}e{}{:02}",
-            &digits[..1],
-            if power < 0 { "-" } else { "+" },
-            power.unsigned_abs()
-        ));
-    }
-    let point = power + 1;
-    let value = if point <= 0 {
-        format!("0.{}{digits}", "0".repeat((-point) as usize))
-    } else if point as usize >= digits.len() {
-        format!("{digits}{}", "0".repeat(point as usize - digits.len()))
-    } else {
-        format!(
-            "{}.{}",
-            &digits[..point as usize],
-            &digits[point as usize..]
-        )
-    };
-    Ok(format!("{sign}{value}"))
+    arkdeck_contract::foundation_json::float_text(number).map_err(|_| DecodeError::Shape)
 }
 
 pub(super) fn encode(value: &Value) -> Result<Vec<u8>> {
@@ -289,71 +244,7 @@ pub(super) fn encode_canonical_pretty(value: &Value) -> Result<Vec<u8>> {
 
 #[cfg(target_os = "macos")]
 fn pretty(value: &Value, escape_solidus: bool) -> Result<Vec<u8>> {
-    fn string(text: &str, escape_solidus: bool, output: &mut Vec<u8>) -> Result<()> {
-        // serde escapes Foundation's set (quote, backslash, C0 controls with
-        // the short forms and lowercase \u00xx) except the solidus.
-        for byte in serde_json::to_vec(text).map_err(|_| DecodeError::Shape)? {
-            if byte == b'/' && escape_solidus {
-                output.push(b'\\');
-            }
-            output.push(byte);
-        }
-        Ok(())
-    }
-    fn line(output: &mut Vec<u8>, depth: usize) {
-        output.push(b'\n');
-        output.resize(output.len() + 2 * depth, b' ');
-    }
-    fn write(
-        value: &Value,
-        depth: usize,
-        escape_solidus: bool,
-        output: &mut Vec<u8>,
-    ) -> Result<()> {
-        match value {
-            Value::Array(values) => {
-                output.push(b'[');
-                for (index, value) in values.iter().enumerate() {
-                    if index > 0 {
-                        output.push(b',');
-                    }
-                    line(output, depth + 1);
-                    write(value, depth + 1, escape_solidus, output)?;
-                }
-                if values.is_empty() {
-                    output.push(b'\n');
-                }
-                line(output, depth);
-                output.push(b']');
-            }
-            Value::Object(fields) => {
-                let mut keys: Vec<&String> = fields.keys().collect();
-                keys.sort_unstable();
-                output.push(b'{');
-                for (index, key) in keys.iter().enumerate() {
-                    if index > 0 {
-                        output.push(b',');
-                    }
-                    line(output, depth + 1);
-                    string(key, escape_solidus, output)?;
-                    output.extend_from_slice(b" : ");
-                    write(&fields[key.as_str()], depth + 1, escape_solidus, output)?;
-                }
-                if fields.is_empty() {
-                    output.push(b'\n');
-                }
-                line(output, depth);
-                output.push(b'}');
-            }
-            Value::String(text) => string(text, escape_solidus, output)?,
-            Value::Number(n) if !n.is_i64() && !n.is_u64() => output.extend(float_text(n)?.bytes()),
-            _ => output.extend(serde_json::to_vec(value).map_err(|_| DecodeError::Shape)?),
-        }
-        Ok(())
-    }
-    let mut bytes = Vec::new();
-    write(value, 0, escape_solidus, &mut bytes)?;
-    Ok(bytes)
+    arkdeck_contract::foundation_json::pretty(value, escape_solidus).map_err(|_| DecodeError::Shape)
 }
 
 /// Foundation `JSONValue` decoding of a caller's document, without requiring

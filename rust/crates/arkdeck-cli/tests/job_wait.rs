@@ -281,6 +281,35 @@ mod runtime {
         assert_eq!(envelope["result"], settled);
     }
 
+    #[test]
+    fn the_legacy_json_stream_prints_only_the_settled_status_document() {
+        // Swift prints the rows in the human rendering only; the legacy `--json`
+        // rendering is the settled status's one document.
+        let settled = status("succeeded", "observe.device@1");
+        let (output, _) = support::run(
+            &["job", "wait", "--job", JOB, "--page-size", "5", "--json"],
+            vec![
+                (
+                    "job.events".to_owned(),
+                    json!({"jobId": JOB, "pageSize": 5}),
+                    events(vec![row(1, 1, "e1")], 1, None).2,
+                ),
+                read(&settled),
+                (
+                    "job.events".to_owned(),
+                    json!({"jobId": JOB, "pageSize": 5, "afterCursor": "cursor-page"}),
+                    events(vec![], 1, None).2,
+                ),
+            ],
+        );
+        assert_eq!(output.status.code(), Some(0));
+        assert_eq!(
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&arkdeck_cli::legacy_document(&settled))
+        );
+        assert!(output.stderr.is_empty());
+    }
+
     fn refused(argv: &[&str]) -> (Option<i32>, Value) {
         let output = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"))
             .args(argv)

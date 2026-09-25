@@ -219,6 +219,18 @@ pub(crate) fn lifecycle(command: &str) -> Option<(String, Option<String>)> {
     })
 }
 
+/// Whether the registry declares `option` for the leaf `command`.
+pub(crate) fn declares(command: &str, option: &str) -> bool {
+    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    registry["commands"]
+        .as_array()
+        .expect("the registry's commands")
+        .iter()
+        .find(|entry| entry["command"] == command)
+        .and_then(|entry| entry["options"].as_array())
+        .is_some_and(|options| options.iter().any(|entry| entry["name"] == option))
+}
+
 /// The output modes one leaf publishes, as the registry declares them. A leaf
 /// the registry does not name takes the two every Runtime leaf takes.
 pub fn output_modes(command: &str) -> Vec<String> {
