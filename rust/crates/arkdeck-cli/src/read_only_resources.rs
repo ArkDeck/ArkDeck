@@ -324,7 +324,7 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
     }
     let id = params["jobId"].as_str().ok_or_else(invalid)?;
     if invocation.command == "job.show" {
-        return crate::job_resources::validate_show(id, v);
+        return crate::job_resources::validate_show(v, id);
     }
     if invocation.command == "job.evidence" {
         return validate_evidence(id, v);
@@ -335,96 +335,10 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
     validate_job_status(id, v)
 }
 
+/// Swift `CLIJobReadValidation` for a Job status of this identity
+/// (`job_resources::validate_status`).
 pub(super) fn validate_job_status(id: &str, v: &Value) -> Result<(), CliError> {
-    // The enclosing method's generated schema has already checked the wire
-    // types. Nested list/show records use their own recorded schema rather
-    // than borrowing the standalone status method's sample-derived branches.
-    if !keys(
-        v,
-        &[
-            "schemaVersion",
-            "jobId",
-            "operation",
-            "targetId",
-            "state",
-            "outcome",
-            "waitingForHuman",
-            "outcomeUnknown",
-            "outstandingResidueCount",
-            "executionMode",
-            "sessionId",
-            "threadId",
-            "workspaceKind",
-            "actualEffect",
-            "createdAtUtc",
-            "startedAtUtc",
-            "finishedAtUtc",
-            "supersededByRecoveryEpochId",
-            "recoveryEpochId",
-            "resolvedByTargetAliasResolutionId",
-            "sessionPublication",
-            "nextAction",
-            "failure",
-            "processProgress",
-        ],
-    ) {
-        return Err(invalid());
-    }
-    let state = v["state"].as_str().ok_or_else(invalid)?;
-    let terminal = terminal_job_state(state);
-    let unknown = v["outcomeUnknown"].as_bool().ok_or_else(invalid)?;
-    let human = v["waitingForHuman"].as_bool().ok_or_else(invalid)?;
-    if !known_job_state(state)
-        || v["schemaVersion"] != "arkdeck.job-status/1"
-        || v["jobId"] != id
-        || !identifier(id)
-        || v["outcome"] != if unknown { "outcomeUnknown" } else { state }
-        || !date(&v["createdAtUtc"])
-        || !publication(&v["sessionPublication"])
-    {
-        return Err(invalid());
-    }
-    let next = &v["nextAction"];
-    if next["owner"] != json!({"kind":"job","id":id}) {
-        return Err(invalid());
-    }
-    let base = ["kind", "owner", "resource", "reasonCode"];
-    let uncertain = unknown || ["waitingForRecovery", "reconciling"].contains(&state);
-    let finalizing = !uncertain
-        && state == "finalizing"
-        && v["operation"] == "debug.hap@1"
-        && typed_failure(&v["failure"])
-        && v["failure"]["code"] != "outcomeUnknown";
-    let (kind, reason) = if uncertain {
-        ("reconcile", "recovery.outcomeUnknown")
-    } else if finalizing {
-        ("reconcile", "job.finalizationPending")
-    } else if terminal {
-        ("readResult", "job.resultAvailable")
-    } else {
-        ("wait", "job.running")
-    };
-    if human
-        || next["resource"] != next["owner"]
-        || next["kind"] != kind
-        || next["reasonCode"] != reason
-        || !keys(
-            next,
-            if kind == "wait" {
-                &["kind", "owner", "resource", "reasonCode", "retryAfter"]
-            } else {
-                &base
-            },
-        )
-        || (kind == "wait"
-            && !next["retryAfter"]
-                .as_str()
-                .is_some_and(|s| duration(s).is_some()))
-    {
-        return Err(invalid());
-    }
-    // Query success preserves attention facts; it is not execution success.
-    Ok(())
+    crate::job_resources::validate_status(v, Some(id)).map(|_| ())
 }
 
 pub(super) fn terminal_job_state(state: &str) -> bool {

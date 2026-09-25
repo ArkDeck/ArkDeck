@@ -194,9 +194,14 @@ pub fn proved_row(
             "the observation has an invalid adopted-target link",
         ));
     }
+    // Swift `CLIDeviceWait` also compares the name with its precomposed form,
+    // but with String `==`, which is canonical equivalence, so that never
+    // refuses: a decomposed spelling is kept as published, as the Runtime's
+    // own `valid_host_text` keeps it. What remains is trimmed, 1…256 UTF-8
+    // bytes and free of control characters.
     let named = match &row["displayName"] {
         Value::Null => true,
-        Value::String(name) => canonical_name(name),
+        Value::String(name) => crate::target_resources::display_name(name),
         _ => false,
     };
     if !named {
@@ -205,19 +210,6 @@ pub fn proved_row(
         ));
     }
     Ok((row, generation, observed_at.to_owned()))
-}
-
-/// A candidate display name as the Runtime must publish it: precomposed,
-/// trimmed, 1…256 UTF-8 bytes and free of control characters.
-fn canonical_name(name: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    let precomposed =
-        arkdeck_platform::host_canonical_text(name).is_some_and(|canonical| canonical == name);
-    // The precomposition is the host's own: off macOS this build has no
-    // canonical mapping, and the remaining three checks stand alone.
-    #[cfg(not(target_os = "macos"))]
-    let precomposed = true;
-    precomposed && crate::target_resources::display_name(name)
 }
 
 /// The one document this leaf emits, once the state it waited for is proved.
@@ -392,6 +384,11 @@ mod tests {
                 "{broken}"
             );
         }
+        // A decomposed spelling is canonically equivalent to its precomposed
+        // one, so Swift accepts it, and so does this CLI.
+        let mut decomposed = row();
+        decomposed["displayName"] = json!("Cafe\u{301}");
+        assert!(proved_row(&snapshot(json!([decomposed])), &following(), 1).is_ok());
         // An adopted link is either absent on both sides or exact on both.
         let mut adopted = row();
         adopted["adoptedTargetId"] = json!("target-a");
