@@ -1,0 +1,14 @@
+{
+  "allowedPaths" : [
+    "entry/src/main/ets/entryability/**"
+  ],
+  "workspace" : {
+    "allowedPathsDigest" : "018d6ac9805f1aadf7090fed2a72576608ba00b3e4c6faec2e1e249b274aa6ca",
+    "baseRevision" : "071092cd303c37046a7bf50b9b1afc39a9d71fcf5a31fc67d6682c60dcfeb792",
+    "createdAtUTC" : "2026-09-25T00:00:00Z",
+    "htaskID" : "runtime-job-ee0d2c02ae92c8eae8af9bc9d6728c91",
+    "projectRef" : "evolution-7e16ae38695affb7c69c",
+    "sourceProjectRef" : "CheckpointOracleProject",
+    "workspaceID" : "evo-7e16ae38695affb7c69c34c4"
+  }
+}

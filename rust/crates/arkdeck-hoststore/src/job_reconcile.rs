@@ -32,7 +32,13 @@
 //! materialized and, as Swift's provider answers, confirmed not executed; the
 //! Job fails with `executionConfirmedNotPerformed` and is never run again.
 //!
+//! A workspace sweep (`workspace.sweep-isolated-copies@1`) destroyed what only
+//! its findings can say: its persisted typed intent is materialized and, as
+//! Swift's provider answers, the decision is that the outcome stays unknown;
+//! the Job stays `waitingForRecovery` and a fresh sweep resumes its work.
+//!
 //! A workspace patch Job (`workspace.apply-patch@1`, `workspace.revert-patch@1`)
+//! — or a build or checkpoint —
 //! is reconciled as Swift's engine reconciles it: its patch lease resolved
 //! again and its persisted typed action materialized, then — the workspace
 //! provider having no dedicated readback for a mutation — the decision that
@@ -93,8 +99,15 @@ const APPLY: &str = "workspace.apply-patch@1";
 const REVERT: &str = "workspace.revert-patch@1";
 const BUILD: &str = crate::workspace_build::BUILD;
 const SIGN: &str = crate::workspace_composition::SIGN;
+const CHECKPOINT: &str = crate::workspace_checkpoint::CHECKPOINT;
+const SWEEP: &str = crate::workspace_sweep::SWEEP;
 /// The workspace mutations: none has a dedicated readback.
-const WORKSPACE_MUTATIONS: [&str; 3] = [APPLY, REVERT, BUILD];
+const WORKSPACE_MUTATIONS: [&str; 4] = [APPLY, REVERT, BUILD, CHECKPOINT];
+/// Swift's provider answer for a sweep whose receipt was lost: which trees
+/// it destroyed is readable only from its findings, and an interrupted
+/// teardown resumes safely on the next sweep.
+const SWEEP_UNKNOWN: &str =
+    "sweep outcome is derivable only from its findings; submit a fresh sweep";
 /// Swift's engine answers a workspace mutation's reconcile from its provider's
 /// dedicated readback, which the workspace provider does not have.
 const NO_READBACK: &str = "mutation has no dedicated readback; original not resent";
@@ -460,6 +473,7 @@ pub struct JobReconciler<'a> {
 fn reconciled(operation: &str, state: &str) -> bool {
     analyzer(operation)
         || workspace_read(operation)
+        || operation == SWEEP
         || operation == SIGN
         || WORKSPACE_MUTATIONS.contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
@@ -496,6 +510,7 @@ impl JobReconciler<'_> {
             operation == HAP && record.state == "finalizing" && !record.outcome_unknown();
         if analyzer(operation)
             || workspace_read(operation)
+            || operation == SWEEP
             || (!record.outcome_unknown() && !hap_finalizing)
         {
             return Ok(None);
@@ -954,6 +969,10 @@ impl JobReconciler<'_> {
                 crate::workspace_build::BuildAction::materialize(&action)
                     .map(|_| ())
                     .map_err(|detail| unsupported(&detail))?;
+            } else if operation == CHECKPOINT {
+                crate::workspace_checkpoint::CheckpointAction::materialize(&action)
+                    .map(|_| ())
+                    .map_err(|detail| unsupported(&detail))?;
             } else {
                 crate::workspace_patch::PatchAction::materialize(&action)
                     .map(|_| ())
@@ -972,6 +991,18 @@ impl JobReconciler<'_> {
                 .map_err(|detail| unsupported(&detail))?;
             exact(&events)?;
             let decision = durable.unwrap_or(Decision::NotExecuted);
+            return self.finish(held, &events, &intent, &step, &attempt, decision, None);
+        }
+        if operation == SWEEP {
+            // What a sweep destroyed is derivable only from its findings, so
+            // Swift's provider neither confirms nor denies it: the intent
+            // stays unknown, nothing is read back or resent, and a fresh
+            // sweep resumes whatever this one left.
+            self.resolve_source(&held.run.record)?;
+            crate::workspace_sweep::SweepIntent::materialize(&action)
+                .map_err(|detail| unsupported(&detail))?;
+            exact(&events)?;
+            let decision = durable.unwrap_or_else(|| Decision::Unknown(SWEEP_UNKNOWN.into()));
             return self.finish(held, &events, &intent, &step, &attempt, decision, None);
         }
         if descriptor.binding() == "none" {

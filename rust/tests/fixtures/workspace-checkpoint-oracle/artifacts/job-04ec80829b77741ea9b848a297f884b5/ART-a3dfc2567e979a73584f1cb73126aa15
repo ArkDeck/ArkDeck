@@ -1,0 +1,13 @@
+{
+  "artifact" : "checkpoint.txt",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "checkpointKind" : "gitObject",
+  "checkpointObject" : "f905a8249ae25101ce98dccd49cf0b1dd17478f0",
+  "exitStatus" : "0",
+  "jobId" : "job-04ec80829b77741ea9b848a297f884b5",
+  "operation" : "workspace.create-checkpoint@1",
+  "stderrByteCount" : "0",
+  "stderrSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdoutByteCount" : "41",
+  "stdoutSHA256" : "a7543a5ce5aebdd6334182f4a2d0ac9eebabd290d38cd55e51c946030ffae8c5"
+}

@@ -1,0 +1,18 @@
+{
+  "evo-354bc0bd1cd5874253eb657e" : [
+    "attempts",
+    "teardown.json",
+    "workspace.json"
+  ],
+  "evo-7e16ae38695affb7c69c34c4" : [
+    "attempts",
+    "teardown.json",
+    "workspace.json"
+  ],
+  "evo-stranger" : [
+    "workspace"
+  ],
+  "not-a-copy" : [
+    "workspace"
+  ]
+}

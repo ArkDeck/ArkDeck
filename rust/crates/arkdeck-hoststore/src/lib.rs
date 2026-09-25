@@ -36,6 +36,8 @@ pub use workspace_profile::{
 #[cfg(target_os = "macos")]
 mod workspace_build;
 #[cfg(target_os = "macos")]
+mod workspace_checkpoint;
+#[cfg(target_os = "macos")]
 mod workspace_signing;
 #[cfg(target_os = "macos")]
 pub use workspace_signing::{SigningSetup, credential_pinning, keychain_credential_pinning};
@@ -43,6 +45,8 @@ pub use workspace_signing::{SigningSetup, credential_pinning, keychain_credentia
 mod workspace_read;
 #[cfg(target_os = "macos")]
 mod workspace_support;
+#[cfg(target_os = "macos")]
+mod workspace_sweep;
 #[cfg(target_os = "macos")]
 pub use workspace_read::Inspector as WorkspaceInspector;
 

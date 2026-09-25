@@ -15,6 +15,7 @@
 //! until the Runtime restarts, as Swift refuses it.
 use crate::operation_catalog::CatalogOperation;
 use crate::workspace_build::{BuildAction, BuildVerdict, Landed, Landing};
+use crate::workspace_checkpoint::{self as checkpoint, ArchiveCheckpoint, CheckpointAction};
 use crate::workspace_isolation::{ISOLATION_DIRECTORY, IsolationIntent};
 use crate::workspace_patch::{
     self as patch, ATTEMPTS_DIRECTORY, AttemptStore, FileSnapshot, PatchAction, PatchAttempt,
@@ -86,8 +87,9 @@ pub struct WorkspaceComposition {
     /// `DEVECO_SDK_HOME`).
     environment: BTreeMap<String, Vec<(String, String)>>,
     /// Swift `DeviceMutationLaneCoordinator` for the host target every
-    /// workspace mutation names: a patch Job's steps hold it from its running
-    /// transition to its last step, so one patch never overlaps another.
+    /// workspace mutation names: a patch or checkpoint Job's steps hold it
+    /// from its running transition to its last step, so one never overlaps
+    /// another.
     pub(crate) lane: Mutex<()>,
     /// The signing half of Swift's provider; without it nothing is signed.
     pub(crate) signing: Option<Signing>,
@@ -1213,6 +1215,119 @@ impl WorkspaceComposition {
             invocation,
             attempt,
         })
+    }
+
+    /// Swift `WorkspaceOperationsProvider.action` for
+    /// `workspace.create-checkpoint@1`: the preamble, then — with a pinned
+    /// source-control tool — `git -C <root> stash create`, which writes a
+    /// commit object and moves no ref, index or working file; otherwise the
+    /// pinned archive writer over exactly the declared files, each inside
+    /// the profile's scope and present, bounded together, into `job_id`'s
+    /// fresh destination in the provider-owned attempt store, with `--`
+    /// before the sorted names so none can become an option. A refusal is
+    /// the detail Swift's provider error describes itself by.
+    pub(crate) fn checkpoint_action(
+        &self,
+        reference: &str,
+        inputs: &Map<String, Value>,
+        job_id: &str,
+    ) -> Result<CheckpointAction, String> {
+        let (_, profile) = self.preamble(reference, inputs)?;
+        let root = profile.project_root.clone();
+        if let Some(invocation) =
+            profile.source_control_invocation(reference, &["-C", &root, "stash", "create"])
+        {
+            return Ok(CheckpointAction::Git(invocation));
+        }
+        let unavailable = || "workspace.checkpointPresetUnavailable".to_owned();
+        if profile
+            .archive_checkpoint_invocation(reference, &[])
+            .is_none()
+        {
+            return Err(unavailable());
+        }
+        let paths = string_array(inputs, "checkpointFilePaths")?;
+        patch::validate(&paths, &root, &profile.allowed_file_globs, &paths)?;
+        let snapshots = patch::snapshots(&paths, &root)?;
+        if snapshots.iter().any(|snapshot| snapshot.sha256.is_none()) {
+            return Err("workspace checkpoint cannot seal a missing source file".into());
+        }
+        checkpoint::require_bounded_sources(&paths, &root)?;
+        let archive_path = self.attempt_store()?.checkpoint_archive_path(job_id);
+        // Anything already there — a dangling link included — refuses.
+        if std::fs::symlink_metadata(&archive_path).is_ok() {
+            return Err("workspace checkpoint destination already exists".into());
+        }
+        let mut sorted = paths;
+        support::swift_sort(&mut sorted);
+        let mut arguments: Vec<&str> = vec!["-c", "-f", &archive_path, "-C", &root, "--"];
+        arguments.extend(sorted.iter().map(String::as_str));
+        let invocation = profile
+            .archive_checkpoint_invocation(reference, &arguments)
+            .ok_or_else(unavailable)?;
+        Ok(CheckpointAction::Archive(ArchiveCheckpoint {
+            invocation,
+            archive_path,
+            source_snapshots: snapshots,
+        }))
+    }
+
+    /// Swift `lower(action:context:)` for a checkpoint: the executable one
+    /// the acting profile pinned; an archive's destination still this Job's
+    /// own and still absent, and its declared files still what the step was
+    /// materialized against.
+    pub(crate) fn lower_checkpoint(
+        &self,
+        action: &CheckpointAction,
+        job_id: &str,
+    ) -> Result<(), String> {
+        let invocation = action.invocation();
+        let profile = self
+            .registry
+            .profile(&invocation.project_ref)
+            .ok_or_else(|| {
+                format!(
+                    "workspace.projectProfileUnavailable:{}",
+                    invocation.project_ref
+                )
+            })?;
+        if !profile.owns_executable(&invocation.executable_path, &invocation.executable_sha256) {
+            return Err("workspace provider received a foreign action or executable".into());
+        }
+        if let CheckpointAction::Archive(archive) = action {
+            let owned = self.attempt_store()?.checkpoint_archive_path(job_id);
+            if archive.archive_path != owned
+                || std::fs::symlink_metadata(&archive.archive_path).is_ok()
+            {
+                return Err(
+                    "workspace checkpoint destination is not fresh and provider-owned".into(),
+                );
+            }
+            patch::require(&archive.source_snapshots, &profile.project_root)?;
+        }
+        Ok(())
+    }
+
+    /// Swift `WorkspaceOperationsProvider.verify` for a checkpoint, in the
+    /// acting profile: a judgement that cannot be made leaves the outcome
+    /// unknown.
+    pub(crate) fn verify_checkpoint(
+        &self,
+        action: &CheckpointAction,
+        receipt: &ToolReceipt,
+        job_id: &str,
+    ) -> PatchVerdict {
+        let project_ref = &action.invocation().project_ref;
+        let Some(profile) = self.registry.profile(project_ref) else {
+            return PatchVerdict::Unknown(format!(
+                "workspace.projectProfileUnavailable:{project_ref}"
+            ));
+        };
+        let owned = match self.attempt_store() {
+            Ok(attempts) => attempts.checkpoint_archive_path(job_id),
+            Err(reason) => return PatchVerdict::Unknown(reason),
+        };
+        action.verify(receipt, &owned, &profile.project_root)
     }
 
     /// Swift `WorkspaceOperationsProvider.action` for

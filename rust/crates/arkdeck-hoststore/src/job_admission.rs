@@ -438,7 +438,11 @@ impl JobAdmitter<'_> {
     /// - a person's primary tree needs a standing capability a person issued,
     ///   and this Runtime holds no path that issues or honours one: a request
     ///   naming none is refused as Swift refuses it, and one naming any is
-    ///   refused as Swift refuses a capability its store does not hold.
+    ///   refused as Swift refuses a capability its store does not hold;
+    /// - an operation whose catalog policy is the Runtime's own
+    ///   (`runtimeCapability`) is issued the Runtime's one-use capability for
+    ///   the exact plan, for a primary tree and a copy alike, and a request
+    ///   naming any capability is refused.
     ///
     /// Either capability is then checked against its envelope and lineage;
     /// nothing is reserved or consumed, and every refusal dispatches nothing.
@@ -478,7 +482,7 @@ impl JobAdmitter<'_> {
         let facts = workspace
             .authorization_facts(&request.inputs)
             .map_err(|error| refused("admissionDenied", error))?;
-        if parsed == Effect::Destructive || policy == "runtimeCapability" {
+        if parsed == Effect::Destructive {
             return Err(unserved());
         }
         let query = CapabilityQuery {
@@ -495,6 +499,35 @@ impl JobAdmitter<'_> {
             workspace_file_scopes_digest: Some(facts.file_scopes_digest.clone()),
         };
         let capability = match &request.capability_id {
+            // A Runtime-owned policy (`workspace.create-checkpoint@1`) is
+            // the Runtime's alone: no capability a caller names admits it,
+            // and the catalog must let the Runtime issue its own — one use,
+            // pinned to this exact plan — for whichever tree it names.
+            Some(_) if policy == "runtimeCapability" => {
+                return Err(refused(
+                    "admissionDenied",
+                    "caller-supplied capabilities cannot admit a Runtime-owned policy",
+                ));
+            }
+            None if policy == "runtimeCapability" => {
+                if !descriptor.default_policy_issuance() {
+                    return Err(refused(
+                        "admissionDenied",
+                        format!("catalog disabled Runtime capability issuance for {reference}"),
+                    ));
+                }
+                capability_policy::issue(
+                    authority.capabilities,
+                    descriptor,
+                    &query,
+                    false,
+                    &self.clock()?,
+                )
+                .map_err(|failure| match failure {
+                    IssueFailure::Refused(message) => refused("admissionDenied", message),
+                    IssueFailure::Unreadable => uncertain(),
+                })?
+            }
             // A primary tree is never admitted under a named capability here:
             // the only one it may run under is a person's, which this Runtime
             // neither issues nor honours.

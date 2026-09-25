@@ -1,0 +1,14 @@
+{
+  "artifact" : "checkpoint.txt",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "checkpointByteCount" : "3072",
+  "checkpointKind" : "sealedArchive",
+  "checkpointObject" : "7aa64c80460d47eea42650cd3c3192b748980b6110598fa943caa2487d5a833d",
+  "exitStatus" : "0",
+  "jobId" : "job-fb3aa03a1e918462b0c827fd52e5692b",
+  "operation" : "workspace.create-checkpoint@1",
+  "stderrByteCount" : "0",
+  "stderrSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdoutByteCount" : "0",
+  "stdoutSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

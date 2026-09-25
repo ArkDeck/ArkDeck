@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "sweepWorkspaceIsolation"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-a202b086e2ec6f78418c5b48b88e444a",
+  "materializedPlanDigest" : "f61e67862a8ef9fc3f9df09c456aff219f4afa9381109f60fad898d66fdbf044",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.sweep-isolated-copies@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-sweep-lost",
+    "inputs" : {
+      "dryRun" : false,
+      "minimumQuiescentSeconds" : 0,
+      "retainLatestCount" : 0
+    },
+    "operation" : {
+      "id" : "workspace.sweep-isolated-copies",
+      "version" : 1
+    },
+    "requestId" : "request-sweep-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJzd2VlcElzb2xhdGVkQ29waWVzIjp7Il8wIjp7ImNyZWF0ZWRBdFVUQyI6IjIwMjYtMDktMjVUMDA6MDA6MDBaIiwiZHJ5UnVuIjpmYWxzZSwibWluaW11bVF1aWVzY2VudFNlY29uZHMiOjAsInJldGFpbkxhdGVzdENvdW50IjowLCJydW50aW1lT3duZXJJRCI6InJ1bnRpbWUtam9iLWEyMDJiMDg2ZTJlYzZmNzg0MThjNWI0OGI4OGU0NDRhIn19fQ=="
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-sweep-isolated-copies",
+  "recoveryStepID" : "sweep-isolated-copies",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-sweep-lost",
+    "inputs" : {
+      "dryRun" : false,
+      "minimumQuiescentSeconds" : 0,
+      "retainLatestCount" : 0
+    },
+    "operation" : {
+      "id" : "workspace.sweep-isolated-copies",
+      "version" : 1
+    },
+    "requestId" : "request-sweep-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent sweep-isolated-copies",
+    "outcomeUnknown sweep-isolated-copies; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

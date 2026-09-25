@@ -1,0 +1,100 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "createWorkspaceCheckpoint"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-25T00:00:00Z",
+    "consumptionFingerprintSHA256" : "d2bc1d8508e6521e9c1e344fe5b8cdebce9ee43d8d70a912e39723a1dccb34c5",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-7AA68AE2F694A1FD3E8F7F69AB74D0D55705C517-G3",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+      "reservationID" : "idempotency-checkpoint-lost",
+      "stepSetDigestSHA256" : "78d0982a8f4e4aa69f2c7e411abcf3fb2938c3ecb6da43d97893df3339961843",
+      "targetBindingDigestSHA256" : "f1e9946b2370d1e7acc9363ca0f7a81b52e966edf80a1456e1cf392294073025",
+      "useOrdinal" : 1
+    },
+    "validUntilUTC" : "2026-10-25T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-25T00:00:00Z",
+  "finishedAtUTC" : "2026-09-25T00:00:00Z",
+  "jobID" : "job-06dade5ded4e192942c707f07036bcc5",
+  "materializedPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "workspace.create-checkpoint@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-checkpoint-lost",
+    "inputs" : {
+      "projectRef" : "CheckpointOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.create-checkpoint",
+      "version" : 1
+    },
+    "requestId" : "request-checkpoint-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "workspace",
+  "recoveryAction" : {
+    "arguments" : {
+      "payload" : "eyJjcmVhdGVDaGVja3BvaW50Ijp7Il8wIjp7ImFyZ3VtZW50cyI6WyItQyIsIi90bXAvYXJrZGVjay13b3Jrc3BhY2UtY2hlY2twb2ludC1vcmFjbGUvcmVwb3NpdG9yeS9wcm9qZWN0Iiwic3Rhc2giLCJjcmVhdGUiXSwiZXhlY3V0YWJsZSI6eyJwYXRoIjoiL3RtcC9hcmtkZWNrLXdvcmtzcGFjZS1jaGVja3BvaW50LW9yYWNsZS90b29scy9naXQiLCJzaGEyNTYiOiIzNmU2ODlhYTI5MTdjYzg1MWIxYWMzNTVhYmVjNjkzNzUxYjhlMDExMTUyZDU5MDcwZjE0ZmM4MzU2ZDZjZDk4In0sIm9wZXJhdGlvbiI6IndvcmtzcGFjZS5jcmVhdGUtY2hlY2twb2ludEAxIiwicHJlc2V0SUQiOiJnaXQiLCJwcm9qZWN0UmVmIjoiQ2hlY2twb2ludE9yYWNsZVByb2plY3QiLCJwcm9qZWN0Um9vdCI6Ii90bXAvYXJrZGVjay13b3Jrc3BhY2UtY2hlY2twb2ludC1vcmFjbGUvcmVwb3NpdG9yeS9wcm9qZWN0IiwidGltZW91dFNlY29uZHMiOjMwfX19"
+    },
+    "kind" : "workspace.action"
+  },
+  "recoveryIntentEventID" : "intent-create-checkpoint",
+  "recoveryStepID" : "create-checkpoint",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-7AA68AE2F694A1FD3E8F7F69AB74D0D55705C517-G3"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idempotency-checkpoint-lost",
+    "inputs" : {
+      "projectRef" : "CheckpointOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.create-checkpoint",
+      "version" : 1
+    },
+    "requestId" : "request-checkpoint-lost",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "workspace-host"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-25T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "capability consumed before first mutation",
+    "intent create-checkpoint",
+    "outcomeUnknown create-checkpoint; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: dispatch outcome unobservable: the oracle lost the receipt after the child ran"
+  ]
+}

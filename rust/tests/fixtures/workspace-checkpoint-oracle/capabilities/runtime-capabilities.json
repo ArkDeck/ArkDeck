@@ -1,0 +1,243 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-7AA68AE2F694A1FD3E8F7F69AB74D0D55705C517-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "projectRef" : "CheckpointOracleProject"
+        },
+        "exactPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "CheckpointOracleProject"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.create-checkpoint@1"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.create-checkpoint",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "7cd31f307d0f5e72e3fc6fa5d110c6b2be3a5d57ff08c062c4510f94cf7bd7dd",
+          "kind" : "workspaceIdentity",
+          "sha256" : "daaea74ec8ca367f831a7587172f43de082e082a045dc802a16e4e45ebe264bc"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "ef09bf87afc09f0409c39404b41d0409c5c3f52a8008ee02b1e05245a11afc15",
+          "consumedAtUTC" : "2026-09-25T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-680032e16e57064ef185177fdba58831",
+          "materializedPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+          "operationReference" : "workspace.create-checkpoint@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-680032e16e57064ef185177fdba58831",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "50727774d8b695c58572c41c8326193057ba39f532ae1de1508112dcd93f5e8f",
+              "recordSHA256" : "83b4d7ed558055750660764bd4d6ac0723c6223123b7a1a6d9b6f800d32fad5f",
+              "recordedAtUTC" : "2026-09-25T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "d2bc1d8508e6521e9c1e344fe5b8cdebce9ee43d8d70a912e39723a1dccb34c5",
+          "receiptSHA256" : "50727774d8b695c58572c41c8326193057ba39f532ae1de1508112dcd93f5e8f",
+          "remainingUsesAfter" : 0,
+          "reservationID" : "idempotency-checkpoint-clean"
+        }
+      ],
+      "remainingUses" : 0
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-7AA68AE2F694A1FD3E8F7F69AB74D0D55705C517-G2",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "projectRef" : "CheckpointOracleProject"
+        },
+        "exactPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "CheckpointOracleProject"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.create-checkpoint@1"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.create-checkpoint",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "f96b4936a64d573c1ce6569ef6c62f1e61db02edacbf2f7dac9f69d2f965a9a1",
+          "kind" : "workspaceIdentity",
+          "sha256" : "daaea74ec8ca367f831a7587172f43de082e082a045dc802a16e4e45ebe264bc"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "ef09bf87afc09f0409c39404b41d0409c5c3f52a8008ee02b1e05245a11afc15",
+          "consumedAtUTC" : "2026-09-25T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-04ec80829b77741ea9b848a297f884b5",
+          "materializedPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+          "operationReference" : "workspace.create-checkpoint@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-04ec80829b77741ea9b848a297f884b5",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "b5ca25ff893f272d58a73010700d8f1ba030e4fb7745dcf3fb2f885495c43689",
+              "recordSHA256" : "1286df9423b7672cde837382598d97a52931c38c0faa167061f7d50f84278882",
+              "recordedAtUTC" : "2026-09-25T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "d2bc1d8508e6521e9c1e344fe5b8cdebce9ee43d8d70a912e39723a1dccb34c5",
+          "receiptSHA256" : "b5ca25ff893f272d58a73010700d8f1ba030e4fb7745dcf3fb2f885495c43689",
+          "remainingUsesAfter" : 0,
+          "reservationID" : "idempotency-checkpoint"
+        }
+      ],
+      "remainingUses" : 0
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-CFF9B641C28C4CBFDC2FC89BA7FCA5B468BF2E40-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "checkpointFilePaths" : [
+            "entry/src/main/ets/pages/Index.ets",
+            "entry/src/main/ets/entryability/EntryAbility.ets"
+          ],
+          "projectRef" : "ArchiveOracleProject"
+        },
+        "exactPlanDigest" : "2726bc3db92adf7ff5466a06f3b4c2c47b9f922a72a8f19b629c0b5a219deab5",
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "ArchiveOracleProject"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.create-checkpoint@1"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.create-checkpoint",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "7cd31f307d0f5e72e3fc6fa5d110c6b2be3a5d57ff08c062c4510f94cf7bd7dd",
+          "kind" : "workspaceIdentity",
+          "sha256" : "a3fee5d6f70f7b7de8fa15eb9d582a96e049f70d532120822883f89f44f2eb9b"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "96fa71195d9414b64fc18bfd51e65c565f2faac93759e495bb0076e0d9b859ba",
+          "consumedAtUTC" : "2026-09-25T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-fb3aa03a1e918462b0c827fd52e5692b",
+          "materializedPlanDigest" : "2726bc3db92adf7ff5466a06f3b4c2c47b9f922a72a8f19b629c0b5a219deab5",
+          "operationReference" : "workspace.create-checkpoint@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-fb3aa03a1e918462b0c827fd52e5692b",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "8d2aac0761dacfd04e49fa0c2d7a284c1d9d02ee2c350f754d6a806df965ab46",
+              "recordSHA256" : "2273a7e3f5bc291127db5ebc1d831a41dd674c4681b5bcf8a9385cd69aabe5ea",
+              "recordedAtUTC" : "2026-09-25T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "ab3a867929d63e232b23bf83ec31e0250c7a0ed460d5675748cdc92f17444b61",
+          "receiptSHA256" : "8d2aac0761dacfd04e49fa0c2d7a284c1d9d02ee2c350f754d6a806df965ab46",
+          "remainingUsesAfter" : 0,
+          "reservationID" : "idempotency-archive"
+        }
+      ],
+      "remainingUses" : 0
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-7AA68AE2F694A1FD3E8F7F69AB74D0D55705C517-G3",
+        "effectCeiling" : "deviceMutation",
+        "exactInputs" : {
+          "projectRef" : "CheckpointOracleProject"
+        },
+        "exactPlanDigest" : "2222c67247135fc06af11ddc3604af11df1fa1dded01b49c575b46fed604baa5",
+        "expiresAtUTC" : "2026-10-25T00:00:00Z",
+        "inputConstraints" : {
+          "projectRef" : {
+            "kind" : "exactString",
+            "value" : "CheckpointOracleProject"
+          }
+        },
+        "issuedAtUTC" : "2026-09-25T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:workspace.create-checkpoint@1"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "workspace.create-checkpoint",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "allowedFileScopesDigest" : "bbcfdd2f7fe186017a9d7c1a0cf4242b7add39d2efc42ee8dfe6fe9ff365baca",
+          "expectedWorkspaceRevision" : "9fe7feed2ea335c141b8b8ad6e09d85c4fb159b3dd2e5d0b3cdf854e3f16409e",
+          "kind" : "workspaceIdentity",
+          "sha256" : "daaea74ec8ca367f831a7587172f43de082e082a045dc802a16e4e45ebe264bc"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 1
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

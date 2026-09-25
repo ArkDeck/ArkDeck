@@ -472,6 +472,14 @@ impl JobRunner<'_> {
             {
                 self.execute_workspace_read(&mut run, workspace)?
             }
+            (None, Some(workspace))
+                if run.record.operation() == crate::workspace_checkpoint::CHECKPOINT =>
+            {
+                self.execute_workspace_checkpoint(&mut run, workspace)?
+            }
+            (None, Some(workspace)) if run.record.operation() == crate::workspace_sweep::SWEEP => {
+                self.execute_workspace_sweep(&mut run, workspace)?
+            }
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }

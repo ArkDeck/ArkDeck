@@ -184,4 +184,48 @@ impl JobStore {
             Ok(())
         })
     }
+
+    /// Swift `RuntimeJobEngine.referenceFacts(prepareRuntimeOwnerID:
+    /// derivedProjectRef:)`: what the durable Job rows say about the Jobs
+    /// referencing one Runtime-owned copy — the Job that made it, and every
+    /// Job whose request names its derived reference — how many there are,
+    /// whether all of them are terminal (the repository's own active-set
+    /// filter, not a reading of state words), and the newest transition among
+    /// the terminal ones. The sweep's testimony comes only from here; no
+    /// caller supplies or biases it.
+    pub(crate) fn workspace_reference_facts(
+        &self,
+        prepare_runtime_owner_id: &str,
+        derived_project_ref: &str,
+    ) -> io::Result<crate::workspace_sweep::ReferenceFacts> {
+        let prepare_job = prepare_runtime_owner_id
+            .strip_prefix("runtime-")
+            .unwrap_or(prepare_runtime_owner_id);
+        self.root.validate_path(&self.path)?;
+        let mut facts = crate::workspace_sweep::ReferenceFacts {
+            referencing_job_count: 0,
+            all_terminal: true,
+            newest_transition_utc: None,
+        };
+        for row in self.repository.rows(None)? {
+            let references = row.id == prepare_job
+                || JobRecord::decode(&row.record).is_ok_and(|record| {
+                    record.request["inputs"]["projectRef"].as_str() == Some(derived_project_ref)
+                });
+            if !references {
+                continue;
+            }
+            facts.referencing_job_count += 1;
+            if !crate::job_record::terminal(&row.state) {
+                facts.all_terminal = false;
+            } else if facts
+                .newest_transition_utc
+                .as_ref()
+                .is_none_or(|newest| row.updated > *newest)
+            {
+                facts.newest_transition_utc = Some(row.updated);
+            }
+        }
+        Ok(facts)
+    }
 }
