@@ -308,24 +308,41 @@ impl SessionStore {
         root.validate_path(path).map_err(unreadable)?;
         Ok(root)
     }
-    /// Swift `RuntimeSessionStorageStore.status()` as the publication writer
-    /// reads it: the active Session root, the settings generation and the
-    /// retention days, once the status read has reconciled (and the first
-    /// time initialized) the catalog. A refusal is spelled `code: message`.
+    /// Swift `RuntimeSessionStorageStore.status()` as the Runtime reads it for
+    /// itself, for a publication or a device mutation's admission: the status
+    /// once the read has reconciled (and the first time initialized) the
+    /// catalog. Swift's status read waits for the storage lock, so a request or
+    /// a publication holding it at this instant delays the read rather than
+    /// refusing it, as the `runtime.storage.*` methods here refuse.
+    pub(crate) fn waited_status(&self) -> Result<Value, WireError> {
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
+        self.locked_storage(&lock, None, None, None)
+    }
+
+    /// The same read without waiting, for the operation availability report,
+    /// which Swift composes without any storage read: a held lock is refused
+    /// at once rather than making `operation.list` wait behind a publication
+    /// or an export.
+    pub(crate) fn status_without_waiting(&self) -> Result<Value, WireError> {
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let lock = self.root.lock_document(LOCK).map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                failure("resourceConflict", "Session storage is being updated")
+            } else {
+                unreadable(error)
+            }
+        })?;
+        self.locked_storage(&lock, None, None, None)
+    }
+
+    /// The waited status as the publication writer reads it: the active
+    /// Session root, the settings generation and the retention days. A refusal
+    /// is spelled `code: message`.
     pub(crate) fn publication_status(&self) -> Result<(PathBuf, u64, u64), String> {
-        let refused = |error: WireError| format!("{}: {}", error.code, error.message);
-        self.root
-            .validate_path(&self.path)
-            .map_err(|error| refused(unreadable(error)))?;
-        // Swift's status read waits for the storage lock; a request holding it
-        // at this instant delays the publication rather than refusing it.
-        let lock = self
-            .root
-            .wait_lock(LOCK, false)
-            .map_err(|error| refused(unreadable(error)))?;
         let status = self
-            .locked_storage(&lock, None, None, None)
-            .map_err(refused)?;
+            .waited_status()
+            .map_err(|error| format!("{}: {}", error.code, error.message))?;
         let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
         match (
             status["rootPath"].as_str(),
@@ -644,6 +661,125 @@ mod tests {
                 .unwrap();
             assert_eq!(status, (root.0.join("sessions"), 1, 90));
         });
+    }
+
+    #[test]
+    fn a_device_mutation_admission_waits_for_a_held_storage_lock() {
+        // Swift's `validateMutationState` reads the storage status as the
+        // publication does. A mutation submitted while the previous Job's
+        // Session is being published was refused here (`admissionDenied`,
+        // "Session storage is being updated"), failing its execution.
+        let root = Root::new();
+        let store = root.open();
+        let state = root.0.join("jobs-state");
+        fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+        let jobs = crate::JobStore::open_owner(&state).unwrap();
+        let capabilities = crate::CapabilityStore::open(&state.join("capabilities")).unwrap();
+        let holds = crate::DeviceHolds::default();
+        let authority = crate::MutationAuthority {
+            default_root: &state,
+            sessions: Some(&store),
+            capabilities: &capabilities,
+            holds: &holds,
+        };
+        let held = store.root.lock_document(LOCK).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let (authority, jobs) = (&authority, &jobs);
+            scope.spawn(move || sender.send(authority.require_state(jobs)).unwrap());
+            assert!(
+                receiver
+                    .recv_timeout(std::time::Duration::from_millis(200))
+                    .is_err()
+            );
+            drop(held);
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+        });
+    }
+
+    #[test]
+    fn admissions_and_publication_reads_wait_for_each_other() {
+        // #2147's shape for the Session storage lock: a publication's status
+        // read and a device mutation's admission meet at a Barrier before
+        // each of 64 rounds, so each round they contend for the storage lock.
+        // Both wait for it, as Swift's blocking `flock` does, so every
+        // publication reads the status and every admission is proved; neither
+        // is refused because the other holds the lock, and neither waits on
+        // anything the other holds. No sleeps and no time bound.
+        let root = Root::new();
+        let store = root.open();
+        let state = root.0.join("jobs-state");
+        fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+        let jobs = crate::JobStore::open_owner(&state).unwrap();
+        let capabilities = crate::CapabilityStore::open(&state.join("capabilities")).unwrap();
+        let holds = crate::DeviceHolds::default();
+        let authority = crate::MutationAuthority {
+            default_root: &state,
+            sessions: Some(&store),
+            capabilities: &capabilities,
+            holds: &holds,
+        };
+        let barrier = std::sync::Barrier::new(2);
+        std::thread::scope(|scope| {
+            let publications = scope.spawn(|| {
+                (0..64)
+                    .map(|_| {
+                        barrier.wait();
+                        store.publication_status()
+                    })
+                    .collect::<Vec<_>>()
+            });
+            let admissions = scope.spawn(|| {
+                (0..64)
+                    .map(|_| {
+                        barrier.wait();
+                        authority.require_state(&jobs)
+                    })
+                    .collect::<Vec<_>>()
+            });
+            for status in publications.join().unwrap() {
+                assert_eq!(status.unwrap(), (root.0.join("sessions"), 1, 90));
+            }
+            for admitted in admissions.join().unwrap() {
+                admitted.unwrap();
+            }
+        });
+    }
+
+    #[test]
+    fn the_availability_report_reads_the_state_without_waiting() {
+        // Swift's operation availability reads no storage, so the report asks
+        // whether the state is proved now: a held lock reads as not proved at
+        // once, where an admission waits. The bound only turns a wait that
+        // never ends into a failure; the answer never depends on it.
+        let root = Root::new();
+        let store = root.open();
+        let state = root.0.join("jobs-state");
+        fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+        let jobs = crate::JobStore::open_owner(&state).unwrap();
+        let capabilities = crate::CapabilityStore::open(&state.join("capabilities")).unwrap();
+        let holds = crate::DeviceHolds::default();
+        let authority = crate::MutationAuthority {
+            default_root: &state,
+            sessions: Some(&store),
+            capabilities: &capabilities,
+            holds: &holds,
+        };
+        let held = store.root.lock_document(LOCK).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let (authority, jobs) = (&authority, &jobs);
+            scope.spawn(move || sender.send(authority.state_proven_now(jobs)).unwrap());
+            let proven = receiver
+                .recv_timeout(std::time::Duration::from_secs(60))
+                .unwrap();
+            assert!(!proven);
+        });
+        drop(held);
+        assert!(authority.state_proven_now(&jobs));
     }
 
     #[test]

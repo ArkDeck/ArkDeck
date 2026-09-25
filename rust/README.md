@@ -673,9 +673,15 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   consumed, and nothing is consumed yet.
 - **The storage state.** The admission proves that this owner's Job root and the
   Session root it publishes into are the account-fixed ones
-  (`MutationAuthority::require_state`, through the Session owner's
-  `runtime.storage.status`). Reading that status takes the storage owner's lock
-  and the retention catalog's, so an admission leaves
+  (`MutationAuthority::require_state`, through the Session owner's status read,
+  `SessionStore::waited_status`). That read waits for the storage lock, as
+  Swift's `validateMutationState` does: a mutation submitted while the previous
+  Job's Session is being published is admitted once the publication releases
+  it, where the `runtime.storage.*` methods refuse a held lock. The operation
+  availability report asks the same question without waiting
+  (`MutationAuthority::state_proven_now`), as Swift's availability reads no
+  storage at all. Reading that status takes the storage owner's lock and the
+  retention catalog's, so an admission leaves
   `session-owner/.session-storage.lock`,
   `sessions/.arkdeck-retention-catalog.json` and its lock where Swift's
   admission leaves none: Swift reads the Session root without them and writes

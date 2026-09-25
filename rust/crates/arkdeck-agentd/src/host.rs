@@ -1061,7 +1061,7 @@ impl HostServices for Host {
                 mutation_owner: self
                     .authority()
                     .zip(self.jobs.as_deref())
-                    .is_some_and(|(authority, jobs)| authority.require_state(jobs).is_ok()),
+                    .is_some_and(|(authority, jobs)| authority.state_proven_now(jobs)),
                 code_sign_helper: self.code_sign_helper.is_some(),
                 // Asked only of an operation this executor runs: every other
                 // one is unsupported whatever the tool measures.

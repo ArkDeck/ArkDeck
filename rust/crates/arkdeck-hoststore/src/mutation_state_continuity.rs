@@ -120,14 +120,42 @@ fn inspect_session_children(
     depth: usize,
     remaining: &mut usize,
 ) -> Result<(), WireError> {
-    for name in root.names(*remaining).map_err(|_| refused())? {
+    let names = root.names(*remaining).map_err(|_| refused())?;
+    inspect_named_children(root, path, depth, remaining, names)
+}
+
+/// An entry gone since the listing is skipped, as Swift's scan skips a path
+/// that no longer exists: a document's temporary name renamed into place by
+/// the publication writing the retention catalog, or a Session removed. What
+/// is gone retains no Journal to prove. Anything else unreadable is refused.
+fn gone(error: &io::Error) -> bool {
+    error.kind() == io::ErrorKind::NotFound
+}
+
+fn inspect_named_children(
+    root: &HostDirectory,
+    path: &Path,
+    depth: usize,
+    remaining: &mut usize,
+    names: Vec<String>,
+) -> Result<(), WireError> {
+    for name in names {
         *remaining = remaining.checked_sub(1).ok_or_else(refused)?;
-        match root.kind_and_size(&name).map_err(|_| refused())?.0 {
+        let kind = match root.kind_and_size(&name) {
+            Ok((kind, _)) => kind,
+            Err(error) if gone(&error) => continue,
+            Err(_) => return Err(refused()),
+        };
+        match kind {
             HostEntryKind::Regular => continue,
             HostEntryKind::Directory => (),
             HostEntryKind::Other => return Err(refused()),
         }
-        let session = root.child(&name).map_err(|_| refused())?;
+        let session = match root.child(&name) {
+            Ok(session) => session,
+            Err(error) if gone(&error) => continue,
+            Err(_) => return Err(refused()),
+        };
         let child_path = path.join(&name);
         let manifest = optional_read(&session, "manifest.json", DOCUMENT_BOUND)?;
         let journal = optional_read(&session, "journal.jsonl", JOURNAL_BOUND)?;
@@ -161,7 +189,11 @@ fn inspect_session_children(
             }
             inspect_session_children(&session, &child_path, depth + 1, remaining)?;
         }
-        session.validate_path(&child_path).map_err(|_| refused())?;
+        match session.validate_path(&child_path) {
+            // Removed while it was read: gone, never replaced.
+            Err(error) if gone(&error) => continue,
+            result => result.map_err(|_| refused())?,
+        }
     }
     Ok(())
 }
@@ -436,6 +468,47 @@ mod tests {
                 .unwrap()
                 .file_type()
                 .is_symlink()
+        );
+    }
+
+    #[test]
+    fn an_entry_gone_since_the_listing_is_skipped() {
+        // The publication writing the retention catalog lists a temporary
+        // name in the Session root and renames it into place: a scan that
+        // listed it finds it gone, as Swift's scan may, and skips it.
+        let fixture = Fixture::new();
+        let sessions = fixture.base.join("Sessions");
+        std::fs::create_dir(&sessions).unwrap();
+        std::fs::set_permissions(&sessions, std::fs::Permissions::from_mode(0o700)).unwrap();
+        let root = HostDirectory::open_session_tree(&sessions).unwrap();
+        let mut remaining = ENTRY_BOUND;
+        inspect_named_children(
+            &root,
+            &sessions,
+            0,
+            &mut remaining,
+            vec![
+                ".arkdeck-retention-catalog.json.00.part".into(),
+                "2026".into(),
+            ],
+        )
+        .unwrap();
+        // An entry still there keeps its checks: an unresolved mutation in a
+        // retained Session's Journal still refuses the state.
+        fixture.file(
+            "Sessions/2026/09/session-a/journal.jsonl",
+            b"not a journal\n",
+        );
+        let mut remaining = ENTRY_BOUND;
+        assert!(
+            inspect_named_children(
+                &root,
+                &sessions,
+                0,
+                &mut remaining,
+                vec![".gone.part".into(), "2026".into()],
+            )
+            .is_err()
         );
     }
 }
