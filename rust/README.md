@@ -2287,6 +2287,37 @@ replays every case through the built daemon, byte for byte, and runs the daemon
 as its own analyzer through an isolated Runtime
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/rust-crash-ledger-analyzer-run.md)).
 
+## HiLog summary analyzer (TASK-XPA-015)
+
+`arkdeck-agentd --summarize-hilog <absolute path>` is Swift's other one-shot
+analyzer mode: the Runtime runs the daemon as the analyzer child of
+`analyzer.summarize-hilog@1` when `ARKDECK_ANALYZER_PATH` names the daemon's
+own bytes (`hilog_summary_analyzer::composed`, Swift
+`HilogSummaryDerivedAnalyzer.profile`); an analyzer executable that is not this
+daemon leaves the operation unavailable as
+`analyzer.hilogRequiresCurrentDaemon`. Like the crash-ledger mode it is
+answered before anything a daemon does. It reads the one file it is named as
+Swift's bounded reader reads it (`arkdeck_platform::read_profile_file`: a
+regular file through its physical path or its `/.vol` alias, no link followed,
+unchanged while read, at most 512 MiB) and prints the canonical
+`HilogSummaryAnalysis` (`arkdeck_hoststore::analyze_hilog`): line, blank and
+unrecognized counts and a count per severity of OpenHarmony's default header,
+matched as ICU matches Swift's pattern. A usage refusal is
+`analyzer.hilogInvalidArguments` and exit 64; any failure is
+`analyzer.hilogReadFailed` and exit 1.
+
+`rust/tests/fixtures/hilog-summary-analyzer/oracle.json` is what the Swift
+daemon answered to 62 cases (`HilogSummaryAnalyzerOracleContractTests`), and
+`rust/tests/fixtures/job-run-hilog/` Swift's plans, admissions, runs, reads and
+store for eleven Jobs of the operation
+(`JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedHilogSummaryJobs`).
+`cargo test -p arkdeck-agentd --test hilog_summary_analyzer` replays every
+case through the built daemon and runs the daemon as its own analyzer through
+an isolated Runtime, by `job.run` and by `agent.run`;
+`cargo test -p arkdeck-hoststore --test job_run_hilog` replays the Jobs byte
+for byte
+([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/analyzers-trace-inspect-run.md)).
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

@@ -40,6 +40,8 @@ mod facade_owners;
 mod facade_owners_tests;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
+#[cfg(target_os = "macos")]
+mod hilog_summary_analyzer;
 mod host;
 #[cfg(test)]
 mod host_tests;
@@ -443,13 +445,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             // executable, and a named path that is not one fails startup.
             .with_planning(
                 &root,
-                std::env::var_os("ARKDECK_ANALYZER_PATH")
-                    .map(|path| {
-                        arkdeck_hoststore::AnalyzerProfile::crash_signature(std::path::Path::new(
-                            &path,
-                        ))
-                    })
-                    .transpose()?,
+                hilog_summary_analyzer::composed(
+                    std::env::var_os("ARKDECK_ANALYZER_PATH")
+                        .as_deref()
+                        .map(std::path::Path::new),
+                )?,
             );
         let development_hdc = development_hdc()?;
         let (registered, managed) = development_hdc.as_ref().map_or((false, false), |hdc| {
@@ -846,14 +846,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
-    // Two one-shot modes are answered before any composition is considered:
-    // Swift's crash-ledger analyzer, which the Runtime runs as its analyzer
-    // child (`crash_ledger_analyzer.rs`), and the M5 cutover preflight, a
-    // read of the production layout (`cutover_preflight.rs`).
+    // Three one-shot modes are answered before any composition is considered:
+    // Swift's HiLog summary and crash-ledger analyzers, which the Runtime runs
+    // as its analyzer children (`hilog_summary_analyzer.rs`,
+    // `crash_ledger_analyzer.rs`), and the M5 cutover preflight, a read of the
+    // production layout (`cutover_preflight.rs`).
     #[cfg(target_os = "macos")]
     {
         let arguments: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
         let first = arguments.first();
+        if first.is_some_and(|argument| argument == hilog_summary_analyzer::FLAG) {
+            std::process::exit(hilog_summary_analyzer::run(&arguments));
+        }
         if first.is_some_and(|argument| argument == crash_ledger_analyzer::FLAG) {
             std::process::exit(crash_ledger_analyzer::run(&arguments));
         }

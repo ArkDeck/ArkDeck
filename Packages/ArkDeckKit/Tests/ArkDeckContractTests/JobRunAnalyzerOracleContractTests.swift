@@ -1028,6 +1028,272 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     throw CocoaError(.fileReadUnknown)
   }
 
+  // MARK: - HiLog summary Jobs
+
+  private static let hilogOracle = repository.appending(
+    path: "rust/tests/fixtures/job-run-hilog", directoryHint: .isDirectory)
+
+  /// The HiLog summary Job oracle `rust/crates/arkdeck-hoststore/tests/
+  /// job_run_hilog.rs` replays: `analyzer.summarize-hilog@1` planned where the
+  /// analyzer is composed, where the daemon's analyzer is not the daemon, and
+  /// where none is; then one Job per answer of the oracle analyzer, each over
+  /// its own HiLog source and run in order over one store, and every Job's
+  /// status, details, result and evidence. The analyzer answers from the
+  /// first line of its source; its answers are Swift's summaries of these
+  /// sources, computed here and written into its bytes. Record it with
+  /// `ARKDECK_RUST_JOB_RUN_HILOG_RECORD=/private/tmp/<new directory>`.
+  func testSwiftRunsTheSharedHilogSummaryJobs() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await hilogFiles(), oracle: Self.hilogOracle,
+      variable: "ARKDECK_RUST_JOB_RUN_HILOG_RECORD")
+  }
+
+  /// Each Job's name, the answer its source names, and the state its run ends in.
+  private static let hilogJobs: [(name: String, mode: String, ends: String)] = [
+    ("answered", "answered", "succeeded"),
+    ("trailingNewline", "newline", "failed"),
+    ("stderrWritten", "stderr", "failed"),
+    ("otherSource", "mismatch", "failed"),
+    ("extraMember", "extra", "failed"),
+    ("nonZeroExit", "exit", "failed"),
+    ("emptyResult", "empty", "failed"),
+    ("malformedResult", "malformed", "failed"),
+    ("scalarResult", "scalar", "failed"),
+    ("overBudget", "big", "failed"),
+    ("signalled", "signal", "waitingForRecovery"),
+  ]
+
+  /// A HiLog source whose first line names the oracle analyzer's answer.
+  private static func hilogSource(_ mode: String) -> Data {
+    Data(
+      (mode + "\n" + "09-25 10:00:00.123  1234  5678 I C02D01/HiLog: started\n\n"
+        + "continuation without a header\n"
+        + "09-25 10:00:01.000  1234  5679 E C02D01/HiLog: failed\n").utf8)
+  }
+
+  /// The oracle analyzer: it answers by the first line of its source, and
+  /// its summaries are Swift's summaries of these sources.
+  private static func hilogAnalyzerBytes() throws -> Data {
+    func summary(_ mode: String) throws -> String {
+      String(decoding: try HilogSummaryDerivedAnalyzer.analyze(hilogSource(mode)), as: UTF8.self)
+    }
+    let answered = try summary("answered")
+    let newline = try summary("newline")
+    let stderr = try summary("stderr")
+    let extra = String(try summary("extra").dropLast()) + #","zzz":1}"#
+    let lines = [
+      "#!/bin/sh",
+      "# ArkDeck hilog-summary Job oracle analyzer. The first line of the source it",
+      "# is given names its answer; its summaries were computed from the sources.",
+      #"[ "$#" -eq 2 ] && [ "$1" = "--summarize-hilog" ] || exit 64"#,
+      #"IFS= read -r mode < "$2" || exit 66"#,
+      #"case "$mode" in"#,
+      "answered) printf '%s' '" + answered + "' ;;",
+      "newline) printf '%s\\n' '" + newline + "' ;;",
+      "stderr) printf '%s' '" + stderr + "'; printf 'warning\\n' >&2 ;;",
+      "mismatch) printf '%s' '" + answered + "' ;;",
+      "extra) printf '%s' '" + extra + "' ;;",
+      "exit) printf 'oracle analyzer failed\\n' >&2; exit 3 ;;",
+      "empty) ;;",
+      "malformed) printf 'hilog summary: none\\n' ;;",
+      #"scalar) printf '"answered"' ;;"#,
+      "big) /usr/bin/head -c 9000 /dev/zero | /usr/bin/tr '\\000' ' '; printf '[]' ;;",
+      #"signal) kill -KILL "$$" ;;"#,
+      "*) exit 65 ;;",
+      "esac",
+    ]
+    return Data((lines.joined(separator: "\n") + "\n").utf8)
+  }
+
+  private static func hilogProfile(_ analyzer: URL, bytes: Data) -> AnalyzerProfile {
+    AnalyzerProfile(
+      analyzerRef: HilogSummaryDerivedAnalyzer.analyzerRef,
+      analyzerVersion: HilogSummaryDerivedAnalyzer.analyzerVersion,
+      executablePath: analyzer.path, executableSHA256: AnalyzerProvider.sha256(bytes),
+      fixedArguments: ["--summarize-hilog"], timeoutSeconds: 120,
+      outputByteBudget: HilogSummaryDerivedAnalyzer.maximumOutputBytes)
+  }
+
+  /// An engine over the oracle's store with `provider`, the real
+  /// descriptor-bound dispatcher over `profiles`, and no Session writer.
+  private func hilogHandler(
+    provider: AnalyzerProvider, profiles: [AnalyzerProfile], jobsState: URL,
+    store: RuntimeArtifactStore, capabilities: RuntimeCapabilityStore
+  ) throws -> RuntimeControlPlaneHandler {
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: jobsState),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try AnalyzerExecutableResolver(profiles: profiles)),
+      capabilityStore: capabilities, artifactStore: store,
+      nowUTC: { Self.nowUTC }, nowPreciseUTC: { Self.nowPreciseUTC })
+    return RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [provider.providerID],
+      nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
+      flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
+      methodObserver: nil)
+  }
+
+  private static func hilogSubmitParams(
+    _ name: String, lease: String
+  ) throws -> [String: JSONValue] {
+    let fields: [String: JSONValue] = [
+      "documentType": .string("runtime-operation-request"),
+      "schemaVersion": .string("1.0.0"),
+      "requestId": .string("req-oracle-hilog-\(name)"),
+      "idempotencyKey": .string("idem-oracle-hilog-\(name)-0001"),
+      "target": .object(["targetId": .string(Self.target)]),
+      "operation": .object([
+        "id": .string("analyzer.summarize-hilog"), "version": .integer(1),
+      ]),
+      "inputs": .object(["sourceArtifactRef": .string(lease)]),
+    ]
+    let bytes = try CanonicalJSONEncoders.canonical().encode(JSONValue.object(fields))
+    return ["requestJson": .string(String(decoding: bytes, as: UTF8.self))]
+  }
+
+  private func hilogFiles() async throws -> [String: Data] {
+    let manager = FileManager.default
+    try? manager.removeItem(at: Self.root)
+    try manager.createDirectory(
+      at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? manager.removeItem(at: Self.root) }
+    let analyzerBytes = try Self.hilogAnalyzerBytes()
+    let analyzer = Self.root.appending(path: "analyzer")
+    try analyzerBytes.write(to: analyzer)
+    guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
+    let artifacts = Self.root.appending(path: "artifacts", directoryHint: .isDirectory)
+    let store = try RuntimeArtifactStore(
+      rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
+      redaction: ArtifactRedactionPolicy(homeDirectory: Self.home), nowUTC: { Self.nowUTC })
+    let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
+    let hilog = Self.hilogProfile(analyzer, bytes: analyzerBytes)
+    // The daemon's own analyzer, when `ARKDECK_ANALYZER_PATH` names another
+    // executable: only the crash-ledger analyzer is composed.
+    let crashOnly = AnalyzerProfile(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      executablePath: analyzer.path, executableSHA256: AnalyzerProvider.sha256(analyzerBytes),
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
+    let handler = try hilogHandler(
+      provider: try AnalyzerProvider(profiles: [hilog]), profiles: [hilog],
+      jobsState: jobsState, store: store, capabilities: capabilities)
+    let otherDaemon = try hilogHandler(
+      provider: try AnalyzerProvider(
+        profiles: [crashOnly],
+        unavailableReasons: [
+          HilogSummaryDerivedAnalyzer.analyzerRef:
+            HilogSummaryDerivedAnalyzer.incompatibleExecutableReason
+        ]),
+      profiles: [crashOnly], jobsState: jobsState, store: store, capabilities: capabilities)
+    let unconfigured = try hilogHandler(
+      provider: try AnalyzerProvider(profiles: []), profiles: [], jobsState: jobsState,
+      store: store, capabilities: capabilities)
+
+    var sources: [String: String] = [:]
+    for job in Self.hilogJobs {
+      let source = try await store.publish(
+        RuntimeArtifactPublicationRequest(
+          jobID: Self.sourceJob, sessionID: "HTASK-JOBRUNORACLE", stepID: "capture-hilog",
+          name: "hilog-\(job.name).txt", mediaType: "text/plain", privacy: .standard,
+          retentionClass: .default, sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: Self.target, bindingRevision: 3,
+            stableIdentitySHA256: String(repeating: "c", count: 64)),
+          contents: Self.hilogSource(job.mode)))
+      sources[job.name] = try await store.leaseReference(
+        jobID: source.jobID, artifactID: source.artifactID)
+    }
+    // How each composition plans the first Job's request.
+    let planned = try Self.hilogSubmitParams("answered", lease: sources["answered"]!)
+    var plans: [JSONValue] = []
+    for (name, composition) in [
+      ("composed", handler), ("otherDaemon", otherDaemon), ("unconfigured", unconfigured),
+    ] {
+      plans.append(
+        .object([
+          "composition": .string(name), "params": .object(planned),
+          "response": try await exchange(composition, "job.plan", planned),
+        ]))
+    }
+    var recorded: [JSONValue] = []
+    var jobIDs: [String] = []
+    for job in Self.hilogJobs {
+      let submit = try Self.hilogSubmitParams(job.name, lease: sources[job.name]!)
+      let accepted = try await exchange(handler, "job.submit", submit)
+      guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
+        case .string(let jobID)? = result["jobId"]
+      else { throw CocoaError(.coderInvalidValue) }
+      jobIDs.append(jobID)
+      recorded.append(
+        .object([
+          "name": .string(job.name), "mode": .string(job.mode), "submit": .object(submit),
+          "accepted": accepted, "params": .object(["jobId": .string(jobID)]),
+        ]))
+    }
+    for (index, job) in Self.hilogJobs.enumerated() {
+      let response = try await exchange(handler, "job.run", ["jobId": .string(jobIDs[index])])
+      guard case .object(let fields) = response, case .object(let result)? = fields["result"]
+      else { throw CocoaError(.coderInvalidValue) }
+      XCTAssertEqual(result["state"], .string(job.ends), job.name)
+      guard case .object(var entry) = recorded[index] else { continue }
+      entry["response"] = response
+      recorded[index] = .object(entry)
+    }
+    var reads: [String: JSONValue] = [:]
+    for jobID in jobIDs {
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    var files: [String: Data] = [
+      "analyzer": analyzerBytes,
+      "plans.json": try encoder.encode(JSONValue.array(plans)) + Data("\n".utf8),
+      "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
+      "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
+      "store/index.json": try encoder.encode(try Self.index(of: jobsState)) + Data("\n".utf8),
+    ]
+    for job in try manager.contentsOfDirectory(atPath: artifacts.path).sorted()
+    where !job.hasPrefix(".") {
+      let directory = artifacts.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
+      where !name.hasPrefix(".") {
+        files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    let jobs = jobsState.appending(path: "jobs", directoryHint: .isDirectory)
+    for job in try manager.contentsOfDirectory(atPath: jobs.path).sorted() {
+      let directory = jobs.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted() {
+        files["store/jobs/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    var digests: [String: JSONValue] = [:]
+    for (path, data) in files { digests[path] = .string(Self.sha256(data)) }
+    files["provenance.json"] =
+      try encoder.encode(
+        JSONValue.object([
+          "producer": .string(
+            "JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedHilogSummaryJobs"),
+          "root": .string(Self.root.path),
+          "nowUTC": .string(Self.nowUTC),
+          "nowPreciseUTC": .string(Self.nowPreciseUTC),
+          "home": .string(Self.home),
+          "quotaBytes": .integer(Int64(Self.quotaBytes)),
+          "files": .object(digests),
+        ])) + Data("\n".utf8)
+    return files
+  }
+
   private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {
     let fields: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),

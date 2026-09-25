@@ -162,7 +162,7 @@ impl JobRunner<'_> {
         // Swift `dispatchWithWAL`'s last boundary before an intent.
         if self.cancellation.is_some_and(RunCancellation::pending) {
             self.carry(run)?;
-            return self.close_cancelled(run, false);
+            return self.close_cancelled(run, None);
         }
         let target = run.record.request["target"]["targetId"]
             .as_str()
@@ -546,7 +546,7 @@ impl JobRunner<'_> {
             Ok(MutationConsumption::Consumed | MutationConsumption::Held) => {}
             Ok(MutationConsumption::Cancelled) => {
                 self.carry(run)?;
-                return self.close_cancelled(run, false);
+                return self.close_cancelled(run, None);
             }
             Ok(MutationConsumption::PersistenceUncertain) => return Err(uncertain()),
             Err(reason) => return self.fail(run, &reason),
@@ -554,7 +554,7 @@ impl JobRunner<'_> {
         // Swift `dispatchWithWAL`'s last boundary before an intent.
         if self.cancellation.is_some_and(RunCancellation::pending) {
             self.carry(run)?;
-            return self.close_cancelled(run, false);
+            return self.close_cancelled(run, None);
         }
         let target = run.record.request["target"]["targetId"]
             .as_str()
@@ -756,7 +756,7 @@ impl JobRunner<'_> {
             Ok(MutationConsumption::Consumed | MutationConsumption::Held) => {}
             Ok(MutationConsumption::Cancelled) => {
                 self.carry(run)?;
-                return self.close_cancelled(run, false);
+                return self.close_cancelled(run, None);
             }
             Ok(MutationConsumption::PersistenceUncertain) => return Err(uncertain()),
             Err(reason) => return self.fail(run, &reason),
@@ -764,7 +764,7 @@ impl JobRunner<'_> {
         // Swift `dispatchWithWAL`'s last boundary before an intent.
         if self.cancellation.is_some_and(RunCancellation::pending) {
             self.carry(run)?;
-            return self.close_cancelled(run, false);
+            return self.close_cancelled(run, None);
         }
         let target = run.record.request["target"]["targetId"]
             .as_str()
@@ -1106,7 +1106,7 @@ impl JobRunner<'_> {
         // Swift `dispatchWithWAL`'s last boundary before an intent.
         if self.cancellation.is_some_and(RunCancellation::pending) {
             self.carry(run)?;
-            return self.close_cancelled(run, false);
+            return self.close_cancelled(run, None);
         }
         let target = run.record.request["target"]["targetId"]
             .as_str()

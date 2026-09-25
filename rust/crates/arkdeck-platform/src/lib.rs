@@ -243,6 +243,13 @@ mod tree_snapshot;
 pub use tree_snapshot::{TreeEntry, TreeEntryKind, snapshot_tree};
 
 #[cfg(target_os = "macos")]
+mod profile_file_reader;
+#[cfg(target_os = "macos")]
+pub use profile_file_reader::{
+    ProfilePath, ProfileReadError, ProfileSnapshot, open_profile_path, read_profile_file,
+};
+
+#[cfg(target_os = "macos")]
 mod bootstrap_bundle_capture;
 #[cfg(target_os = "macos")]
 pub use bootstrap_bundle_capture::{

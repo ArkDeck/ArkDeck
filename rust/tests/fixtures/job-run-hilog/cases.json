@@ -1,0 +1,766 @@
+[
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-ce57f7b014978fe39492cf64043a8fc9",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "answered",
+    "name" : "answered",
+    "params" : {
+      "jobId" : "job-ce57f7b014978fe39492cf64043a8fc9"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-ce57f7b014978fe39492cf64043a8fc9",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-ce57f7b014978fe39492cf64043a8fc9",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-ce57f7b014978fe39492cf64043a8fc9",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "succeeded",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-ce57f7b014978fe39492cf64043a8fc9",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "succeeded",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-answered-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-bfdf1c6973a8e0f2917400119782e8c5\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-answered\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-ee33cec880d312aebb47d3d773bf5aa3",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "newline",
+    "name" : "trailingNewline",
+    "params" : {
+      "jobId" : "job-ee33cec880d312aebb47d3d773bf5aa3"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-ee33cec880d312aebb47d3d773bf5aa3",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-ee33cec880d312aebb47d3d773bf5aa3",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-ee33cec880d312aebb47d3d773bf5aa3",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-ee33cec880d312aebb47d3d773bf5aa3",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-trailingNewline-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-b7b5b4f6e548f286e6b38211d47821ea\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-trailingNewline\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-e4fabaa9d82619eb4b6d16642a45075a",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "stderr",
+    "name" : "stderrWritten",
+    "params" : {
+      "jobId" : "job-e4fabaa9d82619eb4b6d16642a45075a"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-e4fabaa9d82619eb4b6d16642a45075a",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-e4fabaa9d82619eb4b6d16642a45075a",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-e4fabaa9d82619eb4b6d16642a45075a",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-e4fabaa9d82619eb4b6d16642a45075a",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-stderrWritten-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-40015cda0852e0072fc5664e2a85f94d\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-stderrWritten\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-31a4e3543f86df5dacc3b4c490ddc1ea",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "mismatch",
+    "name" : "otherSource",
+    "params" : {
+      "jobId" : "job-31a4e3543f86df5dacc3b4c490ddc1ea"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-31a4e3543f86df5dacc3b4c490ddc1ea",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-31a4e3543f86df5dacc3b4c490ddc1ea",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-31a4e3543f86df5dacc3b4c490ddc1ea",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-31a4e3543f86df5dacc3b4c490ddc1ea",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-otherSource-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-8f30d33523199a7261dcd9afc4cb4e88\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-otherSource\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-9e5a94c2d6dee4718c230bf0ddfb3f78",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "extra",
+    "name" : "extraMember",
+    "params" : {
+      "jobId" : "job-9e5a94c2d6dee4718c230bf0ddfb3f78"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-9e5a94c2d6dee4718c230bf0ddfb3f78",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-9e5a94c2d6dee4718c230bf0ddfb3f78",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-9e5a94c2d6dee4718c230bf0ddfb3f78",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-9e5a94c2d6dee4718c230bf0ddfb3f78",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-extraMember-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-0b72741235e0ba2f16141531374a7080\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-extraMember\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-9d08da568e57d57fae94ee72974a15d0",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "exit",
+    "name" : "nonZeroExit",
+    "params" : {
+      "jobId" : "job-9d08da568e57d57fae94ee72974a15d0"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-9d08da568e57d57fae94ee72974a15d0",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-9d08da568e57d57fae94ee72974a15d0",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-9d08da568e57d57fae94ee72974a15d0",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-9d08da568e57d57fae94ee72974a15d0",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-nonZeroExit-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-a5dc74fdda2b942278ad5f0525b1716e\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-nonZeroExit\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-d4759ab70b7cc8220db8860ea6d1916c",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "empty",
+    "name" : "emptyResult",
+    "params" : {
+      "jobId" : "job-d4759ab70b7cc8220db8860ea6d1916c"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-d4759ab70b7cc8220db8860ea6d1916c",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-d4759ab70b7cc8220db8860ea6d1916c",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-d4759ab70b7cc8220db8860ea6d1916c",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-d4759ab70b7cc8220db8860ea6d1916c",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-emptyResult-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-d97d3057b7a5c4834742f073dd180e34\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-emptyResult\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-97609a0ff003286d3fff11926a6897c1",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "malformed",
+    "name" : "malformedResult",
+    "params" : {
+      "jobId" : "job-97609a0ff003286d3fff11926a6897c1"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-97609a0ff003286d3fff11926a6897c1",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-97609a0ff003286d3fff11926a6897c1",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-97609a0ff003286d3fff11926a6897c1",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-97609a0ff003286d3fff11926a6897c1",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-malformedResult-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-33a35c8d315d42b52a19d4ae0aac9a5e\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-malformedResult\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-dad0649a414d7746686c71adb93e514d",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "scalar",
+    "name" : "scalarResult",
+    "params" : {
+      "jobId" : "job-dad0649a414d7746686c71adb93e514d"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-dad0649a414d7746686c71adb93e514d",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-dad0649a414d7746686c71adb93e514d",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-dad0649a414d7746686c71adb93e514d",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-dad0649a414d7746686c71adb93e514d",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-scalarResult-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-e39e5da92c477446963a9a483a368a8a\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-scalarResult\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-29b07cadf377008ece7ab9364c1a6a2f",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "big",
+    "name" : "overBudget",
+    "params" : {
+      "jobId" : "job-29b07cadf377008ece7ab9364c1a6a2f"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-29b07cadf377008ece7ab9364c1a6a2f",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-29b07cadf377008ece7ab9364c1a6a2f",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-29b07cadf377008ece7ab9364c1a6a2f",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-29b07cadf377008ece7ab9364c1a6a2f",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-overBudget-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-eb5a83be467045a44fd79f40e3030b8a\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-overBudget\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "accepted" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-06c28943c3b7b2ef8cf62c640fe38217",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    },
+    "mode" : "signal",
+    "name" : "signalled",
+    "params" : {
+      "jobId" : "job-06c28943c3b7b2ef8cf62c640fe38217"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "unknownOutcome",
+          "code" : "outcomeUnknown",
+          "recovery" : "awaitRuntimeReconciliation",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-06c28943c3b7b2ef8cf62c640fe38217",
+        "nextAction" : {
+          "kind" : "reconcile",
+          "owner" : {
+            "id" : "job-06c28943c3b7b2ef8cf62c640fe38217",
+            "kind" : "job"
+          },
+          "reasonCode" : "recovery.outcomeUnknown",
+          "resource" : {
+            "id" : "job-06c28943c3b7b2ef8cf62c640fe38217",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.summarize-hilog@1",
+        "outcome" : "outcomeUnknown",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-06c28943c3b7b2ef8cf62c640fe38217",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "waitingForRecovery",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    },
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-hilog-signalled-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-1fe08ca52ec20de60c7ffc6719354643\"},\"operation\":{\"id\":\"analyzer.summarize-hilog\",\"version\":1},\"requestId\":\"req-oracle-hilog-signalled\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  }
+]
