@@ -397,6 +397,81 @@ mod tests {
         assert_eq!(status(&fixture), "runtimeRestartRequired");
     }
 
+    /// Swift answers an idempotent register replay as `list` answers the
+    /// project: once the start composed it, active with what the start
+    /// published — here a project that did not resolve. A replay of a project
+    /// whose every operation is offered keeps the restart-required answer:
+    /// its `null` reason is not in the published register result.
+    #[test]
+    fn a_register_replay_answers_what_the_start_published_when_it_can() {
+        let fixture = Fixture::new();
+        let alpha = fixture.project("alpha", "first");
+        fixture
+            .store
+            .mark_applied(BTreeMap::from([(alpha.clone(), 1)]));
+        let register = || {
+            fixture
+                .call(
+                    "workspace.project.register",
+                    json!({"registrationRequestId": "alpha", "kind": "openharmony",
+                           "root": fixture.base.join("first").to_str().unwrap()}),
+                )
+                .unwrap()
+        };
+        let publication = |available: bool| {
+            Map::from_iter([
+                (
+                    "availability".into(),
+                    json!(if available {
+                        "available"
+                    } else {
+                        "unavailable"
+                    }),
+                ),
+                (
+                    "reasonCode".into(),
+                    if available {
+                        Value::Null
+                    } else {
+                        json!("workspace_project_profile_unavailable")
+                    },
+                ),
+                (
+                    "reason".into(),
+                    if available {
+                        Value::Null
+                    } else {
+                        json!("workspace.projectProfileUnavailable:absent")
+                    },
+                ),
+                ("allowedFileGlobs".into(), json!([])),
+                ("presetRefs".into(), json!([])),
+                ("operations".into(), json!([])),
+            ])
+        };
+        fixture
+            .store
+            .mark_published(BTreeMap::from([(alpha.clone(), publication(false))]));
+        let replayed = register();
+        assert_eq!(replayed["configurationStatus"], "active");
+        assert_eq!(
+            replayed["reasonCode"],
+            "workspace_project_profile_unavailable"
+        );
+        assert_eq!(
+            replayed,
+            fixture
+                .call("workspace.project.show", json!({"projectRef": alpha}))
+                .unwrap()
+        );
+        fixture
+            .store
+            .mark_published(BTreeMap::from([(alpha.clone(), publication(true))]));
+        let replayed = register();
+        assert_eq!(replayed["configurationStatus"], "runtimeRestartRequired");
+        assert!(replayed["reason"].is_string());
+    }
+
     #[test]
     fn presets_are_listed_and_shown_as_swift_projects_them() {
         let fixture = Fixture::new();

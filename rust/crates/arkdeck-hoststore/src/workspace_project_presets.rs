@@ -155,18 +155,16 @@ fn record(p: &Value, projects: &HashSet<&String>) -> Result<(), WireError> {
     let project = text(p, "projectRef")?;
     let request = text(p, "registrationRequestID")?;
     let mutation = text(p, "lastMutationRequestID")?;
-    if !identifier(project, 128)
-        || !identifier(request, 128)
-        || !identifier(mutation, 128)
-        || !projects.iter().any(|v| v.as_str() == project)
-        || p["registrationProjectRef"] != project
-    {
+    if !identifier(project, 128) || !identifier(request, 128) || !identifier(mutation, 128) {
         return Err(unreadable(()));
     }
     let generation = p["generation"].as_u64().unwrap();
     let state = text(p, "state")?;
     if state != "available" && !(state == "removed" && generation >= 2) {
-        return Err(unreadable(()));
+        return Err(failure(
+            "recordUnreadable",
+            "workspace preset state and generation are inconsistent",
+        ));
     }
     let registered = definition(p, true)?;
     let current = definition(p, false)?;
@@ -191,7 +189,17 @@ fn record(p: &Value, projects: &HashSet<&String>) -> Result<(), WireError> {
             .as_bytes(),
         )
     };
-    if p["registrationDigest"] != registered
+    // Swift's guard, with its message. A removed preset's record may outlive
+    // its project: removing a project is refused only while an available
+    // preset names it, so the tombstones of its removed presets stay behind,
+    // and refusing them made every later read of the store fail with nothing
+    // a caller could do. A tombstone grants nothing — every reader that
+    // admits a Job, composes a profile or pins a dependency takes only
+    // available presets, and one still answers only its own removal's
+    // replay. Any other preset must name a registered project.
+    if !(state == "removed" || projects.iter().any(|v| v.as_str() == project))
+        || p["registrationProjectRef"] != project
+        || p["registrationDigest"] != registered
         || p["currentDefinitionDigest"] != current
         || p["lastMutationDigest"] != expected
         || (generation == 1 && mutation != request)
@@ -199,7 +207,10 @@ fn record(p: &Value, projects: &HashSet<&String>) -> Result<(), WireError> {
             .zip(timestamp(text(p, "updatedAtUTC")?))
             .is_some_and(|(a, b)| b >= a)
     {
-        return Err(unreadable(()));
+        return Err(failure(
+            "recordUnreadable",
+            "workspace preset store record is inconsistent",
+        ));
     }
     Ok(())
 }

@@ -346,6 +346,15 @@ PR #2185, merged as `e59e5a412`: at `a0a0d2892` Agent PR 36129933234
 36129933371 all succeeded — `plan`, the Rust host-independent checks (42 s),
 the Rust workspace on macos-26 (9 min 31 s), ubuntu-latest (2 min 40 s) and
 windows-latest (4 min 21 s), and the `swift` aggregate; `swift-tests`,
-`ds-interactions` and `app-build` were skipped by the plan. The hosted soak
-the coordinating session dispatched (§5.5; Performance lanes run
-36130214960, `soak-hours=4`) was still in progress when this was written.
+`ds-interactions` and `app-build` were skipped by the plan.
+
+The hosted soak the coordinating session dispatched (§5.5; Performance lanes
+run 36130214960, `workflow_dispatch`, `soak-hours=4`) succeeded. It ran the
+branch head `a0a0d2892`, whose content is the merged `e59e5a412`, on macos-26
+for 4 hours with a 35 s restart interval: 317 cycles, 3,170 terminal Jobs,
+2,853 of them with verified Artifacts. Resident growth was 23.76 MB at cycle
+288 and 24.95 MB at the end, under the fixture's 32 MiB gate; the descriptor
+count stayed 19 throughout. Growth per cycle keeps falling: 0.106, 0.073 and
+0.045 MB over cycles 51–124, 125–200 and 201–317 as the coordinating session
+fitted them (the end points of the same windows give 0.096, 0.077 and
+0.049 MB).

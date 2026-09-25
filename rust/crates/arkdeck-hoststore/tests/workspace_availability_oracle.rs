@@ -19,18 +19,33 @@ use arkdeck_hoststore::{
     WorkspaceReference, WorkspaceToolchainPinning, operation_unavailability,
 };
 use serde_json::{Map, Value, json};
-use std::fs;
+use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use support::chmod;
 
 /// The recording's fixed root: the registrations pin its projects' roots.
 const ROOT: &str = "/private/tmp/arkdeck-workspace-availability-oracle";
+const LOCK: &str = "/private/tmp/arkdeck-workspace-availability-oracle.lock";
 const TIMESTAMP: &str = "2026-09-25T00:00:00Z";
 const SOURCE_MAP: &str = "entry/build/default/outputs/default/mapping/sourceMaps.map";
 
 fn oracle_now() -> Option<String> {
     Some(TIMESTAMP.into())
+}
+
+/// Serializes every user of the fixed root: another worktree's run of this
+/// binary would otherwise remove the root under this one.
+fn exclusive() -> File {
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(LOCK)
+        .unwrap();
+    lock.lock().unwrap();
+    lock
 }
 
 fn oracle() -> PathBuf {
@@ -248,6 +263,8 @@ fn assert_answer(frames: &mut Frames, store: &WorkspaceProjectStore, method: &st
 
 #[test]
 fn the_rust_composition_publishes_what_swift_s_daemon_published() {
+    // Taken first, so the root is removed before the lock is released.
+    let _lock = exclusive();
     let host = Host::fixed();
     let mut frames = Frames::load();
 
