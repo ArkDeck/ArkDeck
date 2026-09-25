@@ -759,6 +759,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "device-access"] => "flash.device-access",
         ["flash", "prerequisites"] => "flash.prerequisites",
         ["flash", "lane-preview"] => "flash.lane-preview",
+        ["flash", "run"] => "flash.run",
         ["recovery", "flash-invocation", "list"] => "recovery.flash-invocation.list",
         ["recovery", "flash-invocation", "start"] => "recovery.flash-invocation.start",
         ["recovery", "flash-invocation", "evaluate"] => "recovery.flash-invocation.evaluate",
