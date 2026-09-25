@@ -351,6 +351,56 @@ impl CatalogOperation {
         Ok(())
     }
 
+    /// Swift `RuntimeWorkspaceContinuation.inputsMatchCatalog`: whether a
+    /// recorded request's typed inputs may seed a new request. Stricter than
+    /// the Runtime's validation in its own ways: only boolean, integer, string
+    /// and string-array fields match; a string's `maxLength` counts UTF-8
+    /// bytes; a string array without `maxItems` holds no item, and its items
+    /// are not held to the field's enum. A pattern the Catalog evaluator does
+    /// not read matches nothing.
+    pub fn inputs_match_catalog(&self, inputs: &Map<String, Value>) -> bool {
+        if self
+            .inputs
+            .iter()
+            .any(|field| field.required && !inputs.contains_key(&field.name))
+        {
+            return false;
+        }
+        inputs.iter().all(|(name, value)| {
+            let Some(field) = self.inputs.iter().find(|field| &field.name == name) else {
+                return false;
+            };
+            let fits = |text: &str| {
+                field
+                    .max_length
+                    .is_none_or(|maximum| text.len() as u64 <= maximum)
+                    && field
+                        .pattern
+                        .as_ref()
+                        .is_none_or(|pattern| catalog_pattern::matches(pattern, text) == Some(true))
+            };
+            match (field.kind.as_str(), value) {
+                ("boolean", Value::Bool(_)) => true,
+                ("integer", Value::Number(number)) => number.as_i64().is_some_and(|number| {
+                    field.minimum.is_none_or(|minimum| number >= minimum)
+                        && field.maximum.is_none_or(|maximum| number <= maximum)
+                }),
+                ("string", Value::String(text)) => {
+                    fits(text)
+                        && field
+                            .enum_values
+                            .as_ref()
+                            .is_none_or(|allowed| allowed.contains(text))
+                }
+                ("stringArray", Value::Array(items)) => {
+                    items.len() as u64 <= field.max_items.unwrap_or(0)
+                        && items.iter().all(|item| item.as_str().is_some_and(fits))
+                }
+                _ => false,
+            }
+        })
+    }
+
     /// Swift `CatalogOperationEffectResolver.resolvedInputValue`.
     pub fn resolved<'a>(&'a self, name: &str, inputs: &'a Map<String, Value>) -> Option<&'a Value> {
         inputs.get(name).or_else(|| {
@@ -516,5 +566,51 @@ mod tests {
         for disabled in ["workspace.apply-patch", "workspace.run-tests"] {
             assert!(!issuance(disabled), "{disabled}");
         }
+    }
+
+    /// Swift `RuntimeWorkspaceContinuation.inputsMatchCatalog` over
+    /// `capture.diagnostics@1`, whose fields have every constraint it reads.
+    #[test]
+    fn continuation_inputs_match_the_catalog_as_swift_judges_them() {
+        let operation = CatalogOperation::lookup("capture.diagnostics", Some(1)).unwrap();
+        let matches = |inputs: serde_json::Value| {
+            operation.inputs_match_catalog(inputs.as_object().expect("an inputs object"))
+        };
+        assert!(matches(serde_json::json!({
+            "durationSeconds": 30,
+            "screenshotImageType": "jpeg",
+            "hilogFilters": ["a/b", "é", "\u{1}"],
+            "bundleName": "com.example.app",
+            "uiDump": false,
+        })));
+        for refused in [
+            serde_json::json!({}),
+            serde_json::json!({"durationSeconds": 0}),
+            serde_json::json!({"durationSeconds": 601}),
+            serde_json::json!({"durationSeconds": 5.5}),
+            serde_json::json!({"durationSeconds": u64::MAX}),
+            serde_json::json!({"durationSeconds": 30, "unknown": true}),
+            serde_json::json!({"durationSeconds": 30, "screenshotImageType": "gif"}),
+            serde_json::json!({"durationSeconds": 30, "bundleName": "app"}),
+            serde_json::json!({"durationSeconds": 30, "uiDump": "yes"}),
+            serde_json::json!({"durationSeconds": 30, "hilogFilters": [1]}),
+            serde_json::json!({"durationSeconds": 30, "hilogFilters": vec!["x"; 17]}),
+            serde_json::json!({"durationSeconds": 30, "traceCategories": ["é".repeat(33)]}),
+        ] {
+            assert!(!matches(refused.clone()), "{refused}");
+        }
+        // Counted in UTF-8 bytes: 32 two-byte characters fill 64.
+        assert!(matches(
+            serde_json::json!({"durationSeconds": 30, "traceCategories": ["é".repeat(32)]})
+        ));
+        // An Artifact lease never seeds a new request, however well formed.
+        let analyzer = CatalogOperation::lookup("analyzer.summarize-hilog", Some(1)).unwrap();
+        assert!(
+            !analyzer.inputs_match_catalog(
+                serde_json::json!({"sourceArtifactRef": "arkdeck-artifact://job-1/artifact-1"})
+                    .as_object()
+                    .unwrap()
+            )
+        );
     }
 }

@@ -1,0 +1,10 @@
+{
+  "owners" : [
+    "CLIWorkspaceContinuationDraft.sourceRequiresCurrentTarget",
+    "CLIWorkspaceContinuationDraft.prepare",
+    "CLIWorkspaceContinuationDraft.request",
+    "CLIWorkspaceContinuationDraft.validateAcceptedJob",
+    "CLIWorkspaceContinuationDraft.projection"
+  ],
+  "producer" : "CLIWorkspaceContinuationOracleContractTests"
+}

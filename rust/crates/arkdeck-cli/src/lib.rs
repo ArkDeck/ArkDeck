@@ -34,7 +34,11 @@ pub use job_plan::{
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::{validate_session_request, validate_session_response};
+mod workspace_continuation;
 mod workspace_projects;
+pub use workspace_continuation::{
+    Draft, continue_workspace, request_json, requires_current_target,
+};
 pub use workspace_projects::validate_workspace_project_response;
 mod target_resources;
 pub use target_resources::validate_target_response;
@@ -629,6 +633,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--arkforge-profile"
                 | "--bundle-generation"
                 | "--tool-generation"
+                | "--source-job"
+                | "--continuation-request-id"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -708,6 +714,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--arkforge-profile" => "arkforgeProfile",
                         "--bundle-generation" => "bundleGeneration",
                         "--tool-generation" => "toolGeneration",
+                        "--source-job" => "sourceJob",
+                        "--continuation-request-id" => "continuationRequestId",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -776,6 +784,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["workspace", "preset", "register"] => "workspace.preset.register",
         ["workspace", "preset", "update"] => "workspace.preset.update",
         ["workspace", "preset", "remove"] => "workspace.preset.remove",
+        ["workspace", "continuation", "inspect"] => "workspace.continuation.inspect",
+        ["workspace", "continuation", "submit"] => "workspace.continuation.submit",
+        ["workspace", "continuation", "run"] => "workspace.continuation.run",
         ["artifact", "import", "hap"] => "artifact.import.hap",
         ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
         ["artifact", "import", "native-library"] => "artifact.import.native-library",
@@ -1237,6 +1248,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.watch" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.wait" => &["jobId", "timeout", "afterCursor", "pageSize"],
+        "workspace.continuation.inspect" => &["sourceJob", "timeout"],
+        "workspace.continuation.submit" | "workspace.continuation.run" => {
+            &["sourceJob", "continuationRequestId", "timeout"]
+        }
         "job.list" => &[
             "pageSize",
             "cursor",
@@ -1543,6 +1558,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     } else {
         None
     };
+    let continuation_timeout =
+        workspace_continuation::configure(command, &mut method_options, help)?;
     let wait_timeout = if command == "job.wait" && !help {
         job_wait::configure(&mut method_options, mode.as_deref() == Some("jsonl"))?
     } else {
@@ -1565,7 +1582,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         .or(plan_timeout)
         .or(agent_timeout)
         .or(human_action_timeout)
-        .or(hdc_timeout);
+        .or(hdc_timeout)
+        .or(continuation_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -1636,6 +1654,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
         } else if command.starts_with("workspace.project.")
             || command.starts_with("workspace.preset.")
+            || command.starts_with("workspace.continuation.")
             || command.starts_with("history.filter.")
             || command.starts_with("runtime.storage.")
             || matches!(
