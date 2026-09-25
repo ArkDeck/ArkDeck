@@ -1060,6 +1060,34 @@ fn serve_domain_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCod
     }
 }
 
+/// A registry leaf whose subsystem the Rust CLI has not ported: answered
+/// `blockedByProductDefect` in the caller's rendering, and nothing dispatched
+/// (`blocked_leaves`). A deprecated spelling still says so.
+fn serve_blocked_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    let error = arkdeck_cli::blocked_leaves::refusal(invocation.command);
+    let written =
+        if invocation.json {
+            write_document(&arkdeck_cli::with_lifecycle(
+                failure_envelope(invocation.command, &error, id, false),
+                invocation.command,
+            ))
+        } else if invocation.legacy_json {
+            io::stdout().lock().write_all(&arkdeck_cli::legacy_document(
+                &arkdeck_cli::legacy_failure(&error),
+            ))
+        } else {
+            if let Some(warning) = arkdeck_cli::legacy_warning(invocation.command) {
+                eprintln!("{warning}");
+            }
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        };
+    if written.is_err() {
+        return 74.into();
+    }
+    error.exit_code().into()
+}
+
 /// `maintainer contracts export|check`: its one document, then its failure, if
 /// any, which after a document is only a diagnostic and the exit status
 /// (Swift `suppressesMachineRendering`).
@@ -1219,6 +1247,9 @@ fn main() -> std::process::ExitCode {
     }
     if invocation.command.starts_with("maintainer.contracts.") {
         return serve_maintainer_contracts(&invocation, id);
+    }
+    if arkdeck_cli::blocked_leaves::blocks(invocation.command) {
+        return serve_blocked_leaf(&invocation, id);
     }
     if arkdeck_cli::domain_leaves::serves(invocation.command) {
         return serve_domain_leaf(&invocation, id);
