@@ -26,6 +26,24 @@ fn invoke(argv: &[&str], socket: &PathBuf) -> Output {
     command.arg("--socket").arg(socket).output().unwrap()
 }
 
+/// The fake Runtime's private directory, which holds its socket. It is
+/// removed however the test ends: an assertion that fails first, in the
+/// server thread or over what it served, unwinds through here rather than
+/// leaving the directory behind, and a passing test still fails if the
+/// directory cannot be removed.
+struct Root(PathBuf);
+
+impl Drop for Root {
+    fn drop(&mut self) {
+        let removed = std::fs::remove_dir_all(&self.0);
+        // Panicking again while a failed assertion unwinds would abort the
+        // whole test binary.
+        if !std::thread::panicking() {
+            removed.unwrap();
+        }
+    }
+}
+
 /// The CLI run with `argv` against a fake Runtime that serves exactly one
 /// connection and answers the exchanges `replies` names, in order, each
 /// request having to carry exactly that method and parameters. The first
@@ -52,7 +70,8 @@ fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> 
         .mode(0o700)
         .create(&root)
         .unwrap();
-    let path = root.join("a.sock");
+    let root = Root(root);
+    let path = root.0.join("a.sock");
     let listener = UnixListener::bind(&path).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let acceptor = listener.try_clone().unwrap();
@@ -112,7 +131,7 @@ fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> 
         "no connection beyond the first"
     );
     drop(listener);
-    std::fs::remove_dir_all(root).unwrap();
+    drop(root);
     let envelope = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
     (output, envelope)
 }
@@ -147,7 +166,8 @@ fn connections(
         .mode(0o700)
         .create(&root)
         .unwrap();
-    let path = root.join("a.sock");
+    let root = Root(root);
+    let path = root.0.join("a.sock");
     let listener = UnixListener::bind(&path).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
     let acceptor = listener.try_clone().unwrap();
@@ -252,7 +272,7 @@ fn connections(
         "no connection beyond the exchanges"
     );
     drop(listener);
-    std::fs::remove_dir_all(root).unwrap();
+    drop(root);
     let envelope = serde_json::from_slice(&output.stdout).unwrap_or(Value::Null);
     (output, envelope)
 }
