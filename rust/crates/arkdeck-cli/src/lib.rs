@@ -813,6 +813,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["debug", "probe"] => "debug.probe",
+        ["trace", "probe"] => "trace.probe",
         ["debug", "start"] => "debug.start",
         ["debug", "evaluate"] => "debug.evaluate",
         ["debug", "status"] => "debug.status",
@@ -912,10 +913,12 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     // registry lists it beside `--output`, which it excludes), connect to no
     // caller-named Runtime and take no correlation identity.
     let service = command.starts_with("runtime.service.");
-    if legacy_json && (!(command == "debug.probe" || service) || mode.is_some()) {
+    if legacy_json
+        && (!(matches!(command, "debug.probe" | "trace.probe") || service) || mode.is_some())
+    {
         return Err(CliError::new(
             "invalidOption",
-            "--json belongs to debug probe and the runtime service leaves and excludes --output",
+            "--json belongs to debug probe, trace probe and the runtime service leaves and excludes --output",
         ));
     }
     if service && (id.is_some() || socket.is_some()) {
@@ -993,7 +996,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
-        "debug.probe" => &["targetId"],
+        "debug.probe" | "trace.probe" => &["targetId"],
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
@@ -1664,6 +1667,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                     | "operation.validate"
                     | "device.wait"
                     | "debug.probe"
+                    | "trace.probe"
                     | "job.status"
                     | "job.list"
                     | "job.show"
