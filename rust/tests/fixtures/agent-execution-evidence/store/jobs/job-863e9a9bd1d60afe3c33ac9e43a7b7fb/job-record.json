@@ -1,0 +1,133 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "prepareWorkspaceIsolation"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+  "materializedPlanDigest" : "cdb8b8beac5c2b49c02b5a92ac4f64ee7c259739451b1aa25997569890567b8f",
+  "operationReference" : "workspace.prepare-isolated-copy@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "agent-execution-2561a09f46177a7bf4c2b19119a1caa651362e427babd3a58e5a4d990b7a27a5",
+    "inputs" : {
+      "allowedFileGlobs" : [
+        "Sources\/App.txt"
+      ],
+      "expectedWorkspaceRevision" : "b9a6de6eeadde9c32924e042fe29c06f503ff05785e0468d2e4b186d7febe7ea",
+      "projectRef" : "EvidenceOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.prepare-isolated-copy",
+      "version" : 1
+    },
+    "requestId" : "agent-request-2561a09f46177a7bf4c2b19119a1caa651362e427babd3a58e5a4d990b7a27a5",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "EvidenceOracleProject"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "workspace",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "agent-execution-2561a09f46177a7bf4c2b19119a1caa651362e427babd3a58e5a4d990b7a27a5",
+    "inputs" : {
+      "allowedFileGlobs" : [
+        "Sources\/App.txt"
+      ],
+      "expectedWorkspaceRevision" : "b9a6de6eeadde9c32924e042fe29c06f503ff05785e0468d2e4b186d7febe7ea",
+      "projectRef" : "EvidenceOracleProject"
+    },
+    "operation" : {
+      "id" : "workspace.prepare-isolated-copy",
+      "version" : 1
+    },
+    "requestId" : "agent-request-2561a09f46177a7bf4c2b19119a1caa651362e427babd3a58e5a4d990b7a27a5",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "EvidenceOracleProject"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "3139",
+      "lastSequence" : 6,
+      "sha256" : "4f4a68c6b46de2611e80acdbccd1d0e792d5ceb7d59ec73fe49df43a5e9c0cb1"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "68675",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "3524",
+      "lastSequence" : 7,
+      "sha256" : "a6984a33431d8a8f407e095df54672ff05f9ebe32b77785d18ff7476f2e3cef6"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1897",
+      "manifestSHA256" : "ec10ca6c949c76e2d072eb0439485132d771a753dd770ad5ca90a30966dd51bb",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "2",
+      "manifestSHA256" : "ec10ca6c949c76e2d072eb0439485132d771a753dd770ad5ca90a30966dd51bb",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent prepare-isolated-copy",
+    "verified prepare-isolated-copy [\"allowedFileScopesDigest\", \"isolation\", \"projectRef\", \"sourceProjectRef\", \"sourceWorkspaceRevision\", \"workspaceId\", \"workspaceRevision\"]",
+    "artifact isolated-workspace.json -> ART-294c3d88c21441ae4526c32fe9bae50d",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

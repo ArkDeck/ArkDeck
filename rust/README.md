@@ -1406,6 +1406,18 @@ fake, the 19 exchanges that need no adoption, resume or Job: the raises, the
 reads, and the list and show refusals. Replaying the rest waits for the resume
 path.
 
+`rust/tests/fixtures/agent-execution-evidence/` is Swift
+`AgentExecutionEvidenceOracleContractTests`' oracle for completed executions
+whose evidence the published results had not sampled: the three pointer
+gestures, whose Runtime capability names no Artifact (`artifactDigest` null); a
+workspace copy, whose target is its project; and a tap and an analysis that
+wait for a person to connect the device, are resumed, and are resumed again
+once complete, by `agent.resume` and `human-action.resume`. Its frames widened
+those four results. `crates/arkdeck-agentd/tests/agent_run_cli_process.rs`
+runs the real CLI against the real daemon for the copy, the gestures and the
+assisted tap, the oracle's device answering behind the managed fake HDC
+(`fake-hdc.c`'s `DRIVER`).
+
 The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
 <reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
 <path>] [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]`

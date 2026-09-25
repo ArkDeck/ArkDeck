@@ -15,18 +15,18 @@
     },
     "agent.resume": {
       "errors": 10,
-      "requests": 15,
-      "successes": 5
+      "requests": 18,
+      "successes": 8
     },
     "agent.run": {
       "errors": 11,
-      "requests": 28,
-      "successes": 17
+      "requests": 30,
+      "successes": 19
     },
     "agent.status": {
       "errors": 2,
-      "requests": 12,
-      "successes": 10
+      "requests": 15,
+      "successes": 13
     },
     "artifact.export": {
       "errors": 4,
@@ -230,8 +230,8 @@
     },
     "human-action.resume": {
       "errors": 14,
-      "requests": 26,
-      "successes": 12
+      "requests": 28,
+      "successes": 14
     },
     "human-action.show": {
       "errors": 3,
@@ -531,15 +531,15 @@
   },
   "corpusRecordCounts": {
     "errors": 456,
-    "requests": 1010,
-    "successes": 554
+    "requests": 1020,
+    "successes": 564
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "bb526d92fe9c7afd1c69bf2b6d7f1ffb1c8d2c0378387437fbe7972ae5af974c",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "cef213eee61c4158d432d97a2c8034acce43f374331dcbb120d6d5a140bca7d6",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "a5581e9d2fa10972c534b02f26c83c2593cb90c404d6d26f31d5cf1680d2f57f"
+    "spec/control/methods": "5f592bc61c4803950cb86ff4920ea5060cebf55f66c0120d2f29b3a554cd2211"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -723,16 +723,16 @@
       "sha256": "b9b04365780f5efe6b0fca33600e3f6f58b9317969694fc33008dfb446ee0287"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.resume.jsonl": {
-      "blob": "47d66a775bbbcb2949834cd1d6b418536747269e",
-      "sha256": "a74513032a68071f18c8f9c45edeb46b8e3f72b877c925bff259535606103c74"
+      "blob": "4e30cfdc3dcb590b155e9c2121fb1cfbbd5493b7",
+      "sha256": "6272da13e0d329fab296aadfabc4084cd5de813a179b5e6e584e65b11e13c28b"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.run.jsonl": {
-      "blob": "4fb2b7cbca15f39cf1ecdd5a46917cf3409676ee",
-      "sha256": "7b6c64660b92fa55f56d5c320de2badb839932bc1713e270a2704575d6527d91"
+      "blob": "773995a98d6d4d73a840df9ce896da2c0484b922",
+      "sha256": "2408f18fdedd65e3b8988e690d8e2208f6591203bbb6818512eebf3609669a70"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.status.jsonl": {
-      "blob": "dda92260401d965a39f0ed786ba690eb2be5e416",
-      "sha256": "177b00085a893b352a77edcea6d8b7a264921df2d6ecf55b0d17a1201c120985"
+      "blob": "942139ab2b1dbf7bcb78376558e1ef8a1c91ceeb",
+      "sha256": "c2c9395d1deaa400581d1af2115c2183d686d83e58befedfa5a69a2423ac2d93"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.export.jsonl": {
       "blob": "294a7e11eca1a71198217b967800a4e2eb297544",
@@ -895,8 +895,8 @@
       "sha256": "a699e13427efc61b1370def97d16536c85a654fd3ac9184db4c55311111e32c5"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.resume.jsonl": {
-      "blob": "56a7548b8721ffe95d29968438aafe18167f5f9e",
-      "sha256": "b9b1c7d2aaec7bc3906dd608267f3b94cf89ea4d9ea202c386fee8933fe718d1"
+      "blob": "fc68766b79d4cb3f4767cec8a9dafcfa080e9c0b",
+      "sha256": "c7e45db33e5e9bbed83f077d4e9c9047e9e24589d8983a7c2b8704e57ca20715"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/human-action.show.jsonl": {
       "blob": "bc8ef6574f7345d99b08e6e4dac8c0dde2813843",
@@ -1319,16 +1319,16 @@
       "sha256": "9081e79c4972c1573b6427da9d11d0cded1fd673fd6bcaa578214ca6039c650a"
     },
     "spec/control/methods/agent.resume.json": {
-      "blob": "c3557837f4a0b1c05514f6fcfe4be27c11e03a85",
-      "sha256": "1d3585b030cf4df8d3a5ae25d7eec6966c3f81678043071c517b4d244005db5f"
+      "blob": "20d28559c2119ce851db79950a4fcce2cae04c2f",
+      "sha256": "64b0baa02d876f72329b15922172ec21b6fb4ef58f721084749bdfe6e250d1f2"
     },
     "spec/control/methods/agent.run.json": {
-      "blob": "2667280abef8bcb654bc30eaf5c4f7c825fa0122",
-      "sha256": "78bc118a94538ac0bc445559f58c2b87196aab32a4083379d69d24118db691ba"
+      "blob": "797dbda340717b2945b727ed8df02dafb9dd133c",
+      "sha256": "589536bfacdd635e26fe038c3ebb1ae202d5d741b82d2a27a0e9c4ac1779eddb"
     },
     "spec/control/methods/agent.status.json": {
-      "blob": "e50731240594151501dcceff65c19eea1b12a749",
-      "sha256": "ee06df2c83842833535b0206c86c9b427cc78d5449d3863d700f0ef7d6d22c99"
+      "blob": "2fa4e37f5690f1936b4aac31a5d6a402b7d2f2b3",
+      "sha256": "6ef3937ffc8ce555518b6cc05b8559d5692dd0856d8dcb7d1e03119f1e2ba3ae"
     },
     "spec/control/methods/artifact.export.json": {
       "blob": "a5e9bba8d59089e6aa1de5069eb7f0561b505656",
@@ -1491,8 +1491,8 @@
       "sha256": "42bf180e9eb9520699c7e771966720b5f3a2082f2249f73db73196f27fb1796a"
     },
     "spec/control/methods/human-action.resume.json": {
-      "blob": "faf78722a76c83b9711910a238a65f0f919ceac7",
-      "sha256": "682f0c5d79bd9de133facb209788b603ee955df249b02a6b75cbe59a6e614dc3"
+      "blob": "fbc4c19e14a4a0f2f3425d03cb457ec238267803",
+      "sha256": "51bdb56c57737c6bb8f34332cdae15385d61b9d1f63167fba6d041931a660705"
     },
     "spec/control/methods/human-action.show.json": {
       "blob": "f941678198d48cb00721ccce433d063ec3346936",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "bde75cffd517464ff9b7f6dc7c9696955b006155af363e91d8082855f431fe59",
+  "inputDigest": "87baf88be24efdf05b80bb76b2a3a266f4324d56a43c6bfca12299ec3a5b54e9",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

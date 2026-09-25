@@ -116,7 +116,7 @@ final class PointerInputOracleContractTests: XCTestCase {
   /// hint it prints on every run — by mode: `rejected` answers a parameter
   /// error, `silent` answers nothing, `otherGesture` acknowledges a swipe
   /// whatever it was given.
-  private static let answers = #"""
+  static let answers = #"""
     # input.tap@1, input.long-press@1 and input.swipe@1 answers of the shared fake HDC, by mode.
     key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     case "$*" in

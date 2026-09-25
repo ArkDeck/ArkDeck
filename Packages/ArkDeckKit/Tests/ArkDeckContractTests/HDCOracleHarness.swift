@@ -159,8 +159,10 @@ enum HDCOracleHarness {
   /// unless an oracle names them). With `analyzers`, the analyzer provider
   /// over those profiles is registered beside the HDC provider, and the
   /// daemon's dispatcher router sends analysis plans to the descriptor-bound
-  /// analyzer dispatcher over them. None of these is applied unless an oracle
-  /// names it.
+  /// analyzer dispatcher over them. With `workspace`, that workspace provider
+  /// is registered beside them and the router sends workspace plans to its
+  /// dispatcher, as the daemon routes a registered project's operations.
+  /// None of these is applied unless an oracle names it.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
     nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false,
@@ -172,7 +174,8 @@ enum HDCOracleHarness {
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     testHooks: RuntimeJobEngine.Configuration.TestHooks = .none,
-    analyzers: [AnalyzerProfile] = []
+    analyzers: [AnalyzerProfile] = [],
+    workspace: (provider: any DeviceProvider, dispatcher: any RuntimeProcessDispatching)? = nil
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -208,19 +211,24 @@ enum HDCOracleHarness {
     if !analyzers.isEmpty {
       registered.append(try AnalyzerProvider(profiles: analyzers))
     }
+    if let workspace { registered.append(workspace.provider) }
     let providers = DeviceProviderRegistry(providers: registered)
     let processes = DescriptorBoundProcessDispatcher(
       resolver: try FixedExecutableResolver.hashing(path: hdc.path, providerID: "hdc"))
     let hdcDispatcher: any RuntimeProcessDispatching =
       fixedInvocationSeconds.map { FixedDurationDispatcher(base: processes, seconds: $0) }
       ?? processes
-    let dispatcher: any RuntimeProcessDispatching =
+    let analyzerDispatcher: (any RuntimeProcessDispatching)? =
       analyzers.isEmpty
+      ? nil
+      : DescriptorBoundProcessDispatcher(
+        resolver: try AnalyzerExecutableResolver(profiles: analyzers))
+    let dispatcher: any RuntimeProcessDispatching =
+      analyzerDispatcher == nil && workspace == nil
       ? hdcDispatcher
       : RuntimeProcessDispatcherRouter(
-        hdc: hdcDispatcher, rockchip: hdcDispatcher,
-        analyzer: DescriptorBoundProcessDispatcher(
-          resolver: try AnalyzerExecutableResolver(profiles: analyzers)))
+        hdc: hdcDispatcher, rockchip: hdcDispatcher, workspace: workspace?.dispatcher,
+        analyzer: analyzerDispatcher)
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: jobsState, testHooks: testHooks, sessionPublicationWriter: writer),
