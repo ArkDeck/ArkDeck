@@ -1142,6 +1142,48 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(rendered.contains("private-demo-app"), "the host root never crosses the control plane")
   }
 
+  /// `TASK-XPA-015`: `show` publishes the same per-operation answer as
+  /// discovery. An operation the composition could not offer carries its code
+  /// and reason there too — the project's own view is where a caller looks for
+  /// what to install — so its result shape enters the recorded corpus with
+  /// both members as text.
+  func testAShownWorkspaceProjectSaysWhyAnOperationIsUnavailable() async throws {
+    let (handler, _) = try makeStack(workspaceProjects: [
+      WorkspaceProjectPublication(
+        projectRef: "demo-app", kind: "primary", available: true, reasonCode: nil, reason: nil,
+        allowedFileGlobs: ["entry/src/**"],
+        presets: [.init(presetRef: "debug", kind: "build", timeoutSeconds: 900)],
+        operations: [
+          .init(
+            reference: "workspace.build-openharmony@1", available: true, reasonCode: nil,
+            reason: nil),
+          .init(
+            reference: "workspace.inspect-git-status@1", available: false,
+            reasonCode: "workspace_preset_unavailable", reason: "workspace.presetUnavailable"),
+        ])
+    ])
+    let shown = try await request(
+      handler, method: "workspace.project.show", params: ["projectRef": .string("demo-app")])
+    XCTAssertTrue(shown.ok, shown.error?.message ?? "-")
+    guard case .object(let project)? = shown.result,
+      case .array(let operations)? = project["operations"]
+    else { return XCTFail("workspace.project.show must answer the project's operations") }
+    XCTAssertEqual(
+      operations,
+      [
+        .object([
+          "reference": .string("workspace.build-openharmony@1"),
+          "availability": .string("available"), "reasonCode": .null, "reason": .null,
+        ]),
+        .object([
+          "reference": .string("workspace.inspect-git-status@1"),
+          "availability": .string("unavailable"),
+          "reasonCode": .string("workspace_preset_unavailable"),
+          "reason": .string("workspace.presetUnavailable"),
+        ]),
+      ])
+  }
+
   /// §7.9: an unknown reference is `workspaceReferenceNotFound`, which is not
   /// `notFound`. The two send a caller somewhere different — one to a
   /// different identity, the other to `workspace project list`.
