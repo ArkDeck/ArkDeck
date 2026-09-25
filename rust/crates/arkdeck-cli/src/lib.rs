@@ -26,6 +26,7 @@ pub use read_only_resources::{
 mod job_events;
 mod job_plan;
 mod job_resources;
+mod job_wait;
 pub use job_plan::{
     generates_identity, job_plan_params, job_submit_params, run_exit, validate_acceptance,
     validate_cancellation, validate_plan,
@@ -56,6 +57,7 @@ pub use command_registry::{
 };
 pub use device_wait::{proved_row, wait_document, wait_request, wait_timeout};
 pub use job_events::{EventStream, event_line, terminal_line};
+pub use job_wait::{Poll, follows_events, observed, poll, stopped_waiting};
 pub use operation_validation::{
     bounded_input_document, input_findings, validation_attention, validation_document,
 };
@@ -793,6 +795,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["recovery", "flash-invocation", "status"] => "recovery.flash-invocation.status",
         ["debug", "template", "list"] => "debug.template.list",
         ["job", "watch"] => "job.watch",
+        ["job", "wait"] => "job.wait",
         ["job", "plan"] => "job.plan",
         ["job", "submit"] => "job.submit",
         ["job", "run"] => "job.run",
@@ -1191,6 +1194,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.watch" => &["jobId", "pageSize", "afterCursor", "timeout"],
+        "job.wait" => &["jobId", "timeout", "afterCursor", "pageSize"],
         "job.list" => &[
             "pageSize",
             "cursor",
@@ -1497,6 +1501,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     } else {
         None
     };
+    let wait_timeout = if command == "job.wait" && !help {
+        job_wait::configure(&mut method_options, mode.as_deref() == Some("jsonl"))?
+    } else {
+        None
+    };
     debug_probe::configure(command, &method_options, help)?;
     // Swift's parser names the leaf a refused option belongs to.
     flash_leaves::configure(command, &mut method_options, help).map_err(|mut error| {
@@ -1506,6 +1515,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(device_wait_timeout)
         .or(watch_timeout)
+        .or(wait_timeout)
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
@@ -1538,6 +1548,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "device.observations"
         } else if command == "job.watch" {
             "job.events"
+        } else if command == "job.wait" {
+            // Its polling path reads the status; its event path the stream,
+            // then the status (`main.rs` `wait_for_job`).
+            "job.status"
         } else if command == "recovery.flash-invocation.status" {
             // Swift's handler reads the invocation through `debug.status`, the
             // wire method `debug status` also sends.
@@ -1607,6 +1621,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.timeline"
                     | "job.events"
                     | "job.watch"
+                    | "job.wait"
                     | "job.plan"
                     | "job.submit"
                     | "job.run"
