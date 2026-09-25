@@ -23,7 +23,7 @@ impl SessionStore {
                 "Runtime clock is unavailable",
             ));
         }
-        self.with_session_configuration(|configuration, path, lock| {
+        self.with_waited_session_configuration(|configuration, path, lock| {
             self.selected_root(path).map_err(|_| {
                 failure(
                     "recordUnreadable",
@@ -172,8 +172,30 @@ impl SessionStore {
         })
     }
 
+    /// A Session export under the storage lock, which it waits for, as
+    /// Swift's `previewSessionExport` and `applySessionExport` do under
+    /// `withLockedDocument`.
+    pub(super) fn with_waited_session_configuration<T>(
+        &self,
+        action: impl FnOnce(&[u8], &Path, &HostReadLock) -> Result<T, WireError>,
+    ) -> Result<T, WireError> {
+        self.configured(true, action)
+    }
+
+    /// A Session cleanup under the storage lock, which it only tries: its
+    /// caller holds the Job activity guard, and a device mutation's proof
+    /// takes that guard under the storage lock. Swift's cleanup waits; it
+    /// may once it takes the storage lock before the activity guard.
     pub(super) fn with_session_configuration<T>(
         &self,
+        action: impl FnOnce(&[u8], &Path, &HostReadLock) -> Result<T, WireError>,
+    ) -> Result<T, WireError> {
+        self.configured(false, action)
+    }
+
+    fn configured<T>(
+        &self,
+        wait: bool,
         action: impl FnOnce(&[u8], &Path, &HostReadLock) -> Result<T, WireError>,
     ) -> Result<T, WireError> {
         use crate::snapshot_pager::failure;
@@ -184,13 +206,17 @@ impl SessionStore {
             )
         };
         self.root.validate_path(&self.path).map_err(unavailable)?;
-        let lock = self.root.lock_document(LOCK).map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "Session storage is being updated")
-            } else {
-                unavailable(error)
-            }
-        })?;
+        let lock = if wait {
+            self.root.wait_lock(LOCK, false).map_err(unavailable)?
+        } else {
+            self.root.lock_document(LOCK).map_err(|error| {
+                if error.kind() == io::ErrorKind::WouldBlock {
+                    failure("resourceConflict", "Session storage is being updated")
+                } else {
+                    unavailable(error)
+                }
+            })?
+        };
         let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
             Ok(value) => value,
             Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
@@ -359,6 +385,36 @@ mod tests {
     }
     fn fault() -> WireError {
         crate::snapshot_pager::failure("ioFailure", "injected fixture fault")
+    }
+    #[test]
+    fn a_first_session_page_waiting_for_the_storage_lock_leaves_cursor_pages_readable() {
+        // Swift's `listSessions` takes the storage lock for a first page
+        // before its pager and reads a cursor's page under none, so a first
+        // page waiting for the lock holds up no cursor.
+        let fixture = Fixture::with_ids(&["session-other"]);
+        let store = fixture.store();
+        let list =
+            |params: Value| store.handle_resource("session.list", params.as_object().unwrap());
+        let first = list(json!({"pageSize": 1})).unwrap();
+        let cursor = first["nextCursor"].as_str().unwrap().to_owned();
+        let held = store.root.lock_document(LOCK).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let list = &list;
+            scope.spawn(move || sender.send(list(json!({"pageSize": 1}))).unwrap());
+            assert!(
+                receiver
+                    .recv_timeout(std::time::Duration::from_millis(200))
+                    .is_err()
+            );
+            let next = list(json!({"pageSize": 1, "cursor": cursor})).unwrap();
+            assert_eq!(next["items"].as_array().unwrap().len(), 1);
+            drop(held);
+            receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+        });
     }
     #[test]
     fn apply_preserves_pinned_and_active_sessions_and_returns_durable_receipt_after_restart() {

@@ -25,7 +25,7 @@ impl SessionStore {
                 "Session export apply requires an exact preview tuple",
             ));
         }
-        self.with_session_configuration(|configuration,path,lock| {
+        self.with_waited_session_configuration(|configuration,path,lock| {
             let records = SessionExportRecords::open(&self.path.join("session-export-previews"),&self.root,lock)?;
             let record = records.load(preview_id)?;
             if record.preview_digest != preview_digest { return Err(failure("resourceConflict","Session export preview digest does not match")); }
