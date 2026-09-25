@@ -77,6 +77,10 @@ mod operation_availability;
 #[cfg(target_os = "macos")]
 pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
+mod analyzer_composition;
+#[cfg(target_os = "macos")]
+pub use analyzer_composition::{AnalyzerComposition, AnalyzerProfiles};
+#[cfg(target_os = "macos")]
 pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
 #[cfg(target_os = "macos")]
 mod debug_read;
@@ -145,6 +149,12 @@ mod analyzer_output;
 mod crash_ledger;
 #[cfg(target_os = "macos")]
 pub use crash_ledger::{analyze_crash_ledger, crash_ledger_source};
+#[cfg(target_os = "macos")]
+mod hilog_summary;
+#[cfg(target_os = "macos")]
+pub use hilog_summary::{
+    MAXIMUM_INPUT_BYTES as HILOG_MAXIMUM_INPUT_BYTES, analyze_hilog, hilog_source, profile_path,
+};
 #[cfg(target_os = "macos")]
 mod artifact_publication;
 #[cfg(target_os = "macos")]

@@ -1,0 +1,19 @@
+#!/bin/sh
+# ArkDeck hilog-summary Job oracle analyzer. The first line of the source it
+# is given names its answer; its summaries were computed from the sources.
+[ "$#" -eq 2 ] && [ "$1" = "--summarize-hilog" ] || exit 64
+IFS= read -r mode < "$2" || exit 66
+case "$mode" in
+answered) printf '%s' '{"analyzerRef":"hilog-summary@1","analyzerVersion":"1.0.0","blankLineCount":1,"headerCoverage":"partial","levelCounts":{"D":0,"E":1,"F":0,"I":1,"W":0},"lineCount":5,"redaction":"content-and-identifiers-omitted","schemaVersion":"1.0.0","scope":"default-hilog-header-lines","sourceByteCount":149,"sourceSHA256":"a4bc1c6c2557176d1f54edbd6a990b087233d87ce1ef0f17ab1b48d0e0772ede","unrecognizedLineCount":2}' ;;
+newline) printf '%s\n' '{"analyzerRef":"hilog-summary@1","analyzerVersion":"1.0.0","blankLineCount":1,"headerCoverage":"partial","levelCounts":{"D":0,"E":1,"F":0,"I":1,"W":0},"lineCount":5,"redaction":"content-and-identifiers-omitted","schemaVersion":"1.0.0","scope":"default-hilog-header-lines","sourceByteCount":148,"sourceSHA256":"ba1321282dde477fff7c08d27af8a64a17e9444655744db88f8a0944417b630a","unrecognizedLineCount":2}' ;;
+stderr) printf '%s' '{"analyzerRef":"hilog-summary@1","analyzerVersion":"1.0.0","blankLineCount":1,"headerCoverage":"partial","levelCounts":{"D":0,"E":1,"F":0,"I":1,"W":0},"lineCount":5,"redaction":"content-and-identifiers-omitted","schemaVersion":"1.0.0","scope":"default-hilog-header-lines","sourceByteCount":147,"sourceSHA256":"14f72f705ff1eb2bcb0f24d136d50278bd5885d715329c2a5a35d77b575ff81e","unrecognizedLineCount":2}'; printf 'warning\n' >&2 ;;
+mismatch) printf '%s' '{"analyzerRef":"hilog-summary@1","analyzerVersion":"1.0.0","blankLineCount":1,"headerCoverage":"partial","levelCounts":{"D":0,"E":1,"F":0,"I":1,"W":0},"lineCount":5,"redaction":"content-and-identifiers-omitted","schemaVersion":"1.0.0","scope":"default-hilog-header-lines","sourceByteCount":149,"sourceSHA256":"a4bc1c6c2557176d1f54edbd6a990b087233d87ce1ef0f17ab1b48d0e0772ede","unrecognizedLineCount":2}' ;;
+extra) printf '%s' '{"analyzerRef":"hilog-summary@1","analyzerVersion":"1.0.0","blankLineCount":1,"headerCoverage":"partial","levelCounts":{"D":0,"E":1,"F":0,"I":1,"W":0},"lineCount":5,"redaction":"content-and-identifiers-omitted","schemaVersion":"1.0.0","scope":"default-hilog-header-lines","sourceByteCount":146,"sourceSHA256":"f1cd6ff21743961b3e26ad529793e4dc95adadc2966836cdf54c01011f8e0203","unrecognizedLineCount":2,"zzz":1}' ;;
+exit) printf 'oracle analyzer failed\n' >&2; exit 3 ;;
+empty) ;;
+malformed) printf 'hilog summary: none\n' ;;
+scalar) printf '"answered"' ;;
+big) /usr/bin/head -c 9000 /dev/zero | /usr/bin/tr '\000' ' '; printf '[]' ;;
+signal) kill -KILL "$$" ;;
+*) exit 65 ;;
+esac

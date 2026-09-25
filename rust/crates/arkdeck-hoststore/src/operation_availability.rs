@@ -1,12 +1,13 @@
 //! Host discovery for executable Rust operations. It never materializes a
 //! request, reads device facts, admits a Job or establishes target readiness.
-use crate::AnalyzerProfile;
+use crate::AnalyzerComposition;
 
 pub struct OperationAvailabilityContext<'a> {
     pub planning_owner: bool,
     pub job_owner: bool,
     pub artifacts: bool,
-    pub analyzer: Option<&'a AnalyzerProfile>,
+    /// The analyzers the host composed.
+    pub analyzer: Option<&'a dyn AnalyzerComposition>,
     pub hdc_registered: bool,
     pub hdc_tool_current: bool,
     pub mutation_owner: bool,
@@ -53,7 +54,7 @@ pub fn operation_unavailability(
 
     let supported = match provider {
         "hdc" => crate::device_run::runs(reference),
-        "analyzer" => reference == "analyzer.extract-crash-signature@1",
+        "analyzer" => crate::analyzer_composition::EXECUTED.contains(&reference),
         _ => false,
     };
     // Swift `runtimeAvailability`: a native deployment needs the helper its
@@ -70,15 +71,10 @@ pub fn operation_unavailability(
             format!("Rust {provider} provider has no complete production executor for {reference}"),
         ));
     } else if provider == "analyzer" {
-        match context.analyzer {
-            None => reasons.push((
-                "provider_tool_unavailable",
-                "analyzer.profileUnavailable".into(),
-            )),
-            Some(profile) if !profile.still_matches() => {
-                reasons.push(("tool_identity_drift", "analyzer.toolIdentityDrift".into()))
-            }
-            Some(_) => {}
+        if let Err(reason) =
+            crate::analyzer_composition::runtime_availability(context.analyzer, reference)
+        {
+            reasons.push(reason);
         }
     } else if !context.hdc_tool_current {
         reasons.push(("tool_identity_drift", "hdc.toolIdentityDrift".into()));

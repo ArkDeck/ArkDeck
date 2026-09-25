@@ -34,8 +34,9 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 17] = [
+const MATERIALIZED: [&str; 18] = [
     "analyzer.extract-crash-signature@1",
+    "analyzer.summarize-hilog@1",
     "observe.device@1",
     "debug.template@1",
     "capture.diagnostics@1",
@@ -54,8 +55,11 @@ const MATERIALIZED: [&str; 17] = [
     "workspace.sign-openharmony-hap@1",
 ];
 
-/// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
-/// with `ARKDECK_ANALYZER_PATH` (Swift daemon composition).
+/// Swift `AnalyzerProfile`: one analyzer a host configured, its pinned
+/// executable and the closed invocation the Runtime lowers for it. The
+/// crash-ledger analyzer is the executable a host names with
+/// `ARKDECK_ANALYZER_PATH`; the HiLog summary is that same executable when it
+/// is the daemon itself (Swift daemon composition, `AnalyzerProfiles`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AnalyzerProfile {
     pub analyzer_ref: String,
@@ -64,38 +68,75 @@ pub struct AnalyzerProfile {
     pub executable_sha256: String,
     pub fixed_arguments: Vec<String>,
     pub timeout_seconds: i64,
+    /// The most a verified answer may hold (Swift `outputByteBudget`).
+    pub output_byte_budget: usize,
 }
 
 fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
 
+/// Swift `FixedExecutableResolver.hashing(path:)`: an explicit absolute path
+/// to a regular executable file, its physical location, and the SHA-256 of
+/// its bytes.
+fn hashed_executable(path: &Path) -> io::Result<(PathBuf, String)> {
+    if !path.is_absolute() {
+        return Err(invalid(
+            "provider executable path must be explicit and absolute",
+        ));
+    }
+    let executable = std::fs::canonicalize(path)?;
+    let metadata = std::fs::metadata(&executable)?;
+    if !metadata.is_file() || metadata.mode() & 0o111 == 0 {
+        return Err(invalid(
+            "provider executable must be a regular executable file",
+        ));
+    }
+    let bytes = std::fs::read(&executable)?;
+    Ok((executable, sha256_hex(&bytes)))
+}
+
 impl AnalyzerProfile {
-    /// Swift `FixedExecutableResolver.hashing(path:)` then the crash-ledger
-    /// profile: an explicit absolute path to a regular executable file, its
-    /// physical location, and the SHA-256 of its bytes.
+    /// The crash-ledger profile of the executable at `path`.
     pub fn crash_signature(path: &Path) -> io::Result<Self> {
-        if !path.is_absolute() {
-            return Err(invalid(
-                "provider executable path must be explicit and absolute",
-            ));
-        }
-        let executable = std::fs::canonicalize(path)?;
-        let metadata = std::fs::metadata(&executable)?;
-        if !metadata.is_file() || metadata.mode() & 0o111 == 0 {
-            return Err(invalid(
-                "provider executable must be a regular executable file",
-            ));
-        }
-        let bytes = std::fs::read(&executable)?;
+        let (executable, sha256) = hashed_executable(path)?;
         Ok(Self {
             analyzer_ref: "crash-signature@1".into(),
             analyzer_version: "arkdeck-fault-log-ledger@1".into(),
             executable_path: executable,
-            executable_sha256: sha256_hex(&bytes),
+            executable_sha256: sha256,
             fixed_arguments: vec!["--analyze-crash-ledger".into()],
             timeout_seconds: 30,
+            output_byte_budget: 8 * 1024 * 1024,
         })
+    }
+
+    /// The HiLog summary profile of the executable at `path`.
+    pub fn hilog_summary(path: &Path) -> io::Result<Self> {
+        let (executable, sha256) = hashed_executable(path)?;
+        Ok(Self::hilog_summary_of(executable, sha256))
+    }
+
+    /// Swift `HilogSummaryDerivedAnalyzer.profile`: the closed
+    /// `--summarize-hilog` mode of the analyzer executable `analyzer` names,
+    /// under the 120 s budget and the summary's 8 KiB bound.
+    pub(crate) fn hilog_summary_from(analyzer: &Self) -> Self {
+        Self::hilog_summary_of(
+            analyzer.executable_path.clone(),
+            analyzer.executable_sha256.clone(),
+        )
+    }
+
+    fn hilog_summary_of(executable: PathBuf, sha256: String) -> Self {
+        Self {
+            analyzer_ref: crate::hilog_summary::ANALYZER_REF.into(),
+            analyzer_version: crate::hilog_summary::ANALYZER_VERSION.into(),
+            executable_path: executable,
+            executable_sha256: sha256,
+            fixed_arguments: vec!["--summarize-hilog".into()],
+            timeout_seconds: 120,
+            output_byte_budget: crate::hilog_summary::MAXIMUM_OUTPUT_BYTES,
+        }
     }
 
     /// Swift `ArkTraceProfileFileReader.matches(requireExecutable: true)` at
@@ -147,7 +188,9 @@ fn internal_failure() -> PlanRefusal {
 pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
     pub imports: Option<&'a crate::ImportUploadStore>,
-    pub analyzer: Option<&'a AnalyzerProfile>,
+    /// The analyzers the host composed, which an analyzer operation is
+    /// planned against.
+    pub analyzer: Option<&'a dyn crate::AnalyzerComposition>,
     pub state_root: &'a Path,
     /// The HDC composition a device-bound operation materializes against;
     /// without one no HDC provider is registered.
@@ -556,12 +599,10 @@ impl<'a> JobPlanner<'a> {
                 format!("{reference} is runtime unavailable: {reason}"),
             )
         };
-        let Some(profile) = self.analyzer else {
-            return Err(unavailable("analyzer.profileUnavailable"));
-        };
-        if !profile.still_matches() {
-            return Err(unavailable("analyzer.toolIdentityDrift"));
-        }
+        // Swift `AnalyzerProvider.runtimeAvailability`: the operation's one
+        // analyzer as the host composed it, its executable still its bytes.
+        let profile = crate::analyzer_composition::runtime_availability(self.analyzer, &reference)
+            .map_err(|(_, reason)| unavailable(&reason))?;
         let Some(artifacts) = self.artifacts else {
             return Err(unavailable("runtime.artifactStoreUnavailable"));
         };
@@ -627,7 +668,9 @@ impl<'a> JobPlanner<'a> {
                 "journalArguments": {
                     "analyzerRef": profile.analyzer_ref,
                     "inputArtifactId": leased.artifact_id,
-                    "artifactId": "crash-signature.json",
+                    "artifactId": crate::analyzer_composition::derived_artifact_name(
+                        &profile.analyzer_ref,
+                    ),
                 },
                 "processKind": "process",
                 "executableSHA256": profile.executable_sha256,

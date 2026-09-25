@@ -1,0 +1,75 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-ce57f7b014978fe39492cf64043a8fc9",
+  "materializedPlanDigest" : "ad6a1a9374f0923219b27e6587d3f54ff1830d10c38c7125825793c5989a215a",
+  "operationReference" : "analyzer.summarize-hilog@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-bfdf1c6973a8e0f2917400119782e8c5"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-bfdf1c6973a8e0f2917400119782e8c5"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-hilog",
+    "verified summarize-hilog [\"analyzerRef\", \"analyzerVersion\", \"derivedByteCount\", \"derivedSha256\", \"sourceArtifactId\", \"sourceByteCount\", \"sourceSha256\", \"toolSha256\", \"truncated\"]",
+    "artifact hilog-summary.json -> ART-4b509be8295099e86ab78921a82cb214",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

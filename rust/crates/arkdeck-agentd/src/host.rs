@@ -93,10 +93,7 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
     #[cfg(target_os = "macos")]
-    planning: Option<(
-        std::path::PathBuf,
-        Option<arkdeck_hoststore::AnalyzerProfile>,
-    )>,
+    planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
     #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
@@ -276,9 +273,9 @@ impl Host {
     pub fn with_planning(
         mut self,
         state_root: &std::path::Path,
-        analyzer: Option<arkdeck_hoststore::AnalyzerProfile>,
+        analyzer: Option<arkdeck_hoststore::AnalyzerProfiles>,
     ) -> Self {
-        self.planning = Some((state_root.to_owned(), analyzer));
+        self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
         self
     }
     #[cfg(target_os = "macos")]
@@ -588,7 +585,8 @@ impl Host {
         let analyzer = self
             .planning
             .as_ref()
-            .and_then(|(_, analyzer)| analyzer.clone());
+            .map(|(_, analyzer)| analyzer.clone())
+            .unwrap_or_default();
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -638,7 +636,7 @@ impl Host {
                         }),
                     jobs: &jobs,
                     artifacts: &artifacts,
-                    analyzer: analyzer.as_ref(),
+                    analyzer: Some(&analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &home,
                     now: arkdeck_hoststore::runtime_now,
@@ -840,7 +838,7 @@ impl Host {
                 "analyzer",
                 self.planning
                     .as_ref()
-                    .is_some_and(|(_, analyzer)| analyzer.is_some()),
+                    .is_some_and(|(_, analyzer)| !analyzer.profiles().is_empty()),
             ),
             ("agentExecutions", self.agents.is_some()),
             ("humanActions", self.human_actions.is_some()),
@@ -973,7 +971,7 @@ impl HostServices for Host {
                 analyzer: self
                     .planning
                     .as_ref()
-                    .and_then(|(_, analyzer)| analyzer.as_ref()),
+                    .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
                 hdc_registered: self.hdc.is_some() && self.targets.is_some(),
                 mutation_owner: self
                     .authority()
@@ -1269,7 +1267,7 @@ impl HostServices for Host {
             planner: arkdeck_hoststore::JobPlanner {
                 imports: self.imports.as_deref(),
                 artifacts: Some(&**artifacts),
-                analyzer: analyzer.as_ref(),
+                analyzer: Some(analyzer),
                 state_root,
                 hdc: hdc.as_ref(),
                 workspace: self.workspace.as_deref(),
@@ -1481,7 +1479,7 @@ impl HostServices for Host {
         arkdeck_hoststore::JobPlanner {
             imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
-            analyzer: analyzer.as_ref(),
+            analyzer: Some(analyzer),
             state_root,
             hdc: hdc.as_ref(),
             workspace: self.workspace.as_deref(),
@@ -1515,7 +1513,7 @@ impl HostServices for Host {
             planner: arkdeck_hoststore::JobPlanner {
                 imports: self.imports.as_deref(),
                 artifacts: self.artifacts.as_deref(),
-                analyzer: analyzer.as_ref(),
+                analyzer: Some(analyzer),
                 state_root,
                 hdc: hdc.as_ref(),
                 workspace: self.workspace.as_deref(),
@@ -1597,7 +1595,7 @@ impl HostServices for Host {
                 ),
                 jobs,
                 artifacts,
-                analyzer: analyzer.as_ref(),
+                analyzer: Some(analyzer),
                 quota: ARTIFACT_QUOTA,
                 home: &self.home,
                 now: arkdeck_hoststore::runtime_now,
@@ -1743,7 +1741,7 @@ impl HostServices for Host {
             analyzer: self
                 .planning
                 .as_ref()
-                .and_then(|(_, analyzer)| analyzer.as_ref()),
+                .map(|(_, analyzer)| analyzer as &dyn arkdeck_hoststore::AnalyzerComposition),
             quota: ARTIFACT_QUOTA,
             home: &self.home,
             now: arkdeck_hoststore::runtime_now,
@@ -1882,7 +1880,7 @@ impl HostServices for Host {
                     }),
                     jobs,
                     artifacts,
-                    analyzer: analyzer.as_ref(),
+                    analyzer: Some(analyzer),
                     quota: ARTIFACT_QUOTA,
                     home: &self.home,
                     now: arkdeck_hoststore::runtime_now,

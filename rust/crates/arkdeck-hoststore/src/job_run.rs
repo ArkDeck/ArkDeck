@@ -1,6 +1,6 @@
-//! Swift `RuntimeJobEngine.runForTargetControl` for an admitted
-//! `analyzer.extract-crash-signature@1` Job, as the isolated Rust owner runs
-//! it, composed like a Swift engine with no power controller and, where one
+//! Swift `RuntimeJobEngine.runForTargetControl` for an admitted analyzer Job
+//! (`analyzer.extract-crash-signature@1`, `analyzer.summarize-hilog@1`), as
+//! the isolated Rust owner runs it, composed like a Swift engine with no power controller and, where one
 //! is given, the standalone daemon's Session publication writer: the running
 //! transition, the source lease resolved again,
 //! the exact typed action persisted before its write-ahead intent is durable,
@@ -29,7 +29,8 @@
 //! dispatched; the steps it confirmed are never run again
 //! (`device_run.rs`), and a resumed Job continues under the capability use
 //! it holds, never a second one (`mutation_execution.rs`).
-use crate::analyzer_output::{self, ANALYZER_REF, ANALYZER_VERSION, DERIVED_NAME, Receipt, Source};
+use crate::analyzer_composition::{self, AnalyzerComposition};
+use crate::analyzer_output::{self, Receipt, Source};
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
 use crate::device_facts::HdcComposition;
@@ -52,14 +53,10 @@ use std::time::Duration;
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
-const OPERATION: &str = "analyzer.extract-crash-signature@1";
-const STEP: &str = "extract-crash-signature";
 const STEP_KIND: &str = "runDeterministicAnalyzer";
-const INTENT: &str = "intent-extract-crash-signature";
-const OUTCOME: &str = "outcome-extract-crash-signature";
-/// Swift `DescriptorBoundProcessDispatcher`'s per-stream capture, which is
-/// also the analyzer profile's output byte budget.
-const OUTPUT_BYTE_BUDGET: usize = 8 * 1024 * 1024;
+/// Swift `DescriptorBoundProcessDispatcher`'s per-stream capture, whatever
+/// budget the analyzer profile gives its answer.
+const CAPTURE_BYTES: usize = 8 * 1024 * 1024;
 const MAXIMUM_SOURCE_BYTES: u64 = 512 * 1024 * 1024;
 /// The states Swift `runOwned` drives (a finalizing `debug.hap@1` aside).
 const RUNNABLE: [&str; 4] = [
@@ -75,7 +72,9 @@ const RUNNABLE: [&str; 4] = [
 /// reverted from a workspace and a workspace build through its workspace
 /// composition. Every other Job is refused before its run starts.
 pub(crate) fn executes(operation: &str) -> bool {
-    operation == OPERATION || crate::device_run::runs(operation) || workspace_run::runs(operation)
+    analyzer_composition::EXECUTED.contains(&operation)
+        || crate::device_run::runs(operation)
+        || workspace_run::runs(operation)
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -152,10 +151,11 @@ enum Dispatch {
     Cancelled { drained: bool },
 }
 
-/// A child that exited: its status, stdout and whether output was dropped.
+/// A child that exited: its status, its output and whether any was dropped.
 struct Exited {
     status: i32,
     stdout: Vec<u8>,
+    stderr: Vec<u8>,
     truncated: bool,
 }
 
@@ -164,7 +164,9 @@ pub struct JobRunner<'a> {
     pub jobs: &'a JobStore,
     pub artifacts: &'a ArtifactReadStore,
     pub imports: Option<&'a crate::ImportUploadStore>,
-    pub analyzer: Option<&'a AnalyzerProfile>,
+    /// The analyzers the host composed; an analyzer Job runs the profile its
+    /// operation names.
+    pub analyzer: Option<&'a dyn AnalyzerComposition>,
     /// Swift `ArtifactQuota`, in bytes.
     pub quota: u64,
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
@@ -262,15 +264,20 @@ impl Run {
         self.record.timeline.push(format!("reason: {reason}"));
         Ok(())
     }
-    /// The step's confirmed outcome, with the semantic code Swift names for
-    /// it where it names one.
-    fn outcome(&mut self, result: &str, semantic_code: Option<&str>) -> Result<(), RunRefusal> {
-        let envelope = self.envelope(OUTCOME.into())?;
+    /// The analyzer step's confirmed outcome, with the semantic code Swift
+    /// names for it where it names one.
+    fn outcome(
+        &mut self,
+        step: &str,
+        result: &str,
+        semantic_code: Option<&str>,
+    ) -> Result<(), RunRefusal> {
+        let envelope = self.envelope(format!("outcome-{step}"))?;
         self.append(events::step_outcome(
             &envelope,
-            STEP,
+            step,
             1,
-            INTENT,
+            &format!("intent-{step}"),
             result,
             "confirmed",
             semantic_code,
@@ -368,7 +375,10 @@ impl JobRunner<'_> {
         let workspace = self
             .workspace
             .filter(|_| workspace_run::runs(record.operation()));
-        if record.operation() != OPERATION && !device && workspace.is_none() {
+        if !analyzer_composition::EXECUTED.contains(&record.operation())
+            && !device
+            && workspace.is_none()
+        {
             return Err(proven(
                 "rejected",
                 format!(
@@ -466,6 +476,9 @@ impl JobRunner<'_> {
 
     /// Swift `runOwned` through `dispatchWithWAL` for the one analyzer step.
     fn execute(&self, run: &mut Run) -> Result<(), RunRefusal> {
+        let operation = run.record.operation().to_owned();
+        let step = analyzer_composition::step(&operation).ok_or_else(uncertain)?;
+        let intent_id = format!("intent-{step}");
         let started = run.clock()?;
         run.record.start(&started);
         run.transition("preflight", "running", "steps-start")?;
@@ -495,16 +508,19 @@ impl JobRunner<'_> {
             Err(error) => {
                 return self.fail(
                     run,
-                    &format!("input Artifact lease became unreadable before {STEP}: {error}"),
+                    &format!("input Artifact lease became unreadable before {step}: {error}"),
                 );
             }
         };
         if let Some(reason) = binding_refusal(&leased, &run.record) {
             return self.fail(run, &reason);
         }
-        // Swift's typed action needs the profile and re-reads the leased
-        // bytes; its refusal escapes the run as an internal failure.
-        let Some(profile) = self.analyzer else {
+        // Swift's typed action needs the profile the operation names and
+        // re-reads the leased bytes; its refusal escapes the run as an
+        // internal failure.
+        let Some(profile) = analyzer_composition::analyzer_for_operation(&operation)
+            .and_then(|analyzer_ref| self.analyzer?.profile(analyzer_ref))
+        else {
             return Err(uncertain());
         };
         let (Some(sha256), Some(byte_count)) = (
@@ -524,19 +540,20 @@ impl JobRunner<'_> {
             sha256: &sha256,
             byte_count,
         };
+        let derived = analyzer_composition::derived_artifact_name(&profile.analyzer_ref);
         let target = run.record.request["target"]["targetId"]
             .as_str()
             .unwrap_or_default()
             .to_owned();
-        let step = json!({
-            "id": STEP, "kind": STEP_KIND, "effect": "hostOnly", "bindingRequirement": "none",
+        let step_document = json!({
+            "id": step, "kind": STEP_KIND, "effect": "hostOnly", "bindingRequirement": "none",
             "cancellation": "immediate", "compensationDescriptors": [],
-            "arguments": {"analyzerRef": ANALYZER_REF, "inputArtifactId": leased.artifact_id,
-                "artifactId": DERIVED_NAME},
+            "arguments": {"analyzerRef": profile.analyzer_ref,
+                "inputArtifactId": leased.artifact_id, "artifactId": derived},
         });
         let intent = events::step_intent(
-            &run.envelope(INTENT.into())?,
-            &step,
+            &run.envelope(intent_id.clone())?,
+            &step_document,
             &Target {
                 scope: "host".into(),
                 target_id: target.clone(),
@@ -552,14 +569,14 @@ impl JobRunner<'_> {
         // with zero dispatch.
         if self.cancellation.is_some_and(RunCancellation::pending) {
             self.carry(run)?;
-            return self.close_cancelled(run, false);
+            return self.close_cancelled(run, None);
         }
         // The exact typed action is durable before its intent can be.
         run.record.set_recovery(
-            Some(STEP),
-            Some(INTENT),
+            Some(step),
+            Some(&intent_id),
             Some(json!({"kind": "analyzer.analyze", "arguments": {
-                "analyzerRef": ANALYZER_REF, "analyzerVersion": ANALYZER_VERSION,
+                "analyzerRef": profile.analyzer_ref, "analyzerVersion": profile.analyzer_version,
                 "sourceArtifactId": leased.artifact_id, "sourceSha256": sha256,
                 "sourceByteCount": byte_count}})),
         );
@@ -569,7 +586,7 @@ impl JobRunner<'_> {
             let _ = run.persist(self.jobs);
             return Err(uncertain());
         }
-        run.record.timeline.push(format!("intent {STEP}"));
+        run.record.timeline.push(format!("intent {step}"));
         run.record.add_step_kind(STEP_KIND);
         // Only now may the child start; a request that reaches the run while
         // the child runs terminates it.
@@ -587,7 +604,7 @@ impl JobRunner<'_> {
             Err(Dispatch::Cancelled { drained }) if cancelled() => {
                 self.carry(run)?;
                 if drained {
-                    return self.close_cancelled(run, true);
+                    return self.close_cancelled(run, Some(step));
                 }
                 run.record.timeline.push(
                     "analyzer cancellation process-group drain unconfirmed; intent retained".into(),
@@ -606,13 +623,13 @@ impl JobRunner<'_> {
                 // The intent stays outstanding: no outcome is invented, and
                 // recovery alone may resolve it by readback.
                 run.record.timeline.push(format!(
-                    "outcomeUnknown {STEP}; durable intent left outstanding"
+                    "outcomeUnknown {step}; durable intent left outstanding"
                 ));
                 return self.park(run, &reason);
             }
             Err(Dispatch::Failed(reason)) => {
-                run.outcome("failed", None)?;
-                run.record.timeline.push(format!("failed {STEP}"));
+                run.outcome(step, "failed", None)?;
+                run.record.timeline.push(format!("failed {step}"));
                 run.record.set_recovery(None, None, None);
                 return self.fail(run, &reason);
             }
@@ -626,33 +643,34 @@ impl JobRunner<'_> {
                 "analyzer cancellation raced completion without process-group drain proof".into(),
             );
             run.record.timeline.push(format!(
-                "outcomeUnknown {STEP}; durable intent left outstanding"
+                "outcomeUnknown {step}; durable intent left outstanding"
             ));
             return self.park(run, "analyzer cancellation lacks process-group drain proof");
         }
         let receipt = Receipt {
             exit_status: exited.status,
             stdout: &exited.stdout,
+            stderr: &exited.stderr,
             truncated: exited.truncated,
         };
-        let verified = match analyzer_output::verify(&receipt, &source, OUTPUT_BYTE_BUDGET) {
+        let verified = match analyzer_output::verify(&receipt, &source, profile) {
             Ok(verified) => verified,
             Err((code, detail)) => {
-                run.outcome("failed", None)?;
+                run.outcome(step, "failed", None)?;
                 run.record.set_recovery(None, None, None);
                 run.record
                     .timeline
-                    .push(format!("failed {STEP}: {code}: {detail}"));
+                    .push(format!("failed {step}: {code}: {detail}"));
                 return self.fail(run, &format!("{code}: {detail}"));
             }
         };
         if let Some(hook) = self.after_commit {
             hook(&run.record.job_id);
         }
-        run.outcome("succeeded", None)?;
+        run.outcome(step, "succeeded", None)?;
         run.record
             .timeline
-            .push(format!("verified {STEP} {}", verified.fact_names()));
+            .push(format!("verified {step} {}", verified.fact_names()));
         run.record.set_recovery(None, None, None);
         // The declared product is published after the correlated outcome.
         let job_id = run.record.job_id.clone();
@@ -667,12 +685,12 @@ impl JobRunner<'_> {
         let product = Product {
             job_id: &job_id,
             session_id: &session_id,
-            step_id: STEP,
-            name: DERIVED_NAME,
+            step_id: step,
+            name: derived,
             media_type: "application/json",
             privacy: "standard",
             retention_class: "default",
-            source_operation: OPERATION,
+            source_operation: &operation,
             provider_id: "analyzer",
             binding,
             observation_window: window,
@@ -686,7 +704,7 @@ impl JobRunner<'_> {
         let contents = verified.envelope().unwrap_or_else(|| b"{}".to_vec());
         match publisher.publish(&product, &contents) {
             Ok(metadata) => run.record.timeline.push(format!(
-                "artifact {DERIVED_NAME} -> {}",
+                "artifact {derived} -> {}",
                 metadata["artifactID"].as_str().unwrap_or_default()
             )),
             Err(error) => {
@@ -694,9 +712,9 @@ impl JobRunner<'_> {
                 let _ = publisher.record_missing(&product, &error);
                 run.record
                     .timeline
-                    .push(format!("artifact {DERIVED_NAME} missing: {error}"));
+                    .push(format!("artifact {derived} missing: {error}"));
                 let reason = format!(
-                    "artifact publication failed: {DERIVED_NAME} could not be published: {error}"
+                    "artifact publication failed: {derived} could not be published: {error}"
                 );
                 run.record.set_operation_failure(Some(failure(
                     "artifactPublicationFailed",
@@ -774,11 +792,12 @@ impl JobRunner<'_> {
 
     /// Swift `completeCancellationAtSafeBoundary`: a dispatched step's
     /// cancelled outcome, the typed action forgotten, and the Job closed.
-    fn close_cancelled(&self, run: &mut Run, dispatched: bool) -> Result<(), RunRefusal> {
-        if dispatched {
-            run.outcome("failed", Some("cancelled"))?;
+    /// `dispatched` names the step whose child was drained.
+    fn close_cancelled(&self, run: &mut Run, dispatched: Option<&str>) -> Result<(), RunRefusal> {
+        if let Some(step) = dispatched {
+            run.outcome(step, "failed", Some("cancelled"))?;
             run.record.timeline.push(format!(
-                "cancelled {STEP}; dispatch reached a confirmed safe boundary before publication"
+                "cancelled {step}; dispatch reached a confirmed safe boundary before publication"
             ));
         }
         run.record.set_recovery(None, None, None);
@@ -822,7 +841,7 @@ impl JobRunner<'_> {
         arguments.push(verified.inode_path().into());
         let limits = AnalyzerLimits {
             timeout: Duration::from_secs(profile.timeout_seconds.max(1) as u64),
-            capture_bytes: OUTPUT_BYTE_BUDGET,
+            capture_bytes: CAPTURE_BYTES,
         };
         match tool.run_analyzer(&arguments, &verified, limits, cancelled) {
             Err(AnalyzerRunError::Refused(error)) => {
@@ -835,6 +854,7 @@ impl JobRunner<'_> {
                 AnalyzerTermination::Exited(status) => Ok(Exited {
                     status,
                     stdout: execution.stdout,
+                    stderr: execution.stderr,
                     truncated: execution.truncated,
                 }),
                 AnalyzerTermination::TimedOut => Err(Dispatch::OutcomeUnknown(

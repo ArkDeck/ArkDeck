@@ -1,7 +1,8 @@
 //! Swift's `job.reconcile` handler case (`AgentDaemon.swift`) over
 //! `RuntimeJobEngine.reconcile(jobID:)` / `reconcileOwned(jobID:)` and
 //! `finishReconcile`, for the host-only analyzer Jobs this Runtime runs
-//! (`analyzer.extract-crash-signature@1`) and its device-bound HDC Jobs:
+//! (`analyzer.extract-crash-signature@1`, `analyzer.summarize-hilog@1`) and
+//! its device-bound HDC Jobs:
 //! ADR-0009 decisions 2 and 4 as the maintainer ruled on 2026-09-19 (design
 //! §L.1 item 13).
 //!
@@ -72,7 +73,10 @@ use std::path::PathBuf;
 #[path = "job_reconcile_device.rs"]
 mod device;
 
-const ANALYZER: &str = "analyzer.extract-crash-signature@1";
+/// The analyzer operations this Runtime runs, which it also reconciles.
+fn analyzer(operation: &str) -> bool {
+    crate::analyzer_composition::EXECUTED.contains(&operation)
+}
 const HAP: &str = "debug.hap@1";
 const NATIVE: &str = "deploy.native-library.app-owned@1";
 const APPLY: &str = "workspace.apply-patch@1";
@@ -444,7 +448,7 @@ pub struct JobReconciler<'a> {
 /// analyzer, and the device-bound operations it runs — but a terminal debug
 /// HAP, whose own lineage repair is not ported.
 fn reconciled(operation: &str, state: &str) -> bool {
-    operation == ANALYZER
+    analyzer(operation)
         || operation == SIGN
         || WORKSPACE_MUTATIONS.contains(&operation)
         || (crate::device_run::runs(operation) && !(operation == HAP && terminal(state)))
@@ -479,7 +483,7 @@ impl JobReconciler<'_> {
         let operation = record.operation();
         let hap_finalizing =
             operation == HAP && record.state == "finalizing" && !record.outcome_unknown();
-        if operation == ANALYZER || (!record.outcome_unknown() && !hap_finalizing) {
+        if analyzer(operation) || (!record.outcome_unknown() && !hap_finalizing) {
             return Ok(None);
         }
         let refusal = |what: String| {
@@ -1063,7 +1067,7 @@ impl JobReconciler<'_> {
     /// materialized request.
     fn resolve_source(&self, record: &JobRecord) -> Result<Option<Source>, WireError> {
         let input = match record.operation() {
-            ANALYZER => "sourceArtifactRef",
+            operation if analyzer(operation) => "sourceArtifactRef",
             HAP => "hapArtifactLease",
             NATIVE => "libraryArtifactLease",
             APPLY => "patchArtifactRef",

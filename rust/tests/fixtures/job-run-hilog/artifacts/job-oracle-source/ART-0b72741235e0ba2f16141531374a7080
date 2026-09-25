@@ -1,0 +1,5 @@
+extra
+09-25 10:00:00.123  1234  5678 I C02D01/HiLog: started
+
+continuation without a header
+09-25 10:00:01.000  1234  5679 E C02D01/HiLog: failed

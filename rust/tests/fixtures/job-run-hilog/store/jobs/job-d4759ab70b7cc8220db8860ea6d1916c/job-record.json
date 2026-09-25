@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-d4759ab70b7cc8220db8860ea6d1916c",
+  "materializedPlanDigest" : "81c43f426fedec454fdf4f32e6ce8a7a588584c952f327471cb4ca7bcf30b6e5",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-hilog@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-emptyResult-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-d97d3057b7a5c4834742f073dd180e34"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-emptyResult",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-emptyResult-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-d97d3057b7a5c4834742f073dd180e34"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-emptyResult",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-hilog",
+    "failed summarize-hilog: analyzer.emptyResult: hilog-summary@1 produced no output for ART-d97d3057b7a5c4834742f073dd180e34",
+    "running->finalizing",
+    "reason: analyzer.emptyResult: hilog-summary@1 produced no output for ART-d97d3057b7a5c4834742f073dd180e34",
+    "finalizing->failed",
+    "reason: analyzer.emptyResult: hilog-summary@1 produced no output for ART-d97d3057b7a5c4834742f073dd180e34"
+  ]
+}

@@ -3,7 +3,7 @@ use arkdeck_contract::{
     MAX_REQUEST_BYTES, Request, Response, decode_response, encode_frame, sha256_hex,
 };
 use arkdeck_control::Control;
-use arkdeck_hoststore::{AnalyzerProfile, ArtifactReadStore, JobStore, TargetStore};
+use arkdeck_hoststore::{ArtifactReadStore, JobStore, TargetStore};
 use arkdeck_platform::VerifiedTool;
 use arkdeck_provider_hdc::ProcessDispatch;
 use serde_json::{Value, json};
@@ -106,9 +106,12 @@ impl Fixture {
     fn host(&self, artifacts: bool, jobs: bool) -> crate::host::Host {
         let mut host = crate::host::Host::from_environment()
             .with_targets(TargetStore::open(&self.0.join("targets")).unwrap())
+            // The daemon's own composition of the analyzer it is named: the
+            // crash-ledger analyzer, and no HiLog summary, since that
+            // executable is not this one.
             .with_planning(
                 &self.0,
-                Some(AnalyzerProfile::crash_signature(&self.0.join("analyzer")).unwrap()),
+                crate::hilog_summary_analyzer::composed(Some(&self.0.join("analyzer"))).unwrap(),
             )
             .with_development_hdc(Some(ProcessDispatch::new(
                 VerifiedTool::open(
@@ -237,6 +240,16 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
             json!(["host_configuration"])
         );
     }
+    // The HiLog summary is the daemon's own mode: an analyzer executable that
+    // is not this daemon is no HiLog producer, and says so by name.
+    let hilog = entry(&rows, "analyzer.summarize-hilog@1");
+    assert_eq!(hilog["availability"], "unavailable");
+    assert_eq!(hilog["reasonCodes"], json!(["provider_tool_unavailable"]));
+    assert_eq!(
+        hilog["reasons"],
+        json!(["analyzer.hilogRequiresCurrentDaemon"])
+    );
+    assert_eq!(hilog["reasonOrigins"], json!(["host_configuration"]));
     // A native library deployment also needs the verified code-sign helper,
     // which this composition does not carry.
     let native = entry(&rows, "deploy.native-library.app-owned@1");

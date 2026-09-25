@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-97609a0ff003286d3fff11926a6897c1",
+  "materializedPlanDigest" : "2886b2b17ebd55c8c25a1c377be3fdf0a53a86d90412c2c3cd42b68a589b6f23",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-hilog@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-malformedResult-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-33a35c8d315d42b52a19d4ae0aac9a5e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-malformedResult",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-malformedResult-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-33a35c8d315d42b52a19d4ae0aac9a5e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-malformedResult",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-hilog",
+    "failed summarize-hilog: analyzer.malformedResult: hilog-summary@1 did not produce a structured result",
+    "running->finalizing",
+    "reason: analyzer.malformedResult: hilog-summary@1 did not produce a structured result",
+    "finalizing->failed",
+    "reason: analyzer.malformedResult: hilog-summary@1 did not produce a structured result"
+  ]
+}

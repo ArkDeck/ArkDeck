@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-9d08da568e57d57fae94ee72974a15d0",
+  "materializedPlanDigest" : "3e3362300fbfdea97a062b0b63cdbe7ea636bba77c8581cb0adff576eeb24d89",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-hilog@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a5dc74fdda2b942278ad5f0525b1716e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a5dc74fdda2b942278ad5f0525b1716e"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-hilog",
+    "failed summarize-hilog: analyzer.failed: hilog-summary@1 exited 3",
+    "running->finalizing",
+    "reason: analyzer.failed: hilog-summary@1 exited 3",
+    "finalizing->failed",
+    "reason: analyzer.failed: hilog-summary@1 exited 3"
+  ]
+}

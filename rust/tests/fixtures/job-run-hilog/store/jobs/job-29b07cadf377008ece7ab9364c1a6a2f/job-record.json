@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-29b07cadf377008ece7ab9364c1a6a2f",
+  "materializedPlanDigest" : "2596b200d3cf629ee502b625f5dfd3cc32573f3bd7fe81eeacc1dc2158b0effa",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.summarize-hilog@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-overBudget-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-eb5a83be467045a44fd79f40e3030b8a"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-overBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-hilog-overBudget-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-eb5a83be467045a44fd79f40e3030b8a"
+    },
+    "operation" : {
+      "id" : "analyzer.summarize-hilog",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-hilog-overBudget",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent summarize-hilog",
+    "failed summarize-hilog: analyzer.outputLimitExceeded: hilog-summary@1 output exceeded its byte budget",
+    "running->finalizing",
+    "reason: analyzer.outputLimitExceeded: hilog-summary@1 output exceeded its byte budget",
+    "finalizing->failed",
+    "reason: analyzer.outputLimitExceeded: hilog-summary@1 output exceeded its byte budget"
+  ]
+}

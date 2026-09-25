@@ -573,11 +573,7 @@ pub(crate) fn compose(
         .with_mutation_root(layout.state.clone())
         .with_planning(
             &layout.state,
-            inputs
-                .analyzer
-                .as_deref()
-                .map(arkdeck_hoststore::AnalyzerProfile::crash_signature)
-                .transpose()?,
+            crate::hilog_summary_analyzer::composed(inputs.analyzer.as_deref())?,
         )
         // Swift's Flash invocation owner keeps its documents beside the Job
         // state it runs through, and creates their directories at its start;
