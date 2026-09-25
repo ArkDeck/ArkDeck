@@ -197,6 +197,20 @@ class PathClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
 
+    def test_helper_packaging_changes_select_the_rust_lane_that_checks_them(self):
+        # The unsigned structure check of the Rust helper pair runs in the
+        # Rust macOS workspace job; Swift's contract tests pin the release
+        # script, so Swift stays selected as for any package path.
+        for path in (
+            "Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py",
+            "Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh",
+            "Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh",
+            "Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh",
+            "Packages/ArkDeckKit/Distribution/macOS/ArkDeckAgent.entitlements",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
+
     def test_every_declared_generator_input_selects_rust(self):
         root = SCRIPT.resolve().parents[2]
         spec = importlib.util.spec_from_file_location(

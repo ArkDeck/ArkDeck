@@ -49,6 +49,11 @@ RUST_CONTRACT_INPUT_PREFIXES = (
 # schema tests), so such a change runs the Swift lane as well: a bundle-only
 # edit kept consistent with the Rust copies must not skip Swift's drift check.
 RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
+# The Rust helper pair's release layout and the structure check that holds it
+# (G5 slice 20a, #2218) run in the Rust lane's macOS workspace job, over the
+# binaries that job builds. A change to them must run that lane, or it merges
+# unchecked (#2236 did: its fix to the check skipped the lane that runs it).
+RUST_PACKAGING_PREFIXES = ("Packages/ArkDeckKit/Distribution/macOS/",)
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
@@ -155,6 +160,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         if (
             path.startswith(RUST_CONTRACT_INPUT_PREFIXES)
             or path.startswith(RUST_BUNDLE_PREFIXES)
+            or path.startswith(RUST_PACKAGING_PREFIXES)
             or path in RUST_CONTRACT_INPUT_FILES
             or (
                 path.endswith(".swift")
