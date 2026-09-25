@@ -48,8 +48,11 @@ resume is its own slice, with its own Swift oracle.
   with `--capability` (forwarded in the submitted request's `authorization`) and without (no
   `authorization`).
 - `argv_fixtures.rs` replays Swift's argv fixtures for the 20 newly served leaves (zero
-  deviations); its example of a registry node this CLI serves nothing under is now
-  `runtime update` (`debug template run` is served).
+  deviations). Its check that a registry node this CLI serves nothing under refuses `--help`
+  now finds those nodes from the registry and the served leaves instead of naming one:
+  `debug template run` is served here, and #2211 serves the `runtime update` leaves, so any fixed
+  example goes stale as the lane lands (the coordinator's review of #2211 and #2212 found the
+  second one; checked with #2211's commit applied on top).
 
 Mutation check, baseline passing, each reverted after (`/private/tmp/arkdeck-cli-lane-mut-c24.py`):
 `workspace patch` left unserved; `target observe` judged as a Target presentation read. Each fails a
