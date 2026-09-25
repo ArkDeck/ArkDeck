@@ -1,0 +1,190 @@
+{
+  "systrace-context-range": {
+    "inputs": {
+      "endNs": 2010000000,
+      "kind": "context",
+      "maxEvents": 150,
+      "maxOutputBytes": 1048576,
+      "maxRows": 60,
+      "processKey": 1,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 2000000000,
+      "timeoutMs": 60000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "systrace-context-timestamp": {
+    "inputs": {
+      "kind": "context",
+      "maxEvents": 150,
+      "maxOutputBytes": 4194304,
+      "maxRows": 60,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "timeoutMs": 60000,
+      "timestampNs": 4500000000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "systrace-cpu": {
+    "inputs": {
+      "endNs": 9127944000,
+      "kind": "cpu",
+      "limit": 10,
+      "maxEvents": 20000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 0,
+      "timeoutMs": 60000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "systrace-pid": {
+    "inputs": {
+      "endNs": 9127944000,
+      "kind": "cpu",
+      "limit": 10,
+      "maxEvents": 20000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "pid": 1,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 0,
+      "timeoutMs": 60000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "systrace-scheduling": {
+    "inputs": {
+      "endNs": 2000000000,
+      "kind": "scheduling",
+      "limit": 10,
+      "maxEvents": 20000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 1000000000,
+      "timeoutMs": 60000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "systrace-slices": {
+    "inputs": {
+      "kind": "slices",
+      "limit": 5,
+      "maxEvents": 20000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "thresholdNs": 0,
+      "timeoutMs": 60000,
+      "timestampNs": 3000000000
+    },
+    "sourceByteCount": 13465993,
+    "sourceSHA256": "350c9fa59e887a41dab0fc3078d81688aabbb72e3a7e3ea671b620e57a76caef",
+    "trace": "trace_small_10.systrace"
+  },
+  "zlib-context-range": {
+    "inputs": {
+      "endNs": 1100000000,
+      "kind": "context",
+      "maxEvents": 1000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 1000000000,
+      "timeoutMs": 30000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  },
+  "zlib-context-timestamp": {
+    "inputs": {
+      "kind": "context",
+      "maxEvents": 1000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "timeoutMs": 30000,
+      "timestampNs": 16000000000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  },
+  "zlib-cpu": {
+    "inputs": {
+      "endNs": 32210627000,
+      "kind": "cpu",
+      "limit": 10,
+      "maxEvents": 10000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 0,
+      "timeoutMs": 30000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  },
+  "zlib-hot-intervals": {
+    "inputs": {
+      "endNs": 32210627000,
+      "kind": "hot-intervals",
+      "limit": 5,
+      "maxEvents": 10000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 0,
+      "timeoutMs": 30000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  },
+  "zlib-range": {
+    "inputs": {
+      "kind": "range",
+      "limit": 20,
+      "maxEvents": 10000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 200,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "timeoutMs": 30000,
+      "timestampNs": 16000000000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  },
+  "zlib-slices": {
+    "inputs": {
+      "endNs": 32210627000,
+      "kind": "slices",
+      "limit": 10,
+      "maxEvents": 10000,
+      "maxOutputBytes": 1048576,
+      "maxRows": 100,
+      "sourceArtifactRef": "lease-v1:job-trace:ART-00000000000000000000000000000001",
+      "startNs": 0,
+      "thresholdNs": 1000000,
+      "timeoutMs": 30000
+    },
+    "sourceByteCount": 67837,
+    "sourceSHA256": "eb196eeb30c6b959c23d5e18d159ec946ba664ee8d9bc6f1acc32947b4ff5cfe",
+    "trace": "zlib.htrace"
+  }
+}

@@ -1,0 +1,963 @@
+[
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":16000000000,\"timeoutMs\":30000,\"maxRows\":100,\"maxEvents\":1000,\"maxOutputBytes\":1048576}",
+    "name" : "contextTimestamp",
+    "outcome" : {
+      "arguments" : [
+        "context",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "100",
+        "--max-events",
+        "1000",
+        "--max-output-bytes",
+        "1048576",
+        "--timestamp-ns",
+        "16000000000",
+        "--window-ms",
+        "50",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        15950000000,
+        16050000000
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "cbae46ff9fc475b0d49e499b7c2f6415469c9e8d64a352b74caa9d7e6a40283f",
+      "request" : {
+        "endNs" : null,
+        "kind" : "context",
+        "limit" : 100,
+        "maxEvents" : 1000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : null,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : 16000000000
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"startNs\":1000000000,\"endNs\":1100000000,\"timeoutMs\":30000,\"maxRows\":100,\"maxEvents\":1000,\"maxOutputBytes\":1048576}",
+    "name" : "contextRange",
+    "outcome" : {
+      "arguments" : [
+        "context",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "100",
+        "--max-events",
+        "1000",
+        "--max-output-bytes",
+        "1048576",
+        "--start-ns",
+        "1000000000",
+        "--end-ns",
+        "1100000000",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        1000000000,
+        1100000000
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "d25421cc1ec4542ef0a0939fc843159b86354eaddf32e320cc0e83c5026eaa22",
+      "request" : {
+        "endNs" : 1100000000,
+        "kind" : "context",
+        "limit" : 100,
+        "maxEvents" : 1000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 1000000000,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":32210627000,\"limit\":10,\"timeoutMs\":30000,\"maxRows\":100,\"maxEvents\":10000,\"maxOutputBytes\":1048576}",
+    "name" : "cpuRangeLimit",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "100",
+        "--max-events",
+        "10000",
+        "--max-output-bytes",
+        "1048576",
+        "--kind",
+        "cpu",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "32210627000",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "10",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        32210627000
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "8f547e90e8d16cf5d7e19271c505f484ef5070162e579e458a7b61912d441ebd",
+      "request" : {
+        "endNs" : 32210627000,
+        "kind" : "cpu",
+        "limit" : 10,
+        "maxEvents" : 10000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":5,\"timeoutMs\":30000,\"maxRows\":7,\"maxEvents\":9,\"maxOutputBytes\":1048576}",
+    "name" : "cpuDefaultLimit",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "7",
+        "--max-events",
+        "9",
+        "--max-output-bytes",
+        "1048576",
+        "--kind",
+        "cpu",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "5",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "7",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        5
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "6d2c2e8840bdf4652dccd4e78cef2b4acc0f8058aaee4a0a123a1028506f7003",
+      "request" : {
+        "endNs" : 5,
+        "kind" : "cpu",
+        "limit" : 7,
+        "maxEvents" : 9,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 7,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"range\",\"startNs\":0,\"endNs\":5,\"timeoutMs\":30000,\"maxRows\":5000,\"maxEvents\":9000,\"maxOutputBytes\":1048576}",
+    "name" : "defaultLimitCapped",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "5000",
+        "--max-events",
+        "9000",
+        "--max-output-bytes",
+        "1048576",
+        "--kind",
+        "range",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "5",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "1000",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        5
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "0ab7ad102d5e0b650d8617a767c74421d8fe5124d01c9d336a6cff3f4cd2b81f",
+      "request" : {
+        "endNs" : 5,
+        "kind" : "range",
+        "limit" : 1000,
+        "maxEvents" : 9000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 5000,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"slices\",\"timestampNs\":3000000000,\"thresholdNs\":250,\"limit\":5,\"timeoutMs\":60000,\"maxRows\":100,\"maxEvents\":20000,\"maxOutputBytes\":1048576}",
+    "name" : "slicesTimestampThreshold",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "60000",
+        "--max-rows",
+        "100",
+        "--max-events",
+        "20000",
+        "--max-output-bytes",
+        "1048576",
+        "--kind",
+        "slices",
+        "--start-ns",
+        "2950000000",
+        "--end-ns",
+        "3050000000",
+        "--threshold-ns",
+        "250",
+        "--limit",
+        "5",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        2950000000,
+        3050000000
+      ],
+      "processTimeoutSeconds" : 60,
+      "recoveryDigestSHA256" : "13e709a3061b957f2a895f795a3c43ee053ea656b23f5217c063746397e3d1e2",
+      "request" : {
+        "endNs" : null,
+        "kind" : "slices",
+        "limit" : 5,
+        "maxEvents" : 20000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : null,
+        "threadKey" : null,
+        "thresholdNs" : 250,
+        "tid" : null,
+        "timeoutMs" : 60000,
+        "timestampNs" : 3000000000
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"hot-intervals\",\"startNs\":10,\"endNs\":20,\"processKey\":3,\"threadKey\":-4,\"timeoutMs\":1001,\"maxRows\":10,\"maxEvents\":10,\"maxOutputBytes\":1024}",
+    "name" : "hotIntervalsKeys",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "1001",
+        "--max-rows",
+        "10",
+        "--max-events",
+        "10",
+        "--max-output-bytes",
+        "1024",
+        "--kind",
+        "hot-intervals",
+        "--start-ns",
+        "10",
+        "--end-ns",
+        "20",
+        "--process-key",
+        "3",
+        "--thread-key",
+        "-4",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "10",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        10,
+        20
+      ],
+      "processTimeoutSeconds" : 2,
+      "recoveryDigestSHA256" : "1002b33bd9ef9196a406e36bba9d1cda98a2bc10c26951875345b53a76acbe14",
+      "request" : {
+        "endNs" : 20,
+        "kind" : "hot-intervals",
+        "limit" : 10,
+        "maxEvents" : 10,
+        "maxOutputBytes" : 1024,
+        "maxRows" : 10,
+        "pid" : null,
+        "processKey" : 3,
+        "startNs" : 10,
+        "threadKey" : -4,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 1001,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"range\",\"startNs\":10,\"endNs\":20,\"pid\":0,\"tid\":7,\"timeoutMs\":999,\"maxRows\":10,\"maxEvents\":10,\"maxOutputBytes\":67108864}",
+    "name" : "rangePidTid",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "999",
+        "--max-rows",
+        "10",
+        "--max-events",
+        "10",
+        "--max-output-bytes",
+        "67108864",
+        "--kind",
+        "range",
+        "--start-ns",
+        "10",
+        "--end-ns",
+        "20",
+        "--pid",
+        "0",
+        "--tid",
+        "7",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "10",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        10,
+        20
+      ],
+      "processTimeoutSeconds" : 1,
+      "recoveryDigestSHA256" : "7a7479fe27fd0281b19a64eced56ca207c449944e3abec10103267e24f07e9ca",
+      "request" : {
+        "endNs" : 20,
+        "kind" : "range",
+        "limit" : 10,
+        "maxEvents" : 10,
+        "maxOutputBytes" : 67108864,
+        "maxRows" : 10,
+        "pid" : 0,
+        "processKey" : null,
+        "startNs" : 10,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : 7,
+        "timeoutMs" : 999,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"scheduling\",\"timestampNs\":10,\"timeoutMs\":100,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":2048}",
+    "name" : "schedulingTimestampNearZero",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "100",
+        "--max-rows",
+        "1",
+        "--max-events",
+        "1",
+        "--max-output-bytes",
+        "2048",
+        "--kind",
+        "scheduling",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "50000010",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "1",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        50000010
+      ],
+      "processTimeoutSeconds" : 1,
+      "recoveryDigestSHA256" : "60ac52ce28cd7237889c73a3a9f680edad39b54c8e50557bb190940e6899c9f8",
+      "request" : {
+        "endNs" : null,
+        "kind" : "scheduling",
+        "limit" : 1,
+        "maxEvents" : 1,
+        "maxOutputBytes" : 2048,
+        "maxRows" : 1,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : null,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 100,
+        "timestampNs" : 10
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":0,\"timeoutMs\":120000,\"maxRows\":100000,\"maxEvents\":100000,\"maxOutputBytes\":1048576}",
+    "name" : "contextTimestampZero",
+    "outcome" : {
+      "arguments" : [
+        "context",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "120000",
+        "--max-rows",
+        "100000",
+        "--max-events",
+        "100000",
+        "--max-output-bytes",
+        "1048576",
+        "--timestamp-ns",
+        "0",
+        "--window-ms",
+        "50",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        50000000
+      ],
+      "processTimeoutSeconds" : 120,
+      "recoveryDigestSHA256" : "9727e9d3c31301992146ab824fa2f4c7afee3050d47854ff5c324e76fdddbc1a",
+      "request" : {
+        "endNs" : null,
+        "kind" : "context",
+        "limit" : 1000,
+        "maxEvents" : 100000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100000,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : null,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 120000,
+        "timestampNs" : 0
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0.0,\"endNs\":1e3,\"limit\":2.0,\"timeoutMs\":3e4,\"maxRows\":100.0,\"maxEvents\":10,\"maxOutputBytes\":1048576}",
+    "name" : "integralFloats",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "100",
+        "--max-events",
+        "10",
+        "--max-output-bytes",
+        "1048576",
+        "--kind",
+        "cpu",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "1000",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "2",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        1000
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "d1fa63be1020ec2d08d1e2c85198b3ccc18cf8892fc778198022abc166055c5b",
+      "request" : {
+        "endNs" : 1000,
+        "kind" : "cpu",
+        "limit" : 2,
+        "maxEvents" : 10,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":-0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativeZeroStart",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "1",
+        "--max-events",
+        "1",
+        "--max-output-bytes",
+        "1024",
+        "--kind",
+        "cpu",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "1",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "1",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        1
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "12e79bfc028d878d8697c21046f443559356bc1580a51b5fdabc590bb169633b",
+      "request" : {
+        "endNs" : 1,
+        "kind" : "cpu",
+        "limit" : 1,
+        "maxEvents" : 1,
+        "maxOutputBytes" : 1024,
+        "maxRows" : 1,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":9223372036854775000,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "timestampOverflow",
+    "outcome" : {
+      "refused" : "analyzer analysis time selection is invalid"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"slices\",\"timestampNs\":9223372036854775000,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "timestampOverflowAnalysis",
+    "outcome" : {
+      "refused" : "analyzer analysis time selection is invalid"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024,\"window\":1}",
+    "name" : "unknownKey",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":null,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "nullLimit",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":\"1\",\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "stringLimit",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":1.5,\"timeoutMs\":30000,\"maxRows\":2,\"maxEvents\":2,\"maxOutputBytes\":1024}",
+    "name" : "fractionalLimit",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":18446744073709551615,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "unsignedTimestamp",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "missingKind",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs are incomplete"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"memory\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "unknownKind",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs are incomplete"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":\"30000\",\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "stringTimeout",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs are incomplete"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "missingMaxRows",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs are incomplete"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"timestampNs\":5,\"startNs\":0,\"endNs\":10,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "timestampAndStart",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "startWithoutEnd",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "noTimeSelection",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":5,\"endNs\":5,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "emptyRange",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":99,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "timeoutTooShort",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":120001,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "timeoutTooLong",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":0,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "zeroRows",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":100001,\"maxOutputBytes\":1024}",
+    "name" : "tooManyEvents",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1023}",
+    "name" : "outputTooSmall",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":67108865}",
+    "name" : "outputTooLarge",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"thresholdNs\":-1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativeThreshold",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "zeroLimit",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":3,\"timeoutMs\":30000,\"maxRows\":5,\"maxEvents\":2,\"maxOutputBytes\":1024}",
+    "name" : "limitBeyondEvents",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":-1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativeTimestamp",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":-5,\"endNs\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativeStart",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":-1,\"endNs\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "zeroEnd",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"pid\":-1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativePid",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"tid\":-1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "negativeTid",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"processKey\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "zeroProcessKey",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"threadKey\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "zeroThreadKey",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"processKey\":2,\"pid\":3,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "processKeyAndPid",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"threadKey\":2,\"tid\":3,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "threadKeyAndTid",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":5,\"limit\":1,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "contextWithLimit",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"timestampNs\":5,\"thresholdNs\":0,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "contextWithThreshold",
+    "outcome" : {
+      "refused" : "analyzer analysis inputs violate the closed request contract"
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"context\",\"startNs\":1,\"endNs\":2,\"processKey\":-9,\"tid\":4,\"timeoutMs\":30000,\"maxRows\":1,\"maxEvents\":1,\"maxOutputBytes\":1024}",
+    "name" : "contextKeysAndFilters",
+    "outcome" : {
+      "arguments" : [
+        "context",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "1",
+        "--max-events",
+        "1",
+        "--max-output-bytes",
+        "1024",
+        "--start-ns",
+        "1",
+        "--end-ns",
+        "2",
+        "--process-key",
+        "-9",
+        "--tid",
+        "4",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        1,
+        2
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "e07a220cd1342f7be82cab1c7b89a1a60bb501f2672369d5e15640026c288d34",
+      "request" : {
+        "endNs" : 2,
+        "kind" : "context",
+        "limit" : 1,
+        "maxEvents" : 1,
+        "maxOutputBytes" : 1024,
+        "maxRows" : 1,
+        "pid" : null,
+        "processKey" : -9,
+        "startNs" : 1,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : 4,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  },
+  {
+    "inputs" : "{\"sourceArtifactRef\":\"lease\",\"kind\":\"cpu\",\"startNs\":0,\"endNs\":1,\"limit\":1e3,\"timeoutMs\":30000,\"maxRows\":1000,\"maxEvents\":1000,\"maxOutputBytes\":1024}",
+    "name" : "exponentLimit",
+    "outcome" : {
+      "arguments" : [
+        "analyze",
+        "--json",
+        "--no-cache",
+        "--timeout-ms",
+        "30000",
+        "--max-rows",
+        "1000",
+        "--max-events",
+        "1000",
+        "--max-output-bytes",
+        "1024",
+        "--kind",
+        "cpu",
+        "--start-ns",
+        "0",
+        "--end-ns",
+        "1",
+        "--threshold-ns",
+        "0",
+        "--limit",
+        "1000",
+        "/private/tmp/arkdeck-trace-source/job-trace/trace.htrace"
+      ],
+      "normalizedRange" : [
+        0,
+        1
+      ],
+      "processTimeoutSeconds" : 30,
+      "recoveryDigestSHA256" : "0a8424f959d39b68bf19d5947727c1ac1280a38da49c5d9a436649c3defdd141",
+      "request" : {
+        "endNs" : 1,
+        "kind" : "cpu",
+        "limit" : 1000,
+        "maxEvents" : 1000,
+        "maxOutputBytes" : 1024,
+        "maxRows" : 1000,
+        "pid" : null,
+        "processKey" : null,
+        "startNs" : 0,
+        "threadKey" : null,
+        "thresholdNs" : 0,
+        "tid" : null,
+        "timeoutMs" : 30000,
+        "timestampNs" : null
+      }
+    }
+  }
+]

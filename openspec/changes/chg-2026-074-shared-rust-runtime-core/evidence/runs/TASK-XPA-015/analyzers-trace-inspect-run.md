@@ -1017,4 +1017,153 @@ read; then the Trace inspector decision (§4).
 
 ### CI
 
+PR #2167, merged as `0cbb6f534`: Agent PR 36090631799, SDD Guard 36090631761
+and Swift CI 36090632078 all succeeded at `b17473b87` (plan; Rust
+host-independent; Rust workspace on ubuntu-latest, windows-latest and
+macos-26; swift-tests; ds-tokens; ds-interactions; `swift` aggregate;
+app-build skipped by plan).
+
+## 8. `analyzer.analyze-trace@1` on the Rust daemon
+
+Base: protected `main` `c6f38e7e0` (#2166). No contract input changes.
+
+### What a caller sees
+
+- With a loaded ArkTrace descriptor, `analyzer.analyze-trace@1` is available
+  and a Job of it is planned, admitted, run, published, read and reconciled
+  as Swift's engine does it (§7's declared difference is gone); `arkdeck agent
+  run` of it ends `completed`. The Job's inputs make the CLI's request — a
+  context window or one of the five deterministic analyses — and the
+  published `trace-analysis.json` is the exact envelope the reviewed CLI
+  printed, with the request's members in its derivation.
+- A request outside the closed cross-field contract (a timestamp and a range
+  together, a range without its end, a context request with a limit or
+  threshold, a key and an id for one process or thread, zero keys, bounds out
+  of range) is refused before admission as Swift refuses it: `job.plan` and
+  `job.submit` with `invalidInput` "ArkTrace analysis request violates its
+  closed cross-field contract", `agent.run` with `invalidInput` "typed
+  operation inputs were rejected".
+
+### Swift, the oracles
+
+- `ArkTraceAnalysisValidatorOracleContractTests` (new,
+  `rust/tests/fixtures/arktrace-analysis-validator/`): the bases are the
+  reviewed ArkTrace CLI's own answers on this host for the repository's
+  `zlib.htrace` and `trace_small_10.systrace` (twelve envelopes: context
+  windows by timestamp and by range with a process filter; cpu, scheduling,
+  slices, range and hot-interval analyses, with scheduling supported and
+  unsupported for both reasons; checked in with their requests). Swift judges
+  176 byte-level edits of them (28 valid) for invocations made from their
+  requests or changed as their names say: every member's closure and type,
+  the tool, trace, parser and provenance pins, the request echo and filters,
+  the limits, data quality and truncation, each row kind of context and
+  analysis, keys and their references, carried-in counter samples,
+  scheduling samples and percentiles, hot-interval scores, section statuses
+  (aggregation allowed only where Swift allows it), the row and event
+  budgets, private paths and control or format scalars, integral numbers
+  written as `3.0` or `9.17504e5` (integers to `JSONDecoder`), and member
+  names compared under canonical equivalence (`process\u212Aey` is
+  `processKey`). It also reads 49 request inputs: the request or Swift's
+  refusal, and a request's arguments, process deadline, recovery digest and
+  time range.
+- `JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedTraceAnalysisJobs`
+  (new, `rust/tests/fixtures/job-run-trace-analysis/`): five plans (composed,
+  no descriptor, three requests outside the contract, whose submissions are
+  refused too), then nine Jobs over the trace-summary oracle's stand-in
+  answering reviewed envelopes bound to it and to each source — a context
+  window, a cpu analysis and a hot-interval analysis published; stderr
+  written, an envelope of another request, an answer beyond the request's own
+  output budget (`analyzer.outputLimitExceeded`), one beyond the capture, a
+  non-zero exit and a signal death — with every read, each child's arguments
+  and the store.
+- `ArkTraceReviewedDistributionOracleContractTests/testSwiftAnalyzesTheFixtureTraceWithTheReviewedDistribution`
+  (new, host acceptance, run only with `ARKDECK_REVIEWED_ARKTRACE_DESCRIPTOR`
+  and `ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_RECORD`): a context window and a
+  long-slice analysis of `zlib.htrace` with the real CLI.
+
+### Rust
+
+- `arkdeck-hoststore`:
+  - `arktrace_analysis.rs` (new): `AnalysisRequest` (Swift's parse with its
+    three refusals, `arguments`, `process_timeout_seconds`,
+    `recovery_digest_sha256`, `normalized_range`) and `valid_analysis`, the
+    validator over Swift's `JSONDecoder` reading of the bytes
+    (`session_json::parse_foundation`, member names in canonical form, text
+    compared under canonical equivalence).
+  - `analyzer_output.rs`: `Invocation` (Swift `AnalyzerInvocation`: the
+    lowered arguments, deadline and budget, and the analysis request), the
+    analysis verification and summary, the exact bytes as the product and
+    `traceAnalysisDerivation`.
+  - `job_plan.rs`: the operation materialized, the cross-field check after
+    the Catalog's (`validateSupportedPlanInputs`), the plan's arguments and
+    deadline from the request; `job_run.rs`: the invocation built from the
+    Job's inputs, the request digest in the durable action, the canonical
+    dispatch with the invocation's arguments and deadline; `agent_execution.rs`:
+    the check for a new agent intent; `analyzer_composition.rs`,
+    `job_result.rs`: executed and read.
+
+### Evidence
+
+- `cargo test -p arkdeck-hoststore --lib arktrace_analysis`: all 176 of
+  Swift's verdicts and all 49 request readings, on the first run.
+  `--test job_run_trace_analysis`: the five plans, three refused submissions,
+  nine admissions and runs, 36 reads, the nine children's arguments, the Job
+  index, every Job file and every Artifact index and payload, byte for byte;
+  the signal-parked Job reconciled `executionConfirmedNotPerformed`, twice.
+- Host acceptance on this Mac: Swift recorded its context window and
+  long-slice analysis of `zlib.htrace` at
+  `/private/tmp/arkdeck-s25-f-reviewed-analysis-swift`; `cargo test -p
+  arkdeck-hoststore --test arktrace_reviewed` with
+  `ARKDECK_REVIEWED_ARKTRACE_ANALYSIS_SWIFT` gives the same answers, Job files
+  and Artifacts, byte for byte; `cargo test -p arkdeck-agentd --test
+  trace_summary_analyzer`: the built daemon describes the operation as
+  available, and the context Job run directly and the analysis Job owned by
+  an agent execution (`completed`) publish Swift's bytes. Logs
+  `/private/tmp/arkdeck-s25-f-reviewed-{swift,rust}.log`,
+  `/private/tmp/arkdeck-s25-f-agentd-reviewed.log`.
+- Unit test: an agent intent outside the contract is rejected inputs; a
+  closed one passes.
+- Mutations: 14 of 14 caught, each restored by SHA-256 — inner data quality
+  not compared, every section aggregating, member names compared as bytes, two
+  carry-in samples, the limit unbounded, the deadline truncated, a 100 ms
+  context half-window, a bar-joined digest, the cross-field check skipped at
+  plan and at agent intent, the derivation without its limit, the profile's
+  budget for an analysis, the durable action without its digest, the summary
+  contract's detail. Log `/private/tmp/arkdeck-s25-f-mutations.log`.
+
+### Differences from Swift (declared)
+
+- A child's base environment, as declared in §6.
+
+### Checks (local, targeted)
+
+`CARGO_BUILD_JOBS=2`, target `/private/tmp/arkdeck-1330-rust-target`, logs
+`/private/tmp/arkdeck-s25-f-*.log`:
+
+- `cargo fmt --all --check`: exit 0.
+- `cargo clippy -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-soak
+  --all-targets -- -D warnings`: exit 0; the host store and daemon again for
+  `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: exit 0.
+- `cargo test -p arkdeck-hoststore --no-fail-fast`: exit 0, 605 passed, 14
+  ignored (existing).
+- `cargo test -p arkdeck-agentd --no-fail-fast`: exit 0, 165 passed.
+- `cargo test -p arkdeck-soak -p arkdeck-cli --no-fail-fast`: exit 0, 259
+  passed. No stand-in or CLI left running.
+- Swift: `run-swiftpm.sh test --filter
+  'JobRunAnalyzerOracleContractTests|ArkTraceAnalysisValidatorOracleContractTests|ArkTraceSummaryValidatorOracleContractTests|ArkTraceReviewedDistributionOracleContractTests'`:
+  exit 0 (the reviewed ones skipped without their variables; run with them
+  above).
+- `sh scripts/check-sdd.sh`: exit 0.
+- Not run: the platform's, client's and providers' tests (nothing they use
+  changed), `generate-contract.py`/`check-contracts.py` (no contract input
+  changes), the App, a device.
+
+### Next
+
+The Trace inspector decision (§4): with both ArkTrace analyzers on the Rust
+daemon, option (b) — `trace.inspect` answered from the pinned CLI — needs
+only the maintainer's word on `engine.sourceRevision`.
+
+### CI
+
 Pending.

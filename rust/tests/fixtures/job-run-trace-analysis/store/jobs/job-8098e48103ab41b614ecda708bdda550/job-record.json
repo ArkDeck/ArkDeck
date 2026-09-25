@@ -1,0 +1,99 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-8098e48103ab41b614ecda708bdda550",
+  "materializedPlanDigest" : "d107582a7a0228a3bde6e3c2ebb717b2b8ba5d3b52d6d36a4d350d11f3fb0f91",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.analyze-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-truncatedStdout-0001",
+    "inputs" : {
+      "endNs" : 32210627000,
+      "kind" : "slices",
+      "limit" : 10,
+      "maxEvents" : 10000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-79e2dcaa37ba549118dee4b25371bf6e",
+      "startNs" : 0,
+      "thresholdNs" : 1000000,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-truncatedStdout",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-truncatedStdout-0001",
+    "inputs" : {
+      "endNs" : 32210627000,
+      "kind" : "slices",
+      "limit" : 10,
+      "maxEvents" : 10000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-79e2dcaa37ba549118dee4b25371bf6e",
+      "startNs" : 0,
+      "thresholdNs" : 1000000,
+      "timeoutMs" : 30000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-truncatedStdout",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent analyze-trace",
+    "failed analyze-trace: analyzer.truncatedResult: trace-analysis@1 output was truncated",
+    "running->finalizing",
+    "reason: analyzer.truncatedResult: trace-analysis@1 output was truncated",
+    "finalizing->failed",
+    "reason: analyzer.truncatedResult: trace-analysis@1 output was truncated"
+  ]
+}

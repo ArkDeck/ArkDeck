@@ -1697,7 +1697,9 @@ impl AgentExecutionStore {
         self.drive(record, engine)
     }
 
-    /// Swift `engine.validateAgentIntent`, for a new execution only.
+    /// Swift `engine.validateAgentIntent`, for a new execution only: the
+    /// catalog's inputs, then an ArkTrace analysis request's closed
+    /// cross-field contract (`validateSupportedPlanInputs`).
     fn validate_intent(intent: &Intent) -> Result<(), WireError> {
         let catalog = intent.descriptor().ok_or_else(|| internal(ADVANCE))?;
         catalog
@@ -1707,7 +1709,16 @@ impl AgentExecutionStore {
                     failure("invalidInput", "typed operation inputs were rejected")
                 }
                 InputRefusal::Unsupported(_) => internal(ADVANCE),
-            })
+            })?;
+        if catalog.reference() == crate::analyzer_composition::TRACE_ANALYSIS
+            && crate::arktrace_analysis::AnalysisRequest::parse(&intent.inputs).is_err()
+        {
+            return Err(failure(
+                "invalidInput",
+                "typed operation inputs were rejected",
+            ));
+        }
+        Ok(())
     }
 
     /// Swift `drive`: an accepted Job recovered, or the target resolved,
@@ -2455,6 +2466,37 @@ mod tests {
         for text in ["Zg=", "Z===", "Zg==Zg==", "Zm9v!"] {
             assert!(unbase64(text).is_none(), "{text}");
         }
+    }
+
+    /// Swift `validateAgentIntent`: an ArkTrace analysis intent outside the
+    /// request's closed cross-field contract is `.rejected(.invalidInput)`,
+    /// which the agent owner answers as any rejected inputs; a closed one
+    /// passes.
+    #[test]
+    fn an_analysis_intent_outside_its_contract_is_rejected_inputs() {
+        let intent = |inputs: Value| {
+            Intent::parse(
+                json!({"schemaVersion": INTENT_SCHEMA, "executionId": "trace-analysis",
+                    "operation": "analyzer.analyze-trace@1", "inputs": inputs,
+                    "maximumWaitMilliseconds": "300000",
+                    "target": {"targetId": "TGT-3ba3f5f43b92"}})
+                .as_object()
+                .unwrap(),
+                true,
+            )
+            .unwrap()
+        };
+        let closed = json!({"sourceArtifactRef": "lease-v1:job-a:ART-00000000000000000000000000000001",
+            "kind": "cpu", "startNs": 0, "endNs": 10, "timeoutMs": 30000, "maxRows": 1,
+            "maxEvents": 1, "maxOutputBytes": 1024});
+        assert!(AgentExecutionStore::validate_intent(&intent(closed.clone())).is_ok());
+        let mut crossed = closed;
+        crossed["timestampNs"] = json!(5);
+        let refused = AgentExecutionStore::validate_intent(&intent(crossed)).unwrap_err();
+        assert_eq!(
+            (refused.code.as_str(), refused.message.as_str()),
+            ("invalidInput", "typed operation inputs were rejected")
+        );
     }
 
     #[test]

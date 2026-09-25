@@ -1,0 +1,93 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-b8763c1cd75a854c18ccedcbde7004cd",
+  "materializedPlanDigest" : "1a1be62086a3e1655703f69070d87d8353a08896d36da44f236ad1bdfb3f2116",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.analyze-trace@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-stderrWritten-0001",
+    "inputs" : {
+      "kind" : "context",
+      "maxEvents" : 1000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-541035131fbc2f9043f9ead48cdaf821",
+      "timeoutMs" : 30000,
+      "timestampNs" : 16000000000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-stderrWritten",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-analysis-stderrWritten-0001",
+    "inputs" : {
+      "kind" : "context",
+      "maxEvents" : 1000,
+      "maxOutputBytes" : 1048576,
+      "maxRows" : 100,
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-541035131fbc2f9043f9ead48cdaf821",
+      "timeoutMs" : 30000,
+      "timestampNs" : 16000000000
+    },
+    "operation" : {
+      "id" : "analyzer.analyze-trace",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-analysis-stderrWritten",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent analyze-trace",
+    "failed analyze-trace: analyzer.schemaMismatch: trace-analysis@1 produced JSON outside ArkTrace analysis contract 1.0",
+    "running->finalizing",
+    "reason: analyzer.schemaMismatch: trace-analysis@1 produced JSON outside ArkTrace analysis contract 1.0",
+    "finalizing->failed",
+    "reason: analyzer.schemaMismatch: trace-analysis@1 produced JSON outside ArkTrace analysis contract 1.0"
+  ]
+}

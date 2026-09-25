@@ -1,0 +1,61 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-565b786e75ceb223cb895b9d11bec6f3",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 17078,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "derivation" : {
+        "analyzerRef" : "trace-analysis@1",
+        "analyzerVersion" : "0.1.0+1",
+        "indexSchemaVersion" : 3,
+        "maxEvents" : 1000,
+        "maxOutputBytes" : 1048576,
+        "maxRows" : 100,
+        "parserAdapterVersion" : "1",
+        "parserBuildRecipeVersion" : "e4fec8cc9cbb1be13748e7149424ce664a545c2296b424b6ff520cc3e84d3f06",
+        "parserSHA256" : "7c5ed515fc4d74517476fb901e3f7812914cb33b651324f49466d709d4641b35",
+        "parserUpstreamRevision" : "447a0a49a7b3b914d6e9bd00648ba5a340f6fbf6",
+        "parserVersion" : "4.3.7",
+        "requestCommand" : "context",
+        "requestKind" : "context",
+        "requestLimit" : 100,
+        "requestThresholdNs" : 0,
+        "requestTimestampNs" : 16000000000,
+        "schemaAdapterVersion" : "2",
+        "sourceArtifactID" : "ART-54bde9a63da7a96e81ebf52832f82ccf",
+        "sourceByteCount" : 32,
+        "sourceSHA256" : "1059acf357334cddfda57a6f248d70fd0901cbed12701d7f51b6fd75dcc1a7cc",
+        "timeoutMs" : 30000,
+        "toolSHA256" : "471b600a0130f2419c134c68814453745d7b9bce5689590007452e497f5ba580"
+      },
+      "jobID" : "job-2c026d2e5bddaca1fd8bf65eb2350c08",
+      "mediaType" : "application\/json",
+      "name" : "trace-analysis.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "analyzer",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-2c026d2e5bddaca1fd8bf65eb2350c08",
+      "sha256" : "6b9c164b3e1f3d0c700043a7895227ec38d7cf6495635f9e2d26188b0ad2951a",
+      "sourceOperation" : "analyzer.analyze-trace@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "analyze-trace"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

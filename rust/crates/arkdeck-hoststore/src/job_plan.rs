@@ -39,10 +39,11 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 19] = [
+const MATERIALIZED: [&str; 20] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
+    "analyzer.analyze-trace@1",
     "observe.device@1",
     "debug.template@1",
     "capture.diagnostics@1",
@@ -426,8 +427,10 @@ impl<'a> JobPlanner<'a> {
         Ok(descriptor)
     }
 
-    /// Swift `validateInputs`; a catalog constraint this validator does not
-    /// evaluate is refused rather than skipped.
+    /// Swift `validateInputs`, then `validateSupportedPlanInputs`: an
+    /// ArkTrace analysis request's closed cross-field contract. A catalog
+    /// constraint this validator does not evaluate is refused rather than
+    /// skipped.
     pub(crate) fn validate_inputs(
         request: &OperationRequest,
         descriptor: &CatalogOperation,
@@ -437,7 +440,16 @@ impl<'a> JobPlanner<'a> {
             .map_err(|failure| match failure {
                 InputRefusal::Invalid(message) => refusal("invalidInput", message),
                 InputRefusal::Unsupported(message) => refusal("rejected", message),
-            })
+            })?;
+        if descriptor.reference() == crate::analyzer_composition::TRACE_ANALYSIS
+            && crate::arktrace_analysis::AnalysisRequest::parse(&request.inputs).is_err()
+        {
+            return Err(refusal(
+                "invalidInput",
+                "ArkTrace analysis request violates its closed cross-field contract",
+            ));
+        }
+        Ok(())
     }
 
     /// Swift's Import holds, then `materializeTypedPlanBeforeAuthorization`:
@@ -774,8 +786,16 @@ impl<'a> JobPlanner<'a> {
                     "typed plan preflight failed before authorization: analyzer input Artifact bytes do not match their lease",
                 ));
             }
-            let mut arguments = profile.fixed_arguments.clone();
-            arguments.push(path.clone());
+            // Swift `AnalyzerProvider.action`: an analysis lowers its request.
+            let invocation =
+                crate::analyzer_output::Invocation::of(profile, &request.inputs, &path).map_err(
+                    |reason| {
+                        refusal(
+                            "invalidInput",
+                            format!("typed plan preflight failed before authorization: {reason}"),
+                        )
+                    },
+                )?;
             steps.push(json!({
                 "stepID": step.step_id,
                 "kind": step.kind,
@@ -792,8 +812,8 @@ impl<'a> JobPlanner<'a> {
                 },
                 "processKind": "process",
                 "executableSHA256": profile.executable_sha256,
-                "argumentSummary": arguments,
-                "timeoutSeconds": profile.timeout_seconds,
+                "argumentSummary": invocation.arguments,
+                "timeoutSeconds": invocation.timeout_seconds,
             }));
         }
         let document = json!({
