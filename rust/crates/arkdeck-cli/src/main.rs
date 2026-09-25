@@ -1061,22 +1061,31 @@ fn serve_domain_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCod
         eprintln!("arkdeck {root}: {}", failure.message);
         failure.exit_code.into()
     };
-    let request = match domain_leaves::execution_request(invocation) {
+    let mut request = match domain_leaves::execution_request(invocation) {
         Ok(request) => request,
         Err(failure) => return plain(failure),
     };
-    let answer = match runtime_endpoint(invocation) {
-        Ok((endpoint, identity)) => domain_leaves::run(
-            &request,
-            LocalRuntime {
-                endpoint: &endpoint,
-                identity: &identity,
-            },
-            domain_leaves::state_directory(&endpoint),
-        ),
-        Err(error) => Answer::Refused {
-            error,
+    // A capture preset replaces the caller's inputs with its own before
+    // anything is sent, or refuses them.
+    let preset = domain_leaves::preset(invocation.command, &request.inputs);
+    let answer = match preset.map(|inputs| request.inputs = inputs) {
+        Err(reason) => Answer::Refused {
+            error: CliError::new("invalidInput", reason),
             progress: None,
+        },
+        Ok(()) => match runtime_endpoint(invocation) {
+            Ok((endpoint, identity)) => domain_leaves::run(
+                &request,
+                LocalRuntime {
+                    endpoint: &endpoint,
+                    identity: &identity,
+                },
+                domain_leaves::state_directory(&endpoint),
+            ),
+            Err(error) => Answer::Refused {
+                error,
+                progress: None,
+            },
         },
     };
     let human = !invocation.json && !invocation.legacy_json;

@@ -1,0 +1,979 @@
+[
+  {
+    "inputs" : {
+
+    },
+    "name" : "screenDefault",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "presetInputs" : {
+      "captureHilog" : false,
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : true
+    }
+  },
+  {
+    "inputs" : {
+      "screenshotImageType" : "png"
+    },
+    "name" : "screenPng",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "presetInputs" : {
+      "captureHilog" : false,
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "screenshotImageType" : "png",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : true
+    }
+  },
+  {
+    "inputs" : {
+      "screenshotImageType" : "jpeg"
+    },
+    "name" : "screenJpeg",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "presetInputs" : {
+      "captureHilog" : false,
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "screenshotImageType" : "jpeg",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : true
+    }
+  },
+  {
+    "inputs" : {
+      "screenshotImageType" : "gif"
+    },
+    "name" : "screenGif",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "refusal" : "screenshotImageType must be png or jpeg"
+  },
+  {
+    "inputs" : {
+      "screenshotImageType" : 1
+    },
+    "name" : "screenNotString",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "refusal" : "screenshotImageType must be a string"
+  },
+  {
+    "inputs" : {
+      "captureHilog" : true,
+      "uiDump" : true
+    },
+    "name" : "screenExtra",
+    "path" : [
+      "screen",
+      "capture"
+    ],
+    "refusal" : "screen capture preset does not accept input fields: captureHilog, uiDump"
+  },
+  {
+    "inputs" : {
+
+    },
+    "name" : "uiDump",
+    "path" : [
+      "ui-dump",
+      "capture"
+    ],
+    "presetInputs" : {
+      "captureHilog" : false,
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : true,
+      "uiDump" : true,
+      "uiScreenshot" : true
+    }
+  },
+  {
+    "inputs" : {
+      "screenshotImageType" : "png"
+    },
+    "name" : "uiDumpExtra",
+    "path" : [
+      "ui-dump",
+      "capture"
+    ],
+    "refusal" : "ui-dump capture preset does not accept input fields: screenshotImageType"
+  },
+  {
+    "inputs" : {
+      "componentId" : "345",
+      "windowId" : "12"
+    },
+    "name" : "detail",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "presetInputs" : {
+      "advancedDump" : true,
+      "captureHilog" : false,
+      "componentId" : "345",
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false,
+      "windowId" : "12"
+    }
+  },
+  {
+    "inputs" : {
+      "componentId" : "0",
+      "windowId" : "12345678901234567890"
+    },
+    "name" : "detailTwentyDigits",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "presetInputs" : {
+      "advancedDump" : true,
+      "captureHilog" : false,
+      "componentId" : "0",
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false,
+      "windowId" : "12345678901234567890"
+    }
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : "123456789012345678901"
+    },
+    "name" : "detailTwentyOneDigits",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId and componentId must be 1...20 ASCII decimal digits"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : ""
+    },
+    "name" : "detailEmpty",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId and componentId must be 1...20 ASCII decimal digits"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : "1a"
+    },
+    "name" : "detailNonDigit",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId and componentId must be 1...20 ASCII decimal digits"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : "１"
+    },
+    "name" : "detailFullwidthDigit",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId and componentId must be 1...20 ASCII decimal digits"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : "٣"
+    },
+    "name" : "detailArabicDigit",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId and componentId must be 1...20 ASCII decimal digits"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1",
+      "windowId" : 1
+    },
+    "name" : "detailNumber",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId must be a string"
+  },
+  {
+    "inputs" : {
+      "componentId" : "1"
+    },
+    "name" : "detailMissingWindow",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId must be a string"
+  },
+  {
+    "inputs" : {
+
+    },
+    "name" : "detailMissingBoth",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "windowId must be a string"
+  },
+  {
+    "inputs" : {
+      "alpha" : "a",
+      "componentId" : "1",
+      "windowId" : "1",
+      "zeta" : "z"
+    },
+    "name" : "detailExtra",
+    "path" : [
+      "ui-dump",
+      "component-detail"
+    ],
+    "refusal" : "ui-dump component-detail preset does not accept input fields: alpha, zeta"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5
+    },
+    "name" : "logs",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 600,
+      "hilogFilters" : [
+        "A.b_c:d-e",
+        "é中文",
+        "x1"
+      ]
+    },
+    "name" : "logsFilters",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 600,
+      "hilogFilters" : [
+        "A.b_c:d-e",
+        "é中文",
+        "x1"
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 0
+    },
+    "name" : "logsZero",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "durationSeconds must be in 1...600"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 601
+    },
+    "name" : "logsTooLong",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "durationSeconds must be in 1...600"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5.5
+    },
+    "name" : "logsFloat",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "durationSeconds must be an integer"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : "5"
+    },
+    "name" : "logsString",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "durationSeconds must be an integer"
+  },
+  {
+    "inputs" : {
+
+    },
+    "name" : "logsMissing",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "durationSeconds must be an integer"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "a b"
+      ]
+    },
+    "name" : "logsBadFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must contain at most 16 typed component filters of at most 200 alphanumeric, dot, underscore, colon or hyphen characters"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        ""
+      ]
+    },
+    "name" : "logsEmptyFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must contain at most 16 typed component filters of at most 200 alphanumeric, dot, underscore, colon or hyphen characters"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "é"
+      ]
+    },
+    "name" : "logsCombiningFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "é"
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "🙂"
+      ]
+    },
+    "name" : "logsEmojiFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must contain at most 16 typed component filters of at most 200 alphanumeric, dot, underscore, colon or hyphen characters"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    "name" : "logsLongFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    "name" : "logsTooLongFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must contain at most 16 typed component filters of at most 200 alphanumeric, dot, underscore, colon or hyphen characters"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      ]
+    },
+    "name" : "logsGraphemeFilter",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "f10",
+        "f11",
+        "f12",
+        "f13",
+        "f14",
+        "f15"
+      ]
+    },
+    "name" : "logsSixteenFilters",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "f10",
+        "f11",
+        "f12",
+        "f13",
+        "f14",
+        "f15"
+      ],
+      "redactionProfile" : "standard",
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "f10",
+        "f11",
+        "f12",
+        "f13",
+        "f14",
+        "f15",
+        "f16"
+      ]
+    },
+    "name" : "logsSeventeenFilters",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must contain at most 16 typed component filters of at most 200 alphanumeric, dot, underscore, colon or hyphen characters"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : "a"
+    },
+    "name" : "logsFiltersNotArray",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must be a string array"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "hilogFilters" : [
+        1
+      ]
+    },
+    "name" : "logsFilterNotString",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "hilogFilters must be a string array"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 5,
+      "uiDump" : true
+    },
+    "name" : "logsExtra",
+    "path" : [
+      "debug",
+      "logs"
+    ],
+    "refusal" : "debug logs preset does not accept input fields: uiDump"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 10,
+      "traceBufferKB" : 1024,
+      "traceCategories" : [
+        "ability",
+        "graphic"
+      ]
+    },
+    "name" : "trace",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 10,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "traceBufferKB" : 1024,
+      "traceCategories" : [
+        "ability",
+        "graphic"
+      ],
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 600,
+      "ringBuffered" : true,
+      "traceBufferKB" : 65536,
+      "traceCategories" : [
+        "a_1"
+      ]
+    },
+    "name" : "traceRing",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 600,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "ringBuffered" : true,
+      "traceBufferKB" : 65536,
+      "traceCategories" : [
+        "a_1"
+      ],
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "ringBuffered" : false,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceRingFalse",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "presetInputs" : {
+      "crashLogs" : false,
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "redactionProfile" : "standard",
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a"
+      ],
+      "uiComponentTree" : false,
+      "uiDump" : false,
+      "uiScreenshot" : false
+    }
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "ringBuffered" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceRingNotBool",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "ringBuffered must be a boolean"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 1023,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceSmallBuffer",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceBufferKB must be in 1024...65536"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 65537,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceLargeBuffer",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceBufferKB must be in 1024...65536"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+
+      ]
+    },
+    "name" : "traceNoCategories",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a",
+        "a"
+      ]
+    },
+    "name" : "traceDuplicateCategories",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a-b"
+      ]
+    },
+    "name" : "traceBadCategory",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "é"
+      ]
+    },
+    "name" : "traceUnicodeCategory",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ]
+    },
+    "name" : "traceLongCategory",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "c0",
+        "c1",
+        "c2",
+        "c3",
+        "c4",
+        "c5",
+        "c6",
+        "c7",
+        "c8",
+        "c9",
+        "c10",
+        "c11",
+        "c12",
+        "c13",
+        "c14",
+        "c15",
+        "c16",
+        "c17",
+        "c18",
+        "c19",
+        "c20",
+        "c21",
+        "c22",
+        "c23",
+        "c24"
+      ]
+    },
+    "name" : "traceTwentyFiveCategories",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must contain 1...24 unique ASCII letter, digit, or underscore values of at most 64 bytes"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceMissingBuffer",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceBufferKB must be an integer"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        1
+      ]
+    },
+    "name" : "traceCategoriesNotStrings",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "traceCategories must be a string array"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 0,
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceZeroDuration",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "durationSeconds must be in 1...600"
+  },
+  {
+    "inputs" : {
+      "durationSeconds" : 1,
+      "hilogFilters" : [
+
+      ],
+      "traceBufferKB" : 2048,
+      "traceCategories" : [
+        "a"
+      ]
+    },
+    "name" : "traceExtra",
+    "path" : [
+      "trace",
+      "capture"
+    ],
+    "refusal" : "trace capture preset does not accept input fields: hilogFilters"
+  },
+  {
+    "inputs" : {
+      "x" : 1
+    },
+    "name" : "notAPreset",
+    "path" : [
+      "input",
+      "tap"
+    ],
+    "presetInputs" : {
+      "x" : 1
+    }
+  }
+]

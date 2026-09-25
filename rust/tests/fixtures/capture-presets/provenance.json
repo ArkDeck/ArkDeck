@@ -1,0 +1,8 @@
+{
+  "owners" : [
+    "RuntimeCLI.capturePresetExecutionRequest",
+    "DiagnosticCapturePreset",
+    "DebugTypedValueValidator.isSafeHilogComponent"
+  ],
+  "producer" : "CLICapturePresetOracleContractTests"
+}
