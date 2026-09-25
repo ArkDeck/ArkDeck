@@ -160,6 +160,46 @@ pub trait FlashLane: Send + Sync {
     }
 }
 
+/// Swift `HostManagedProcessDescriptor` of one Rockchip action the Runtime
+/// runs itself rather than through `arkforged` (a delegated Flash's optional
+/// post-flash HiLog capture): the Job step and the device it is bound to,
+/// the configured tool, and the typed action pinned by its digest.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostAction {
+    pub identifier: String,
+    pub job_id: String,
+    pub step_id: String,
+    pub target_id: String,
+    pub binding_revision: i64,
+    pub connect_key: String,
+    pub expected_identity_sha256: String,
+    pub provider_executable_sha256: String,
+    pub action_sha256: String,
+    /// The typed action's persisted form, as canonical JSON text.
+    pub action: String,
+    /// The typed plan's own stdout budget, when it declares one.
+    pub output_byte_budget: Option<u64>,
+}
+
+/// Swift `ProviderProcessReceipt` of a host-managed action: what the host ran
+/// answered, and the durable record the verdict is read from.
+#[derive(Clone, Debug, PartialEq)]
+pub struct HostReceipt {
+    pub exit_status: Option<i32>,
+    pub stdout: Vec<u8>,
+    pub stderr: Vec<u8>,
+    pub stdout_truncated: bool,
+    pub duration_seconds: f64,
+    pub record_id: Option<String>,
+    pub summary: std::collections::BTreeMap<String, String>,
+}
+
+/// Swift's Rockchip per-action host (`ArkForgeNativeRockchipControlDispatcher`)
+/// as the Runtime dispatches a host-managed action through it.
+pub trait RockchipHost: Send + Sync {
+    fn dispatch(&self, action: &HostAction) -> Result<HostReceipt, LaneFailure>;
+}
+
 /// Swift `ArkForgeManagedControlPort.canonicalFactsDigest`: every fact as
 /// `key=value` and a newline, in the byte order of the keys, hashed. `None`
 /// when a key repeats, which a dictionary could not hold.

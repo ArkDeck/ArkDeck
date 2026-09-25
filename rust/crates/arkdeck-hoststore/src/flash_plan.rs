@@ -84,7 +84,7 @@ impl FlashPlanning {
 
     /// Swift `declaredRuntimeBuildVersion`: the version the leased archive's
     /// system image declares, read once per exact lease and digest.
-    fn build_version(&self, lease: &str, leased: &LeasedArtifact) -> Option<String> {
+    pub(crate) fn build_version(&self, lease: &str, leased: &LeasedArtifact) -> Option<String> {
         let sha256 = leased.row["sha256"].as_str()?.to_owned();
         let key = (lease.to_owned(), sha256);
         let mut cache = self.build_versions.lock().ok()?;
@@ -277,7 +277,7 @@ impl<'a> FlashPlanner<'a> {
     /// Swift `materializeTypedPlanBeforeAuthorization` for a Flash request:
     /// the plan document's digest and what it binds, and the provider's
     /// `executionAdmissionBlocker`.
-    fn materialize<'b>(
+    pub(crate) fn materialize<'b>(
         &self,
         flash: &FlashPlanning,
         request: &OperationRequest,
@@ -439,7 +439,7 @@ impl<'a> FlashPlanner<'a> {
 /// Swift `ArkForgeFlashRequest.canonicalInputs`: the alias's inputs as the
 /// canonical request names them, or the `DeviceProviderError` detail Swift
 /// throws when they cannot be converted.
-fn canonical_inputs(
+pub(crate) fn canonical_inputs(
     reference: &str,
     inputs: &Map<String, Value>,
 ) -> Result<Map<String, Value>, &'static str> {
@@ -504,7 +504,7 @@ fn validate_facts(
 }
 
 /// Swift `ArkForgeFlashProviderAdapter.executionAdmissionBlocker`.
-fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
+pub(crate) fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
     if facts.server_facts.get(CROSS_MODE).map(String::as_str) != Some("satisfied") {
         return Some(format!(
             "flash.crossModeBindingUnprepared: target {} is not covered by the durable DAYU200 \
@@ -538,7 +538,10 @@ fn admission_blocker(facts: &RockchipFacts) -> Option<String> {
 
 /// Swift `journalStep`'s arguments for the two steps `arkforged` performs:
 /// the resolved archive is their identity.
-fn delegated_arguments(step: &str, artifact: &BTreeMap<String, String>) -> Option<Value> {
+pub(crate) fn delegated_arguments(
+    step: &str,
+    artifact: &BTreeMap<String, String>,
+) -> Option<Value> {
     let sha256 = artifact.get("artifactSha256")?;
     Some(match step {
         "flash-partitions" => json!({
@@ -555,6 +558,63 @@ fn delegated_arguments(step: &str, artifact: &BTreeMap<String, String>) -> Optio
             "expectedState": format!("mapped-set:{sha256}"),
         }),
     })
+}
+
+/// Swift `journalStep(..., delegatedArkForgePlanCompletion: true)`'s
+/// arguments for the Runtime's projection of a completed ArkForge plan onto
+/// one of its catalog steps. It is given no resolved Artifact, so the
+/// readback's projection names the generic process-state probe, as Swift's
+/// does.
+pub(crate) fn plan_completion_arguments(step: &str) -> Option<Value> {
+    Some(match step {
+        "verify-flash-readback" => json!({"probeId": "process-state", "expectedState": "running"}),
+        "reboot-device" => json!({"targetMode": "normal", "reason": "rockusbResetAfterFlash"}),
+        "wait-for-hdc" => json!({"deadlineMilliseconds": 120_000, "reason": "normalModeReconnect"}),
+        "rebind-and-verify-build" => json!({"evidencePolicy": "postFlashBuild"}),
+        _ => return None,
+    })
+}
+
+/// One step of an admitted Flash the Rockchip host runs itself: the typed
+/// action it is given, pinned by the canonical digest of its persisted form,
+/// and the arguments its write-ahead intent journals.
+pub(crate) struct HostStep {
+    pub(crate) identifier: &'static str,
+    /// Swift `PersistedTypedProviderAction(.rockchip(action))`.
+    pub(crate) action: Value,
+    pub(crate) action_sha256: String,
+    pub(crate) arguments: Value,
+    pub(crate) effect: &'static str,
+}
+
+impl FlashPlanning {
+    /// Swift `ArkForgeFlashProviderAdapter.action(for:…)` for a step the
+    /// Rockchip host runs, over the canonical inputs and the step's facts,
+    /// each refusal its `DeviceProviderError` description.
+    pub(crate) fn host_step(
+        &self,
+        step: &str,
+        kind: &str,
+        inputs: &Map<String, Value>,
+        facts: &RockchipFacts,
+        lease: &str,
+        leased: &LeasedArtifact,
+    ) -> Result<HostStep, String> {
+        let action = action(step, kind, inputs, facts, || {
+            self.build_version(lease, leased)
+        })?;
+        let persisted = action.persisted();
+        let action_sha256 = sha256_hex(
+            &session_json::encode(&persisted).map_err(|_| "the action cannot be encoded")?,
+        );
+        Ok(HostStep {
+            identifier: action.identifier(),
+            action: persisted,
+            action_sha256,
+            arguments: journal_arguments(kind, &action),
+            effect: action.effect(),
+        })
+    }
 }
 
 /// Swift `RockchipHDCReconnectExpectation`.

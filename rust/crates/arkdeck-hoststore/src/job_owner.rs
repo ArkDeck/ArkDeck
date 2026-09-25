@@ -26,6 +26,10 @@ mod mutation_state_continuity;
 #[path = "job_flash_state.rs"]
 mod flash_state;
 
+#[cfg(target_os = "macos")]
+#[path = "arkforge_job_state.rs"]
+pub(crate) mod arkforge_job_state;
+
 #[cfg(test)]
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;

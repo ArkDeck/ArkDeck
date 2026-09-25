@@ -24,8 +24,9 @@ pub use device_access::{
     DEVICE_ACCESS_TIMEOUT, DeviceAccessFailure, DeviceAccessObserver, DeviceMode,
 };
 pub use flash_lane::{
-    ActionReceipt, DeviceBinding, Execution, FlashLane, LaneArtifact, LaneFailure, PrewarmReceipt,
-    Terminal, canonical_facts_digest, validate_completion,
+    ActionReceipt, DeviceBinding, Execution, FlashLane, HostAction, HostReceipt, LaneArtifact,
+    LaneFailure, PrewarmReceipt, RockchipHost, Terminal, canonical_facts_digest,
+    validate_completion,
 };
 #[cfg(target_os = "macos")]
 pub use lane::{

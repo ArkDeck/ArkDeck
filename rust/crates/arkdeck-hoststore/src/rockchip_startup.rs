@@ -207,7 +207,7 @@ fn job_record(directory: &Path) -> Result<JobRecord, String> {
 /// decoded, then replayed; its facts and its events, in order. A refusal is
 /// Swift's `DurableFileError` as the daemon prints it, a replay violation
 /// with this Runtime's fixed reason.
-fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), String> {
+pub(crate) fn journal(directory: &Path) -> Result<(ReplayFacts, Vec<Value>), String> {
     let path = directory.join("journal.jsonl");
     let open_failed = |error: std::io::Error| {
         format!(

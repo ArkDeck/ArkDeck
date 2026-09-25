@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 28] = [
+const READABLE: [&str; 30] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
     "analyzer.summarize-trace@1",
@@ -52,6 +52,8 @@ const READABLE: [&str; 28] = [
     "workspace.sweep-isolated-copies@1",
     "workspace.run-tests@1",
     "workspace.symbolize-crash@1",
+    "flash.full-restore@1",
+    "flash.dayu200",
 ];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;
 /// Swift `RuntimeJobReadProjection.bounded`.
@@ -232,9 +234,16 @@ impl JobResultReader<'_> {
     /// Swift `durableActualStepKinds` for a debug HAP: the kinds its record
     /// kept, then any its journal's step and compensation intents prove, in
     /// journal order, so a record persisted before its last intents loses
-    /// none; `null` when the journal cannot be replayed. Every other Job
+    /// none; `null` when the journal cannot be replayed. A Flash projects
+    /// its confirmed steps' kinds (`flash_step_kinds`). Every other Job
     /// reads the kinds its record kept.
     fn durable_step_kinds(&self, record: &JobRecord) -> Option<Value> {
+        if crate::job_plan::is_flash(record.operation()) {
+            return Some(
+                self.flash_step_kinds(record)
+                    .map_or(Value::Null, |kinds| json!(kinds)),
+            );
+        }
         if record.operation() != "debug.hap@1" {
             return None;
         }
@@ -254,6 +263,54 @@ impl JobResultReader<'_> {
         }))
     }
 
+    /// Swift `durableActualStepKinds` for a Flash: the lane runs one plan
+    /// while the journal keeps a confirmed pair for each catalog obligation
+    /// it closes, so the kinds of every step the journal confirms succeeded
+    /// are proven, in catalog order, then any other kind the record kept;
+    /// none, rather than a partial answer, while an intent is unresolved or
+    /// the journal cannot be read.
+    fn flash_step_kinds(&self, record: &JobRecord) -> Option<Vec<String>> {
+        let descriptor = descriptor_of(record.operation())?;
+        let directory = self.jobs.job_directory(&record.job_id).ok()?;
+        let (facts, events) = crate::rockchip_startup::journal(&directory).ok()?;
+        if !facts.outstanding_intents.is_empty() || !facts.unknown_outcomes.is_empty() {
+            return None;
+        }
+        let confirmed: BTreeSet<&str> = events
+            .iter()
+            .filter(|event| {
+                event["kind"] == "stepOutcome"
+                    && event["payload"]["outcomeCertainty"] == "confirmed"
+                    && event["payload"]["result"] == "succeeded"
+            })
+            .filter_map(|event| event["stepId"].as_str())
+            .collect();
+        let stored = record.step_kinds().unwrap_or_default();
+        let proven: BTreeSet<&str> = stored
+            .iter()
+            .map(String::as_str)
+            .chain(
+                descriptor
+                    .steps
+                    .iter()
+                    .filter(|step| confirmed.contains(step.step_id.as_str()))
+                    .map(|step| step.kind.as_str()),
+            )
+            .collect();
+        let mut ordered: Vec<String> = Vec::new();
+        for step in &descriptor.steps {
+            if proven.contains(step.kind.as_str()) && !ordered.contains(&step.kind) {
+                ordered.push(step.kind.clone());
+            }
+        }
+        for kind in stored {
+            if !ordered.contains(kind) {
+                ordered.push(kind.clone());
+            }
+        }
+        Some(ordered)
+    }
+
     /// Swift `jobReadSnapshot` from the durable index, with its refusals.
     fn snapshot(&self, id: &str) -> Result<JobRecord, WireError> {
         self.jobs.read_snapshot(id)
@@ -262,10 +319,7 @@ impl JobResultReader<'_> {
     fn facts(&self, record: &JobRecord, is_terminal: bool) -> Facts {
         let mut blockers = BTreeSet::new();
         let descriptor = (record.catalog_digest() == CATALOG_DIGEST)
-            .then(|| {
-                let (id, version) = record.operation().rsplit_once('@')?;
-                CatalogOperation::lookup(id, version.parse().ok())
-            })
+            .then(|| descriptor_of(record.operation()))
             .flatten();
         if descriptor.is_none() {
             blockers.insert("operationUnavailable");
@@ -274,11 +328,7 @@ impl JobResultReader<'_> {
         // whichever catalog admitted it.
         let empty = Map::new();
         let inputs = record.request["inputs"].as_object().unwrap_or(&empty);
-        let omitted = match record
-            .operation()
-            .rsplit_once('@')
-            .and_then(|(id, version)| CatalogOperation::lookup(id, version.parse().ok()))
-        {
+        let omitted = match descriptor_of(record.operation()) {
             Some(operation) => device_steps::omitted_products(operation, inputs),
             None => {
                 blockers.insert("recordUnreadable");
@@ -506,6 +556,15 @@ impl JobResultReader<'_> {
 /// The kind of every step and compensation intent a journal's complete
 /// records hold, in order, once they replay (Swift
 /// `DurableJournalRecovery.inspect`); a torn tail is not read.
+/// Swift `RuntimeOperationCatalog.descriptor(reference:)`: `id@version`, or
+/// an operation published without a version, as the Flash alias is.
+fn descriptor_of(reference: &str) -> Option<&'static CatalogOperation> {
+    match reference.rsplit_once('@') {
+        Some((id, version)) => CatalogOperation::lookup(id, version.parse().ok()),
+        None => CatalogOperation::lookup(reference, None),
+    }
+}
+
 fn intent_kinds(bytes: &[u8]) -> Option<Vec<String>> {
     let replay = crate::job_journal_replay::ReplayState::replay(bytes).ok()?;
     let mut kinds = Vec::new();

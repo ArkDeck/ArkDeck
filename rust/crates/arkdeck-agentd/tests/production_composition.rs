@@ -1140,8 +1140,12 @@ fn a_rockchip_binding_the_start_cannot_read_refuses_the_start() {
 
 /// A DAYU200 Flash Job for `target` at revision 1, parked in
 /// `waitingForRecovery` with its outcome unknown at its enter-Loader intent,
-/// admitted and recorded at the state root as the Rust runner records one.
+/// as a Runtime leaves one: admitted with its journal's `jobCreated` and
+/// `queued -> preflight`, then running, its write-ahead intent for the
+/// enter-Loader transition journaled and no outcome, and parked. The start
+/// recovers it as the Job it is before naming it.
 fn park_loader_transition(state: &Path, id: &str, target: &str) {
+    use arkdeck_hoststore::job_journal_events::{self as events, Envelope, Target};
     let jobs = JobStore::open_state_root_owner(state).unwrap();
     let base = arkdeck_hoststore::JobRecord::decode(
         &fs::read(fixture(
@@ -1161,6 +1165,79 @@ fn park_loader_transition(state: &Path, id: &str, target: &str) {
     let admitted =
         arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
     jobs.admit(&admitted, &"a".repeat(64)).unwrap();
+    let directory = state.join("jobs").join(id);
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .recursive(true)
+        .create(&directory)
+        .unwrap();
+    let mut journal = arkdeck_hoststore::JournalWriter::open(&directory, true).unwrap();
+    let envelope = |event: &str, sequence: i64| Envelope {
+        event_id: event.into(),
+        sequence,
+        session_id: format!("session-{id}"),
+        job_id: id.into(),
+        timestamp: "2026-09-25T00:00:00Z".into(),
+    };
+    journal
+        .append(&events::job_created(
+            &envelope("job-created", 0),
+            "execute",
+            "standardAgent",
+            "CORE-2.0.0",
+        ))
+        .unwrap();
+    journal
+        .append(&events::state_transition(
+            &envelope("to-preflight", 1),
+            "queued",
+            "preflight",
+            "admitted",
+            None,
+        ))
+        .unwrap();
+    jobs.persist(&admitted, "2026-09-25T00:00:00Z").unwrap();
+    journal
+        .append(&events::state_transition(
+            &envelope("t-2", 2),
+            "preflight",
+            "running",
+            "steps-start",
+            None,
+        ))
+        .unwrap();
+    let step = json!({"id": "enter-loader-mode", "kind": "enterUpdater",
+        "effect": "deviceMutation", "bindingRequirement": "confirmedDevice",
+        "cancellation": "atSafeBoundary", "compensationDescriptors": [],
+        "arguments": {"expectedMode": "loader", "providerOperationId": "enterLoaderMode",
+            "reconnectDeadlineMilliseconds": 60000}});
+    let device = Target {
+        scope: "device".into(),
+        target_id: target.into(),
+        connect_key: Some("fixture-connect-key".into()),
+        identity_snapshot_hash: Some("0".repeat(64)),
+    };
+    journal
+        .append(
+            &events::step_intent(
+                &envelope("intent-enter-loader-mode", 3),
+                &step,
+                &device,
+                1,
+                Some(1),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    journal
+        .append(&events::state_transition(
+            &envelope("t-4", 4),
+            "running",
+            "waitingForRecovery",
+            "outcomeUnknown: the enter-Loader transition's outcome was lost",
+            None,
+        ))
+        .unwrap();
     value["state"] = json!("waitingForRecovery");
     value["outcomeUnknown"] = json!(true);
     value["recoveryStepID"] = json!("enter-loader-mode");
