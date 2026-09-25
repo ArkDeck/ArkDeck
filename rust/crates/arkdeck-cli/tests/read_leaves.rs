@@ -11,6 +11,8 @@
 //!   with the Job and its one recorded residue, a remote path or a bundle,
 //!   and print its answer. A reply that is lost once the request went out is
 //!   an unknown outcome, never replayed.
+//! - `diagnostics export` is `artifact export` of any Artifact a diagnostics
+//!   capture published; anything else is refused before it is exported.
 //! - `trace export` is `artifact export` of the one Trace a diagnostics
 //!   capture publishes. The inspected Artifact must be that Trace before
 //!   anything is exported.
@@ -321,8 +323,12 @@ mod runtime {
     }
 
     fn argv(metadata: &Value) -> Vec<String> {
+        leaf_argv("trace", metadata)
+    }
+
+    fn leaf_argv(family: &str, metadata: &Value) -> Vec<String> {
         [
-            "trace",
+            family,
             "export",
             "--job",
             metadata["owner"]["id"].as_str().unwrap(),
@@ -408,6 +414,63 @@ mod runtime {
             assert_eq!(envelope["error"]["code"], "invalidInput");
             assert_eq!(envelope["error"]["message"], message);
         }
+    }
+
+    /// A published Artifact Swift recorded, as the hilog a diagnostics capture
+    /// publishes beside its Trace.
+    fn hilog() -> Value {
+        let mut metadata = trace();
+        metadata["name"] = json!("hilog.txt");
+        metadata["mediaType"] = json!("text/plain");
+        metadata["privacy"] = json!("standard");
+        metadata
+    }
+
+    #[test]
+    fn diagnostics_export_exports_any_artifact_the_capture_published() {
+        for metadata in [hilog(), trace()] {
+            let receipt = json!({"schemaVersion": "arkdeck.artifact-export/1",
+                "owner": metadata["owner"], "artifactId": metadata["artifactId"],
+                "artifactDigest": metadata["artifactDigest"], "byteCount": metadata["byteCount"],
+                "privacy": metadata["privacy"], "overwritten": false,
+                "exportedPath": format!("/private/tmp/arkdeck-trace-export-out/{}-{}",
+                    metadata["artifactId"].as_str().unwrap(), metadata["name"].as_str().unwrap())});
+            let argv = leaf_argv("diagnostics", &metadata);
+            let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+            let (output, envelope) = support::run_session(
+                &argv,
+                vec![
+                    health(),
+                    inspect(&metadata),
+                    (
+                        "artifact.export".to_owned(),
+                        json!({"owner": metadata["owner"], "artifactId": metadata["artifactId"],
+                            "destinationDirectory": "/private/tmp/arkdeck-trace-export-out",
+                            "allowSensitive": true, "overwrite": false}),
+                        json!({"ok": true, "result": receipt}),
+                    ),
+                ],
+            );
+            assert_eq!(output.status.code(), Some(0), "{envelope}");
+            assert_eq!(envelope["command"], "diagnostics.export");
+            assert_eq!(envelope["result"], receipt);
+        }
+    }
+
+    #[test]
+    fn diagnostics_export_refuses_an_artifact_of_another_operation_before_exporting_it() {
+        let mut elsewhere = hilog();
+        elsewhere["sourceOperation"] = json!("observe.device@1");
+        let argv = leaf_argv("diagnostics", &elsewhere);
+        let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
+        let (output, envelope) = support::run_session(&argv, vec![health(), inspect(&elsewhere)]);
+        assert_eq!(output.status.code(), Some(65), "{envelope}");
+        assert_eq!(envelope["command"], "diagnostics.export");
+        assert_eq!(envelope["error"]["code"], "invalidInput");
+        assert_eq!(
+            envelope["error"]["message"],
+            "selected Artifact does not belong to capture.diagnostics@1"
+        );
     }
 }
 

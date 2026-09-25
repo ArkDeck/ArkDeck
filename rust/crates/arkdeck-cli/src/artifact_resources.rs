@@ -64,6 +64,7 @@ pub(crate) fn configure(
                 | "artifact.read"
                 | "artifact.export"
                 | "trace.export"
+                | "diagnostics.export"
         )
     {
         return Ok(None);
@@ -159,7 +160,10 @@ pub(crate) fn configure(
         }
         fields.entry("allowSensitive").or_insert(json!(false));
     }
-    if matches!(command, "artifact.export" | "trace.export") {
+    if matches!(
+        command,
+        "artifact.export" | "trace.export" | "diagnostics.export"
+    ) {
         let destination = fields.remove("destinationPath").ok_or_else(|| {
             CliError::new("invalidOption", "Artifact export requires --destination")
         })?;
@@ -444,13 +448,21 @@ fn export_destination(input: &str) -> Result<String, CliError> {
 /// Swift `trace export`: `artifact export` of a Job's Artifact that must be
 /// the one Trace a diagnostics capture publishes. Judged on the inspected
 /// metadata, before anything is exported.
-pub fn require_trace_artifact(metadata: &Value) -> Result<(), CliError> {
+/// Swift `runArtifactResource(requiredSourceOperation:)` for the
+/// diagnostics capture: the selected Artifact is one that
+/// `capture.diagnostics@1` published (`diagnostics export`).
+pub fn require_diagnostics_artifact(metadata: &Value) -> Result<(), CliError> {
     if metadata["sourceOperation"] != "capture.diagnostics@1" {
         return Err(CliError::new(
             "invalidInput",
             "selected Artifact does not belong to capture.diagnostics@1",
         ));
     }
+    Ok(())
+}
+
+pub fn require_trace_artifact(metadata: &Value) -> Result<(), CliError> {
+    require_diagnostics_artifact(metadata)?;
     if metadata["name"] != "trace.htrace"
         || metadata["mediaType"] != "application/octet-stream"
         || metadata["privacy"] != "sensitive"
