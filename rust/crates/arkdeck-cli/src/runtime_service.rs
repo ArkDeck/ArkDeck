@@ -41,7 +41,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 pub(crate) const LABEL: &str = launchd::AGENT_LABEL;
 pub(crate) const HDC_KEY: &str = "ARKDECK_HDC_PATH";
@@ -86,31 +86,7 @@ pub(crate) fn text(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// Swift `ISO8601Timestamps.string(from:)`: whole seconds, UTC, `Z`.
-pub(crate) fn utc_now() -> String {
-    let seconds = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let days = (seconds / 86_400) as i64 + 719_468;
-    let era = days / 146_097;
-    let day_of_era = days - era * 146_097;
-    let year_of_era =
-        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
-    let year = year_of_era + era * 400;
-    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
-    let month_index = (5 * day_of_year + 2) / 153;
-    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
-    let month = month_index + if month_index < 10 { 3 } else { -9 };
-    let year = year + i64::from(month <= 2);
-    let time = seconds % 86_400;
-    format!(
-        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
-        time / 3600,
-        time % 3600 / 60,
-        time % 60
-    )
-}
+pub(crate) use crate::utc_now;
 
 /// Swift `LaunchAgentPaths`: every file of the service below one home.
 #[derive(Clone, Debug, PartialEq, Eq)]

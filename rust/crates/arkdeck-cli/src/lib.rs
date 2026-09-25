@@ -16,6 +16,7 @@ pub use failure_mapping::{BOUNDED_READ_ONLY_METHODS, bounded_read_only};
 mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
+pub mod domain_leaves;
 pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
@@ -305,6 +306,32 @@ fn unconfirmed(method: &str, error: &ClientError) -> String {
         _ => return format!("the {method} reply is unconfirmed; no request was replayed"),
     }
     .to_owned()
+}
+
+/// Swift `ISO8601Timestamps.string(from:)`: whole seconds, UTC, `Z`.
+pub(crate) fn utc_now() -> String {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let days = (seconds / 86_400) as i64 + 719_468;
+    let era = days / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = month_index + if month_index < 10 { 3 } else { -9 };
+    let year = year + i64::from(month <= 2);
+    let time = seconds % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        time / 3600,
+        time % 3600 / 60,
+        time % 60
+    )
 }
 
 pub fn valid_correlation(id: &str) -> bool {
@@ -713,6 +740,16 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         // Legacy spellings: both read the target list (Swift `runDevice`).
         ["device", "list"] => "device.list",
         ["device", "show"] => "device.show",
+        // Domain leaves (CLI spec §6.2): each submits its declared Catalog
+        // operation through the client-side executor (`domain_leaves`).
+        ["workspace", "status"] => "workspace.status",
+        ["workspace", "diff"] => "workspace.diff",
+        ["workspace", "inspect"] => "workspace.inspect",
+        ["workspace", "read"] => "workspace.read",
+        ["analyze", "trace"] => "analyze.trace",
+        ["analyze", "trace-summary"] => "analyze.trace-summary",
+        ["analyze", "hilog-summary"] => "analyze.hilog-summary",
+        ["analyze", "crash-signature"] => "analyze.crash-signature",
         ["device", "wait"] => "device.wait",
         ["target", "adopt"] => "target.adopt",
         ["target", "list"] => "target.list",
@@ -1181,6 +1218,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             &["targetId", "maximumWaitSeconds", "executionId", "jobId"]
         }
         "runtime.service.restart" | "agentd.restart" => &["maximumWaitSeconds"],
+        command if domain_leaves::serves(command) => {
+            &["targetId", "inputsFile", "capabilityId", "executionId"]
+        }
         "runtime.service.install" => &["bundle", "bundleGeneration", "tool", "toolGeneration"],
         // `agentd install` is Swift's compatibility install from path inputs:
         // `update`'s options, never the typed bootstrap's.
@@ -1537,6 +1577,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             // Swift's `runDevice` answers both legacy leaves with the target
             // list, without parameters.
             "target.list"
+        } else if domain_leaves::serves(command) {
+            // `runDomainOperation` maps every client error the executor throws
+            // under this one method.
+            "job.submit"
         } else if matches!(command, "recovery.cleanup.list" | "cleanup-debt.list") {
             // Both spellings share Swift's one handler and its one method.
             "cleanupDebt.list"
@@ -1591,6 +1635,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("session.")
             || command.starts_with("human-action.")
             || is_runtime_service(command)
+            || domain_leaves::serves(command)
             || command.starts_with("maintainer.contracts.")
             || matches!(
                 command,
