@@ -17,8 +17,9 @@ use serde_json::{Map, Number, Value, json};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-/// The domain leaves this CLI serves. Each is `runDomainOperation` over the
-/// registry's `catalogOperation`, without a capture preset.
+/// The domain leaves this CLI serves: every leaf Swift routes through
+/// `runDomainOperation` without a capture preset, each over the registry's
+/// `catalogOperation`.
 pub const SERVED: &[&str] = &[
     "workspace.status",
     "workspace.diff",
@@ -28,6 +29,26 @@ pub const SERVED: &[&str] = &[
     "analyze.trace-summary",
     "analyze.hilog-summary",
     "analyze.crash-signature",
+    "target.observe",
+    "input.tap",
+    "input.long-press",
+    "input.swipe",
+    "port-forward.create",
+    "port-forward.remove",
+    "screen.record",
+    "diagnostics.capture",
+    "workspace.isolate",
+    "workspace.checkpoint",
+    "workspace.patch",
+    "workspace.revert",
+    "workspace.build",
+    "workspace.test",
+    "workspace.sign",
+    "workspace.symbolize",
+    "workspace.sweep",
+    "debug.hap",
+    "debug.template.run",
+    "debug.native.deploy",
 ];
 
 /// Whether `command` is a served domain leaf.

@@ -44,7 +44,11 @@ pub(crate) fn configure(
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
-    if help || !(command.starts_with("target.") || command.starts_with("device.display-name.")) {
+    // `target observe` is a domain leaf, not a Target presentation read.
+    if help
+        || crate::domain_leaves::serves(command)
+        || !(command.starts_with("target.") || command.starts_with("device.display-name."))
+    {
         return Ok(None);
     }
     let timeout = fields
@@ -140,7 +144,9 @@ pub fn validate_target_response(invocation: &Invocation, value: &Value) -> Resul
     // Judged per leaf: the legacy `device list|show` send `target.list` too,
     // and Swift's `runDevice` emits that reply as the Runtime answered it.
     let command = invocation.command;
-    if !(command.starts_with("target.") || command.starts_with("device.display-name.")) {
+    if crate::domain_leaves::serves(command)
+        || !(command.starts_with("target.") || command.starts_with("device.display-name."))
+    {
         return Ok(());
     }
     let invalid = || {

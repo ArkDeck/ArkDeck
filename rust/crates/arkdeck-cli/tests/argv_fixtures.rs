@@ -284,7 +284,7 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
     // A node of the registry this CLI serves nothing under is still refused,
     // and so is a node's help in a machine mode.
     for argv in [
-        vec!["debug", "template", "run", "--help"],
+        vec!["runtime", "update", "--help"],
         vec!["nope", "--help"],
         vec!["runtime", "--help", "--output", "json"],
     ] {
