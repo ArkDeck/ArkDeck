@@ -1,0 +1,9 @@
+#!/bin/sh
+# ArkDeck agent execution evidence oracle analyzer. It holds until the
+# oracle releases it, then answers with Swift's analysis of the source.
+[ "$#" -eq 2 ] && [ "$1" = "--analyze-crash-ledger" ] || exit 64
+while [ ! -e /private/tmp/arkdeck-hdc-oracle/released ] &&
+  kill -0 "$PPID" 2>/dev/null; do
+  /bin/sleep 0.01
+done
+printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"bundle":"com.example.demo","kind":"cppcrash","name":"cppcrash-com.example.demo-20010039-20260914000000","timestamp":"20260914000000","uid":"20010039"}],"schemaVersion":"1.0.0","status":"answered"}'

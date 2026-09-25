@@ -1,0 +1,37 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-f8baf31e0c5581d37c9256656ede677e",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 688,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-9a9c110c3142265cb2cf0e7a985faecd",
+      "mediaType" : "application\/json",
+      "name" : "crash-signature.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "analyzer",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-9a9c110c3142265cb2cf0e7a985faecd",
+      "sha256" : "2d482336de070e4f7f6e02fe5d16deceffcf4c7d2a17ab022906ce07a6f8a1be",
+      "sourceOperation" : "analyzer.extract-crash-signature@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "extract-crash-signature"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

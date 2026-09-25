@@ -1,0 +1,13 @@
+{
+  "allowedFileScopesDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+  "artifact" : "isolated-workspace.json",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "isolation" : "runtimeOwned",
+  "jobId" : "job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+  "operation" : "workspace.prepare-isolated-copy@1",
+  "projectRef" : "evolution-8fd842e4cd307ceaf175",
+  "sourceProjectRef" : "EvidenceOracleProject",
+  "sourceWorkspaceRevision" : "b9a6de6eeadde9c32924e042fe29c06f503ff05785e0468d2e4b186d7febe7ea",
+  "workspaceId" : "evo-8fd842e4cd307ceaf1756fb4",
+  "workspaceRevision" : "cb4ad29ecc1d79f79a93a113454d103e46722156e3853080c6f5d269f4d2ab26"
+}

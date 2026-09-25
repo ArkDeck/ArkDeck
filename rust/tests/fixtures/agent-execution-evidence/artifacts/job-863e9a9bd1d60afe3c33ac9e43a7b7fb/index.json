@@ -1,0 +1,36 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-294c3d88c21441ae4526c32fe9bae50d",
+      "bindingSnapshot" : {
+        "targetID" : "EvidenceOracleProject"
+      },
+      "byteCount" : 706,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+      "mediaType" : "application\/json",
+      "name" : "isolated-workspace.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "workspace",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-job-863e9a9bd1d60afe3c33ac9e43a7b7fb",
+      "sha256" : "cb9e64d30590358aec1441f0b3411e05092c5aa0c6aeb30ad53c07a1f6a37396",
+      "sourceOperation" : "workspace.prepare-isolated-copy@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "prepare-isolated-copy"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

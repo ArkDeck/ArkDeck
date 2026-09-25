@@ -13,8 +13,11 @@
  * `servers` there before it returns, since that server is nobody's child
  * (rust/tests/support/fake_hdc_servers.rs ends it). FAIL_RESTART answers
  * `kill` with unregistered stderr instead. A server of this build also ends
- * once OWNER_PID, the test process, is gone. No real HDC, server or device is
- * involved. */
+ * once OWNER_PID, the test process, is gone. DRIVER names a POSIX sh script
+ * that answers every other command, the device's: this executable execs it
+ * with the same arguments, so the server the daemon launched and proved stays
+ * this one while a fake device answers its clients. No real HDC, server or
+ * device is involved. */
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -129,6 +132,14 @@ int main(int argc, char **argv) {
 #else
     (void)kill_command;
     (void)restart;
+#endif
+#ifdef DRIVER
+    /* Only `-s <endpoint> -m` is the server: a gesture's own `-m` names no
+     * endpoint. */
+    if (!foreground || endpoint == NULL) {
+        execv(DRIVER, argv);
+        return 69;
+    }
 #endif
     if (!foreground || endpoint == NULL) {
         fprintf(stderr, "unregistered fixture output\n");

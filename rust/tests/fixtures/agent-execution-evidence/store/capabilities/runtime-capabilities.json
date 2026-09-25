@@ -1,0 +1,200 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "displayHeight" : 2832,
+          "displayWidth" : 1280
+        },
+        "expiresAtUTC" : "2026-09-14T01:00:00Z",
+        "inputConstraints" : {
+          "displayHeight" : {
+            "kind" : "integerRange",
+            "maximum" : 2832,
+            "minimum" : 2832
+          },
+          "displayWidth" : {
+            "kind" : "integerRange",
+            "maximum" : 1280,
+            "minimum" : 1280
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.tap@1"
+        },
+        "maximumUses" : 2000,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "c94a971bb2a7a7cd0e3fdb823479727501587f93b8a71db4e0ca8ebda9af366e",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-a251afb221a855a334fae1c121150f8a",
+          "materializedPlanDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+          "operationReference" : "input.tap@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-a251afb221a855a334fae1c121150f8a",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "99482d08d95bbbcbb64c4c8ace0ed6f7a618d3f9d8fbeb163d753d6137115c26",
+              "recordSHA256" : "454dc9c5406d66b530cbd127b723f6bd9ae78ce2f33fdd6beb697177662cee6b",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "8527e901bb74394aeaeefb5a3a41973da179ffa0d45f1ef3c4ac4ba549524fdb",
+          "receiptSHA256" : "99482d08d95bbbcbb64c4c8ace0ed6f7a618d3f9d8fbeb163d753d6137115c26",
+          "remainingUsesAfter" : 1999,
+          "reservationID" : "agent-execution-53ea6493d0f273db9b997e0c50b1fc96583003820514497d8085f97c6a5cfa6d",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 1999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-17F97B5F77C739129FF25F13350A9CC0F0BD1AF0-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "displayHeight" : 2832,
+          "displayId" : 2,
+          "displayWidth" : 1280
+        },
+        "expiresAtUTC" : "2026-09-14T01:00:00Z",
+        "inputConstraints" : {
+          "displayHeight" : {
+            "kind" : "integerRange",
+            "maximum" : 2832,
+            "minimum" : 2832
+          },
+          "displayId" : {
+            "kind" : "integerRange",
+            "maximum" : 2,
+            "minimum" : 2
+          },
+          "displayWidth" : {
+            "kind" : "integerRange",
+            "maximum" : 1280,
+            "minimum" : 1280
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.long-press@1"
+        },
+        "maximumUses" : 2000,
+        "operationScope" : [
+          {
+            "operationID" : "input.long-press",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "1ca43c5acd8e722887e003aa50f1038ba47cf112d62839d678c43257d89e10db",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-e79b4b7be69bf955bdea4f2a3e777919",
+          "materializedPlanDigest" : "81fcae30c117c946fcc0be3b4f0516b2802813612ad5caa0c7e14cfc7e43cd5f",
+          "operationReference" : "input.long-press@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-e79b4b7be69bf955bdea4f2a3e777919",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "d9f7fe32ec0b16423407b569e20269e1028e59ce230c1275c9c023a0b53f1ce3",
+              "recordSHA256" : "d792ef5defb9cc0cd5e46b8671d6d266fddf22fbcef6a353a17ebf2e3d3b101e",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "2eb2b7acd1a884aeba9ef6d4fd6aa2b503695102f5394247ed1e896f1f8e3358",
+          "receiptSHA256" : "d9f7fe32ec0b16423407b569e20269e1028e59ce230c1275c9c023a0b53f1ce3",
+          "remainingUsesAfter" : 1999,
+          "reservationID" : "agent-execution-382649eef6e9723b1ec20b8be5b161bad911bdec3b6e0e2b27c8f49873770201",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 1999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-C88E3FFD0651C85BE36D45CE346BDAB2EBD06D16-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "displayHeight" : 2832,
+          "displayWidth" : 1280
+        },
+        "expiresAtUTC" : "2026-09-14T01:00:00Z",
+        "inputConstraints" : {
+          "displayHeight" : {
+            "kind" : "integerRange",
+            "maximum" : 2832,
+            "minimum" : 2832
+          },
+          "displayWidth" : {
+            "kind" : "integerRange",
+            "maximum" : 1280,
+            "minimum" : 1280
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.swipe@1"
+        },
+        "maximumUses" : 2000,
+        "operationScope" : [
+          {
+            "operationID" : "input.swipe",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 2000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
