@@ -454,46 +454,55 @@ fn replay(scenario: &Value, leaf: &str) -> Result<(), String> {
     }
 }
 
-/// The leaves this slice serves, each through the one handler Swift routes
-/// every domain leaf through.
-const LEAVES: [&str; 8] = [
-    "workspace.status",
-    "workspace.diff",
-    "workspace.inspect",
-    "workspace.read",
-    "analyze.trace",
-    "analyze.trace-summary",
-    "analyze.hilog-summary",
-    "analyze.crash-signature",
-];
-
-/// Every scenario whose ending the operation's own name does not decide,
-/// each through one of the leaves in turn: the executor's path is chosen by
-/// what `operation.describe` answers (host scope or device target), so a
-/// recorded run replays through any leaf with its operation named instead.
-/// `hostArtifactConsumerKeepsItsTarget` is decided by the name
-/// (`workspace.apply-patch@1` keeps its lease's target) and waits for its own
-/// leaf; `capabilityWithoutVersion` names no version, which only
+/// Every scenario as recorded, through the leaf Swift ran it through
+/// (`workspace build`, `workspace patch` or `input tap`).
+/// `capabilityWithoutVersion` names no version, which only
 /// `agent run --operation` can do: a leaf's registry operation is versioned.
 #[test]
-fn every_leaf_replays_swifts_recorded_runs() {
+fn every_scenario_replays_through_its_own_leaf() {
     let mut failures = Vec::new();
     let mut replayed = 0;
-    for (index, scenario) in scenarios()
+    for scenario in scenarios()
         .iter()
-        .filter(|scenario| {
-            scenario["name"] != "hostArtifactConsumerKeepsItsTarget"
-                && scenario["request"].get("operationVersion").is_some()
-        })
-        .enumerate()
+        .filter(|scenario| scenario["request"].get("operationVersion").is_some())
     {
-        let leaf = LEAVES[index % LEAVES.len()];
+        let leaf = scenario["leaf"].as_str().unwrap();
+        assert!(arkdeck_cli::domain_leaves::serves(leaf), "{leaf}");
         replayed += 1;
         if let Err(failure) = replay(scenario, leaf) {
             failures.push(failure);
         }
     }
-    assert_eq!(replayed, 28);
+    assert_eq!(replayed, 29);
+    assert!(failures.is_empty(), "{}", failures.join("\n\n"));
+}
+
+/// Every served leaf, each driving the scenarios whose ending the operation's
+/// own name does not decide, in turn: the executor's path is chosen by what
+/// `operation.describe` answers (host scope or device target), so a recorded
+/// run replays through any leaf with its operation named instead.
+/// `hostArtifactConsumerKeepsItsTarget` is decided by the name
+/// (`workspace.apply-patch@1` keeps its lease's target), and
+/// `capabilityWithoutVersion` names no version.
+#[test]
+fn every_leaf_replays_swifts_recorded_runs() {
+    let leaves = arkdeck_cli::domain_leaves::SERVED;
+    let scenarios: Vec<Value> = scenarios()
+        .into_iter()
+        .filter(|scenario| {
+            scenario["name"] != "hostArtifactConsumerKeepsItsTarget"
+                && scenario["request"].get("operationVersion").is_some()
+        })
+        .collect();
+    assert_eq!(scenarios.len(), 28);
+    let runs = leaves.len().max(scenarios.len());
+    let mut failures = Vec::new();
+    for index in 0..runs {
+        let leaf = leaves[index % leaves.len()];
+        if let Err(failure) = replay(&scenarios[index % scenarios.len()], leaf) {
+            failures.push(failure);
+        }
+    }
     assert!(failures.is_empty(), "{}", failures.join("\n\n"));
 }
 
@@ -591,6 +600,51 @@ fn a_named_capability_is_forwarded_as_its_reference() {
         submitted["authorization"],
         json!({"capabilityId": "CAP-RT-EXAMPLE-G1"})
     );
+}
+
+/// A leaf that changes a workspace or a device authorizes it only with what
+/// the caller names: `workspace sign` of the main tree names a capability a
+/// person had the Runtime issue, and it is forwarded as that reference; an
+/// isolated copy's sign, and any leaf without `--capability`, submits no
+/// authorization at all and leaves the decision to the Runtime. The CLI never
+/// builds one.
+#[test]
+fn a_mutation_leaf_forwards_only_the_capability_it_is_given() {
+    let submitted = |run: &Run| -> Value {
+        serde_json::from_str(
+            run.seen
+                .sent
+                .iter()
+                .find(|frame| frame["method"] == "job.submit")
+                .unwrap()["params"]["requestJson"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap()
+    };
+    for (leaf, recorded) in [
+        ("workspace.sign", "hostOnlyBuild"),
+        ("input.tap", "explicitTargetConnected"),
+    ] {
+        let named = {
+            let mut scenario = retargeted(&scenario(recorded), leaf);
+            scenario["request"]["capabilityReference"] = json!("CAP-RT-MANUAL-G1");
+            run(&scenario, leaf, &["--output", "json"])
+        };
+        assert_eq!(named.output.status.code(), Some(0), "{leaf}");
+        assert_eq!(
+            submitted(&named)["authorization"],
+            json!({"capabilityId": "CAP-RT-MANUAL-G1"}),
+            "{leaf}"
+        );
+        let unnamed = run(
+            &retargeted(&scenario(recorded), leaf),
+            leaf,
+            &["--output", "json"],
+        );
+        assert_eq!(unnamed.output.status.code(), Some(0), "{leaf}");
+        assert_eq!(submitted(&unnamed).get("authorization"), None, "{leaf}");
+    }
 }
 
 /// Typed inputs are one readable JSON object, or the leaf is refused as a

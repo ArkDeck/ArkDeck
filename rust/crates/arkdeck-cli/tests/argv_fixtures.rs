@@ -282,12 +282,63 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
             .contains("list")
     );
     // A node of the registry this CLI serves nothing under is still refused,
-    // and so is a node's help in a machine mode.
-    for argv in [
-        vec!["debug", "template", "run", "--help"],
-        vec!["nope", "--help"],
-        vec!["runtime", "--help", "--output", "json"],
-    ] {
+    // and so is a node's help in a machine mode. Which nodes those are changes
+    // as leaves are served, so the node is found here: every node of the
+    // registry none of whose leaves is served (none, once all are).
+    let all: Vec<Vec<String>> = serde_json::from_str::<Value>(include_str!(
+        "../src/command_registry.json"
+    ))
+    .unwrap()["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            entry["path"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|token| token.as_str().unwrap().to_owned())
+                .collect()
+        })
+        .collect();
+    let served: Vec<Vec<String>> = command_registry()["commands"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|entry| {
+            entry["path"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|token| token.as_str().unwrap().to_owned())
+                .collect()
+        })
+        .collect();
+    let mut unserved_nodes: Vec<Vec<String>> = Vec::new();
+    for path in &all {
+        for length in 1..path.len() {
+            let node = &path[..length];
+            let below = |paths: &[Vec<String>]| paths.iter().any(|leaf| leaf.starts_with(node));
+            if !below(&served) && !unserved_nodes.iter().any(|seen| seen == node) {
+                unserved_nodes.push(node.to_vec());
+            }
+        }
+    }
+    let mut refused: Vec<Vec<String>> = unserved_nodes
+        .into_iter()
+        .map(|mut node| {
+            node.push("--help".into());
+            node
+        })
+        .collect();
+    refused.push(vec!["nope".into(), "--help".into()]);
+    refused.push(vec![
+        "runtime".into(),
+        "--help".into(),
+        "--output".into(),
+        "json".into(),
+    ]);
+    for argv in refused {
         let answer = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
             .args(&argv)
             .output()
