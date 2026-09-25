@@ -139,6 +139,7 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "flash.bootloader-status",
             "flash.prerequisites",
             "flash.device-access",
+            "flash.lanePlanPreview",
             "flash.bind-current-loader",
         ]
         .contains(method)

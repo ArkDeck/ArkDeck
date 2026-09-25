@@ -8,14 +8,25 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
+@testable import ArkForgeClient
+@testable import ArkForgeProtocol
 
-/// Swift `flash.bootloader-status` and `flash.prerequisites` through the
-/// daemon's control-plane handler, composed with the owners the daemon
-/// composes for them: `ProductRockchipBootloaderStatusObserver` over the
-/// Target store, the Rockchip binding store and the post-flash HDC binding
-/// store of the Application Support root, and `TargetStoreRockchipRuntimeFactsPort`
-/// over the same three with the measured native RockUSB identity and the live
-/// mode probe.
+/// Swift `flash.bootloader-status`, `flash.prerequisites` and
+/// `flash.lanePlanPreview` through the daemon's control-plane handler,
+/// composed with the owners the daemon composes for them:
+/// `ProductRockchipBootloaderStatusObserver` over the Target store, the
+/// Rockchip binding store and the post-flash HDC binding store of the
+/// Application Support root, and `TargetStoreRockchipRuntimeFactsPort` over
+/// the same three with the measured native RockUSB identity and the live mode
+/// probe.
+///
+/// The preview's previewer is `main.swift`'s, copied (it is declared inside
+/// the daemon's composition): the ArkForge provider over that facts port,
+/// then the lane. The lane daemon is scripted to hold no archive, so Swift's
+/// preview stops at its first call, and every exchange records the calls the
+/// lane received. The handler is also composed without a lane, without a
+/// Target store, and with an ArkForge provider missing its facts port, as each
+/// preview exchange names.
 ///
 /// What a host cannot fix is injected, and nothing else: the USB census both
 /// read in place of the I/O Registry; which `arkforged` the RockUSB identity
@@ -99,8 +110,11 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
     }
   }
 
-  /// The daemon's prerequisite observer with its probe, or without one.
-  private final class Prerequisites: RockchipFlashPrerequisiteObserving, @unchecked Sendable {
+  /// The daemon's prerequisite observer with its probe, or without one, and
+  /// the same facts port as the ArkForge provider resolves through.
+  private final class Prerequisites: RockchipFlashPrerequisiteObserving, RockchipRuntimeFactsPort,
+    @unchecked Sendable
+  {
     private let lock = NSLock()
     private let probed: TargetStoreRockchipRuntimeFactsPort
     private let unprobed: TargetStoreRockchipRuntimeFactsPort
@@ -116,6 +130,91 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
     func observePrerequisites(targetID: String) async throws -> [RockchipPrerequisiteObservation] {
       let port = lock.withLock { probe ? probed : unprobed }
       return try await port.observePrerequisites(targetID: targetID)
+    }
+
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      let port = lock.withLock { probe ? probed : unprobed }
+      return try await port.currentFacts(targetID: targetID)
+    }
+  }
+
+  /// The calls the lane's controller received, in order.
+  private final class LaneCalls: @unchecked Sendable {
+    private let lock = NSLock()
+    private var calls: [String] = []
+
+    func record(_ call: String) { lock.withLock { calls.append(call) } }
+
+    func drain() -> [String] {
+      lock.withLock {
+        defer { calls = [] }
+        return calls
+      }
+    }
+  }
+
+  private struct StoreMiss: Error {}
+
+  /// The lane daemon as a preview meets it: every call recorded, and the
+  /// archive never in its store, so Swift's preview stops at its first call.
+  private struct LaneStore: ArkForgePlanSource {
+    let calls: LaneCalls
+
+    func importArtifact(
+      contentsOf _: URL, expectedSHA256 _: String, requestID _: String
+    ) throws -> ArkForgeImportArtifactResponse {
+      calls.record("importArtifact")
+      throw StoreMiss()
+    }
+
+    func inspectArtifact(
+      artifactID: String, requestID _: String
+    ) throws -> ArkForgeInspectArtifactResponse {
+      calls.record("inspectArtifact \(artifactID)")
+      throw StoreMiss()
+    }
+
+    func discoverDevices(requestID _: String) throws -> [ArkForgeDeviceObservation] {
+      calls.record("discoverDevices")
+      throw StoreMiss()
+    }
+
+    func materializePlan(
+      _: ArkForgeMaterializePlanRequest, requestID _: String
+    ) throws -> ArkForgeMaterializePlanResponse {
+      calls.record("materializePlan")
+      throw StoreMiss()
+    }
+  }
+
+  /// `main.swift`'s `ComposedLanePlanPreviewer` (1377-1409), copied because
+  /// the daemon declares it inside its composition: the ArkForge provider's
+  /// facts, the confirmed HDC-normal topology among them, then the lane.
+  private struct ComposedLanePlanPreviewer: FlashLanePlanPreviewing {
+    let lane: ArkForgeLaneHost
+    let profileID: String
+    let providers: DeviceProviderRegistry
+
+    func preview(
+      targetID: String, profileReference _: String, archiveSHA256: String
+    ) async -> ArkForgeLanePlanPreviewOutcome {
+      let facts: ProviderFacts
+      do {
+        facts = try await providers.resolveFacts(
+          providerID: CatalogProvider.arkforge.rawValue, targetID: targetID)
+      } catch {
+        return .deviceNotObserved("target facts could not be resolved: \(error)")
+      }
+      guard
+        let topology = facts.serverFacts[
+          TargetStoreRockchipRuntimeFactsPort.hdcAliasTopologyServerFactKey],
+        !topology.isEmpty
+      else {
+        return .deviceNotObserved(
+          "no confirmed HDC-normal USB topology for \(targetID)")
+      }
+      return await lane.previewPlan(
+        archiveSHA256: archiveSHA256, profileID: profileID, usbTopology: topology)
     }
   }
 
@@ -388,6 +487,51 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
     return answer
   }
 
+  /// The daemon's handler as `flash.lanePlanPreview` meets it: with a lane
+  /// (the one every other exchange uses), without one, without a Target
+  /// store, and with an ArkForge provider composed without its facts port.
+  private struct Previews {
+    let lane: RuntimeControlPlaneHandler
+    let noLane: RuntimeControlPlaneHandler
+    let noTargetStore: RuntimeControlPlaneHandler
+    let noFactsPort: RuntimeControlPlaneHandler
+    let calls: LaneCalls
+
+    func handler(_ composition: String) -> RuntimeControlPlaneHandler {
+      switch composition {
+      case "noLane": return noLane
+      case "noTargetStore": return noTargetStore
+      case "noFactsPort": return noFactsPort
+      default: return lane
+      }
+    }
+  }
+
+  private static let previewRequest: [String: JSONValue] = [
+    "targetId": .string(targetID), "profileReference": .string("dayu200"),
+    "archiveSha256": .string(String(repeating: "e", count: 64)),
+  ]
+
+  /// One `flash.lanePlanPreview` exchange through the named composition,
+  /// recorded with it and with the calls the lane's daemon received.
+  @discardableResult
+  private func preview(
+    _ name: String, _ params: [String: JSONValue]? = nil, expect: String? = nil,
+    composition: String = "lane", previews: Previews,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws -> JSONValue {
+    let answer = try await exchange(
+      name, "flash.lanePlanPreview", params ?? Self.previewRequest, expect: expect,
+      handler: previews.handler(composition), file: file, line: line)
+    guard case .object(var recorded)? = exchanges.popLast() else {
+      throw CocoaError(.coderInvalidValue)
+    }
+    recorded["composition"] = .string(composition)
+    recorded["laneCalls"] = .array(previews.calls.drain().map(JSONValue.string))
+    exchanges.append(.object(recorded))
+    return answer
+  }
+
   private func assertStatuses(
     _ answer: JSONValue, _ expected: [String], file: StaticString = #filePath, line: UInt = #line
   ) {
@@ -447,16 +591,50 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
       providers: DeviceProviderRegistry(providers: []),
       dispatcher: RuntimeAgentExecutionContractTests.Dispatcher(),
       capabilityStore: capabilities, nowUTC: { Self.nowUTC })
-    let handler = RuntimeControlPlaneHandler(
-      engine: engine, capabilityStore: capabilities, providerIDs: [],
-      nowUTC: { Self.nowUTC }, targetStore: targetStore,
-      flashPrerequisiteObserver: prerequisites,
-      rockchipBootloaderStatusObserver: observer)
+    // The lane plan previewer the daemon composes with a lane, over a lane
+    // daemon whose store never holds the archive, and the ArkForge provider
+    // over the same facts port.
+    let laneCalls = LaneCalls()
+    let lane = ArkForgeLaneHost(
+      connection: .init(
+        socketPath: Self.root.appending(path: "arkforge/arkforged.sock").path,
+        controllerSessionID: "arkdeck-agentd"),
+      toolchainSHA256: Self.digest(String(decoding: Self.arkforged, as: UTF8.self)),
+      makePerformer: { _, _ in preconditionFailure("a preview never builds a performer") },
+      makeClient: { _ in preconditionFailure("a preview never opens the job client") },
+      makeMaterializer: { _ in LaneStore(calls: laneCalls) },
+      makeAssessmentSource: { _ in LaneStore(calls: laneCalls) },
+      authoritySupport: scriptedAuthoritySupport(),
+      makeAuthority: { _, _, _, _ in preconditionFailure("a preview never builds an authority") })
+    func previewer(_ factsPort: (any RockchipRuntimeFactsPort)?) -> ComposedLanePlanPreviewer {
+      ComposedLanePlanPreviewer(
+        lane: lane, profileID: "org.openharmony.dayu200",
+        providers: DeviceProviderRegistry(providers: [
+          ArkForgeFlashProviderAdapter(factsPort: factsPort)
+        ]))
+    }
+    func handler(
+      targetStore: RuntimeTargetStore?, previewer: ComposedLanePlanPreviewer?
+    ) -> RuntimeControlPlaneHandler {
+      RuntimeControlPlaneHandler(
+        engine: engine, capabilityStore: capabilities, providerIDs: [],
+        nowUTC: { Self.nowUTC }, targetStore: targetStore,
+        flashPrerequisiteObserver: prerequisites,
+        flashLanePlanPreviewer: previewer,
+        rockchipBootloaderStatusObserver: observer)
+    }
+    let previews = Previews(
+      lane: handler(targetStore: targetStore, previewer: previewer(prerequisites)),
+      noLane: handler(targetStore: targetStore, previewer: nil),
+      noTargetStore: handler(targetStore: nil, previewer: previewer(prerequisites)),
+      noFactsPort: handler(targetStore: targetStore, previewer: previewer(nil)),
+      calls: laneCalls)
 
     try write("arkforged", input: "arkforged", Self.arkforged, mode: 0o700)
-    try await bootloaderStatus(handler: handler, census: census)
+    try await bootloaderStatus(handler: previews.lane, census: census)
     try await prerequisiteFacts(
-      handler: handler, identity: identity, loader: loader, prerequisites: prerequisites)
+      handler: previews.lane, identity: identity, loader: loader, prerequisites: prerequisites,
+      previews: previews)
 
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
@@ -567,9 +745,12 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
 
   // MARK: flash.prerequisites
 
+  /// `flash.prerequisites` over each state of the facts, each followed by
+  /// `flash.lanePlanPreview` over the same state: its handler's own answers
+  /// first, then the previewer's, whose facts come from the same port.
   private func prerequisiteFacts(
     handler: RuntimeControlPlaneHandler, identity: Identity, loader: Loader,
-    prerequisites: Prerequisites
+    prerequisites: Prerequisites, previews: Previews
   ) async throws {
     let method = "flash.prerequisites"
     let request: [String: JSONValue] = [
@@ -586,22 +767,60 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
       ["targetId": .string(Self.targetID), "profileReference": .string("dayu600")],
       expect: "invalidParams", handler: handler)
     try await exchange("prerequisites.notAdopted", method, request, expect: "notFound", handler: handler)
+    func previewing(_ changes: [String: JSONValue]) -> [String: JSONValue] {
+      Self.previewRequest.merging(changes) { $1 }
+    }
+    let digestKey = "archiveSha256"
+    try await preview("preview.noParameters", [:], expect: "invalidParams", previews: previews)
+    try await preview(
+      "preview.unsupportedProfile", previewing(["profileReference": .string("dayu600")]),
+      expect: "invalidParams", previews: previews)
+    try await preview(
+      "preview.shortDigest", previewing([digestKey: .string(String(repeating: "e", count: 63))]),
+      expect: "invalidParams", previews: previews)
+    try await preview(
+      "preview.digestNotHex",
+      previewing([digestKey: .string(String(repeating: "e", count: 63) + "g")]),
+      expect: "invalidParams", previews: previews)
+    try await preview(
+      "preview.noTargetStore", expect: "internalError", composition: "noTargetStore",
+      previews: previews)
+    try await preview("preview.notAdopted", expect: "notFound", previews: previews)
+    try await preview(
+      "preview.notAdoptedWithoutLane", expect: "notFound", composition: "noLane",
+      previews: previews)
     try write(Self.targets, input: "targets-host.json", try Self.targetsDocument([Self.hostTarget]))
     try await exchange("prerequisites.laneNotConfigured", method, request, expect: "rejected", handler: handler)
+    // Swift's handler takes a digest of any case, fullwidth digits included,
+    // and answers without a lane before anything reads the facts.
+    try await preview("preview.laneNotComposed", composition: "noLane", previews: previews)
+    try await preview(
+      "preview.uppercaseDigest", previewing([digestKey: .string(String(repeating: "E", count: 64))]),
+      composition: "noLane", previews: previews)
+    try await preview(
+      "preview.fullwidthDigest",
+      previewing([digestKey: .string(String(repeating: "\u{FF10}\u{FF41}", count: 32))]),
+      composition: "noLane", previews: previews)
+    try await preview("preview.noFactsPort", composition: "noFactsPort", previews: previews)
+    try await preview("preview.laneNotConfigured", previews: previews)
     rockusb(identity, daemon: "arkforged", underRoot: false, declared: sha)
     try await exchange("prerequisites.relativeDaemon", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.relativeDaemon", previews: previews)
     rockusb(identity, daemon: "arkforged", declared: String(repeating: "0", count: 64))
     try await exchange("prerequisites.digestChanged", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.digestChanged", previews: previews)
     rockusb(identity, daemon: "arkforged", declared: sha)
     probe(prerequisites, false)
     assertStatuses(
       try await exchange("prerequisites.unprobed", method, request, expect: nil, handler: handler),
       unknown)
+    try await preview("preview.unprobed", previews: previews)
     probe(prerequisites, true)
     try hdcMode("hdcKey")
     assertStatuses(
       try await exchange("prerequisites.hdcUnprepared", method, request, expect: nil, handler: handler),
       unprepared)
+    try await preview("preview.hdcUnprepared", previews: previews)
     try write(
       Self.binding, input: "binding-loader-lineage.json",
       try Self.bindingDocument(
@@ -610,54 +829,64 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
     assertStatuses(
       try await exchange("prerequisites.hdcReady", method, request, expect: nil, handler: handler),
       satisfied)
+    try await preview("preview.hdcReady", previews: previews)
     try hdcMode("offline")
     loaderObservation(loader, topology: Self.loaderTopology)
     assertStatuses(
       try await exchange("prerequisites.loaderReady", method, request, expect: nil, handler: handler),
       satisfied)
+    try await preview("preview.loaderReady", previews: previews)
     try hdcMode("empty")
     loaderObservation(loader, topology: nil, refusal: "DAYU200 target unavailable")
     assertStatuses(
       try await exchange("prerequisites.absent", method, request, expect: nil, handler: handler),
       unknown)
+    try await preview("preview.absent", previews: previews)
     try hdcMode("malformed")
     assertStatuses(
       try await exchange("prerequisites.listMalformed", method, request, expect: nil, handler: handler),
       unknown)
+    try await preview("preview.listMalformed", previews: previews)
     try hdcMode("failing")
     assertStatuses(
       try await exchange("prerequisites.listFailing", method, request, expect: nil, handler: handler),
       unknown)
+    try await preview("preview.listFailing", previews: previews)
     try hdcMode("empty")
     loaderObservation(loader, topology: Self.loaderTopology)
     try remove(Self.binding)
     assertStatuses(
       try await exchange("prerequisites.loaderUnprepared", method, request, expect: nil, handler: handler),
       unprepared)
+    try await preview("preview.loaderUnprepared", previews: previews)
     try write(
       Self.binding, input: "binding-loader-lineage.json",
       try Self.bindingDocument(
         revision: 2, serial: Self.loaderSerial, topology: Self.loaderTopology,
         evidence: Self.loaderLineage), mode: 0o644)
     try await exchange("prerequisites.bindingSharedMode", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.bindingSharedMode", previews: previews)
     try write(
       Self.binding, input: "binding-extra-key.json",
       Data(
         #"{"evidence":["product:e0-iokit-single-loader-readback"],"extra":true,"revision":2,"serial":"loader-serial-0451","usbTopology":"17956864"}"#
           .utf8))
     try await exchange("prerequisites.bindingSchema", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.bindingSchema", previews: previews)
     try write(
       Self.binding, input: "binding-evidence-names-serial.json",
       try Self.bindingDocument(
         revision: 2, serial: Self.loaderSerial, topology: Self.loaderTopology,
         evidence: Self.loaderLineage + ["note:\(Self.loaderSerial)"]))
     try await exchange("prerequisites.bindingSnapshot", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.bindingSnapshot", previews: previews)
     try write(
       Self.binding, input: "binding-lineage-without-previous.json",
       try Self.bindingDocument(
         revision: 2, serial: Self.loaderSerial, topology: Self.loaderTopology,
         evidence: Self.loaderLineage.filter { !$0.hasPrefix("binding:previous-revision=") }))
     try await exchange("prerequisites.lineageInvalid", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.lineageInvalid", previews: previews)
     try write(
       Self.binding, input: "binding-loader-lineage.json",
       try Self.bindingDocument(
@@ -668,16 +897,20 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
       Self.alias, input: "alias-other-target.json",
       try Self.aliasDocument(targetID: "TGT-ELSE", revision: 2))
     try await exchange("prerequisites.aliasOfAnotherTarget", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.aliasOfAnotherTarget", previews: previews)
     try write(Self.alias, input: "alias-revision-4.json", try Self.aliasDocument(revision: 4))
     try await exchange("prerequisites.aliasReissued", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.aliasReissued", previews: previews)
     try write(
       Self.alias, input: "alias-revision-4-other-loader.json",
       try Self.aliasDocument(revision: 4, loader: String(repeating: "b", count: 64)))
     try await exchange("prerequisites.aliasNewer", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.aliasNewer", previews: previews)
     try write(
       Self.alias, input: "alias-revision-2-other-loader.json",
       try Self.aliasDocument(revision: 2, loader: String(repeating: "b", count: 64)))
     try await exchange("prerequisites.aliasOtherLoader", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.aliasOtherLoader", previews: previews)
     try write(Self.alias, input: "alias-revision-2.json", try Self.aliasDocument(revision: 2))
     try write(
       Self.targets, input: "targets-host-and-alias-owner.json",
@@ -688,16 +921,23 @@ final class FlashHostFactsOracleContractTests: XCTestCase {
           connectKey: Self.otherKey),
       ]))
     try await exchange("prerequisites.aliasOwnedElsewhere", method, request, expect: "rejected", handler: handler)
+    try await preview("preview.aliasOwnedElsewhere", previews: previews)
     try write(Self.targets, input: "targets-host.json", try Self.targetsDocument([Self.hostTarget]))
     assertStatuses(
       try await exchange("prerequisites.aliasRouted", method, request, expect: nil, handler: handler),
       satisfied)
+    try await preview("preview.aliasRouted", previews: previews)
+    // The lane is asked about the digest lowercased.
+    try await preview(
+      "preview.aliasRoutedUppercase",
+      previewing([digestKey: .string(String(repeating: "E", count: 64))]), previews: previews)
     // An older alias is not this revision's route: the adoption key is.
     try hdcMode("hdcKey")
     try write(Self.alias, input: "alias-revision-1.json", try Self.aliasDocument(revision: 1))
     assertStatuses(
       try await exchange("prerequisites.aliasOlder", method, request, expect: nil, handler: handler),
       satisfied)
+    try await preview("preview.aliasOlder", previews: previews)
     try remove(Self.alias)
     try remove(Self.binding)
     try remove(Self.targets)

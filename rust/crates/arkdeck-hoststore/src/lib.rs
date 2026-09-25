@@ -367,8 +367,9 @@ mod flash_archive;
 mod flash_facts;
 #[cfg(target_os = "macos")]
 pub use flash_facts::{
-    ArkForgeLoader, FlashHostFacts, NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity,
-    NoArkForgeLane, RockchipFacts,
+    ArkForgeLoader, FlashHostFacts, LANE_PREVIEW_UNAVAILABLE, LanePreview,
+    NATIVE_ROCKUSB_TOOLCHAIN, NativeRockUsbIdentity, NoArkForgeLane, RockchipFacts,
+    lane_plan_preview, preview_before_lane,
 };
 mod display_names;
 mod format_time;

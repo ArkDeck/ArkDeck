@@ -1,11 +1,16 @@
 //! The Swift Flash host facts oracle (`rust/tests/fixtures/flash-host-facts`,
 //! recorded by `FlashHostFactsOracleContractTests`) replayed through the
-//! production Host and Control: `flash.bootloader-status` and
-//! `flash.prerequisites` over the Target store, the Rockchip binding and the
-//! post-flash alias of an Application Support root, with the census, the
-//! measured `arkforged`, the Loader observation and the shared fake HDC each
-//! exchange's setup names. Every answer must be Swift's, byte for byte, and
-//! every exchange must make exactly the HDC calls Swift's made.
+//! production Host and Control: `flash.bootloader-status`,
+//! `flash.prerequisites` and `flash.lanePlanPreview` over the Target store,
+//! the Rockchip binding and the post-flash alias of an Application Support
+//! root, with the census, the measured `arkforged`, the Loader observation
+//! and the shared fake HDC each exchange's setup names, and the composition
+//! each preview names. Every answer must be Swift's, byte for byte, and every
+//! exchange must make exactly the HDC calls Swift's made.
+//!
+//! One declared difference: where Swift's preview went on to ask the lane's
+//! daemon (the oracle records the calls it received), this Runtime's stops,
+//! with the same Target and revision, and answers `previewFailed` with why.
 //!
 //! The oracle's live probe had no USB port, while this Runtime's reads the
 //! census: the port only names an HDC-normal alias's current topology among
@@ -17,7 +22,9 @@ use arkdeck_contract::{
     validate_method_value,
 };
 use arkdeck_control::Control;
-use arkdeck_hoststore::{FlashHostFacts, NativeRockUsbIdentity, TargetStore};
+use arkdeck_hoststore::{
+    FlashHostFacts, LANE_PREVIEW_UNAVAILABLE, NativeRockUsbIdentity, TargetStore,
+};
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice, VerifiedTool};
 use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver, ProcessDispatch};
 use serde_json::{Value, json};
@@ -165,8 +172,10 @@ impl Scene {
     }
 
     /// The daemon as composed for this exchange: with the HDC the probe
-    /// reads, or, as Swift's daemon without HDC, with none.
-    fn control(&self, root: &Path, hdc: &Hdc) -> Control<crate::host::Host> {
+    /// reads, or, as Swift's daemon without HDC, with none; and as the
+    /// exchange's `composition` names it — with a lane (the default), without
+    /// one, without a Target store, or without the facts.
+    fn control(&self, root: &Path, hdc: &Hdc, composition: &str) -> Control<crate::host::Host> {
         let census = Arc::clone(&self.census);
         let facts = FlashHostFacts::new(root, move || {
             census
@@ -177,9 +186,19 @@ impl Scene {
         })
         .with_rockusb(self.rockusb.clone())
         .with_loader_observer(Box::new(self.loader.clone()));
-        let host = crate::host::Host::from_environment()
-            .with_targets(TargetStore::open(&root.join("state/targets")).unwrap())
-            .with_flash_host_facts(facts);
+        let host = crate::host::Host::from_environment().with_lane_plan_preview(
+            (composition != "noLane").then(|| "org.openharmony.dayu200".to_owned()),
+        );
+        let host = if composition == "noTargetStore" {
+            host
+        } else {
+            host.with_targets(TargetStore::open(&root.join("state/targets")).unwrap())
+        };
+        let host = if composition == "noFactsPort" {
+            host
+        } else {
+            host.with_flash_host_facts(facts)
+        };
         Control::new(if self.probe {
             host.with_development_hdc(Some(hdc.dispatch()))
         } else {
@@ -310,6 +329,7 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
     let root = Root::new();
     let mut scene = Scene::new();
     let mut compared = 0;
+    let mut declared = 0;
     // What the setup last wrote to each path, or `None` once it removed it.
     let mut written: BTreeMap<String, Option<(String, String)>> = BTreeMap::new();
     for exchange in cases["exchanges"].as_array().unwrap() {
@@ -331,13 +351,29 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
             }
         }
         let method = exchange["method"].as_str().unwrap();
-        let control = scene.control(&root.0, &hdc);
-        let answer = call(&control, index, method, exchange["params"].clone());
-        assert_eq!(
-            answer,
-            published(method, &exchange["answer"]),
-            "{index} {name}"
+        let control = scene.control(
+            &root.0,
+            &hdc,
+            exchange["composition"].as_str().unwrap_or("lane"),
         );
+        let answer = call(&control, index, method, exchange["params"].clone());
+        let expected = if exchange["laneCalls"]
+            .as_array()
+            .is_some_and(|calls| !calls.is_empty())
+        {
+            // The declared difference: Swift's preview asked the lane's
+            // daemon, whose store the oracle scripted empty; this one stops
+            // before it, for the same Target at the same revision.
+            let swift = &exchange["answer"]["result"];
+            assert_eq!(swift["state"], "bundleNotInLaneStore", "{index} {name}");
+            declared += 1;
+            json!({"ok": true, "result": {
+                "targetId": swift["targetId"], "bindingRevision": swift["bindingRevision"],
+                "state": "previewFailed", "reason": LANE_PREVIEW_UNAVAILABLE}})
+        } else {
+            published(method, &exchange["answer"])
+        };
+        assert_eq!(answer, expected, "{index} {name}");
         assert_eq!(
             hdc.calls(),
             exchange["hdcCalls"],
@@ -345,7 +381,8 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
         );
         compared += 1;
     }
-    assert!(compared >= 40, "every recorded exchange replays");
+    assert!(compared >= 74, "every recorded exchange replays");
+    assert_eq!(declared, 8, "the previews that reached the lane");
     // The reads wrote nothing: the Application Support root holds what the
     // setup last wrote, byte for byte and in its mode, and nothing else.
     let mut left: Vec<String> = fs::read_dir(&root.0)
@@ -402,6 +439,12 @@ fn a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers() {
             json!({"targetId": "TGT-HOST", "profileReference": "dayu200"}),
             "Flash prerequisite observation is not configured",
         ),
+        (
+            "flash.lanePlanPreview",
+            json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+                "archiveSha256": "e".repeat(64)}),
+            "lane plan preview is not configured",
+        ),
     ] {
         assert_eq!(
             call(&control, 1, method, params),
@@ -424,6 +467,41 @@ fn a_host_without_the_facts_answers_as_swifts_daemon_without_its_observers() {
             "{params}"
         );
     }
+    // So are the preview's, and its digest is 64 hexadecimal characters as
+    // Swift's `Character` reads them: none other, no longer, none combined.
+    let digest = "e".repeat(64);
+    for params in [
+        json!({"targetId": "TGT-HOST", "profileReference": "dayu200"}),
+        json!({"targetId": "TGT-HOST", "profileReference": "DAYU200", "archiveSha256": digest}),
+        json!({"targetId": 7, "profileReference": "dayu200", "archiveSha256": digest}),
+        json!({"targetId": "TGT-HOST", "profileReference": "dayu200", "archiveSha256": 7}),
+        json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+            "archiveSha256": "e".repeat(65)}),
+        json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+            "archiveSha256": format!("{}\u{FF47}", "e".repeat(63))}),
+        json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+            "archiveSha256": format!("{}e\u{301}", "e".repeat(62))}),
+    ] {
+        assert_eq!(
+            call(&control, 3, "flash.lanePlanPreview", params.clone())["error"],
+            json!({"code": "invalidParams", "message":
+                "a supported targetId, profileReference and 64-hex archiveSha256 are required"}),
+            "{params}"
+        );
+    }
+    for digest in ["\u{FF19}\u{FF26}".repeat(32), "A".repeat(64)] {
+        assert_eq!(
+            call(
+                &control,
+                4,
+                "flash.lanePlanPreview",
+                json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+                    "archiveSha256": digest})
+            )["error"]["message"],
+            "lane plan preview is not configured",
+            "{digest}"
+        );
+    }
 }
 
 #[test]
@@ -433,7 +511,7 @@ fn members_swift_ignores_change_neither_the_reads_nor_the_answers() {
     let hdc = Hdc::install(&fixtures);
     let root = Root::new();
     let scene = Scene::new();
-    let control = scene.control(&root.0, &hdc);
+    let control = scene.control(&root.0, &hdc, "lane");
     assert_eq!(
         call(
             &control,
@@ -450,6 +528,16 @@ fn members_swift_ignores_change_neither_the_reads_nor_the_answers() {
             "flash.prerequisites",
             json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
                 "connectKey": "forged", "rockusbPath": "/usr/local/bin/rockusb"})
+        ),
+        json!({"ok": false, "error": {"code": "notFound", "message": "target is not adopted"}})
+    );
+    assert_eq!(
+        call(
+            &control,
+            4,
+            "flash.lanePlanPreview",
+            json!({"targetId": "TGT-HOST", "profileReference": "dayu200",
+                "archiveSha256": "e".repeat(64), "planId": "forged", "usbTopology": "1"})
         ),
         json!({"ok": false, "error": {"code": "notFound", "message": "target is not adopted"}})
     );

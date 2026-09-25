@@ -428,6 +428,16 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `flash.lanePlanPreview` once its target, the supported profile and an
+    /// archive digest were read. A host without a Target store answers as
+    /// Swift's daemon without one does.
+    fn flash_lane_plan_preview(&self, _target_id: &str) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "lane plan preview is not configured".into(),
+            details: None,
+        })
+    }
     /// `flash.bootloader-status`, which reads no parameter. A host without
     /// the bootloader status observer answers as Swift's daemon without it.
     fn flash_bootloader_status(&self) -> Result<Value, WireError> {
@@ -1443,6 +1453,26 @@ impl<H: HostServices> Control<H> {
                     "a supported targetId and profileReference are required",
                 ),
             },
+            // As Swift's handler: three strings, the one supported profile
+            // and 64 hexadecimal digits as Swift's `Character` reads them,
+            // before the Target store; the digest is read, never used here.
+            "flash.lanePlanPreview" => match (
+                params.get("targetId").and_then(Value::as_str),
+                params.get("profileReference").and_then(Value::as_str),
+                params.get("archiveSha256").and_then(Value::as_str),
+            ) {
+                (Some(target), Some("dayu200"), Some(digest)) if swift_hex_digest(digest) => {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self.host.flash_lane_plan_preview(target),
+                    }
+                }
+                _ => Response::failure(
+                    &request.id,
+                    "invalidParams",
+                    "a supported targetId, profileReference and 64-hex archiveSha256 are required",
+                ),
+            },
             // As Swift's handler: no parameter is read.
             "flash.bootloader-status" => Response {
                 id: request.id.clone(),
@@ -2111,6 +2141,20 @@ fn workspace_params_refusal(
         ]) && generation()))
         .then_some("workspace preset remove requires identity and exact generation"),
     }
+}
+
+/// Swift's `count == 64 && allSatisfy(\.isHexDigit)` over a `String`: 64
+/// characters, each a hexadecimal digit as `Character.hexDigitValue` reads
+/// one — ASCII or fullwidth, in either case. A character of more than one
+/// scalar is never a digit there, and no digit scalar joins another into one
+/// character, so counting scalars counts the characters.
+fn swift_hex_digest(text: &str) -> bool {
+    text.chars().count() == 64
+        && text.chars().all(|character| {
+            matches!(character,
+                '0'..='9' | 'A'..='F' | 'a'..='f'
+                | '\u{FF10}'..='\u{FF19}' | '\u{FF21}'..='\u{FF26}' | '\u{FF41}'..='\u{FF46}')
+        })
 }
 
 /// Foundation's `Int64` of a JSON number, as Swift's `JSONValue.integer`

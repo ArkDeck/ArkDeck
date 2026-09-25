@@ -31,6 +31,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 
+#[path = "flash_lane_preview.rs"]
+mod lane_preview;
+pub use lane_preview::{
+    LANE_PREVIEW_UNAVAILABLE, LanePreview, lane_plan_preview, preview_before_lane,
+};
+
 /// The host's USB devices, as the Runtime's census reads them.
 type Census = dyn Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync;
 

@@ -689,6 +689,7 @@ pub(crate) fn compose(
         .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
             &arkforge.runtime_directory,
         ))
+        .with_lane_plan_preview(arkforge.lane_plan_preview())
         // Swift's Loader binding coordinator (`main.swift` 1549): the same
         // root and census, ArkForge's half of the Loader observation through
         // the lane's directory, and the Runtime's records in
