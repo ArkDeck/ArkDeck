@@ -75,7 +75,10 @@ mod job_plan;
 #[cfg(target_os = "macos")]
 mod operation_availability;
 #[cfg(target_os = "macos")]
-pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
+pub use job_plan::{
+    AnalyzerProfile, FlashPlanner, FlashPlanning, JobPlanner, PlanRefusal, RockchipFactsPort,
+    rockchip_dispatch_unavailable,
+};
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
 #[cfg(target_os = "macos")]

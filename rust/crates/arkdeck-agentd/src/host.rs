@@ -189,6 +189,12 @@ pub struct Host {
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(target_os = "macos")]
     flash_facts: Option<arkdeck_hoststore::FlashHostFacts>,
+    /// What a Flash `job.plan` reads beyond the Artifact and Import owners
+    /// and those facts: the ArkForge provider's availability, the Rockchip
+    /// dispatcher's reason and the lane's toolchain, as Swift's daemon
+    /// composes them.
+    #[cfg(target_os = "macos")]
+    flash_planning: Option<arkdeck_hoststore::FlashPlanning>,
     /// Swift `ProductRockchipDeviceAccessObserver`: ArkForge's public socket
     /// in the lane's runtime directory, a fresh bounded session per read.
     #[cfg(target_os = "macos")]
@@ -798,6 +804,15 @@ impl Host {
         self
     }
 
+    /// `job.plan` materializes the ArkForge Flash operations over this
+    /// composition and the Rockchip facts; without it they stay the
+    /// planner's, which does not materialize them.
+    #[cfg(target_os = "macos")]
+    pub fn with_flash_planning(mut self, planning: arkdeck_hoststore::FlashPlanning) -> Self {
+        self.flash_planning = Some(planning);
+        self
+    }
+
     /// `flash.bind-current-loader` binds through this owner, against this
     /// host's Target store and Jobs.
     #[cfg(target_os = "macos")]
@@ -944,6 +959,8 @@ impl Host {
             flash_invocations: None,
             #[cfg(target_os = "macos")]
             flash_facts: None,
+            #[cfg(target_os = "macos")]
+            flash_planning: None,
             #[cfg(target_os = "macos")]
             device_access: None,
             #[cfg(target_os = "macos")]
@@ -1476,13 +1493,33 @@ impl HostServices for Host {
             });
         };
         let hdc = self.hdc();
-        arkdeck_hoststore::JobPlanner {
-            imports: self.imports.as_deref(),
-            artifacts: self.artifacts.as_deref(),
-            analyzer: Some(analyzer),
-            state_root,
-            hdc: hdc.as_ref(),
-            workspace: self.workspace.as_deref(),
+        // Swift's ArkForge facts port: the Target store's, measured over this
+        // host's HDC when it has one.
+        let facts = match (&self.flash_facts, &self.targets) {
+            (Some(facts), Some(targets)) => Some(move |target_id: &str| {
+                facts.current_facts(
+                    targets,
+                    self.hdc
+                        .as_deref()
+                        .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+                    target_id,
+                )
+            }),
+            _ => None,
+        };
+        arkdeck_hoststore::FlashPlanner {
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
+                artifacts: self.artifacts.as_deref(),
+                analyzer: Some(analyzer),
+                state_root,
+                hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
+            },
+            flash: self.flash_planning.as_ref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
         }
         .handle(params)
         // Planning never admits: every refusal is pre-admission with zero dispatch.

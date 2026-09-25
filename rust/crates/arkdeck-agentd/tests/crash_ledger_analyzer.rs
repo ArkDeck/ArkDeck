@@ -332,13 +332,42 @@ impl Drop for Runtime {
 }
 
 /// The published contract view runs this checkout's tests against the merge
-/// base's inputs, which name their commit and may predate the widened
-/// `agent.run` and `agent.status` results. The checkout and candidate views
-/// carry them.
+/// base's inputs, which name their commit. The checkout and candidate views
+/// carry this checkout's.
 fn published_view() -> bool {
     let inputs =
         arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
     inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// Whether the contract this build compiled publishes `method`'s answer for
+/// a host-only execution: null for its Artifacts' binding revision and
+/// stable identity, and for its evidence's and its evidence Artifacts'
+/// (#2161). A merge base older than that refuses the daemon's own answer;
+/// one that includes it publishes the answer, as the checkout does.
+fn publishes_host_only(method: &str) -> bool {
+    let (_, schema) = arkdeck_contract::METHOD_SCHEMAS
+        .iter()
+        .find(|(name, _)| *name == method)
+        .unwrap();
+    let schema: Value = serde_json::from_str(schema).unwrap();
+    let result = &schema["$defs"]["result"]["properties"];
+    let artifact = &result["artifacts"]["items"]["properties"];
+    let evidence = &result["evidence"]["properties"];
+    let evidence_artifact = &evidence["artifacts"]["items"]["properties"];
+    [
+        &artifact["bindingRevision"],
+        &artifact["stableIdentitySha256"],
+        &evidence["bindingRevision"],
+        &evidence_artifact["bindingRevision"],
+        &evidence_artifact["stableIdentitySha256"],
+    ]
+    .iter()
+    .all(|member| {
+        member["type"]
+            .as_array()
+            .is_some_and(|types| types.contains(&json!("null")))
+    })
 }
 
 /// One control frame, answered with its result.
@@ -588,10 +617,15 @@ fn an_agent_execution_of_the_analyzer_runs_its_job_to_the_end() {
         ("agent.run", intent),
     ] {
         let answered = exchange(root, method, params);
-        if published_view() {
-            // The merge base's `agent.run` and `agent.status` results predate
-            // a host-only execution: the daemon refuses its own answer.
+        if !publishes_host_only(method) {
+            // Only a published view's merge base can predate a host-only
+            // execution's results: the daemon refuses its own answer.
+            assert!(published_view(), "{method} must publish a host-only answer");
             assert_eq!(answered["error"]["code"], "internalError", "{answered}");
+            assert_eq!(
+                answered["error"]["message"], "the result does not conform to the current contract",
+                "{answered}"
+            );
             continue;
         }
         assert_eq!(answered["ok"], true, "{method}: {answered}");

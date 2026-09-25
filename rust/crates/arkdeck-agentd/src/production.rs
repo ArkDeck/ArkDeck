@@ -674,6 +674,9 @@ pub(crate) fn compose(
         hdc_sha256.as_deref(),
     );
     let host = host
+        // Swift's Flash planning over that lane, the per-action host's
+        // records in `…/Agentd/rockchip-runtime` when an HDC is composed.
+        .with_flash_planning(arkforge.planning(&layout.state, hdc_sha256.is_some()))
         .with_flash_host_facts(
             arkdeck_hoststore::FlashHostFacts::new(
                 &layout.application_support,

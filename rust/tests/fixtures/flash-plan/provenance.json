@@ -1,0 +1,10 @@
+{
+  "producer" : "FlashPlanOracleContractTests",
+  "root" : "/private/tmp/arkdeck-flash-plan-oracle",
+  "steps" : [
+    "artifact.import (flash-bundle, production policy)",
+    "RuntimeControlPlaneHandler job.plan",
+    "RuntimeJobEngine.planOnly",
+    "ArkForgeNativeRockchipControlDispatcher.unavailableReason (dispatch.json)"
+  ]
+}

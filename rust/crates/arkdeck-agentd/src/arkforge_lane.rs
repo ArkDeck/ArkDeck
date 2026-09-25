@@ -60,6 +60,20 @@ impl Composed {
         }
     }
 
+    /// Swift's Flash planning over this lane (`flash_planning`): why there is
+    /// no lane, or why a lane without a campaign may not flash, and the
+    /// lane's toolchain, which its StepPermits bind.
+    pub(crate) fn planning(&self, state: &Path, hdc: bool) -> arkdeck_hoststore::FlashPlanning {
+        let (unavailable, toolchain) = match &self.lane {
+            Ok(lane) => (
+                lane.assessment_only_reason().map(str::to_owned),
+                Some(lane.daemon_sha256().to_owned()),
+            ),
+            Err(absence) => (Some(absence.to_string()), None),
+        };
+        flash_planning(unavailable, toolchain, self.rockusb(), state, hdc)
+    }
+
     /// Stops the lane's daemon, once, after the owner's drain.
     pub(crate) fn stop(&self) {
         if let Ok(lane) = &self.lane
@@ -68,6 +82,27 @@ impl Composed {
             eprintln!("arkdeck-agentd: stopped arkforged ({:?})", stopped.exit);
         }
     }
+}
+
+/// Swift's Flash planning as `main.swift` composes the ArkForge provider and
+/// the Rockchip dispatcher: the provider's availability (`unavailable`, none
+/// when it may flash) and the lane's `toolchain`, and the dispatcher's
+/// reason over the configured `arkforged` (`identity`) and, with a
+/// descriptor-bound HDC (`hdc`), the per-action host's record root
+/// `<state>/rockchip-runtime`.
+pub(crate) fn flash_planning(
+    unavailable: Option<String>,
+    toolchain: Option<String>,
+    identity: NativeRockUsbIdentity,
+    state: &Path,
+    hdc: bool,
+) -> arkdeck_hoststore::FlashPlanning {
+    let records = hdc.then(|| state.join("rockchip-runtime"));
+    arkdeck_hoststore::FlashPlanning::new(
+        unavailable,
+        move || arkdeck_hoststore::rockchip_dispatch_unavailable(&identity, records.as_deref()),
+        toolchain,
+    )
 }
 
 /// The digest of this very executable, the authority the lane's permits will
