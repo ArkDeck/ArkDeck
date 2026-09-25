@@ -312,4 +312,8 @@ devices, none of which this change touches.
 
 ## CI
 
-Pending.
+PR #2192, merged as `5959a3194`: Agent PR 36141439476 (`open-pr`), SDD Guard
+36141439593 (`guard`, `ds-tokens`) and Swift CI 36141439587 (`plan`,
+`swift-tests`, `ds-interactions`, the Rust host-independent checks, the Rust
+workspace on ubuntu-latest, macos-26 and windows-latest, and the `swift`
+aggregate; `app-build` skipped by the plan) all succeeded at `7a8ca04ce`.

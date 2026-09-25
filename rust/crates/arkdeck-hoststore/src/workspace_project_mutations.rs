@@ -122,6 +122,7 @@ impl WorkspaceProjectStore {
                             }
                             let removed = next.records.remove(index);
                             transaction.save(&next)?;
+                            self.forget_applied(project);
                             return Ok(removed_resource(&removed));
                         };
                         if next.records[index].kind != family
@@ -213,8 +214,8 @@ impl WorkspaceProjectStore {
                                             "workspaceReferenceNotFound",
                                             "workspace preset is not registered",
                                         )
-                                    })?
-                                    .resource();
+                                    })
+                                    .and_then(|record| self.preset_resource(record));
                             }
                             if !document
                                 .records
@@ -238,7 +239,7 @@ impl WorkspaceProjectStore {
                                 "projectRef": project,
                                 "presets": presets
                                     .into_iter()
-                                    .map(PresetRecord::resource)
+                                    .map(|record| self.preset_resource(record))
                                     .collect::<Result<Vec<_>, _>>()?,
                             }))
                         },
@@ -367,6 +368,33 @@ mod tests {
         } else {
             json!(owner)
         }
+    }
+
+    /// Swift forgets a removed project's applied generation: registering
+    /// the same reference again awaits a restart, even at the generation
+    /// the start composed.
+    #[test]
+    fn a_removed_registration_is_composed_again_only_by_a_restart() {
+        let fixture = Fixture::new();
+        let alpha = fixture.project("alpha", "first");
+        fixture
+            .store
+            .mark_applied(BTreeMap::from([(alpha.clone(), 1)]));
+        let status = |fixture: &Fixture| {
+            fixture
+                .call("workspace.project.show", json!({"projectRef": alpha}))
+                .unwrap()["configurationStatus"]
+                .clone()
+        };
+        assert_eq!(status(&fixture), "active");
+        fixture
+            .call(
+                "workspace.project.remove",
+                json!({"projectRef": alpha, "expectedGeneration": "1"}),
+            )
+            .unwrap();
+        assert_eq!(fixture.project("alpha", "first"), alpha);
+        assert_eq!(status(&fixture), "runtimeRestartRequired");
     }
 
     #[test]

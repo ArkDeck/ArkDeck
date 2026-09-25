@@ -7,7 +7,7 @@ use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     fs::OpenOptions,
     io,
     os::unix::fs::{MetadataExt, OpenOptionsExt},
@@ -71,6 +71,14 @@ pub struct WorkspaceProjectStore {
     /// Swift `appliedPresetGenerations`: the generation of every registered
     /// preset the Runtime composed when it started. A Job names only those.
     applied_presets: Mutex<BTreeMap<String, u64>>,
+    /// Swift `presetResolutionFailures`: the registered presets the Runtime
+    /// tried to compose when it started and could not, which a restart alone
+    /// does not change.
+    preset_failures: Mutex<BTreeSet<String>>,
+    /// What the Runtime's start-up composition published for each registered
+    /// project (the Swift handler's `workspaceProjects`), less the reference
+    /// and kind the registration itself carries.
+    publications: Mutex<BTreeMap<String, Map<String, Value>>>,
     /// Swift `uses` and `presetUses`: the Jobs materializing against a
     /// project or preset right now, which its update and removal wait out.
     uses: Mutex<(HashMap<String, usize>, HashMap<String, usize>)>,
@@ -304,6 +312,20 @@ fn validate_records(document: &Value) -> Result<Vec<Record>, WireError> {
     presets::validate(document, &refs)?;
     Ok(records)
 }
+/// `workspace.project.show` as the published contract still has it: an
+/// operation's reason and code are `null`, available or not. Swift answers
+/// them as `list` does; the widened schema is its own change (#2197), and
+/// until it lands a `show` carrying them would be rewritten.
+fn without_operation_reasons(mut value: Value) -> Value {
+    if let Some(operations) = value["operations"].as_array_mut() {
+        for operation in operations {
+            operation["reason"] = Value::Null;
+            operation["reasonCode"] = Value::Null;
+        }
+    }
+    value
+}
+/// A registration's projection awaiting a restart: nothing composed for it.
 fn resource(r: &Record) -> Value {
     json!({"schemaVersion":"arkdeck.workspace-project/1","projectRef":r.project_ref,"generation":r.generation.to_string(),"kind":r.kind,"registeredAtUtc":r.registered_at,"updatedAtUtc":r.updated_at,"configurationStatus":"runtimeRestartRequired","availability":"unavailable","reasonCode":"workspace_runtime_restart_required","reason":"restart the Runtime to compose the registered root before submitting a workspace Job","allowedFileGlobs":[],"presetRefs":[],"operations":[]})
 }
@@ -319,6 +341,8 @@ impl WorkspaceProjectStore {
             credential_pinning: None,
             applied: Mutex::new(BTreeMap::new()),
             applied_presets: Mutex::new(BTreeMap::new()),
+            preset_failures: Mutex::new(BTreeSet::new()),
+            publications: Mutex::new(BTreeMap::new()),
             uses: Mutex::new((HashMap::new(), HashMap::new())),
         })
     }
@@ -379,7 +403,7 @@ impl WorkspaceProjectStore {
             |_, document| {
                 let mut records = Vec::new();
                 for record in document.presets.iter().filter(|record| record.available()) {
-                    record.resource()?;
+                    self.preset_resource(record)?;
                     records.push(WorkspacePresetComposition {
                         preset_ref: record.preset_ref.clone(),
                         project_ref: record.project_ref.clone(),
@@ -407,6 +431,86 @@ impl WorkspaceProjectStore {
         if let Ok(mut applied) = self.applied_presets.lock() {
             applied.remove(preset_ref);
         }
+    }
+
+    /// Swift's removal of a project from `appliedGenerations` once the
+    /// project is removed: a later registration must restart to be composed.
+    pub(super) fn forget_applied(&self, project_ref: &str) {
+        if let Ok(mut applied) = self.applied.lock() {
+            applied.remove(project_ref);
+        }
+    }
+
+    /// Swift `markApplied(projects:presets:presetResolutionFailures:)` for
+    /// the failures: the registered presets this Runtime tried to compose
+    /// when it started and could not.
+    pub fn mark_preset_failures(&self, failures: BTreeSet<String>) {
+        if let Ok(mut current) = self.preset_failures.lock() {
+            *current = failures;
+        }
+    }
+
+    /// The publications of this Runtime's start-up composition, by project,
+    /// as the Swift handler is handed them.
+    pub(crate) fn mark_published(&self, publications: BTreeMap<String, Map<String, Value>>) {
+        if let Ok(mut current) = self.publications.lock() {
+            *current = publications;
+        }
+    }
+
+    /// Swift `presetResource`'s status: `removed`; `active` when this
+    /// Runtime composed the preset's generation when it started;
+    /// `unresolved` when it tried and could not; otherwise it awaits a
+    /// restart. A lock another thread poisoned proves nothing applied.
+    fn preset_status(&self, record: &preset_mutations::PresetRecord) -> &'static str {
+        if record.state == "removed" {
+            return "removed";
+        }
+        if self
+            .applied_presets
+            .lock()
+            .is_ok_and(|applied| applied.get(&record.preset_ref) == Some(&record.generation))
+        {
+            return "active";
+        }
+        if self
+            .preset_failures
+            .lock()
+            .is_ok_and(|failures| failures.contains(&record.preset_ref))
+        {
+            return "unresolved";
+        }
+        "runtimeRestartRequired"
+    }
+
+    /// Swift `presetResource`: the preset's projection with its status.
+    fn preset_resource(&self, record: &preset_mutations::PresetRecord) -> Result<Value, WireError> {
+        record.resource(self.preset_status(record))
+    }
+
+    /// Swift `resource(_:)` as the handler's `encodeRegisteredWorkspaceProject`
+    /// answers it: `active` when this Runtime composed the registration's
+    /// generation when it started, then carrying what that composition
+    /// published for the project; otherwise it awaits a restart. A lock
+    /// another thread poisoned proves nothing applied.
+    fn projection(&self, record: &Record) -> Value {
+        let mut value = resource(record);
+        if !self
+            .applied
+            .lock()
+            .is_ok_and(|applied| applied.get(&record.project_ref) == Some(&record.generation))
+        {
+            return value;
+        }
+        value["configurationStatus"] = json!("active");
+        if let Ok(publications) = self.publications.lock()
+            && let Some(published) = publications.get(&record.project_ref)
+        {
+            for (key, field) in published {
+                value[key.as_str()] = field.clone();
+            }
+        }
+        value
     }
 
     /// Swift `acquireUse(projectRef:presetRefs:)`: the registration a Job
@@ -650,13 +754,13 @@ impl WorkspaceProjectStore {
                 } else if method.ends_with(".list") {
                     next.records.sort_by(|a, b| a.project_ref.cmp(&b.project_ref));
                     Ok(
-                        json!({"schemaVersion":"arkdeck.workspace-project-list/1","projects":next.records.iter().map(resource).collect::<Vec<_>>()}),
+                        json!({"schemaVersion":"arkdeck.workspace-project-list/1","projects":next.records.iter().map(|record| self.projection(record)).collect::<Vec<_>>()}),
                     )
                 } else {
                     next.records
                         .iter()
                         .find(|r| Some(r.project_ref.as_str()) == params["projectRef"].as_str())
-                        .map(resource)
+                        .map(|record| without_operation_reasons(self.projection(record)))
                         .ok_or_else(|| {
                             failure(
                                 "workspaceReferenceNotFound",

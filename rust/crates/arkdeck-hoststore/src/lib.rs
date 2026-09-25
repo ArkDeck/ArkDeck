@@ -118,7 +118,9 @@ pub use arktrace_profile::{
     ResolvedExecutable, TrustContract, TrustEvidence,
 };
 #[cfg(target_os = "macos")]
-pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
+pub use operation_availability::{
+    OperationAvailabilityContext, hdc_operation_runs, operation_unavailability,
+};
 #[cfg(target_os = "macos")]
 mod debug_read;
 #[cfg(target_os = "macos")]

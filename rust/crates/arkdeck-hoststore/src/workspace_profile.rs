@@ -680,6 +680,56 @@ impl WorkspaceProfile {
         })
     }
 
+    /// What `WorkspaceProjectPublication.make` publishes of the profile's
+    /// presets: each build, test, symbol and signing preset by reference,
+    /// kind-tagged, with its timeout, sorted by kind then reference.
+    pub(crate) fn published_presets(&self) -> Vec<(String, &'static str, i64)> {
+        let mut presets: Vec<(String, &'static str, i64)> = [
+            ("build", &self.build),
+            ("test", &self.test),
+            ("symbol", &self.symbol),
+        ]
+        .into_iter()
+        .flat_map(|(kind, table)| {
+            table
+                .values()
+                .map(move |preset| (preset.preset_id.clone(), kind, preset.timeout_seconds))
+        })
+        .chain(
+            self.signing
+                .values()
+                .map(|preset| (preset.preset_id.clone(), "signing", preset.timeout_seconds)),
+        )
+        .collect();
+        presets.sort_by(|left, right| (left.1, &left.0).cmp(&(right.1, &right.0)));
+        presets
+    }
+
+    /// Swift `WorkspaceActionExecutableResolver(profiles:)`'s generic
+    /// resolution, which the workspace dispatcher's `unavailableReason`
+    /// asks: some executable any of `profiles` pinned — tried in path order —
+    /// still measures as pinned. Refused as Swift's resolver refuses, by the
+    /// `RuntimeDispatchFailure.failed` detail.
+    pub(crate) fn generic_resolution(profiles: &[WorkspaceProfile]) -> Result<(), &'static str> {
+        let mut identities: Vec<&ExecutableIdentity> = profiles
+            .iter()
+            .flat_map(WorkspaceProfile::executable_identities)
+            .collect();
+        identities
+            .sort_by(|left, right| (&left.path, &left.sha256).cmp(&(&right.path, &right.sha256)));
+        identities.dedup();
+        if identities.is_empty() {
+            return Err("workspace profile has no executable presets");
+        }
+        if identities.iter().any(|identity| {
+            ExecutableIdentity::hashing(&identity.path)
+                .is_ok_and(|measured| measured.sha256 == identity.sha256)
+        }) {
+            return Ok(());
+        }
+        Err("workspace registry has no available executable preset")
+    }
+
     /// Swift `executableIdentities`: every command preset's executable, once.
     fn executable_identities(&self) -> Vec<&ExecutableIdentity> {
         let mut identities: Vec<&ExecutableIdentity> = Vec::new();

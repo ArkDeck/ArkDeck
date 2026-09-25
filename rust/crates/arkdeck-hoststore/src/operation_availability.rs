@@ -14,6 +14,9 @@ pub struct OperationAvailabilityContext<'a> {
     /// Whether the HDC composition carries the verified code-sign helper a
     /// native library deployment stages.
     pub code_sign_helper: bool,
+    /// The workspace provider the host composed over its registered
+    /// projects, if it composed one.
+    pub workspace: Option<&'a crate::WorkspaceComposition>,
 }
 
 /// The executable operations that mutate a device: each consumes a Runtime
@@ -29,6 +32,23 @@ const MUTATIONS: [&str; 8] = [
     "deploy.native-library.app-owned@1",
 ];
 
+/// Whether `reference` is an HDC operation this Rust executor runs: the
+/// operations whose availability asks after the pinned HDC tool's identity.
+pub fn hdc_operation_runs(reference: &str) -> bool {
+    crate::device_run::runs(reference)
+}
+
+/// The workspace operations that write a tree: each consumes a Runtime
+/// capability use first, as a device mutation does, so none is available
+/// without the mutation owner.
+const WORKSPACE_MUTATIONS: [&str; 5] = [
+    "workspace.apply-patch@1",
+    "workspace.build-openharmony@1",
+    "workspace.create-checkpoint@1",
+    "workspace.revert-patch@1",
+    "workspace.run-tests@1",
+];
+
 /// Swift RuntimeJobEngine.operationAvailability's provider, dispatcher and
 /// Artifact checks, limited to the operations this Rust executor can run.
 /// None preserves provider_not_registered. Unsupported plans must never turn
@@ -38,6 +58,11 @@ pub fn operation_unavailability(
     provider: &str,
     context: &OperationAvailabilityContext<'_>,
 ) -> Option<Vec<(&'static str, String)>> {
+    if context.planning_owner && provider == "workspace" {
+        return context
+            .workspace
+            .map(|workspace| workspace_unavailability(reference, workspace, context));
+    }
     if !context.planning_owner
         || !["hdc", "analyzer"].contains(&provider)
         || (provider == "hdc" && !context.hdc_registered)
@@ -104,6 +129,54 @@ pub fn operation_unavailability(
     Some(reasons)
 }
 
+/// Swift `RuntimeJobEngine.operationAvailability` for a workspace
+/// operation: the registered provider's answer (`WorkspaceProvider` and the
+/// operations provider over the start-up profiles), then the workspace
+/// dispatcher's unless it repeats a reason already given, then the Artifact
+/// store every workspace operation publishes through. As for a device
+/// mutation, a tree mutation first needs the mutation owner, and every
+/// operation the Job owner.
+fn workspace_unavailability(
+    reference: &str,
+    workspace: &crate::WorkspaceComposition,
+    context: &OperationAvailabilityContext<'_>,
+) -> Vec<(&'static str, String)> {
+    let mut reasons = Vec::new();
+    if WORKSPACE_MUTATIONS.contains(&reference) && !context.mutation_owner {
+        reasons.push((
+            "provider_tool_unavailable",
+            "runtime.mutationOwnerUnavailable".into(),
+        ));
+    }
+    if let Some(reason) = workspace.provider_unavailability(reference) {
+        reasons.push(reason);
+    }
+    if let Some(reason) = workspace.dispatcher_unavailability()
+        && !reasons.iter().any(|(_, given)| *given == reason)
+    {
+        reasons.push(("provider_tool_unavailable", reason));
+    }
+    if !crate::job_run::executes(reference) {
+        reasons.push((
+            "operation_not_supported",
+            format!("Rust workspace provider has no complete production executor for {reference}"),
+        ));
+    }
+    if !context.job_owner {
+        reasons.push((
+            "provider_tool_unavailable",
+            "runtime.jobOwnerUnavailable".into(),
+        ));
+    }
+    if !context.artifacts {
+        reasons.push((
+            "artifact_store_unavailable",
+            "runtime.artifactStoreUnavailable".into(),
+        ));
+    }
+    reasons
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,6 +190,7 @@ mod tests {
             hdc_tool_current: true,
             mutation_owner: false,
             code_sign_helper: true,
+            workspace: None,
         }
     }
     #[test]
