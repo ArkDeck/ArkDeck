@@ -1,8 +1,23 @@
 use super::*;
+use crate::decode_bundles;
 use std::{
-    fs,
-    os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
+    fs::{self, Metadata},
+    os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt, symlink},
+    path::{Path, PathBuf},
 };
+fn same_document(left: &Metadata, right: &Metadata) -> bool {
+    left.dev() == right.dev()
+        && left.ino() == right.ino()
+        && left.mode() == right.mode()
+        && left.uid() == right.uid()
+        && left.gid() == right.gid()
+        && left.nlink() == right.nlink()
+        && left.len() == right.len()
+        && left.mtime() == right.mtime()
+        && left.mtime_nsec() == right.mtime_nsec()
+        && left.ctime() == right.ctime()
+        && left.ctime_nsec() == right.ctime_nsec()
+}
 
 // Every fixture is newly created under the physical temporary root and retained.
 // These metadata/negative tests do not establish a positive signing identity.
@@ -173,10 +188,10 @@ fn bootstrap_lock_covers_both_pager_success_and_failure() {
     let store = root.store();
     store.list_page(1, None).unwrap();
     for cursor in [None, Some("bad")] {
-        let result = store.list_page_with_checkpoint(1, cursor, |_| {
+        let result = list_page_with_checkpoint(&store, 1, cursor, |_| {
             assert!(
                 root.store()
-                    .root
+                    .root()
                     .try_lock_existing_strict(".lock")
                     .unwrap()
                     .is_none()
@@ -189,16 +204,16 @@ fn bootstrap_lock_covers_both_pager_success_and_failure() {
         }
         assert!(
             root.store()
-                .root
+                .root()
                 .try_lock_existing_strict(".lock")
                 .unwrap()
                 .is_some()
         );
     }
-    let lock = store.root.lock_document(".lock").unwrap();
+    let lock = store.root().lock_document(".lock").unwrap();
     error_code(store.list_page(0, Some("bad")), "resourceConflict");
     drop(lock);
-    let snapshots = store.root.child("bundle-snapshots").unwrap();
+    let snapshots = store.root().child("bundle-snapshots").unwrap();
     let _snapshot_lock = snapshots.lock_document(".snapshots.lock").unwrap();
     error_code(store.list_page(1, None), "resourceConflict");
 }
@@ -210,7 +225,7 @@ fn changed_registry_or_lock_after_pager_overrides_success_and_cursor_error() {
             let root = Root::new();
             let store = root.store();
             store.list_page(1, None).unwrap();
-            let result = store.list_page_with_checkpoint(1, cursor, |phase| {
+            let result = list_page_with_checkpoint(&store, 1, cursor, |phase| {
                 if phase != "afterPager" {
                     return;
                 }

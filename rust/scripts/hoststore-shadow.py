@@ -156,7 +156,7 @@ INPUTS = [
     "rust/crates/arkdeck-hoststore/Cargo.toml",
     "rust/crates/arkdeck-hoststore/src/lib.rs",
     "rust/crates/arkdeck-hoststore/src/main.rs",
-    "rust/crates/arkdeck-hoststore/src/registry.rs",
+    "rust/crates/arkdeck-bootstrap/src/registry.rs",
     "rust/crates/arkdeck-hoststore/src/session.rs",
     "rust/crates/arkdeck-hoststore/src/trace.rs",
     "rust/crates/arkdeck-platform/src/host_store.rs",

@@ -148,7 +148,7 @@ struct Ledger<'a> {
 /// tool index read whole — it is published atomically — without the store's
 /// lock, without creating an absent index and without verifying any tool. An
 /// absent store or index holds no selection.
-pub(crate) fn cutover_pending_selection(path: &Path) -> Result<Option<String>, String> {
+pub fn cutover_pending_selection(path: &Path) -> Result<Option<String>, String> {
     let root = match arkdeck_platform::HostDirectory::open(path) {
         Ok(root) => root,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),

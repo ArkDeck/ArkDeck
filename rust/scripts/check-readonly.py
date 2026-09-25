@@ -57,14 +57,22 @@ def assert_boundaries() -> None:
         "arkdeck-contract": set(),
         "arkdeck-platform": set(),
         "arkdeck-control": {"arkdeck-contract"},
+        # The current-user Bootstrap registry's bundle and HDC tool owners
+        # (indexes, content checks, the HDC selection ledger): one
+        # implementation and one lock for every writer of that store, the
+        # Runtime and the CLI's zero-Runtime service install alike
+        # (协调会话 2026-09-26). It holds no Runtime authority store.
+        "arkdeck-bootstrap": {"arkdeck-contract", "arkdeck-platform"},
         # The Job engine lowers device steps through the HDC provider's typed
         # actions and signs workspace HAPs through the workspace provider's
         # signer and credential owner (the design's crate graph:
         # RUNTIME --> PHDC & PWS).
         # The flash facts read the ArkForge lane's public socket through its
         # provider (the dual-source Loader observation).
+        # The Runtime composes its Bootstrap inventories and the DevEco
+        # registry over the shared Bootstrap owners.
         "arkdeck-hoststore": {
-            "arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc",
+            "arkdeck-bootstrap", "arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc",
             "arkdeck-provider-arkforge", "arkdeck-provider-workspace",
         },
         # Debug template lowering reads the closed template definitions from the

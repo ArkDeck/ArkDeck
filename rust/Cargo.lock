@@ -53,6 +53,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkdeck-bootstrap"
+version = "0.1.0"
+dependencies = [
+ "arkdeck-contract",
+ "arkdeck-platform",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "arkdeck-cli"
 version = "0.1.0"
 dependencies = [
@@ -95,6 +105,7 @@ name = "arkdeck-hoststore"
 version = "0.1.0"
 dependencies = [
  "aes-gcm",
+ "arkdeck-bootstrap",
  "arkdeck-contract",
  "arkdeck-platform",
  "arkdeck-provider-arkforge",
