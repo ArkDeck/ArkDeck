@@ -188,4 +188,9 @@ managed control and execution authority, which touch none of these files (`s37-r
 
 ## CI
 
-Pending; recorded by the next slice.
+#2254, head `4263b241c`, run 36211694831: every selected lane passed.
+- Rust workspace: macOS 10m43s, Ubuntu 2m17s, Windows 4m22s. Host-independent checks: 32s.
+- `guard` (run 36211694648); `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `20130b631`. Recorded by the next slice (TASK-XPA-019, the App ingress's door
+refusals), as AGENTS.md has it.
