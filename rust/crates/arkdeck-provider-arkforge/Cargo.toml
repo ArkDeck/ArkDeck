@@ -10,11 +10,12 @@ publish.workspace = true
 arkdeck-contract.workspace = true
 arkdeck-platform.workspace = true
 arkforge-client.workspace = true
+# The messages `arkforge-client`'s controller surface takes and returns.
+arkforge-ipc.workspace = true
 
 [dev-dependencies]
 arkforge-authority-api.workspace = true
 arkforge-core.workspace = true
-arkforge-ipc.workspace = true
 serde_json.workspace = true
 
 # The lane launches this test binary as its stand-in `arkforged`, which must

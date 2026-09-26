@@ -113,8 +113,9 @@ def assert_boundaries() -> None:
         "arkdeck-soak": {"arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
     }
     # ArkForge's crates come from its repository at one pinned revision; only
-    # the lane's provider depends on them, and only on the client.
-    arkforge = {"arkdeck-provider-arkforge": {"arkforge-client"}}
+    # the lane's provider depends on them: the client, and the messages its
+    # controller surface takes and returns.
+    arkforge = {"arkdeck-provider-arkforge": {"arkforge-client", "arkforge-ipc"}}
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
     for path in manifests:
