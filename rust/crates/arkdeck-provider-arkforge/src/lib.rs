@@ -22,6 +22,7 @@ pub mod authority;
 pub mod authority_support;
 mod device_access;
 mod flash_lane;
+pub mod flash_session;
 #[cfg(target_os = "macos")]
 mod lane;
 mod loader;
