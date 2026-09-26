@@ -2488,6 +2488,98 @@ fn the_cutover_takes_both_preflight_passes_and_records_the_old_state() {
 }
 
 #[test]
+fn a_failed_rust_bootstrap_can_explicitly_roll_back_without_rewriting_runtime_state() {
+    let home = Home::new();
+    home.install();
+    let swift = Helper::new(&home, "swift", &Daemon::Swift);
+    let launchd = Launchd::loaded();
+    assert_eq!(
+        update_leaf(&host(&home, &launchd), &update_options(&swift, &home)).failure,
+        None
+    );
+    let swift_bytes = fs::read(&home.paths.installed_daemon).unwrap();
+    let swift_plist = fs::read(&home.paths.plist).unwrap();
+    let swift_receipt = fs::read(&home.paths.receipt).unwrap();
+    // This opaque fixture must survive both the failed cutover and rollback.
+    // It represents retained state, not a usable capability or device record.
+    fs::write(
+        home.paths.state_directory.join("retained-fixture"),
+        b"unchanged",
+    )
+    .unwrap();
+    let state_before = tree(&home.paths.state_directory);
+    let rust = Helper::new(
+        &home,
+        "rust",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+            analyzer: Analyzer::Answers,
+        },
+    );
+    let rust_bytes = fs::read(rust.bundle.join("Contents/MacOS/arkdeck-agentd")).unwrap();
+    launchd.calls.lock().unwrap().clear();
+    *launchd.bootstrap.lock().unwrap() = VecDeque::from([1]);
+    let failed = update_leaf(&host(&home, &launchd), &update_options(&rust, &home));
+    let failure = failed.failure.unwrap();
+    assert_eq!(failure.exit_code, 1);
+    assert!(
+        failure.message.contains("bootstrap exited 1"),
+        "{failure:?}"
+    );
+    assert!(!launchd.loaded.load(Ordering::SeqCst));
+    assert_eq!(fs::read(&home.paths.installed_daemon).unwrap(), rust_bytes);
+    assert_eq!(
+        fs::read(
+            home.paths
+                .rollback_bundle
+                .join("Contents/MacOS/arkdeck-agentd")
+        )
+        .unwrap(),
+        swift_bytes
+    );
+    assert_eq!(tree(&home.paths.state_directory), state_before);
+    let snapshots = tree(&home.paths.cutover_snapshots);
+    assert!(!snapshots.is_empty());
+    // Exercise the documented explicit rollback using the retained bundle
+    // itself: replacement must stage it before rotating the rollback slot.
+    let rollback = Map::from_iter([
+        (
+            "daemon".to_owned(),
+            json!(text(&home.paths.rollback_bundle)),
+        ),
+        ("hdc".to_owned(), json!(text(&home.hdc()))),
+    ]);
+    launchd.calls.lock().unwrap().clear();
+    let answer = update_leaf(&host(&home, &launchd), &rollback);
+    assert_eq!(answer.failure, None);
+    assert!(launchd.loaded.load(Ordering::SeqCst));
+    assert_eq!(fs::read(&home.paths.installed_daemon).unwrap(), swift_bytes);
+    assert_eq!(fs::read(&home.paths.plist).unwrap(), swift_plist);
+    assert_eq!(fs::read(&home.paths.receipt).unwrap(), swift_receipt);
+    assert_eq!(tree(&home.paths.state_directory), state_before);
+    assert_eq!(tree(&home.paths.cutover_snapshots), snapshots);
+    assert_eq!(
+        fs::read(
+            home.paths
+                .rollback_bundle
+                .join("Contents/MacOS/arkdeck-agentd")
+        )
+        .unwrap(),
+        rust_bytes
+    );
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootstrap {} {}", domain(), text(&home.paths.plist)),
+        ]
+    );
+}
+
+#[test]
 fn a_cutover_the_first_pass_refuses_changes_nothing() {
     let home = Home::new();
     home.install();

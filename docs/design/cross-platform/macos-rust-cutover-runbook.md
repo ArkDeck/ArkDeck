@@ -514,7 +514,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 17. 第 5 步 GJ-5：Rust CLI 没有装签名预设的叶子（S-1 前），预设由谁、用哪个 CLI 建立；若沿用切换前由 Swift 建的预设，
     又与 P6 的切换拒绝冲突。
 18. 第 2 步在快照之后失败的中间态：已只读核实（`evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 18 条）：快照写完之后确无自动恢复；本文给的处理（按 §4 第 3 行
-    回到 `$ROLLBACK`）与源码一致，但没有测试覆盖从半途的安装态回退。待定：维护者是否认可这条回退路径。
+    回到 `$ROLLBACK`）与源码一致。现有临时 home / 记录型 launchctl 测试覆盖了快照、helper、plist 与收据已写入但 bootstrap 失败后的显式回滚，验证 Swift bundle、plist、收据恢复且 Runtime 状态与快照不变（`evidence/runs/TASK-XPA-017/cutover-rollback-bootstrap-run.md`）；真实安装态、签名与设备连续性仍未验收。待定：维护者是否认可并执行真实回退路径。
 19. 1a 手工预检：已只读核实（同上，第 19 条）：无锁那遍不取锁、不建目录或锁文件、不写任何 owner 数据；**会在 Job 索引旁
     创建或触碰 `-wal`/`-shm`，不改数据库内容**（有 `-shm` 时在其中记读标记；没有时新建空 `-wal` 与新 `-shm`）。待定：
     维护者是否接受这一点、是否认可在真实账户上这样跑；若要真正零写入（immutable 打开或先复制再读），是另一刀的设计取舍。
