@@ -1185,6 +1185,8 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 
+- 2026-09-26: `runtime signing remove` and its legacy spelling use the credential owner's durable removal transaction, refuse pinned credentials and retain user source files. See `evidence/runs/TASK-XPA-018/signing-remove-run.md`; installation/migration and update-time credential refresh remain unported.
+
 - Status:in-progress（2026-09-11: the continuous Rust CLI foundation serves operation describe/example and consumes current Job queries with bounded deadlines; full leaf parity, export, Swift retirement and GJ acceptance remain pending）
 - Platform:macos（r8: the Rust CLI becomes the only CLI on Windows when that side starts）
 - Requirements:CLI-REQ-001..025, `docs/design/arkdeck-cli-product-spec.md` §14/§15/§18

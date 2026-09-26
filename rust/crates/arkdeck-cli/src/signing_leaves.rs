@@ -10,7 +10,10 @@ use serde_json::{Value, json};
 
 /// Whether `command` is a signing leaf this CLI serves.
 pub fn serves(command: &str) -> bool {
-    matches!(command, "runtime.signing.status" | "signing.status")
+    matches!(
+        command,
+        "runtime.signing.status" | "signing.status" | "runtime.signing.remove" | "signing.remove"
+    )
 }
 
 /// Swift `OpenHarmonySigningCredentialResource.projection`.
@@ -103,4 +106,56 @@ pub fn status() -> Option<Value> {
         Ok(secrets) => status_document(&root, &secrets),
         Err(_) => status_document(&root, &Unanswerable),
     })
+}
+
+/// Swift `runSigning`'s removal projection over the same credential owner
+/// used by workspace preset registration. Tests inject a remover that never
+/// reaches a Keychain; production supplies the fixed ArkDeck service scope.
+#[cfg(target_os = "macos")]
+pub fn remove_document(
+    root: &std::path::Path,
+    secrets: &dyn arkdeck_provider_workspace::signing_removal::SigningSecretRemoval,
+) -> Result<Value, arkdeck_provider_workspace::SigningError> {
+    use arkdeck_provider_workspace::credential_owner::CredentialOwner;
+    use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
+    let removed = CredentialOwner::new(SigningPresetStore::new(root)).remove(secrets)?;
+    Ok(
+        json!({"schemaVersion": "arkdeck.signing-credential-removal/1", "state": "removed",
+        "removedReceipt": removed.removed_receipt,
+        "removedKeystorePassword": removed.removed_keystore_password,
+        "removedKeyPassword": removed.removed_key_password,
+        "removedManagedMaterial": removed.removed_managed_material,
+        "preservedSourceCount": removed.preserved_source_count}),
+    )
+}
+
+#[cfg(target_os = "macos")]
+pub fn run(command: &str) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
+    use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
+    let no_home = || {
+        crate::CliError::new(
+            "ioFailure",
+            "this account has no Application Support directory for the signing preset",
+        )
+    };
+    if matches!(command, "runtime.signing.status" | "signing.status") {
+        return status().ok_or_else(no_home);
+    }
+    if !matches!(command, "runtime.signing.remove" | "signing.remove") {
+        return Err(crate::CliError::new(
+            "invalidCommand",
+            "unsupported signing subcommand",
+        ));
+    }
+    let root = SigningPresetStore::default_root().ok_or_else(no_home)?;
+    let daemon = KeychainSigningSecrets::default_daemon_executable().ok_or_else(no_home)?;
+    KeychainSigningSecrets::installed(daemon)
+        .and_then(|secrets| remove_document(&root, &secrets))
+        .map_err(|error| crate::CliError {
+            // Swift's generic catch for SigningError: stderr, exit 1, even
+            // when the requested success rendering was JSON.
+            plain_exit: Some(1),
+            ..crate::CliError::new("ioFailure", error.to_string())
+        })
 }

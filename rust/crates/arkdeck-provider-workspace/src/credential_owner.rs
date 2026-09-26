@@ -11,9 +11,8 @@
 //! measures as recorded. A ledger that does not match the installed receipt
 //! is refused, never repaired from a guess.
 //!
-//! Only the Runtime's side is here — resolution and the pins a preset's
-//! registration takes and releases. Replacing and removing the credential
-//! stay with the maintenance CLI.
+//! The Runtime resolves and pins credentials here. Explicit CLI removal also
+//! holds this owner lock and refuses credentials with active preset owners.
 use crate::SigningError;
 use crate::signing_preset::{
     DEFAULT_PRESET_ID, SigningPresetReceipt, SigningPresetStore, SigningSecrets,
@@ -290,6 +289,53 @@ impl CredentialOwner {
                 .retain(|owner| registered.contains(owner));
             self.save(held, &ledger)?;
             Ok(orphaned)
+        })
+    }
+
+    /// Swift `remove`: an explicit uninstall may clear a broken receipt,
+    /// but must never remove a credential pinned by a workspace preset.
+    pub fn remove(
+        &self,
+        secrets: &dyn crate::signing_removal::SigningSecretRemoval,
+    ) -> Result<crate::signing_removal::SigningPresetRemoval, SigningError> {
+        self.with_lock(|held| {
+            // Intentionally do not validate/adopt the receipt: uninstall is
+            // also the exit from an unreadable or interrupted installation.
+            let mut ledger = self.read_ledger(held, false)?;
+            let mut sorted = ledger.preset_owners.clone();
+            sorted.sort();
+            sorted.dedup();
+            if ledger.schema_version != LEDGER_SCHEMA
+                || !["stable", "replacing", "removing"].contains(&ledger.state.as_str())
+                || ledger.preset_owners.len() > MAX_OWNERS
+                || ledger.preset_owners != sorted
+                || !ledger
+                    .preset_owners
+                    .iter()
+                    .all(|owner| valid_identifier(owner))
+            {
+                return Err(SigningError::receipt(
+                    "signing credential mutation record is invalid",
+                ));
+            }
+            if !ledger.preset_owners.is_empty() {
+                return Err(SigningError::invalid(
+                    "signing credential is referenced by an active workspace preset",
+                ));
+            }
+            ledger.state = "removing".into();
+            self.save(held, &ledger)?;
+            let result =
+                crate::signing_removal::remove_preset(&self.store, secrets).and_then(|removal| {
+                    self.save(held, &Ledger::stable(None, Vec::new()))?;
+                    Ok(removal)
+                });
+            if result.is_err() {
+                // Settle only the receipt that actually remains. A receipt
+                // that cannot be validated leaves `removing` durable.
+                let _ = self.recover_mutation(held, &ledger);
+            }
+            result
         })
     }
 

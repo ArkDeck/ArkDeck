@@ -874,6 +874,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         // reporting the name the caller typed (Swift `runAgentDaemon`).
         ["runtime", "signing", "status"] => "runtime.signing.status",
         ["signing", "status"] => "signing.status",
+        ["runtime", "signing", "remove"] => "runtime.signing.remove",
+        ["signing", "remove"] => "signing.remove",
         ["agentd", "install"] => "agentd.install",
         ["agentd", "update"] => "agentd.update",
         ["agentd", "restart"] => "agentd.restart",

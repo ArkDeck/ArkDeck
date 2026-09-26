@@ -966,7 +966,7 @@ fn write_document(value: &Value) -> io::Result<()> {
 /// document when there is one, then a plain failure's diagnostic on stderr
 /// and its exit status — never a failure envelope, so a refusal leaves stdout
 /// empty.
-/// `runtime signing status` and its deprecated `signing status` spelling:
+/// `runtime signing status|remove` and their deprecated `signing` spellings:
 /// Swift `runSigning`, which answers through its session as the runtime
 /// service leaves do.
 fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
@@ -977,12 +977,7 @@ fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
         eprintln!("{warning}");
     }
     #[cfg(target_os = "macos")]
-    let answer = arkdeck_cli::signing_leaves::status().ok_or_else(|| {
-        CliError::new(
-            "ioFailure",
-            "this account has no Application Support directory for the signing preset",
-        )
-    });
+    let answer = arkdeck_cli::signing_leaves::run(invocation.command);
     #[cfg(not(target_os = "macos"))]
     let answer: Result<Value, CliError> = Err(CliError::new(
         "unsupportedOnPlatform",
@@ -1001,6 +996,15 @@ fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
             "{}",
             serde_json::to_string_pretty(document).expect("a JSON document")
         ),
+        Err(error) if error.plain_exit.is_some() => {
+            let group = if invocation.command.starts_with("runtime.") {
+                "runtime"
+            } else {
+                "signing"
+            };
+            eprintln!("arkdeck {group}: {}", error.message);
+            Ok(())
+        }
         Err(error) if invocation.json => write_document(&arkdeck_cli::with_lifecycle(
             failure_envelope(invocation.command, error, id, true),
             invocation.command,
