@@ -330,6 +330,68 @@ final class DurableImportContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  /// `TASK-XPA-017`: `artifact.import.inspection` and `artifact.import.release`
+  /// refused by the Import owner, as Swift's daemon answers each refusal
+  /// through its handler: the owner's code and message and its `importOwner`
+  /// zero-dispatch evidence. Run with `ARKDECK_CONTROL_FRAME_LOG`, these are
+  /// the frames the two methods' contracts publish `resourceNotFound` and
+  /// `inputTooLarge` from, so a Runtime held to those contracts answers them
+  /// instead of rewriting them.
+  func testInspectionAndReleaseRefusalsCarryTheImportOwnersCodeMessageAndEvidence() async throws {
+    try startServer()
+    let configured = try XCTUnwrap(handler)
+    func refused(
+      _ method: String, _ params: [String: JSONValue], code: String, message: String,
+      file: StaticString = #filePath, line: UInt = #line
+    ) async throws {
+      let request = try ArkDeckAgentXPC.requestFrame(
+        method: method, params: params, requestID: "import-read-refusal")
+      let response = try JSONDecoder().decode(
+        AgentWireProtocol.Response.self, from: await configured.handleLine(request))
+      XCTAssertFalse(response.ok, file: file, line: line)
+      XCTAssertNil(response.result, file: file, line: line)
+      XCTAssertEqual(
+        response.error,
+        AgentWireProtocol.WireError(
+          code: code, message: message,
+          details: ["phase": .string("importOwner"), "newDispatchCount": .integer(0)]),
+        file: file, line: line)
+    }
+
+    // An Import this Runtime never began, by either selector, and its release.
+    let missing = "imp-00000000-0000-0000-0000-000000000001"
+    try await refused(
+      "artifact.import.inspection", ["importId": .string(missing)],
+      code: "resourceNotFound", message: "Import does not exist")
+    try await refused(
+      "artifact.import.inspection", ["importRequestId": .string("never-began")],
+      code: "resourceNotFound", message: "Import does not exist")
+    try await refused(
+      "artifact.import.release", ["importId": .string(missing), "generation": .string("2")],
+      code: "resourceNotFound", message: "Import does not exist")
+
+    // A committed HAP more active Jobs reference than the inspection reports.
+    let imported = try await commit(append(begin(), data: hap))
+    let lease = try XCTUnwrap(object(XCTUnwrap(object(imported.value)["receipt"]))["lease"])
+    var accepted = Set<String>()
+    for index in 0...1000 {
+      let request = try RuntimeOperationRequest(
+        requestID: "referencing-\(index)", idempotencyKey: "referencing-\(index)",
+        target: .init(targetID: target.targetID, expectedBindingRevision: 1),
+        operation: .init(id: "debug.hap", version: 1),
+        inputs: [
+          "hapArtifactLease": lease, "bundleName": .string("com.example.fixture"),
+          "abilityName": .string("EntryAbility"),
+        ])
+      accepted.insert(try await engine.submit(RuntimeOperationCodec.encodeRequest(request)).jobID)
+    }
+    XCTAssertEqual(accepted.count, 1001)
+    try await refused(
+      "artifact.import.inspection", ["importId": .string(imported.id)],
+      code: "inputTooLarge", message: "Import reference inspection exceeds its Job bound")
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testAppAndCLIUseTheSameTypedImportWithoutSharingUploadOwnership() async throws {
     try startServer()
     let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())

@@ -816,6 +816,58 @@ fn commit_refusals_reach_the_local_client_and_the_app_as_swifts_daemon_answers_t
     }
 }
 
+/// The inspection and release of an Import the production Host's owner never
+/// began reach the local client as Swift's daemon answers them
+/// (`DurableImportContractTests
+/// .testInspectionAndReleaseRefusalsCarryTheImportOwnersCodeMessageAndEvidence`),
+/// wherever this build's schema publishes `resourceNotFound`; in
+/// check-contracts' published view, whose schemas predate it, the control
+/// layer still rewrites it as `internalError` (TASK-XPA-017). The App's
+/// transport admits neither method. (The inspection past its Job bound is the
+/// owner's own test and the control layer's.)
+#[test]
+fn inspection_and_release_refusals_reach_the_local_client_as_swifts_daemon_answers_them() {
+    let root = uploads();
+    let (control, _) = compose(&root, None);
+    let missing = "imp-00000000-0000-0000-0000-000000000001";
+    for (method, params) in [
+        ("artifact.import.inspection", json!({ "importId": missing })),
+        (
+            "artifact.import.inspection",
+            json!({"importRequestId":"never-began"}),
+        ),
+        (
+            "artifact.import.release",
+            json!({"importId":missing,"generation":"2"}),
+        ),
+    ] {
+        let error = refusal(
+            &control.handle_frame(&frame(method, params.clone())),
+            method,
+        );
+        if validate_method_value(method, "errorCode", &json!("resourceNotFound")).is_ok() {
+            assert_eq!(
+                error,
+                swift_refusal(method, "resourceNotFound", "Import does not exist"),
+                "{method} {params}"
+            );
+        } else {
+            assert!(
+                published_view(),
+                "only the merge base's schema predates {method}'s resourceNotFound"
+            );
+            assert_eq!(
+                (error.code.as_str(), error.message.as_str()),
+                (
+                    "internalError",
+                    "the result does not conform to the current contract"
+                ),
+                "{method} {params}"
+            );
+        }
+    }
+}
+
 #[test]
 fn malformed_uploads_other_kinds_and_foreign_peers_never_enter_the_owner() {
     let root = uploads();

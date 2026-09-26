@@ -874,3 +874,109 @@ fn release_uses_original_generation_and_refuses_foreign_or_unbounded_receipts() 
         );
     }
 }
+
+#[cfg(target_os = "macos")]
+mod support;
+
+/// Swift's daemon refuses the inspection and the release of an Import it never
+/// began, and the inspection of one more active Jobs reference than its bound,
+/// with the Import owner's code, words and zero-dispatch evidence
+/// (`DurableImportContractTests
+/// .testInspectionAndReleaseRefusalsCarryTheImportOwnersCodeMessageAndEvidence`,
+/// TASK-XPA-017). Wherever this build's schema publishes the code, this CLI
+/// reads the refusal and answers the Import owner's code (§8.4). check-contracts'
+/// published view compiles the merge base's schemas, which predate the codes.
+#[cfg(target_os = "macos")]
+#[test]
+fn inspection_and_release_refusals_reach_the_caller_with_the_import_owners_code() {
+    let missing = "imp-00000000-0000-0000-0000-000000000001";
+    let referenced = "imp-c7737f12-9678-47a8-aca9-a39a12d80a0b";
+    for (argv, method, params, code, message) in [
+        (
+            vec!["artifact", "import", "inspect", "--import", missing],
+            "artifact.import.inspection",
+            json!({ "importId": missing }),
+            "resourceNotFound",
+            "Import does not exist",
+        ),
+        (
+            vec![
+                "artifact",
+                "import",
+                "inspect",
+                "--import-request-id",
+                "never-began",
+            ],
+            "artifact.import.inspection",
+            json!({"importRequestId":"never-began"}),
+            "resourceNotFound",
+            "Import does not exist",
+        ),
+        (
+            vec![
+                "artifact",
+                "import",
+                "release",
+                "--import",
+                missing,
+                "--generation",
+                "2",
+            ],
+            "artifact.import.release",
+            json!({"importId":missing,"generation":"2"}),
+            "resourceNotFound",
+            "Import does not exist",
+        ),
+        (
+            vec!["artifact", "import", "inspect", "--import", referenced],
+            "artifact.import.inspection",
+            json!({ "importId": referenced }),
+            "inputTooLarge",
+            "Import reference inspection exceeds its Job bound",
+        ),
+    ] {
+        let error = json!({"code":code,"message":message,
+            "details":{"newDispatchCount":0,"phase":"importOwner"}});
+        if arkdeck_contract::validate_method_value(method, "errorCode", &json!(code)).is_err() {
+            let inputs: Value = serde_json::from_str(arkdeck_contract::CONTRACT_INPUTS).unwrap();
+            assert!(
+                inputs["kind"] == "development" && inputs.get("commit").is_some(),
+                "only the merge base's schema predates {method}'s {code}"
+            );
+            continue;
+        }
+        // The refusal is the frame Swift's daemon answered, as its corpus holds it.
+        let corpus = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+                "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+            )),
+        )
+        .unwrap();
+        assert!(
+            corpus
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                .any(|row| row["params"] == params && row["error"] == error),
+            "{method} {params}"
+        );
+        let (output, envelope) = support::run(
+            &argv,
+            vec![(
+                method.into(),
+                params.clone(),
+                json!({"ok":false,"error":error}),
+            )],
+        );
+        assert_eq!(
+            output.status.code(),
+            Some(i32::from(CliError::new(code, message).exit_code())),
+            "{method} {params}"
+        );
+        assert_eq!(envelope["ok"], false, "{method} {params}");
+        assert_eq!(
+            (&envelope["error"]["code"], &envelope["error"]["message"]),
+            (&json!(code), &json!(message)),
+            "{method} {params}"
+        );
+    }
+}

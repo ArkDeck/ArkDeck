@@ -8,6 +8,16 @@ use crate::job_owner::import_references::ImportReference;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_USE: AtomicU64 = AtomicU64::new(1);
+/// Swift `RuntimeImportControlHandler.response` answers every refusal of an
+/// Import request with the owner's zero-dispatch evidence, those of the Job
+/// reference scan (`activeImportReferenceJobs`) too; the scan's own refusals
+/// carry none.
+fn with_owner_evidence(mut error: WireError) -> WireError {
+    if error.details.is_none() {
+        error.details = failure(&error.code, &error.message).details;
+    }
+    error
+}
 fn released() -> WireError {
     failure(
         "invalidInput",
@@ -212,7 +222,7 @@ impl ImportUploadStore {
                     "outcomeUnknownJobIds":active.iter().filter(|(_,unknown)|*unknown).map(|(id,_)|id).collect::<Vec<_>>(),
                     "activeMaterializationCount":holds.to_string()}});
                 arkdeck_contract::validate_import_inspection(&value).map_err(unreadable)?; Ok(value)
-            });
+            }).map_err(with_owner_evidence);
         }
         if record.state == "released" && generation == 2 {
             return record.release_receipt.ok_or_else(invalid);
@@ -259,5 +269,6 @@ impl ImportUploadStore {
             self.finish_release(artifacts,&record)?;
             Ok(release)
         })
+        .map_err(with_owner_evidence)
     }
 }

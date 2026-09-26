@@ -185,5 +185,13 @@ App ingress".
 | Rust | `cargo test --manifest-path rust/Cargo.toml -p arkdeck-agentd -p arkdeck-cli -p arkdeck-control` | exit 0; 625 passed, 0 failed |
 | Records | `sh scripts/check-sdd.sh` (validation venv) | exit 0; 0 errors, 0 warnings |
 
-**CI.** This pull request's lanes; the result is recorded outside this
-commit.
+**CI.** PR #2249, head `c955eb181`, recorded by the next change
+(`TASK-XPA-017/import-inspection-release-owner-codes-run.md`):
+
+- Swift CI run 36208722233: pass. It covered `plan`, `swift-tests`, the
+  `swift` aggregate, `ds-interactions`, the Rust host-independent checks and
+  the Rust workspace on `macos-26`, `ubuntu-latest` and `windows-latest`.
+  `app-build` was skipped by the plan.
+- SDD Guard run 36208722109: `guard` and `ds-tokens` pass.
+
+Merged as `8bddca654`.
