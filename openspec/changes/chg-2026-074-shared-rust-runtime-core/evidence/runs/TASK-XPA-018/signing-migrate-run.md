@@ -55,11 +55,51 @@ this record does not approve a cutover or certify device/Keychain acceptance.
 
 ## Local targeted checks
 
-In progress: final corrected-source checks and Swift compatibility regression.
-The earlier migration-only baseline is not evidence for the publication fix.
-Log paths and exact exits will be recorded after completion. All successful
-maintenance tests use temporary files and fake secret storage. No installed
-Runtime, live credential, launchd service or device has changed.
+Corrected code head: `87f2b6d9480a3ca543316a8938fca7a5d2bc0c7e`.
+`CARGO_TARGET_DIR=/private/tmp/arkdeck-takeover-d79c-target`,
+`CARGO_BUILD_JOBS=2` for every Rust command below.
+
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-provider-workspace`:
+  exit 0, 43 pass. Log:
+  `/private/tmp/arkdeck-signing-migrate-fixed-provider-unsandboxed.log`.
+  The initial sandbox attempt exited 101 at the existing fake HAP signer's
+  disposable file-Keychain creation (`SecKeychainCreate`), after the new unit
+  tests passed. That log is `/private/tmp/arkdeck-signing-migrate-fixed-provider.log`.
+  A controlled rerun passed; the failure was not repaired by changing tests.
+  Contrary to the escalation's initial shorthand about compiler-cache access,
+  the actual observed refusal was file-Keychain creation. These fixtures never
+  write login/Data Protection items or change the user's search list.
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-cli --test argv_fixtures
+  --test signing_install --test signing_remove --test signing_refresh
+  --test signing_status`: exit 0, 27 pass, including the 12 new Swift migration
+  refusal recordings. Log: `/private/tmp/arkdeck-signing-migrate-fixed-cli.log`.
+- `cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-provider-workspace
+  -p arkdeck-hoststore -p arkdeck-cli --all-targets -- -D warnings`: exit 0.
+  Log: `/private/tmp/arkdeck-signing-migrate-fixed-clippy.log`.
+- `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter
+  OpenHarmonyLocalSigningContractTests/testRustSecretTransactionStatesCannotBeRecoveredBySwift`:
+  exit 0, one actual XCTest pass, 0 failures. This uses Swift's existing owner
+  implementation and injected secret fixture; both guarded states refuse
+  current/resolve/restarted-owner/replacement and preserve ledger bytes.
+  Log: `/private/tmp/arkdeck-signing-migrate-swift-compat.log`.
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`, `git diff --check`,
+  `sh scripts/check-sdd.sh`: exit 0; SDD 121 acceptance IDs. Log:
+  `/private/tmp/arkdeck-signing-migrate-sdd.log`.
+- `python3 rust/scripts/generate-contract.py --check`: exit 0; 105 methods,
+  1,043 shapes. Log: `/private/tmp/arkdeck-signing-migrate-contract.log`.
+- Earlier migration-only three-crate baseline: exit 0, 1,184 pass / 18 ignored,
+  `/private/tmp/arkdeck-signing-migrate-all-tests.log`. It predates the publication
+  and concurrency corrections and is not evidence for those corrections.
+  The corrected source's full hoststore/CLI suites were not rerun in this
+  short coordinated window; their changed behavior is covered by provider and
+  CLI signing tests, with all three crates' targets compiled by Clippy.
+
+Two independent static reviews found the publication and concurrent-input P2s;
+review of the corrected code head found neither remaining and no new blocker.
+No full local unified gate, App build, performance capture or actual installed
+Keychain/Runtime/device acceptance ran. Successful maintenance tests use fake
+secret storage; the pre-existing signer tests use disposable file Keychains.
+This is not `REAL_DEVICE_PASS`, GJ-5 or TASK-XPA-017 completion.
 
 ## CI
 
