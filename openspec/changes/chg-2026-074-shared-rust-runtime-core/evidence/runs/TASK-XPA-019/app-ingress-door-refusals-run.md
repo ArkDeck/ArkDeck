@@ -192,4 +192,10 @@ On `20130b631`, 10:49–11:06, before the hub's 12:20–13:10 quiet window. Rust
 
 ## CI
 
-Pending; recorded by the next slice.
+#2259, head `58b877055`, run 36213881779: every selected lane passed.
+- Rust workspace: macOS 12m16s, Ubuntu 1m46s, Windows 3m53s. Host-independent checks: 41s.
+- `swift-tests`: 7m45s. `ds-interactions` passed.
+- `guard` (run 36213881531); `swift` aggregate. `app-build` was not selected.
+
+It merged as `784641012`. Recorded by the next slice (TASK-XPA-017, the cutover runbook's appendix B
+verification), as AGENTS.md has it.
