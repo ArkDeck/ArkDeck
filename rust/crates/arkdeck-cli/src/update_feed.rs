@@ -66,7 +66,7 @@ pub fn options(argv: &[String]) -> BTreeMap<String, String> {
 
 /// Swift `URL(filePath:).standardizedFileURL.path`: a relative path against
 /// the working directory, then standardized.
-fn standardized_file(path: &str) -> String {
+pub(crate) fn standardized_file(path: &str) -> String {
     let absolute = if path.starts_with('/') {
         path.to_owned()
     } else {

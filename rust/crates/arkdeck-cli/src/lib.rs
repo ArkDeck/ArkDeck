@@ -21,6 +21,7 @@ pub mod domain_leaves;
 pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
+pub mod runtime_update;
 pub mod support_bundle;
 mod trace_inspect;
 pub mod ui_dump;
@@ -398,6 +399,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         return answer;
     }
     if let Some(answer) = blocked_leaves::answer(argv) {
+        return answer;
+    }
+    if let Some(answer) = runtime_update::answer(argv) {
         return answer;
     }
     if let Some(answer) = update_feed::answer(argv) {

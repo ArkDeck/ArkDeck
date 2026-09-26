@@ -19,9 +19,6 @@ const BLOCKED: &[(&str, &str)] = &[
     ("runtime.update.check", "the macOS update subsystem"),
     ("runtime.update.download", "the macOS update subsystem"),
     ("runtime.update.handoff", "the macOS update subsystem"),
-    ("runtime.update.status", "the macOS update subsystem"),
-    ("runtime.update.cancel", "the macOS update subsystem"),
-    ("runtime.update.cleanup", "the macOS update subsystem"),
 ];
 
 /// Whether `command` is answered by name as not yet provided.

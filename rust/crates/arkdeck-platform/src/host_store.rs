@@ -20,6 +20,8 @@ pub use journal::{HostJournal, HostJournalAppender, JournalAppendError, JournalW
 mod session_publication;
 #[path = "host_session_removal.rs"]
 mod session_removal;
+#[path = "host_update_store.rs"]
+mod update_store;
 pub use session_removal::PreparedSessionRemoval;
 #[path = "host_trace_removal.rs"]
 mod trace_removal;

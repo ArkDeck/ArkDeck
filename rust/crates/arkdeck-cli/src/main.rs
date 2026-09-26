@@ -1446,6 +1446,44 @@ fn serve_blocked_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCo
     error.exit_code().into()
 }
 
+fn serve_runtime_update(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    let answer = arkdeck_cli::runtime_update::run(invocation);
+    let written = match &answer {
+        Ok(result) if invocation.json => {
+            io::stdout()
+                .lock()
+                .write_all(&arkdeck_cli::runtime_update::render_document(
+                    &success_envelope(invocation.command, result.clone(), id),
+                ))
+        }
+        Ok(result) if invocation.legacy_json => io::stdout()
+            .lock()
+            .write_all(&arkdeck_cli::legacy_document(result)),
+        Ok(result) => writeln!(
+            io::stdout().lock(),
+            "{}",
+            arkdeck_cli::human_rendering(result)
+        ),
+        Err(error) if invocation.json => {
+            write_document(&failure_envelope(invocation.command, error, id, true))
+        }
+        Err(error) if invocation.legacy_json => io::stdout().lock().write_all(
+            &arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(error)),
+        ),
+        Err(error) => {
+            eprintln!("arkdeck: {}", error.message);
+            Ok(())
+        }
+    };
+    if written.is_err() {
+        return 74.into();
+    }
+    match answer {
+        Ok(_) => 0.into(),
+        Err(error) => error.exit_code().into(),
+    }
+}
+
 /// `runtime support-bundle preview|export`: the preview or the export
 /// receipt, or the refusal, in the caller's rendering. Nothing reaches a
 /// Runtime.
@@ -1548,8 +1586,21 @@ fn main() -> std::process::ExitCode {
     let invocation = match parse(&args) {
         Ok(invocation) => invocation,
         Err(error) => {
-            if machine {
+            // Swift stamps the updater's unsupported JSONL selector before
+            // constructing a runtime session: one JSON refusal, with a fresh
+            // parse correlation, even though this leaf never emits JSONL.
+            let update_jsonl_refusal = output_values == ["jsonl"]
+                && error
+                    .command
+                    .is_some_and(arkdeck_cli::runtime_update::serves)
+                && error.details.get("value").and_then(Value::as_str) == Some("jsonl");
+            if machine || update_jsonl_refusal {
                 let command = error.command.unwrap_or("registry.parse");
+                let parse_id = if update_jsonl_refusal {
+                    &fallback_id
+                } else {
+                    parse_id
+                };
                 if write_document(&arkdeck_cli::with_lifecycle(
                     failure_envelope(command, &error, parse_id, false),
                     command,
@@ -1654,6 +1705,9 @@ fn main() -> std::process::ExitCode {
     }
     if arkdeck_cli::blocked_leaves::blocks(invocation.command) {
         return serve_blocked_leaf(&invocation, id);
+    }
+    if arkdeck_cli::runtime_update::serves(invocation.command) {
+        return serve_runtime_update(&invocation, id);
     }
     if invocation.command.starts_with("runtime.support-bundle.") {
         return serve_support_bundle(&invocation, id);

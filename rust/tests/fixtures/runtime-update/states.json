@@ -1,0 +1,319 @@
+{
+  "cases" : [
+    {
+      "name" : "idle",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : true,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "idle",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImlkbGUiOnt9fSwidXBkYXRlZEF0VVRDIjoiMjAyNi0wOS0yNlQwMDowMDowMFoifQ=="
+    },
+    {
+      "name" : "checking",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : true,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : true,
+        "noUpdateReason" : null,
+        "phase" : "checking",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJhY3RpdmVPcGVyYXRpb25JRCI6IkFCQ0RFRjAxLTIzNDUtNjc4OS1BQkNELUVGMDEyMzQ1Njc4OSIsImNhbmNlbGxhdGlvblJlcXVlc3RlZCI6dHJ1ZSwiZ2VuZXJhdGlvbiI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInNjaGVtYVZlcnNpb24iOiJhcmtkZWNrLnJ1bnRpbWUtdXBkYXRlLXN0YXRlLzEiLCJzdGF0ZSI6eyJjaGVja2luZyI6e319LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9"
+    },
+    {
+      "name" : "available",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : true,
+        "canDownload" : true,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "available",
+        "releaseNotesSummary" : "测试 release",
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : "1.2.3",
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImF2YWlsYWJsZSI6eyJfMCI6eyJjYW5vbmljYWxQYXlsb2FkIjoiZXlKaGNtTm9hWFJsWTNSMWNtVnpJanBiSW1GeWJUWTBJbDBzSW1GeWRHbG1ZV04wSWpwN0ltSjVkR1ZNWlc1bmRHZ2lPakV3TWpRc0luTm9ZVEkxTmlJNkltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSWlMQ0oxY213aU9pSm9kSFJ3Y3pvdkwyZHBkR2gxWWk1amIyMHZRWEpyUkdWamF5OUJjbXRFWldOckwyRXVaRzFuSW4wc0ltVjRjR2x5WlhOQmRDSTZJakl3TWpZdE1Ea3RNamRVTURBNk1EQTZNREJhSWl3aWFYTnpkV1ZrUVhRaU9pSXlNREkyTFRBNUxUSTJWREF3T2pBd09qQXdXaUlzSW0xcGJtbHRkVzFUZVhOMFpXMVdaWEp6YVc5dUlqb2lNVFF1TUNJc0luSmxiR1ZoYzJWT2IzUmxjMU4xYlcxaGNua2lPaUxtdFl2b3I1VWdjbVZzWldGelpTSXNJbk5sY1hWbGJtTmxJam94T0RRME5qYzBOREEzTXpjd09UVTFNVFl4TlN3aWRtVnljMmx2YmlJNklqRXVNaTR6SW4wPSIsInBheWxvYWQiOnsiYXJjaGl0ZWN0dXJlcyI6WyJhcm02NCJdLCJhcnRpZmFjdCI6eyJieXRlTGVuZ3RoIjoxMDI0LCJzaGEyNTYiOiJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiIiwidXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL0Fya0RlY2svQXJrRGVjay9hLmRtZyJ9LCJleHBpcmVzQXQiOiIyMDI2LTA5LTI3VDAwOjAwOjAwWiIsImlzc3VlZEF0IjoiMjAyNi0wOS0yNlQwMDowMDowMFoiLCJtaW5pbXVtU3lzdGVtVmVyc2lvbiI6IjE0LjAiLCJyZWxlYXNlTm90ZXNTdW1tYXJ5Ijoi5rWL6K+VIHJlbGVhc2UiLCJzZXF1ZW5jZSI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInZlcnNpb24iOiIxLjIuMyJ9LCJwYXlsb2FkU0hBMjU2IjoiNTEwMzY5NjkxMGIzNmUyNThkMDE5YmQxOTljNzg3MjU2YmE4MDE2MTM5YjNmYmE1ZDkyNzJjZGFkODBmYmQ1NyJ9fX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0="
+    },
+    {
+      "name" : "noUpdate",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : true,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : "unsupportedSystem",
+        "phase" : "noUpdate",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7Im5vVXBkYXRlIjp7Il8wIjoidW5zdXBwb3J0ZWRTeXN0ZW0ifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0="
+    },
+    {
+      "name" : "downloading",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : true,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : true,
+        "noUpdateReason" : null,
+        "phase" : "downloading",
+        "releaseNotesSummary" : "测试 release",
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : "1.2.3",
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJhY3RpdmVPcGVyYXRpb25JRCI6IkFCQ0RFRjAxLTIzNDUtNjc4OS1BQkNELUVGMDEyMzQ1Njc4OSIsImNhbmNlbGxhdGlvblJlcXVlc3RlZCI6dHJ1ZSwiZ2VuZXJhdGlvbiI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInNjaGVtYVZlcnNpb24iOiJhcmtkZWNrLnJ1bnRpbWUtdXBkYXRlLXN0YXRlLzEiLCJzdGF0ZSI6eyJkb3dubG9hZGluZyI6eyJfMCI6eyJjYW5vbmljYWxQYXlsb2FkIjoiZXlKaGNtTm9hWFJsWTNSMWNtVnpJanBiSW1GeWJUWTBJbDBzSW1GeWRHbG1ZV04wSWpwN0ltSjVkR1ZNWlc1bmRHZ2lPakV3TWpRc0luTm9ZVEkxTmlJNkltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSWlMQ0oxY213aU9pSm9kSFJ3Y3pvdkwyZHBkR2gxWWk1amIyMHZRWEpyUkdWamF5OUJjbXRFWldOckwyRXVaRzFuSW4wc0ltVjRjR2x5WlhOQmRDSTZJakl3TWpZdE1Ea3RNamRVTURBNk1EQTZNREJhSWl3aWFYTnpkV1ZrUVhRaU9pSXlNREkyTFRBNUxUSTJWREF3T2pBd09qQXdXaUlzSW0xcGJtbHRkVzFUZVhOMFpXMVdaWEp6YVc5dUlqb2lNVFF1TUNJc0luSmxiR1ZoYzJWT2IzUmxjMU4xYlcxaGNua2lPaUxtdFl2b3I1VWdjbVZzWldGelpTSXNJbk5sY1hWbGJtTmxJam94T0RRME5qYzBOREEzTXpjd09UVTFNVFl4TlN3aWRtVnljMmx2YmlJNklqRXVNaTR6SW4wPSIsInBheWxvYWQiOnsiYXJjaGl0ZWN0dXJlcyI6WyJhcm02NCJdLCJhcnRpZmFjdCI6eyJieXRlTGVuZ3RoIjoxMDI0LCJzaGEyNTYiOiJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiIiwidXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL0Fya0RlY2svQXJrRGVjay9hLmRtZyJ9LCJleHBpcmVzQXQiOiIyMDI2LTA5LTI3VDAwOjAwOjAwWiIsImlzc3VlZEF0IjoiMjAyNi0wOS0yNlQwMDowMDowMFoiLCJtaW5pbXVtU3lzdGVtVmVyc2lvbiI6IjE0LjAiLCJyZWxlYXNlTm90ZXNTdW1tYXJ5Ijoi5rWL6K+VIHJlbGVhc2UiLCJzZXF1ZW5jZSI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInZlcnNpb24iOiIxLjIuMyJ9LCJwYXlsb2FkU0hBMjU2IjoiNTEwMzY5NjkxMGIzNmUyNThkMDE5YmQxOTljNzg3MjU2YmE4MDE2MTM5YjNmYmE1ZDkyNzJjZGFkODBmYmQ1NyJ9fX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0="
+    },
+    {
+      "name" : "verifying",
+      "projection" : {
+        "artifactByteLength" : 1024,
+        "artifactSha256" : "abababababababababababababababababababababababababababababababab",
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : true,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : true,
+        "noUpdateReason" : null,
+        "phase" : "verifying",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJhY3RpdmVPcGVyYXRpb25JRCI6IkFCQ0RFRjAxLTIzNDUtNjc4OS1BQkNELUVGMDEyMzQ1Njc4OSIsImNhbmNlbGxhdGlvblJlcXVlc3RlZCI6dHJ1ZSwiZ2VuZXJhdGlvbiI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInNjaGVtYVZlcnNpb24iOiJhcmtkZWNrLnJ1bnRpbWUtdXBkYXRlLXN0YXRlLzEiLCJzdGF0ZSI6eyJ2ZXJpZnlpbmciOnsiXzAiOnsiYnl0ZUxlbmd0aCI6MTAyNCwiaWRlbnRpdHkiOnsiYnl0ZUxlbmd0aCI6MTAyNCwiY2hhbmdlZE5hbm9zZWNvbmRzIjo2LCJjaGFuZ2VkU2Vjb25kcyI6NSwiZGV2aWNlIjoxLCJpbm9kZSI6MiwibW9kZSI6MzMwMjQsIm1vZGlmaWVkTmFub3NlY29uZHMiOjQsIm1vZGlmaWVkU2Vjb25kcyI6M30sInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJmaWxlOi8vL3ByaXZhdGUvdG1wL2Fya2RlY2stdXBkYXRlLWZpeHR1cmUvMTIzNDU2NzgtMTIzNC0xMjM0LTEyMzQtMTIzNDU2Nzg5YWJjLmRtZyJ9fX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0="
+    },
+    {
+      "name" : "awaitingConsent",
+      "projection" : {
+        "artifactByteLength" : 1024,
+        "artifactSha256" : "abababababababababababababababababababababababababababababababab",
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : true,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "awaitingConsent",
+        "releaseNotesSummary" : "测试 release",
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : "1.2.3",
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImF3YWl0aW5nQ29uc2VudCI6eyJhcnRpZmFjdCI6eyJkb3dubG9hZGVkIjp7ImJ5dGVMZW5ndGgiOjEwMjQsImlkZW50aXR5Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsImNoYW5nZWROYW5vc2Vjb25kcyI6NiwiY2hhbmdlZFNlY29uZHMiOjUsImRldmljZSI6MSwiaW5vZGUiOjIsIm1vZGUiOjMzMDI0LCJtb2RpZmllZE5hbm9zZWNvbmRzIjo0LCJtb2RpZmllZFNlY29uZHMiOjN9LCJzaGEyNTYiOiJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiIiwidXJsIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hcmtkZWNrLXVwZGF0ZS1maXh0dXJlLzEyMzQ1Njc4LTEyMzQtMTIzNC0xMjM0LTEyMzQ1Njc4OWFiYy5kbWcifSwidGVhbUlkZW50aWZpZXIiOiJGSVhUVVJFMTIzIn0sImZlZWQiOnsiY2Fub25pY2FsUGF5bG9hZCI6ImV5SmhjbU5vYVhSbFkzUjFjbVZ6SWpwYkltRnliVFkwSWwwc0ltRnlkR2xtWVdOMElqcDdJbUo1ZEdWTVpXNW5kR2dpT2pFd01qUXNJbk5vWVRJMU5pSTZJbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0lpTENKMWNtd2lPaUpvZEhSd2N6b3ZMMmRwZEdoMVlpNWpiMjB2UVhKclJHVmpheTlCY210RVpXTnJMMkV1WkcxbkluMHNJbVY0Y0dseVpYTkJkQ0k2SWpJd01qWXRNRGt0TWpkVU1EQTZNREE2TURCYUlpd2lhWE56ZFdWa1FYUWlPaUl5TURJMkxUQTVMVEkyVkRBd09qQXdPakF3V2lJc0ltMXBibWx0ZFcxVGVYTjBaVzFXWlhKemFXOXVJam9pTVRRdU1DSXNJbkpsYkdWaGMyVk9iM1JsYzFOMWJXMWhjbmtpT2lMbXRZdm9yNVVnY21Wc1pXRnpaU0lzSW5ObGNYVmxibU5sSWpveE9EUTBOamMwTkRBM016Y3dPVFUxTVRZeE5Td2lkbVZ5YzJsdmJpSTZJakV1TWk0ekluMD0iLCJwYXlsb2FkIjp7ImFyY2hpdGVjdHVyZXMiOlsiYXJtNjQiXSwiYXJ0aWZhY3QiOnsiYnl0ZUxlbmd0aCI6MTAyNCwic2hhMjU2IjoiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYiIsInVybCI6Imh0dHBzOi8vZ2l0aHViLmNvbS9BcmtEZWNrL0Fya0RlY2svYS5kbWcifSwiZXhwaXJlc0F0IjoiMjAyNi0wOS0yN1QwMDowMDowMFoiLCJpc3N1ZWRBdCI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIiwibWluaW11bVN5c3RlbVZlcnNpb24iOiIxNC4wIiwicmVsZWFzZU5vdGVzU3VtbWFyeSI6Iua1i+ivlSByZWxlYXNlIiwic2VxdWVuY2UiOjE4NDQ2NzQ0MDczNzA5NTUxNjE1LCJ2ZXJzaW9uIjoiMS4yLjMifSwicGF5bG9hZFNIQTI1NiI6IjUxMDM2OTY5MTBiMzZlMjU4ZDAxOWJkMTk5Yzc4NzI1NmJhODAxNjEzOWIzZmJhNWQ5MjcyY2RhZDgwZmJkNTcifX19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9"
+    },
+    {
+      "name" : "handoffInProgress",
+      "projection" : {
+        "artifactByteLength" : 1024,
+        "artifactSha256" : "abababababababababababababababababababababababababababababababab",
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : true,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : true,
+        "noUpdateReason" : null,
+        "phase" : "awaitingConsent",
+        "releaseNotesSummary" : "测试 release",
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : "1.2.3",
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJhY3RpdmVPcGVyYXRpb25JRCI6IkFCQ0RFRjAxLTIzNDUtNjc4OS1BQkNELUVGMDEyMzQ1Njc4OSIsImNhbmNlbGxhdGlvblJlcXVlc3RlZCI6dHJ1ZSwiZ2VuZXJhdGlvbiI6MTg0NDY3NDQwNzM3MDk1NTE2MTUsInNjaGVtYVZlcnNpb24iOiJhcmtkZWNrLnJ1bnRpbWUtdXBkYXRlLXN0YXRlLzEiLCJzdGF0ZSI6eyJhd2FpdGluZ0NvbnNlbnQiOnsiYXJ0aWZhY3QiOnsiZG93bmxvYWRlZCI6eyJieXRlTGVuZ3RoIjoxMDI0LCJpZGVudGl0eSI6eyJieXRlTGVuZ3RoIjoxMDI0LCJjaGFuZ2VkTmFub3NlY29uZHMiOjYsImNoYW5nZWRTZWNvbmRzIjo1LCJkZXZpY2UiOjEsImlub2RlIjoyLCJtb2RlIjozMzAyNCwibW9kaWZpZWROYW5vc2Vjb25kcyI6NCwibW9kaWZpZWRTZWNvbmRzIjozfSwic2hhMjU2IjoiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYiIsInVybCI6ImZpbGU6Ly8vcHJpdmF0ZS90bXAvYXJrZGVjay11cGRhdGUtZml4dHVyZS8xMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODlhYmMuZG1nIn0sInRlYW1JZGVudGlmaWVyIjoiRklYVFVSRTEyMyJ9LCJmZWVkIjp7ImNhbm9uaWNhbFBheWxvYWQiOiJleUpoY21Ob2FYUmxZM1IxY21WeklqcGJJbUZ5YlRZMElsMHNJbUZ5ZEdsbVlXTjBJanA3SW1KNWRHVk1aVzVuZEdnaU9qRXdNalFzSW5Ob1lUSTFOaUk2SW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdKaFltRmlZV0poWW1GaVlXSmhZbUZpWVdJaUxDSjFjbXdpT2lKb2RIUndjem92TDJkcGRHaDFZaTVqYjIwdlFYSnJSR1ZqYXk5QmNtdEVaV05yTDJFdVpHMW5JbjBzSW1WNGNHbHlaWE5CZENJNklqSXdNall0TURrdE1qZFVNREE2TURBNk1EQmFJaXdpYVhOemRXVmtRWFFpT2lJeU1ESTJMVEE1TFRJMlZEQXdPakF3T2pBd1dpSXNJbTFwYm1sdGRXMVRlWE4wWlcxV1pYSnphVzl1SWpvaU1UUXVNQ0lzSW5KbGJHVmhjMlZPYjNSbGMxTjFiVzFoY25raU9pTG10WXZvcjVVZ2NtVnNaV0Z6WlNJc0luTmxjWFZsYm1ObElqb3hPRFEwTmpjME5EQTNNemN3T1RVMU1UWXhOU3dpZG1WeWMybHZiaUk2SWpFdU1pNHpJbjA9IiwicGF5bG9hZCI6eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0sInBheWxvYWRTSEEyNTYiOiI1MTAzNjk2OTEwYjM2ZTI1OGQwMTliZDE5OWM3ODcyNTZiYTgwMTYxMzliM2ZiYTVkOTI3MmNkYWQ4MGZiZDU3In19fSwidXBkYXRlZEF0VVRDIjoiMjAyNi0wOS0yNlQwMDowMDowMFoifQ=="
+    },
+    {
+      "name" : "handedOff",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "handedOff",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImhhbmRlZE9mZiI6eyJfMCI6ImZpbGU6Ly8vcHJpdmF0ZS90bXAvYXJrZGVjay11cGRhdGUtZml4dHVyZS8xMjM0NTY3OC0xMjM0LTEyMzQtMTIzNC0xMjM0NTY3ODlhYmMuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9"
+    },
+    {
+      "name" : "failed",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : true,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : "network",
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "failed",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImZhaWxlZCI6eyJfMCI6Im5ldHdvcmsifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0="
+    },
+    {
+      "name" : "cancelled",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : true,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "cancelled",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImNhbmNlbGxlZCI6e319LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9"
+    },
+    {
+      "name" : "filePathEscaping",
+      "projection" : {
+        "artifactByteLength" : null,
+        "artifactSha256" : null,
+        "canCheck" : false,
+        "canDownload" : false,
+        "canHandoff" : false,
+        "cancellationRequested" : false,
+        "failureCode" : null,
+        "generation" : 18446744073709551615,
+        "isBusy" : false,
+        "noUpdateReason" : null,
+        "phase" : "handedOff",
+        "releaseNotesSummary" : null,
+        "schemaVersion" : "arkdeck.runtime-update-status/1",
+        "updateVersion" : null,
+        "updatedAtUtc" : "2026-09-26T00:00:00.123Z"
+      },
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwic2NoZW1hVmVyc2lvbiI6ImFya2RlY2sucnVudGltZS11cGRhdGUtc3RhdGUvMSIsInN0YXRlIjp7ImhhbmRlZE9mZiI6eyJfMCI6ImZpbGU6Ly8vcHJpdmF0ZS90bXAvQXBwbGljYXRpb24lMjBTdXBwb3J0LyVFNiVCNSU4QiVFOCVBRiU5NSUyNW5hbWUuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwLjEyM1oifQ=="
+    }
+  ],
+  "producer" : "RuntimeUpdateRustOracleTests",
+  "urlCases" : [
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hJTIwYi5kbWcifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "recordAccepted" : true,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hJTIwYi5kbWcifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "url" : "file:///private/tmp/a%20b.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hJTIwYi5kbWcifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hIGIuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : "file:///private/tmp/a b.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lMjUuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lLmRtZyJ9fSwidXBkYXRlZEF0VVRDIjoiMjAyNi0wOS0yNlQwMDowMDowMFoifQ==",
+      "url" : "file:///private/tmp/%.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lMjVaWi5kbWcifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lWlouZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : "file:///private/tmp/%ZZ.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lRTYlQjUlOEIlRTglQUYlOTUuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC/mtYvor5UuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : "file:///private/tmp/测试.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lRkYuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "recordAccepted" : true,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC8lRkYuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : "file:///private/tmp/%FF.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hLmRtZz94PSU1QjElNUQifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiZmlsZTovLy9wcml2YXRlL3RtcC9hLmRtZz94PVsxXSJ9fSwidXBkYXRlZEF0VVRDIjoiMjAyNi0wOS0yNlQwMDowMDowMFoifQ==",
+      "url" : "file:///private/tmp/a.dmg?x=[1]"
+    },
+    {
+      "canonicalSnapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoicmVsYXRpdmUuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "recordAccepted" : true,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoicmVsYXRpdmUuZG1nIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : "relative.dmg"
+    },
+    {
+      "canonicalSnapshotBase64" : null,
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiIn19LCJ1cGRhdGVkQXRVVEMiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiJ9",
+      "url" : ""
+    },
+    {
+      "canonicalSnapshotBase64" : null,
+      "recordAccepted" : false,
+      "snapshotBase64" : "eyJjYW5jZWxsYXRpb25SZXF1ZXN0ZWQiOmZhbHNlLCJnZW5lcmF0aW9uIjoxLCJzY2hlbWFWZXJzaW9uIjoiYXJrZGVjay5ydW50aW1lLXVwZGF0ZS1zdGF0ZS8xIiwic3RhdGUiOnsiaGFuZGVkT2ZmIjp7Il8wIjoiaHR0cDovL1ticm9rZW4ifX0sInVwZGF0ZWRBdFVUQyI6IjIwMjYtMDktMjZUMDA6MDA6MDBaIn0=",
+      "url" : "http://[broken"
+    }
+  ]
+}

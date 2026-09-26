@@ -37,18 +37,6 @@ fn leaves(_out: &str) -> Vec<(&'static str, Vec<String>)> {
                 "reveal-in-finder",
             ]),
         ),
-        (
-            "runtime.update.status",
-            owned(&["runtime", "update", "status"]),
-        ),
-        (
-            "runtime.update.cancel",
-            owned(&["runtime", "update", "cancel"]),
-        ),
-        (
-            "runtime.update.cleanup",
-            owned(&["runtime", "update", "cleanup"]),
-        ),
     ]
 }
 
@@ -62,7 +50,7 @@ fn a_blocked_leaf_is_blocked_by_a_product_defect_and_dispatches_nothing() {
     let out = root.join("out.json");
     let out = out.to_str().unwrap();
     let leaves = leaves(out);
-    assert_eq!(leaves.len(), 6);
+    assert_eq!(leaves.len(), 3);
     for (command, argv) in &leaves {
         let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
         let deprecated = command.starts_with("update-feed.");
