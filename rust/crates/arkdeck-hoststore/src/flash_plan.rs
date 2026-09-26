@@ -17,8 +17,8 @@ use super::debug_hap_plan::primary_facts;
 use super::*;
 use crate::device_facts::DeviceFacts;
 use crate::flash_facts::{NativeRockUsbIdentity, RockchipFacts};
-use crate::strict_json::swift_quoted;
-use std::path::{Component, Path};
+use crate::rockchip_action::{CaptureRequest, Expectation, RockchipAction};
+use std::path::Path;
 use std::sync::Mutex;
 
 /// Swift `ArkForgeFlashOperation.canonicalReference`.
@@ -126,69 +126,7 @@ pub fn rockchip_dispatch_unavailable(
                 .into(),
         );
     };
-    prepare_record_root(records)
-        .err()
-        .map(|error| format!("durable Rockchip host record root is unavailable: {error}"))
-}
-
-/// Swift `RockchipRuntimeActionRecordStore.prepareDirectory(allowExisting:
-/// true)`: the root created owner-only when missing, its parent then
-/// synchronized, and otherwise required to be an owner-only real directory;
-/// each refusal as Swift interpolates its `RuntimeDispatchFailure`.
-fn prepare_record_root(root: &Path) -> Result<(), String> {
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
-    let failed = |detail: String| format!("failed({})", swift_quoted(&detail));
-    // Swift compares the path with its standardized form; here it must be
-    // absolute, name no parent, and be spelled exactly as its components
-    // rebuild it (no `.`, empty or trailing component). Declared difference:
-    // Foundation also strips `/private` from an existing `/private/tmp/…`
-    // path, so Swift refuses such a root once it exists; this one does not.
-    let canonical = root.is_absolute()
-        && !root
-            .components()
-            .any(|component| component == Component::ParentDir)
-        && root
-            .components()
-            .collect::<std::path::PathBuf>()
-            .as_os_str()
-            == root.as_os_str();
-    if !canonical {
-        return Err(failed("Rockchip record path is not canonical".into()));
-    }
-    let created = match std::fs::DirBuilder::new().mode(0o700).create(root) {
-        Ok(()) => true,
-        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => false,
-        Err(error) => {
-            return Err(failed(format!(
-                "cannot create Rockchip record directory (errno {})",
-                error.raw_os_error().unwrap_or(0)
-            )));
-        }
-    };
-    let owner_only = std::fs::symlink_metadata(root).is_ok_and(|metadata| {
-        metadata.file_type().is_dir() && metadata.permissions().mode() & 0o077 == 0
-    });
-    if !owner_only {
-        return Err(failed(
-            "Rockchip record directory is not an owner-only real directory".into(),
-        ));
-    }
-    if created {
-        let parent = std::fs::OpenOptions::new()
-            .read(true)
-            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-            .open(root.parent().unwrap_or(root))
-            .map_err(|_| {
-                failed("cannot open Rockchip record directory for synchronization".into())
-            })?;
-        parent.sync_all().map_err(|error| {
-            failed(format!(
-                "cannot synchronize Rockchip record directory (errno {})",
-                error.raw_os_error().unwrap_or(0)
-            ))
-        })?;
-    }
-    Ok(())
+    crate::rockchip_records::RockchipRecordStore::new(records).unavailable_reason()
 }
 
 /// The Target's facts as Swift's ArkForge facts port reads them
@@ -617,95 +555,6 @@ impl FlashPlanning {
     }
 }
 
-/// Swift `RockchipHDCReconnectExpectation`.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Expectation {
-    connect_key: String,
-    identity: String,
-    topology: String,
-}
-
-/// Swift `RockchipProviderAction`, the actions a Flash plan names.
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum Action {
-    EnterLoader(String),
-    WaitForDisconnect(String),
-    WaitForLoader(String),
-    RebindLoader(String),
-    RebootToNormal(String),
-    WaitForBoundReconnect(Expectation),
-    VerifyBoundBuild(Expectation, String),
-    CaptureDiagnostics(String),
-}
-
-impl Action {
-    fn effect(&self) -> &'static str {
-        match self {
-            Self::EnterLoader(_) | Self::RebootToNormal(_) => "deviceMutation",
-            _ => "readOnly",
-        }
-    }
-
-    /// Swift `RockchipHostManagedActionCatalog.identifier(for:)`.
-    fn identifier(&self) -> &'static str {
-        match self {
-            Self::EnterLoader(_) => "rockchip.hdc.enter-loader.v1",
-            Self::WaitForDisconnect(_) => "rockchip.hdc.wait-disconnect.v1",
-            Self::WaitForLoader(_) => "rockchip.rockusb.wait-loader.v1",
-            Self::RebindLoader(_) => "rockchip.rockusb.rebind-loader.v1",
-            Self::RebootToNormal(_) => "rockchip.rockusb.reboot-normal.v1",
-            Self::WaitForBoundReconnect(_) => "rockchip.hdc.wait-bound-reconnect.v1",
-            Self::VerifyBoundBuild(..) => "rockchip.hdc.verify-bound-build.v1",
-            Self::CaptureDiagnostics(_) => "rockchip.hdc.capture-post-flash-hilog.v1",
-        }
-    }
-
-    /// Swift `PersistedTypedProviderAction(.rockchip(action))`, whose
-    /// canonical encoding the host-managed descriptor pins.
-    fn persisted(&self) -> Value {
-        let expectation = |expectation: &Expectation| {
-            json!({
-                "previousConnectKey": expectation.connect_key,
-                "previousIdentitySha256": expectation.identity,
-                "usbTopology": expectation.topology,
-            })
-        };
-        let (kind, arguments) = match self {
-            Self::EnterLoader(key) => ("rockchip.enterLoader", json!({"connectKey": key})),
-            Self::WaitForDisconnect(key) => {
-                ("rockchip.waitForHDCDisconnect", json!({"connectKey": key}))
-            }
-            Self::WaitForLoader(identity) => (
-                "rockchip.waitForLoader",
-                json!({"stableIdentitySha256": identity}),
-            ),
-            Self::RebindLoader(identity) => (
-                "rockchip.rebindLoader",
-                json!({"stableIdentitySha256": identity}),
-            ),
-            Self::RebootToNormal(identity) => (
-                "rockchip.rebootToNormal",
-                json!({"stableIdentitySha256": identity}),
-            ),
-            Self::WaitForBoundReconnect(bound) => {
-                ("rockchip.waitForBoundHDCReconnect", expectation(bound))
-            }
-            Self::VerifyBoundBuild(bound, version) => {
-                let mut arguments = expectation(bound);
-                arguments["expectedProductModel"] = json!(PRODUCT_MODEL);
-                arguments["expectedBuildVersion"] = json!(version);
-                ("rockchip.verifyBoundBuild", arguments)
-            }
-            Self::CaptureDiagnostics(key) => (
-                "rockchip.capturePostFlashDiagnostics",
-                json!({"connectKey": key, "durationSeconds": 30, "filters": [],
-                    "byteBudget": 16 * 1024 * 1024}),
-            ),
-        };
-        json!({"kind": kind, "arguments": arguments})
-    }
-}
-
 /// Swift `ArkForgeFlashProviderAdapter.action(for:operation:inputs:context:)`
 /// over the canonical inputs, each refusal its `DeviceProviderError`
 /// description.
@@ -715,7 +564,7 @@ fn action(
     inputs: &Map<String, Value>,
     facts: &RockchipFacts,
     build_version: impl FnOnce() -> Option<String>,
-) -> Result<Action, String> {
+) -> Result<RockchipAction, String> {
     let key = &facts.execution_connect_key;
     let identity = &facts.identity_sha256;
     if key.is_empty() || !lowercase_sha256(identity) {
@@ -734,25 +583,29 @@ fn action(
         match (alias, topology) {
             (Some(alias), Some(topology)) if sha256_hex(key.as_bytes()) == *alias => {
                 Ok(Expectation {
-                    connect_key: key.clone(),
-                    identity: alias.clone(),
-                    topology: topology.clone(),
+                    previous_connect_key: key.clone(),
+                    previous_identity_sha256: alias.clone(),
+                    usb_topology: topology.clone(),
                 })
             }
             _ => Err("post-flash HDC binding expectation is absent or malformed".into()),
         }
     };
     match (step, kind) {
-        ("enter-loader-mode", "enterUpdater") => Ok(Action::EnterLoader(key.clone())),
+        ("enter-loader-mode", "enterUpdater") => Ok(RockchipAction::EnterLoader(key.clone())),
         ("wait-loader-disconnect", "waitForDisconnect") => {
-            Ok(Action::WaitForDisconnect(key.clone()))
+            Ok(RockchipAction::WaitForHdcDisconnect(key.clone()))
         }
         ("wait-loader-reconnect", "waitForReconnect") => {
-            Ok(Action::WaitForLoader(identity.clone()))
+            Ok(RockchipAction::WaitForLoader(identity.clone()))
         }
-        ("rebind-loader-identity", "probeDevice") => Ok(Action::RebindLoader(identity.clone())),
-        ("reboot-device", "rebootDevice") => Ok(Action::RebootToNormal(identity.clone())),
-        ("wait-for-hdc", "waitForReconnect") => Ok(Action::WaitForBoundReconnect(expectation()?)),
+        ("rebind-loader-identity", "probeDevice") => {
+            Ok(RockchipAction::RebindLoader(identity.clone()))
+        }
+        ("reboot-device", "rebootDevice") => Ok(RockchipAction::RebootToNormal(identity.clone())),
+        ("wait-for-hdc", "waitForReconnect") => {
+            Ok(RockchipAction::WaitForBoundHdcReconnect(expectation()?))
+        }
         ("rebind-and-verify-build", "probeDevice") => {
             flash_bundle(inputs)?;
             let Some(version) = build_version().filter(|version| !version.is_empty()) else {
@@ -762,10 +615,18 @@ fn action(
                         .into(),
                 );
             };
-            Ok(Action::VerifyBoundBuild(expectation()?, version))
+            Ok(RockchipAction::VerifyBoundBuild {
+                expectation: expectation()?,
+                product_model: PRODUCT_MODEL.to_owned(),
+                build_version: version,
+            })
         }
         ("capture-post-flash-diagnostics", "captureRemoteStdout") => {
-            Ok(Action::CaptureDiagnostics(key.clone()))
+            Ok(RockchipAction::CapturePostFlashDiagnostics {
+                connect_key: key.clone(),
+                // The catalog's bounded HiLog: 30 s, no filters, 16 MiB.
+                request: CaptureRequest::new(30, Vec::new(), 16 * 1024 * 1024)?,
+            })
         }
         _ => Err(format!("{step} has no registered Rockchip runtime action")),
     }
@@ -790,7 +651,7 @@ fn flash_bundle(inputs: &Map<String, Value>) -> Result<(), String> {
 }
 
 /// Swift `journalStep`'s arguments for a step the Rockchip host performs.
-fn journal_arguments(kind: &str, action: &Action) -> Value {
+fn journal_arguments(kind: &str, action: &RockchipAction) -> Value {
     match (kind, action) {
         ("enterUpdater", _) => json!({
             "providerOperationId": "rockusb.enter-loader",
@@ -800,13 +661,13 @@ fn journal_arguments(kind: &str, action: &Action) -> Value {
         ("waitForDisconnect", _) => {
             json!({"deadlineMilliseconds": 15_000, "reason": "enterLoader"})
         }
-        ("waitForReconnect", Action::WaitForLoader(_)) => {
+        ("waitForReconnect", RockchipAction::WaitForLoader(_)) => {
             json!({"deadlineMilliseconds": 45_000, "reason": "loaderReconnect"})
         }
         ("waitForReconnect", _) => {
             json!({"deadlineMilliseconds": 120_000, "reason": "normalModeReconnect"})
         }
-        ("probeDevice", Action::RebindLoader(_)) => {
+        ("probeDevice", RockchipAction::RebindLoader(_)) => {
             json!({"evidencePolicy": "rockusbLoaderIdentity"})
         }
         ("probeDevice", _) => json!({"evidencePolicy": "postFlashBuild"}),
@@ -836,14 +697,26 @@ mod tests {
             "/arkdeck-no-such-parent//rockchip-runtime",
         ] {
             assert_eq!(
-                prepare_record_root(Path::new(path)),
-                Err("failed(\"Rockchip record path is not canonical\")".to_owned()),
+                record_root_unavailable(path),
+                Some(
+                    "durable Rockchip host record root is unavailable: failed(\"Rockchip record \
+                     path is not canonical\")"
+                        .to_owned()
+                ),
                 "{path}"
             );
         }
         assert_eq!(
-            prepare_record_root(Path::new("/arkdeck-no-such-parent/rockchip-runtime")),
-            Err("failed(\"cannot create Rockchip record directory (errno 2)\")".to_owned())
+            record_root_unavailable("/arkdeck-no-such-parent/rockchip-runtime"),
+            Some(
+                "durable Rockchip host record root is unavailable: failed(\"cannot create \
+                 Rockchip record directory (errno 2)\")"
+                    .to_owned()
+            )
         );
+    }
+
+    fn record_root_unavailable(path: &str) -> Option<String> {
+        crate::rockchip_records::RockchipRecordStore::new(Path::new(path)).unavailable_reason()
     }
 }

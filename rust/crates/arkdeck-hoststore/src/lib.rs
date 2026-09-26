@@ -371,6 +371,16 @@ pub use rockchip_binding::{
     LineageAdvance, RecoveryProof, RockchipBindingStore, install_current_target,
 };
 #[cfg(target_os = "macos")]
+mod rockchip_action;
+#[cfg(target_os = "macos")]
+pub use rockchip_action::{CaptureRequest, Expectation, RockchipAction};
+#[cfg(target_os = "macos")]
+mod rockchip_records;
+#[cfg(target_os = "macos")]
+pub use rockchip_records::{
+    DurableRockchipHost, ExecutionResult, RockchipActionExecutor, RockchipRecordStore,
+};
+#[cfg(target_os = "macos")]
 mod rockchip_reactivation;
 #[cfg(target_os = "macos")]
 pub use rockchip_reactivation::{ReactivationProof, ReactivationProofSource};
