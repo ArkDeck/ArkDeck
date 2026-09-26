@@ -1,6 +1,7 @@
 # TASK-XPA-018 — SDK release signing installation
 
-Local implementation and targeted verification in progress. `runtime signing install-sdk-release` and
+Local implementation and targeted verification complete; independent review
+and remote CI/maintainer approval remain. `runtime signing install-sdk-release` and
 legacy `signing install-sdk-release` use explicit SDK, Java, bundle name and
 optional project reference inputs. No SDK search, download, real credential or
 device operation has been performed while developing this slice.
@@ -66,7 +67,7 @@ proved present, and complete explicit repair/removal cleanup. The publication
 unit fixture substitutes material preparation only; the separate integration
 fixtures actually run the vendored signer/verification process.
 
-## Planned verification and limits
+## Local targeted checks and limits
 
 Five integration fixtures cover successful replacement, signer/verification
 failure, active preset pins, malformed template/chain, and preservation of a
@@ -76,10 +77,49 @@ and exact verification readback. The process stand-in is the same vendored Swift
 fixture used by existing signing tests; secrets are in memory. These are not
 real cryptographic or device acceptance.
 
-The Swift pre-Keychain relative-path recording script is prepared. Recordings,
-Rust tests, Clippy and final SDD checks have not yet run: the coordinator has
-reserved the host for TASK-XPA-025 formal performance measurement. This note
-will record the commands, exits and logs after the next test window.
+Corrected code head: `aa3bd266f09eeb187e6dd9b3c68994f69557d942`.
+Rust commands use `CARGO_TARGET_DIR=/private/tmp/arkdeck-takeover-d79c-target`
+and `CARGO_BUILD_JOBS=2`.
+
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-provider-workspace`:
+  exit 0, 54 pass. `/private/tmp/arkdeck-signing-sdk-final-provider.log`.
+  This includes the two added material-publication/cleanup unit tests, the
+  five actual fake-signer SDK process fixtures and existing installation,
+  DevEco and signing regressions. The pre-existing fake HAP signer uses
+  disposable file Keychains; SDK tests use memory secrets only.
+- Initial corrected SDK fault run (`--lib --test sdk_release --test signing_install`)
+  exited 101: cleanup exposed the Foundation `/tmp` spelling versus the
+  physical path required by `HostDirectory::open`. The fix preserves only
+  physical-canonical or Foundation-canonical root spellings; arbitrary symlink
+  spellings still refuse. `/private/tmp/arkdeck-signing-sdk-fixed-provider.log`.
+  The same targeted command then passed 38 tests (exit 0), followed by the
+  final full provider suite above. `/private/tmp/arkdeck-signing-sdk-fixed-provider-2.log`.
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-cli --test argv_fixtures
+  --test signing_install --test signing_remove --test signing_refresh
+  --test signing_status`: exit 0, 29 pass.
+  `/private/tmp/arkdeck-signing-sdk-cli.log`.
+- Twelve real Swift SDK/Java relative-path refusals were recorded with
+  `rust/scripts/record-signing-sdk-oracle.py` and replayed byte-for-byte across
+  both spellings and three output modes. Every process refuses before owner
+  mutation or Keychain item access and leaves its temporary home unchanged.
+  Fixture provenance names the actual Swift binary digest; HOME is not used as
+  Keychain isolation. `/private/tmp/arkdeck-signing-sdk-oracle-20260926`.
+- `cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-provider-workspace
+  -p arkdeck-hoststore -p arkdeck-cli --all-targets -- -D warnings`: exit 0.
+  `/private/tmp/arkdeck-signing-sdk-final-clippy.log`. Initial Clippy exited
+  101 for `collapsible_if`; the condition was collapsed without suppressing
+  the warning (`/private/tmp/arkdeck-signing-sdk-clippy.log`).
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`, `git diff --check`,
+  and `sh scripts/check-sdd.sh`: exit 0, 121 acceptance IDs.
+  `/private/tmp/arkdeck-signing-sdk-sdd.log`.
+- `python3 rust/scripts/generate-contract.py --check`: exit 0, 105 methods,
+  1,043 shapes. `/private/tmp/arkdeck-signing-sdk-contract.log`.
+
+No full local unified gate, App build, real SDK signer, installed credential,
+login/Data Protection item, launchd service or device was changed. Full
+hoststore/CLI suites were not repeated in this coordinated window; signing
+behavior was targeted and their targets compiled by Clippy. These results do
+not constitute real cryptographic/Keychain/GJ-5 acceptance or G5 completion.
 
 ## CI
 
