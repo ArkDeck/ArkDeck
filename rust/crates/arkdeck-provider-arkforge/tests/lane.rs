@@ -7,6 +7,9 @@
 //! as `arkforged` reports its own), answers `discoverDevices` with nothing,
 //! and ends on its stdin's end — the owner's liveness — with status 11.
 //!
+//! Three more stand-ins play the owner's stop (`stop_order`): they catch TERM
+//! rather than die of it, and record in `events` what reached them and when.
+//!
 //! No daemon, board or USB host is involved; nothing here is device evidence.
 //! A custom harness (`harness = false`), because the daemon role must run
 //! before any test framework reads the arguments.
@@ -21,16 +24,22 @@ mod lane {
     use arkforge_ipc::messages::{ErrorBody, Hello, HelloAck, Request, Response};
     use arkforge_ipc::{Api, PROTOCOL_MAJOR, PROTOCOL_MINOR, SessionKind, Status};
     use serde_json::json;
-    use std::io::Read;
+    use std::io::{Read, Write};
+    use std::os::fd::AsFd;
     use std::os::unix::fs::PermissionsExt;
     use std::os::unix::net::{UnixListener, UnixStream};
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::{Duration, Instant};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     const SECRET: [u8; 32] = [0x5a; 32];
     const AGENTD: &str = "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1";
     const HDC: &str = "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2";
+    /// The stand-ins of the owner's stop (`stop_order`).
+    const STOP_ORDER: [&str; 3] = ["ends-at-eof", "outlasts-eof", "ignores-term"];
+    /// The half second the owner's stop gives TERM before KILL, as Swift's
+    /// `stopDaemonProcessGroup` does.
+    const TERM_GRACE: Duration = Duration::from_millis(500);
 
     // MARK: the stand-in daemon
 
@@ -50,6 +59,11 @@ mod lane {
             .find_map(|line| line.strip_prefix("# fake-arkforged: "))
             .unwrap_or("ready")
             .to_owned();
+        // Caught from the start, so that TERM never ends a stop-order
+        // stand-in by itself; every other one keeps TERM's default.
+        let stop = STOP_ORDER
+            .contains(&mode.as_str())
+            .then(|| arkdeck_platform::StopSignal::install().unwrap());
         let mut secret = [0u8; 32];
         if std::io::stdin().read_exact(&mut secret).is_err() {
             std::process::exit(12);
@@ -58,6 +72,7 @@ mod lane {
         // process ends, which is what the cases observe.
         let alive = std::fs::File::create(runtime.join("alive")).unwrap();
         alive.lock().unwrap();
+        std::fs::write(runtime.join("pid"), std::process::id().to_string()).unwrap();
         std::fs::write(runtime.join("paired"), sha256_hex(&secret)).unwrap();
         std::fs::write(runtime.join("arguments"), arguments[1..].join("\n")).unwrap();
         if mode == "exit-at-once" {
@@ -77,11 +92,79 @@ mod lane {
                 }
             });
         }
+        if let Some(stop) = stop {
+            stop_order(&runtime.join("events"), &mode, &stop);
+        }
         // Its owner's end of input, and nothing else, ends it.
         let mut rest = Vec::new();
         let _ = std::io::stdin().read_to_end(&mut rest);
         std::fs::write(runtime.join("eof"), rest.len().to_string()).unwrap();
         std::process::exit(11);
+    }
+
+    /// The owner's stop as a stand-in meets it, each event a line of
+    /// `events` with the microsecond it was recorded at:
+    ///
+    /// - `ends-at-eof` watches its input, as `arkforged` does, and exits 11 at
+    ///   its end. TERM does nothing to it, as it does nothing to an
+    ///   `arkforged` Swift started, which inherits TERM ignored.
+    /// - `outlasts-eof` does not watch its input. At TERM it records whether
+    ///   that input had already ended, then exits 21.
+    /// - `ignores-term` records the same at TERM and keeps running, so only
+    ///   KILL can end it.
+    fn stop_order(events: &Path, mode: &str, stop: &arkdeck_platform::StopSignal) -> ! {
+        if mode == "ends-at-eof" {
+            let mut rest = Vec::new();
+            let _ = std::io::stdin().read_to_end(&mut rest);
+            record(events, "eof", "");
+            record(events, "exit", "11");
+            std::process::exit(11);
+        }
+        while !stop.requested() {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        record(
+            events,
+            "term",
+            if input_ended() {
+                "input-ended"
+            } else {
+                "input-open"
+            },
+        );
+        if mode == "outlasts-eof" {
+            record(events, "exit", "21");
+            std::process::exit(21);
+        }
+        loop {
+            std::thread::park();
+        }
+    }
+
+    /// Whether this process's input has ended — its owner closed the pipe's
+    /// write end — without waiting for it: a nonblocking read of stdin
+    /// answers 0 at the end, and would-block while the owner holds it open.
+    /// The pipe is made nonblocking through std's socket door, whose
+    /// `set_nonblocking` sets `O_NONBLOCK` on any descriptor; this crate
+    /// forbids the unsafe `fcntl`.
+    fn input_ended() -> bool {
+        let duplicate = || std::io::stdin().as_fd().try_clone_to_owned().unwrap();
+        UnixStream::from(duplicate()).set_nonblocking(true).unwrap();
+        matches!(std::fs::File::from(duplicate()).read(&mut [0u8; 1]), Ok(0))
+    }
+
+    fn record(events: &Path, event: &str, detail: &str) {
+        let micros = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_micros();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(events)
+            .unwrap();
+        file.write_all(format!("{event} {micros} {detail}\n").as_bytes())
+            .unwrap();
     }
 
     fn serve(mut stream: UnixStream, kind: SessionKind, mode: &str, digest: &str) {
@@ -247,6 +330,81 @@ mod lane {
                 std::fs::File::open(self.runtime.join("alive")).expect("the stand-in was launched");
             alive.try_lock().is_ok()
         }
+
+        /// The stand-in's own PID, as it recorded it.
+        fn pid(&self) -> i32 {
+            std::fs::read_to_string(self.runtime.join("pid"))
+                .unwrap()
+                .parse()
+                .unwrap()
+        }
+
+        /// Drops `lane` without its stop, as a daemon that ends without its
+        /// drain drops it: how long the drop took, and what reached the
+        /// stand-in, in the order it recorded it, each event with its detail
+        /// and how many milliseconds after the drop began it was recorded.
+        fn dropped(&self, lane: Lane) -> (Duration, Vec<(String, String, f64)>) {
+            let began = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_micros() as f64;
+            let started = Instant::now();
+            drop(lane);
+            let took = started.elapsed();
+            let events = std::fs::read_to_string(self.runtime.join("events"))
+                .unwrap_or_default()
+                .lines()
+                .map(|line| {
+                    let mut fields = line.splitn(3, ' ');
+                    let event = fields.next().unwrap().to_owned();
+                    let micros: f64 = fields.next().unwrap().parse().unwrap();
+                    let detail = fields.next().unwrap_or_default().to_owned();
+                    (event, detail, (micros - began) / 1000.0)
+                })
+                .collect();
+            (took, events)
+        }
+
+        /// Nothing of the stand-in is left: its PID names no process, no
+        /// process runs with this scene's runtime directory among its
+        /// arguments, and its lifelong lock is free.
+        fn nothing_left(&self, pid: i32) {
+            assert!(
+                arkdeck_platform::process_argument_record(pid).is_none(),
+                "the stand-in (pid {pid}) still runs"
+            );
+            let running = std::process::Command::new("/usr/bin/pgrep")
+                .args(["-f", self.runtime.to_str().unwrap()])
+                .output()
+                .unwrap();
+            assert!(
+                running.stdout.is_empty(),
+                "left running: {}",
+                String::from_utf8_lossy(&running.stdout)
+            );
+            assert!(self.ended(), "the stand-in's lock is still held");
+        }
+    }
+
+    /// The events a stop-order stand-in recorded, without their times, after
+    /// printing them with their times.
+    fn seen(case: &str, took: Duration, events: &[(String, String, f64)]) -> Vec<(String, String)> {
+        let timeline: Vec<String> = events
+            .iter()
+            .map(|(event, detail, at)| format!("{event} {detail} +{at:.1} ms"))
+            .collect();
+        println!("  {case}: the drop took {took:?}; {}", timeline.join(", "));
+        events
+            .iter()
+            .map(|(event, detail, _)| (event.clone(), detail.clone()))
+            .collect()
+    }
+
+    fn expected(events: &[(&str, &str)]) -> Vec<(String, String)> {
+        events
+            .iter()
+            .map(|(event, detail)| ((*event).to_owned(), (*detail).to_owned()))
+            .collect()
     }
 
     impl Drop for Scene {
@@ -400,8 +558,60 @@ mod lane {
         }
     }
 
+    // A lane dropped without its stop — as a daemon that ends without its
+    // drain drops it — ends its daemon as Swift's failed start does
+    // (`DaemonLifecycle.stop`, `stopDaemonProcessGroup`): its end of input,
+    // then TERM to its group, then KILL once half a second has passed, and
+    // reaps it. Each stand-in catches TERM and records what reached it.
+
+    /// A daemon that ends at its end of input, as `arkforged` does, ends
+    /// there with its own status, whatever the TERM that follows does.
+    fn a_dropped_lane_ends_a_daemon_at_its_end_of_input() {
+        let scene = Scene::new("org.openharmony.dayu200", "ends-at-eof");
+        let lane = scene.compose().unwrap();
+        let pid = scene.pid();
+        let (took, events) = scene.dropped(lane);
+        assert_eq!(
+            seen("ends-at-eof", took, &events),
+            expected(&[("eof", ""), ("exit", "11")])
+        );
+        scene.nothing_left(pid);
+    }
+
+    /// A daemon that does not watch its input finds, at its TERM, that the
+    /// input has already ended: the end of input comes first.
+    fn a_dropped_lane_sends_term_only_once_the_input_has_ended() {
+        let scene = Scene::new("org.openharmony.dayu200", "outlasts-eof");
+        let lane = scene.compose().unwrap();
+        let pid = scene.pid();
+        let (took, events) = scene.dropped(lane);
+        assert_eq!(
+            seen("outlasts-eof", took, &events),
+            expected(&[("term", "input-ended"), ("exit", "21")])
+        );
+        scene.nothing_left(pid);
+    }
+
+    /// A daemon that outlives its TERM is killed once TERM's half second has
+    /// passed, and reaped.
+    fn a_dropped_lane_kills_a_daemon_that_outlives_term_after_its_grace() {
+        let scene = Scene::new("org.openharmony.dayu200", "ignores-term");
+        let lane = scene.compose().unwrap();
+        let pid = scene.pid();
+        let (took, events) = scene.dropped(lane);
+        assert_eq!(
+            seen("ignores-term", took, &events),
+            expected(&[("term", "input-ended")])
+        );
+        assert!(
+            took >= TERM_GRACE,
+            "the drop ended {took:?} after it began, within TERM's grace: KILL came early"
+        );
+        scene.nothing_left(pid);
+    }
+
     pub fn run() {
-        let cases: [(&str, fn()); 5] = [
+        let cases: [(&str, fn()); 8] = [
             (
                 "a_bundle_composes_one_paired_ready_daemon_that_ends_with_its_owner",
                 a_bundle_composes_one_paired_ready_daemon_that_ends_with_its_owner,
@@ -421,6 +631,18 @@ mod lane {
             (
                 "nothing_is_launched_before_the_profile_and_the_authority_are_proved",
                 nothing_is_launched_before_the_profile_and_the_authority_are_proved,
+            ),
+            (
+                "a_dropped_lane_ends_a_daemon_at_its_end_of_input",
+                a_dropped_lane_ends_a_daemon_at_its_end_of_input,
+            ),
+            (
+                "a_dropped_lane_sends_term_only_once_the_input_has_ended",
+                a_dropped_lane_sends_term_only_once_the_input_has_ended,
+            ),
+            (
+                "a_dropped_lane_kills_a_daemon_that_outlives_term_after_its_grace",
+                a_dropped_lane_kills_a_daemon_that_outlives_term_after_its_grace,
             ),
         ];
         let mut failed = 0;
