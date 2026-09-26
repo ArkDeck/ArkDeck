@@ -91,9 +91,9 @@ A capture document names the task and spike of the daemon it measured: a Swift
 capture keeps `TASK-XPA-023`/`SPK-1`, the identity of the committed Swift
 baseline, and a Rust capture carries `TASK-XPA-025`/`SPK-11`. The rows the
 harness cannot measure are declared per daemon, each with the reason that holds
-for that daemon (`metrics.gap_definitions(runtime_kind)`); for example, recovery
-and `job.reconcile` on the Rust daemon wait for design section L.1 item 13,
-which does not apply to the Swift engine. The first quiet-host Rust capture is
+for that daemon (`metrics.gap_definitions(runtime_kind)`). Rust recovery and
+`job.reconcile` are implemented, but the capture does not yet time their
+required workloads; they remain measurement gaps. The first quiet-host Rust capture is
 recorded beside its run record,
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md`,
 not in `baselines/`. A document in `baselines/` becomes the nightly lane's
