@@ -21,6 +21,8 @@ use std::{ffi::OsStr, io, os::unix::fs::MetadataExt, path::Path, sync::Arc};
 mod imports;
 #[path = "app_ingress/jobs.rs"]
 pub(crate) mod jobs;
+#[path = "app_ingress/storage.rs"]
+mod storage;
 
 const SERVICE: &str = "com.arkdeck.agentd";
 // Same policy as AgentXPCContract and the production facade. No caller override.
@@ -150,45 +152,28 @@ impl<H: HostServices> AppIngress<H> {
                 "authenticated App transport origin is required",
             );
         }
+        // Swift `AgentXPCEndpoint.responseFrame` (`AgentFacadeOrigin.swift:109–128`):
+        // a frame it cannot read answers under no request's identity; one of
+        // another version or contract, or naming a method this Runtime does
+        // not publish, under its own.
         let request = match decode_request(frame) {
             Ok(request) => request,
             Err(error) => {
-                let code = match error {
+                let (code, id) = match error {
                     ContractError::UnsupportedVersion | ContractError::ContractMismatch => {
-                        "unsupportedProtocolVersion"
+                        ("unsupportedProtocolVersion", frame_id(frame))
                     }
-                    ContractError::UnknownMethod => "unknownMethod",
-                    _ => "malformedFrame",
+                    ContractError::UnknownMethod => ("unknownMethod", frame_id(frame)),
+                    _ => ("malformedFrame", String::new()),
                 };
-                let id = if matches!(
-                    error,
-                    ContractError::UnsupportedVersion
-                        | ContractError::ContractMismatch
-                        | ContractError::UnknownMethod
-                ) {
-                    strict_json(frame)
-                        .ok()
-                        .and_then(|value| value["id"].as_str().map(str::to_owned))
-                        .unwrap_or_else(|| "-".into())
-                } else {
-                    "-".into()
-                };
-                return refusal(
-                    &id,
-                    code,
-                    "App ingress requires the exact current request frame",
-                );
+                return refusal(&id, code, TRANSPORT_REFUSED);
             }
         };
-        let job = match jobs::Action::parse(&request) {
-            Ok(action) => action,
-            Err(()) => {
-                return refusal(
-                    &request.id,
-                    "rejected",
-                    "a closed typed App Job request is required",
-                );
-            }
+        // Swift's typed App Job gate (`AgentXPCListener.swift:214–245`)
+        // refuses any other Job request as it refuses a method outside the
+        // allowlist.
+        let Ok(job) = jobs::Action::parse(&request) else {
+            return not_allowlisted(&request.id);
         };
         if job.is_none()
             && !matches!(
@@ -229,9 +214,12 @@ impl<H: HostServices> AppIngress<H> {
             return not_allowlisted(&request.id);
         }
         // Swift's App transport admits a begin only for complete, valid
-        // metadata of one of the App's three kinds, before anything reaches
-        // the Runtime.
-        if request.method == "artifact.import.begin" && !imports::admitted_begin(&request) {
+        // metadata of one of the App's three kinds, and a Runtime storage
+        // request only in its closed shape, before anything reaches the
+        // Runtime.
+        if (request.method == "artifact.import.begin" && !imports::admitted_begin(&request))
+            || (storage::METHODS.contains(&request.method.as_str()) && !storage::admitted(&request))
+        {
             return not_allowlisted(&request.id);
         }
         if job.is_none() && !closed_parameters(&request) {
@@ -243,23 +231,15 @@ impl<H: HostServices> AppIngress<H> {
         }
         // Retain the one-shot claim across the synchronous owner call, but
         // never hold the gate mutex while executing; a parallel cancel must enter.
+        // A Job the App did not submit, or one already run, is refused as
+        // Swift's gate refuses it (`AgentXPCListener.swift:145–155`).
         let _run = match &job {
             Some(jobs::Action::Run(id)) => match self.jobs.begin(id) {
                 Some(run) => Some(run),
-                None => {
-                    return refusal(
-                        &request.id,
-                        "rejected",
-                        "Job is not runnable by this App ingress",
-                    );
-                }
+                None => return not_allowlisted(&request.id),
             },
             Some(jobs::Action::Cancel(id)) if !self.jobs.owns(id) => {
-                return refusal(
-                    &request.id,
-                    "rejected",
-                    "Job is not owned by this App ingress",
-                );
+                return not_allowlisted(&request.id);
             }
             _ => None,
         };
@@ -288,35 +268,13 @@ impl<H: HostServices> AppIngress<H> {
     }
 }
 fn closed_parameters(request: &Request) -> bool {
-    let params = request.params.clone().unwrap_or_default();
-    // Only complete settings mutations cross this boundary. The existing owner
-    // retains generation CAS, quota relationships and filesystem admission.
-    if matches!(
-        request.method.as_str(),
-        "runtime.storage.policy" | "runtime.storage.root"
-    ) {
-        let positive = |key: &str| canonical_decimal(params.get(key), 1);
-        let shape = if request.method == "runtime.storage.policy" {
-            params.len() == 4
-                && [
-                    "expectedGeneration",
-                    "totalQuotaBytes",
-                    "safetyMarginBytes",
-                    "retentionDays",
-                ]
-                .iter()
-                .all(|key| positive(key))
-        } else {
-            params.len() == 2
-                && positive("expectedGeneration")
-                && ((params.get("rootPath").is_some_and(Value::is_string)
-                    && !params.contains_key("resetToDefault"))
-                    || (params.get("resetToDefault") == Some(&Value::Bool(true))
-                        && !params.contains_key("rootPath")))
-        };
-        return shape
-            && validate_method_value(&request.method, "request", &Value::Object(params)).is_ok();
+    // The door admitted a Runtime storage request in exactly the shape
+    // Swift's admits (`storage::admitted`), and the storage owner checks the
+    // rest.
+    if storage::METHODS.contains(&request.method.as_str()) {
+        return true;
     }
+    let params = request.params.clone().unwrap_or_default();
     // Observation references name Runtime-owned snapshots, never caller facts.
     // The broad recorded schema alone also admits retired input shapes.
     if request.method == "device.observations" {
@@ -356,7 +314,6 @@ fn closed_parameters(request: &Request) -> bool {
         | "operation.list"
         | "target.list"
         | "runtime.hdc.status"
-        | "runtime.storage.status"
         | "artifact.quota"
         | "trace.cache.status"
         | "trace.cache.purge"
@@ -404,13 +361,20 @@ fn refusal(id: &str, code: &str, message: &str) -> Vec<u8> {
     let response = Response::failure(id, code, message).value();
     encode_frame(&response, MAX_RESPONSE_BYTES).expect("bounded App ingress refusal")
 }
+/// The words of every refusal at Swift's App transport
+/// (`AgentFacadeOrigin.swift:137–145`), whatever its code.
+const TRANSPORT_REFUSED: &str = "Runtime transport refused this request";
 /// Swift's App transport refusing a request outside its allowlist before the
 /// Runtime (`AgentXPCEndpoint.responseFrame`): this code and these words,
 /// and nothing else, whatever the method.
 fn not_allowlisted(id: &str) -> Vec<u8> {
-    refusal(
-        id,
-        "methodNotAllowlisted",
-        "Runtime transport refused this request",
-    )
+    refusal(id, "methodNotAllowlisted", TRANSPORT_REFUSED)
+}
+/// The identity a frame names, as Swift reads it back for a refusal of the
+/// frame's version or method: its `id`, or none.
+fn frame_id(frame: &[u8]) -> String {
+    strict_json(frame)
+        .ok()
+        .and_then(|value| value["id"].as_str().map(str::to_owned))
+        .unwrap_or_default()
 }

@@ -147,26 +147,15 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             continue;
         }
         let reply = ingress.handle(&frame(method, json!({})), root.peer());
-        if matches!(
-            *method,
-            "job.plan" | "job.submit" | "job.run" | "job.cancel"
-        ) {
-            // The App's Job requests meet their own typed gate first.
-            assert_eq!(code(&reply), "rejected", "{method}");
-            assert!(
-                decode_response(reply.trim_ascii_end(), "request-1", method).is_ok(),
-                "refusal must conform for {method}"
-            );
-        } else {
-            // Swift's App transport refusal, whatever the method: its code
-            // and words and nothing else, outside any method schema.
-            assert_eq!(
-                serde_json::from_slice::<Value>(&reply).unwrap(),
-                json!({"id":"request-1","ok":false,"error":{"code":"methodNotAllowlisted",
-                    "message":"Runtime transport refused this request"}}),
-                "{method}"
-            );
-        }
+        // Swift's App transport refusal, whatever the method, and a Job
+        // request its typed gate refuses too: its code and words and nothing
+        // else, outside any method schema.
+        assert_eq!(
+            serde_json::from_slice::<Value>(&reply).unwrap(),
+            json!({"id":"request-1","ok":false,"error":{"code":"methodNotAllowlisted",
+                "message":"Runtime transport refused this request"}}),
+            "{method}"
+        );
     }
     let mut forged: Value = serde_json::from_slice(&valid).unwrap();
     forged["arkdeckOrigin"] = json!({"transport":"appXPC","peerEUID":root.peer().euid});
@@ -411,9 +400,15 @@ fn app_observation_handles_are_closed_and_never_become_caller_facts() {
             json!({"peerEUID":root.peer().euid}),
             json!({"authorization":{}}),
         ] {
+            // Swift's App transport refuses a storage status with any
+            // parameter at its door.
             assert_eq!(
                 code(&ingress.handle(&frame(method, params), root.peer())),
-                "invalidParams"
+                if method == "runtime.storage.status" {
+                    "methodNotAllowlisted"
+                } else {
+                    "invalidParams"
+                }
             );
         }
     }
@@ -425,6 +420,9 @@ mod job_tests;
 
 #[path = "storage_tests.rs"]
 mod storage_tests;
+
+#[path = "door_tests.rs"]
+mod door_tests;
 
 #[path = "import_tests.rs"]
 mod import_tests;

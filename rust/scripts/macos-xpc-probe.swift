@@ -14,18 +14,34 @@ xpc_connection_set_event_handler(connection) { _ in }
 xpc_connection_activate(connection)
 var samples = [Double]()
 var errors = [String]()
+// The current protocol version and contract identity, as this checkout's
+// published method schemas name them.
+let published = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+  .appendingPathComponent("../../spec/control/methods/health.json")
+guard let schema = try? JSONSerialization.jsonObject(with: Data(contentsOf: published)) as? [String: Any],
+  let protocolVersion = schema["x-arkdeck-protocolVersion"] as? String,
+  let contractIdentity = schema["x-arkdeck-contractIdentity"] as? String else { exit(66) }
+// The App transport's door (TASK-XPA-019; `rust/tests/fixtures/app-ingress-door-oracle`):
+// every refusal is Swift's frame, these words under its code, and an unread
+// frame answers under no request's identity. None of these requests changes
+// any state, even past the door.
+let refused = "Runtime transport refused this request"
 let cases: [(String, [String: Any], String?)] = contractMode ? [
   ("health", [:], nil),
   ("health", ["arkdeckOrigin": ["foregroundConsole": true]], "malformedFrame"),
+  ("health", ["protocolVersion": "0.9.0"], "unsupportedProtocolVersion"),
+  ("no.such.method", [:], "unknownMethod"),
+  ("job.submit", ["params": ["requestJson": "{}"]], "methodNotAllowlisted"),
   ("job.run", ["params": ["jobId": "JOB-XPA-UNOWNED"]], "methodNotAllowlisted"),
   ("job.cancel", ["params": ["jobId": "JOB-XPA-UNOWNED"]], "methodNotAllowlisted"),
+  ("runtime.storage.status", ["params": ["verbose": "1"]], "methodNotAllowlisted"),
+  ("runtime.storage.root", ["params": ["expectedGeneration": "1", "rootPath": "relative"]], "methodNotAllowlisted"),
 ] : Array(repeating: ("health", [:], nil), count: count + 10)
 var completedCases = [String]()
 for (i, test) in cases.enumerated() {
   let done = DispatchSemaphore(value: 0)
-  var fields: [String: Any] = ["protocolVersion": "1.0.0",
-    "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
-    "id": "probe-\(i)", "method": test.0]
+  var fields: [String: Any] = ["protocolVersion": protocolVersion,
+    "contractIdentity": contractIdentity, "id": "probe-\(i)", "method": test.0]
   fields.merge(test.1) { _, value in value }
   let frame = try JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
   let message = xpc_dictionary_create(nil, nil, 0)
@@ -40,7 +56,8 @@ for (i, test) in cases.enumerated() {
         let object = try? JSONSerialization.jsonObject(with: Data(bytes: bytes, count: length)) as? [String: Any],
         object["id"] as? String == (test.2 == "malformedFrame" ? "" : "probe-\(i)"),
         (test.2 == nil ? object["ok"] as? Bool == true :
-          object["ok"] as? Bool == false && (object["error"] as? [String: Any])?["code"] as? String == test.2) {
+          object["ok"] as? Bool == false && (object["error"] as? [String: Any])?["code"] as? String == test.2
+            && (object["error"] as? [String: Any])?["message"] as? String == refused) {
         completedCases.append(test.0)
         if contractMode || i >= 10 { samples.append(Double(clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - started) / 1e6) }
       } else { errors.append("invalidFrame") }

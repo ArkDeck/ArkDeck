@@ -1,0 +1,10 @@
+{
+  "command": "ARKDECK_APP_INGRESS_DOOR_ORACLE_OUTPUT=<new path under /private/tmp> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter AppIngressDoorOracleContractTests; without the variable the same test compares Swift's answers with cases.json byte for byte",
+  "determinism": "every request carries the fixed id door-oracle and fixed identities (JOB-door-oracle, TGT-fixture, door-oracle-request); raw frames name the current protocol version and contract identity as $protocolVersion and $contractIdentity, which the replay substitutes; a request the door lets through is recorded as forwarded, never by the Runtime's answer",
+  "files": {
+    "cases.json": "58405356f3c6d1dc44e265748ef719adbcd352bf97a15c509a285ba5392cd6cf"
+  },
+  "recordedBy": "AppIngressDoorOracleContractTests.testTheAppTransportDoor, main 20130b631, macOS 27.0 (26A428)",
+  "source": "each case goes through AgentXPCEndpoint.responseFrame, the frame the App's raw XPC listener sends back, with a fresh App Job gate, over a RuntimeControlPlaneHandler composed without the storage, Target and Artifact owners: the door's refusal recorded byte for byte as received, or forwarded (checked against AgentXPCEndpoint.admission for every method but job.run and job.cancel); no dispatch",
+  "why": "TASK-XPA-019: the App ingress door refusals #2249 left open (TASK-XPA-013 import-app-and-cli-refusals-run.md): frames the door cannot decode, the typed App Job gate's refusals, and the Runtime storage requests' closed parameters; the Rust App ingress replays them"
+}
