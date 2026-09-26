@@ -920,7 +920,8 @@ pub trait WorkspaceToolDispatch: Send + Sync {
 }
 
 /// The production dispatch: the executable opened by the digest its profile
-/// pinned and started from its retained inode, argv only, no shell, the
+/// pinned and started from its retained inode (the SwiftPM test role uses
+/// the mapping-proved canonical path), argv only, no shell, the
 /// clean base environment plus the invocation's overlay, `/dev/null` as stdin
 /// and each stream bounded; every verified resource opened by its pinned
 /// identity first and held until the child is gone.
@@ -987,7 +988,33 @@ impl WorkspaceToolDispatch for VerifiedToolDispatch {
         };
         // A workspace step is cancelled at its safe boundaries, never
         // mid-child.
-        let ran = tool.run_tool(&request, &|| false);
+        // SwiftPM initializes Foundation from its toolchain bundle. An inode
+        // alias loses that bundle and can crash before the test runner starts.
+        // Its profile-owned test role needs the same suspended, mapping-proved
+        // canonical launch already used for bundle analyzers. Ordinary tools
+        // keep the inode path; no caller selects a launch mode.
+        let swiftpm_tests = Path::new(invocation.executable_path).file_name()
+            == Some(std::ffi::OsStr::new("swift-package"))
+            && invocation.argument_zero.is_some_and(|zero| {
+                Path::new(zero).file_name() == Some(std::ffi::OsStr::new("swift-test"))
+            });
+        let ran = if swiftpm_tests {
+            let bound = || {
+                for resource in invocation.resources {
+                    arkdeck_platform::VerifiedResource::open(
+                        &resource.path,
+                        &resource.sha256,
+                        resource.byte_count,
+                        resource.require_executable,
+                    )?
+                    .revalidate()?;
+                }
+                Ok(())
+            };
+            tool.run_tool_at_canonical_path(&request, &bound, &|| false)
+        } else {
+            tool.run_tool(&request, &|| false)
+        };
         drop(held);
         match ran {
             Err(ToolRunError::Refused(error)) => Err(refused(&error)),
