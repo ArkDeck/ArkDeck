@@ -357,9 +357,8 @@ impl Owners {
                 let jobs = &self.jobs;
                 match self
                     .artifacts
-                    .handle_list(params, &jobs.snapshot_directory(), |job| {
-                        jobs.read_snapshot(job).map(|_| ())
-                    }) {
+                    .handle_list(params, |job| jobs.read_snapshot(job).map(|_| ()))
+                {
                     // The pager's revision is its own; the oracle labels it.
                     Ok(mut result) => {
                         result["snapshotRevision"] = json!("<snapshotRevision>");
@@ -478,12 +477,12 @@ fn play(story: &str) -> Vec<String> {
     differences
 }
 
-/// The pagers' snapshots: Swift keeps the Artifact pager's in the Artifact
-/// root and the Job list pager's in the Job root, each labelled in the
-/// oracle; this Runtime keeps both pagers' in the Job root.
-const SWIFT_SNAPSHOTS: &str = "artifacts/.imports-v1/artifact-snapshots/snapshot-";
-const SWIFT_JOB_SNAPSHOT: &str = "store/cli-job-snapshots/snapshot-<revision>.json";
-const RUST_SNAPSHOTS: &str = "store/cli-job-snapshots/snapshot-";
+/// The pagers' snapshots, which each pager keeps where Swift's does: the
+/// Artifact list's below the Artifact root's Import namespace, the Job
+/// list's in the Job root. The oracle labels their revisions; each pager's
+/// snapshots are counted, not compared.
+const ARTIFACT_SNAPSHOTS: &str = "artifacts/.imports-v1/artifact-snapshots/snapshot-";
+const JOB_SNAPSHOTS: &str = "store/cli-job-snapshots/snapshot-";
 
 /// What Swift's daemon leaves below the root that no story made, and this
 /// Runtime does not: the Job directory its engine creates when it starts;
@@ -498,18 +497,19 @@ fn swift_incidental(path: &str) -> bool {
             | "store/targets"
             | "store/targets/.target-display-names.lock"
             | "store/targets/target-display-names.json"
-            | "artifacts/.imports-v1/artifact-snapshots"
-            | SWIFT_JOB_SNAPSHOT
-    ) || path.starts_with(SWIFT_SNAPSHOTS)
+    ) || path.starts_with(ARTIFACT_SNAPSHOTS)
+        || path.starts_with(JOB_SNAPSHOTS)
         || path.ends_with("/.payload-verification-v1.json")
         || path
             .strip_prefix("artifacts/job-")
             .is_some_and(|job| job.len() == 32 && !job.contains('/'))
 }
 
-/// What this Runtime's owners leave that Swift's do not: each owner's lock,
-/// the empty Session retention catalog a Session owner writes when it opens
-/// (Swift writes it at its first publication), and the pager's snapshots.
+/// What this Runtime's owners leave that Swift's do not: each owner's and
+/// each pager's lock, the empty Session retention catalog a Session owner
+/// writes when it opens (Swift writes it at its first publication), the Job
+/// list's snapshot directory, which the Job owner makes when it opens, and
+/// the pagers' snapshots.
 fn rust_incidental(path: &str) -> bool {
     matches!(
         path,
@@ -520,7 +520,9 @@ fn rust_incidental(path: &str) -> bool {
             | "Sessions/.arkdeck-retention-catalog.json"
             | "store/cli-job-snapshots"
             | "store/cli-job-snapshots/.snapshots.lock"
-    ) || path.starts_with(RUST_SNAPSHOTS)
+            | "artifacts/.imports-v1/artifact-snapshots/.snapshots.lock"
+    ) || path.starts_with(ARTIFACT_SNAPSHOTS)
+        || path.starts_with(JOB_SNAPSHOTS)
 }
 
 /// A Flash record's timeline measures how long its run waited for the lane's
@@ -645,14 +647,13 @@ fn leftovers(story: &str, root: &Path) -> Vec<String> {
             .filter(|entry| path(entry).starts_with(prefix))
             .count()
     };
-    let (swift_pages, rust_pages) = (
-        snapshots(swift_tree, SWIFT_SNAPSHOTS) + snapshots(swift_tree, SWIFT_JOB_SNAPSHOT),
-        snapshots(&tree, RUST_SNAPSHOTS),
-    );
-    if swift_pages != rust_pages {
-        differences.push(format!(
-            "{story}: Swift's pager kept {swift_pages} snapshots, this Runtime's {rust_pages}"
-        ));
+    for pager in [ARTIFACT_SNAPSHOTS, JOB_SNAPSHOTS] {
+        let (swift_pages, rust_pages) = (snapshots(swift_tree, pager), snapshots(&tree, pager));
+        if swift_pages != rust_pages {
+            differences.push(format!(
+                "{story}: Swift's pager kept {swift_pages} snapshots in {pager}, this Runtime's {rust_pages}"
+            ));
+        }
     }
     let mut files = BTreeMap::new();
     for (path, kind, _) in walk(root) {

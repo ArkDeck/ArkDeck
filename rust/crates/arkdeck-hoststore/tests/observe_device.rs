@@ -195,9 +195,7 @@ fn rust_observes_the_swift_fake_device() {
                 Err(error) => refused(&error.code, error.message, error.details),
             },
             "artifact.list" => {
-                match artifacts.handle_list(params, &jobs.snapshot_directory(), |job| {
-                    jobs.read_snapshot(job).map(|_| ())
-                }) {
+                match artifacts.handle_list(params, |job| jobs.read_snapshot(job).map(|_| ())) {
                     // The pager's revision is its own; the oracle labels it.
                     Ok(mut result) => {
                         result["snapshotRevision"] = json!("<snapshotRevision>");

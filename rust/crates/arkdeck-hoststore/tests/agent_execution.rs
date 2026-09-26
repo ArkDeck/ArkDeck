@@ -297,9 +297,8 @@ fn rust_runs_the_swift_agent_executions() {
                     Err(error) => refused(&error.code, error.message, error.details),
                 },
                 "artifact.list" => {
-                    match artifacts.handle_list(&params, &jobs.snapshot_directory(), |job| {
-                        jobs.read_snapshot(job).map(|_| ())
-                    }) {
+                    match artifacts.handle_list(&params, |job| jobs.read_snapshot(job).map(|_| ()))
+                    {
                         Ok(result) => json!({"ok": true, "result": result}),
                         Err(error) => refused(&error.code, error.message, error.details),
                     }

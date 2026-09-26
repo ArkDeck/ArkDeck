@@ -7,7 +7,6 @@ use crate::{
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
 use std::io;
-use std::path::Path;
 
 pub(crate) fn failure(code: &str, message: &str) -> WireError {
     WireError {
@@ -114,13 +113,12 @@ impl ArtifactReadStore {
     /// Swift `RuntimeArtifactResourceHandler`'s `artifact.list` of a Job
     /// owner, in its order: closed parameters with one tagged owner, the
     /// Job's existence from the Job owner, the cursor, the page size, then a
-    /// page of the snapshot `snapshots` keeps of every Artifact the Job's
+    /// page of the snapshot this owner keeps of every Artifact the Job's
     /// index verifies, each the projection `artifact.inspect` answers, newest
     /// first and then by Artifact identity.
     pub fn handle_list(
         &self,
         params: &Map<String, Value>,
-        snapshots: &Path,
         require_job: impl FnOnce(&str) -> Result<(), WireError>,
     ) -> Result<Value, WireError> {
         if params.get("owner").and_then(|v| v.get("kind")) == Some(&json!("import")) {
@@ -129,13 +127,15 @@ impl ArtifactReadStore {
                 "Import Artifact ownership requires its Import owner",
             ));
         }
-        self.handle_owned_list(params, snapshots, require_job)
+        self.handle_owned_list(params, require_job)
     }
 
+    /// The list of a Job or an Import owner. Either owner's pages are kept
+    /// in Swift's Artifact snapshot directory (`list_snapshots`), never
+    /// beside another pager's: each pager reclaims its own snapshots only.
     pub(crate) fn handle_owned_list(
         &self,
         params: &Map<String, Value>,
-        snapshots: &Path,
         require_job: impl FnOnce(&str) -> Result<(), WireError>,
     ) -> Result<Value, WireError> {
         if !params
@@ -170,7 +170,9 @@ impl ArtifactReadStore {
                     )
                 })?,
         };
-        let pager = SnapshotPager::open(snapshots)
+        let pager = self
+            .list_snapshots()
+            .and_then(|snapshots| SnapshotPager::open(&snapshots))
             .map_err(|_| failure("recordUnreadable", "Artifact resource is unreadable"))?;
         pager
             .page_filtered(

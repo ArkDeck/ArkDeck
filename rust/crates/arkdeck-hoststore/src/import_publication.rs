@@ -308,9 +308,8 @@ impl ImportUploadStore {
         artifacts: &ArtifactReadStore,
         method: &str,
         params: &Map<String, Value>,
-        snapshots: &Path,
     ) -> Result<Value, WireError> {
-        self.artifact_resource_inner(artifacts, method, params, snapshots)
+        self.artifact_resource_inner(artifacts, method, params)
             .map_err(|mut error| {
                 if let Some(details) = error.details.as_mut() {
                     details.insert("phase".into(), json!("artifactOwner"));
@@ -324,7 +323,6 @@ impl ImportUploadStore {
         artifacts: &ArtifactReadStore,
         method: &str,
         params: &Map<String, Value>,
-        snapshots: &Path,
     ) -> Result<Value, WireError> {
         let owner = params
             .get("owner")
@@ -359,7 +357,7 @@ impl ImportUploadStore {
             }
         };
         let mut value = if method == "artifact.list" {
-            artifacts.handle_owned_list(params, snapshots, require_owner)?
+            artifacts.handle_owned_list(params, require_owner)?
         } else {
             artifacts.handle_owned_resource(method, params, require_owner)?
         };

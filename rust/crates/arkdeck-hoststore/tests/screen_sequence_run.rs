@@ -306,9 +306,8 @@ fn rust_captures_every_swift_screen_sequence_as_swift_does() {
                 let jobs = &owners.jobs;
                 match owners
                     .artifacts
-                    .handle_list(params, &jobs.snapshot_directory(), |job| {
-                        jobs.read_snapshot(job).map(|_| ())
-                    }) {
+                    .handle_list(params, |job| jobs.read_snapshot(job).map(|_| ()))
+                {
                     // The pager's revision is its own; the oracle labels it.
                     Ok(mut result) => {
                         result["snapshotRevision"] = json!("<snapshotRevision>");
