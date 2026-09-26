@@ -548,6 +548,9 @@ pub struct ServiceHost<'a> {
     pub validate_daemon_bundle: &'a dyn Fn(&Path) -> Result<PathBuf, String>,
     /// The signature check of a helper's sibling facade.
     pub validate_facade: &'a dyn Fn(&Path) -> Result<(), String>,
+    /// Maintenance after the installed helper is verified and before launchd
+    /// starts it. Production uses the credential owner; tests record it.
+    pub refresh_signing_access: &'a dyn Fn(&Path, &Path) -> Result<(), String>,
     /// The Bootstrap registry's trust in a retained helper bundle (Swift
     /// `validateBundle`): the production helper policy, as for `--daemon`.
     pub bundle_trust: arkdeck_bootstrap::BundleValidator,
@@ -1696,6 +1699,7 @@ pub fn run(invocation: &Invocation, id: &str) -> ServiceAnswer {
         launchctl: &launchctl,
         validate_daemon_bundle: &validate_daemon_bundle,
         validate_facade: &validate_facade,
+        refresh_signing_access: &crate::signing_leaves::refresh_installed_identity,
         bundle_trust: std::sync::Arc::new(arkdeck_platform::validate_production_daemon_bundle),
         hdc_identities: None,
         now_utc: &utc_now,

@@ -159,3 +159,34 @@ pub fn run(command: &str) -> Result<Value, crate::CliError> {
             ..crate::CliError::new("ioFailure", error.to_string())
         })
 }
+
+/// Before changing a service installation, reject an unreadable or drifted
+/// preset using public file identities only. This probe creates no owner
+/// ledger and never opens or reads the Keychain.
+#[cfg(target_os = "macos")]
+pub fn validate_refresh(
+    root: &std::path::Path,
+) -> Result<(), arkdeck_provider_workspace::SigningError> {
+    use arkdeck_provider_workspace::signing_preset::{DEFAULT_PRESET_ID, SigningPresetStore};
+    SigningPresetStore::new(root)
+        .load_validated(DEFAULT_PRESET_ID, false, &Unanswerable)
+        .map(|_| ())
+}
+
+/// Production `beforeBootstrap`: bind the still-installed credential to the
+/// freshly verified, installed helper. Identity comes from the platform's
+/// code-signature check, never from the caller's JSON or a supplied digest.
+#[cfg(target_os = "macos")]
+pub fn refresh_installed_identity(
+    root: &std::path::Path,
+    daemon: &std::path::Path,
+) -> Result<(), String> {
+    use arkdeck_provider_workspace::credential_owner::CredentialOwner;
+    use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
+    use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
+    let secrets =
+        KeychainSigningSecrets::installed(daemon.to_owned()).map_err(|e| e.to_string())?;
+    CredentialOwner::new(SigningPresetStore::new(root))
+        .refresh_daemon_identity(&secrets)
+        .map_err(|e| e.to_string())
+}

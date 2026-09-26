@@ -1186,6 +1186,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 
 - 2026-09-26: `runtime signing remove` and its legacy spelling use the credential owner's durable removal transaction, refuse pinned credentials and retain user source files. See `evidence/runs/TASK-XPA-018/signing-remove-run.md`; installation/migration and update-time credential refresh remain unported.
+- 2026-09-26: service install/update now validates installed signing material before changing the installation and refreshes the installed daemon identity under the credential owner lock before bootstrap. Credential references and preset pins stay unchanged; known-absent envelopes and untrusted identities fail refresh. As Swift does, maintenance failure first attempts to restore the validated replacement service, then reports the error; signing remains independently fail-closed. Temporary homes and recording secret/launchd fixtures only; no installed Keychain acceptance. Signing preset install/migration leaves still remain. See `evidence/runs/TASK-XPA-017/signing-identity-refresh-run.md`.
 
 - Status:in-progress（2026-09-11: the continuous Rust CLI foundation serves operation describe/example and consumes current Job queries with bounded deadlines; full leaf parity, export, Swift retirement and GJ acceptance remain pending）
 - Platform:macos（r8: the Rust CLI becomes the only CLI on Windows when that side starts）

@@ -339,6 +339,59 @@ impl CredentialOwner {
         })
     }
 
+    /// Swift `owner.maintain { store.refreshDaemonKeychainIdentity() }`.
+    /// A helper update changes only the receipt's daemon fingerprint, never
+    /// a password, envelope account or public credential identity. Preset
+    /// pins therefore remain valid throughout this locked maintenance.
+    pub fn refresh_daemon_identity(
+        &self,
+        secrets: &dyn SigningSecrets,
+    ) -> Result<(), SigningError> {
+        self.with_lock(|held| {
+            let (ledger, installed) = self.load_and_recover(held)?;
+            let Some(mut receipt) = installed else {
+                return Ok(());
+            };
+            let before = credential_reference(&receipt)?;
+            let identity = secrets.trusted_daemon_fingerprint()?;
+            let envelope = receipt.secret_envelope_account.as_deref().ok_or_else(|| {
+                SigningError::secret("Data Protection Keychain envelope is absent")
+            })?;
+            // Unreadable is not absent. This maintenance process may lack
+            // the shared access group; refreshing a public fingerprint does
+            // not decrypt/rewrite the envelope or admit a signing operation.
+            if secrets.presence(envelope) == crate::signing_preset::SecretPresence::Absent {
+                return Err(SigningError::secret(
+                    "Data Protection Keychain envelope is absent",
+                ));
+            }
+            if receipt.trusted_daemon_application_sha256 != identity {
+                receipt.trusted_daemon_application_sha256 = identity;
+                let value = serde_json::to_value(&receipt)
+                    .map_err(|_| SigningError::io("signing receipt cannot be encoded"))?;
+                let bytes = crate::canonical_json::encode(&value)
+                    .ok_or_else(|| SigningError::io("signing receipt cannot be encoded"))?;
+                self.revalidate(held)?;
+                held.directory
+                    .publish_document(crate::signing_preset::RECEIPT_FILE, &bytes, 1024 * 1024)
+                    .map_err(|_| SigningError::io("cannot durably refresh signing receipt"))?;
+            }
+            self.revalidate(held)?;
+            let after = self
+                .installed_receipt()?
+                .as_ref()
+                .map(credential_reference)
+                .transpose()?;
+            self.revalidate(held)?;
+            if after.as_deref() != Some(before.as_str()) || ledger.credential_ref != after {
+                return Err(SigningError::drift(
+                    "signing credential maintenance changed its public identity",
+                ));
+            }
+            Ok(())
+        })
+    }
+
     /// Swift `installedReceipt()`: the receipt, or `None` only when the root
     /// positively holds none; one this build cannot honour is an error.
     fn installed_receipt(&self) -> Result<Option<SigningPresetReceipt>, SigningError> {
