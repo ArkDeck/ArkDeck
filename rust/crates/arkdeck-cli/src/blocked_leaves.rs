@@ -1,8 +1,6 @@
 //! Registry leaves whose subsystem the Rust CLI has not ported yet, answered
-//! by name: `runtime update *`, and `maintainer update-feed assemble` with its
-//! deprecated `update-feed assemble` spelling (a declared difference,
-//! TASK-XPA-018; the coordinator's ruling of 2026-09-26; `prepare` is ported
-//! in `update_feed`).
+//! by name: `runtime update *` (TASK-XPA-018). Feed maintainer tools
+//! are ported in `update_feed`.
 //!
 //! The registry publishes them as executable, so they are not tombstones
 //! (CLI spec §12:1462 reserves `commandRemoved` for leaves the registry marks
@@ -24,11 +22,6 @@ const BLOCKED: &[(&str, &str)] = &[
     ("runtime.update.status", "the macOS update subsystem"),
     ("runtime.update.cancel", "the macOS update subsystem"),
     ("runtime.update.cleanup", "the macOS update subsystem"),
-    (
-        "maintainer.update-feed.assemble",
-        "the update feed maintainer tools",
-    ),
-    ("update-feed.assemble", "the update feed maintainer tools"),
 ];
 
 /// Whether `command` is answered by name as not yet provided.

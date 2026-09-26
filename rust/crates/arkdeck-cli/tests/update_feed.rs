@@ -10,9 +10,8 @@
 //! status, stdout and stderr (a generated correlation identity, of Swift's
 //! shape, compared as the oracle's `ctl-<uuid>`) — and write the same payload
 //! and signature input, byte for byte, with the same modes. The recorded
-//! `assemble` runs wait for that leaf's port (it verifies an Ed25519
-//! signature, a dependency not yet approved); this CLI answers it
-//! `blockedByProductDefect`, which `blocked_leaves.rs` holds.
+//! `assemble` refusal runs also replay; successful signing uses fixture keys
+//! in codec tests, never the production private key.
 #![cfg(target_os = "macos")]
 
 use serde_json::Value;
@@ -99,7 +98,7 @@ fn base64(bytes: &[u8]) -> String {
 }
 
 #[test]
-fn swifts_recorded_prepare_runs_replay_through_the_cli() {
+fn swifts_recorded_prepare_and_assemble_runs_replay_through_the_cli() {
     let oracle = oracle();
     let root = std::fs::canonicalize(std::env::temp_dir())
         .unwrap()
@@ -121,6 +120,8 @@ fn swifts_recorded_prepare_runs_replay_through_the_cli() {
     )
     .unwrap();
     std::fs::write(format!("{}/empty.dmg", root.0), b"").unwrap();
+    std::fs::write(format!("{}/short.sig", root.0), [1; 63]).unwrap();
+    std::fs::write(format!("{}/forged.sig", root.0), [7; 64]).unwrap();
     let label = |text: &str| text.replace(&root.0, "<root>");
     let mut failures = Vec::new();
     let mut replayed = 0;
@@ -132,9 +133,6 @@ fn swifts_recorded_prepare_runs_replay_through_the_cli() {
             .iter()
             .map(|argument| decomposed(&argument.as_str().unwrap().replace("<root>", &root.0)))
             .collect();
-        if argv.iter().any(|argument| argument == "assemble") {
-            continue;
-        }
         replayed += 1;
         let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
             .args(&argv)
@@ -166,6 +164,13 @@ fn swifts_recorded_prepare_runs_replay_through_the_cli() {
             failures.push(format!("{}: mode {mode:?}", file["path"]));
         }
     }
-    assert_eq!(replayed, 26);
+    assert_eq!(replayed, 31);
+    assert!(!std::fs::read_dir(&root.0).unwrap().any(|entry| {
+        entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with("feed-")
+    }));
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

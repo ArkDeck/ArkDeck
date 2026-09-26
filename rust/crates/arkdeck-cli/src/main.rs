@@ -1354,7 +1354,7 @@ fn render_agent_answer(
     }
 }
 
-/// `maintainer update-feed prepare` and its deprecated spelling: the prepared
+/// `maintainer update-feed prepare|assemble` and its deprecated spelling: the prepared
 /// payload's facts, as the runbook's lines in the human rendering; a refusal
 /// as Swift's session makes it, or a plain diagnostic where Swift's handler
 /// throws its plain error.
@@ -1376,7 +1376,12 @@ fn serve_update_feed_prepare(invocation: &Invocation, id: &str) -> std::process:
         })
         .unwrap_or_default();
     let root = invocation.command.split('.').next().unwrap_or_default();
-    match update_feed::prepare(&options) {
+    let answer = if invocation.command.ends_with(".assemble") {
+        update_feed::assemble(&options)
+    } else {
+        update_feed::prepare(&options)
+    };
+    match answer {
         Answer::Prepared { document, lines } => {
             let written = if invocation.json {
                 write_document(&arkdeck_cli::with_lifecycle(
@@ -1655,7 +1660,10 @@ fn main() -> std::process::ExitCode {
     }
     if matches!(
         invocation.command,
-        "maintainer.update-feed.prepare" | "update-feed.prepare"
+        "maintainer.update-feed.prepare"
+            | "update-feed.prepare"
+            | "maintainer.update-feed.assemble"
+            | "update-feed.assemble"
     ) {
         return serve_update_feed_prepare(&invocation, id);
     }
