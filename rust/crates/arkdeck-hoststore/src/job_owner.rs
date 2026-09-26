@@ -11,7 +11,7 @@ use crate::job_repository::{
     AdmissionVerdict, JobRepository, JobRow, JobWriteError, identifier, order_key,
 };
 use crate::snapshot_pager::SnapshotPager;
-use arkdeck_contract::WireError;
+use arkdeck_contract::{WireError, canonical_json};
 use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde_json::{Map, Value, json};
 use std::{
@@ -759,6 +759,10 @@ impl JobStore {
                 // snapshot: the refusal of the first such record in creation
                 // order, however the rows are handed over.
                 let mut refused: Option<(String, String, WireError)> = None;
+                // Swift's Job owner bounds the canonical bytes of the rows the
+                // query keeps, before its pager (`RuntimeJobEngine.swift`
+                // `jobListSnapshot`); past the bound no row is handed over.
+                let mut kept = 0usize;
                 self.repository
                     .map_rows_ordered(None, descending, |row| {
                         let projected = (|| -> Result<_, WireError> {
@@ -782,7 +786,13 @@ impl JobStore {
                             Ok(Some(value))
                         })();
                         match projected {
-                            Ok(Some(value)) => emit(value),
+                            Ok(Some(_)) if kept > MAX_JOB_SNAPSHOT => {}
+                            Ok(Some(value)) => {
+                                kept += canonical_json(&value).map_err(io::Error::other)?.len();
+                                if kept <= MAX_JOB_SNAPSHOT {
+                                    emit(value);
+                                }
+                            }
                             Ok(None) => {}
                             Err(error) => {
                                 if refused.as_ref().is_none_or(|(key, id, _)| {
@@ -795,11 +805,21 @@ impl JobStore {
                         Ok(())
                     })
                     .map_err(unreadable)?;
-                refused.map_or(Ok(()), |(_, _, error)| Err(error))
+                match refused {
+                    Some((_, _, error)) => Err(error),
+                    None if kept > MAX_JOB_SNAPSHOT => Err(pre_admission(failure(
+                        "operationUnavailable",
+                        "Job snapshot exceeds its storage bound; narrow the query",
+                    ))),
+                    None => Ok(()),
+                }
             })
             .map_err(pager_refusal)
     }
 }
+/// The canonical bytes of the rows one Job list snapshot may keep.
+const MAX_JOB_SNAPSHOT: usize = 16 * 1024 * 1024;
+
 /// Swift's Job read handler: a refusal of the request itself
 /// (`AgentExecutionControlFailure`) is pre-admission, with zero dispatch.
 fn pre_admission(mut error: WireError) -> WireError {

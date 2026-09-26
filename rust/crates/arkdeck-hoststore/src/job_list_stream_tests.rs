@@ -429,3 +429,81 @@ fn the_job_reads_refuse_a_cursor_as_swifts_handler_does() {
         );
     }
 }
+
+/// Swift's Job owner bounds the canonical bytes of the rows a list keeps
+/// before its pager does (`RuntimeJobEngine.swift` `jobListSnapshot`): past
+/// 16 MiB it refuses the query in its own words, with its handler's
+/// pre-admission proof, where the pager would have refused in its own. Rows
+/// the query leaves out, or projects without their timelines, do not count.
+#[test]
+fn a_job_list_past_its_storage_bound_is_refused_as_swifts_owner_refuses_it() {
+    let root = Root::new();
+    drop(JobStore::open(&root.0).unwrap());
+    // Eighty Jobs of 250 000 timeline bytes each, a timeline still inline
+    // (at most 256 KiB): all of them past the snapshot's bound, the forty
+    // that succeeded and the forty that failed each within it.
+    let long = "t".repeat(250_000);
+    for index in 0..80_i64 {
+        let id = format!("job-{index:02}");
+        let created = format!("2026-08-31T12:{:02}:{:02}Z", index / 60, index % 60);
+        let state = if index < 40 { "succeeded" } else { "failed" };
+        let record = json!({"jobID":id, "request":{"documentType":"runtime-operation-request",
+            "schemaVersion":"1.0.0", "requestId":format!("req-{id}"), "idempotencyKey":format!("idem-{id}"),
+            "target":{"targetId":"TGT-a", "expectedBindingRevision":1},
+            "operation":{"id":"observe.device", "version":1}, "inputs":{}, "requestedOutputs":["derivedArtifacts"]},
+            "operationReference":"observe.device@1", "catalogDigest":arkdeck_contract::CATALOG_DIGEST,
+            "providerID":"hdc", "createdAtUTC":created, "actualEffect":"readOnly",
+            "materializedPlanDigest":"a".repeat(64), "materializedBindingRevision":1, "state":state,
+            "outcomeUnknown":false, "timeline":["created", long], "actualStepKinds":[], "skipReasons":{}});
+        root.insert(
+            &id,
+            state,
+            &created,
+            index + 1,
+            serde_json::to_vec(&record).unwrap(),
+        );
+    }
+    let store = JobStore::open(&root.0).unwrap();
+    let list = |params: Value| store.handle_resource("job.list", params.as_object().unwrap());
+    let refusal = json!({"code":"operationUnavailable",
+        "message":"Job snapshot exceeds its storage bound; narrow the query",
+        "details":{"phase":"preAdmission","newDispatchCount":0}});
+    for order in ["createdAtDescJobIdAsc", "createdAtAscJobIdAsc"] {
+        assert_eq!(
+            answered_error(list(json!({"includeTimeline": true, "order": order}))),
+            refusal,
+            "{order}"
+        );
+    }
+    // Without their timelines, or only those the query keeps, the rows fit.
+    let page = list(json!({"pageSize": 1000})).unwrap();
+    assert_eq!(page["items"].as_array().map(Vec::len), Some(80));
+    for (state, count) in [("succeeded", 40), ("failed", 40)] {
+        let mut items = 0;
+        let mut params = json!({"includeTimeline": true, "state": state});
+        loop {
+            let page = list(params.clone()).unwrap();
+            items += page["items"].as_array().unwrap().len();
+            match page["nextCursor"].as_str() {
+                Some(cursor) => params["cursor"] = json!(cursor),
+                None => break,
+            }
+        }
+        assert_eq!(items, count, "{state}");
+    }
+    // A record refusal is the answer before the bound's, whatever the order
+    // Swift's unordered repository read would have met them in.
+    root.insert(
+        "job-99",
+        "succeeded",
+        "2026-08-31T13:00:00Z",
+        99,
+        b"{}".to_vec(),
+    );
+    let unreadable = answered_error(list(json!({})));
+    assert_ne!(unreadable["code"], json!("operationUnavailable"));
+    assert_eq!(
+        answered_error(list(json!({"includeTimeline": true}))),
+        unreadable
+    );
+}
