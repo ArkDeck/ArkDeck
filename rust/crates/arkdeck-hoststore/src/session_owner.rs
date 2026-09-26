@@ -14,6 +14,7 @@ const MAXIMUM: usize = 64 * 1024;
 
 #[path = "session_cleanup_owner.rs"]
 mod cleanup;
+pub use cleanup::ActiveSessions;
 #[path = "session_export_owner.rs"]
 mod export;
 
@@ -938,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn cleanup_preview_is_durable_and_refuses_configuration_contention_or_unknown_content() {
+    fn cleanup_preview_is_durable_waits_for_the_storage_lock_and_refuses_unknown_content() {
         use std::collections::BTreeSet;
         let root = Root::new();
         let store = root.open();
@@ -957,15 +958,29 @@ mod tests {
         )
         .unwrap();
         assert_eq!(records.load(id).unwrap().preview, preview);
-        assert_eq!(
-            store
-                .preview_cleanup(&BTreeSet::new(), now)
-                .unwrap_err()
-                .code,
-            "resourceConflict"
-        );
         drop(records);
-        drop(lock);
+        // A preview made while the storage lock is held waits for it, as
+        // Swift's `withLockedDocument` does, and is answered once it is
+        // released, a second preview beside the first.
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let store = &store;
+            scope.spawn(move || {
+                sender
+                    .send(store.preview_cleanup(&BTreeSet::new(), now))
+                    .unwrap()
+            });
+            // The bound only lets an early answer arrive.
+            if let Ok(early) = receiver.recv_timeout(std::time::Duration::from_millis(200)) {
+                panic!("answered while the storage lock was held: {early:?}");
+            }
+            drop(lock);
+            let waited = receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+            assert_eq!(waited["sessions"], json!([]));
+        });
         fs::write(root.0.join("sessions/unaccounted"), b"retain this").unwrap();
         assert_eq!(
             store
@@ -982,7 +997,7 @@ mod tests {
             fs::read_dir(root.0.join("state/session-cleanup-previews"))
                 .unwrap()
                 .count(),
-            1
+            2
         );
     }
     #[test]

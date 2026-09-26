@@ -289,7 +289,7 @@ mod session_owner;
 #[cfg(target_os = "macos")]
 mod snapshot_pager;
 #[cfg(target_os = "macos")]
-pub use session_owner::SessionStore;
+pub use session_owner::{ActiveSessions, SessionStore};
 #[cfg(target_os = "macos")]
 mod session_cleanup_plan;
 #[cfg(target_os = "macos")]

@@ -104,8 +104,21 @@ proofs each way, debug build, 1-minute load 3.3 (`c-measure.log`).
 | Reading every Session | 356 ms | 442 ms |
 | Reusing every Session | 36 ms | 37 ms |
 
-What remains is listing the tree and two metadata reads per Session. A quiet-host run is left to
-the window the hub arranges, with the staged publication's P99 and the 20b baseline.
+What remains is listing the tree and two metadata reads per Session.
+
+**Again, in the hub's quiet window.** The hub's quiet window, 2026-09-26 08:44–09:04: no build ran on the host. The hub measured the
+1-minute load every 15 s: a median of 2.07 with every session's builds stopped, and a median of
+2.66 (max 3.35) during these measurements. This session sampled it every second
+(`window-load.log`): between 1.96 and 3.42. It ran a prebuilt debug binary, the
+`arkdeck-hoststore` library tests as built on `eec3df485` with the cleanup slice's change, which
+touches none of the measured paths, measuring only
+(`window-measure.log`). The same test, five proofs each way, at a
+1-minute load of 1.97:
+
+| Proof | Median | Max |
+| --- | --- | --- |
+| Reading every Session | 342 ms | 349 ms |
+| Reusing every Session | 37 ms | 38 ms |
 
 ## Contract
 

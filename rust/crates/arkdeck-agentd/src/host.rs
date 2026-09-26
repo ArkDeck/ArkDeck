@@ -2328,22 +2328,24 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             })?;
-            jobs.with_active_sessions(|active| {
+            // The storage lock first, as Swift's cleanup waits for it, and
+            // the Job owner's activity guard only under it
+            // (`SessionStore::preview_cleanup`).
+            let jobs: &arkdeck_hoststore::JobStore = jobs;
+            if let Some((id, digest)) = tuple {
+                sessions.apply_cleanup(id, digest, jobs, || {
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .map(|value| value.as_secs_f64() - 978307200.0)
+                        .unwrap_or(f64::NAN)
+                })
+            } else {
                 let now = SystemTime::now()
                     .duration_since(UNIX_EPOCH)
                     .map(|value| value.as_secs_f64() - 978307200.0)
                     .unwrap_or(f64::NAN);
-                if let Some((id, digest)) = tuple {
-                    sessions.apply_cleanup(id, digest, active, || {
-                        SystemTime::now()
-                            .duration_since(UNIX_EPOCH)
-                            .map(|value| value.as_secs_f64() - 978307200.0)
-                            .unwrap_or(f64::NAN)
-                    })
-                } else {
-                    sessions.preview_cleanup(active, now)
-                }
-            })
+                sessions.preview_cleanup(jobs, now)
+            }
         } else {
             sessions.handle_resource(method, params)
         }

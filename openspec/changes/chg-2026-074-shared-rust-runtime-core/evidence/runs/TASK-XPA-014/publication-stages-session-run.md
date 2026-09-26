@@ -228,13 +228,35 @@ take S before `activity`.
   - S was held 0.63 ms for the status read, 6.1 ms for the creation of staging, and 23.3 ms for
     the rename, the removal of staging and the catalog entry.
   - The whole publication took 50 s, without S.
-- **The planned P99 run was not executed.** It is 12 samples, each in a Sessions root of its own.
-  The host's 1-minute load was 11.8, with five sessions building in parallel. The hub arranges a
-  quiet window, and a follow-up adds the numbers here.
+- **The P99 run, in the hub's quiet window** (see below). It was not run with the slice: the
+  host's 1-minute load was then 11.8, with five sessions building in parallel.
 - **One proof, alone, over one retained 10,013-record Session: 9.4 s** (the same sample). The
   Journal replay grows with the square of a Journal's length (`ReplayState::validate` looks
   through every intent for each event). This is why the scan does not run under S. The next
   slice makes the replay linear.
+
+**The P99 run.** The hub's quiet window, 2026-09-26 08:44–09:04: no build ran on the host. The hub measured the
+1-minute load every 15 s: a median of 2.07 with every session's builds stopped, and a median of
+2.66 (max 3.35) during these measurements. This session sampled it every second
+(`window-load.log`): between 1.96 and 3.42. It ran a prebuilt debug binary, the
+`arkdeck-hoststore` library tests as built on `eec3df485` with the cleanup slice's change, which
+touches none of the measured paths, measuring only
+(`window-measure.log`).
+- `session_publication::measurement`: 12 samples, each publishing the 10,013-record Journal into
+  a Sessions root of its own while another thread proves the mutation state over and over. The
+  load was 1.97 to 3.22 before and after each sample.
+- By then #2234 and #2240 were on `main`, so a proof no longer replays quadratically.
+
+| What | n | Min | P50 | P95 | P99 | Max |
+| --- | --- | --- | --- | --- | --- | --- |
+| The storage lock held, each of a publication's three holds | 36 | 0.53 ms | 8.9 ms | 26.6 ms | 27.7 ms | 27.7 ms |
+| A whole publication, without the lock | 12 | 33.0 s | 36.3 s | 37.7 s | 39.2 s | 39.2 s |
+| A proof during a publication | 255,124 | 0.67 ms | 0.90 ms | 3.95 ms | 4.21 ms | 553 ms |
+| A proof alone, over the one retained Session | 12 | 512 ms | 514 ms | 515 ms | 516 ms | 516 ms |
+
+The storage lock's P99 is 27.7 ms, where the coordinator's rule for design A allowed 300 ms. The
+longest proof during a publication, 553 ms, is the one that first met the renamed 10,013-record
+Session.
 
 ## Contract
 
