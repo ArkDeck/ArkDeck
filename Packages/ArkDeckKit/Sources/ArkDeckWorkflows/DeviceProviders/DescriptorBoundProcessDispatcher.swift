@@ -441,6 +441,16 @@ package struct DescriptorBoundProcessDispatcher: RuntimeProcessDispatching {
     {
       return .verifiedCanonicalPath
     }
+    // SwiftPM needs its toolchain bundle while initializing Foundation. Its
+    // profile-owned test role can crash when launched through an inode alias.
+    // The canonical mode still proves the suspended child's executable mapping
+    // against the retained descriptor before any tool code runs.
+    if case .workspace(.runTests(let invocation)) = action,
+      URL(filePath: invocation.executable.path).lastPathComponent == "swift-package",
+      invocation.argumentZero.map({ URL(filePath: $0).lastPathComponent }) == "swift-test"
+    {
+      return .verifiedCanonicalPath
+    }
     return .stableInodePath
   }
 }
