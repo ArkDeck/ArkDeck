@@ -108,6 +108,47 @@ pub struct RecoveryEpoch {
 }
 
 impl RecoveryEpoch {
+    /// The epoch as `job.evidence` and `job.result` project it (Swift
+    /// `AgentDaemon.encodeEvidence`'s `recoveryEpoch`).
+    pub(crate) fn evidence(&self) -> Value {
+        let draft = &self.draft;
+        let intents: Vec<Value> = draft
+            .covered_intents
+            .iter()
+            .map(|intent| {
+                json!({
+                    "jobId": intent.job_id,
+                    "intentEventId": intent.intent_event_id,
+                    "operationReference": intent.operation_reference,
+                    "profileReference": intent.profile_reference,
+                    "observedAtUtc": intent.observed_at_utc,
+                    "possibleEffects": intent.possible_effects,
+                })
+            })
+            .collect();
+        json!({
+            "epochId": self.epoch_id,
+            "source": draft.source.word(),
+            "stableTargetIdentitySha256": draft.stable_target_identity_sha256,
+            "bindingRevision": draft.binding_revision,
+            "coveredIntents": intents,
+            "uncertainEffectSetSha256": draft.uncertain_effect_set_sha256,
+            "coverageContractVersion": draft.coverage_contract_version,
+            "coveredEffectSetSha256": draft.covered_effect_set_sha256,
+            "recoveryJobId": draft.recovery_job_id,
+            "recoveryIntentEventId": draft.recovery_intent_event_id,
+            "operationReference": draft.operation_reference,
+            "profileReference": draft.profile_reference,
+            "materializedPlanDigestSha256": draft.materialized_plan_digest_sha256,
+            "artifactSha256": draft.artifact_sha256,
+            "providerExecutableSha256": draft.provider_executable_sha256,
+            "confirmedStepIds": draft.confirmed_step_ids,
+            "resultingTargetEpochSha256": draft.resulting_target_epoch_sha256,
+            "establishedAtUtc": draft.established_at_utc,
+            "epochSha256": self.epoch_sha256,
+        })
+    }
+
     /// Swift `covers(jobID:intentEventID:stableIdentitySHA256:bindingRevision:)`.
     pub fn covers(
         &self,
@@ -578,19 +619,36 @@ mod tests {
         std::fs::create_dir(&root.0).unwrap();
         std::fs::set_permissions(&root.0, std::fs::Permissions::from_mode(0o700)).unwrap();
         let jobs = crate::JobStore::open_owner(&root.0).unwrap();
-        assert_eq!(jobs.recovery_epoch_names("job-recovery"), Ok(false));
+        assert_eq!(
+            jobs.recovery_epoch_of("job-recovery")
+                .map(|epoch| epoch.is_some()),
+            Ok(false)
+        );
         assert!(!root.0.join(RECOVERY_EPOCH_LOCK).exists());
 
         let document = root.0.join(RECOVERY_EPOCH_DOCUMENT);
         std::fs::write(&document, two_epoch_document()).unwrap();
         std::fs::set_permissions(&document, std::fs::Permissions::from_mode(0o600)).unwrap();
-        assert_eq!(jobs.recovery_epoch_names("job-recovery"), Ok(true));
-        assert_eq!(jobs.recovery_epoch_names("job-recovery-2"), Ok(true));
-        assert_eq!(jobs.recovery_epoch_names("job-old-a"), Ok(false));
+        assert_eq!(
+            jobs.recovery_epoch_of("job-recovery")
+                .map(|epoch| epoch.is_some()),
+            Ok(true)
+        );
+        assert_eq!(
+            jobs.recovery_epoch_of("job-recovery-2")
+                .map(|epoch| epoch.is_some()),
+            Ok(true)
+        );
+        assert_eq!(
+            jobs.recovery_epoch_of("job-old-a")
+                .map(|epoch| epoch.is_some()),
+            Ok(false)
+        );
 
         std::fs::set_permissions(&document, std::fs::Permissions::from_mode(0o644)).unwrap();
         assert_eq!(
-            jobs.recovery_epoch_names("job-recovery")
+            jobs.recovery_epoch_of("job-recovery")
+                .map(|epoch| epoch.is_some())
                 .map_err(|error| error.kind()),
             Err("corrupt")
         );

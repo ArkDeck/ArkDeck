@@ -195,11 +195,16 @@ impl UnresolvedUse {
 }
 
 /// One entry of Swift's `RuntimeCapabilityStatus.lineage`, as the lineage
-/// repairs of a lost outcome read it: the capability, the Job the use was
-/// taken for, its binding revision, and where the use stands now.
+/// repairs of a lost outcome and a complete-overwrite admission read it: the
+/// capability and the use's ordinal, the Job and operation it was taken for,
+/// its effect, Target and binding revision, and where the use stands now.
 pub(crate) struct LineageUse {
     pub(crate) capability: String,
+    pub(crate) ordinal: i64,
     pub(crate) job: String,
+    pub(crate) operation_reference: String,
+    pub(crate) effect: String,
+    pub(crate) target: Option<String>,
     pub(crate) binding_revision: Option<i64>,
     pub(crate) outcome: UseOutcome,
 }
@@ -484,7 +489,11 @@ impl CapabilityStore {
                 .flat_map(|record| {
                     record.consumptions.iter().map(|use_| LineageUse {
                         capability: record.capability.id.clone(),
+                        ordinal: use_.ordinal,
                         job: use_.job.clone(),
+                        operation_reference: use_.operation_reference.clone(),
+                        effect: use_.effect.clone(),
+                        target: use_.target.clone(),
                         binding_revision: use_.binding_revision,
                         outcome: use_.current(),
                     })

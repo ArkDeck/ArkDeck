@@ -17,10 +17,11 @@
 //! authority.
 //!
 //! A record this build cannot read is quarantined, as Swift quarantines it:
-//! never rewritten, reported, and still counted as active. Two recoveries
-//! depend on state this Runtime does not hold, and those Jobs are refused the
-//! same way, untouched: an ArkForge Flash execution (its lane state) and a
-//! complete-overwrite recovery Job (its superseding epoch).
+//! never rewritten, reported, and still counted as active. An ArkForge Flash
+//! whose execution lived in the lane process the restart lost is parked
+//! unknown and never redispatched; a complete-overwrite recovery interrupted
+//! after its superseding epoch became durable completes to `recovered`,
+//! journal-only.
 use crate::artifact_read_owner::swift_string;
 use crate::capability_store::{CapabilityStore, UseOutcome};
 use crate::job_journal_events::{self as events, Envelope};
@@ -77,7 +78,9 @@ pub struct RecoveredJobs {
     /// read, and why. None of its bytes was written.
     pub quarantined: Vec<(String, String)>,
     /// Each Job whose recovery needs state this Runtime does not hold, and
-    /// why. None of its bytes was written.
+    /// why. None of its bytes was written. Every Job this Runtime admits is
+    /// recovered as Swift recovers it, so none is refused today; the daemon
+    /// still reports any.
     pub refused: Vec<(String, String)>,
 }
 
@@ -201,10 +204,6 @@ fn recover_rows(
             // The projection is restored from the admission's own record.
             RecordState::Absent => JobRecord::decode(&row.record).ok(),
         };
-        if let Some(reason) = unheld_state(record.as_ref()) {
-            result.refused.push((row.id, reason));
-            continue;
-        }
         if capabilities.is_none()
             && record
                 .as_ref()
@@ -234,22 +233,6 @@ fn recover_rows(
         settle_capability(&record, capabilities, now)?;
     }
     Ok(result)
-}
-
-/// Why the Job's recovery needs state this Runtime does not hold, if it does.
-fn unheld_state(record: Option<&JobRecord>) -> Option<String> {
-    let record = record?;
-    if record
-        .admission_evidence()
-        .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some())
-    {
-        return Some(
-            "a complete-overwrite recovery completes against its superseding epoch, which the \
-             Rust Runtime does not recover yet; nothing was written"
-                .into(),
-        );
-    }
-    None
 }
 
 /// Every complete record of the Job's journal, in order (Swift
@@ -423,8 +406,7 @@ fn settle_known(record: &mut JobRecord) {
     record.set_recovery(None, None, None);
 }
 
-/// Swift `RuntimeRecoveryService.replay(_:)`, a complete-overwrite
-/// recovery's own completion refused beforehand.
+/// Swift `RuntimeRecoveryService.replay(_:)`.
 fn replay(
     jobs: &JobStore,
     row: &JobRow,
@@ -649,12 +631,27 @@ fn replay(
                 );
             }
             Some("finalizing") => {
-                journal.transition(
-                    "finalizing",
-                    "failed",
-                    "finalization was interrupted before its terminal transition",
-                    None,
-                )?;
+                // A complete-overwrite recovery whose epoch is already
+                // durable completes to `recovered`; any other interrupted
+                // finalization fails.
+                let established = jobs
+                    .matching_recovery_epoch(&record, &events)
+                    .map_err(|error| internal(format!("{error:?}")))?;
+                if established.is_some() {
+                    journal.transition(
+                        "finalizing",
+                        "recovered",
+                        "complete terminal transition for durable superseding recovery epoch",
+                        None,
+                    )?;
+                } else {
+                    journal.transition(
+                        "finalizing",
+                        "failed",
+                        "finalization was interrupted before its terminal transition",
+                        None,
+                    )?;
+                }
                 (facts, events) = refresh(&journal)?;
                 record.finish(&clock(now)?);
                 if facts.last_reconcile_outcome_certainty.as_deref() == Some("confirmed") {
@@ -662,8 +659,12 @@ fn replay(
                 }
                 mark(
                     &mut record,
-                    "recovered: finalization interrupted before terminal transition; failed \
-                     without redispatch",
+                    if established.is_some() {
+                        "recovered: durable superseding epoch completed journal-only; no redispatch"
+                    } else {
+                        "recovered: finalization interrupted before terminal transition; failed \
+                         without redispatch"
+                    },
                 );
             }
             _ => mark(&mut record, "recovered: journal clean"),

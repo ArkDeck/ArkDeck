@@ -648,14 +648,16 @@ final class FlashRunOracleContractTests: XCTestCase {
   /// The Artifact pager's continuation snapshots, each named by a random
   /// revision its contents repeat.
   private static let artifactSnapshots = "artifacts/.imports-v1/artifact-snapshots/snapshot-"
+  /// The Job list pager's, kept the same way below the Job root.
+  private static let jobSnapshots = "store/cli-job-snapshots/snapshot-"
 
   /// What a story leaves below the root: the Job index as a reader observes
   /// it, every entry's kind and mode, and every regular file's bytes, each
   /// Job record's machine facts labelled. A payload's verification cache pins
   /// its inode, so the oracle keeps that it exists and its mode, not its
-  /// bytes; an Artifact pager's snapshot is kept the same way, its random
-  /// revision labelled; the Job index's database files are kept as its
-  /// reader's view.
+  /// bytes; an Artifact or Job list pager's snapshot is kept the same way,
+  /// its random revision labelled; the Job index's database files are kept as
+  /// its reader's view.
   private static func leftovers(_ story: String) throws -> [String: Data] {
     var files: [String: Data] = [:]
     var tree: [JSONValue] = []
@@ -665,10 +667,11 @@ final class FlashRunOracleContractTests: XCTestCase {
       var metadata = stat()
       guard lstat(url.path, &metadata) == 0 else { throw POSIXError(.EIO) }
       let type = metadata.st_mode & S_IFMT
-      let snapshot = path.hasPrefix(artifactSnapshots)
+      let pager = [artifactSnapshots, jobSnapshots].first { path.hasPrefix($0) }
+      let snapshot = pager != nil
       tree.append(
         .object([
-          "path": .string(snapshot ? "\(artifactSnapshots)<revision>.json" : path),
+          "path": .string(pager.map { "\($0)<revision>.json" } ?? path),
           "kind": .string(type == S_IFDIR ? "directory" : type == S_IFLNK ? "symlink" : "file"),
           "mode": .string(String(metadata.st_mode & 0o777, radix: 8)),
         ]))
@@ -958,6 +961,13 @@ final class FlashRunOracleContractTests: XCTestCase {
     try await story.send("recovery.run", "job.run", ["jobId": .string(recovery)])
     try await story.reads("recovery", recovery)
     try await story.send("original.status", "job.status", ["jobId": .string(original)])
+    // What each Job's record and the Job list show once the epoch stands:
+    // the recovery names its epoch, the unknown Flash the epoch superseding it.
+    try await story.send("original.show", "job.show", ["jobId": .string(original)])
+    try await story.send("recovery.show", "job.show", ["jobId": .string(recovery)])
+    try await story.send("list", "job.list", ["pageSize": .integer(100)])
+    try await story.send(
+      "list.current", "job.list", ["pageSize": .integer(100), "includeCurrent": .bool(true)])
     if let after = try await story.submit("after.submit", try story.request("after")) {
       try await story.send("after.run", "job.run", ["jobId": .string(after)])
       try await story.send("after.status", "job.status", ["jobId": .string(after)])

@@ -34,7 +34,7 @@ const CROSS_MODE: &str = "dayu200CrossModeBinding";
 const ALIAS_IDENTITY: &str = "dayu200HDCNormalAliasSHA256";
 const ALIAS_TOPOLOGY: &str = "dayu200HDCNormalAliasUSBTopology";
 /// The DAYU200 profile's mapped partitions, in write order.
-const PARTITIONS: [&str; 9] = [
+pub(crate) const PARTITIONS: [&str; 9] = [
     "uboot",
     "resource",
     "boot_linux",

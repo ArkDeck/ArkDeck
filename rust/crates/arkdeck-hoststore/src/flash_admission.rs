@@ -9,22 +9,24 @@
 //!    materializes it (`FlashPlanner`), the fresh digest checked against a
 //!    reviewed one;
 //! 5. `preauthorize`: the Job state, another client's device session, the
-//!    catalog's Runtime-owned policy, the provider's execution blocker, a
-//!    capability a caller named.
-//!
-//! 6. the Runtime's own one-use destructive capability for the exact plan
-//!    and Artifact, issued or rolled over as Swift rolls it
-//!    (`capability_policy::issue_destructive`), and validated for this
-//!    execution; nothing is consumed yet;
-//! 7. the Job admitted: its index row, its journal's `jobCreated` and
-//!    `queued -> preflight`, and its record.
+//!    catalog's Runtime-owned policy, the provider's execution blocker;
+//! 6. DEC-016 (`JobStore::complete_overwrite_admission`): with an unresolved
+//!    destructive intent on the binding, only a complete overwrite of every
+//!    covered partition with full verification is admitted, as a distinct
+//!    recovery, or a complete later recovery already in history is
+//!    recognized and its epoch appended; then a capability a caller named;
+//! 7. the Runtime's own one-use destructive capability for the exact plan
+//!    and Artifact — a recovery's under its own policy identity — issued or
+//!    rolled over as Swift rolls it (`capability_policy::issue_destructive`),
+//!    and validated for this execution; nothing is consumed yet;
+//! 8. the Job admitted: its index row, its journal's `jobCreated` and
+//!    `queued -> preflight`, and its record, whose timeline names the
+//!    recovery it was classified as or the epoch recognized.
 //!
 //! Every refusal comes before the durable admission point and dispatches
-//! nothing. A binding a superseding recovery would have to cover — an
-//! unresolved destructive use — is refused by its lineage before anything
-//! is issued: this Runtime does not admit a complete-overwrite recovery
-//! (DEC-016) yet.
+//! nothing; a recognized epoch is the one write before it.
 use super::*;
+use crate::job_owner::flash_recovery::{OverwriteAdmission, OverwriteRefusal, RecoveryContext};
 use crate::job_plan::{FlashPlanner, FlashPlanning, RockchipFactsPort, is_flash};
 
 /// `job.submit` over the Flash composition: the ArkForge Flash operations
@@ -38,9 +40,14 @@ pub struct FlashAdmitter<'a> {
     pub facts: Option<RockchipFactsPort<'a>>,
     /// Whether this composition also runs an admitted Flash. A Flash is
     /// admitted only together with the run that consumes its capability:
-    /// without one it is refused after every check and before anything is
-    /// issued, so no Job is left waiting for a run that cannot come.
+    /// without one it is refused before DEC-016 reads the Target's history
+    /// and before anything is issued, so no Job is left waiting for a run
+    /// that cannot come.
     pub executes: bool,
+    /// The operator-named hardware acceptance campaign the lane is bound to
+    /// (DEC-014), which may admit a recovery after the shared four-hour
+    /// budget (DEC-016).
+    pub campaign: Option<&'a str>,
 }
 
 impl FlashAdmitter<'_> {
@@ -127,7 +134,7 @@ impl FlashAdmitter<'_> {
                 "the fresh materialized plan differs from the immutable reviewed plan",
             ));
         }
-        let capability =
+        let (capability, recovery) =
             self.preauthorize(&request, descriptor, &effect, &materialized, blocker)?;
         let job_id = format!(
             "job-{}",
@@ -149,6 +156,26 @@ impl FlashAdmitter<'_> {
             &materialized.digest,
         );
         record.set_materialized(materialized.identity.clone(), materialized.binding_revision);
+        match &recovery {
+            OverwriteAdmission::Recovery { context, campaign } => {
+                record.timeline.push(format!(
+                    "complete-overwrite recovery classified epoch {}; covered intents {}",
+                    context.destructive_epoch_ordinal,
+                    context.covered_intents.len()
+                ));
+                if let Some(campaign) = campaign {
+                    record.timeline.push(format!(
+                        "complete-overwrite recovery admitted after the shared four-hour budget \
+                         under hardware acceptance campaign {campaign}"
+                    ));
+                }
+            }
+            OverwriteAdmission::Recognized(epoch) => record.timeline.push(format!(
+                "recognized durable complete-overwrite supersession {}; device dispatch 0",
+                epoch.epoch_id
+            )),
+            OverwriteAdmission::Ordinary => {}
+        }
         match _admission
             .admit(&record, &fingerprint)
             .map_err(|_| uncertain())?
@@ -165,8 +192,9 @@ impl FlashAdmitter<'_> {
     }
 
     /// Swift `preauthorize` for a Flash: every check that can refuse before
-    /// a capability exists, then the Runtime's own capability issued and
-    /// validated for this execution. Answers its identity.
+    /// a capability exists, DEC-016's decision, then the Runtime's own
+    /// capability issued and validated for this execution. Answers its
+    /// identity and the recovery decision.
     fn preauthorize(
         &self,
         request: &OperationRequest,
@@ -174,7 +202,7 @@ impl FlashAdmitter<'_> {
         effect: &str,
         materialized: &Materialized<'_>,
         blocker: Option<String>,
-    ) -> Result<String, AdmissionRefusal> {
+    ) -> Result<(String, OverwriteAdmission), AdmissionRefusal> {
         let admitter = &self.admitter;
         let reference = descriptor.reference();
         let unserved = || {
@@ -227,28 +255,33 @@ impl FlashAdmitter<'_> {
                 "complete-overwrite admission requires stable target identity and binding",
             ));
         };
-        // Swift's complete-overwrite admission (DEC-016) reads the
-        // superseding recovery epochs under their store's lock first; the
-        // Jobs an epoch covers on this binding no longer block its lineage.
-        let superseded: std::collections::BTreeSet<String> = admitter
+        if !self.executes {
+            return Err(refused(
+                "rejected",
+                format!("{reference} is not executed by the Rust Runtime yet"),
+            ));
+        }
+        let recovery = admitter
             .jobs
-            .recovery_epochs()
-            .map_err(|_| uncertain())?
-            .iter()
-            .filter(|epoch| {
-                crate::swift_decoding::same_text(
-                    &epoch.draft.stable_target_identity_sha256,
-                    &identity,
-                ) && epoch.draft.binding_revision == binding
-            })
-            .flat_map(|epoch| {
-                epoch
-                    .draft
-                    .covered_intents
-                    .iter()
-                    .map(|intent| intent.job_id.clone())
-            })
-            .collect();
+            .complete_overwrite_admission(
+                authority.capabilities,
+                &reference,
+                &Value::Object(request.inputs.clone()),
+                &identity,
+                binding,
+                &admitter.clock()?,
+                self.campaign,
+            )
+            .map_err(|refusal| match refusal {
+                OverwriteRefusal::Blocked(reason) => refused(
+                    "admissionDenied",
+                    format!(
+                        "non-overridable recovery blocker: {}",
+                        OverwriteRefusal::blocker(&reason)
+                    ),
+                ),
+                OverwriteRefusal::Failed(_) => uncertain(),
+            })?;
         if policy == "runtimeCapability" {
             if request.capability_id.is_some() {
                 return Err(refused(
@@ -265,11 +298,18 @@ impl FlashAdmitter<'_> {
         } else {
             return Err(unserved());
         }
-        if !self.executes {
-            return Err(refused(
-                "rejected",
-                format!("{reference} is not executed by the Rust Runtime yet"),
-            ));
+        let context = match &recovery {
+            OverwriteAdmission::Recovery { context, .. } => Some(context),
+            _ => None,
+        };
+        // The lineage check lists the epochs again, a recognized one among
+        // them; the Jobs the recovery covers no longer block it either.
+        let mut superseded = admitter
+            .jobs
+            .superseded_jobs(&identity, binding)
+            .map_err(|_| uncertain())?;
+        if let Some(context) = context {
+            superseded.extend(context.covered_jobs().map(str::to_owned));
         }
         let query = CapabilityQuery {
             operation_id: descriptor.id().to_owned(),
@@ -288,7 +328,7 @@ impl FlashAdmitter<'_> {
             authority.capabilities,
             descriptor,
             &query,
-            None,
+            context.map(RecoveryContext::policy_lines).as_deref(),
             &superseded,
             &admitter.clock()?,
         )
@@ -309,6 +349,6 @@ impl FlashAdmitter<'_> {
                     ),
                 )
             })?;
-        Ok(capability)
+        Ok((capability, recovery))
     }
 }

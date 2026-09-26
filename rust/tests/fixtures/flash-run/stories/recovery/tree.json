@@ -182,6 +182,21 @@
   {
     "kind" : "directory",
     "mode" : "700",
+    "path" : "store/cli-job-snapshots"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/cli-job-snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/cli-job-snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
     "path" : "store/jobs"
   },
   {

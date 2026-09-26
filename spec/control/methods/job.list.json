@@ -211,7 +211,10 @@
                 "type": "null"
               },
               "recoveryEpochId": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "resolvedByTargetAliasResolutionId": {
                 "type": "null"
@@ -265,7 +268,10 @@
                 "type": "string"
               },
               "supersededByRecoveryEpochId": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "targetId": {
                 "type": "string"
@@ -391,7 +397,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 37,
-    "request": 57,
-    "result": 20
+    "request": 59,
+    "result": 22
   }
 }

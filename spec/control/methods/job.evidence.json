@@ -144,7 +144,135 @@
                   "type": "string"
                 },
                 "recoveryEpoch": {
-                  "type": "null"
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "artifactSha256": {
+                          "type": "string"
+                        },
+                        "bindingRevision": {
+                          "type": "integer"
+                        },
+                        "confirmedStepIds": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "coverageContractVersion": {
+                          "type": "string"
+                        },
+                        "coveredEffectSetSha256": {
+                          "type": "string"
+                        },
+                        "coveredIntents": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "intentEventId": {
+                                "type": "string"
+                              },
+                              "jobId": {
+                                "type": "string"
+                              },
+                              "observedAtUtc": {
+                                "type": "string"
+                              },
+                              "operationReference": {
+                                "type": "string"
+                              },
+                              "possibleEffects": {
+                                "items": {
+                                  "type": "string"
+                                },
+                                "type": "array"
+                              },
+                              "profileReference": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "intentEventId",
+                              "jobId",
+                              "observedAtUtc",
+                              "operationReference",
+                              "possibleEffects",
+                              "profileReference"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "epochId": {
+                          "type": "string"
+                        },
+                        "epochSha256": {
+                          "type": "string"
+                        },
+                        "establishedAtUtc": {
+                          "type": "string"
+                        },
+                        "materializedPlanDigestSha256": {
+                          "type": "string"
+                        },
+                        "operationReference": {
+                          "type": "string"
+                        },
+                        "profileReference": {
+                          "type": "string"
+                        },
+                        "providerExecutableSha256": {
+                          "type": "string"
+                        },
+                        "recoveryIntentEventId": {
+                          "type": "string"
+                        },
+                        "recoveryJobId": {
+                          "type": "string"
+                        },
+                        "resultingTargetEpochSha256": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "stableTargetIdentitySha256": {
+                          "type": "string"
+                        },
+                        "uncertainEffectSetSha256": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "artifactSha256",
+                        "bindingRevision",
+                        "confirmedStepIds",
+                        "coverageContractVersion",
+                        "coveredEffectSetSha256",
+                        "coveredIntents",
+                        "epochId",
+                        "epochSha256",
+                        "establishedAtUtc",
+                        "materializedPlanDigestSha256",
+                        "operationReference",
+                        "profileReference",
+                        "providerExecutableSha256",
+                        "recoveryIntentEventId",
+                        "recoveryJobId",
+                        "resultingTargetEpochSha256",
+                        "source",
+                        "stableTargetIdentitySha256",
+                        "uncertainEffectSetSha256"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": [
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "reference": {
                   "type": "string"
@@ -351,7 +479,135 @@
           "type": "string"
         },
         "recoveryEpoch": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "artifactSha256": {
+                  "type": "string"
+                },
+                "bindingRevision": {
+                  "type": "integer"
+                },
+                "confirmedStepIds": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "coverageContractVersion": {
+                  "type": "string"
+                },
+                "coveredEffectSetSha256": {
+                  "type": "string"
+                },
+                "coveredIntents": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "intentEventId": {
+                        "type": "string"
+                      },
+                      "jobId": {
+                        "type": "string"
+                      },
+                      "observedAtUtc": {
+                        "type": "string"
+                      },
+                      "operationReference": {
+                        "type": "string"
+                      },
+                      "possibleEffects": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "profileReference": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "intentEventId",
+                      "jobId",
+                      "observedAtUtc",
+                      "operationReference",
+                      "possibleEffects",
+                      "profileReference"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "epochId": {
+                  "type": "string"
+                },
+                "epochSha256": {
+                  "type": "string"
+                },
+                "establishedAtUtc": {
+                  "type": "string"
+                },
+                "materializedPlanDigestSha256": {
+                  "type": "string"
+                },
+                "operationReference": {
+                  "type": "string"
+                },
+                "profileReference": {
+                  "type": "string"
+                },
+                "providerExecutableSha256": {
+                  "type": "string"
+                },
+                "recoveryIntentEventId": {
+                  "type": "string"
+                },
+                "recoveryJobId": {
+                  "type": "string"
+                },
+                "resultingTargetEpochSha256": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "stableTargetIdentitySha256": {
+                  "type": "string"
+                },
+                "uncertainEffectSetSha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "artifactSha256",
+                "bindingRevision",
+                "confirmedStepIds",
+                "coverageContractVersion",
+                "coveredEffectSetSha256",
+                "coveredIntents",
+                "epochId",
+                "epochSha256",
+                "establishedAtUtc",
+                "materializedPlanDigestSha256",
+                "operationReference",
+                "profileReference",
+                "providerExecutableSha256",
+                "recoveryIntentEventId",
+                "recoveryJobId",
+                "resultingTargetEpochSha256",
+                "source",
+                "stableTargetIdentitySha256",
+                "uncertainEffectSetSha256"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "schemaVersion": {
           "type": "string"
@@ -576,7 +832,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 23,
-    "result": 21
+    "request": 24,
+    "result": 22
   }
 }

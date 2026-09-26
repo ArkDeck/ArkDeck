@@ -30,6 +30,10 @@ mod flash_state;
 #[path = "arkforge_job_state.rs"]
 pub(crate) mod arkforge_job_state;
 
+#[cfg(target_os = "macos")]
+#[path = "flash_recovery.rs"]
+pub(crate) mod flash_recovery;
+
 #[cfg(test)]
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;
@@ -597,20 +601,22 @@ impl JobStore {
 
     /// Swift `evidenceSnapshot`'s read of the superseding recovery epochs,
     /// which it makes for every snapshot and which throws when they are
-    /// unreadable: whether an epoch names this Job as the Job that recovered.
-    /// An absent document names none; Swift's read would also create the
-    /// store's lock, an incidental file this read does not create.
-    pub(crate) fn recovery_epoch_names(
+    /// unreadable: the last epoch that names this Job as its recovery Job,
+    /// the evidence's `recoveryEpoch`. An absent document names none; Swift's
+    /// read would also create the store's lock, an incidental file this read
+    /// does not create.
+    pub(crate) fn recovery_epoch_of(
         &self,
         job_id: &str,
-    ) -> Result<bool, crate::RecoveryEpochError> {
+    ) -> Result<Option<crate::RecoveryEpoch>, crate::RecoveryEpochError> {
         match self.root.document_metadata(crate::RECOVERY_EPOCH_DOCUMENT) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
             _ => {}
         }
         Ok(crate::list_recovery_epochs(&self.root)?
-            .iter()
-            .any(|epoch| crate::swift_decoding::same_text(&epoch.draft.recovery_job_id, job_id)))
+            .into_iter()
+            .rev()
+            .find(|epoch| crate::swift_decoding::same_text(&epoch.draft.recovery_job_id, job_id)))
     }
 
     pub fn handle_resource(
@@ -653,8 +659,14 @@ impl JobStore {
                     size,
                 )?
             }
-            "job.status" => record.status(),
-            "job.show" => record.show(),
+            "job.status" => self.indexed_status(&record),
+            // Swift `jobReadSnapshot`: the record's status names the epoch
+            // that supersedes the Job or that the Job established.
+            "job.show" => {
+                let mut shown = record.show();
+                shown["job"] = self.indexed_status(&record);
+                shown
+            }
             "job.timeline" => {
                 let (size, cursor) = pagination(params)?;
                 SnapshotPager::open(&self.path.join("cli-job-snapshots"))
@@ -726,6 +738,7 @@ impl JobStore {
             }
         }
         let (size, cursor) = pagination(params)?;
+        let indexes = self.epoch_indexes();
         // The repository hands the rows over in the list's order, creation
         // time and then identity, so each history row goes to the snapshot as
         // it is projected, and no list of them all is held.
@@ -742,7 +755,8 @@ impl JobStore {
                     .map_rows_ordered(None, descending, |row| {
                         let projected = (|| -> Result<_, WireError> {
                             let record = JobRecord::from_row(&row)?;
-                            let value = record.history(timeline);
+                            let mut value = record.history(timeline);
+                            indexes.project_history(&record, &mut value);
                             if [
                                 ("state", "state"),
                                 ("operation", "operation"),

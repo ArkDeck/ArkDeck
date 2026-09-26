@@ -7,9 +7,8 @@
 //! while the fakes answer as it recorded. Every answer must be Swift's, and
 //! so must what the fakes were asked and what the story leaves below the root.
 //!
-//! The stories replayed here are the ones this Runtime serves; the two
-//! complete-overwrite recovery stories wait for the slice that admits a
-//! superseding recovery (DEC-016).
+//! Every story the oracle recorded is replayed, the complete-overwrite
+//! recoveries (DEC-016) among them.
 #![cfg(target_os = "macos")]
 
 mod support;
@@ -19,7 +18,7 @@ use arkdeck_hoststore::{
     FlashPlanning, FlashReconciler, FlashRunner, ImportUploadStore, JobAdmitter, JobCanceller,
     JobPlanner, JobReconciler, JobResultReader, JobRunner, JobStore, MutationAuthority,
     MutationExecution, SessionPublisher, SessionStore, StorageClaims, TargetStore,
-    recover_active_jobs,
+    recover_active_jobs, recover_jobs,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -236,6 +235,8 @@ impl Owners {
                     flash: Some(&self.flash),
                     facts: Some(&facts),
                     executes: true,
+                    // The oracle's lane is bound to no campaign.
+                    campaign: None,
                 };
                 match admitter.handle(params) {
                     Ok(result) => json!({"ok": true, "result": result}),
@@ -330,10 +331,18 @@ impl Owners {
                     Err(error) => wire(error),
                 }
             }
-            "job.status" => match self.jobs.handle_resource(method, params) {
-                Ok(result) => json!({"ok": true, "result": result}),
-                Err(error) => wire(error),
-            },
+            "job.status" | "job.show" | "job.list" => {
+                match self.jobs.handle_resource(method, params) {
+                    // The list pager's revision is its own; the oracle labels it.
+                    Ok(mut result) => {
+                        if method == "job.list" {
+                            result["snapshotRevision"] = json!("<snapshotRevision>");
+                        }
+                        json!({"ok": true, "result": result})
+                    }
+                    Err(error) => wire(error),
+                }
+            }
             "job.result" | "job.evidence" => {
                 let reader = JobResultReader {
                     jobs: &self.jobs,
@@ -469,17 +478,19 @@ fn play(story: &str) -> Vec<String> {
     differences
 }
 
-/// The Artifact pager's snapshots: Swift keeps them in the Artifact root,
-/// labelled in the oracle; this Runtime keeps its pager in the Job root.
+/// The pagers' snapshots: Swift keeps the Artifact pager's in the Artifact
+/// root and the Job list pager's in the Job root, each labelled in the
+/// oracle; this Runtime keeps both pagers' in the Job root.
 const SWIFT_SNAPSHOTS: &str = "artifacts/.imports-v1/artifact-snapshots/snapshot-";
+const SWIFT_JOB_SNAPSHOT: &str = "store/cli-job-snapshots/snapshot-<revision>.json";
 const RUST_SNAPSHOTS: &str = "store/cli-job-snapshots/snapshot-";
 
 /// What Swift's daemon leaves below the root that no story made, and this
 /// Runtime does not: the Job directory its engine creates when it starts;
 /// the empty Target store below the state root its every status read opens
 /// (`recoveryEpochIndexes`); what its Artifact reads write, a Job's empty
-/// Artifact directory and a payload's verification cache; and its pager's
-/// snapshots.
+/// Artifact directory and a payload's verification cache; and its pagers'
+/// snapshots, labelled.
 fn swift_incidental(path: &str) -> bool {
     matches!(
         path,
@@ -488,6 +499,7 @@ fn swift_incidental(path: &str) -> bool {
             | "store/targets/.target-display-names.lock"
             | "store/targets/target-display-names.json"
             | "artifacts/.imports-v1/artifact-snapshots"
+            | SWIFT_JOB_SNAPSHOT
     ) || path.starts_with(SWIFT_SNAPSHOTS)
         || path.ends_with("/.payload-verification-v1.json")
         || path
@@ -634,7 +646,7 @@ fn leftovers(story: &str, root: &Path) -> Vec<String> {
             .count()
     };
     let (swift_pages, rust_pages) = (
-        snapshots(swift_tree, SWIFT_SNAPSHOTS),
+        snapshots(swift_tree, SWIFT_SNAPSHOTS) + snapshots(swift_tree, SWIFT_JOB_SNAPSHOT),
         snapshots(&tree, RUST_SNAPSHOTS),
     );
     if swift_pages != rust_pages {
@@ -750,6 +762,86 @@ fn a_lost_flash_is_reconciled_as_swifts() {
     assert!(differences.is_empty(), "{}", differences.join("\n"));
 }
 
+/// DEC-016: an unknown Flash blocks its binding; a basic request is refused,
+/// a full one admitted as a distinct recovery, run as a superseding
+/// execution and its epoch established, which the unknown Job's status then
+/// names; the same ordinary request is answered as Swift answers it.
+#[test]
+fn a_complete_overwrite_supersedes_an_unknown_flash_as_swifts() {
+    let differences = replay("recovery");
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+}
+
+/// Swift's one crash window after a recovery's epoch append: every typed
+/// outcome and the epoch durable, `finalizing -> recovered` not. A restart
+/// completes it journal-only, the epoch untouched and nothing dispatched.
+#[test]
+fn a_recovery_interrupted_after_its_epoch_completes_at_restart() {
+    let _lock = exclusive();
+    let differences = play("recovery");
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    let root = PathBuf::from(ROOT);
+    let jobs = root.join("store/jobs");
+    let recovery = fs::read_dir(&jobs)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .find(|job| support::document(&jobs.join(job), "job-record.json")["state"] == "recovered")
+        .expect("the recovery Job");
+    let epochs = root.join("store/superseding-recovery-epochs.json");
+    let established = fs::read(&epochs).unwrap();
+    // The terminal transition lost: the journal's last record and the
+    // record's terminal projection.
+    let journal = jobs.join(&recovery).join("journal.jsonl");
+    let text = fs::read_to_string(&journal).unwrap();
+    let mut lines: Vec<&str> = text.lines().collect();
+    let last = lines.pop().unwrap();
+    assert!(last.contains("\"to\":\"recovered\""), "{last}");
+    fs::write(&journal, format!("{}\n", lines.join("\n"))).unwrap();
+    let mut record = support::document(&jobs.join(&recovery), "job-record.json");
+    record["state"] = json!("finalizing");
+    record.as_object_mut().unwrap().remove("finishedAtUTC");
+    fs::write(
+        jobs.join(&recovery).join("job-record.json"),
+        serde_json::to_vec_pretty(&record).unwrap(),
+    )
+    .unwrap();
+
+    let fakes = Fakes::default();
+    let owners = Owners::open(&root, &fakes);
+    let recovered = recover_jobs(
+        &owners.jobs,
+        std::slice::from_ref(&recovery),
+        Some(&owners.capabilities),
+        now,
+    )
+    .unwrap();
+    assert_eq!(recovered.statuses[0]["state"], "recovered");
+    assert_eq!(
+        fakes.calls(),
+        (vec![], vec![]),
+        "a restart dispatches nothing"
+    );
+    let text = fs::read_to_string(&journal).unwrap();
+    let last: Value = serde_json::from_str(text.lines().last().unwrap()).unwrap();
+    assert_eq!(
+        last["payload"]["reason"],
+        "complete terminal transition for durable superseding recovery epoch"
+    );
+    assert_eq!(
+        fs::read(&epochs).unwrap(),
+        established,
+        "the epoch is untouched"
+    );
+}
+
+/// The compatibility alias asked for the complete overwrite after an unknown
+/// canonical Flash.
+#[test]
+fn the_alias_recovers_an_unknown_canonical_flash_as_swifts() {
+    let differences = replay("recoveryAlias");
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+}
+
 /// Every way a delegated Flash ends short of success, one Job each over one
 /// store, each capability outcome and generation as Swift's.
 #[test]
@@ -836,12 +928,13 @@ fn a_flash_runs_only_inside_its_targets_mutation_lane() {
     );
 }
 
-/// Until the recovery slice serves DEC-016, a Flash whose outcome is unknown
-/// blocks every later Flash of its binding through the capability lineage:
-/// the request is refused before admission, with nothing issued, admitted or
-/// dispatched.
+/// DEC-016: a Flash whose outcome is unknown blocks every later Flash of its
+/// binding but its complete overwrite. A request with basic verification is
+/// refused before admission, with nothing issued, admitted or dispatched;
+/// the same request with full verification is admitted as the distinct
+/// recovery that covers the unknown intent.
 #[test]
-fn a_flash_after_an_unknown_one_is_refused_by_its_lineage() {
+fn a_flash_after_an_unknown_one_is_admitted_only_as_its_complete_overwrite() {
     let _lock = exclusive();
     let differences = play("failures");
     assert!(differences.is_empty(), "{}", differences.join("\n"));
@@ -854,32 +947,31 @@ fn a_flash_after_an_unknown_one_is_refused_by_its_lineage() {
         fs::read(store.join("runtime-capabilities.json")).unwrap(),
         fs::read(store.join("runtime-capabilities.ledger")).unwrap(),
     );
-    let mut request: Value = serde_json::from_str(
-        recorded("failures", "prewarmRefused.submit")["params"]["requestJson"]
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap();
-    request["requestId"] = json!("req-flash-after-unknown");
-    request["idempotencyKey"] = json!("idem-flash-after-unknown");
+    let request = |id: &str, verification: &str| {
+        let mut request: Value = serde_json::from_str(
+            recorded("failures", "prewarmRefused.submit")["params"]["requestJson"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        request["requestId"] = json!(format!("req-flash-{id}"));
+        request["idempotencyKey"] = json!(format!("idem-flash-{id}"));
+        request["inputs"]["verification"] = json!(verification);
+        json!({"requestJson": request.to_string()})
+    };
     fakes.begin(Script::default());
-    let answer = owners.answer(
+    let basic = owners.answer(
         &fakes,
         "job.submit",
-        json!({"requestJson": request.to_string()})
-            .as_object()
-            .unwrap(),
-    );
-    assert_eq!(answer["error"]["code"], "admissionDenied", "{answer}");
-    assert!(
-        answer["error"]["message"].as_str().is_some_and(
-            |message| message.starts_with("automatic Runtime target lineage is blocked:")
-        ),
-        "{answer}"
+        request("after-unknown-basic", "basic").as_object().unwrap(),
     );
     assert_eq!(
-        answer["error"]["details"],
-        json!({"phase": "preAdmission", "newDispatchCount": 0})
+        basic["error"],
+        json!({"code": "admissionDenied",
+            "message": "non-overridable recovery blocker: \
+                blocked(\"completeOverwriteRecovery.incompleteRequestedCoverage\")",
+            "details": {"phase": "preAdmission", "newDispatchCount": 0}}),
+        "{basic}"
     );
     assert_eq!(fakes.calls(), (Vec::new(), Vec::new()));
     assert_eq!(support::index(&root.join("store")), index);
@@ -889,5 +981,20 @@ fn a_flash_after_an_unknown_one_is_refused_by_its_lineage() {
             fs::read(store.join("runtime-capabilities.ledger")).unwrap(),
         ),
         capabilities
+    );
+    let full = owners.answer(
+        &fakes,
+        "job.submit",
+        request("after-unknown-full", "full").as_object().unwrap(),
+    );
+    let job = full["result"]["jobId"]
+        .as_str()
+        .unwrap_or_else(|| panic!("{full}"));
+    assert_eq!(fakes.calls(), (Vec::new(), Vec::new()));
+    let timeline = owners.jobs.read_snapshot(job).unwrap().timeline;
+    assert_eq!(
+        timeline.last().map(String::as_str),
+        Some("complete-overwrite recovery classified epoch 2; covered intents 1"),
+        "{timeline:?}"
     );
 }
