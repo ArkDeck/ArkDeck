@@ -48,7 +48,7 @@ struct DebugWorkspaceView: View {
 
   @SceneStorage("debug.workspace.tab")
   private var storedTab = DebugWorkspaceTab.artifacts.rawValue
-  @State private var selectedTargetID: String?
+  @SceneStorage("debug.workspace.target") private var selectedTargetID: String?
   @State private var showsTabKeyboardFocus = false
   @FocusState private var focusedTab: DebugWorkspaceTab?
 
@@ -109,8 +109,9 @@ struct DebugWorkspaceView: View {
       if historyContext == nil { reconcileTargetSelection() } else { applyHistoryContext() }
     }
     .onChange(of: model.workspace.targets) { _, _ in reconcileTargetSelection() }
-    .onChange(of: selectedTargetID) { _, targetID in
-      model.refresh(targetID: targetID)
+    .onChange(of: model.hasLoadedWorkspace) { _, _ in reconcileTargetSelection() }
+    .onChange(of: selectedTargetID, initial: true) { _, targetID in
+      model.selectTarget(targetID)
     }
   }
 
@@ -284,15 +285,10 @@ struct DebugWorkspaceView: View {
       selectedTargetID = historyContext.targetID
       return
     }
-    guard !model.workspace.targets.isEmpty else {
-      selectedTargetID = nil
-      return
-    }
-    if let selectedTargetID, model.workspace.targets.contains(where: { $0.id == selectedTargetID })
-    {
-      return
-    }
-    selectedTargetID = model.workspace.targets.first?.id
+    selectedTargetID = DebugWorkspaceRefreshState.reconciledTarget(
+      selectedTargetID, targets: model.workspace.targets.map(\.id),
+      hasLoaded: model.hasLoadedWorkspace,
+      loadFailed: model.workspace.targetLoadFailure != nil)
   }
 
   private func applyHistoryContext() {
@@ -3068,7 +3064,9 @@ final class DebugWorkspaceViewModel {
   }
 
   private(set) var workspace = DebugWorkspacePresentation.loading
-  private(set) var isRefreshing = false
+  private var refreshState = DebugWorkspaceRefreshState()
+  private(set) var hasLoadedWorkspace = false
+  var isRefreshing: Bool { refreshState.inFlight != nil }
   private(set) var artifactsByJobID: [String: [RuntimeArtifactPresentation]] = [:]
   private(set) var exportStatesByArtifactID: [String: RuntimeArtifactExportState] = [:]
   private(set) var isSubmittingLogs = false
@@ -3204,13 +3202,17 @@ final class DebugWorkspaceViewModel {
     }
   }
 
+  func selectTarget(_ targetID: String?) {
+    refreshState.select(targetID)
+    refresh()
+  }
+
   func refresh(targetID: String? = nil) {
-    guard !isRefreshing else { return }
-    isRefreshing = true
+    guard let request = refreshState.begin(fallbackTargetID: targetID) else { return }
     let provider = provider
     let detailProvider = detailProvider
     Task { [weak self] in
-      let next = await provider.refreshWorkspace(targetID: targetID)
+      let next = await provider.refreshWorkspace(targetID: request.targetID)
       var artifacts: [String: [RuntimeArtifactPresentation]] = [:]
       for job in next.jobs.prefix(6) {
         let detail = await detailProvider.loadJobDetail(
@@ -3220,9 +3222,9 @@ final class DebugWorkspaceViewModel {
           artifacts[job.id] = detail.artifacts
         }
       }
-      guard let self else { return }
-      defer { self.isRefreshing = false }
+      guard let self, self.refreshState.finish(request) else { return }
       guard !Task.isCancelled else { return }
+      self.hasLoadedWorkspace = true
       self.workspace = next
       artifacts.merge(self.historyArtifactsByJobID) { _, historical in historical }
       self.artifactsByJobID = artifacts

@@ -140,8 +140,16 @@ struct GlobalJobInspectorView: View {
     }
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("jobInspector")
-    .task(id: focusedJob?.id) {
-      if isExpanded { actions.load(focusedJob) }
+    .onChange(of: focusedJob, initial: true) { _, job in
+      // The native list selection must match the detail's fallback record.
+      if let job { selectedJobID = job.id }
+      // A Job keeps its identity while its outcome and evidence change.
+      // During refresh, wait for the completed list before loading details.
+      if isExpanded, !isRefreshInFlight { actions.load(job) }
+    }
+    .onChange(of: isRefreshInFlight) { _, refreshing in
+      // An identical summary can still have new artifacts or timeline entries.
+      if !refreshing, isExpanded { actions.load(focusedJob) }
     }
     .onChange(of: isExpanded) { _, expanded in
       if expanded { actions.load(focusedJob) }
@@ -349,9 +357,19 @@ struct GlobalJobInspectorView: View {
               Button(jobsText("jobInspector.action.readLog") + " · " + artifact.name) {
                 actions.readLog(job: job, artifact: artifact)
               }
-              .disabled(actions.isReadingLog || artifact.privacy == "sensitive")
+              .disabled(actions.isReadingLog || artifact.privacy != "standard")
               .help(jobsText("jobInspector.log.privacy"))
               .accessibilityIdentifier("jobInspector.readLog.\(artifact.id)")
+            }
+            if case .unavailable(let reason) = detail.artifactAvailability {
+              Text(reason).font(WorkspaceFont.secondary).foregroundStyle(.orange)
+                .textSelection(.enabled)
+                .accessibilityIdentifier("jobInspector.artifacts.unavailable")
+            }
+            if actions.isReadingLog {
+              ProgressView(jobsText("jobInspector.action.readLog"))
+                .controlSize(.small)
+                .accessibilityIdentifier("jobInspector.log.loading")
             }
             if let log = actions.logText {
               Text(jobsText("jobInspector.log.tail")).font(WorkspaceFont.caption).foregroundStyle(.secondary)
@@ -431,7 +449,6 @@ struct GlobalJobInspectorView: View {
       }
       Button(jobsText("jobInspector.action.refresh")) {
         onRefresh()
-        if isExpanded { actions.load(focusedJob) }
       }
         .disabled(isRefreshInFlight)
         .accessibilityIdentifier("jobInspector.refresh")

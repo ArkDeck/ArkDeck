@@ -88,8 +88,11 @@ Primary Window
 
 ### 4.1 全局 Job Inspector（AC-UX-001-01）
 
-**实现边界**：当前 `GlobalJobInspectorView` 只展示 `job.list` 事实，不含以下目标中的
-全局日志尾部、取消与拖动布局能力；普通原型只镜像当前只读入口。下列是尚需闭合的设计要求。
+**当前实现**：`GlobalJobInspectorView` 展示 `job.list` 摘要，并按所选 Job 读取详情与
+Artifact metadata；已接通标准日志的显式读取（最多 2 MiB、末 200 行）与 fresh identity
+核对后的取消请求。取消请求不代表终态，unknown 不提供取消或重放。可拖动布局仍是目标。
+同一 Job 摘要变化或全局 History 刷新完成后重新读取详情；旧日志清除后需显式再读，避免新状态
+配上旧详情。读取日志显示进度，Artifact 列表不可读时显示 Runtime 原因，不当作空列表。
 
 - 折叠态 36pt：运行中数量、最高风险 Job 的 symbol/阶段/elapsed、indeterminate 或真实进度、展开按钮。
 - 展开态 220–320pt，可拖动：左侧 Job 列表，右侧阶段、当前 typed operation、目标 binding、预算、日志尾部 200 行和 Artifact 增量。
@@ -338,8 +341,8 @@ GJ-5 由外部 Agent 调用已发布的 `agent` / `job` / `artifact` 等面推�
 - Accent：跟随用户系统 accent；ArkDeck 不固定 teal 覆盖系统选择。
 - Viewer：首次进入先显示真实空态；抓取成功后使用左侧截图 + 右侧上下检查器。树与属性之间保留紧凑的可拖动结构分隔线，不使用圆角卡片。普通截图边界默认隐藏，当前选中边界、树行与 inspector 使用同一 accent selection，并保留 ID / type 文字线索。
 - Diagnostic：参考宽屏使用“上方当前画面 + 当前时间上下文、下方全宽 Timeline”，不做三个等宽文件查看器。Trace event 是主选择身份，Marker 截图、可选视频与日志可反向移动共享光标但不伪造也不清空 event identity。默认不持续录屏；Marker 截图按拍摄时刻显示并固定标注 `+N ms`；画面 metadata 与对齐状态固定可见（第一版两态）；自动与手动 Marker 在 track 上样式区分；Timeline 用结构分隔，不把每条 Track 包成卡片。
-- Device：与当前 App 相同的无二级导航布局。顶部 target / binding 与截图动作，左图右 Inspector（窄窗纵向）；空态居中，无手机壳或虚构默认截图。录屏按帧数，结果在原分组内显示，性能提示和静止画面边界常显。详见 v1.5 中英文参考图。
-- Debug：Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。来源编辑器先选 SSH / 本机目录 / SMB / WSL，再渐进披露对应连接字段；SSH 再选密码或密钥，隐藏分支不进入 tab order。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
+- Device：宽屏右侧 Inspector 整体独立滚动，包含录屏结果、操作日志和性能提示；窄窗仍为页面单一纵向滚动。长设备名与 binding 摘要截断时保留完整 help，截图按钮保持完整标签。与当前 App 相同的无二级导航布局。顶部 target / binding 与截图动作，左图右 Inspector（窄窗纵向）；空态居中，无手机壳或虚构默认截图。录屏按帧数，结果在原分组内显示，性能提示和静止画面边界常显。详见 v1.5 中英文参考图。
+- Debug：当前窗口记住选中的目标设备，返回工作区刷新时以该目标调用 probe；初始空列表和读取失败不清掉选择，换目标后的旧请求不能覆盖新目标结果。仍核对当前目标列表与历史来源，不恢复任何 Runtime authority。Artifacts 是首个且默认 tab；编译来源配置和搜索结果各自成组，避免把来源管理、文件勾选与设备执行混成一张表。来源编辑器先选 SSH / 本机目录 / SMB / WSL，再渐进披露对应连接字段；SSH 再选密码或密钥，隐藏分支不进入 tab order。替换后的重启与日志反馈原位出现，不另开 dashboard；兼容性阻止、备份确认、替换 readback、重启后验证使用不同文案和状态，不用一个绿色「成功」吞并全部阶段。
 - 页面标题只在 toolbar：任何工作区的内容区都不再画与 toolbar 同名的主标题。原型此前每页一个 `<h1>` 且标题栏显示「ArkDeck — 页面名」，两者不重复；SwiftUI 的 `navigationTitle` 只显示裸页面名，内容区再画一遍就成了字面重复，违反 §3 与 §6 的「一个 detail 只有一个可感知主标题」。需要解释的页面改用一行 secondary 说明 + 页面级控件（Debug 的 scope 行即此形态）。原型已同步移除全部 `<h1>`，改由 `data-page-title` 提供标题栏文本。
 - 统一页面测量 920：Flash、设备详情与 Trace 此前各自取 760 / 920 / 1000。在 1180 参考窗口下 detail pane 约 926，920 正好填满而不留死白，在更宽的显示器上仍有界。正文段落另按约 620 收窄，Flash 的「一条平静阅读路径」不靠整页变窄来实现。
 - 容器圆角 11：与 §2 同心圆角一致，外层 container 11、内嵌 box 9、control 7。
