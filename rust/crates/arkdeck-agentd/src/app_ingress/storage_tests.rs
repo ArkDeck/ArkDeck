@@ -127,14 +127,14 @@ fn malformed_settings_and_foreign_peers_never_enter_the_owner() {
             params[key] = bad;
             assert_eq!(
                 code(&ingress.handle(&frame("runtime.storage.policy", params), root.peer())),
-                "invalidParams"
+                "methodNotAllowlisted"
             );
         }
         let mut params = policy("1");
         params.as_object_mut().unwrap().remove(key);
         assert_eq!(
             code(&ingress.handle(&frame("runtime.storage.policy", params), root.peer())),
-            "invalidParams"
+            "methodNotAllowlisted"
         );
     }
     for params in [
@@ -146,7 +146,7 @@ fn malformed_settings_and_foreign_peers_never_enter_the_owner() {
     ] {
         assert_eq!(
             code(&ingress.handle(&frame("runtime.storage.root", params), root.peer())),
-            "invalidParams"
+            "methodNotAllowlisted"
         );
     }
     for method in ["runtime.storage.policy", "runtime.storage.root"] {
@@ -169,10 +169,22 @@ fn malformed_settings_and_foreign_peers_never_enter_the_owner() {
 fn unsafe_roots_and_unreadable_storage_fail_without_fallback() {
     let root = Root::new();
     let ingress = AppIngress::new(control(&root), root.peer().euid);
-    let invalid = ingress.handle(
+    // A relative root is refused at the door, as Swift's App transport
+    // refuses it; an absolute one the owner cannot select, a path with a NUL
+    // that the door lets through as Swift's does, is the owner's refusal.
+    let relative = ingress.handle(
         &frame(
             "runtime.storage.root",
             json!({"expectedGeneration":"1","rootPath":"relative"}),
+        ),
+        root.peer(),
+    );
+    assert_eq!(code(&relative), "methodNotAllowlisted");
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+    let invalid = ingress.handle(
+        &frame(
+            "runtime.storage.root",
+            json!({"expectedGeneration":"1","rootPath":"/private/tmp/unsafe\u{0}root"}),
         ),
         root.peer(),
     );

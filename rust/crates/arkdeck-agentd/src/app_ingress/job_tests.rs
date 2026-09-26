@@ -3,6 +3,10 @@ use super::*;
 use arkdeck_contract::{Response, WireError};
 use std::sync::{Barrier, Mutex};
 
+/// Swift's App transport refuses every Job request outside its typed gate,
+/// and every Job the App did not submit, with this code.
+const NOT_ALLOWLISTED: &str = "methodNotAllowlisted";
+
 struct Owner {
     calls: Arc<Mutex<Vec<String>>>,
     entered: Arc<Barrier>,
@@ -84,7 +88,7 @@ fn app_run_is_owned_once_parallel_cancel_enters_and_unknown_never_replays() {
     let run = frame("job.run", json!({"jobId":"job-owned"}));
     let cancel = frame("job.cancel", json!({"jobId":"job-owned"}));
     for request in [&run, &cancel] {
-        assert_eq!(code(&ingress.handle(request, root.peer())), "rejected");
+        assert_eq!(code(&ingress.handle(request, root.peer())), NOT_ALLOWLISTED);
     }
     assert!(calls.lock().unwrap().is_empty());
     assert_eq!(
@@ -106,7 +110,7 @@ fn app_run_is_owned_once_parallel_cancel_enters_and_unknown_never_replays() {
         &ingress.handle(&submit(&capture()), root.peer()),
         "job.submit",
     );
-    assert_eq!(code(&ingress.handle(&run, root.peer())), "rejected");
+    assert_eq!(code(&ingress.handle(&run, root.peer())), NOT_ALLOWLISTED);
     assert_eq!(
         result(&ingress.handle(&cancel, root.peer()), "job.cancel")["cancelRequested"],
         true
@@ -121,7 +125,7 @@ fn app_run_is_owned_once_parallel_cancel_enters_and_unknown_never_replays() {
     assert_eq!(error.message, "execution outcome cannot be observed");
     assert!(error.details.is_none()); // Never add a zero-dispatch claim after execution.
     for request in [&run, &cancel] {
-        assert_eq!(code(&ingress.handle(request, root.peer())), "rejected");
+        assert_eq!(code(&ingress.handle(request, root.peer())), NOT_ALLOWLISTED);
     }
     assert_eq!(
         *calls.lock().unwrap(),
@@ -137,7 +141,7 @@ fn failed_submission_and_a_new_ingress_never_adopt_a_job() {
         "internalError"
     );
     let run = frame("job.run", json!({"jobId":"job-owned"}));
-    assert_eq!(code(&failed.handle(&run, root.peer())), "rejected");
+    assert_eq!(code(&failed.handle(&run, root.peer())), NOT_ALLOWLISTED);
     assert_eq!(*calls.lock().unwrap(), ["submit"]);
     let (accepted, _, _, _) = owner(&root, false);
     result(
@@ -145,7 +149,7 @@ fn failed_submission_and_a_new_ingress_never_adopt_a_job() {
         "job.submit",
     );
     let reopened = AppIngress::new(accepted.control.clone(), root.peer().euid);
-    assert_eq!(code(&reopened.handle(&run, root.peer())), "rejected");
+    assert_eq!(code(&reopened.handle(&run, root.peer())), NOT_ALLOWLISTED);
     // A plan result, malformed receipt or mismatched response id grants nothing.
     let gate = jobs::Gate::default();
     let reply=encode_frame(&Response::success("other",json!({"schemaVersion":"arkdeck.job-acceptance/1","jobId":"job-owned","deduplicated":false,"newDispatchCount":0})).value(),MAX_RESPONSE_BYTES).unwrap();
@@ -224,7 +228,7 @@ fn typed_app_pairs_are_closed_and_bad_authority_never_reaches_control() {
     for doc in invalid {
         assert_eq!(
             code(&ingress.handle(&submit(&doc), root.peer())),
-            "rejected"
+            NOT_ALLOWLISTED
         );
     }
     let duplicate =
@@ -238,7 +242,7 @@ fn typed_app_pairs_are_closed_and_bad_authority_never_reaches_control() {
     ] {
         assert_eq!(
             code(&ingress.handle(&frame("job.submit", params), root.peer())),
-            "rejected"
+            NOT_ALLOWLISTED
         );
     }
     for method in ["job.run", "job.cancel"] {
@@ -249,7 +253,7 @@ fn typed_app_pairs_are_closed_and_bad_authority_never_reaches_control() {
         ] {
             assert_eq!(
                 code(&ingress.handle(&frame(method, params), root.peer())),
-                "rejected"
+                NOT_ALLOWLISTED
             );
         }
     }
@@ -312,7 +316,7 @@ fn continuation_refuses_mutation_stale_markers_and_missing_context_before_contro
                     &frame(method, json!({"requestJson":doc.to_string()})),
                     root.peer()
                 )),
-                "rejected",
+                NOT_ALLOWLISTED,
                 "{change}/{method}"
             );
         }

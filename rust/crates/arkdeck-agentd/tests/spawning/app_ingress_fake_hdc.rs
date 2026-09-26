@@ -292,7 +292,11 @@ esac
             );
         }
         let calls = fs::read(root.0.join("calls")).unwrap();
-        assert_eq!(code(&ingress.handle(&request, root.peer())), "rejected");
+        // A Job the App already ran is refused as Swift's App Job gate refuses it.
+        assert_eq!(
+            code(&ingress.handle(&request, root.peer())),
+            "methodNotAllowlisted"
+        );
         assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
         if continuation || template {
             // Even a caller explicitly resubmitting the identical request
@@ -405,7 +409,10 @@ esac
     );
     assert_eq!(shown["job"]["state"], "succeeded", "{shown}");
     let calls = fs::read(root.0.join("calls")).unwrap();
-    assert_eq!(code(&ingress.handle(&request, root.peer())), "rejected");
+    assert_eq!(
+        code(&ingress.handle(&request, root.peer())),
+        "methodNotAllowlisted"
+    );
     assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
     // A valid Job submitted over UDS is still foreign to the App gate.
     doc["requestId"] = json!(format!("foreign-{id}"));
@@ -417,7 +424,7 @@ esac
                 &frame(method, json!({"jobId":foreign["jobId"]})),
                 root.peer()
             )),
-            "rejected"
+            "methodNotAllowlisted"
         );
     }
     assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
