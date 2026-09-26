@@ -18,6 +18,24 @@
 //! Jobs and settled or parked uses are carried over as they are, never
 //! replayed.
 //!
+//! Two refusals keep this Runtime from carrying over what it would then hold
+//! stuck (协调会话裁定 2026-09-26):
+//! - `loaderTransitionAwaitingBinding`: a parked DAYU200 Flash Job, not
+//!   driven by an ArkForge lane, whose record and journal hold exactly the
+//!   enter-Loader transition Swift's `flash.bind-current-loader` settles
+//!   (`settleLoaderTransitionAfterBinding`, which this Runtime does not port:
+//!   F7). Carried over, it would refuse that binding until a complete
+//!   overwrite recovers it; settled first on the Swift Runtime, with the
+//!   Target and binding revision named here, it is carried over as the
+//!   failed Job the settlement leaves.
+//! - `retainedSessions`: the retained Sessions a device mutation's
+//!   continuity proof refuses — a Session with its identity and no Manifest
+//!   that a publication stopped short of (an installed Swift daemon publishes
+//!   in place) and no failed publication of the state's Jobs accounts for —
+//!   answered with that proof's own code and message. The proof is the one
+//!   `JobStore::require_retained_sessions` makes, run over this state's Job
+//!   store without opening it as an owner, which would write into it.
+//!
 //! Without `--hold-instance-lock` the read takes no lock, so it may run beside
 //! the Runtime it would replace: the CLI's first pass, whose refusal changes
 //! nothing. With it, the process first takes that Runtime's instance lock
@@ -157,6 +175,7 @@ pub(crate) fn preflight(layout: &Layout, hold: bool) -> Value {
         agent_executions: &layout.agent_executions,
         capabilities: &layout.capabilities,
         bootstrap: &layout.bootstrap,
+        sessions: &layout.sessions,
     });
     blocks.extend(fact_blocks(&facts));
     let document = json!({
@@ -177,8 +196,8 @@ pub(crate) fn preflight(layout: &Layout, hold: bool) -> Value {
     document
 }
 
-/// The shared table's refusals, then the pending selection and every source
-/// that could not be read.
+/// The shared table's refusals, then the pending selection, the retained
+/// Sessions' refusal and every source that could not be read.
 fn fact_blocks(facts: &CutoverFacts) -> Vec<Value> {
     let mut blocks: Vec<Value> = arkdeck_contract::cutover_preflight(
         &facts.jobs,
@@ -193,6 +212,15 @@ fn fact_blocks(facts: &CutoverFacts) -> Vec<Value> {
         CutoverBlock::UnresolvedJournal { job_id } => {
             block("unresolvedJournal", json!({"jobId": job_id}))
         }
+        CutoverBlock::LoaderTransitionAwaitingBinding {
+            job_id,
+            target_id,
+            expected_binding_revision,
+        } => block(
+            "loaderTransitionAwaitingBinding",
+            json!({"jobId": job_id, "targetId": target_id,
+                "expectedBindingRevision": expected_binding_revision}),
+        ),
         CutoverBlock::ActiveExecution {
             execution_id,
             state,
@@ -214,6 +242,13 @@ fn fact_blocks(facts: &CutoverFacts) -> Vec<Value> {
         blocks.push(block(
             "pendingToolSelection",
             json!({"controlActionId": action}),
+        ));
+    }
+    if let Some(refusal) = &facts.retained_sessions {
+        blocks.push(block(
+            "retainedSessions",
+            json!({"sessionsRoot": refusal.sessions_root, "code": refusal.code,
+                "message": refusal.message}),
         ));
     }
     for source in &facts.unreadable {

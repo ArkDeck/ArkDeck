@@ -71,14 +71,18 @@ fn files(path: &Path) -> Vec<(PathBuf, Vec<u8>)> {
 }
 
 /// What the continuity proof answers over the Sessions root: the proof
-/// alone (`require_retained_sessions`) and a device mutation's
-/// (`require_mutation_state`), which must agree.
+/// alone (`require_retained_sessions`), a device mutation's
+/// (`require_mutation_state`) and the cutover preflight's, which reads the
+/// Job store without its owner (`cutover_retained_sessions`); all three must
+/// agree.
 fn proof(daemon: &Daemon) -> Result<(), String> {
     let jobs = &daemon.stores().jobs;
     let sessions = daemon.root.join("Sessions");
     let alone = jobs.require_retained_sessions(&sessions);
+    let cutover = arkdeck_hoststore::cutover_retained_sessions(&daemon.default_root, &sessions);
     let whole = jobs.require_mutation_state(&daemon.default_root, &[sessions]);
     assert_eq!(alone, whole);
+    assert_eq!(cutover, alone);
     alone.map_err(|refusal| format!("{}: {}", refusal.code, refusal.message))
 }
 

@@ -390,6 +390,9 @@ pub struct ReplayState {
     resource_release_authorized: bool,
     requires_unknown_finalized_outcome: bool,
     compensation: Compensation,
+    /// Whether a step intent declared a destructive effect, whatever became
+    /// of it.
+    destructive_step_intent: bool,
 }
 
 /// One snapshot's replay: complete records validated in order, and whether
@@ -427,6 +430,13 @@ impl ReplayState {
 
     pub fn event_count(&self) -> usize {
         self.events
+    }
+
+    /// Whether any step intent declared a destructive effect: Swift
+    /// `pendingLoaderTransition`'s check that no `stepIntent` event's effect
+    /// is at least destructive.
+    pub(crate) fn holds_destructive_step_intent(&self) -> bool {
+        self.destructive_step_intent
     }
 
     /// The intents not completed, in event identity order.
@@ -747,6 +757,9 @@ impl ReplayState {
                 } else {
                     &payload["descriptor"]["effect"]
                 };
+                if kind == "stepIntent" && Effect::parse(source) == Some(Effect::Destructive) {
+                    self.destructive_step_intent = true;
+                }
                 if let (Some(step_id), Some(attempt), Some(effect)) = (
                     e["stepId"].as_str(),
                     e["attempt"].as_i64(),

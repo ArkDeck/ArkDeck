@@ -54,6 +54,14 @@ const RESUMING: (&str, &str) = (
     "job-9b3bd3e59373446bcdeaad9bd0a97001",
 );
 
+/// A DAYU200 Flash Job the engine drove itself, recorded by the Rockchip
+/// start-up oracle.
+const LOADER: (&str, &str) = (
+    "rockchip-startup/inputs/alias.complete/Agentd/jobs",
+    "job-11111111111111111111111111111111",
+);
+const LOADER_INTENT: &str = "intent-enter-loader-mode";
+
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures")
@@ -202,6 +210,157 @@ impl Home {
             ],
         )
         .unwrap();
+    }
+
+    /// Only the terminal and parked Jobs, the settled executions and uses,
+    /// and no pending selection: nothing the table refuses.
+    fn quiet(&self) {
+        for job in [PREFLIGHT, RESUMING] {
+            fs::remove_dir_all(self.job(job)).unwrap();
+            let mut db =
+                HostSqlite::open(&self.state().join("runtime-jobs.sqlite3"), false, false).unwrap();
+            db.execute(
+                "DELETE FROM runtime_job WHERE job_id = ?",
+                &[SqliteValue::Text(job.1.into())],
+            )
+            .unwrap();
+        }
+        for entry in fs::read_dir(self.state().join("agent-executions")).unwrap() {
+            let path = entry.unwrap().path();
+            let record: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            if record["state"] == "orchestrating" {
+                fs::remove_file(&path).unwrap();
+            }
+        }
+        self.active_tool_selection();
+    }
+
+    /// A recorded tool index whose selection is active, with nothing pending.
+    fn active_tool_selection(&self) {
+        directory(&self.bootstrap());
+        fs::copy(
+            fixture(
+                "tool-selection-registry/indexes/5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc.json",
+            ),
+            self.bootstrap().join("tools.json"),
+        )
+        .unwrap();
+        fs::set_permissions(
+            self.bootstrap().join("tools.json"),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+    }
+
+    /// The Flash Job of the Rockchip start-up oracle, which the engine drove
+    /// itself as it did before CHG-059, parked as Swift's engine parks it at
+    /// its own enter-Loader transition: its journal ends at the
+    /// `enter-loader-mode` intent, outstanding at binding revision 2 of its
+    /// Target, and then waits for recovery; its record keeps that intent with
+    /// its outcome unknown. `operation` is how its request names the Flash.
+    fn park_at_loader(&self, operation: Value) {
+        let directory = self.job(LOADER);
+        copy_files(&fixture(LOADER.0).join(LOADER.1), &directory);
+        let reference = match operation["version"].as_i64() {
+            Some(version) => format!("{}@{version}", operation["id"].as_str().unwrap()),
+            None => operation["id"].as_str().unwrap().to_owned(),
+        };
+        self.edit_record(LOADER, |record| {
+            record["state"] = json!("waitingForRecovery");
+            record["outcomeUnknown"] = json!(true);
+            record["recoveryStepID"] = json!("enter-loader-mode");
+            record["recoveryIntentEventID"] = json!(LOADER_INTENT);
+            record["operationReference"] = json!(reference);
+            record["request"]["operation"] = operation.clone();
+            record["originalSubmissionRequest"]["operation"] = operation;
+        });
+        self.edit_journal(LOADER, |events| {
+            let intent = events
+                .iter()
+                .position(|event| event["eventId"] == LOADER_INTENT)
+                .unwrap();
+            events.truncate(intent + 1);
+            let mut parked = events[intent - 1].clone();
+            assert_eq!(parked["kind"], "stateTransition");
+            parked["eventId"] = json!(format!("parked-{}", LOADER.1));
+            parked["payload"] = json!({"from": "running", "to": "waitingForRecovery",
+                "reason": "outcomeUnknown: the board did not answer after entering the Loader",
+                "triggerEventId": null});
+            events.push(parked);
+        });
+    }
+
+    /// Rewrites one Job's record as `edit` leaves it.
+    fn edit_record(&self, job: (&str, &str), edit: impl FnOnce(&mut Value)) {
+        let path = self.job(job).join("job-record.json");
+        let mut record: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+        edit(&mut record);
+        fs::write(&path, serde_json::to_vec(&record).unwrap()).unwrap();
+    }
+
+    /// Rewrites one Job's journal as `edit` leaves its events, numbered again
+    /// in their order.
+    fn edit_journal(&self, job: (&str, &str), edit: impl FnOnce(&mut Vec<Value>)) {
+        let path = self.job(job).join("journal.jsonl");
+        let mut events: Vec<Value> = fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        edit(&mut events);
+        let mut bytes = Vec::new();
+        for (sequence, event) in events.iter_mut().enumerate() {
+            event["sequence"] = json!(sequence);
+            bytes.extend(serde_json::to_vec(event).unwrap());
+            bytes.push(b'\n');
+        }
+        fs::write(&path, bytes).unwrap();
+    }
+
+    fn sessions(&self) -> PathBuf {
+        self.0.join("Library/Application Support/ArkDeck/Sessions")
+    }
+
+    /// A state holding no Job: the instance lock, a capability store whose
+    /// checkpoint lets a device mutation's proof pass over Job history, and a
+    /// tool index with nothing pending.
+    fn minimal(&self) {
+        let state = self.state();
+        directory(&state);
+        fs::write(state.join("instance.lock"), b"").unwrap();
+        fs::set_permissions(
+            state.join("instance.lock"),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+        copy_files(
+            &fixture("capture-diagnostics-file-legs/store/capabilities"),
+            &state.join("capabilities"),
+        );
+        self.active_tool_selection();
+    }
+
+    /// What a publication of `job`'s Session that stopped before its
+    /// Journal leaves at `location` below `root`: the Session's directories
+    /// and its identity, and no Manifest.
+    fn stopped_publication(&self, root: &Path, location: &str, job: &str) -> PathBuf {
+        let session = root.join(location);
+        for part in [
+            "audit",
+            "artifacts/derived",
+            "artifacts/partial",
+            "artifacts/raw",
+        ] {
+            directory(&session.join(part));
+        }
+        let identity = session.join(".session-identity.json");
+        fs::write(
+            &identity,
+            format!(r#"{{"jobId":"{job}","schemaVersion":"1.0.0","sessionId":"session-{job}"}}"#),
+        )
+        .unwrap();
+        fs::set_permissions(&identity, fs::Permissions::from_mode(0o600)).unwrap();
+        session
     }
 
     /// Every entry below the home with its mode, inode and, for a file, its
@@ -558,38 +717,7 @@ fn a_state_with_nothing_in_flight_is_clear_and_the_held_pass_records_its_snapsho
     let _turn = turn();
     let home = Home::new();
     home.seed();
-    // Only the terminal and parked Jobs, the settled executions and uses, and
-    // no pending selection.
-    for job in [PREFLIGHT, RESUMING] {
-        fs::remove_dir_all(home.job(job)).unwrap();
-        let mut db =
-            HostSqlite::open(&home.state().join("runtime-jobs.sqlite3"), false, false).unwrap();
-        db.execute(
-            "DELETE FROM runtime_job WHERE job_id = ?",
-            &[SqliteValue::Text(job.1.into())],
-        )
-        .unwrap();
-    }
-    for entry in fs::read_dir(home.state().join("agent-executions")).unwrap() {
-        let path = entry.unwrap().path();
-        let record: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-        if record["state"] == "orchestrating" {
-            fs::remove_file(&path).unwrap();
-        }
-    }
-    // A recorded index whose selection is active, with nothing pending.
-    fs::copy(
-        fixture(
-            "tool-selection-registry/indexes/5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc.json",
-        ),
-        home.bootstrap().join("tools.json"),
-    )
-    .unwrap();
-    fs::set_permissions(
-        home.bootstrap().join("tools.json"),
-        fs::Permissions::from_mode(0o600),
-    )
-    .unwrap();
+    home.quiet();
     let before = home.tree();
     let document = preflight(&home, false);
     assert_eq!(document["clear"], true, "{document}");
@@ -786,4 +914,394 @@ fn the_job_index_is_read_the_way_swift_inspects_it() {
     assert_eq!(fs::read(&database).unwrap(), bytes);
     assert_eq!(fs::read(&log).unwrap(), b"a log with frames");
     assert!(!index.exists());
+}
+
+/// The Loader transition block the preflight names for the parked Flash Job.
+fn loader_block() -> Value {
+    json!({"kind": "loaderTransitionAwaitingBinding", "jobId": LOADER.1,
+        "targetId": "TGT-8b3d0a34cf32", "expectedBindingRevision": 2})
+}
+
+/// A copy of the parked Flash Job's enter-Loader intent as another step of
+/// `effect`, which the journal holds before it.
+fn another_intent(events: &mut Vec<Value>, step: &str, effect: &str) -> usize {
+    let at = events
+        .iter()
+        .position(|event| event["eventId"] == LOADER_INTENT)
+        .unwrap();
+    let mut intent = events[at].clone();
+    intent["eventId"] = json!(format!("intent-{step}"));
+    intent["stepId"] = json!(step);
+    intent["payload"]["step"]["id"] = json!(step);
+    intent["payload"]["step"]["effect"] = json!(effect);
+    events.insert(at, intent);
+    at
+}
+
+/// The outcome of the intent at `at`, as the engine records it.
+fn outcome(events: &[Value], at: usize, certainty: &str) -> Value {
+    let intent = &events[at];
+    let result = if certainty == "confirmed" {
+        "succeeded"
+    } else {
+        "failed"
+    };
+    json!({"attempt": intent["attempt"],
+        "eventId": format!("outcome-{}", intent["stepId"].as_str().unwrap()),
+        "jobId": intent["jobId"], "kind": "stepOutcome",
+        "payload": {"correlatesToIntentEventId": intent["eventId"], "outcomeCertainty": certainty,
+            "result": result, "summary": "recorded for the preflight"},
+        "schemaVersion": "1.0.0", "sequence": 0, "sessionId": intent["sessionId"],
+        "stepId": intent["stepId"], "timestamp": intent["timestamp"]})
+}
+
+#[test]
+fn a_parked_flash_only_swift_can_settle_at_its_loader_transition_refuses_the_cutover() {
+    let _turn = turn();
+    // Each spelling of the DAYU200 Flash a request names.
+    for operation in [
+        json!({"id": "flash.full-restore", "version": 1}),
+        json!({"id": "flash.dayu200"}),
+        json!({"id": "flash.dayu200", "version": 1}),
+    ] {
+        let home = Home::new();
+        home.seed();
+        home.quiet();
+        home.park_at_loader(operation.clone());
+        // The journal Swift's engine leaves: one intent outstanding, the
+        // Loader transition, at binding revision 2.
+        let journal = arkdeck_hoststore::inspect_journal(&home.job(LOADER)).unwrap();
+        assert_eq!(journal.current_state.as_deref(), Some("waitingForRecovery"));
+        assert_eq!(
+            journal
+                .outstanding_intents
+                .iter()
+                .map(|intent| (
+                    intent.event_id.as_str(),
+                    intent.effect.as_str(),
+                    intent.binding_revision
+                ))
+                .collect::<Vec<_>>(),
+            [(LOADER_INTENT, "deviceMutation", Some(2))]
+        );
+        assert!(journal.unknown_outcomes.is_empty());
+        let before = home.tree();
+        // Refused by name, with the Target and binding revision whose fresh
+        // Loader binding settles it on Swift's Runtime, by both passes; every
+        // other parked Job is carried over as before.
+        let free = preflight(&home, false);
+        let held = preflight(&home, true);
+        for document in [&free, &held] {
+            assert_eq!(document["clear"], false, "{operation}: {document}");
+            assert_eq!(
+                blocks(document),
+                [loader_block()],
+                "{operation}: {document}"
+            );
+            assert_eq!(
+                document["carriedOver"]["parkedJobIds"],
+                json!([LOADER.1, PARKED.1]),
+                "{operation}"
+            );
+        }
+        assert_eq!(held["instanceLockHeld"], true);
+        assert_eq!(home.tree(), before, "{operation}");
+    }
+}
+
+#[test]
+fn a_parked_flash_swift_would_not_settle_is_carried_over_as_every_parked_job_is() {
+    let _turn = turn();
+    type Change = fn(&Home);
+    let cases: [(&str, Change); 10] = [
+        ("its ArkForge lane holds the transition", |home| {
+            let sidecar = home.job(LOADER).join("arkforge-runtime-state.json");
+            fs::write(&sidecar, b"{}").unwrap();
+            fs::set_permissions(&sidecar, fs::Permissions::from_mode(0o600)).unwrap();
+        }),
+        (
+            "another intent is outstanding, reading the device",
+            |home| {
+                home.edit_journal(LOADER, |events| {
+                    another_intent(events, "probe-before-loader", "readOnly");
+                });
+            },
+        ),
+        ("another device mutation is outstanding", |home| {
+            home.edit_journal(LOADER, |events| {
+                another_intent(events, "reboot-before-loader", "deviceMutation");
+            });
+        }),
+        ("the transition's outcome is recorded as unknown", |home| {
+            home.edit_journal(LOADER, |events| {
+                let at = events
+                    .iter()
+                    .position(|event| event["eventId"] == LOADER_INTENT)
+                    .unwrap();
+                let unknown = outcome(events, at, "outcomeUnknown");
+                events.insert(at + 1, unknown);
+            });
+        }),
+        ("a destructive step ran before it", |home| {
+            home.edit_journal(LOADER, |events| {
+                let at = another_intent(events, "flash-before-loader", "destructive");
+                let confirmed = outcome(events, at, "confirmed");
+                events.insert(at + 1, confirmed);
+            });
+        }),
+        ("its journal ends in a torn record", |home| {
+            let journal = home.job(LOADER).join("journal.jsonl");
+            let mut bytes = fs::read(&journal).unwrap();
+            bytes.extend_from_slice(b"{\"eventId\":\"torn");
+            fs::write(&journal, &bytes).unwrap();
+        }),
+        ("its record does not keep the outcome unknown", |home| {
+            home.edit_record(LOADER, |record| record["outcomeUnknown"] = json!(false));
+        }),
+        ("its request expects another binding revision", |home| {
+            home.edit_record(LOADER, |record| {
+                for request in ["request", "originalSubmissionRequest"] {
+                    record[request]["target"]["expectedBindingRevision"] = json!(3);
+                }
+            });
+        }),
+        ("it is not a Flash", |home| {
+            home.edit_record(LOADER, |record| {
+                record["operationReference"] = json!("capture.screen-sequence@1");
+                for request in ["request", "originalSubmissionRequest"] {
+                    record[request]["operation"] =
+                        json!({"id": "capture.screen-sequence", "version": 1});
+                }
+            });
+        }),
+        ("its record parks it at another step", |home| {
+            home.edit_record(LOADER, |record| {
+                record["recoveryStepID"] = json!("flash-partitions");
+            });
+        }),
+    ];
+    for (case, change) in cases {
+        let home = Home::new();
+        home.seed();
+        home.quiet();
+        home.park_at_loader(json!({"id": "flash.full-restore", "version": 1}));
+        change(&home);
+        // Still a record and a journal the Runtime reads, parked: carried
+        // over for what they hold, not for being unreadable.
+        let journal = arkdeck_hoststore::inspect_journal(&home.job(LOADER)).unwrap();
+        assert_eq!(
+            journal.current_state.as_deref(),
+            Some("waitingForRecovery"),
+            "{case}"
+        );
+        arkdeck_hoststore::JobRecord::decode(
+            &fs::read(home.job(LOADER).join("job-record.json")).unwrap(),
+        )
+        .unwrap();
+        let document = preflight(&home, false);
+        assert_eq!(document["clear"], true, "{case}: {document}");
+        assert_eq!(
+            document["carriedOver"]["parkedJobIds"],
+            json!([LOADER.1, PARKED.1]),
+            "{case}"
+        );
+    }
+    // Not parked, it is refused by the table's rules, never as a Loader
+    // transition.
+    let home = Home::new();
+    home.seed();
+    home.quiet();
+    home.park_at_loader(json!({"id": "flash.full-restore", "version": 1}));
+    let mut db =
+        HostSqlite::open(&home.state().join("runtime-jobs.sqlite3"), false, false).unwrap();
+    db.execute(
+        "INSERT INTO runtime_job VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, NULL)",
+        &[
+            SqliteValue::Text(LOADER.1.into()),
+            SqliteValue::Text(format!("key-{}", LOADER.1)),
+            SqliteValue::Text("0".repeat(64)),
+            SqliteValue::Text("running".into()),
+            SqliteValue::Integer(9),
+            SqliteValue::Text("2026-09-01T00:00:00Z".into()),
+            SqliteValue::Text(format!("{:016x}", 9)),
+            SqliteValue::Text("2026-09-01T00:00:00Z".into()),
+        ],
+    )
+    .unwrap();
+    drop(db);
+    let document = preflight(&home, false);
+    assert_eq!(
+        blocks(&document),
+        [
+            json!({"kind": "jobState", "jobId": LOADER.1, "state": "running"}),
+            json!({"kind": "unresolvedJournal", "jobId": LOADER.1}),
+        ],
+        "{document}"
+    );
+}
+
+/// The Swift-recorded Job whose Session publication failed, as its durable
+/// record keeps it: terminal, created 2026-07-29.
+const FAILED_PUBLICATION: &str = "job-a9fda911411280791d18df748a6d3d84";
+
+#[test]
+fn a_retained_session_the_continuity_proof_refuses_refuses_the_cutover_in_its_own_words() {
+    let _turn = turn();
+    let home = Home::new();
+    home.minimal();
+    let state = home.state();
+    let sessions = home.sessions();
+    directory(&sessions);
+    // The Job store's owner, opened before the state is measured: it answers
+    // what a device mutation's proof refuses once this state is carried over.
+    let jobs = arkdeck_hoststore::JobStore::open_state_root_owner(&state).unwrap();
+    // What a publication that stopped before its Journal leaves, for a Job no
+    // record of this state accounts for.
+    let stray = "job-0000000000000000000000000000c001";
+    let location = format!("2026/09/session-{stray}");
+    let session = home.stopped_publication(&sessions, &location, stray);
+    // What a device mutation's proof answers there. Asked first: the owner's
+    // first read leaves the index's log and shared memory beside it, as a
+    // Swift daemon's do, before the state is measured.
+    let refusal = jobs.require_mutation_state(&state, &[]).unwrap_err();
+    let before = home.tree();
+    let free = preflight(&home, false);
+    let held = preflight(&home, true);
+    assert_eq!(home.tree(), before);
+    assert!(
+        refusal
+            .message
+            .contains(&format!("retained Session {location} has no Manifest")),
+        "{refusal:?}"
+    );
+    let refused = json!({"kind": "retainedSessions", "sessionsRoot": sessions.to_str().unwrap(),
+        "code": refusal.code, "message": refusal.message});
+    for document in [&free, &held] {
+        assert_eq!(document["clear"], false, "{document}");
+        assert_eq!(
+            blocks(document),
+            std::slice::from_ref(&refused),
+            "{document}"
+        );
+    }
+
+    // A copy that holds its Journal, which replays clean, passes, as the
+    // proof passes it (and Swift, which does not look below it).
+    let journal = session.join("journal.jsonl");
+    fs::copy(
+        fixture(SUCCEEDED.0).join(SUCCEEDED.1).join("journal.jsonl"),
+        &journal,
+    )
+    .unwrap();
+    fs::set_permissions(&journal, fs::Permissions::from_mode(0o600)).unwrap();
+    assert_eq!(jobs.require_mutation_state(&state, &[]), Ok(()));
+    let document = preflight(&home, false);
+    assert_eq!(document["clear"], true, "{document}");
+    fs::remove_dir_all(sessions.join("2026")).unwrap();
+
+    // The Session a failed publication of a Job this state holds left is
+    // accounted for by that Job's durable record, and passes.
+    let record = fs::read(fixture("job-publication-current/failed/job-record.json")).unwrap();
+    let decoded = arkdeck_hoststore::JobRecord::decode(&record).unwrap();
+    assert_eq!(
+        jobs.admit(&decoded, &"0".repeat(64)).unwrap(),
+        arkdeck_hoststore::AdmissionVerdict::Admitted
+    );
+    let job = state.join("jobs").join(FAILED_PUBLICATION);
+    directory(&job);
+    fs::write(job.join("job-record.json"), &record).unwrap();
+    // A terminal Journal of its own: the succeeded capture's, its events
+    // named for this Job and its Session (their arguments, which their
+    // digests cover, are left as they are).
+    fs::copy(
+        fixture(SUCCEEDED.0).join(SUCCEEDED.1).join("journal.jsonl"),
+        job.join("journal.jsonl"),
+    )
+    .unwrap();
+    for name in ["job-record.json", "journal.jsonl"] {
+        fs::set_permissions(job.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    home.edit_journal(("", FAILED_PUBLICATION), |events| {
+        for event in events {
+            event["jobId"] = json!(FAILED_PUBLICATION);
+            event["sessionId"] = json!(format!("session-{FAILED_PUBLICATION}"));
+        }
+    });
+    let journal = arkdeck_hoststore::inspect_journal(&job).unwrap();
+    assert_eq!(journal.current_state.as_deref(), Some("succeeded"));
+    assert!(!journal.requires_recovery);
+    let location = format!("2026/07/session-{FAILED_PUBLICATION}");
+    home.stopped_publication(&sessions, &location, FAILED_PUBLICATION);
+    assert!(jobs.failed_publication_accounts_for(
+        &sessions,
+        ["2026", "07", &format!("session-{FAILED_PUBLICATION}")]
+    ));
+    assert_eq!(jobs.require_mutation_state(&state, &[]), Ok(()));
+    let before = home.tree();
+    for hold in [false, true] {
+        let document = preflight(&home, hold);
+        assert_eq!(document["clear"], true, "{document}");
+        assert_eq!(document["carriedOver"]["terminalJobCount"], 1);
+    }
+    assert_eq!(home.tree(), before);
+}
+
+#[test]
+fn the_session_root_the_settings_select_is_proved_too() {
+    let _turn = turn();
+    let home = Home::new();
+    home.minimal();
+    let state = home.state();
+    let custom = home.0.join("custom-sessions");
+    directory(&custom);
+    directory(&home.sessions());
+    let jobs = arkdeck_hoststore::JobStore::open_state_root_owner(&state).unwrap();
+    let settings = |bytes: &[u8]| {
+        fs::write(state.join("session-storage.json"), bytes).unwrap();
+        fs::set_permissions(
+            state.join("session-storage.json"),
+            fs::Permissions::from_mode(0o600),
+        )
+        .unwrap();
+    };
+    let mut selected = serde_json::to_vec(&json!({
+        "schemaVersion": "arkdeck.session-storage-store/1", "generation": 2,
+        "rootKind": "custom", "rootPath": custom.to_str().unwrap(),
+        "policy": {"totalQuotaBytes": 21474836480_u64, "safetyMarginBytes": 2147483648_u64,
+            "retentionDays": 90}}))
+    .unwrap();
+    selected.push(b'\n');
+    settings(selected.as_slice());
+    let stray = "job-0000000000000000000000000000c002";
+    let location = format!("2026/09/session-{stray}");
+    home.stopped_publication(&custom, &location, stray);
+    let refusal = jobs
+        .require_mutation_state(&state, std::slice::from_ref(&custom))
+        .unwrap_err();
+    let document = preflight(&home, false);
+    assert_eq!(
+        blocks(&document),
+        [
+            json!({"kind": "retainedSessions", "sessionsRoot": custom.to_str().unwrap(),
+            "code": refusal.code, "message": refusal.message})
+        ],
+        "{document}"
+    );
+    // Settings that cannot be read are named, and the default root is still
+    // proved.
+    settings(b"not the settings".as_slice());
+    let default = home.sessions();
+    home.stopped_publication(&default, &location, stray);
+    let document = preflight(&home, false);
+    let refusal = jobs.require_mutation_state(&state, &[]).unwrap_err();
+    assert_eq!(
+        blocks(&document),
+        [
+            json!({"kind": "retainedSessions", "sessionsRoot": default.to_str().unwrap(),
+                "code": refusal.code, "message": refusal.message}),
+            json!({"kind": "unreadable", "source": "sessionStorage",
+                "reason": "Session storage is unavailable or unsafe"}),
+        ],
+        "{document}"
+    );
 }

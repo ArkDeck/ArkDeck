@@ -189,39 +189,98 @@ fn current_layout(db: &mut HostSqlite) -> io::Result<()> {
     }
     Ok(())
 }
-/// Every Job's identity and state as the index at `path` holds them, for the
-/// cutover preflight: read through the connection Swift's repository inspects
-/// with (`inspection`), so no owner lock is taken or marked and no log is
-/// recovered or checkpointed; the database bytes are left as they are. An
-/// absent index holds no Job.
-pub(crate) fn cutover_index_states(path: &Path) -> io::Result<Vec<(String, String)>> {
-    let root = HostDirectory::open(path)?;
-    match root.owned_kind_and_size(DATABASE) {
-        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
-        Err(error) => return Err(error),
-        Ok(_) => (),
+/// Every column of a Job's index row, in `job_row`'s order.
+const ROWS: &str = "SELECT job_id, idempotency_key, request_hash, state, created_at_utc, updated_at_utc, version, initial_record_json, created_at_order_key, admission_sequence FROM runtime_job";
+
+/// One row of `ROWS`, checked as every reader of the index checks it.
+fn job_row(row: Vec<SqliteValue>) -> io::Result<JobRow> {
+    if row.len() != 10 || row[9].integer().is_none_or(|n| n <= 0) {
+        return Err(corrupt());
     }
-    validate_files(&root)?;
-    let (mut db, _) = inspection(&root, path)?;
-    current_layout(&mut db)?;
-    let mut rows = Vec::new();
-    let mut after = String::new();
-    loop {
-        let page = db.query(
-            "SELECT job_id, state FROM runtime_job WHERE job_id COLLATE BINARY > ? ORDER BY job_id COLLATE BINARY LIMIT 256",
-            &[SqliteValue::Text(after.clone())],
-            1024 * 1024,
-        )?;
-        if page.is_empty() {
-            return Ok(rows);
+    let text = |n: usize| {
+        row[n]
+            .text()
+            .filter(|s| s.len() <= 4096)
+            .map(str::to_owned)
+            .ok_or_else(corrupt)
+    };
+    let row = JobRow {
+        id: text(0)?,
+        idempotency_key: text(1)?,
+        request_hash: text(2)?,
+        state: text(3)?,
+        created: text(4)?,
+        updated: text(5)?,
+        version: row[6].integer().filter(|v| *v > 0).ok_or_else(corrupt)?,
+        record: row[7].blob().ok_or_else(corrupt)?.to_vec(),
+        order_key: text(8)?,
+    };
+    if !identifier(&row.id) || row.order_key != order_key(&row.created)? {
+        return Err(corrupt());
+    }
+    Ok(row)
+}
+
+/// The Job index at a state root as the cutover preflight reads it: through
+/// the connection Swift's repository inspects with (`inspection`), so no
+/// owner lock is taken or marked and no log is recovered or checkpointed; the
+/// database bytes are left as they are.
+pub(crate) struct InspectedIndex {
+    db: Mutex<HostSqlite>,
+}
+
+impl InspectedIndex {
+    /// The index at `path`, checked as the owner checks its layout; `None`
+    /// where there is none, which holds no Job.
+    pub(crate) fn open(path: &Path) -> io::Result<Option<Self>> {
+        let root = HostDirectory::open(path)?;
+        match root.owned_kind_and_size(DATABASE) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+            Ok(_) => (),
         }
-        for row in page {
-            let [SqliteValue::Text(id), SqliteValue::Text(state)] = row.as_slice() else {
-                return Err(corrupt());
-            };
-            after.clone_from(id);
-            rows.push((id.clone(), state.clone()));
+        validate_files(&root)?;
+        let (mut db, _) = inspection(&root, path)?;
+        current_layout(&mut db)?;
+        Ok(Some(Self { db: Mutex::new(db) }))
+    }
+
+    /// Every Job's identity and state, in identity order.
+    pub(crate) fn states(&self) -> io::Result<Vec<(String, String)>> {
+        let mut db = self.db.lock().map_err(|_| corrupt())?;
+        let mut rows = Vec::new();
+        let mut after = String::new();
+        loop {
+            let page = db.query(
+                "SELECT job_id, state FROM runtime_job WHERE job_id COLLATE BINARY > ? ORDER BY job_id COLLATE BINARY LIMIT 256",
+                &[SqliteValue::Text(after.clone())],
+                1024 * 1024,
+            )?;
+            if page.is_empty() {
+                return Ok(rows);
+            }
+            for row in page {
+                let [SqliteValue::Text(id), SqliteValue::Text(state)] = row.as_slice() else {
+                    return Err(corrupt());
+                };
+                after.clone_from(id);
+                rows.push((id.clone(), state.clone()));
+            }
         }
+    }
+
+    /// The Job's row, as `JobRepository::rows` reads it.
+    pub(crate) fn row(&self, id: &str) -> io::Result<Option<JobRow>> {
+        let mut db = self.db.lock().map_err(|_| corrupt())?;
+        Ok(db
+            .query_map(
+                &format!("{ROWS} WHERE job_id = ?"),
+                &[SqliteValue::Text(id.into())],
+                17 * 1024 * 1024,
+                job_row,
+            )?
+            .into_iter()
+            .next())
     }
 }
 
@@ -494,34 +553,8 @@ impl JobRepository {
         db.execute("BEGIN", &[])?;
         let result = (|| {
             current_layout(&mut db)?;
-            let sql = "SELECT job_id, idempotency_key, request_hash, state, created_at_utc, updated_at_utc, version, initial_record_json, created_at_order_key, admission_sequence FROM runtime_job";
-            let decode = |row: Vec<SqliteValue>| {
-                if row.len() != 10 || row[9].integer().is_none_or(|n| n <= 0) {
-                    return Err(corrupt());
-                }
-                let text = |n: usize| {
-                    row[n]
-                        .text()
-                        .filter(|s| s.len() <= 4096)
-                        .map(str::to_owned)
-                        .ok_or_else(corrupt)
-                };
-                let row = JobRow {
-                    id: text(0)?,
-                    idempotency_key: text(1)?,
-                    request_hash: text(2)?,
-                    state: text(3)?,
-                    created: text(4)?,
-                    updated: text(5)?,
-                    version: row[6].integer().filter(|v| *v > 0).ok_or_else(corrupt)?,
-                    record: row[7].blob().ok_or_else(corrupt)?.to_vec(),
-                    order_key: text(8)?,
-                };
-                if !identifier(&row.id) || row.order_key != order_key(&row.created)? {
-                    return Err(corrupt());
-                }
-                project(row)
-            };
+            let sql = ROWS;
+            let decode = |row: Vec<SqliteValue>| project(job_row(row)?);
             if let Some(id) = id {
                 db.query_map(
                     &format!("{sql} WHERE job_id = ?"),

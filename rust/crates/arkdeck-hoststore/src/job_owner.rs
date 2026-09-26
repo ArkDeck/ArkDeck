@@ -21,6 +21,7 @@ use std::{
 
 #[path = "mutation_state_continuity.rs"]
 mod mutation_state_continuity;
+pub(crate) use mutation_state_continuity::require_retained_sessions_without_owner;
 
 #[cfg(target_os = "macos")]
 #[path = "job_flash_state.rs"]
@@ -88,6 +89,25 @@ impl JobAdmissionInterlock<'_> {
 
 fn guard_unavailable() -> JobWriteError {
     JobWriteError::Refused(io::Error::other("The Job activity guard is unavailable"))
+}
+
+/// Swift `RuntimeJobEngine.loaderTransitionAwaitingBinding`'s candidate
+/// filter over one record: a DAYU200 flash Job parked in
+/// `waitingForRecovery` with an unknown outcome at its outstanding
+/// `enter-loader-mode` intent, answered with the Target and binding revision
+/// its request expects, which a binding must name to settle it.
+pub(crate) fn loader_transition_candidate(record: &JobRecord) -> Option<(&str, i64)> {
+    let target = &record.request["target"];
+    let expected = (
+        target["targetId"].as_str()?,
+        target["expectedBindingRevision"].as_i64()?,
+    );
+    (record.dayu200_flash()
+        && record.state == "waitingForRecovery"
+        && record.outcome_unknown()
+        && record.recovery_step() == Some("enter-loader-mode")
+        && record.recovery_intent().is_some())
+    .then_some(expected)
 }
 
 impl JobStore {
@@ -555,14 +575,7 @@ impl JobStore {
                 .resident(&row.id)
                 .map(Ok)
                 .unwrap_or_else(|| JobRecord::from_row(row))?;
-            let target = &record.request["target"];
-            if record.dayu200_flash()
-                && target["targetId"].as_str() == Some(target_id)
-                && target["expectedBindingRevision"].as_i64() == Some(expected_binding_revision)
-                && record.state == "waitingForRecovery"
-                && record.outcome_unknown()
-                && record.recovery_step() == Some("enter-loader-mode")
-                && record.recovery_intent().is_some()
+            if loader_transition_candidate(&record) == Some((target_id, expected_binding_revision))
             {
                 jobs.push(record.job_id.clone());
             }

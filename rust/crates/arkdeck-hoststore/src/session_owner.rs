@@ -567,6 +567,41 @@ pub(crate) struct StorageHold<'a> {
     lock: HostReadLock,
 }
 
+/// The Session root the settings kept in the storage owner's directory
+/// `root` select, or `default_sessions` where there are none.
+fn configured_root_in(root: &HostDirectory, default_sessions: &Path) -> Result<PathBuf, WireError> {
+    let loaded = match root.read(DOCUMENT, MAXIMUM) {
+        Ok(value) => value,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {
+            return Ok(default_sessions.to_path_buf());
+        }
+        Err(e) => return Err(unreadable(e)),
+    };
+    let decoded = decode_session_configuration(&loaded).map_err(unreadable)?;
+    let document: Value = serde_json::from_slice(&decoded.document).map_err(unreadable)?;
+    document["rootPath"]
+        .as_str()
+        .map(PathBuf::from)
+        .ok_or_else(|| unreadable(()))
+}
+
+/// [`StorageHold::configured_root`] at a state directory no owner of this
+/// process holds (`state`, where the production composition keeps its
+/// Session storage settings), read without the storage lock: the cutover
+/// preflight's read of the Runtime it would replace. The settings are only
+/// ever published whole, so a read beside their writer reads one whole
+/// document; nothing is locked, created or written.
+pub(crate) fn configured_root_without_owner(
+    state: &Path,
+    default_sessions: &Path,
+) -> Result<PathBuf, WireError> {
+    match HostDirectory::open(state) {
+        Ok(root) => configured_root_in(&root, default_sessions),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(default_sessions.to_path_buf()),
+        Err(e) => Err(unreadable(e)),
+    }
+}
+
 impl StorageHold<'_> {
     /// Swift `RuntimeSessionStorageStore.status()`: the status once the read
     /// has reconciled (and the first time initialized) the catalog.
@@ -578,20 +613,7 @@ impl StorageHold<'_> {
     /// reconciliation of the catalog, which writes one where there is none:
     /// the daemon's start reads it and writes nothing.
     pub(crate) fn configured_root(&self) -> Result<PathBuf, WireError> {
-        let store = self.store;
-        let loaded = match store.root.read(DOCUMENT, MAXIMUM) {
-            Ok(value) => value,
-            Err(e) if e.kind() == io::ErrorKind::NotFound => {
-                return Ok(store.default_sessions.clone());
-            }
-            Err(e) => return Err(unreadable(e)),
-        };
-        let decoded = decode_session_configuration(&loaded).map_err(unreadable)?;
-        let document: Value = serde_json::from_slice(&decoded.document).map_err(unreadable)?;
-        document["rootPath"]
-            .as_str()
-            .map(PathBuf::from)
-            .ok_or_else(|| unreadable(()))
+        configured_root_in(&self.store.root, &self.store.default_sessions)
     }
 
     /// The status as the publication writer reads it: the active Session

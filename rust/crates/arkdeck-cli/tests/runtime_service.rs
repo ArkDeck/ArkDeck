@@ -2524,6 +2524,59 @@ fn a_cutover_the_first_pass_refuses_changes_nothing() {
     assert!(is_analyzer_probe(&runs[1]), "{runs:?}");
 }
 
+/// The two refusals of state the Rust Runtime would hold stuck: a parked
+/// Loader transition only Swift's Runtime settles, named with the binding
+/// that settles it there, and the retained Sessions' continuity proof,
+/// answered in its own words.
+#[test]
+fn a_cutover_names_what_only_the_swift_runtime_can_settle() {
+    let home = Home::new();
+    home.install();
+    let message = "Runtime mutation state continuity cannot be proved: retained Session \
+                   2026/07/session-job-a has no Manifest and no failed publication of this \
+                   Runtime accounts for it; runtime storage status and session cleanup name \
+                   it; move it out of the Session root once reviewed; original state is \
+                   preserved";
+    let blocks = json!([
+        {"kind": "loaderTransitionAwaitingBinding", "jobId": "job-flash",
+            "targetId": "target-dayu200", "expectedBindingRevision": 3},
+        {"kind": "retainedSessions", "sessionsRoot": "/Users/a/Library/Application Support/ArkDeck/Sessions",
+            "code": "recordUnreadable", "message": message},
+    ]);
+    let helper = Helper::new(
+        &home,
+        "src",
+        &Daemon::Rust {
+            first: preflight_document(&home, blocks, false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+            analyzer: Analyzer::Answers,
+        },
+    );
+    let before = tree(&home.paths.home);
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&helper, &home));
+    assert_eq!(
+        answer.failure,
+        Some(PlainFailure {
+            exit_code: 75,
+            message: format!(
+                "runtime service update refused: the Runtime state cannot be carried over as it \
+                 is (Job job-flash awaits a Loader binding of target target-dayu200 at binding \
+                 revision 3 to settle its enter-Loader transition, which the Rust Runtime does \
+                 not settle: settle it first on the old Swift Runtime with `arkdeck flash \
+                 bind-loader --target target-dayu200 --expected-binding-revision 3` \
+                 (flash.bind-current-loader), then run the preflight again; the retained \
+                 Sessions under /Users/a/Library/Application Support/ArkDeck/Sessions are \
+                 refused as a device mutation's continuity proof refuses them: \
+                 recordUnreadable: {message}); nothing was changed"
+            )
+        })
+    );
+    assert_eq!(launchd.calls(), [print_call()]);
+    assert_eq!(tree(&home.paths.home), before);
+}
+
 #[test]
 fn a_cutover_the_held_pass_refuses_starts_the_old_service_again() {
     let home = Home::new();
