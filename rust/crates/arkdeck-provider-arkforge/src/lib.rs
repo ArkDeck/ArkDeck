@@ -9,16 +9,21 @@
 //! It composes the lane — one owned, paired `arkforged` generation — and reads
 //! through the daemon's public socket: which Rockchip flashing modes it sees,
 //! and its half of the dual-source Loader observation. The Runtime's Flash
-//! execution reaches a lane through `FlashLane`; the controller surface that
-//! plans and permits behind it follows in later slices.
+//! execution reaches a lane through `FlashLane`. Behind it, `managed_control`
+//! builds the receipts this authority answers the daemon's control requests
+//! with, and `authority_support` the key that binds this authority build to
+//! an executable plan; the controller surface that plans and permits follows
+//! in later slices.
 
 #![forbid(unsafe_code)]
 
+pub mod authority_support;
 mod device_access;
 mod flash_lane;
 #[cfg(target_os = "macos")]
 mod lane;
 mod loader;
+pub mod managed_control;
 
 pub use device_access::{
     DEVICE_ACCESS_TIMEOUT, DeviceAccessFailure, DeviceAccessObserver, DeviceMode,
