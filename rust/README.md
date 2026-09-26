@@ -725,6 +725,23 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   Over a thousand retained Sessions each holding a 9-record Swift pointer oracle
   Journal, a proof that reads them all took 356 ms and one that reuses them
   36 ms (debug build).
+- **A failed publication's Session.** A Session holding its identity and no
+  Manifest is what a publication that stopped short of it left. Where the scan
+  refuses one (its identity and directories alone, or a Journal copy with a torn
+  tail or an unresolved device mutation), it passes it over only when
+  `JobStore::failed_publication_accounts_for` proves a failed publication of this
+  Runtime left it: the identity names a Job this store holds, whose durable
+  record keeps a failed publication of that Session, at `yyyy/mm` of its
+  creation; and the Session holds nothing the publication does not write before
+  it stops (a Journal that is the Job's own as far as it goes, the outcome audit
+  only with the whole Journal, empty locks). Anything else is refused, naming
+  the Session: "retained Session <path> has no Manifest and no failed
+  publication of this Runtime accounts for it; runtime storage status and
+  session cleanup name it; move it out of the Session root once reviewed".
+  Swift's scan never refuses such a Session: it looks only at the Session root's
+  direct children, so in the `yyyy/mm/session-*` layout it reads no Session at
+  all. `JobStore::require_retained_sessions` runs the same scan over one
+  Sessions root alone, for a check made before the Runtime serves.
 - **Not served.** A descriptor without `defaultPolicyIssuance` counts as enabled,
   as Swift's generated catalog reads it. Destructive effects, the
   `runtimeCapability` policy and workspace subjects are still refused.

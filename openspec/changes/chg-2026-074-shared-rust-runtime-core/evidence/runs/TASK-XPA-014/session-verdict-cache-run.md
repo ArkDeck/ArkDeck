@@ -157,4 +157,9 @@ skip and this slice's verdicts first met in one function:
 
 ## CI
 
-Pending.
+#2240, head `ae2d4c828`, run 36201424042: every selected lane passed.
+- Rust workspace: macOS 10m32s, Ubuntu 2m17s, Windows 4m15s. Host-independent checks: 33s.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `a66520ca6`. Recorded by the next slice (TASK-XPA-014, the failed publication's
+Session), as AGENTS.md has it.

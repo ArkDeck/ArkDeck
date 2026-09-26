@@ -71,6 +71,9 @@ impl Reuse {
 
 /// One scan's reading of the last one's verdicts, and the verdicts it keeps.
 struct Verdicts<'a> {
+    /// The Job store whose failed publications may account for a retained
+    /// Session that holds its identity and no Manifest.
+    jobs: &'a JobStore,
     reuse: Reuse,
     previous: &'a HashMap<PathBuf, Passed>,
     next: HashMap<PathBuf, Passed>,
@@ -122,6 +125,34 @@ impl Verdicts<'_> {
             self.next.insert(path, passed);
         }
     }
+}
+
+const IDENTITY: &str = ".session-identity.json";
+
+/// A retained Session holding its identity and no Manifest that no failed
+/// publication of this Runtime accounts for, named by its place under its
+/// Sessions root, bounded.
+fn incomplete(location: &[String]) -> WireError {
+    let mut named = location.join("/");
+    if named.chars().count() > 200 {
+        named = format!("{}...", named.chars().take(200).collect::<String>());
+    }
+    crate::job_record::failure(
+        "recordUnreadable",
+        &format!(
+            "Runtime mutation state continuity cannot be proved: retained Session {named} has no Manifest and no failed publication of this Runtime accounts for it; runtime storage status and session cleanup name it; move it out of the Session root once reviewed; original state is preserved"
+        ),
+    )
+}
+
+/// The names from the Sessions root down to the Session at `path`, found at
+/// `depth`.
+fn location(path: &Path, depth: usize) -> Vec<String> {
+    let names: Vec<String> = path
+        .components()
+        .map(|component| component.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    names[names.len().saturating_sub(depth + 1)..].to_vec()
 }
 
 fn refused() -> WireError {
@@ -298,43 +329,68 @@ fn inspect_named_children(
         }
         let manifest = optional_read(&session, "manifest.json", DOCUMENT_BOUND)?;
         let journal = optional_read(&session, "journal.jsonl", JOURNAL_BOUND)?;
-        if let Some((bytes, _)) = &manifest {
-            crate::session_manifest::decode_manifest(bytes).map_err(|_| refused())?;
-        }
-        if let Some((bytes, _)) = &journal {
-            let replay =
-                crate::job_journal_replay::ReplayState::replay(bytes).map_err(|_| refused())?;
-            let facts = replay.state.facts(replay.torn);
-            let mutation = |effect: &str| matches!(effect, "deviceMutation" | "destructive");
-            if facts.has_torn_tail
-                || facts
-                    .outstanding_intents
-                    .iter()
-                    .any(|intent| mutation(&intent.effect))
-                || facts
-                    .unknown_outcomes
-                    .iter()
-                    .any(|outcome| mutation(&outcome.effect))
-            {
-                return Err(refused());
+        let verdict = (|| {
+            if let Some((bytes, _)) = &manifest {
+                crate::session_manifest::decode_manifest(bytes).map_err(|_| refused())?;
             }
-        }
-        // Current production SessionStore is YYYY/MM/session-ID. Inspect its
-        // containers as well as older flat roots, but never reinterpret raw
-        // Artifact subdirectories beneath a discovered Session as control state.
-        if manifest.is_none() && journal.is_none() {
-            if depth >= 3 {
-                return Err(refused());
+            if let Some((bytes, _)) = &journal {
+                let replay =
+                    crate::job_journal_replay::ReplayState::replay(bytes).map_err(|_| refused())?;
+                let facts = replay.state.facts(replay.torn);
+                let mutation = |effect: &str| matches!(effect, "deviceMutation" | "destructive");
+                if facts.has_torn_tail
+                    || facts
+                        .outstanding_intents
+                        .iter()
+                        .any(|intent| mutation(&intent.effect))
+                    || facts
+                        .unknown_outcomes
+                        .iter()
+                        .any(|outcome| mutation(&outcome.effect))
+                {
+                    return Err(refused());
+                }
             }
-            inspect_session_children(&session, &child_path, depth + 1, remaining, verdicts)?;
-        } else {
-            verdicts.read(
+            // Current production SessionStore is YYYY/MM/session-ID. Inspect
+            // its containers as well as older flat roots, but never
+            // reinterpret raw Artifact subdirectories beneath a discovered
+            // Session as control state.
+            if manifest.is_none() && journal.is_none() {
+                if depth >= 3 {
+                    return Err(refused());
+                }
+                inspect_session_children(&session, &child_path, depth + 1, remaining, verdicts)?;
+            }
+            Ok(())
+        })();
+        match verdict {
+            Ok(()) if manifest.is_some() || journal.is_some() => verdicts.read(
                 child_path.clone(),
                 Passed {
                     manifest: manifest.map(|(_, identity)| identity),
                     journal: journal.map(|(_, identity)| identity),
                 },
-            );
+            ),
+            Ok(()) => (),
+            // A Session holding its identity and no Manifest is what a
+            // publication that stopped short of it left. Refused as any
+            // other, it passes only where a failed publication of this
+            // Runtime accounts for it, and is never kept; otherwise the
+            // refusal names it.
+            Err(refusal) => {
+                if manifest.is_some() || optional_identity(&session, IDENTITY)?.is_none() {
+                    return Err(refusal);
+                }
+                let location = location(&child_path, depth);
+                let journal = journal.as_ref().map(|(bytes, _)| bytes.as_slice());
+                if verdicts
+                    .jobs
+                    .failed_publication(&session, &location, journal)
+                    .is_none()
+                {
+                    return Err(incomplete(&location));
+                }
+            }
         }
         match session.validate_path(&child_path) {
             // Removed while it was read: gone, never replaced.
@@ -411,6 +467,7 @@ impl JobStore {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut verdicts = Verdicts {
+            jobs: self,
             reuse,
             previous: &kept.passed,
             next: HashMap::new(),
@@ -431,6 +488,185 @@ impl JobStore {
             };
         }
         Ok(())
+    }
+}
+
+impl JobStore {
+    /// The continuity proof of the retained Sessions under `sessions_root`
+    /// alone, read-only and reusing nothing: what a device mutation's proof
+    /// (`require_mutation_state`) refuses there, this refuses, with the same
+    /// reason, so a check made before the Runtime serves can never differ
+    /// from the proof it makes later.
+    pub fn require_retained_sessions(&self, sessions_root: &Path) -> Result<(), WireError> {
+        let root = normalized(sessions_root)?;
+        let _activity = self.activity.lock().map_err(|_| refused())?;
+        let previous = HashMap::new();
+        let mut verdicts = Verdicts {
+            jobs: self,
+            reuse: Reuse::Never,
+            previous: &previous,
+            next: HashMap::new(),
+            #[cfg(test)]
+            counts: (0, 0),
+        };
+        check_sessions(&root, &mut verdicts)
+    }
+
+    /// Whether the Session at `location` (`yyyy`, `mm`, `session-<job>`)
+    /// under `sessions_root`, holding its identity and no Manifest, is
+    /// exactly what a failed publication of a Job this store holds leaves,
+    /// which the continuity proof passes over. Read-only, and it takes no
+    /// lock.
+    pub fn failed_publication_accounts_for(
+        &self,
+        sessions_root: &Path,
+        location: [&str; 3],
+    ) -> bool {
+        let session = HostDirectory::open_session_tree(sessions_root).and_then(|root| {
+            root.child(location[0])?
+                .child(location[1])?
+                .child(location[2])
+        });
+        let Ok(session) = session else {
+            return false;
+        };
+        if !matches!(optional_identity(&session, "manifest.json"), Ok(None)) {
+            return false;
+        }
+        let journal = match session.read("journal.jsonl", JOURNAL_BOUND) {
+            Ok(bytes) => Some(bytes),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+            Err(_) => return false,
+        };
+        self.failed_publication(&session, &location.map(str::to_owned), journal.as_deref())
+            .is_some()
+    }
+
+    /// The durable proof that `session`, at `location` under its Sessions
+    /// root, holding `journal` (if any) and no Manifest, is what a failed
+    /// publication of a Job this store holds leaves (`SessionPublisher`,
+    /// `session_publication.rs`), all of it:
+    /// - its identity, canonical, names that Job, and its name is that Job's
+    ///   Session;
+    /// - the Job's durable record keeps a publication that failed, for this
+    ///   Session, which it would have published at `yyyy/mm` of its creation;
+    /// - it holds nothing the publication does not create before it stops:
+    ///   its directories, empty but for the outcome audit and publication
+    ///   locks, a Journal that is the Job's own as far as it goes, and the
+    ///   outcome audit of this Job only once the whole Journal is copied.
+    fn failed_publication(
+        &self,
+        session: &HostDirectory,
+        location: &[String],
+        journal: Option<&[u8]>,
+    ) -> Option<()> {
+        use serde_json::{Value, json};
+        let [year, month, name] = location else {
+            return None;
+        };
+        let identity = session.read(IDENTITY, 4096).ok()?;
+        let job_id = strict_json(&identity).ok()?["jobId"].as_str()?.to_owned();
+        let session_id = format!("session-{job_id}");
+        let canonical = crate::session_json::encode(
+            &json!({"jobId": job_id, "schemaVersion": "1.0.0", "sessionId": session_id}),
+        )
+        .ok()?;
+        if identity != canonical || *name != session_id {
+            return None;
+        }
+
+        let rows = self.repository.rows(Some(&job_id)).ok()?;
+        let record = crate::job_record::JobRecord::from_row(rows.first()?).ok()?;
+        let marker = record.session_publication()?;
+        if crate::job_record_fields::publication_fact(Some(marker))["state"] != "failed"
+            || marker["sessionID"] != session_id.as_str()
+            || crate::session_publication::utc_month(record.created())?
+                != (year.clone(), month.clone())
+        {
+            return None;
+        }
+
+        let kind = |directory: &HostDirectory, name: &str| directory.kind_and_size(name).ok();
+        let empty_file = |directory: &HostDirectory, name: &str| {
+            kind(directory, name) == Some((HostEntryKind::Regular, 0))
+        };
+        let names = session.names(8).ok()?;
+        let created = [
+            IDENTITY,
+            "audit",
+            "artifacts",
+            "journal.jsonl",
+            ".manifest.lock",
+        ];
+        if names.iter().any(|name| !created.contains(&name.as_str()))
+            || kind(session, IDENTITY)?.0 != HostEntryKind::Regular
+            || (journal.is_some() && kind(session, "journal.jsonl")?.0 != HostEntryKind::Regular)
+            || (names.iter().any(|name| name == ".manifest.lock")
+                && !empty_file(session, ".manifest.lock"))
+        {
+            return None;
+        }
+        // Every directory is created before the identity.
+        let artifacts = session.child("artifacts").ok()?;
+        if artifacts.names(4).ok()? != ["derived", "partial", "raw"] {
+            return None;
+        }
+        for part in ["derived", "raw"] {
+            if !artifacts.child(part).ok()?.names(1).ok()?.is_empty() {
+                return None;
+            }
+        }
+        let partial = artifacts.child("partial").ok()?;
+        for lock in partial.names(17).ok()? {
+            let shard = lock
+                .strip_prefix(".publication-lock-")
+                .and_then(|rest| rest.strip_suffix(".lock"))?;
+            if shard.len() != 1
+                || !shard
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                || !empty_file(&partial, &lock)
+            {
+                return None;
+            }
+        }
+        let job_journal = self.journal_bytes(&job_id).ok()?;
+        if journal.is_some_and(|copy| !job_journal.starts_with(copy)) {
+            return None;
+        }
+        let audit = session.child("audit").ok()?;
+        match audit.names(2).ok()?.as_slice() {
+            [] => Some(()),
+            // Appended only once the whole Journal is copied.
+            [only] if only == "session.jsonl" && journal == Some(job_journal.as_slice()) => {
+                let line = audit.read("session.jsonl", 64 * 1024).ok()?;
+                let body = line.strip_suffix(b"\n")?;
+                if body.contains(&b'\n') {
+                    return None;
+                }
+                let audit = strict_json(body).ok()?;
+                let proposal = self
+                    .root
+                    .child("jobs")
+                    .ok()?
+                    .child(&job_id)
+                    .ok()?
+                    .read("session-manifest.proposal.json", DOCUMENT_BOUND)
+                    .ok()?;
+                let expected = |timestamp: &Value| {
+                    json!({"auditId": format!("session-publication-{job_id}"),
+                        "category": "outcome", "correlationId": job_id,
+                        "details": {"manifestSha256": arkdeck_contract::sha256_hex(&proposal),
+                            "operation": record.operation(), "terminalStatus": record.state},
+                        "jobId": job_id, "recordId": "session-publication-outcome",
+                        "schemaVersion": "1.0.0", "sessionId": session_id,
+                        "timestamp": timestamp})
+                };
+                (audit["timestamp"].is_string() && audit == expected(&audit["timestamp"]))
+                    .then_some(())
+            }
+            _ => None,
+        }
     }
 }
 
@@ -670,6 +906,7 @@ mod tests {
         let root = HostDirectory::open_session_tree(&sessions).unwrap();
         let previous = HashMap::new();
         let mut verdicts = Verdicts {
+            jobs: &fixture.jobs,
             reuse: Reuse::Never,
             previous: &previous,
             next: HashMap::new(),
