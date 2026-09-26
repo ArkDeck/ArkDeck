@@ -294,6 +294,31 @@ impl HumanActionResources {
             .filter(|(key, _)| matches!(key.as_str(), "ownerKind" | "owner"))
             .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
+        // Swift reads and validates every owner's rows for each request, a
+        // cursor's too, before the pager decides what the cursor names: a row
+        // refusal outranks a cursor refusal.
+        let rows = (|| {
+            let (kind, owner) = (kind.and_then(Value::as_str), owner.and_then(Value::as_str));
+            let mut rows = Vec::new();
+            if kind.is_none_or(|kind| kind == "agentExecution") {
+                rows.extend(agents.human_action_rows(owner)?);
+            }
+            if kind.is_none_or(|kind| kind == "controlAction")
+                && let Some(controls) = controls
+            {
+                rows.extend(controls.human_action_rows(owner)?);
+            }
+            let mut identities = BTreeSet::new();
+            if !rows.iter().all(|row| identities.insert(row.id.clone())) {
+                return Err(refused(
+                    "recordUnreadable",
+                    "human action identity has multiple owners",
+                ));
+            }
+            rows.sort_by(|a, b| b.created.cmp(&a.created).then_with(|| a.id.cmp(&b.id)));
+            Ok(rows.into_iter().map(|row| row.value).collect::<Vec<_>>())
+        })()
+        .map_err(owned)?;
         self.pages
             .page_filtered(
                 "human-action.list",
@@ -301,28 +326,7 @@ impl HumanActionResources {
                 "createdAtDescActionIdAsc",
                 size,
                 cursor,
-                || {
-                    let (kind, owner) =
-                        (kind.and_then(Value::as_str), owner.and_then(Value::as_str));
-                    let mut rows = Vec::new();
-                    if kind.is_none_or(|kind| kind == "agentExecution") {
-                        rows.extend(agents.human_action_rows(owner)?);
-                    }
-                    if kind.is_none_or(|kind| kind == "controlAction")
-                        && let Some(controls) = controls
-                    {
-                        rows.extend(controls.human_action_rows(owner)?);
-                    }
-                    let mut identities = BTreeSet::new();
-                    if !rows.iter().all(|row| identities.insert(row.id.clone())) {
-                        return Err(refused(
-                            "recordUnreadable",
-                            "human action identity has multiple owners",
-                        ));
-                    }
-                    rows.sort_by(|a, b| b.created.cmp(&a.created).then_with(|| a.id.cmp(&b.id)));
-                    Ok(rows.into_iter().map(|row| row.value).collect())
-                },
+                move || Ok(rows),
             )
             // The pager's refusals are the owner's own in Swift.
             .map_err(owned)

@@ -419,3 +419,32 @@ fn a_reference_two_owners_hold_is_refused_as_each_handler_refuses_it() {
         ))
     );
 }
+
+/// Swift reads and validates every owner's rows for each `human-action.list`
+/// request, a cursor's too, before its pager decides what the cursor names
+/// (`RuntimeHumanActionResourceCoordinator.swift:77-97`): with an unreadable
+/// execution record, a cursor request is refused as a first page is, however
+/// its cursor would have been judged.
+#[test]
+fn a_row_refusal_outranks_a_cursor_refusal() {
+    let root = Root::new("row-first");
+    let owners = Owners::new(&root, &[]);
+    let foreign = json!({"cursor":
+        "00000000-0000-4000-8000-000000000001.00000000-0000-4000-8000-000000000002"});
+    assert_eq!(
+        owners
+            .human("human-action.list", foreign.clone())
+            .unwrap_err()
+            .code,
+        "invalidCursor"
+    );
+    let record = root.0.join("agent-executions").join(TRUST);
+    fs::write(&record, b"{\"not\":\"a record\"}").unwrap();
+    chmod(&record, 0o600);
+    let first = owners.human("human-action.list", json!({})).unwrap_err();
+    assert_ne!(first.code, "invalidCursor");
+    assert_eq!(
+        owners.human("human-action.list", foreign).unwrap_err(),
+        first
+    );
+}
