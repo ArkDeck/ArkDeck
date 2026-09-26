@@ -355,10 +355,16 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         assert!(script.contains("debug probe"), "{shell}");
         assert!(script.contains("--expected-active-generation"), "{shell}");
         assert!(script.contains("flash lane-preview"), "{shell}");
-        assert!(
-            !script.contains("flash install-binding"),
-            "{shell} names a leaf this CLI refuses"
-        );
+        assert!(script.contains("flash install-binding"), "{shell}");
+        // No leaf this CLI refuses is named: every registry leaf but the
+        // served ones (none, once all are).
+        for path in all.iter().filter(|path| !served.contains(path)) {
+            let spelled = path.join(" ");
+            assert!(
+                !script.contains(&spelled),
+                "{shell} names `{spelled}`, a leaf this CLI refuses"
+            );
+        }
     }
     assert!(completion_script("elvish").is_none());
     for argv in [

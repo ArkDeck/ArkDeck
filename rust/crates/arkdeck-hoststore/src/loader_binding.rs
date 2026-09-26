@@ -20,7 +20,7 @@
 //! half is a read of its public socket.
 use crate::job_owner::JobStore;
 use crate::rockchip_binding::{
-    BindingSnapshot, BoundTarget, RockchipBindingStore, canonical_sha256,
+    BindingEvidence, BindingSnapshot, BoundTarget, RockchipBindingStore, canonical_sha256,
 };
 use crate::rockchip_reactivation::ReactivationProofSource;
 use crate::strict_json::swift_quoted;
@@ -444,10 +444,13 @@ impl LoaderBinding {
                     format!("rebind:user-selection-sha256={selection}"),
                 ],
             };
-            let stored = self
-                .store
-                .activate_selected_target(existing.revision, &existing_identity, &next)
-                .map_err(swift)?;
+            let stored = crate::rockchip_binding::activate_selected_target(
+                &self.store,
+                existing.revision,
+                &existing_identity,
+                &next,
+            )
+            .map_err(swift)?;
             if !stored.covers_runtime_target(&bound).map_err(swift)?
                 || !stored
                     .matches_confirmed_live_identity(identity)

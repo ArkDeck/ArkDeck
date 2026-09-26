@@ -16,6 +16,7 @@ arkdeck-contract.workspace = true
 arkdeck-client.workspace = true
 arkdeck-platform.workspace = true
 arkdeck-provider-workspace.workspace = true
+arkdeck-rockchip-binding.workspace = true
 serde_json.workspace = true
 unicode-segmentation.workspace = true
 

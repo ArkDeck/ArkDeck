@@ -15,7 +15,9 @@
 //! fresh readback and reservation at the consume point.
 use crate::post_flash_alias::PostFlashBinding;
 use crate::post_flash_alias_store::PostFlashAliasStore;
-use crate::rockchip_binding::{BindingError, BindingSnapshot, BoundTarget, RockchipBindingStore};
+use crate::rockchip_binding::{
+    BindingError, BindingEvidence, BindingSnapshot, BoundTarget, RockchipBindingStore,
+};
 use crate::strict_json::swift_quoted;
 use crate::target_owner::TargetStore;
 use arkdeck_contract::{WireError, sha256_hex};

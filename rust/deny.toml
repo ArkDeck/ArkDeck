@@ -33,6 +33,7 @@ allow = [
     "arkdeck-provider-arkforge@0.1.0",
     "arkdeck-provider-hdc@0.1.0",
     "arkdeck-provider-workspace@0.1.0",
+    "arkdeck-rockchip-binding@0.1.0",
     "arkdeck-soak@0.1.0",
     # First-party ArkForge crates, from the one allowed git source below at
     # the revision Package.swift pins; they carry no third-party dependency.

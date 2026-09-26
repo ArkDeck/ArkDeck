@@ -27,6 +27,8 @@ pub mod ui_dump;
 pub mod update_feed;
 pub use debug_templates::debug_template_list;
 pub use flash_leaves::{broker_params, is_broker_leaf};
+#[cfg(target_os = "macos")]
+pub use flash_leaves::{install_binding, install_binding_human, install_binding_result};
 mod device_wait;
 pub mod diagnostics_resources;
 pub use debug_probe::validate_debug_probe;
@@ -431,6 +433,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 "--overwrite" => {
                     method_options.insert("overwrite".into(), json!(true));
                 }
+                "--rebind" => {
+                    method_options.insert("rebind".into(), json!(true));
+                }
                 "--require-healthy" => require_healthy = true,
                 "--allow-sensitive" => {
                     method_options.insert("allowSensitive".into(), json!(true));
@@ -761,6 +766,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "bind-loader"] => "flash.bind-loader",
         ["flash", "bootloader-status"] => "flash.bootloader-status",
         ["flash", "device-access"] => "flash.device-access",
+        ["flash", "install-binding"] => "flash.install-binding",
         ["flash", "prerequisites"] => "flash.prerequisites",
         ["flash", "lane-preview"] => "flash.lane-preview",
         ["flash", "run"] => "flash.run",
@@ -1067,6 +1073,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         "flash.reconcile-alias" | "flash.bind-loader" => &["targetId", "expectedBindingRevision"],
         "flash.prerequisites" => &["targetId", "deviceProfile"],
         "flash.lane-preview" => &["targetId", "deviceProfile", "archiveSha256"],
+        "flash.install-binding" => &["rebind"],
         "recovery.flash-invocation.list" => &["pageSize", "cursor"],
         "recovery.flash-invocation.status" | "debug.status" => &["invocationId"],
         "recovery.flash-invocation.start" | "debug.start" => &["requestFile"],

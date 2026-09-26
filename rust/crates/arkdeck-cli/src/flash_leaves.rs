@@ -183,3 +183,144 @@ pub fn broker_params(fields: &Map<String, Value>) -> Result<Map<String, Value>, 
     params.insert("actionJson".into(), document("actionFile")?);
     Ok(params)
 }
+
+/// Swift `runInstallBinding` (`flash install-binding [--rebind]`), below its
+/// rendering: the DAYU200 cross-mode binding installed in this process, as
+/// Swift's CLI installs it, from one census of the host's I/O Registry into
+/// the Rockchip binding store of the account's Application Support root
+/// (`arkdeck-rockchip-binding`, the Runtime's own store). Nothing reaches the
+/// Runtime or the device. `Err` is the refusal as Swift's CLI prints it after
+/// `arkdeck flash: `.
+#[cfg(target_os = "macos")]
+pub fn install_binding(
+    rebind: bool,
+    application_support_root: &std::path::Path,
+    census: impl FnOnce() -> Result<
+        Vec<arkdeck_platform::UsbHostDevice>,
+        arkdeck_platform::RegistryUnavailable,
+    >,
+) -> Result<arkdeck_rockchip_binding::BindingInstallation, String> {
+    arkdeck_rockchip_binding::install_current_target(
+        census,
+        &arkdeck_rockchip_binding::RockchipBindingStore::new(application_support_root),
+        rebind,
+    )
+}
+
+/// Swift's machine answer of an install: the binding's revision and USB
+/// topology, and whether this install wrote it.
+#[cfg(target_os = "macos")]
+pub fn install_binding_result(installed: &arkdeck_rockchip_binding::BindingInstallation) -> Value {
+    json!({
+        "created": installed.created,
+        "bindingRevision": installed.revision,
+        "usbTopology": installed.usb_topology,
+    })
+}
+
+/// Swift's human answer of an install, line for line.
+#[cfg(target_os = "macos")]
+pub fn install_binding_human(installed: &arkdeck_rockchip_binding::BindingInstallation) -> String {
+    format!(
+        "durable DAYU200 cross-mode binding {}\nbinding revision: {}\nUSB topology: {}\n\
+         serial sha256: {}\ndevice mutation dispatch: 0",
+        if installed.created {
+            "installed"
+        } else {
+            "unchanged"
+        },
+        installed.revision,
+        installed.usb_topology,
+        installed.serial_digest_sha256
+    )
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod install_binding_tests {
+    use super::*;
+    use arkdeck_platform::{RegistryUnavailable, UsbHostDevice};
+    use std::os::unix::fs::PermissionsExt;
+
+    /// A private temporary Application Support root, removed however the
+    /// test ends; the account's own is never touched.
+    struct Root(std::path::PathBuf);
+
+    impl Root {
+        fn new() -> Self {
+            let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+            let root = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("arkdeck-install-binding-{nonce:x}"));
+            std::fs::create_dir(&root).unwrap();
+            std::fs::set_permissions(&root, std::fs::Permissions::from_mode(0o700)).unwrap();
+            Self(root)
+        }
+    }
+
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn board(serial: &str, topology: &str) -> UsbHostDevice {
+        UsbHostDevice {
+            serial: serial.into(),
+            vendor_id: 0x2207,
+            product_id: 0x5000,
+            topology: topology.into(),
+            product_name: Some("\"HDC Device\"".into()),
+            registry_entry_id: Some(0x1_0000_0042),
+        }
+    }
+
+    /// Swift `runInstallBinding`'s two renderings of a receipt: the result
+    /// the envelope carries, and the human lines.
+    #[test]
+    fn an_install_renders_as_swifts_handler_renders_it() {
+        let root = Root::new();
+        let store = root.0.join("ArkDeck");
+        let first = install_binding(false, &store, || {
+            Ok(vec![board("150100424a544e4600", "18874368")])
+        })
+        .unwrap();
+        assert_eq!(
+            install_binding_result(&first),
+            json!({"created": true, "bindingRevision": 1, "usbTopology": "18874368"})
+        );
+        assert_eq!(
+            install_binding_human(&first),
+            "durable DAYU200 cross-mode binding installed\nbinding revision: 1\n\
+             USB topology: 18874368\n\
+             serial sha256: 83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1\n\
+             device mutation dispatch: 0"
+        );
+        let again = install_binding(false, &store, || {
+            Ok(vec![board("150100424a544e4600", "18874368")])
+        })
+        .unwrap();
+        assert!(
+            install_binding_human(&again)
+                .starts_with("durable DAYU200 cross-mode binding unchanged\n")
+        );
+        assert_eq!(install_binding_result(&again)["created"], json!(false));
+    }
+
+    /// A refusal is the error as Swift's CLI interpolates it after
+    /// `arkdeck flash: `, and nothing is written.
+    #[test]
+    fn a_refusal_is_swifts_interpolated_error() {
+        let root = Root::new();
+        let store = root.0.join("ArkDeck");
+        assert_eq!(
+            install_binding(false, &store, || Err(RegistryUnavailable::Matching)).unwrap_err(),
+            "admissionRejected(\"USB registry unavailable\")"
+        );
+        assert_eq!(
+            install_binding(false, &store, || Ok(Vec::new())).unwrap_err(),
+            "admissionRejected(\"DAYU200 target unavailable\")"
+        );
+        assert!(!store.exists());
+    }
+}

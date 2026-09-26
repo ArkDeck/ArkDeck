@@ -16,6 +16,7 @@ arkdeck-bootstrap = { path = "crates/arkdeck-bootstrap" }
 arkdeck-control = { path = "crates/arkdeck-control" }
 arkdeck-hoststore = { path = "crates/arkdeck-hoststore" }
 arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
+arkdeck-rockchip-binding = { path = "crates/arkdeck-rockchip-binding" }
 arkdeck-provider-workspace = { path = "crates/arkdeck-provider-workspace" }
 arkdeck-client = { path = "crates/arkdeck-client" }
 arkdeck-provider-arkforge = { path = "crates/arkdeck-provider-arkforge" }

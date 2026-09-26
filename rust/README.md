@@ -454,6 +454,12 @@ lock, over `arkdeck-contract` and `arkdeck-platform` only; every writer of that
 store uses it — the CLI's zero-Runtime `runtime service install` and its
 `uninstall` among them — and `arkdeck-hoststore` composes the Runtime's paged
 inventories and the DevEco registry over it.
+`arkdeck-rockchip-binding` owns the Rockchip product binding's file
+(`rockchip-binding.json` under its one lock) and the DAYU200 USB personalities,
+over `arkdeck-contract` and `arkdeck-platform` only; the Runtime's binding
+owners and the CLI's zero-Runtime `flash install-binding` write that file
+through it, `arkdeck-hoststore` keeps what a binding's evidence means, and
+`arkdeck-provider-hdc` re-exports the personalities.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while

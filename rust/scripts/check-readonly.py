@@ -63,6 +63,13 @@ def assert_boundaries() -> None:
         # Runtime and the CLI's zero-Runtime service install alike
         # (协调会话 2026-09-26). It holds no Runtime authority store.
         "arkdeck-bootstrap": {"arkdeck-contract", "arkdeck-platform"},
+        # The DAYU200's durable cross-mode binding — its document, lock and
+        # writes — and the USB personalities it binds: one implementation for
+        # the Runtime and for the CLI's in-process `flash install-binding`,
+        # which links no Runtime store (协调会话 2026-09-26). What its evidence
+        # means stays the Runtime's; it holds device identity, so it is not a
+        # Bootstrap registry.
+        "arkdeck-rockchip-binding": {"arkdeck-contract", "arkdeck-platform"},
         # The Job engine lowers device steps through the HDC provider's typed
         # actions and signs workspace HAPs through the workspace provider's
         # signer and credential owner (the design's crate graph:
@@ -71,13 +78,17 @@ def assert_boundaries() -> None:
         # provider (the dual-source Loader observation).
         # The Runtime composes its Bootstrap inventories and the DevEco
         # registry over the shared Bootstrap owners.
+        # The Runtime reads and moves the Rockchip binding through its one
+        # store (协调会话 2026-09-26).
         "arkdeck-hoststore": {
             "arkdeck-bootstrap", "arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc",
-            "arkdeck-provider-arkforge", "arkdeck-provider-workspace",
+            "arkdeck-provider-arkforge", "arkdeck-provider-workspace", "arkdeck-rockchip-binding",
         },
         # Debug template lowering reads the closed template definitions from the
         # pure contract crate, their single source, which the CLI also discloses.
-        "arkdeck-provider-hdc": {"arkdeck-contract", "arkdeck-platform"},
+        # A DAYU200's registered personalities are the Rockchip binding's
+        # (协调会话 2026-09-26).
+        "arkdeck-provider-hdc": {"arkdeck-contract", "arkdeck-platform", "arkdeck-rockchip-binding"},
         # Workspace signing and credentials (SPK-10): measured files, the
         # Keychain and the signer's terminal all come from the platform crate.
         "arkdeck-provider-workspace": {"arkdeck-platform"},
@@ -86,10 +97,12 @@ def assert_boundaries() -> None:
         # publishes the first HDC selection, and `uninstall` releases the pins,
         # through the Bootstrap registry's one owner (协调会话 2026-09-26); the
         # CLI links no Runtime store (never arkdeck-hoststore). Q8: the signing
-        # leaves read the workspace provider's preset store and owner.
+        # leaves read the workspace provider's preset store and owner. Its
+        # in-process `flash install-binding` installs the Rockchip binding
+        # through that binding's one store (协调会话 2026-09-26).
         "arkdeck-cli": {
             "arkdeck-bootstrap", "arkdeck-contract", "arkdeck-client", "arkdeck-platform",
-            "arkdeck-provider-workspace",
+            "arkdeck-provider-workspace", "arkdeck-rockchip-binding",
         },
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore", "arkdeck-provider-arkforge"},
         # The ArkForge lane (lane D) speaks to `arkforged` only through
