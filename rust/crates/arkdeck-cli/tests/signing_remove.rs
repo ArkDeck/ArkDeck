@@ -144,6 +144,90 @@ fn removal_clears_both_scopes_once_and_preserves_private_source_material() {
 }
 
 #[test]
+fn negative_file_sizes_do_not_discard_envelope_or_material_cleanup_tracking() {
+    for field in [
+        "javaExecutable",
+        "signerJAR",
+        "keystore",
+        "appCertificate",
+        "signedProfile",
+    ] {
+        for managed_preset in [false, true] {
+            let home = Home::new();
+            let managed = home.root().join("managed-material");
+            let mut receipt = home.receipt(managed_preset.then_some(managed.as_path()));
+            receipt[field]["byteCount"] = json!(-1);
+            home.write("preset-v1.json", &receipt);
+            for name in ["source.p12", "source.pem", "source.p7b"] {
+                fs::write(home.0.join(name), b"user source must survive").unwrap();
+            }
+            if managed_preset {
+                fs::create_dir(&managed).unwrap();
+                fs::write(managed.join("owned.p12"), b"managed fixture").unwrap();
+            }
+            // Admission must still reject the damaged receipt. Only the
+            // explicit cleanup decoder accepts its signed size fields.
+            assert!(
+                arkdeck_provider_workspace::signing_preset::decode_receipt(
+                    &serde_json::to_vec(&receipt).unwrap()
+                )
+                .is_err()
+            );
+            let secrets = Secrets::default();
+            let result = remove_document(&home.root(), &secrets).unwrap();
+            assert_eq!(result["removedReceipt"], true);
+            assert_eq!(result["removedKeystorePassword"], true);
+            assert_eq!(result["removedKeyPassword"], true);
+            assert_eq!(result["removedManagedMaterial"], managed_preset);
+            assert_eq!(
+                result["preservedSourceCount"],
+                if managed_preset { 0 } else { 3 }
+            );
+            assert!(!home.root().join("preset-v1.json").exists());
+            assert!(!managed.exists());
+            let calls = secrets.calls.lock().unwrap();
+            assert_eq!(calls.len(), 8);
+            for account in [ENVELOPE, OLD_ENVELOPE] {
+                for scope in ["current", "legacy"] {
+                    assert!(
+                        calls.contains(&(scope.into(), account.into())),
+                        "{field} {calls:?}"
+                    );
+                }
+            }
+            for name in ["source.p12", "source.pem", "source.p7b"] {
+                assert_eq!(
+                    fs::read(home.0.join(name)).unwrap(),
+                    b"user source must survive"
+                );
+            }
+        }
+    }
+
+    let home = Home::new();
+    let mut receipt = home.receipt(None);
+    receipt["javaExecutable"]["byteCount"] = json!(-1);
+    home.write("preset-v1.json", &receipt);
+    let ledger = json!({"schemaVersion": "arkdeck.signing-credential-owner/1",
+        "state": "stable", "presetOwners": ["preset-a"]});
+    home.write("credential-owner-v1.json", &ledger);
+    let secrets = Secrets::default();
+    assert!(
+        remove_document(&home.root(), &secrets)
+            .unwrap_err()
+            .to_string()
+            .contains("referenced by an active")
+    );
+    assert!(secrets.calls.lock().unwrap().is_empty());
+    assert_eq!(home.ledger(), ledger);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&fs::read(home.root().join("preset-v1.json")).unwrap())
+            .unwrap(),
+        receipt
+    );
+}
+
+#[test]
 fn only_managed_material_immediately_below_the_preset_root_is_removed() {
     let home = Home::new();
     let managed = home.root().join("managed-material");

@@ -147,10 +147,17 @@ fn decode_for_removal(bytes: &[u8]) -> Option<crate::signing_preset::SigningPres
         "appCertificate",
         "signedProfile",
     ] {
-        object
-            .get_mut(name)?
-            .as_object_mut()?
-            .retain(|key, _| matches!(key.as_str(), "path" | "sha256" | "byteCount"));
+        let identity = object.get_mut(name)?.as_object_mut()?;
+        identity.retain(|key, _| matches!(key.as_str(), "path" | "sha256" | "byteCount"));
+        // Swift's receipt decoder accepts an Int here, including a negative
+        // value in a damaged record. Cleanup uses no file size or digest:
+        // preserve its account/material tracking instead of falling back to
+        // "no receipt" and orphaning those resources. Normalize only this
+        // unused cleanup value before the strict unsigned type is decoded.
+        let count = identity.get("byteCount")?.as_i64()?;
+        if count < 0 {
+            identity.insert("byteCount".into(), serde_json::json!(0));
+        }
     }
     decode_receipt(&serde_json::to_vec(&value).ok()?).ok()
 }

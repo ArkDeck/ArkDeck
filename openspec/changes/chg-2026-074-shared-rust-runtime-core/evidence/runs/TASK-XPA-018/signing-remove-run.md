@@ -18,7 +18,11 @@ adds no operation, Provider, transport, capability or secret input.
   user source keystore/certificate/profile files are preserved. An escaped
   managed path refuses before the secret-removal calls.
 - Extra receipt keys are ignored only by the explicit cleanup decoder, as Swift's
-  uninstall decoder ignores them; Runtime admission keeps its strict decoder.
+  uninstall decoder ignores them. It also accepts Swift's signed `Int` file
+  sizes, including negative sizes in damaged receipts, solely to retain cleanup
+  account/material tracking. Sizes are unused during cleanup; negative values
+  are normalized in that private projection before decoding, never in the
+  receipt or Runtime admission. Runtime admission keeps its strict decoder.
   The receipt is read through the bounded, descriptor-relative private-store
   reader. If the tracking file is unsafe/unreadable, removal refuses before
   deleting secrets rather than unlinking the only record of their account names.
@@ -71,5 +75,24 @@ Worktree-private `CARGO_TARGET_DIR=/private/tmp/arkdeck-takeover-d79c-target`,
 
 ## CI
 
-PR and run pending publication. Required CI and maintainer review precede merge;
+PR #2270: `https://github.com/ArkDeck/ArkDeck/pull/2270`. Required CI and maintainer review precede merge;
 this fixture evidence is not GJ-5 or installed Keychain acceptance.
+
+## Signed-size cleanup regression
+
+Review of the first head found that reusing the strict receipt type would drop
+all cleanup tracking when Swift's signed `Int` byteCount was negative. The
+cleanup-only decoder now retains that record; `decode_receipt` still rejects
+it for Runtime use. Regression cases cover -1 in each of the five file identities,
+both managed and private presets: current/superseded envelopes in both Keychain
+scopes are cleared, owned material is removed and user source files survive.
+A pinned negative-size receipt still refuses before any secret deletion.
+
+- Focused signing tests: exit 0, nine removal tests and one status replay;
+  `/private/tmp/arkdeck-signing-remove-signed-size-tests.log`.
+- Clippy on the changed crates/direct dependents, format and SDD: exit 0;
+  `/private/tmp/arkdeck-signing-remove-signed-size-clippy.log` and
+  `/private/tmp/arkdeck-signing-remove-signed-size-sdd.log` (121 acceptance IDs).
+- The conservative refusal for unsafe, unreadable or oversized tracking files
+  remains an explicit difference from Swift's unchecked uninstall read. Only
+  the six recorded CLI refusal cases are claimed byte-for-byte equal.
