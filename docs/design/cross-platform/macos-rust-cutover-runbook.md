@@ -166,8 +166,18 @@ design §G.4 也写明：快照恢复不能当作真实设备副作用的常规�
   `Agentd`、`instanceLockHeld: false`、`clear: true`、`blocks: []`、`snapshot: null`；`carriedOver`
   列出原样承接的 `parkedJobIds`、`terminalJobCount`、`outcomeUnknownUseCount`；`counts` 给出 `jobs`、
   `agentExecutions`、`capabilityUses`（字段见 run 记录 :50-56）。
-- 「只读」的精确含义：不写任何 owner 数据；SQLite 读者自身可能在索引旁留下 `-wal`/`-shm`（数据库字节不变），
-  见 run 记录 :111-115。
+- 「只读」的精确含义（逐项核实见 `evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 19 条）：
+  - 这一遍不取任何锁（无 `flock`，也不开 SQLite 写事务），不建目录、不建锁文件，不写 record、journal、ledger、
+    索引行或设置。
+  - 读哪个账户的 state：`CFFIXED_USER_HOME`，未设时为运行用户 passwd 记录里的家目录
+    （`rust/crates/arkdeck-platform/src/account.rs:7`）；`HOME` 不决定读哪里。
+  - **会在 Job 索引 `runtime-jobs.sqlite3` 旁创建或触碰 `-wal`/`-shm`，不改数据库内容**：旁边已有 `-shm`（Swift daemon
+    在跑或停过都会留下）时用只读连接，可能在 `-shm` 里记下读标记（触碰）；没有 `-shm` 时用一条不写的读写连接，可能在
+    索引旁新建空的 `-wal` 与新的 `-shm`（创建，与数据库同权限）；两种情况数据库字节都不变（run 记录 :111-115；
+    `rust/crates/arkdeck-agentd/tests/cutover_preflight.rs:862`）。#2142、#2255 记录里「两遍都不写」说的是 owner 数据
+    （record、journal、索引行），不含这里的 `-wal`/`-shm`。能否接受由维护者判断（附录 B 第 19 条）；若要真正零写入
+    （例如以 immutable 方式打开、或先复制一份再读），是另一刀的设计取舍，列为待定。
+  - SQLite 报忙时不等待（busy timeout 为 0），直接记为 `unreadable` 的 `jobIndex`。
 - 停止判据：exit 非 0；`clear: false`；两遍之间 `blocks` 不同且差异不能由「刚好在跑的 Job 已结束」解释。
 - 失败时：按下表逐项处理，处理后重跑 1a，直到两遍都 `clear: true`。**`carriedOver` 里的 Job 不处理**：
   `waitingForRecovery`（outcomeUnknown lane）与终态 Job、outcome-unknown 的 capability use 按 design §G.4
@@ -186,11 +196,11 @@ over as it is (<各块文案，以「; 」连接>); nothing was changed`（`runt
 | `unresolvedJournal` {`jobId`} | 非停放 Job 的 journal 有未决 intent、unknown outcome、torn 尾或无法回放 | 让该 Job 在旧 Runtime 上结束（同上）；torn 尾或无法回放的：**停止**，不手改 journal，交协调会话排查，必要时维护者裁决 |
 | `activeAgentExecution` {`executionId`,`state`} | 有活跃的 agent execution（被停放/终态 Job 名下的 `jobOwned` 除外） | `"$OLD_ARKDECK" agent status --execution-id <id> --output json`（`command_registry.json:10944`）读状态，按其 `nextAction` 走完（等待、`agent resume`）；不从外部改 execution 记录 |
 | `unsettledCapabilityUse` {`capabilityId`,`useOrdinal`,`jobId`} | capability use 的 outcome 是 `pending` 或不在表里 | 让所属 Job 结算（同 `jobState`）；**不手工 settle、不删 ledger** |
-| `pendingToolSelection` {`controlActionId`} | `Bootstrap/v1/tools.json` 有待定的 HDC 工具选择 | 在旧 Runtime 上完成或放弃该选择。具体命令 **TBD（维护者定）**：`runtime tool select` 存在（`command_registry.json:2600`），但「放弃一个待定选择」的已发布路径本文未在源码中核实 |
+| `pendingToolSelection` {`controlActionId`} | `Bootstrap/v1/tools.json` 有待定的 HDC 工具选择 | 没有「放弃待定选择」的已发布命令（核实见 `evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 11 条）。待定选择只由 Swift daemon 自己结算：下一次启动时，所选 HDC 起得来就发布，起不来就判失败并回到原工具（`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift:474-545`，只在配置了 HDC 时）。选择流程本身会让 daemon 重启，无锁那遍可能正好读到这个窗口，重启后即消失。持续存在时，让旧 daemon 再启动一次的已发布路径是 `"$OLD_ARKDECK" runtime service restart --output json`（`command_registry.json:1020`；有活动或未收尾的 Job 时 exit 75 拒绝）；之后 `"$OLD_ARKDECK" control-action reconcile --control-action <controlActionId> --output json`（`:12156`）结算该控制动作的记录（预检只读 `tools.json` 的待定项）。是否为此重启旧 Runtime，**维护者定** |
 | `unreadable` {`source`,`reason`} | 某个来源读不了（`jobs`、`jobIndex`、`agentExecutions`、`capabilities`、`toolSelection`、`stateDirectory`、`instanceLock`、`snapshot`；#2255 起还有 `sessionStorage`） | **停止**。不删不改，交协调会话只读排查，维护者裁决 |
 | `runtimeRunning` {`reason`} | 只在持锁那一遍出现：别的进程持有 `Agentd/instance.lock` | 第 2 步的 update 在「只因 runtimeRunning 被拒」时自己按 poll 间隔重问，最多 50 次，约 5 s（`runtime_service_install.rs:87`、`:628-648`）；仍拒则说明 bootout 后仍有进程持锁：**停止**，旧服务会被原样 bootstrap 回来（见第 2 步失败语义） |
 | `loaderTransitionAwaitingBinding` {`jobId`,`targetId`,`expectedBindingRevision`}（#2255） | 一个从未被 ArkForge lane 驱动过的停放 DAYU200 Flash Job，其记录与 journal 恰好停在 Swift 的 `flash.bind-current-loader` 能结算的「进入 Loader」过渡上；Rust Runtime 不移植该结算（F7） | 板子接好并处于 **Loader** 时，在**旧 Swift Runtime** 上执行 `"$OLD_ARKDECK" flash bind-loader --target <targetId> --expected-binding-revision <expectedBindingRevision> --output json`（两个选项均必填，`command_registry.json:20059`；拒绝文案原文在 `rust/crates/arkdeck-cli/src/runtime_service_install.rs:702-711`），然后重跑 1a。bind-loader 被拒：**停止**，保留该 Job 与拒绝原文，交维护者裁决；不用 `--rebind` 覆盖缺失的身份/lineage 证明 |
-| `retainedSessions` {`sessionsRoot`,`code`,`message`}（#2255） | 保留的 Session（默认 `Sessions` 根，以及 `Agentd/session-storage.json` 选中的根）会被设备 mutation 的连续性证明拒绝，`code`/`message` 即该证明自己的码与原话（`recordUnreadable`；`rust/crates/arkdeck-hoststore/src/mutation_state_continuity.rs:196-201`、`:214-219`） | 按 `message` 所说：用 `"$OLD_ARKDECK" runtime storage status --output json`（无其他选项，`command_registry.json:3259`）与 `session cleanup preview --output json`（`:8118`）读出被点名的 Session，审阅后移出 Session 根。`session cleanup apply` 需 `--preview-id` 与 `--preview-digest`（`:8222`），它是否就是「移出 Session 根」的已发布路径、还是需要维护者手工移动，**TBD（维护者定）**。第一遍无锁，Swift 正在原地发布的 Session 可能被一时点名，重跑即消失 |
+| `retainedSessions` {`sessionsRoot`,`code`,`message`}（#2255） | 保留的 Session（默认 `Sessions` 根，以及 `Agentd/session-storage.json` 选中的根）会被设备 mutation 的连续性证明拒绝，`code`/`message` 即该证明自己的码与原话（`recordUnreadable`；`rust/crates/arkdeck-hoststore/src/mutation_state_continuity.rs:196-201`、`:214-219`） | 被拒的 Session 由这一块的 `message` 点名（`retained Session <yyyy/mm/名称> …`）。`"$OLD_ARKDECK" runtime storage status --output json`（无其他选项，`command_registry.json:3259`）只给 `usage.unaccountedSessionCount` 计数、不点名（`message` 里说 status 会点名，实际只计数）；`session cleanup preview --output json`（`:8118`）遇到这种无法归属的内容会整根拒绝（`operationUnavailable`「Session catalog contains unaccounted content: …」），在拒绝原文里点名。所以 `session cleanup apply`（`:8222`，须先有 preview）移除不了它，也没有移动或删除它的已发布命令（核实见 `evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 12 条）。审阅后是否手工移出 Session 根、移到哪里，**维护者定**。第一遍无锁，Swift 正在原地发布的 Session 可能被一时点名，重跑即消失 |
 
 **1b update 内部的两遍（第 2 步自动执行，这里只说明）**：Rust CLI 的 `runtime service update` 在装 Rust daemon
 时先跑一遍无锁预检（不 clear → exit 75，零改动），然后 bootout，再持 `Agentd/instance.lock` 跑一遍并在读事实之前
@@ -251,7 +261,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   |---|---|---|---|
   | 参数、签名预设、源 bundle 验签、分析器探测、façade 门、第一遍预检 | 64（参数）；69「… is refused while an OpenHarmony signing preset is installed …」（`:442-455`）；1（验签，`host_bundle_signature.rs:19` 的要求）；69「… does not answer --analyze-crash-ledger …」（`:492-506`）；69「a Rust daemon bundle carries no facade」（`:507-515`）；69 预检探测错误（`:775-823`）；75「… nothing was changed」 | 未改动，旧服务照常运行 | 按原文处理后重跑第 1、2 步，或关窗口 |
   | bootout 之后的持锁一遍（`:593-670`） | 75「… the state was left as it is」或 69「the helper's daemon stopped answering the cutover preflight」「the held cutover preflight answered no snapshot taken under the instance lock」，并带后缀「; the previous service was started again from its unchanged plist」或「; starting the previous service again failed: …」（`:599-625`） | 前一种后缀：旧服务已从未改的 plist 重新 bootstrap；后一种：**旧服务停着** | 前者同上一行；后者由【维护者】`launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.arkdeck.agentd.plist` 拉起旧服务（plist 未改），再用第 0 步的命令核对 |
-  | 快照写完之后：换 bundle、写 plist/回执、bootstrap（`:544-580`） | exit 1，原文即底层错误；**没有自动恢复**（按源码读出的行为，源码未另作说明） | 可能处于「旧服务已 bootout、bundle 已换或未换」的中间态 | **停止**。【维护者】只读核对 `Helpers/ArkDeckAgent.app` 与 `.rollback/` 里各是哪个 helper（有无 `arkdeck-facade`）、plist 的 `ProgramArguments`，【协调会话】比对；然后按 §4 第 3 行处理，不手改 state |
+  | 快照写完之后：换 bundle、写 plist/回执、bootstrap（`:539-580`；换 bundle 见 `:1036-1066`） | exit 1，原文即底层错误；**没有自动恢复**：快照写入及之前的失败会从未改的 plist 拉起旧服务（`:599-625`），之后的各步没有（核实见 `evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 18 条） | 旧服务已 bootout、未运行。视失败的那一步：已装的 helper 未换（旧的）或已换成 Rust；被换下的 helper 在 `.rollback/ArkDeckAgent.app`，若失败发生在对换之后、移入 `.rollback` 之前，则留在 `Helpers/.arkdeck-agentd-<UUID>.app`；plist 与回执都未改、只改了 plist，或都已改 | **停止**。【维护者】只读核对 `Helpers/ArkDeckAgent.app`、`.rollback/` 与有无 `Helpers/.arkdeck-agentd-*.app` 里各是哪个 helper（有无 `arkdeck-facade`）、plist 的 `ProgramArguments`，【协调会话】比对；然后按 §4 第 3 行处理，不手改 state |
 - façade 保留一个周期：`$SUPPORT/Helpers/.rollback/ArkDeckAgent.app` 与 `$ROLLBACK` 都不删。「一个周期」到哪天
   结束 **TBD（维护者定）**；在 20d 删除 Swift target 之前不得删除。注意 `.rollback` 只存一代：之后每次
   `--daemon` 指向别处的 `runtime service update` 都会先删掉 `.rollback` 里原有的那一代、再把当时被替换的 helper 放进去；
@@ -408,7 +418,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 |---|---|---|
 | 第 0、1 步 | 什么都没改 | 按表处理后重来，或关窗口 |
 | 第 2 步 update 非 0 退出 | 取决于失败阶段，见第 2 步「失败时」表 | 读 `02-update.err` 原文，按该表判断阶段；`"$ARKDECK" runtime service status` 看 `launchAgent.ready` 与 `ProgramArguments`；旧服务健康则按原文处理后重跑第 1、2 步或关窗口；旧服务停着且 plist 未改则由【维护者】bootstrap 旧 plist；中间态见下一行 |
-| 第 2 步成功，但 Rust daemon 起不来（第 3 步 `socket_absent`、崩溃循环）；或第 2 步在快照之后失败（中间态） | 安装态已是 Rust，或处于中间态 | 【维护者】先 `launchctl bootout gui/$(id -u)/com.arkdeck.agentd` 止住循环；读 `agentd.error.log`；用 `"$ARKDECK" runtime service update --daemon "$ROLLBACK" --hdc "$HDC" --arktrace-descriptor <同第 2 步> --output json` 回到 Swift（第 7 步的前提、签名预设限制与核实同样适用；这条路径是按源码推出的，见附录 B 第 18 条）；不改 state |
+| 第 2 步成功，但 Rust daemon 起不来（第 3 步 `socket_absent`、崩溃循环）；或第 2 步在快照之后失败（中间态） | 安装态已是 Rust，或处于中间态 | 【维护者】先 `launchctl bootout gui/$(id -u)/com.arkdeck.agentd` 止住循环；读 `agentd.error.log`；用 `"$ARKDECK" runtime service update --daemon "$ROLLBACK" --hdc "$HDC" --arktrace-descriptor <同第 2 步> --output json` 回到 Swift（`$ROLLBACK` 的 Swift daemon 在解析参数时就以 exit 64 拒绝 `--cutover-preflight`，不碰 state，update 据此判为 Swift、不走预检门：`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift:183-203`、`rust/crates/arkdeck-cli/src/runtime_service_install.rs:812`；第 7 步的前提、签名预设限制与核实同样适用；这条路径是按源码推出的，见附录 B 第 18 条）；不改 state |
 | 第 3–6 步功能缺陷 | 安装态 Rust，daemon 健康 | 记 `BLOCKED_BY_PRODUCT_DEFECT`（原文、Runtime 引用、复现 argv）。两种走法由维护者当场定：(a) 停在 Rust，停止新执行、保留状态，修复后更新 Rust helper 再验（design §G.4「故障退出」）；(b) 回到 Swift（同上一行命令） |
 | 任何一步出现真实设备不确定状态 | — | 只读回；只有 `POL-RECOVERY-001` 的完整机械证明成立时 Runtime 才能独立完整覆写恢复；缺证明时零新 dispatch。**不**为此回滚、不换 state 目录、不从备份恢复 |
 | 第 7 步回滚演练失败 | 安装态 Swift 或半途 | 切回 Rust（第 2 步命令），不改 state，记录原文，交维护者裁决 |
@@ -493,13 +503,18 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 
 步骤中的 TBD（缺依据，维护者定或另派只读核实）：
 
-11. 第 1 步 `pendingToolSelection`：放弃一个待定 HDC 工具选择的已发布路径。
-12. 第 1 步 `retainedSessions`：「把被点名的 Session 移出 Session 根」的已发布路径（`session cleanup apply` 是否适用，或需维护者手工移动）。
+11. 第 1 步 `pendingToolSelection`：已只读核实（`evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 11 条）：没有「放弃」的已发布命令；待定选择由 Swift daemon
+    下次启动自行结算，让它重启的已发布路径是 `runtime service restart`。待定：是否为此重启旧 Runtime。
+12. 第 1 步 `retainedSessions`：已只读核实（同上，第 12 条）：`session cleanup apply` 不适用（有无法归属的内容时 cleanup
+    整根拒绝），也没有移动它的已发布命令，只能手工移出 Session 根。待定：是否手工移出、移到哪里。
 13. 第 2 步：「façade 保留一个周期」的截止日。
 14. 第 4 步：SPK-8 正向的具体 UI 测试名与开关；负向用例与 harness；`FacadeRollbackUITests` 对 standalone Rust daemon 是否适用。
 15. 第 7 步：`AgentXPCTransportContractTests` 黑盒子集对安装态 daemon 的运行方式。
 16. 第 7 步与 P6：装有签名预设时 Rust CLI 的 update（含回滚、GJ-4 campaign staging）一律被拒；改用 Swift CLI 回滚是否可行、是否可接受。
 17. 第 5 步 GJ-5：Rust CLI 没有装签名预设的叶子（S-1 前），预设由谁、用哪个 CLI 建立；若沿用切换前由 Swift 建的预设，
     又与 P6 的切换拒绝冲突。
-18. 第 2 步在快照之后失败的中间态：源码无自动恢复，本文给的处理（按 §4 第 3 行回到 `$ROLLBACK`）是按源码推出的，需维护者认可。
-19. 1a 手工预检：CLI 没有预检叶子，手工运行 daemon 的 `--cutover-preflight` 是按该模式「只读」的实现推出的用法，需维护者认可在真实账户上这样跑。
+18. 第 2 步在快照之后失败的中间态：已只读核实（`evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 18 条）：快照写完之后确无自动恢复；本文给的处理（按 §4 第 3 行
+    回到 `$ROLLBACK`）与源码一致，但没有测试覆盖从半途的安装态回退。待定：维护者是否认可这条回退路径。
+19. 1a 手工预检：已只读核实（同上，第 19 条）：无锁那遍不取锁、不建目录或锁文件、不写任何 owner 数据；**会在 Job 索引旁
+    创建或触碰 `-wal`/`-shm`，不改数据库内容**（有 `-shm` 时在其中记读标记；没有时新建空 `-wal` 与新 `-shm`）。待定：
+    维护者是否接受这一点、是否认可在真实账户上这样跑；若要真正零写入（immutable 打开或先复制再读），是另一刀的设计取舍。
