@@ -884,6 +884,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "support-bundle", "export"] => "runtime.support-bundle.export",
         // §12's superseded spelling of `runtime service`: the same handler,
         // reporting the name the caller typed (Swift `runAgentDaemon`).
+        ["runtime", "signing", "migrate-deveco"] => "runtime.signing.migrate-deveco",
+        ["signing", "migrate-deveco"] => "signing.migrate-deveco",
         ["runtime", "signing", "install"] => "runtime.signing.install",
         ["signing", "install"] => "signing.install",
         ["runtime", "signing", "status"] => "runtime.signing.status",
@@ -962,7 +964,13 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             "the option does not belong to this command",
         ));
     }
-    if matches!(command, "runtime.signing.install" | "signing.install") {
+    if matches!(
+        command,
+        "runtime.signing.install"
+            | "signing.install"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
+    ) {
         registry_parse::check(argv)?;
     }
 
@@ -1110,6 +1118,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco" => {
+            &["buildProfile", "daemon", "keyAlias"]
+        }
         "runtime.signing.install" | "signing.install" => &[
             "java",
             "jar",

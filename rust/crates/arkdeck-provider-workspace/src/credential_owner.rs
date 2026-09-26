@@ -59,6 +59,12 @@ struct Ledger {
     credential_ref: Option<String>,
     #[serde(rename = "presetOwners")]
     preset_owners: Vec<String>,
+    #[serde(
+        rename = "pendingEnvelopeAccounts",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pending_envelope_accounts: Vec<String>,
 }
 
 impl Ledger {
@@ -68,6 +74,7 @@ impl Ledger {
             state: "stable".into(),
             credential_ref,
             preset_owners,
+            pending_envelope_accounts: Vec::new(),
         }
     }
 
@@ -302,13 +309,22 @@ impl CredentialOwner {
             // Intentionally do not validate/adopt the receipt: uninstall is
             // also the exit from an unreadable or interrupted installation.
             let mut ledger = self.ledger_for_mutation(held)?;
-            ledger.state = "removing".into();
+            ledger.state = if ledger.pending_envelope_accounts.is_empty() {
+                "removing"
+            } else {
+                "removingSecrets"
+            }
+            .into();
             self.save(held, &ledger)?;
-            let result =
+            let result = (|| {
+                for account in &ledger.pending_envelope_accounts {
+                    secrets.remove_current(account)?;
+                }
                 crate::signing_removal::remove_preset(&self.store, secrets).and_then(|removal| {
                     self.save(held, &Ledger::stable(None, Vec::new()))?;
                     Ok(removal)
-                });
+                })
+            })();
             if result.is_err() {
                 // Settle only the receipt that actually remains. A receipt
                 // that cannot be validated leaves `removing` durable.
@@ -329,7 +345,8 @@ impl CredentialOwner {
     ) -> Result<CredentialResource, SigningError> {
         self.with_lock(|held| {
             let mut ledger = self.ledger_for_mutation(held)?;
-            ledger.state = "replacing".into();
+            let prior_pending = ledger.pending_envelope_accounts.clone();
+            ledger.state = "replacingSecrets".into();
             self.save(held, &ledger)?;
             let result = (|| {
                 crate::signing_install::install_preset(
@@ -339,6 +356,15 @@ impl CredentialOwner {
                     passwords,
                     secrets,
                     installed_at_utc,
+                    crate::signing_install::ReplacementTracking {
+                        prior: &prior_pending,
+                        stage: &mut |account| {
+                            ledger.pending_envelope_accounts.push(account.into());
+                            ledger.pending_envelope_accounts.sort();
+                            ledger.pending_envelope_accounts.dedup();
+                            self.save(held, &ledger)
+                        },
+                    },
                 )?;
                 self.revalidate(held)?;
                 let receipt = self
@@ -354,7 +380,74 @@ impl CredentialOwner {
                     reference_count: 0,
                 })
             })();
-            if result.is_err() {
+            if let Err(error) = &result
+                && !matches!(error, SigningError::MaintenanceUncertain(_))
+                && prior_pending.is_empty()
+            {
+                // Only a synchronous, proven restoration may settle this
+                // guarded transaction. Crashes leave replacingSecrets and
+                // neither Rust nor older Swift auto-adopts it.
+                ledger.state = "replacing".into();
+                ledger.pending_envelope_accounts.clear();
+                let _ = self.recover_mutation(held, &ledger);
+            }
+            result
+        })
+    }
+
+    /// Explicit DevEco maintenance retains installation and file identity.
+    pub fn replace_secret_envelope(
+        &self,
+        passwords: &crate::secret_envelope::SecretPair,
+        key_alias: Option<&str>,
+        secrets: &dyn crate::signing_install::SigningSecretInstallation,
+    ) -> Result<(bool, CredentialResource), SigningError> {
+        self.with_lock(|held| {
+            let mut ledger = self.ledger_for_mutation(held)?;
+            let prior_pending = ledger.pending_envelope_accounts.clone();
+            ledger.state = "replacingSecrets".into();
+            self.save(held, &ledger)?;
+            let result = (|| {
+                let created = crate::signing_rekey::replace_secret_envelope(
+                    &self.store,
+                    &held.directory,
+                    passwords,
+                    key_alias,
+                    secrets,
+                    &prior_pending,
+                    &mut |account| {
+                        ledger.pending_envelope_accounts.push(account.into());
+                        ledger.pending_envelope_accounts.sort();
+                        ledger.pending_envelope_accounts.dedup();
+                        self.save(held, &ledger)
+                    },
+                )?;
+                self.revalidate(held)?;
+                let receipt = self
+                    .store
+                    .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
+                let reference = credential_reference(&receipt)?;
+                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
+                Ok((
+                    created,
+                    CredentialResource {
+                        credential_ref: reference,
+                        project_ref: receipt.project_ref,
+                        preset_id: receipt.preset_id,
+                        installed_at_utc: receipt.installed_at_utc,
+                        reference_count: 0,
+                    },
+                ))
+            })();
+            if let Err(error) = &result
+                && !matches!(error, SigningError::MaintenanceUncertain(_))
+                && prior_pending.is_empty()
+            {
+                // Only a synchronous, proven restoration may settle this
+                // guarded transaction. Crashes leave replacingSecrets and
+                // neither Rust nor older Swift auto-adopts it.
+                ledger.state = "replacing".into();
+                ledger.pending_envelope_accounts.clear();
                 let _ = self.recover_mutation(held, &ledger);
             }
             result
@@ -369,7 +462,19 @@ impl CredentialOwner {
         sorted.sort();
         sorted.dedup();
         if ledger.schema_version != LEDGER_SCHEMA
-            || !["stable", "replacing", "removing"].contains(&ledger.state.as_str())
+            || ![
+                "stable",
+                "replacing",
+                "removing",
+                "replacingSecrets",
+                "removingSecrets",
+            ]
+            .contains(&ledger.state.as_str())
+            || ledger.pending_envelope_accounts.len() > MAX_OWNERS
+            || !ledger
+                .pending_envelope_accounts
+                .iter()
+                .all(|account| crate::signing_install::envelope_account(account))
             || ledger.preset_owners.len() > MAX_OWNERS
             || ledger.preset_owners != sorted
             || !ledger
@@ -471,6 +576,7 @@ impl CredentialOwner {
         let unique: BTreeSet<&String> = ledger.preset_owners.iter().collect();
         if ledger.schema_version != LEDGER_SCHEMA
             || ledger.state != "stable"
+            || !ledger.pending_envelope_accounts.is_empty()
             || ledger.preset_owners.len() > MAX_OWNERS
             || ledger.preset_owners != sorted
             || unique.len() != ledger.preset_owners.len()
@@ -492,6 +598,7 @@ impl CredentialOwner {
     fn recover_mutation(&self, held: &Held, ledger: &Ledger) -> Result<Ledger, SigningError> {
         if !["replacing", "removing"].contains(&ledger.state.as_str())
             || !ledger.preset_owners.is_empty()
+            || !ledger.pending_envelope_accounts.is_empty()
         {
             return Err(SigningError::receipt(
                 "signing credential mutation record is invalid",

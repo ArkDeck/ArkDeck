@@ -18,6 +18,8 @@ pub fn serves(command: &str) -> bool {
             | "signing.remove"
             | "runtime.signing.install"
             | "signing.install"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
     )
 }
 
@@ -150,7 +152,12 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
     }
     if !matches!(
         command,
-        "runtime.signing.remove" | "signing.remove" | "runtime.signing.install" | "signing.install"
+        "runtime.signing.remove"
+            | "signing.remove"
+            | "runtime.signing.install"
+            | "signing.install"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
     ) {
         return Err(crate::CliError::new(
             "invalidCommand",
@@ -159,6 +166,14 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
     }
     let root = SigningPresetStore::default_root().ok_or_else(no_home)?;
     let daemon = KeychainSigningSecrets::default_daemon_executable().ok_or_else(no_home)?;
+    let empty = serde_json::Map::new();
+    let options = invocation.params.as_ref().unwrap_or(&empty);
+    if matches!(
+        command,
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
+    ) {
+        validate_migration_daemon(command, options, &daemon)?;
+    }
     let secrets = KeychainSigningSecrets::for_maintenance(daemon).map_err(signing_error)?;
     if matches!(command, "runtime.signing.install" | "signing.install") {
         let empty = serde_json::Map::new();
@@ -175,6 +190,11 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
             },
             &crate::utc_now(),
         )
+    } else if matches!(
+        command,
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
+    ) {
+        migrate_deveco_document(&root, options, &secrets)
     } else {
         remove_document(&root, &secrets).map_err(signing_error)
     }
@@ -323,4 +343,91 @@ fn lexical_absolute(path: &std::path::Path) -> std::path::PathBuf {
         }
     }
     result
+}
+
+/// Reject caller-selected daemons before opening the maintenance Keychain.
+#[cfg(target_os = "macos")]
+pub fn validate_migration_daemon(
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    installed: &std::path::Path,
+) -> Result<(), crate::CliError> {
+    let spelling = command.replace('.', " ");
+    let profile = options
+        .get("buildProfile")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let daemon = options.get("daemon").and_then(Value::as_str).unwrap_or("");
+    if !profile.starts_with('/') || !daemon.starts_with('/') {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} requires --build-profile and --daemon absolute paths"
+        )));
+    }
+    if lexical_absolute(std::path::Path::new(daemon)) != installed
+        || arkdeck_provider_workspace::foundation_resolved_path(daemon).as_deref()
+            != installed.to_str()
+    {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} --daemon must name the canonical installed LaunchAgent daemon"
+        )));
+    }
+    Ok(())
+}
+
+/// The authenticated build-profile's adjacent material is the decryption
+/// anchor; only a measured match to the installed keystore may replace it.
+#[cfg(target_os = "macos")]
+pub fn migrate_deveco_document(
+    root: &std::path::Path,
+    options: &serde_json::Map<String, Value>,
+    secrets: &dyn arkdeck_provider_workspace::signing_install::SigningSecretInstallation,
+) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::{
+        credential_owner::CredentialOwner,
+        deveco_password::decode_if_needed,
+        secret_envelope::SecretPair,
+        signing_preset::{DEFAULT_PRESET_ID, SigningPresetStore},
+    };
+    let store = SigningPresetStore::new(root);
+    let receipt = store
+        .load_validated(DEFAULT_PRESET_ID, false, secrets)
+        .map_err(signing_error)?;
+    let profile = options
+        .get("buildProfile")
+        .and_then(Value::as_str)
+        .ok_or_else(|| crate::CliError::plain_usage("migrate-deveco requires --build-profile"))?;
+    let material = crate::signing_inputs::read_deveco_profile(std::path::Path::new(profile))?;
+    let source = arkdeck_provider_workspace::measure(
+        material.store_file.to_str().unwrap(),
+        "DevEco build-profile keystore",
+        false,
+        true,
+    )
+    .map_err(signing_error)?;
+    if source.sha256 != receipt.keystore.sha256 || source.byte_count != receipt.keystore.byte_count
+    {
+        return Err(signing_error(
+            arkdeck_provider_workspace::SigningError::IdentityDrift(
+                "DevEco build-profile keystore does not match the installed preset".into(),
+            ),
+        ));
+    }
+    let passwords = SecretPair {
+        keystore: decode_if_needed(material.keystore.as_bytes(), &material.store_file)
+            .map_err(signing_error)?,
+        key: decode_if_needed(material.key.as_bytes(), &material.store_file)
+            .map_err(signing_error)?,
+    };
+    let (created, resource) = CredentialOwner::new(store)
+        .replace_secret_envelope(
+            &passwords,
+            options.get("keyAlias").and_then(Value::as_str),
+            secrets,
+        )
+        .map_err(signing_error)?;
+    Ok(
+        json!({"schemaVersion":"arkdeck.signing-credential-maintenance/1",
+        "operation":"migrate-deveco", "credential":projection(&resource),
+        "createdEnvelopeItem":created}),
+    )
 }

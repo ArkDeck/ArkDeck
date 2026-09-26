@@ -10,6 +10,8 @@ pub enum SigningError {
     ReceiptUnavailable(String),
     SecretUnavailable(String),
     IoFailure(String),
+    /// Secret/receipt consistency cannot be proved; explicit maintenance only.
+    MaintenanceUncertain(String),
 }
 
 impl SigningError {
@@ -53,6 +55,9 @@ impl fmt::Display for SigningError {
             }
             Self::SecretUnavailable(value) => {
                 write!(formatter, "signing secret unavailable: {value}")
+            }
+            Self::MaintenanceUncertain(value) => {
+                write!(formatter, "signing maintenance outcome unknown: {value}")
             }
             Self::IoFailure(value) => write!(formatter, "signing I/O failure: {value}"),
         }

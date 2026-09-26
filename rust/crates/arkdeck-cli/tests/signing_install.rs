@@ -235,3 +235,90 @@ fn signing_option_spellings_do_not_leak_into_other_command_surfaces() {
         assert_eq!(error.code, "invalidOption");
     }
 }
+
+#[test]
+fn migrate_authenticates_profile_keystore_and_preserves_installation() {
+    use arkdeck_cli::signing_leaves::migrate_deveco_document;
+    let home = Home::new();
+    let options = home.options();
+    let secrets = Secrets::default();
+    let first = install_document(
+        &home.0,
+        "runtime.signing.install",
+        &options,
+        &secrets,
+        &mut |_| Ok(Secret::from_slice(b"old-password")),
+        "2026-09-26T00:00:00Z",
+    )
+    .unwrap();
+    let profile = home.profile(&format!(
+        "{{storeFile:'{}',storePassword:'{}',keyPassword:'{}'}}",
+        options["keystore"].as_str().unwrap(),
+        "ab".repeat(16),
+        "cd".repeat(16)
+    ));
+    let migrate = json!({"buildProfile":profile});
+    let result = migrate_deveco_document(&home.0, migrate.as_object().unwrap(), &secrets).unwrap();
+    assert_eq!(result["credential"], first);
+    assert_eq!(result["createdEnvelopeItem"], false);
+    let other = home.0.join("different.p12");
+    fs::write(&other, b"unrelated keystore").unwrap();
+    fs::set_permissions(&other, fs::Permissions::from_mode(0o600)).unwrap();
+    let other =
+        arkdeck_provider_workspace::foundation_resolved_path(other.to_str().unwrap()).unwrap();
+    home.profile(&format!(
+        "{{storeFile:'{other}',storePassword:'{}',keyPassword:'{}'}}",
+        "ab".repeat(16),
+        "cd".repeat(16)
+    ));
+    let before: BTreeMap<_, _> = secrets
+        .0
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.as_bytes().to_vec()))
+        .collect();
+    let error =
+        migrate_deveco_document(&home.0, migrate.as_object().unwrap(), &secrets).unwrap_err();
+    assert!(
+        error
+            .message
+            .contains("does not match the installed preset")
+    );
+    for (account, value) in before {
+        assert_eq!(secrets.read(&account).unwrap().as_bytes(), value);
+    }
+}
+
+#[test]
+fn migrate_cli_replays_swift_refusals_before_keychain_access() {
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/signing-migrate/cases.json"
+    ))
+    .unwrap();
+    assert_eq!(cases.len(), 12);
+    for case in cases {
+        let home = Home::new();
+        fs::create_dir(&home.0).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+            .args(
+                case["argv"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| v.as_str().unwrap()),
+            )
+            .env("HOME", &home.0)
+            .env("CFFIXED_USER_HOME", &home.0)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(case["exit"].as_i64().unwrap() as i32)
+        );
+        assert_eq!(output.stdout, case["stdout"].as_str().unwrap().as_bytes());
+        assert_eq!(output.stderr, case["stderr"].as_str().unwrap().as_bytes());
+        assert_eq!(fs::read_dir(&home.0).unwrap().count(), 0);
+    }
+}

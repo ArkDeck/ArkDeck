@@ -1,0 +1,7 @@
+{
+  "owners": [
+    "RuntimeCLI.runSigning.migrate-deveco"
+  ],
+  "producer": "record-signing-migrate-oracle.py",
+  "swiftCliSha256": "0fc1877f361d7f1ae68e59f249b0056d341f689af22818018fec1564c817fddf"
+}

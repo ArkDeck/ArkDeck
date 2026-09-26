@@ -40,6 +40,8 @@ pub mod signing_action;
 pub mod signing_install;
 pub mod signing_preset;
 #[cfg(target_os = "macos")]
+pub mod signing_rekey;
+#[cfg(target_os = "macos")]
 pub mod signing_removal;
 
 #[cfg(target_os = "macos")]
