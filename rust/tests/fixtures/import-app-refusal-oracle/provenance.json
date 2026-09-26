@@ -1,0 +1,10 @@
+{
+  "command": "ARKDECK_IMPORT_APP_REFUSAL_ORACLE_OUTPUT=<new path under /private/tmp> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter ImportAppRefusalOracleContractTests; without the variable the same test compares Swift's answers with cases.json byte for byte",
+  "determinism": "runtime identities are recorded by the names the replay substitutes: $liveImportId (an upload with the first 2048 bytes of the HAP), $committedImportId (a committed HAP, generation 2), $targetId (the one adopted Target) and $file (the CLI's source path); the machine output's controlRequestId is recorded as $controlRequestId; imp-00000000-0000-4000-8000-000000000001 is a fixed identity no fixture holds; the HAP is the 4-byte ZIP magic followed by 4,092 bytes of 0x61",
+  "files": {
+    "cases.json": "57c47b5a7cf851b98aacedcfaf59810737074caab8bc5341e5ee16ee20ebb1ea"
+  },
+  "recordedBy": "ImportAppRefusalOracleContractTests.testImportRefusalsOfTheAppTransportAndTheCLI, main eec3df485, macOS 27.0 (26A428)",
+  "source": "app cases: the frame the App's raw XPC listener sends back for each request (AgentXPCEndpoint.responseFrame), over a RuntimeControlPlaneHandler composed with an actual RuntimeArtifactStore, RuntimeTargetStore and RuntimeJobEngine, or composed without the Artifact and Target owners (owners false): the transport's own refusal of the request, or the Runtime's reply; a successful reply's result is recorded as $result; cli cases: Swift's arkdeck CLI against that handler's daemon, with its exit status, machine output and standard error",
+  "why": "TASK-XPA-013 X3-X7: what the App receives for Import requests its transport refuses or the Runtime refuses without its owners, and what Swift's CLI answers for Import arguments it leaves to the Runtime or refuses itself; the Rust App ingress and CLI replay them"
+}

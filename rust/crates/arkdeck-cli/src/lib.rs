@@ -126,6 +126,10 @@ pub struct CliError {
     /// `CLIRegistryError.command`); a machine answer names it instead of
     /// `registry.parse`.
     pub command: Option<&'static str>,
+    /// Swift's `CLIError`: a failure its CLI prints as `arkdeck <group>:
+    /// <message>` on stderr, with no machine answer on stdout, and exits with
+    /// this status. The code stays for callers that read one.
+    pub plain_exit: Option<u8>,
 }
 impl CliError {
     pub fn new(code: &'static str, message: impl Into<String>) -> Self {
@@ -134,12 +138,23 @@ impl CliError {
             message: message.into(),
             details: Map::new(),
             command: None,
+            plain_exit: None,
+        }
+    }
+    /// A usage failure Swift's CLI raises as a plain `CLIError(exitCode: 64)`.
+    pub fn plain_usage(message: impl Into<String>) -> Self {
+        Self {
+            plain_exit: Some(64),
+            ..Self::new("invalidOption", message)
         }
     }
     /// §9: the exit status of the code's category in the error registry; a
-    /// code the registry does not have is an internal failure.
+    /// code the registry does not have is an internal failure. A plain
+    /// failure exits with its own status.
     pub fn exit_code(&self) -> u8 {
-        error_registry::category(self.code).map_or(70, error_registry::ExitCategory::exit_code)
+        self.plain_exit.unwrap_or_else(|| {
+            error_registry::category(self.code).map_or(70, error_registry::ExitCategory::exit_code)
+        })
     }
     /// Swift `CLIRuntimeSession.mapped` of a connection that did not open for
     /// `method`: nothing was sent, so nothing was accepted, whatever the

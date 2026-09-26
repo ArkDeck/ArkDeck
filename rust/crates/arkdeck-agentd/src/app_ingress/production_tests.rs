@@ -89,13 +89,13 @@ fn production_ingress_registers_the_fixed_service_with_the_app_requirement() {
         "1"
     );
     // A method outside the App's allowlist is refused as the isolated
-    // ingress refuses it.
+    // ingress refuses it: Swift's App transport refusal.
     assert_eq!(
         code(&handler(
             &frame("runtime.hdc.restart", json!({"expectedGeneration": "1"})),
             peer
         )),
-        "rejected"
+        "methodNotAllowlisted"
     );
 }
 

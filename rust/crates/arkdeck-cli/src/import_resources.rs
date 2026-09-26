@@ -31,28 +31,23 @@ pub(crate) fn configure(
         if let Some(target) = fields.remove("targetId") {
             fields.insert("target".into(), target);
         }
-        if fields
-            .get("target")
-            .is_some_and(|v| !v.as_str().is_some_and(arkdeck_contract::import_identifier))
-            || fields.get("state").is_some_and(|v| {
-                !v.as_str().is_some_and(|s| {
-                    [
-                        "inProgress",
-                        "committing",
-                        "committed",
-                        "aborted",
-                        "released",
-                    ]
-                    .contains(&s)
-                })
+        // Swift sends the target and the cursor as given: the Runtime judges
+        // them ("Import filter is invalid", "invalid Import cursor"). A state
+        // outside the registry's enumeration is refused here only so that
+        // `parse` consults the registry, which answers in Swift's words, as
+        // the page size's conversion above does for its bounds.
+        if fields.get("state").is_some_and(|v| {
+            !v.as_str().is_some_and(|s| {
+                [
+                    "inProgress",
+                    "committing",
+                    "committed",
+                    "aborted",
+                    "released",
+                ]
+                .contains(&s)
             })
-            || fields
-                .get("pageSize")
-                .is_some_and(|v| !v.as_u64().is_some_and(|n| (1..=1000).contains(&n)))
-            || fields
-                .get("cursor")
-                .is_some_and(|v| !v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 2048))
-        {
+        }) {
             return Err(invalid());
         }
     } else if command == "artifact.import.release" {
@@ -69,6 +64,9 @@ pub(crate) fn configure(
         }
         fields.insert("importId".into(), id);
     } else if command == "artifact.import.inspect" {
+        // Not a dead check: this refusal is what makes `parse` consult the
+        // registry, whose `requiresExactlyOneOf` then answers in Swift's words
+        // ("`artifact import inspect` requires exactly one of …").
         if fields.contains_key("import") == fields.contains_key("importRequestId") {
             return Err(invalid());
         }
@@ -599,16 +597,17 @@ fn canonical_native_name(source: &str) -> Result<String, CliError> {
                 .map(|_| &source[37..])
         })
         .unwrap_or(source);
+    // Swift `canonicalNativeLibraryImportName`: a plain usage failure.
     if !stripped.starts_with("lib")
         || !stripped.ends_with(".so")
         || stripped.len() <= 6
+        || stripped.len() > 128
         || !stripped
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b))
     {
-        return Err(CliError::new(
-            "invalidInput",
-            "Native-library Import requires a lib*.so name",
+        return Err(CliError::plain_usage(
+            "native library file must have a safe lib*.so basename or an exact ArkDeck export name ART-<32 lowercase hex>-lib*.so",
         ));
     }
     Ok(stripped.into())

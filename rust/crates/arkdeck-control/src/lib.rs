@@ -50,14 +50,27 @@ pub trait HostServices: Send + Sync {
     /// A host without that owner refuses with zero dispatch.
     fn app_import_resource(
         &self,
-        _method: &str,
+        method: &str,
         _params: &serde_json::Map<String, Value>,
     ) -> Result<Value, WireError> {
+        // As Swift's App gateway without its Artifact owner: the App's
+        // follow-up uploads are refused before the Runtime, and a begin by the
+        // handler for its missing owners.
+        if method == "artifact.import.begin" {
+            return Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "Import owner services are unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), json!("importOwner")),
+                    ("newDispatchCount".into(), json!(0)),
+                ])),
+            });
+        }
         Err(WireError {
-            code: "operationUnavailable".into(),
-            message: "App Import owner services are unavailable".into(),
+            code: "admissionDenied".into(),
+            message: "Import is outside this App upload scope".into(),
             details: Some(serde_json::Map::from_iter([
-                ("phase".into(), json!("importOwner")),
+                ("phase".into(), json!("preAdmission")),
                 ("newDispatchCount".into(), json!(0)),
             ])),
         })

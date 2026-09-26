@@ -4,10 +4,8 @@
 //! and App ownership stay with the Import owner, which only App frames reach
 //! as App-owned (`Control::handle_app_frame`).
 use super::canonical_decimal;
-use arkdeck_contract::{
-    MAX_RESPONSE_BYTES, Request, Response, WireError, encode_frame, validate_method_value,
-};
-use serde_json::{Map, Value, json};
+use arkdeck_contract::{ImportIntent, Request, validate_method_value};
+use serde_json::{Map, Value};
 
 pub(super) const METHODS: [&str; 4] = [
     "artifact.import.begin",
@@ -74,27 +72,18 @@ pub(super) fn closed(method: &str, params: &Map<String, Value>) -> bool {
     shape && validate_method_value(method, "request", &Value::Object(params.clone())).is_ok()
 }
 
-/// As Swift's App transport (`AgentXPCListener`), a kind outside the App's
-/// uploads — a HAP, a native library and a Flash bundle, which the owner
-/// validates as Swift's production policy does — is refused before the owner.
-pub(super) fn out_of_scope(request: &Request) -> Option<Vec<u8>> {
-    if request.method != "artifact.import.begin" {
-        return None;
-    }
-    let kind = request.params.as_ref()?.get("kind")?.as_str()?;
-    if matches!(kind, "hap" | "native-library" | "flash-bundle") {
-        return None;
-    }
-    let response = Response {
-        id: request.id.clone(),
-        outcome: Err(WireError {
-            code: "admissionDenied".into(),
-            message: "Import is outside this App upload scope".into(),
-            details: Some(Map::from_iter([
-                ("phase".into(), json!("preAdmission")),
-                ("newDispatchCount".into(), json!(0)),
-            ])),
-        }),
+/// Swift's App transport (`AgentXPCListener.admission`): a begin is admitted
+/// only when its metadata is a complete, valid Import intent of one of the
+/// App's uploads, a HAP, a native library or a Flash bundle. Any other is
+/// refused at the door, before the owner.
+pub(super) fn admitted_begin(request: &Request) -> bool {
+    let Some(params) = request.params.as_ref() else {
+        return false;
     };
-    Some(encode_frame(&response.value(), MAX_RESPONSE_BYTES).expect("bounded App Import refusal"))
+    ImportIntent::from_wire(params).is_ok_and(|intent| {
+        matches!(
+            intent.kind.as_str(),
+            "hap" | "native-library" | "flash-bundle"
+        )
+    })
 }
