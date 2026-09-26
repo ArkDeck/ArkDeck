@@ -300,7 +300,7 @@ class CaptureDocumentIdentityTests(unittest.TestCase):
         self.assertEqual(document["spike"], "SPK-11")
         self.assertEqual(document["toolchain"]["runtimeKind"], "rust")
         self.assertIn("job.reconcile", document["metrics"]["job.cancelReconcile"]["reason"])
-        self.assertIn("L.1 item 13", document["metrics"]["daemon.warmStartRecovery"]["reason"])
+        self.assertIn("does not time a 10k", document["metrics"]["daemon.warmStartRecovery"]["reason"])
 
     def test_a_swift_capture_keeps_the_historical_identity(self) -> None:
         code, document = self._capture("swift")

@@ -371,9 +371,13 @@ class MetricTableTests(unittest.TestCase):
     def test_rust_gaps_name_the_rust_blockers(self) -> None:
         gaps = metrics.gap_definitions("rust")
         recovery = gaps["daemon.warmStartRecovery"]
-        self.assertIn("L.1 item 13", recovery.reason)
-        self.assertIn("L.1 item 13", recovery.blocked_by)
+        self.assertIn("does not time a 10k", recovery.reason)
+        self.assertIn("timed Rust 10k", recovery.blocked_by)
+        self.assertNotIn("L.1 item 13", recovery.reason)
+        self.assertNotIn("L.1 item 13", recovery.blocked_by)
         self.assertIn("job.reconcile", gaps["job.cancelReconcile"].reason)
+        self.assertNotIn("refuses job.reconcile", gaps["job.cancelReconcile"].reason)
+        self.assertIn("does not measure", gaps["ipc.namedPipe"].reason)
         self.assertIn("ARKDECK_APP_INGRESS", gaps["ipc.xpc"].reason)
         swift = metrics.gap_definitions("swift")
         self.assertNotIn("L.1 item 13", swift["daemon.warmStartRecovery"].reason)

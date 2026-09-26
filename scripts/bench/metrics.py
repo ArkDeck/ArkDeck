@@ -114,10 +114,10 @@ RUNTIME_KINDS = ("swift", "rust")
 def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
     """Design rows this harness cannot measure on the given daemon, and why.
 
-    Most reasons hold for both compositions.  Two rows differ: the Swift
-    engine's recovery is measured elsewhere, while the Rust owner has not
-    ported recovery at all; and the Rust daemon additionally refuses
-    `job.reconcile`.  A reason that was true of an earlier protocol is not
+    Most reasons hold for both compositions. Runtime support does not imply
+    that this harness measures it: the Rust owner now supports recovery and
+    `job.reconcile`, but this read-only capture times neither. A reason that
+    was true of an earlier protocol is not
     carried forward: a committed document that states it would be wrong.
     """
 
@@ -130,10 +130,9 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
             "I.2 rows 2 and 7 (warm start and 10k journal/history recovery)",
             (
                 "JournalRecoveryContractTests in the Swift nightly slow lane "
-                "time the Swift engine, not this daemon; the Rust owner has no "
-                "10k-event journal or 10k-Job fixture, and it ports journal "
-                "recovery and restart reconciliation only after design section "
-                "L.1 item 13 is ruled"
+                "time the Swift engine, not this daemon; Rust journal recovery "
+                "and restart reconciliation are implemented, but this harness "
+                "does not time a 10k-event journal or 10k-Job recovery workload"
             )
             if rust
             else (
@@ -143,7 +142,7 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
                 "runs, so no baseline value can be carried here yet"
             ),
             (
-                "design section L.1 item 13 (recovery ruling) and a Rust 10k fixture"
+                "a timed Rust 10k recovery workload in this capture"
                 if rust
                 else "no cross-run archiving for the existing slow lane"
             ),
@@ -158,8 +157,9 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
         "ipc.namedPipe": baseline.Gap(
             "ipc.namedPipe",
             "I.2 row 4 (IPC, named-pipe leg)",
-            "no named-pipe transport exists on any platform yet",
-            "TASK-XPA-002 (Windows transport)",
+            "the macOS capture uses Unix domain sockets and does not measure "
+            "the Windows named-pipe transport",
+            "a Windows performance capture with a named-pipe client",
         ),
         "ipc.xpc": baseline.Gap(
             "ipc.xpc",
@@ -234,14 +234,14 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
             "would cancel, and the terminal leg needs an HDC child process on a "
             "real device"
             + (
-                "; the Rust daemon also refuses job.reconcile as unavailable in "
-                "its read-only foundation"
+                "; the Rust daemon supports job.reconcile, but this capture "
+                "does not time a cancellation/reconciliation workload"
                 if rust
                 else ""
             ),
             (
-                "design section L.1 item 13 (recovery ruling), a harness leg that "
-                "submits and cancels a Job, and a device window"
+                "a Rust harness leg that submits, cancels and reconciles a Job, "
+                "and a device window"
                 if rust
                 else "a harness leg that submits and cancels a Job, and a device window"
             ),
