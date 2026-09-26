@@ -16,7 +16,8 @@ use serde_json::{Map, Value, json};
 use std::io;
 
 const SCHEMA_VERSION: &str = "arkdeck-arkforge-runtime-state/v1";
-const FILE: &str = "arkforge-runtime-state.json";
+/// The sidecar's name in the Job's directory.
+pub(crate) const FILE: &str = "arkforge-runtime-state.json";
 const BOUND: usize = 1024 * 1024;
 
 /// One Job's ArkForge state: the correlated daemon job once it was prepared,

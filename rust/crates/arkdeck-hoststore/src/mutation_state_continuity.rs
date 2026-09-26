@@ -11,6 +11,8 @@
 //! A refusal is never kept. Swift keeps nothing: its scan never reads a
 //! Session's files.
 use super::JobStore;
+use crate::job_record::JobRecord;
+use crate::job_repository::InspectedIndex;
 use arkdeck_contract::{WireError, strict_json};
 use arkdeck_platform::{HostDirectory, HostEntryKind, HostFileIdentity};
 use std::{
@@ -69,11 +71,65 @@ impl Reuse {
     }
 }
 
+/// The Job store whose failed publications may account for a retained
+/// Session that holds its identity and no Manifest: the owner's, or the
+/// state root the cutover preflight reads without any owner. Either way the
+/// proof reads the same facts of it: a Job's durable record as its index row
+/// keeps it, its Journal and its Manifest proposal.
+#[derive(Clone, Copy)]
+enum PublicationSource<'a> {
+    Owner(&'a JobStore),
+    /// The Job store's root and its index, each where it could be opened,
+    /// the index read through the connection Swift's repository inspects
+    /// with.
+    Inspected {
+        root: Option<&'a HostDirectory>,
+        index: Option<&'a InspectedIndex>,
+    },
+}
+
+impl PublicationSource<'_> {
+    fn root(&self) -> Option<&HostDirectory> {
+        match self {
+            Self::Owner(jobs) => Some(&jobs.root),
+            Self::Inspected { root, .. } => *root,
+        }
+    }
+
+    /// The Job's durable record, from its index row.
+    fn record(&self, job_id: &str) -> Option<JobRecord> {
+        let row = match self {
+            Self::Owner(jobs) => jobs.repository.rows(Some(job_id)).ok()?.into_iter().next(),
+            Self::Inspected { index, .. } => index.as_ref()?.row(job_id).ok()?,
+        }?;
+        JobRecord::from_row(&row).ok()
+    }
+
+    /// The Job's own Journal.
+    fn journal(&self, job_id: &str) -> io::Result<Vec<u8>> {
+        match self {
+            Self::Owner(jobs) => jobs.journal_bytes(job_id),
+            Self::Inspected { root, .. } => {
+                if !crate::job_repository::identifier(job_id) {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "The Job identity is not a Runtime identifier",
+                    ));
+                }
+                root.ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?
+                    .child("jobs")?
+                    .child(job_id)?
+                    .read("journal.jsonl", JOURNAL_BOUND)
+            }
+        }
+    }
+}
+
 /// One scan's reading of the last one's verdicts, and the verdicts it keeps.
 struct Verdicts<'a> {
     /// The Job store whose failed publications may account for a retained
     /// Session that holds its identity and no Manifest.
-    jobs: &'a JobStore,
+    jobs: PublicationSource<'a>,
     reuse: Reuse,
     previous: &'a HashMap<PathBuf, Passed>,
     next: HashMap<PathBuf, Passed>,
@@ -467,7 +523,7 @@ impl JobStore {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let mut verdicts = Verdicts {
-            jobs: self,
+            jobs: PublicationSource::Owner(self),
             reuse,
             previous: &kept.passed,
             next: HashMap::new(),
@@ -500,16 +556,7 @@ impl JobStore {
     pub fn require_retained_sessions(&self, sessions_root: &Path) -> Result<(), WireError> {
         let root = normalized(sessions_root)?;
         let _activity = self.activity.lock().map_err(|_| refused())?;
-        let previous = HashMap::new();
-        let mut verdicts = Verdicts {
-            jobs: self,
-            reuse: Reuse::Never,
-            previous: &previous,
-            next: HashMap::new(),
-            #[cfg(test)]
-            counts: (0, 0),
-        };
-        check_sessions(&root, &mut verdicts)
+        retained_sessions(PublicationSource::Owner(self), &root)
     }
 
     /// Whether the Session at `location` (`yyyy`, `mm`, `session-<job>`)
@@ -538,10 +585,44 @@ impl JobStore {
             Err(error) if error.kind() == io::ErrorKind::NotFound => None,
             Err(_) => return false,
         };
-        self.failed_publication(&session, &location.map(str::to_owned), journal.as_deref())
+        PublicationSource::Owner(self)
+            .failed_publication(&session, &location.map(str::to_owned), journal.as_deref())
             .is_some()
     }
+}
 
+/// The retained Sessions under `root` scanned, reusing nothing, with the
+/// failed publications of `jobs` passing a Session they account for.
+fn retained_sessions(jobs: PublicationSource<'_>, root: &Path) -> Result<(), WireError> {
+    let previous = HashMap::new();
+    let mut verdicts = Verdicts {
+        jobs,
+        reuse: Reuse::Never,
+        previous: &previous,
+        next: HashMap::new(),
+        #[cfg(test)]
+        counts: (0, 0),
+    };
+    check_sessions(root, &mut verdicts)
+}
+
+/// [`JobStore::require_retained_sessions`] over a state root no owner of
+/// this process holds, for the cutover preflight's read of the Runtime it
+/// would replace: the same scan, which refuses what a device mutation's proof
+/// will refuse there, with the same reason. The failed publications that
+/// may account for a Session are read from the Job store's root `jobs` and
+/// its `index` (each `None` where there is none) without any owner: no lock
+/// is taken, and nothing is marked, created or written.
+pub(crate) fn require_retained_sessions_without_owner(
+    jobs: Option<&HostDirectory>,
+    index: Option<&InspectedIndex>,
+    sessions_root: &Path,
+) -> Result<(), WireError> {
+    let root = normalized(sessions_root)?;
+    retained_sessions(PublicationSource::Inspected { root: jobs, index }, &root)
+}
+
+impl PublicationSource<'_> {
     /// The durable proof that `session`, at `location` under its Sessions
     /// root, holding `journal` (if any) and no Manifest, is what a failed
     /// publication of a Job this store holds leaves (`SessionPublisher`,
@@ -555,7 +636,7 @@ impl JobStore {
     ///   locks, a Journal that is the Job's own as far as it goes, and the
     ///   outcome audit of this Job only once the whole Journal is copied.
     fn failed_publication(
-        &self,
+        self,
         session: &HostDirectory,
         location: &[String],
         journal: Option<&[u8]>,
@@ -575,8 +656,7 @@ impl JobStore {
             return None;
         }
 
-        let rows = self.repository.rows(Some(&job_id)).ok()?;
-        let record = crate::job_record::JobRecord::from_row(rows.first()?).ok()?;
+        let record = self.record(&job_id)?;
         let marker = record.session_publication()?;
         if crate::job_record_fields::publication_fact(Some(marker))["state"] != "failed"
             || marker["sessionID"] != session_id.as_str()
@@ -630,7 +710,7 @@ impl JobStore {
                 return None;
             }
         }
-        let job_journal = self.journal_bytes(&job_id).ok()?;
+        let job_journal = self.journal(&job_id).ok()?;
         if journal.is_some_and(|copy| !job_journal.starts_with(copy)) {
             return None;
         }
@@ -646,7 +726,7 @@ impl JobStore {
                 }
                 let audit = strict_json(body).ok()?;
                 let proposal = self
-                    .root
+                    .root()?
                     .child("jobs")
                     .ok()?
                     .child(&job_id)
@@ -906,7 +986,7 @@ mod tests {
         let root = HostDirectory::open_session_tree(&sessions).unwrap();
         let previous = HashMap::new();
         let mut verdicts = Verdicts {
-            jobs: &fixture.jobs,
+            jobs: PublicationSource::Owner(&fixture.jobs),
             reuse: Reuse::Never,
             previous: &previous,
             next: HashMap::new(),

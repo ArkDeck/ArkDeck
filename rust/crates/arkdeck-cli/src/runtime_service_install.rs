@@ -699,6 +699,16 @@ fn block_text(block: &Value) -> String {
     match block["kind"].as_str().unwrap_or_default() {
         "jobState" => format!("Job {} is {}", field("jobId"), field("state")),
         "unresolvedJournal" => format!("Job {} has an unresolved journal", field("jobId")),
+        "loaderTransitionAwaitingBinding" => format!(
+            "Job {job} awaits a Loader binding of target {target} at binding revision \
+             {revision} to settle its enter-Loader transition, which the Rust Runtime does \
+             not settle: settle it first on the old Swift Runtime with `arkdeck flash \
+             bind-loader --target {target} --expected-binding-revision {revision}` \
+             (flash.bind-current-loader), then run the preflight again",
+            job = field("jobId"),
+            target = field("targetId"),
+            revision = block["expectedBindingRevision"],
+        ),
         "activeAgentExecution" => format!(
             "agent execution {} is {}",
             field("executionId"),
@@ -714,6 +724,13 @@ fn block_text(block: &Value) -> String {
             format!("HDC tool selection {} is pending", field("controlActionId"))
         }
         "runtimeRunning" => field("reason"),
+        "retainedSessions" => format!(
+            "the retained Sessions under {} are refused as a device mutation's continuity \
+             proof refuses them: {}: {}",
+            field("sessionsRoot"),
+            field("code"),
+            field("message")
+        ),
         "unreadable" => format!("{} is unreadable: {}", field("source"), field("reason")),
         other => format!("{other}: {block}"),
     }

@@ -34,7 +34,7 @@ pub use framing::{
 };
 pub use job_state_preflight::{
     CutoverBlock, CutoverExecution, CutoverJob, CutoverUse, JOB_STATE_PREFLIGHT_TABLE,
-    JobStateClass, MalformedCurrentJob, RestartPreflight, agent_execution_active,
+    JobStateClass, LoaderTransition, MalformedCurrentJob, RestartPreflight, agent_execution_active,
     capability_use_unsettled, classify_restart, cutover_job_class, cutover_preflight,
     job_state_class, job_states,
 };

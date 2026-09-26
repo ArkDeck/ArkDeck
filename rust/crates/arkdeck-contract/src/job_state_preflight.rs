@@ -20,7 +20,10 @@
 //!   decides it.
 //! - [`cutover_preflight`] is §G.4's M5 preflight over a state root's facts,
 //!   which the caller gathers from the Job index, records and journals, the
-//!   agent executions and the capability ledger.
+//!   agent executions and the capability ledger. Beside the table's rules it
+//!   refuses one cutover-only case, which the table does not class: a parked
+//!   Flash Job whose enter-Loader transition only Swift's
+//!   `flash.bind-current-loader` settles (F7, not ported).
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -196,11 +199,29 @@ pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, Malformed
 /// row, record and journal give (a crash window can leave them apart); the
 /// most conservative one classes the Job. `journal_unresolved` is true when
 /// its journal holds an outstanding intent, an unknown outcome or a torn tail.
+/// `loader_transition` is set when its record and journal hold exactly the
+/// enter-Loader transition Swift's `flash.bind-current-loader` settles and no
+/// ArkForge lane held it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CutoverJob {
     pub job_id: String,
     pub states: Vec<String>,
     pub journal_unresolved: bool,
+    pub loader_transition: Option<LoaderTransition>,
+}
+
+/// A DAYU200 Flash Job's enter-Loader transition left awaiting a Loader
+/// binding, as Swift's `RuntimeJobEngine.loaderTransitionAwaitingBinding`
+/// and `pendingLoaderTransition` find one (a Job from before CHG-059, whose
+/// engine wrote the transition's intent itself): only Swift's
+/// `settleLoaderTransitionAfterBinding`, after `flash.bind-current-loader`
+/// binds `target_id` at `expected_binding_revision`, settles it. This Runtime
+/// does not port that settlement (F7), so carried over, the Job would keep
+/// refusing that binding.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LoaderTransition {
+    pub target_id: String,
+    pub expected_binding_revision: i64,
 }
 
 /// An agent execution: its state and the Job it owns, if any.
@@ -227,6 +248,14 @@ pub enum CutoverBlock {
     JobState { job_id: String, state: String },
     /// A Job that is not parked, whose journal is unresolved.
     UnresolvedJournal { job_id: String },
+    /// A parked Flash Job whose enter-Loader transition only Swift's
+    /// `flash.bind-current-loader` settles: settled there first, it is
+    /// carried over as the terminal Job the settlement leaves.
+    LoaderTransitionAwaitingBinding {
+        job_id: String,
+        target_id: String,
+        expected_binding_revision: i64,
+    },
     /// An agent execution that is active and not merely owned by a parked or
     /// terminal Job.
     ActiveExecution { execution_id: String, state: String },
@@ -248,7 +277,8 @@ pub fn cutover_job_class(job: &CutoverJob) -> JobStateClass {
 }
 
 /// Design §G.4's cutover preflight: every reason to refuse, sorted; empty
-/// means every Job, execution and use may be carried over as it is.
+/// means every Job, execution and use may be carried over as it is. The
+/// table's rules, and a parked Job's Loader transition only Swift settles.
 pub fn cutover_preflight(
     jobs: &[CutoverJob],
     executions: &[CutoverExecution],
@@ -276,6 +306,17 @@ pub fn cutover_preflight(
         if job.journal_unresolved && class != JobStateClass::Parked {
             blocks.push(CutoverBlock::UnresolvedJournal {
                 job_id: job.job_id.clone(),
+            });
+        }
+        // A parked Job is carried over as it is, unless only Swift's Runtime
+        // can settle the Loader transition it awaits.
+        if class == JobStateClass::Parked
+            && let Some(transition) = &job.loader_transition
+        {
+            blocks.push(CutoverBlock::LoaderTransitionAwaitingBinding {
+                job_id: job.job_id.clone(),
+                target_id: transition.target_id.clone(),
+                expected_binding_revision: transition.expected_binding_revision,
             });
         }
     }
@@ -390,6 +431,7 @@ mod tests {
             job_id: id.into(),
             states: states.iter().map(|state| (*state).into()).collect(),
             journal_unresolved,
+            loader_transition: None,
         }
     }
 
@@ -489,6 +531,67 @@ mod tests {
         assert_eq!(
             cutover_job_class(&job("job-no-sources", &[], false)),
             JobStateClass::Blocking
+        );
+    }
+
+    #[test]
+    fn a_parked_loader_transition_only_swift_settles_refuses_the_cutover() {
+        let awaiting = |id: &str, states: &[&str]| CutoverJob {
+            loader_transition: Some(LoaderTransition {
+                target_id: "target-dayu200".into(),
+                expected_binding_revision: 3,
+            }),
+            ..job(id, states, true)
+        };
+        // Parked, whichever source parks it: refused by name, with the
+        // binding that settles it on Swift's Runtime.
+        let parked = awaiting("job-loader", &["waitingForRecovery", "failed"]);
+        assert_eq!(
+            cutover_preflight(std::slice::from_ref(&parked), &[], &[]),
+            [CutoverBlock::LoaderTransitionAwaitingBinding {
+                job_id: "job-loader".into(),
+                target_id: "target-dayu200".into(),
+                expected_binding_revision: 3,
+            }]
+        );
+        // Its owning execution is still carried with the parked Job.
+        let owned = CutoverExecution {
+            execution_id: "execution-loader".into(),
+            state: "jobOwned".into(),
+            job_id: Some("job-loader".into()),
+        };
+        assert_eq!(
+            cutover_preflight(std::slice::from_ref(&parked), &[owned], &[]).len(),
+            1
+        );
+        // Another parked Job, even with an unresolved journal, is carried
+        // over as before.
+        assert!(
+            cutover_preflight(
+                &[job("job-parked", &["waitingForRecovery"], true)],
+                &[],
+                &[]
+            )
+            .is_empty()
+        );
+        // A Job that is not parked is refused by the table's rules alone.
+        assert_eq!(
+            cutover_preflight(&[awaiting("job-running", &["running"])], &[], &[]),
+            [
+                CutoverBlock::JobState {
+                    job_id: "job-running".into(),
+                    state: "running".into(),
+                },
+                CutoverBlock::UnresolvedJournal {
+                    job_id: "job-running".into(),
+                },
+            ]
+        );
+        assert_eq!(
+            cutover_preflight(&[awaiting("job-failed", &["failed"])], &[], &[]),
+            [CutoverBlock::UnresolvedJournal {
+                job_id: "job-failed".into(),
+            }]
         );
     }
 }

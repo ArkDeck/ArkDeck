@@ -263,7 +263,8 @@ mod cutover_facts;
 mod job_events;
 #[cfg(target_os = "macos")]
 pub use cutover_facts::{
-    CutoverFacts, CutoverRoots, MISSING_RECORD, UNREADABLE_RECORD, UnreadableSource, cutover_facts,
+    CutoverFacts, CutoverRoots, MISSING_RECORD, RetainedSessionsRefusal, UNREADABLE_RECORD,
+    UnreadableSource, cutover_facts, cutover_retained_sessions,
 };
 #[cfg(target_os = "macos")]
 mod job_journal;

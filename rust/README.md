@@ -2700,6 +2700,23 @@ Runtime's instance lock before the facts are read; a Runtime still holding that
 lock refuses the held pass
 ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cutover-preflight-run.md)).
 
+Two more blocks name state this Runtime would carry over and then hold stuck
+(协调会话裁定 2026-09-26,
+[run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-017/cutover-preflight-legacy-refusals-run.md)):
+`loaderTransitionAwaitingBinding`, a parked DAYU200 Flash Job no ArkForge lane
+drove whose record and journal hold exactly the enter-Loader transition Swift's
+`flash.bind-current-loader` settles (Swift `loaderTransitionAwaitingBinding` and
+`pendingLoaderTransition`; this Runtime does not port the settlement, F7), named
+with the Target and binding revision to settle it with on the old Swift Runtime
+(`arkdeck flash bind-loader`) before the preflight is run again; and
+`retainedSessions`, the first refusal of a device mutation's continuity proof of
+the retained Sessions (the default Session root and the one the storage settings
+select), in that proof's own code and words. The proof is
+`JobStore::require_retained_sessions`'s scan, run without opening the Job store
+as an owner (`arkdeck_hoststore::cutover_retained_sessions`): an owner would
+create and mark its lock document and create its snapshot directory in the
+state the preflight must leave as it is.
+
 `runtime service update` asks the new helper's daemon for it: Swift's daemon
 refuses the argument as unknown (exit 64) and is installed as above; the Rust
 daemon answers, and installing it is the cutover. Its plist names the Rust daemon
