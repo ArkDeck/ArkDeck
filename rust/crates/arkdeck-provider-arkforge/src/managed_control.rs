@@ -11,10 +11,12 @@
 //! daemon rejects it.
 
 use crate::flash_lane::canonical_facts_digest;
-use arkforge_ipc::messages::{
-    FORBIDDEN_CONTROL_RECEIPT_FACTS, KeyValue, ManagedControlAction,
-    SubmitManagedControlReceiptRequest,
-};
+use arkforge_ipc::messages::{FORBIDDEN_CONTROL_RECEIPT_FACTS, SubmitManagedControlReceiptRequest};
+/// ArkForge's own messages for what a managed control is asked, re-exported
+/// for the performer that answers it (`flash_session::ControlPerformer`),
+/// which lives with the Rockchip host outside this crate. Only this crate
+/// depends on ArkForge.
+pub use arkforge_ipc::messages::{KeyValue, ManagedControlAction, ManagedControlRequest};
 use std::collections::BTreeMap;
 
 /// Swift `providerActions(for:)`: the provider actions each semantic action

@@ -391,6 +391,10 @@ mod rockchip_dispatcher;
 #[cfg(target_os = "macos")]
 pub use rockchip_dispatcher::NativeRockchipDispatcher;
 #[cfg(target_os = "macos")]
+mod control_performer;
+#[cfg(target_os = "macos")]
+pub use control_performer::{ArkForgeControlPerformer, ControlBinding};
+#[cfg(target_os = "macos")]
 mod rockchip_reactivation;
 #[cfg(target_os = "macos")]
 pub use rockchip_reactivation::{ReactivationProof, ReactivationProofSource};
