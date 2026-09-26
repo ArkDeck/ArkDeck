@@ -9,13 +9,15 @@ publish.workspace = true
 [dependencies]
 arkdeck-contract.workspace = true
 arkdeck-platform.workspace = true
+# ArkForge's authority API, whose StepPermit this authority signs.
+arkforge-authority-api.workspace = true
 arkforge-client.workspace = true
+# The typed identifiers and digests a StepPermit is made of.
+arkforge-core.workspace = true
 # The messages `arkforge-client`'s controller surface takes and returns.
 arkforge-ipc.workspace = true
 
 [dev-dependencies]
-arkforge-authority-api.workspace = true
-arkforge-core.workspace = true
 serde_json.workspace = true
 
 # The lane launches this test binary as its stand-in `arkforged`, which must
