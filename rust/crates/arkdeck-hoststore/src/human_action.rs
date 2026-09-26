@@ -324,16 +324,7 @@ impl HumanActionResources {
                     Ok(rows.into_iter().map(|row| row.value).collect())
                 },
             )
-            .map_err(|error| {
-                // The pager's refusals are the owner's own in Swift.
-                if error.code == "invalidCursor" {
-                    refused(
-                        "invalidCursor",
-                        "cursor is invalid, belongs to another query or its snapshot was reclaimed",
-                    )
-                } else {
-                    owned(error)
-                }
-            })
+            // The pager's refusals are the owner's own in Swift.
+            .map_err(owned)
     }
 }

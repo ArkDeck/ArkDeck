@@ -2302,17 +2302,9 @@ impl AgentExecutionStore {
                     Ok(rows.into_iter().map(|(_, _, value)| value).collect())
                 },
             )
-            .map_err(|error| {
-                // The pager's refusals are the owner's own in Swift, with
-                // the owner's zero-dispatch proof.
-                let message = if error.code == "invalidCursor" {
-                    "cursor is invalid, belongs to another query or its snapshot was reclaimed"
-                        .to_owned()
-                } else {
-                    error.message
-                };
-                failure(&error.code, message)
-            })
+            // The pager's refusals are the owner's own in Swift, with the
+            // owner's zero-dispatch proof.
+            .map_err(|error| failure(&error.code, error.message))
     }
 
     /// Swift `humanActionResourceRows`: every physical-assistance action of

@@ -129,7 +129,7 @@ fn whole_list(store: &JobStore, params: &Map<String, Value>) -> Result<Value, Wi
             filters[key] = value.clone();
         }
     }
-    let (size, cursor) = pagination(params)?;
+    let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
     SnapshotPager::open(&store.path.join("cli-job-snapshots"))
         .map_err(unreadable)?
         .page_filtered("job.list", &filters, order, size, cursor, || {
@@ -173,6 +173,7 @@ fn whole_list(store: &JobStore, params: &Map<String, Value>) -> Result<Value, Wi
             });
             Ok(rows.into_iter().map(|(_, _, value)| value).collect())
         })
+        .map_err(pager_refusal)
 }
 
 /// Every page of one list, from its first page through its cursors, each
@@ -356,4 +357,75 @@ fn a_new_job_list_holds_each_row_encoded_and_not_as_a_value() {
         rows < 2 * encoded,
         "600 more Jobs made a first page hold {rows} more bytes for {encoded} more stored"
     );
+}
+
+/// The error Swift's Job read handler answered in the ControlFrames corpus,
+/// at `line` of `method`'s recording.
+fn recorded_error(method: &str, line: usize) -> Value {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+    ));
+    let text = std::fs::read_to_string(path).unwrap();
+    let frame: Value = serde_json::from_str(text.lines().nth(line - 1).unwrap()).unwrap();
+    frame["error"].clone()
+}
+
+fn answered_error(result: Result<Value, WireError>) -> Value {
+    let error = result.unwrap_err();
+    json!({"code": error.code, "message": error.message, "details": error.details})
+}
+
+/// A cursor the Job reads refuse is refused in Swift's words and with its
+/// handler's pre-admission proof: a cursor that is not a bounded string
+/// (`RuntimeJobListQuery`), one not shaped as the pager's token, one of
+/// another query, and a page size out of range.
+#[test]
+fn the_job_reads_refuse_a_cursor_as_swifts_handler_does() {
+    let root = Root::new();
+    drop(JobStore::open(&root.0).unwrap());
+    for index in 0..3_i64 {
+        root.seed(
+            &format!("job-{index}"),
+            "succeeded",
+            "2026-08-31T12:00:00Z",
+            index + 1,
+            "TGT-a",
+        );
+    }
+    let store = JobStore::open(&root.0).unwrap();
+    let list = |params: Value| store.handle_resource("job.list", params.as_object().unwrap());
+    let cursor = list(json!({"pageSize": 1})).unwrap()["nextCursor"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (params, method, line) in [
+        (json!({"cursor": ""}), "job.list", 3),
+        (json!({"pageSize": 0}), "job.list", 13),
+        (json!({"cursor": "not-a-snapshot-token"}), "job.list", 54),
+        // The same cursor for another query of the list.
+        (json!({"cursor": cursor, "state": "failed"}), "job.list", 27),
+    ] {
+        assert_eq!(
+            answered_error(list(params.clone())),
+            recorded_error(method, line),
+            "{params}"
+        );
+    }
+    let timeline =
+        |params: Value| store.handle_resource("job.timeline", params.as_object().unwrap());
+    for (params, line) in [
+        (json!({"jobId": "job-0", "cursor": ""}), 12),
+        (
+            json!({"jobId": "job-0", "cursor": "not-a-snapshot-token"}),
+            13,
+        ),
+        // A list's cursor is another query's.
+        (json!({"jobId": "job-0", "cursor": cursor}), 9),
+    ] {
+        assert_eq!(
+            answered_error(timeline(params.clone())),
+            recorded_error("job.timeline", line),
+            "{params}"
+        );
+    }
 }

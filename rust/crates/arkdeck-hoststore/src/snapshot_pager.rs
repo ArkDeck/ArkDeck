@@ -45,10 +45,12 @@ fn unreadable(_: impl std::fmt::Debug) -> WireError {
         "Session snapshot storage is unreadable or unsafe",
     )
 }
+/// Swift `RuntimeSnapshotPager.invalidCursor()`: one sentence for a cursor of
+/// the wrong shape, of another query, or of a reclaimed snapshot.
 fn invalid_cursor() -> WireError {
     failure(
         "invalidCursor",
-        "Cursor is invalid, belongs to another query, or its snapshot was reclaimed",
+        "cursor is invalid, belongs to another query or its snapshot was reclaimed",
     )
 }
 /// A failed read of a stored snapshot: one no longer present was reclaimed.
@@ -128,7 +130,7 @@ impl Draft {
         if size + 2 > MAX_PAGE {
             return Err(failure(
                 "inputTooLarge",
-                "Resource projection exceeds its page bound",
+                "resource projection exceeds its page bound",
             ));
         }
         if self.current == self.page_size || self.bytes + size > MAX_PAGE {
@@ -141,7 +143,7 @@ impl Draft {
         if self.total > MAX_SNAPSHOT {
             return Err(failure(
                 "operationUnavailable",
-                "Snapshot exceeds its storage bound",
+                "snapshot exceeds its storage bound",
             ));
         }
         let separator: &[u8] = match (self.pages, self.current) {
@@ -357,7 +359,7 @@ impl SnapshotPager {
         if document.len() > MAX_SNAPSHOT {
             return Err(failure(
                 "operationUnavailable",
-                "Snapshot exceeds its encoded storage bound",
+                "snapshot exceeds its encoded storage bound",
             ));
         }
         self.retain_space(document.len())?;
@@ -768,6 +770,57 @@ mod tests {
             )
             .unwrap()
     }
+    /// A cursor of another query, and one naming a reclaimed snapshot, are
+    /// refused as Swift's `RuntimeSnapshotPager` refuses them: Swift's
+    /// recorded `session.list` answer, whose handler passes the pager's
+    /// refusal through (ControlFrames `session.list.jsonl`, line 1).
+    #[test]
+    fn a_foreign_or_reclaimed_cursor_is_refused_in_swifts_words() {
+        let recorded: Value = {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+                "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/session.list.jsonl",
+            );
+            let text = fs::read_to_string(path).unwrap();
+            serde_json::from_str::<Value>(text.lines().next().unwrap()).unwrap()["error"].clone()
+        };
+        let answered = |error: WireError| json!({"code": error.code, "message": error.message, "details": error.details});
+        let root = Root::new();
+        let cursor = first(&root.pager())["nextCursor"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let pager = root.pager();
+        let foreign = pager
+            .page(
+                "session.list",
+                "startedAtDescSessionIdAsc",
+                1,
+                Some(&cursor),
+                || panic!("a refused cursor never rescans"),
+            )
+            .unwrap_err();
+        assert_eq!(answered(foreign), recorded);
+        for entry in fs::read_dir(&root.0).unwrap() {
+            let path = entry.unwrap().path();
+            if path
+                .extension()
+                .is_some_and(|extension| extension == "json")
+            {
+                fs::remove_file(path).unwrap();
+            }
+        }
+        let reclaimed = pager
+            .page(
+                "session.list",
+                "completedAtDescSessionIdAsc",
+                1,
+                Some(&cursor),
+                || panic!("a refused cursor never rescans"),
+            )
+            .unwrap_err();
+        assert_eq!(answered(reclaimed), recorded);
+    }
+
     #[test]
     fn cursor_survives_restart_without_rebuilding_inventory() {
         let root = Root::new();

@@ -1053,74 +1053,20 @@ impl<H: HostServices> Control<H> {
                     );
                 }
             }
-            "runtime.tool.list" => {
-                let size = match params.get("pageSize") {
-                    None => Some(100),
-                    Some(value) => value.as_i64(),
-                };
-                let cursor = params.get("cursor");
-                let valid = params
-                    .keys()
-                    .all(|key| matches!(key.as_str(), "pageSize" | "cursor"))
-                    && size.is_some()
-                    && cursor.is_none_or(Value::is_string);
-                if !valid {
-                    Response {
-                        id: request.id.clone(),
-                        outcome: Err(WireError {
-                            code: "invalidParams".into(),
-                            message: "tool list accepts only integer pageSize and string cursor"
-                                .into(),
-                            details: Some(serde_json::Map::from_iter([
-                                ("phase".into(), json!("bootstrapRegistryOwner")),
-                                ("newDispatchCount".into(), json!(0)),
-                            ])),
-                        }),
-                    }
-                } else {
-                    Response {
-                        id: request.id.clone(),
-                        outcome: self.host.bootstrap_tool_list(
-                            usize::try_from(size.expect("checked integer")).unwrap_or(0),
-                            cursor.and_then(Value::as_str),
-                        ),
-                    }
-                }
-            }
-            "runtime.bundle.list" => {
-                let size = match params.get("pageSize") {
-                    None => Some(100),
-                    Some(value) => value.as_i64(),
-                };
-                let cursor = params.get("cursor");
-                let valid = params
-                    .keys()
-                    .all(|key| matches!(key.as_str(), "pageSize" | "cursor"))
-                    && size.is_some()
-                    && cursor.is_none_or(Value::is_string);
-                if !valid {
-                    Response {
-                        id: request.id.clone(),
-                        outcome: Err(WireError {
-                            code: "invalidParams".into(),
-                            message: "bundle list accepts only integer pageSize and string cursor"
-                                .into(),
-                            details: Some(serde_json::Map::from_iter([
-                                ("phase".into(), json!("bootstrapRegistryOwner")),
-                                ("newDispatchCount".into(), json!(0)),
-                            ])),
-                        }),
-                    }
-                } else {
-                    Response {
-                        id: request.id.clone(),
-                        outcome: self.host.bootstrap_bundle_list(
-                            usize::try_from(size.expect("checked integer")).unwrap_or(0),
-                            cursor.and_then(Value::as_str),
-                        ),
-                    }
-                }
-            }
+            "runtime.tool.list" => Response {
+                id: request.id.clone(),
+                outcome: registry_list_params(&params, "tool").and_then(|(size, cursor)| {
+                    self.host
+                        .bootstrap_tool_list(usize::try_from(size).unwrap_or(0), cursor)
+                }),
+            },
+            "runtime.bundle.list" => Response {
+                id: request.id.clone(),
+                outcome: registry_list_params(&params, "bundle").and_then(|(size, cursor)| {
+                    self.host
+                        .bootstrap_bundle_list(usize::try_from(size).unwrap_or(0), cursor)
+                }),
+            },
             "runtime.bundle.remove" => {
                 let reference = params.get("bundle").and_then(Value::as_str);
                 let generation = params.get("expectedGeneration").and_then(Value::as_str);
@@ -2188,4 +2134,42 @@ fn foundation_integer(value: &Value) -> Option<i64> {
             })
             .map(|float| float as i64)
     })
+}
+
+/// Swift's `bootstrapToolListRequest` / `bootstrapBundleListRequest` argument
+/// checks, in their order and words: only `pageSize` and `cursor`, an integer
+/// page size (100 when absent), and a string cursor; each refusal is the
+/// registry owner's, with zero dispatch.
+fn registry_list_params<'a>(
+    params: &'a serde_json::Map<String, Value>,
+    noun: &str,
+) -> Result<(i64, Option<&'a str>), WireError> {
+    let refused = |message: String| WireError {
+        code: "invalidParams".into(),
+        message,
+        details: Some(serde_json::Map::from_iter([
+            ("phase".into(), json!("bootstrapRegistryOwner")),
+            ("newDispatchCount".into(), json!(0)),
+        ])),
+    };
+    if !params
+        .keys()
+        .all(|key| matches!(key.as_str(), "pageSize" | "cursor"))
+    {
+        return Err(refused(format!(
+            "{noun} list accepts only pageSize and cursor"
+        )));
+    }
+    let size = match params.get("pageSize") {
+        None => 100,
+        Some(value) => value
+            .as_i64()
+            .ok_or_else(|| refused("pageSize must be an integer".into()))?,
+    };
+    let cursor = match params.get("cursor") {
+        None => None,
+        Some(Value::String(cursor)) => Some(cursor.as_str()),
+        Some(_) => return Err(refused("cursor must be a string".into())),
+    };
+    Ok((size, cursor))
 }

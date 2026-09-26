@@ -358,18 +358,9 @@ impl ControlActionResources {
                 request.cursor,
                 || Ok(values),
             )
-            .map_err(|error| {
-                // The pager's refusals are the owner's own in Swift, with the
-                // handler's zero-dispatch proof.
-                if error.code == "invalidCursor" {
-                    refused(
-                        "invalidCursor",
-                        "cursor is invalid, belongs to another query or its snapshot was reclaimed",
-                    )
-                } else {
-                    refused(&error.code, error.message)
-                }
-            })
+            // The pager's refusals are the owner's own in Swift, with the
+            // handler's zero-dispatch proof.
+            .map_err(|error| refused(&error.code, error.message))
     }
 }
 

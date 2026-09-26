@@ -909,15 +909,29 @@ fn bundle_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
         assert_eq!(reply["error"]["code"], "unknownMethod");
         return;
     }
-    for params in [
-        json!({"pageSize":null}),
-        json!({"pageSize":1.5}),
-        json!({"cursor":1}),
-        json!({"path":"/private/tmp/forbidden"}),
+    // Swift's words, in its order (AgentDaemon.swift:2874-2893).
+    for (params, message) in [
+        (json!({"pageSize":null}), "pageSize must be an integer"),
+        (json!({"pageSize":1.5}), "pageSize must be an integer"),
+        (
+            json!({"pageSize":1.5, "cursor":1}),
+            "pageSize must be an integer",
+        ),
+        (json!({"cursor":1}), "cursor must be a string"),
+        (
+            json!({"path":"/private/tmp/forbidden", "cursor":1}),
+            "bundle list accepts only pageSize and cursor",
+        ),
     ] {
-        let error = call(&control, method, params).outcome.unwrap_err();
-        assert_eq!(error.code, "invalidParams");
-        assert_eq!(error.details.unwrap()["newDispatchCount"], 0);
+        let error = call(&control, method, params.clone()).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams", "{params}");
+        assert_eq!(error.message, message, "{params}");
+        assert_eq!(
+            error.details.unwrap(),
+            *json!({"phase":"bootstrapRegistryOwner","newDispatchCount":0})
+                .as_object()
+                .unwrap()
+        );
     }
     for params in [
         json!({}),
@@ -1003,15 +1017,29 @@ fn tool_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
         assert_eq!(reply["error"]["code"], "unknownMethod");
         return;
     }
-    for params in [
-        json!({"pageSize":null}),
-        json!({"pageSize":1.5}),
-        json!({"cursor":1}),
-        json!({"path":"/private/tmp/forbidden"}),
+    // Swift's words, in its order (AgentDaemon.swift:2829-2848).
+    for (params, message) in [
+        (json!({"pageSize":null}), "pageSize must be an integer"),
+        (json!({"pageSize":1.5}), "pageSize must be an integer"),
+        (
+            json!({"pageSize":1.5, "cursor":1}),
+            "pageSize must be an integer",
+        ),
+        (json!({"cursor":1}), "cursor must be a string"),
+        (
+            json!({"path":"/private/tmp/forbidden", "cursor":1}),
+            "tool list accepts only pageSize and cursor",
+        ),
     ] {
-        let error = call(&control, method, params).outcome.unwrap_err();
-        assert_eq!(error.code, "invalidParams");
-        assert_eq!(error.details.unwrap()["newDispatchCount"], 0);
+        let error = call(&control, method, params.clone()).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams", "{params}");
+        assert_eq!(error.message, message, "{params}");
+        assert_eq!(
+            error.details.unwrap(),
+            *json!({"phase":"bootstrapRegistryOwner","newDispatchCount":0})
+                .as_object()
+                .unwrap()
+        );
     }
     for params in [
         json!({}),

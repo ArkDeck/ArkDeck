@@ -650,7 +650,7 @@ impl JobStore {
                 if let Some(value) = paging.remove("afterCursor") {
                     paging.insert("cursor".into(), value);
                 }
-                let (size, cursor) = pagination(&paging)?;
+                let (size, cursor) = pagination(&paging, "The Job cursor is malformed")?;
                 crate::job_events::page(
                     &self.path.join("jobs").join(id),
                     id,
@@ -668,7 +668,7 @@ impl JobStore {
                 shown
             }
             "job.timeline" => {
-                let (size, cursor) = pagination(params)?;
+                let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
                 SnapshotPager::open(&self.path.join("cli-job-snapshots"))
                     .map_err(unreadable)?
                     .page_filtered(
@@ -678,7 +678,8 @@ impl JobStore {
                         size,
                         cursor,
                         || Ok(record.timeline_rows()),
-                    )?
+                    )
+                    .map_err(pager_refusal)?
             }
             _ => return Err(failure("unknownMethod", "Not a Job read resource method")),
         };
@@ -737,7 +738,7 @@ impl JobStore {
                 filters[key] = value.clone();
             }
         }
-        let (size, cursor) = pagination(params)?;
+        let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
         let indexes = self.epoch_indexes();
         // The repository hands the rows over in the list's order, creation
         // time and then identity, so each history row goes to the snapshot as
@@ -789,19 +790,60 @@ impl JobStore {
                     .map_err(unreadable)?;
                 refused.map_or(Ok(()), |(_, _, error)| Err(error))
             })
+            .map_err(pager_refusal)
     }
 }
-fn pagination(params: &Map<String, Value>) -> Result<(usize, Option<&str>), WireError> {
+/// Swift's Job read handler: a refusal of the request itself
+/// (`AgentExecutionControlFailure`) is pre-admission, with zero dispatch.
+fn pre_admission(mut error: WireError) -> WireError {
+    let details = error.details.get_or_insert_with(Map::new);
+    details.insert("phase".into(), json!("preAdmission"));
+    details.insert("newDispatchCount".into(), json!(0));
+    error
+}
+
+/// A refusal of the shared snapshot pager (the ones it stamps as its own) as
+/// the Job read handler answers it; the rows' own refusals pass unchanged.
+fn pager_refusal(error: WireError) -> WireError {
+    let stamped = error
+        .details
+        .as_ref()
+        .is_some_and(|details| details.get("phase") == Some(&json!("sessionOwner")));
+    if stamped {
+        pre_admission(WireError {
+            details: None,
+            ..error
+        })
+    } else {
+        error
+    }
+}
+
+/// The page size and cursor of a Job read, refused as Swift's handler refuses
+/// them; `malformed` is the words for a cursor that is not a bounded string
+/// (Swift `RuntimeJobListQuery`'s for the list and the timeline).
+fn pagination<'a>(
+    params: &'a Map<String, Value>,
+    malformed: &str,
+) -> Result<(usize, Option<&'a str>), WireError> {
     let size = params
         .get("pageSize")
         .map_or(Some(100), Value::as_u64)
         .filter(|n| (1..=1000).contains(n))
-        .ok_or_else(|| failure("invalidInput", "pageSize must be between 1 and 1000"))?
-        as usize;
+        .ok_or_else(|| {
+            pre_admission(failure(
+                "invalidInput",
+                "pageSize must be between 1 and 1000",
+            ))
+        })? as usize;
     let cursor = match params.get("cursor") {
         None => None,
         Some(Value::String(s)) if !s.is_empty() && s.len() <= 2048 => Some(s.as_str()),
-        _ => return Err(failure("invalidCursor", "The Job cursor is malformed")),
+        _ => return Err(pre_admission(failure("invalidCursor", malformed))),
     };
     Ok((size, cursor))
 }
+
+/// Swift `RuntimeJobListQuery`'s words for a cursor that is not a bounded
+/// string, on `job.list` and `job.timeline`.
+const MALFORMED_SNAPSHOT_CURSOR: &str = "cursor must be a bounded snapshot token";
