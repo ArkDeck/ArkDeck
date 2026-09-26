@@ -7,8 +7,10 @@
 //! as `arkforged` reports its own), answers `discoverDevices` with nothing,
 //! and ends on its stdin's end — the owner's liveness — with status 11.
 //!
-//! Three more stand-ins play the owner's stop (`stop_order`): they catch TERM
-//! rather than die of it, and record in `events` what reached them and when.
+//! Every stand-in starts with SIGINT and SIGTERM ignored, as the lane launches
+//! it and as Swift's daemon starts `arkforged`. Three more play the owner's
+//! stop (`stop_order`): they catch TERM, and record in `events` what reached
+//! them and when.
 //!
 //! No daemon, board or USB host is involved; nothing here is device evidence.
 //! A custom harness (`harness = false`), because the daemon role must run
@@ -59,8 +61,8 @@ mod lane {
             .find_map(|line| line.strip_prefix("# fake-arkforged: "))
             .unwrap_or("ready")
             .to_owned();
-        // Caught from the start, so that TERM never ends a stop-order
-        // stand-in by itself; every other one keeps TERM's default.
+        // Caught from the start, so that a stop-order stand-in notes TERM;
+        // every other one keeps the ignore its launch gave it.
         let stop = STOP_ORDER
             .contains(&mode.as_str())
             .then(|| arkdeck_platform::StopSignal::install().unwrap());
@@ -451,13 +453,11 @@ mod lane {
             DeviceAccessObserver::new(&scene.runtime).observe(),
             Ok(Vec::new())
         );
+        // Its end of input ends it: TERM, right after, does nothing to a
+        // daemon that starts with TERM ignored, as Swift's `arkforged` does.
         let stopped = lane.stop().expect("the lane owned a daemon");
-        assert!(
-            scene.runtime.join("eof").exists()
-                || stopped.exit == arkdeck_platform::ServerExit::Signalled(15),
-            "{:?}",
-            stopped.exit
-        );
+        assert_eq!(stopped.exit, arkdeck_platform::ServerExit::Exited(11));
+        assert!(scene.runtime.join("eof").exists());
         assert!(!scene.serving("controller.sock"));
         assert!(scene.ended());
         assert!(lane.stop().is_none(), "one generation stops once");
@@ -480,12 +480,11 @@ mod lane {
             "arkforged is not ready to execute: NO_DISPATCHER. Nothing was dispatched — this \
              is a standing fact about the daemon, not a fault of this job"
         );
-        // The refusal returns only once the generation has ended. Whether the
-        // stand-in read its end of input before TERM reached it is a race
-        // Swift's stop leaves open too, as the stop sends TERM right after
-        // closing the input; the platform's paired-launch test proves the
-        // input is closed first.
+        // The refusal returns only once the generation has ended, at its end
+        // of input: TERM does nothing to a daemon that starts with TERM
+        // ignored, as Swift's `arkforged` does.
         assert!(scene.ended(), "the generation was stopped");
+        assert!(scene.runtime.join("eof").exists());
         assert!(!scene.serving("public.sock"));
 
         let scene = Scene::new("org.openharmony.dayu200", "replay");

@@ -9,7 +9,9 @@
 //! bundle: launched with `--pair-from-stdin` it plays the daemon, reads the
 //! 32-byte pairing secret, serves a ready controller and public session in
 //! its runtime directory with ArkForge's own codec, and ends at its end of
-//! input with status 11, as `arkforged` does; TERM keeps its default. The
+//! input with status 11, as `arkforged` does. It starts with SIGINT and
+//! SIGTERM ignored, as the lane launches it and as Swift's daemon starts
+//! `arkforged`, so TERM does nothing to it. The
 //! HDC is the fake the managed-server tests compile from C. No device,
 //! installed state or Swift daemon is used; nothing here is device evidence.
 //! A custom harness (`harness = false`): the daemon role must run before any
@@ -447,11 +449,8 @@ mod owner {
         let (server, _) = named(lines[hdc], HDC);
         let (pid, end) = named(lines[arkforged], ARKFORGED);
         assert_eq!(pid, scene.arkforged(), "{stderr}");
-        // At its end of input, or at the TERM right after it.
-        assert!(
-            matches!(end.as_str(), "exited with status 11" | "ended on signal 15"),
-            "{stderr}"
-        );
+        // At its end of input: the TERM right after it does nothing.
+        assert_eq!(end, "exited with status 11", "{stderr}");
         for (name, pid) in [("the managed server", server), ("arkforged", pid)] {
             assert!(
                 arkdeck_platform::process_argument_record(pid).is_none(),
@@ -496,12 +495,9 @@ mod owner {
         for line in &stops {
             println!("  {line}");
         }
-        assert!(
-            matches!(
-                stops.as_slice(),
-                ["arkdeck-agentd: stopped arkforged (Exited(11))"]
-                    | ["arkdeck-agentd: stopped arkforged (Signalled(15))"]
-            ),
+        assert_eq!(
+            stops,
+            ["arkdeck-agentd: stopped arkforged (Exited(11))"],
             "{stderr}"
         );
         assert!(
