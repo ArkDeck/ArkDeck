@@ -72,6 +72,22 @@ facts, `job_publication` byte for byte, `device_reconcile`, `crash_window`, `job
 Before, doubling the Journal took four to six times as long; after, twice as long. What remains
 is decoding and checking each record once, about 52 µs a record in a debug build.
 
+**Again, in the hub's quiet window.** The hub's quiet window, 2026-09-26 08:44–09:04: no build ran on the host. The hub measured the
+1-minute load every 15 s: a median of 2.07 with every session's builds stopped, and a median of
+2.66 (max 3.35) during these measurements. This session sampled it every second
+(`window-load.log`): between 1.96 and 3.42. It ran a prebuilt debug binary, the
+`arkdeck-hoststore` library tests as built on `eec3df485` with the cleanup slice's change, which
+touches none of the measured paths, measuring only
+(`window-measure.log`). The same test, five samples each, at a 1-minute
+load of 1.96 to 1.97:
+
+| What | Median | Max |
+| --- | --- | --- |
+| Replay of 2,513 records | 119 ms | 134 ms |
+| Replay of 5,013 records | 241 ms | 248 ms |
+| Replay of 10,013 records | 490 ms | 490 ms |
+| Proof over one retained 10,013-record Session | 513 ms | 516 ms |
+
 The proof still reads and replays every retained Session each time. The next slice caches each
 Session's verdict in memory. It is keyed by its files' device, inode, size, and nanosecond
 modification and change times, and any difference means a full scan, as the hub ruled.

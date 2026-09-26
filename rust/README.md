@@ -200,10 +200,15 @@ are preserved for inspection. A storage request waits for the storage lock
 catalog lock, as Swift's `RuntimeSessionStorageStore` and
 `SessionRetentionCatalog` do: one made while a Session publication or another
 request holds either is answered once it is released. So do the Session
-resources and export below; only Session cleanup still tries the storage lock
-and refuses a held one (`resourceConflict`). `storage_lock_wait_oracle` replays
-Swift's answers. Artifact publication and installed activation are still
-pending migration.
+resources, export and cleanup below. A cleanup takes the Job owner's activity
+guard, for its census of active Sessions, only under the storage lock, which it
+waits for first (`SessionStore::preview_cleanup` with an `ActiveSessions`):
+nothing that holds that guard waits for the storage lock, so the two never wait
+for each other (`session_owner::cleanup::lock_order_tests`). Swift takes its
+census as a snapshot before the storage lock; this Runtime keeps the guard
+through the removal, so no Job becomes active between the census and it.
+`storage_lock_wait_oracle` replays Swift's answers. Artifact publication and
+installed activation are still pending migration.
 
 Run `python3 rust/scripts/check-session-owner.py` after building the binaries for
 actual socket/CLI, nonempty Session census, restart/CAS, requests made while the

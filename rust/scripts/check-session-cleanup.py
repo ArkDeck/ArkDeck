@@ -17,6 +17,7 @@ import sqlite3
 import struct
 import subprocess
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -173,11 +174,19 @@ def main():
             child.kill();child.wait(timeout=10);child=start()
             assert record.read_bytes()==stored
             assert result('session.cleanup.preview',{})['sessions']==preview['sessions']
+            # Swift's cleanup waits for the storage lock: a preview made while
+            # it is held is answered once it is released, never refused.
+            answers=[]
+            waiting=threading.Thread(target=lambda:answers.append(exchange('session.cleanup.preview',{})))
             descriptor=os.open(root/'session-state/.session-storage.lock',os.O_RDWR)
             try:
                 fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                refused('session.cleanup.preview',{},'resourceConflict')
+                waiting.start()
+                waiting.join(.5)
+                assert waiting.is_alive() and not answers,answers
             finally:os.close(descriptor)
+            waiting.join(10)
+            assert not waiting.is_alive() and len(answers)==1 and answers[0]['ok'],answers
             refused('session.cleanup.preview',{'sessionId':'unexpected'},'invalidParams')
             tuple_params={'previewId':preview['previewId'],'previewDigest':preview['previewDigest']}
             refused('session.cleanup.apply',dict(tuple_params,previewDigest='f'*64),'resourceConflict')

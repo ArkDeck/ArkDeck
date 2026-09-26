@@ -159,4 +159,9 @@ already answered, and no ControlFrames frame holds either.
 
 ## CI
 
-Pending.
+#2242, head `87246bc5a`, run 36203549851: every selected lane passed.
+- Rust workspace: macOS 13m17s, Ubuntu 1m54s, Windows 4m41s. Host-independent checks: 41s.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `9428277e3`. Recorded by the next slice (TASK-XPA-014, the cleanup's storage lock),
+as AGENTS.md has it.
