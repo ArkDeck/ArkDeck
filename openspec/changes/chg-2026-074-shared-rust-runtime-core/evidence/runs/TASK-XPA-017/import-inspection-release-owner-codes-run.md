@@ -146,6 +146,38 @@ compiled schema admits.
 | agentd | `import_tests::inspection_and_release_refusals_reach_the_local_client_as_swifts_daemon_answers_them` | the production Host answers the three missing-Import refusals to the local client as Swift's frames, deciding by the compiled schema: check-contracts' published view expects the old `internalError` |
 | CLI | `import_resources::inspection_and_release_refusals_reach_the_caller_with_the_import_owners_code` | this CLI's binary, against a fake Runtime answering the four Swift frames, answers the owner's code, words and exit status wherever the compiled schema publishes the code |
 
+### check-contracts' published view
+
+That view compiles this checkout's `rust/` with the merge base's contract
+inputs, whose corpus predates the four appended frames. The first head,
+`c9e338c4f`, required them in the hoststore owner's two tests, which read
+the corpus through `include_str!`. So those tests failed in that view only
+(Swift CI run 36210880468, `Rust workspace (macos-26)`, step `Published
+consumer and candidate contract parity`). The checkout and candidate views
+passed them, and every other new test passed in all three runs.
+
+The two tests now resolve an appended frame through `appended_refusal`, and
+what they require depends on whether the view's corpus holds the frame, not
+on which view runs:
+
+- Where the view's corpus holds the frame, the owner's answer must be that
+  frame, byte for byte, and the frame must be the answer the test writes
+  down.
+- Where it does not, the view must be the published one (`CONTRACT_INPUTS`
+  of kind `development` naming a `commit`, as agentd's `published_view()`),
+  and the owner is held to the same written answer without its witness.
+
+Two local runs check both branches, with the two corpora put back to
+`main`'s and restored from `HEAD` afterwards:
+
+- Without a `commit` in the baseline (the checkout view with the frames
+  missing), both tests fail with "no Swift frame of … answers …".
+- With the baseline naming the merge base as its `commit` (the published
+  view), all four tests of the module pass.
+
+The agentd, CLI and control tests already decided by the compiled schema or
+by the view's corpus, and passed in the published view.
+
 ## Which tests enumerate these corpora
 
 Appending lines to a corpus that a test replays line by line can change that
@@ -207,6 +239,9 @@ frames and the structure.
 | Rust | `cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore -p arkdeck-control -p arkdeck-contract -p arkdeck-agentd -p arkdeck-cli -p arkdeck-soak` | exit 0; 1356 passed, 0 failed, 18 ignored (ignored before this change) |
 | Mutations | `scratchpad/contract/mutations.sh`, three mutations, each restored from `HEAD` and checked equal: (1) the two schemas as `main`'s; (2) the two corpora as `main`'s; (3) the inspection's scan refusals without the owner's evidence | each caught: (1) control (`internalError` "the result does not conform to the current contract"), agentd and CLI (only the published view may predate the code); (2) hoststore's two tests and agentd (no Swift frame), control (a code published with no witness), CLI (the frame is not in the corpus); (3) the hoststore bound test (`details` null) |
 | Records | `sh scripts/check-sdd.sh` (validation venv) | exit 0; 0 errors, 0 warnings |
+| The published view, locally | the two corpora as `main`'s; the hoststore module `refusal_oracle_tests`, with the baseline unchanged and then naming the merge base as its `commit`; everything restored from `HEAD` | without the `commit`, both appended-frame tests fail; with it, 4 passed, 0 failed |
 
-**CI.** This pull request's lanes; the result is recorded outside this
+**CI.** The first head, `c9e338c4f`, failed only check-contracts' published
+view (run 36210880468, above). Otherwise, this pull request's lanes; the
+result is recorded outside this
 commit.
