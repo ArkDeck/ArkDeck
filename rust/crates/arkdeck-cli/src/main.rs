@@ -977,7 +977,7 @@ fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
         eprintln!("{warning}");
     }
     #[cfg(target_os = "macos")]
-    let answer = arkdeck_cli::signing_leaves::run(invocation.command);
+    let answer = arkdeck_cli::signing_leaves::run(invocation);
     #[cfg(not(target_os = "macos"))]
     let answer: Result<Value, CliError> = Err(CliError::new(
         "unsupportedOnPlatform",

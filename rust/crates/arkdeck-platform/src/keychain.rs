@@ -1,11 +1,12 @@
 //! Generic-password items through the Security framework's `SecItem*` C API,
 //! as Swift `LoginKeychainSigningSecretStore` keeps the OpenHarmony signing
 //! envelope (SPK-10, TASK-XPA-015): the Data Protection Keychain bound to one
-//! access group, a value-only update before an add, reads that never ask for
-//! user interaction, and a presence probe that keeps "the Keychain answered
+//! access group, a value-only update before an add, default Runtime reads that
+//! never ask for user interaction, and a presence probe that keeps "the Keychain answered
 //! that there is no such item" apart from "this process could not look".
 //!
-//! The non-interactive policy is Swift's own object: a `LocalAuthentication`
+//! Only an explicit maintenance constructor enables interactive reads.
+//! The default non-interactive policy is Swift's own object: a `LocalAuthentication`
 //! `LAContext` whose `interactionNotAllowed` is set, passed as
 //! `kSecUseAuthenticationContext`. It is created through the Objective-C
 //! runtime's C entry points, so no Swift or Objective-C code is involved; the
@@ -221,6 +222,7 @@ enum Scope {
 /// The generic-password items of one service in one Keychain scope.
 pub struct KeychainItems {
     service: Owned,
+    allows_interaction: bool,
     scope: Scope,
 }
 
@@ -238,10 +240,22 @@ impl KeychainItems {
     pub fn data_protection(service: &str, access_group: &str) -> Result<Self, KeychainError> {
         Ok(Self {
             service: cf_string(service)?,
+            allows_interaction: false,
             scope: Scope::DataProtection {
                 access_group: cf_string(access_group)?,
             },
         })
+    }
+
+    /// Explicit maintenance CLI only. Runtime readers keep the default
+    /// non-interactive policy; account/service/access-group scope is unchanged.
+    pub fn data_protection_for_maintenance(
+        service: &str,
+        access_group: &str,
+    ) -> Result<Self, KeychainError> {
+        let mut items = Self::data_protection(service, access_group)?;
+        items.allows_interaction = true;
+        Ok(items)
     }
 
     /// Items outside the Data Protection Keychain, in the default search list.
@@ -250,6 +264,7 @@ impl KeychainItems {
     pub fn outside_data_protection(service: &str) -> Result<Self, KeychainError> {
         Ok(Self {
             service: cf_string(service)?,
+            allows_interaction: false,
             scope: Scope::OutsideDataProtection,
         })
     }
@@ -281,6 +296,7 @@ impl KeychainItems {
         .ok_or(KeychainError::Refused("could not build the search list"))?;
         Ok(Self {
             service: cf_string(service)?,
+            allows_interaction: false,
             scope: Scope::File {
                 keychain,
                 search_list,
@@ -333,8 +349,9 @@ impl KeychainItems {
         }
     }
 
-    /// Swift `read(account:)` without user interaction: the item's value, or
-    /// the status that refused it.
+    /// Swift `read(account:)`: the item's value, or
+    /// the status that refused it. Runtime/default readers disallow interaction;
+    /// only the explicit maintenance constructor permits it.
     pub fn read(&self, account: &str) -> Result<Secret, KeychainError> {
         if matches!(self.scope, Scope::OutsideDataProtection) {
             return Err(KeychainError::Refused(
@@ -342,13 +359,19 @@ impl KeychainItems {
             ));
         }
         let account = cf_string(account)?;
-        let context = NonInteractiveContext::new()?;
+        let context = if self.allows_interaction {
+            None
+        } else {
+            Some(NonInteractiveContext::new()?)
+        };
         let mut query = self.identity(&account);
         // SAFETY: statics are initialised framework constants.
         unsafe {
             query.push((kSecReturnData, kCFBooleanTrue));
             query.push((kSecMatchLimit, kSecMatchLimitOne));
-            query.push((kSecUseAuthenticationContext, context.as_value()));
+            if let Some(context) = &context {
+                query.push((kSecUseAuthenticationContext, context.as_value()));
+            }
         }
         let query = dictionary(&query)?;
         let mut result = ptr::null();
@@ -410,14 +433,20 @@ impl KeychainItems {
 
     fn presence_status(&self, account: &str) -> Result<i32, KeychainError> {
         let account = cf_string(account)?;
-        let context = NonInteractiveContext::new()?;
+        let context = if self.allows_interaction {
+            None
+        } else {
+            Some(NonInteractiveContext::new()?)
+        };
         let mut query = self.identity(&account);
         // SAFETY: statics are initialised framework constants.
         unsafe {
             query.push((kSecReturnAttributes, kCFBooleanTrue));
             query.push((kSecReturnData, kCFBooleanFalse));
             query.push((kSecMatchLimit, kSecMatchLimitOne));
-            query.push((kSecUseAuthenticationContext, context.as_value()));
+            if let Some(context) = &context {
+                query.push((kSecUseAuthenticationContext, context.as_value()));
+            }
         }
         let query = dictionary(&query)?;
         let mut result = ptr::null();
@@ -734,6 +763,16 @@ pub fn trusted_daemon_fingerprint(executable: &Path) -> io::Result<String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_explicit_maintenance_allows_keychain_interaction() {
+        let runtime = super::KeychainItems::data_protection("fixture", "fixture.group").unwrap();
+        let maintenance =
+            super::KeychainItems::data_protection_for_maintenance("fixture", "fixture.group")
+                .unwrap();
+        assert!(!runtime.allows_interaction);
+        assert!(maintenance.allows_interaction);
+    }
+
     use super::NonInteractiveContext;
 
     /// Swift `testLoginKeychainReadsUseOnlyModernNonInteractiveAuthenticationContext`:

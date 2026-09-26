@@ -36,7 +36,11 @@ mod temporary_directory;
 #[cfg(unix)]
 pub use temporary_directory::foundation_temporary_directory;
 mod secret;
+#[cfg(target_os = "macos")]
+mod terminal_secret;
 pub use secret::{Secret, wipe};
+#[cfg(target_os = "macos")]
+pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;

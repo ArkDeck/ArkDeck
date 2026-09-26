@@ -36,6 +36,8 @@ mod error;
 mod file_identity;
 pub mod secret_envelope;
 pub mod signing_action;
+#[cfg(target_os = "macos")]
+pub mod signing_install;
 pub mod signing_preset;
 #[cfg(target_os = "macos")]
 pub mod signing_removal;

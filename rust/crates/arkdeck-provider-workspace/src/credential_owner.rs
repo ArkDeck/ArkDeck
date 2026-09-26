@@ -301,28 +301,7 @@ impl CredentialOwner {
         self.with_lock(|held| {
             // Intentionally do not validate/adopt the receipt: uninstall is
             // also the exit from an unreadable or interrupted installation.
-            let mut ledger = self.read_ledger(held, false)?;
-            let mut sorted = ledger.preset_owners.clone();
-            sorted.sort();
-            sorted.dedup();
-            if ledger.schema_version != LEDGER_SCHEMA
-                || !["stable", "replacing", "removing"].contains(&ledger.state.as_str())
-                || ledger.preset_owners.len() > MAX_OWNERS
-                || ledger.preset_owners != sorted
-                || !ledger
-                    .preset_owners
-                    .iter()
-                    .all(|owner| valid_identifier(owner))
-            {
-                return Err(SigningError::receipt(
-                    "signing credential mutation record is invalid",
-                ));
-            }
-            if !ledger.preset_owners.is_empty() {
-                return Err(SigningError::invalid(
-                    "signing credential is referenced by an active workspace preset",
-                ));
-            }
+            let mut ledger = self.ledger_for_mutation(held)?;
             ledger.state = "removing".into();
             self.save(held, &ledger)?;
             let result =
@@ -337,6 +316,77 @@ impl CredentialOwner {
             }
             result
         })
+    }
+
+    /// Swift `replace { store.install(...) }`: preserve a durable mutation
+    /// marker until the published receipt validates with its secret present.
+    pub fn install(
+        &self,
+        configuration: &crate::signing_install::SigningPresetConfiguration,
+        passwords: &crate::secret_envelope::SecretPair,
+        secrets: &dyn crate::signing_install::SigningSecretInstallation,
+        installed_at_utc: &str,
+    ) -> Result<CredentialResource, SigningError> {
+        self.with_lock(|held| {
+            let mut ledger = self.ledger_for_mutation(held)?;
+            ledger.state = "replacing".into();
+            self.save(held, &ledger)?;
+            let result = (|| {
+                crate::signing_install::install_preset(
+                    &self.store,
+                    &held.directory,
+                    configuration,
+                    passwords,
+                    secrets,
+                    installed_at_utc,
+                )?;
+                self.revalidate(held)?;
+                let receipt = self
+                    .store
+                    .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
+                let reference = credential_reference(&receipt)?;
+                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
+                Ok(CredentialResource {
+                    credential_ref: reference,
+                    project_ref: receipt.project_ref,
+                    preset_id: receipt.preset_id,
+                    installed_at_utc: receipt.installed_at_utc,
+                    reference_count: 0,
+                })
+            })();
+            if result.is_err() {
+                let _ = self.recover_mutation(held, &ledger);
+            }
+            result
+        })
+    }
+
+    /// Both replacement and removal validate pins without adopting a broken
+    /// receipt: explicit maintenance is also how such a receipt is repaired.
+    fn ledger_for_mutation(&self, held: &Held) -> Result<Ledger, SigningError> {
+        let ledger = self.read_ledger(held, false)?;
+        let mut sorted = ledger.preset_owners.clone();
+        sorted.sort();
+        sorted.dedup();
+        if ledger.schema_version != LEDGER_SCHEMA
+            || !["stable", "replacing", "removing"].contains(&ledger.state.as_str())
+            || ledger.preset_owners.len() > MAX_OWNERS
+            || ledger.preset_owners != sorted
+            || !ledger
+                .preset_owners
+                .iter()
+                .all(|owner| valid_identifier(owner))
+        {
+            return Err(SigningError::receipt(
+                "signing credential mutation record is invalid",
+            ));
+        }
+        if !ledger.preset_owners.is_empty() {
+            return Err(SigningError::invalid(
+                "signing credential is referenced by an active workspace preset",
+            ));
+        }
+        Ok(ledger)
     }
 
     /// Swift `owner.maintain { store.refreshDaemonKeychainIdentity() }`.
