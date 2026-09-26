@@ -19,13 +19,29 @@ pub enum StoreError {
 
 pub struct Store {
     directory: PathBuf,
+    clock: Option<std::sync::Arc<dyn Fn() -> String + Send + Sync>>,
 }
 
 impl Store {
     pub fn new(directory: impl Into<PathBuf>) -> Self {
         Self {
             directory: directory.into(),
+            clock: None,
         }
+    }
+
+    /// Production snapshots take their timestamp while the state transaction
+    /// is locked. The explicit `now` arguments remain deterministic fallback
+    /// inputs for existing record fixtures, not a long operation's wall clock.
+    pub fn with_clock(mut self, clock: impl Fn() -> String + Send + Sync + 'static) -> Self {
+        self.clock = Some(std::sync::Arc::new(clock));
+        self
+    }
+
+    fn timestamp(&self, fallback: &str) -> String {
+        self.clock
+            .as_ref()
+            .map_or_else(|| fallback.to_owned(), |clock| clock())
     }
 
     pub fn directory(&self) -> &Path {
@@ -72,7 +88,7 @@ impl Store {
             if let Some(snapshot) = read(root)? {
                 return Ok(snapshot);
             }
-            let snapshot = Snapshot::initial(now);
+            let snapshot = Snapshot::initial(&self.timestamp(now));
             save(root, &snapshot)?;
             Ok(snapshot)
         })
@@ -87,7 +103,7 @@ impl Store {
         now: &str,
     ) -> Result<Snapshot, StoreError> {
         self.transaction(|root| {
-            let current = read(root)?.unwrap_or_else(|| Snapshot::initial(now));
+            let current = read(root)?.unwrap_or_else(|| Snapshot::initial(&self.timestamp(now)));
             if current.generation != expected_generation || current.generation == u64::MAX {
                 return Err(StoreError::ResourceConflict);
             }
@@ -96,7 +112,7 @@ impl Store {
                 state,
                 active_operation_id: active_operation_id.map(|id| id.to_ascii_uppercase()),
                 cancellation_requested,
-                updated_at_utc: now.into(),
+                updated_at_utc: self.timestamp(now),
                 ..current
             };
             save(root, &next)?;
@@ -106,7 +122,8 @@ impl Store {
 
     pub fn request_cancellation(&self, now: &str) -> Result<Snapshot, StoreError> {
         self.transaction(|root| {
-            let mut current = read(root)?.unwrap_or_else(|| Snapshot::initial(now));
+            let mut current =
+                read(root)?.unwrap_or_else(|| Snapshot::initial(&self.timestamp(now)));
             if current.active_operation_id.is_none() {
                 return Ok(current);
             }
@@ -115,9 +132,53 @@ impl Store {
                 .checked_add(1)
                 .ok_or(StoreError::ResourceConflict)?;
             current.cancellation_requested = true;
-            current.updated_at_utc = now.into();
+            current.updated_at_utc = self.timestamp(now);
             save(root, &current)?;
             Ok(current)
+        })
+    }
+
+    /// Complete the held operation under the same short lock as cancellation.
+    /// In particular, cancellation cannot race a separate read/CAS gap and
+    /// turn an already observed Finder reveal into an untrue cancelled state.
+    pub(crate) fn complete_operation(
+        &self,
+        operation_id: &str,
+        minimum_generation: Option<u64>,
+        result: State,
+        now: &str,
+    ) -> Result<Option<(Snapshot, bool)>, StoreError> {
+        self.transaction(|root| {
+            let current = read(root)?.ok_or(StoreError::RecordUnreadable)?;
+            if current.active_operation_id.as_deref() != Some(operation_id) {
+                return if minimum_generation.is_none() {
+                    Ok(None)
+                } else {
+                    Err(StoreError::ResourceConflict)
+                };
+            }
+            if minimum_generation.is_some_and(|minimum| current.generation < minimum) {
+                return Err(StoreError::ResourceConflict);
+            }
+            let cancelled =
+                current.cancellation_requested && !matches!(result, State::HandedOff { .. });
+            let next = Snapshot {
+                generation: current
+                    .generation
+                    .checked_add(1)
+                    .ok_or(StoreError::ResourceConflict)?,
+                state: if cancelled {
+                    State::Cancelled {}
+                } else {
+                    result
+                },
+                active_operation_id: None,
+                cancellation_requested: false,
+                updated_at_utc: self.timestamp(now),
+                ..current
+            };
+            save(root, &next)?;
+            Ok(Some((next, cancelled)))
         })
     }
 
@@ -195,6 +256,79 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn every_persisted_timestamp_uses_the_clock_while_holding_the_state_lock() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicU64, Ordering},
+        };
+        let root = Root::new();
+        let tick = Arc::new(AtomicU64::new(1));
+        let tick_read = tick.clone();
+        let path = root.0.clone();
+        let store = Store::new(&root.0).with_clock(move || {
+            let directory = HostDirectory::open_update_store(&path).unwrap();
+            assert!(matches!(directory.lock_update_record(STATE_LOCK, false), Err(error) if error.kind() == std::io::ErrorKind::WouldBlock));
+            format!("2026-09-26T00:00:{:02}Z", tick_read.load(Ordering::SeqCst))
+        });
+        assert_eq!(
+            store.load(NOW).unwrap().updated_at_utc,
+            "2026-09-26T00:00:01Z"
+        );
+        tick.store(2, Ordering::SeqCst);
+        assert_eq!(
+            store
+                .replace(0, State::Checking {}, Some(ID.into()), false, NOW)
+                .unwrap()
+                .updated_at_utc,
+            "2026-09-26T00:00:02Z"
+        );
+        tick.store(3, Ordering::SeqCst);
+        assert_eq!(
+            store.request_cancellation(NOW).unwrap().updated_at_utc,
+            "2026-09-26T00:00:03Z"
+        );
+        tick.store(4, Ordering::SeqCst);
+        let (finished, cancelled) = store
+            .complete_operation(
+                ID,
+                Some(1),
+                State::HandedOff {
+                    url: "file:///private/tmp/fixture.dmg".into(),
+                },
+                NOW,
+            )
+            .unwrap()
+            .unwrap();
+        assert!(!cancelled);
+        assert_eq!(finished.updated_at_utc, "2026-09-26T00:00:04Z");
+        assert_eq!(store.load(NOW).unwrap(), finished);
+        tick.store(5, Ordering::SeqCst);
+        let started = store
+            .replace(
+                finished.generation,
+                State::Checking {},
+                Some(ID.into()),
+                false,
+                NOW,
+            )
+            .unwrap();
+        assert_eq!(started.updated_at_utc, "2026-09-26T00:00:05Z");
+        tick.store(6, Ordering::SeqCst);
+        let (settled, _) = store
+            .complete_operation(
+                ID,
+                None,
+                State::Failed {
+                    code: super::super::Failure::Feed,
+                },
+                NOW,
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(settled.updated_at_utc, "2026-09-26T00:00:06Z");
     }
 
     #[test]

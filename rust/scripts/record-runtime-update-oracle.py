@@ -37,6 +37,24 @@ SCENARIOS = [
     ("directoryPartial", "status", "idle", False, "directory"),
 ]
 
+# Every check is refused by state/lease/record/argv before any request; every
+# handoff is refused by consent/state/lease or an unsealed fixture artifact.
+CONSUMER_SCENARIOS = [
+    ("checkAwaitingConsent", "check", "awaitingConsent", False, None),
+    ("downloadIdle", "download", "idle", False, None),
+    ("handoffNoConsent", "handoff", "awaitingConsent", False, None),
+    ("handoffWrongConsent", "handoff", "awaitingConsent", False, "badConsent"),
+    ("handoffConsentIdle", "handoff", "idle", False, "consent"),
+    ("handoffUnsealedArtifact", "handoff", "awaitingConsent", False, "consent"),
+    ("liveCheck", "check", "checking", True, None),
+    ("liveDownload", "download", "available", True, None),
+    ("liveHandoff", "handoff", "awaitingConsent", True, "consent"),
+    ("jsonlCheck", "check", "awaitingConsent", False, "jsonl"),
+    ("jsonlDownload", "download", "idle", False, "jsonl"),
+    ("jsonlHandoff", "handoff", "idle", False, "jsonl"),
+    ("corruptCheck", "check", "idle", False, "newline"),
+]
+
 
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
@@ -98,6 +116,8 @@ def run_case(executable, rows, scenario):
             argv = ["runtime", "update", leaf, "--output", "json", "--control-request-id", "ctl-update-oracle"]
             if defect == "jsonl":
                 argv[4] = "jsonl"
+            if defect in ("consent", "badConsent"):
+                argv.extend(["--consent", "reveal-in-finder" if defect == "consent" else "not-consent"])
             environment = dict(os.environ)
             environment["CFFIXED_USER_HOME"] = str(home)
             environment.pop("ARKDECK_ENDPOINT", None)
@@ -105,7 +125,8 @@ def run_case(executable, rows, scenario):
         finally:
             if lease is not None:
                 os.close(lease)
-        document = normalize(json.loads(result.stdout), cache.as_uri(), defect == "jsonl")
+        parse_failure = defect == "jsonl" or (leaf == "handoff" and defect in (None, "badConsent"))
+        document = normalize(json.loads(result.stdout), cache.as_uri(), parse_failure)
         assert str(home) not in json.dumps(document), name
         current = None
         if record.exists():
@@ -128,18 +149,21 @@ def main():
     mode.add_argument("--swift-cli", type=Path)
     mode.add_argument("--replay-cli", type=Path)
     parser.add_argument("--out", type=Path)
+    parser.add_argument("--consumer", action="store_true", help="record only effect-free refusals of check/download/handoff")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
     fixture = root / "rust/tests/fixtures/runtime-update/states.json"
     rows = {row["name"]: row for row in json.loads(fixture.read_bytes())["cases"]}
+    scenarios = CONSUMER_SCENARIOS if args.consumer else SCENARIOS
+    output_name = "consumer-cli.json" if args.consumer else "cli.json"
     if args.replay_cli:
-        oracle = json.loads((fixture.parent / "cli.json").read_bytes())
+        oracle = json.loads((fixture.parent / output_name).read_bytes())
         assert oracle["stateFixtureSha256"] == hashlib.sha256(fixture.read_bytes()).hexdigest()
-        assert len(oracle["cases"]) == len(SCENARIOS)
-        for expected, scenario in zip(oracle["cases"], SCENARIOS):
+        assert len(oracle["cases"]) == len(scenarios)
+        for expected, scenario in zip(oracle["cases"], scenarios):
             actual = run_case(args.replay_cli, rows, scenario)
             assert actual == expected, json.dumps({"case": scenario[0], "expected": expected, "actual": actual}, ensure_ascii=False, indent=2)
-        print(f"Replayed {len(SCENARIOS)} actual Swift CLI cases")
+        print(f"Replayed {len(scenarios)} actual Swift CLI cases")
         return
     if args.out is None:
         parser.error("--out is required when recording")
@@ -147,11 +171,11 @@ def main():
         "producer": "record-runtime-update-oracle.py",
         "executableSha256": hashlib.sha256(args.swift_cli.read_bytes()).hexdigest(),
         "stateFixtureSha256": hashlib.sha256(fixture.read_bytes()).hexdigest(),
-        "cases": [run_case(args.swift_cli, rows, scenario) for scenario in SCENARIOS],
+        "cases": [run_case(args.swift_cli, rows, scenario) for scenario in scenarios],
     }
     args.out.mkdir(parents=True, exist_ok=False)
-    (args.out / "cli.json").write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n")
-    print(f"Recorded {len(SCENARIOS)} actual Swift CLI cases in {args.out}")
+    (args.out / output_name).write_text(json.dumps(output, ensure_ascii=False, indent=2) + "\n")
+    print(f"Recorded {len(scenarios)} actual Swift CLI cases in {args.out}")
 
 
 if __name__ == "__main__":

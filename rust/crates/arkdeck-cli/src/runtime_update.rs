@@ -7,13 +7,56 @@ mod store;
 #[cfg(target_os = "macos")]
 pub use store::{Store, StoreError};
 #[cfg(target_os = "macos")]
+mod artifact;
+#[cfg(target_os = "macos")]
+mod consumer;
+#[cfg(target_os = "macos")]
+mod errors;
+#[cfg(target_os = "macos")]
+mod logging;
+#[cfg(target_os = "macos")]
+mod production;
+#[cfg(target_os = "macos")]
+pub use consumer::{
+    ConsumerError, Effects as RuntimeUpdateEffects, Event as RuntimeUpdateEvent,
+    check as check_update, download as download_update, handoff as handoff_update,
+};
+#[cfg(target_os = "macos")]
+pub use errors::consumer_failure;
+#[cfg(target_os = "macos")]
+pub use logging::UpdateLogger;
+#[cfg(target_os = "macos")]
+pub use production::{ProductionUpdateEffects, current_product_identity};
+#[cfg(target_os = "macos")]
 mod cache;
+#[cfg(target_os = "macos")]
+pub use artifact::{ArtifactFailure, validate_artifact};
+#[cfg(target_os = "macos")]
+mod download;
+#[cfg(target_os = "macos")]
+pub use download::{DownloadFailure, download_artifact};
+#[cfg(target_os = "macos")]
+mod network;
+#[cfg(target_os = "macos")]
+mod operation;
 #[cfg(target_os = "macos")]
 mod owner;
 #[cfg(target_os = "macos")]
-pub use cache::Cache;
+mod replay;
+#[cfg(target_os = "macos")]
+mod verification;
+#[cfg(target_os = "macos")]
+pub use cache::{Cache, CacheDownload};
+#[cfg(target_os = "macos")]
+pub use network::{NetworkError, StreamFailure, artifact_url, feed_url, redirect_url, stream_url};
+#[cfg(target_os = "macos")]
+pub use operation::{ActiveOperation, OperationError, OperationKind};
 #[cfg(target_os = "macos")]
 pub use owner::Owner;
+#[cfg(target_os = "macos")]
+pub use replay::{ReplayDecision, ReplayRecord, ReplayStore};
+#[cfg(target_os = "macos")]
+pub use verification::{ProductIdentity, verify_feed};
 
 use crate::{
     CliError, Invocation,
@@ -26,7 +69,12 @@ use serde_json::json;
 pub fn serves(command: &str) -> bool {
     matches!(
         command,
-        "runtime.update.status" | "runtime.update.cancel" | "runtime.update.cleanup"
+        "runtime.update.status"
+            | "runtime.update.cancel"
+            | "runtime.update.cleanup"
+            | "runtime.update.check"
+            | "runtime.update.download"
+            | "runtime.update.handoff"
     )
 }
 
@@ -75,7 +123,9 @@ pub(crate) fn answer(argv: &[String]) -> Option<Result<Invocation, CliError>> {
     Some(Ok(Invocation {
         command,
         method: command,
-        params: None,
+        params: value("--consent").map(|consent| {
+            serde_json::Map::from_iter([("consent".into(), Value::String(consent))])
+        }),
         json: mode.as_deref() == Some("json"),
         jsonl: mode.as_deref() == Some("jsonl"),
         legacy_json: argv.iter().any(|token| token == "--json"),
@@ -105,10 +155,41 @@ pub fn run(invocation: &Invocation) -> Result<Value, CliError> {
         let library =
             std::path::Path::new(&home).join("Library/Containers/com.arkdeck.desktop/Data/Library");
         let owner = Owner {
-            store: Store::new(library.join("Application Support/ArkDeck/AutoUpdateLifecycle")),
+            store: Store::new(library.join("Application Support/ArkDeck/AutoUpdateLifecycle"))
+                .with_clock(crate::utc_now),
             cache: Cache::new(library.join("Caches/ArkDeck-Updates")),
         };
         let now = crate::utc_now();
+        if matches!(phase, "check" | "download" | "handoff") {
+            owner
+                .store
+                .load(&now)
+                .map_err(|error| failure(error, phase))?;
+            let (identity, diagnostic_directory) =
+                current_product_identity().map_err(|error| consumer_failure(error, phase))?;
+            let effects = ProductionUpdateEffects::new(
+                &library.join("Application Support/ArkDeck/AutoUpdateReplay"),
+                diagnostic_directory.as_deref(),
+            );
+            let result = match phase {
+                "check" => check_update(&owner, &effects, &identity, &now),
+                "download" => download_update(&owner, &effects, &now),
+                _ => handoff_update(
+                    &owner,
+                    &effects,
+                    invocation
+                        .params
+                        .as_ref()
+                        .and_then(|p| p.get("consent"))
+                        .and_then(Value::as_str)
+                        == Some("reveal-in-finder"),
+                    &now,
+                ),
+            };
+            return result
+                .map(|snapshot| snapshot.projection())
+                .map_err(|error| consumer_failure(error, phase));
+        }
         let result = match phase {
             "status" => owner.status(&now).map(|snapshot| snapshot.projection()),
             "cancel" => owner.cancel(&now).map(|snapshot| snapshot.projection()),

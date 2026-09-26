@@ -1,5 +1,5 @@
-use super::{State, StoreError};
-use arkdeck_platform::HostDirectory;
+use super::{DownloadedArtifact, FileIdentity, State, StoreError};
+use arkdeck_platform::{HostDirectory, HostFileIdentity, HostUpdateDownload, UpdateDownloadError};
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
@@ -7,7 +7,115 @@ pub struct Cache {
     directory: PathBuf,
 }
 
+pub struct CacheDownload {
+    directory: PathBuf,
+    root_identity: (u64, u64),
+    writer: HostUpdateDownload,
+}
+
+fn validate_directory(path: &Path, identity: (u64, u64)) -> Result<(), UpdateDownloadError> {
+    use std::os::unix::fs::MetadataExt;
+    let linked = std::fs::symlink_metadata(path)?;
+    if !linked.is_dir()
+        || (linked.dev(), linked.ino()) != identity
+        || linked.uid() != arkdeck_platform::effective_user_id()
+        || linked.mode() & 0o7777 != 0o700
+    {
+        return Err(UpdateDownloadError::UnsafeDirectory);
+    }
+    Ok(())
+}
+
+fn file_identity(value: HostFileIdentity) -> FileIdentity {
+    FileIdentity {
+        device: value.device,
+        inode: value.inode,
+        byte_length: value.size,
+        mode: 0o400,
+        modified_seconds: value.modified.0,
+        modified_nanoseconds: value.modified.1,
+        changed_seconds: value.changed.0,
+        changed_nanoseconds: value.changed.1,
+    }
+}
+
+impl CacheDownload {
+    pub fn write_chunk(&mut self, bytes: &[u8]) -> Result<(), UpdateDownloadError> {
+        self.writer.write_chunk(bytes)
+    }
+
+    pub fn seal(self, digest: &str) -> Result<DownloadedArtifact, UpdateDownloadError> {
+        validate_directory(&self.directory, self.root_identity)?;
+        let (name, identity) = self.writer.seal(digest)?;
+        validate_directory(&self.directory, self.root_identity)?;
+        let url = arkdeck_platform::host_file_url(&self.directory.join(name))
+            .ok_or(UpdateDownloadError::UnsafeArtifact)?;
+        Ok(DownloadedArtifact {
+            url,
+            byte_length: identity.size,
+            sha256: digest.to_owned(),
+            identity: file_identity(identity),
+        })
+    }
+}
+
 impl Cache {
+    pub fn begin_download(&self, expected: u64) -> Result<CacheDownload, UpdateDownloadError> {
+        let root = HostDirectory::open_update_store(&self.directory)?;
+        let root_identity = root.directory_identity()?;
+        validate_directory(&self.directory, root_identity)?;
+        Ok(CacheDownload {
+            directory: self.directory.clone(),
+            root_identity,
+            writer: root.begin_update_download(expected)?,
+        })
+    }
+
+    pub fn verify_download(
+        &self,
+        artifact: &DownloadedArtifact,
+    ) -> Result<FileIdentity, UpdateDownloadError> {
+        let actual = self.rehash_download(artifact)?;
+        if actual != artifact.identity {
+            return Err(UpdateDownloadError::UnsafeArtifact);
+        }
+        Ok(actual)
+    }
+
+    pub(super) fn rehash_download(
+        &self,
+        artifact: &DownloadedArtifact,
+    ) -> Result<FileIdentity, UpdateDownloadError> {
+        self.artifact_path(artifact)?;
+        let name = self
+            .name(&artifact.url)
+            .ok_or(UpdateDownloadError::UnsafeArtifact)?;
+        let root = HostDirectory::open_update_store(&self.directory)?;
+        let root_identity = root.directory_identity()?;
+        validate_directory(&self.directory, root_identity)?;
+        let actual = root.verify_update_download(&name, artifact.byte_length, &artifact.sha256)?;
+        validate_directory(&self.directory, root_identity)?;
+        Ok(file_identity(actual))
+    }
+
+    /// Hashing is descriptor-relative while Security/Finder consume a path.
+    /// Refuse spellings whose lexical parent normalization could hide an
+    /// intermediate symlink (for example cache/alias/../artifact.dmg).
+    pub(super) fn artifact_path(
+        &self,
+        artifact: &DownloadedArtifact,
+    ) -> Result<PathBuf, UpdateDownloadError> {
+        let name = self
+            .name(&artifact.url)
+            .ok_or(UpdateDownloadError::UnsafeArtifact)?;
+        let input = file_path(&artifact.url).ok_or(UpdateDownloadError::UnsafeArtifact)?;
+        let path = self.directory.join(name);
+        if input.as_os_str() != path.as_os_str() {
+            return Err(UpdateDownloadError::UnsafeArtifact);
+        }
+        Ok(path)
+    }
+
     pub fn new(directory: impl Into<PathBuf>) -> Self {
         Self {
             directory: directory.into(),
@@ -101,7 +209,7 @@ fn verified_name(name: &str) -> bool {
         })
 }
 
-fn file_path(url: &str) -> Option<PathBuf> {
+pub(super) fn file_path(url: &str) -> Option<PathBuf> {
     let path = url.strip_prefix("file://")?;
     let path = path.strip_prefix("localhost").unwrap_or(path);
     if !path.starts_with('/') || path.contains(['?', '#']) {
@@ -124,4 +232,65 @@ fn file_path(url: &str) -> Option<PathBuf> {
         return None;
     }
     Some(Path::new(&text).to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arkdeck_contract::sha256_hex;
+    struct Root(PathBuf);
+    impl Drop for Root {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    fn setup() -> (Root, Cache) {
+        let root =
+            Root(std::env::temp_dir().join(format!("arkdeck-cache-{}", crate::client_frame_id())));
+        let cache = Cache::new(root.0.join("cache #百分比% ?"));
+        (root, cache)
+    }
+
+    #[test]
+    fn download_round_trips_escaped_file_url_and_rejects_changed_identity() {
+        let (_root, cache) = setup();
+        let data = b"verified artifact";
+        let digest = sha256_hex(data);
+        let mut writer = cache.begin_download(data.len() as u64).unwrap();
+        writer.write_chunk(data).unwrap();
+        let mut artifact = writer.seal(&digest).unwrap();
+        assert!(artifact.url.contains("%23"));
+        assert!(artifact.url.contains("%25"));
+        assert!(!artifact.url.contains('?'));
+        assert_eq!(
+            file_path(&artifact.url).unwrap().parent().unwrap(),
+            cache.directory
+        );
+        assert_eq!(cache.verify_download(&artifact).unwrap(), artifact.identity);
+        artifact.identity.inode += 1;
+        assert!(matches!(
+            cache.verify_download(&artifact),
+            Err(UpdateDownloadError::UnsafeArtifact)
+        ));
+    }
+
+    #[test]
+    fn abandoned_stream_removes_partial_and_replaced_directory_cannot_publish() {
+        let (root, cache) = setup();
+        let mut writer = cache.begin_download(3).unwrap();
+        writer.write_chunk(b"a").unwrap();
+        drop(writer);
+        assert_eq!(std::fs::read_dir(&cache.directory).unwrap().count(), 0);
+        let mut writer = cache.begin_download(3).unwrap();
+        writer.write_chunk(b"abc").unwrap();
+        let moved = root.0.join("moved");
+        std::fs::rename(&cache.directory, &moved).unwrap();
+        std::fs::create_dir(&cache.directory).unwrap();
+        assert!(matches!(
+            writer.seal(&sha256_hex(b"abc")),
+            Err(UpdateDownloadError::UnsafeDirectory)
+        ));
+        assert_eq!(std::fs::read_dir(moved).unwrap().count(), 0);
+        assert_eq!(std::fs::read_dir(&cache.directory).unwrap().count(), 0);
+    }
 }

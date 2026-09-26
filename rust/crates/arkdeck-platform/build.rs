@@ -2,6 +2,7 @@ use std::{env, path::PathBuf, process::Command};
 fn main() {
     println!("cargo:rerun-if-changed=src/macos_control.c");
     println!("cargo:rerun-if-changed=src/macos_procscan.c");
+    println!("cargo:rerun-if-changed=src/macos_update_http.m");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("macos") {
         return;
     }
@@ -12,12 +13,20 @@ fn main() {
         "x86_64"
     };
     let mut objects = Vec::new();
-    for source in ["macos_control", "macos_procscan"] {
+    for (source, extension) in [
+        ("macos_control", "c"),
+        ("macos_procscan", "c"),
+        ("macos_update_http", "m"),
+    ] {
         let object = output.join(format!("{source}.o"));
+        let mut compiler = Command::new("xcrun");
+        compiler.arg("clang");
+        if extension == "m" {
+            compiler.arg("-fobjc-arc");
+        }
         assert!(
-            Command::new("xcrun")
+            compiler
                 .args([
-                    "clang",
                     "-arch",
                     arch,
                     "-mmacosx-version-min=14.0",
@@ -26,7 +35,7 @@ fn main() {
                     "-Wextra",
                     "-Werror",
                     "-c",
-                    &format!("src/{source}.c"),
+                    &format!("src/{source}.{extension}"),
                     "-o"
                 ])
                 .arg(&object)

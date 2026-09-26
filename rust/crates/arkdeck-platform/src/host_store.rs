@@ -20,9 +20,15 @@ pub use journal::{HostJournal, HostJournalAppender, JournalAppendError, JournalW
 mod session_publication;
 #[path = "host_session_removal.rs"]
 mod session_removal;
+#[path = "host_update_download.rs"]
+mod update_download;
 #[path = "host_update_store.rs"]
 mod update_store;
 pub use session_removal::PreparedSessionRemoval;
+pub use update_download::{HostUpdateDownload, UpdateDownloadError};
+#[path = "host_diagnostic_log.rs"]
+mod diagnostic_log;
+pub use diagnostic_log::HostDiagnosticWriter;
 #[path = "host_trace_removal.rs"]
 mod trace_removal;
 pub use trace_removal::PreparedTraceRemoval;

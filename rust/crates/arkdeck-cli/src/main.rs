@@ -1418,34 +1418,6 @@ fn serve_update_feed_prepare(invocation: &Invocation, id: &str) -> std::process:
     }
 }
 
-/// A registry leaf whose subsystem the Rust CLI has not ported: answered
-/// `blockedByProductDefect` in the caller's rendering, and nothing dispatched
-/// (`blocked_leaves`). A deprecated spelling still says so.
-fn serve_blocked_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCode {
-    let error = arkdeck_cli::blocked_leaves::refusal(invocation.command);
-    let written =
-        if invocation.json {
-            write_document(&arkdeck_cli::with_lifecycle(
-                failure_envelope(invocation.command, &error, id, false),
-                invocation.command,
-            ))
-        } else if invocation.legacy_json {
-            io::stdout().lock().write_all(&arkdeck_cli::legacy_document(
-                &arkdeck_cli::legacy_failure(&error),
-            ))
-        } else {
-            if let Some(warning) = arkdeck_cli::legacy_warning(invocation.command) {
-                eprintln!("{warning}");
-            }
-            eprintln!("arkdeck: {}", error.message);
-            Ok(())
-        };
-    if written.is_err() {
-        return 74.into();
-    }
-    error.exit_code().into()
-}
-
 fn serve_runtime_update(invocation: &Invocation, id: &str) -> std::process::ExitCode {
     let answer = arkdeck_cli::runtime_update::run(invocation);
     let written = match &answer {
@@ -1586,9 +1558,12 @@ fn main() -> std::process::ExitCode {
     let invocation = match parse(&args) {
         Ok(invocation) => invocation,
         Err(error) => {
-            // Swift stamps the updater's unsupported JSONL selector before
-            // constructing a runtime session: one JSON refusal, with a fresh
-            // parse correlation, even though this leaf never emits JSONL.
+            // Swift stamps updater registry refusals before constructing a
+            // runtime session, with a fresh parse correlation. Unsupported
+            // JSONL still emits one JSON refusal, though no leaf emits JSONL.
+            let update_parse_refusal = error
+                .command
+                .is_some_and(arkdeck_cli::runtime_update::serves);
             let update_jsonl_refusal = output_values == ["jsonl"]
                 && error
                     .command
@@ -1596,7 +1571,7 @@ fn main() -> std::process::ExitCode {
                 && error.details.get("value").and_then(Value::as_str) == Some("jsonl");
             if machine || update_jsonl_refusal {
                 let command = error.command.unwrap_or("registry.parse");
-                let parse_id = if update_jsonl_refusal {
+                let parse_id = if update_parse_refusal {
                     &fallback_id
                 } else {
                     parse_id
@@ -1702,9 +1677,6 @@ fn main() -> std::process::ExitCode {
     }
     if invocation.command.starts_with("maintainer.contracts.") {
         return serve_maintainer_contracts(&invocation, id);
-    }
-    if arkdeck_cli::blocked_leaves::blocks(invocation.command) {
-        return serve_blocked_leaf(&invocation, id);
     }
     if arkdeck_cli::runtime_update::serves(invocation.command) {
         return serve_runtime_update(&invocation, id);

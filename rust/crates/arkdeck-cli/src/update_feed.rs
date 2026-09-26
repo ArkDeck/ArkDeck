@@ -191,7 +191,7 @@ fn feed_failure(error: FeedError, doing: &str) -> CliError {
 
 /// Swift `UpdateSemanticVersion(_:)`: three dot-separated decimal numbers
 /// without leading zeros.
-fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
     let parts: Vec<&str> = value.split('.').collect();
     if parts.len() != 3 {
         return None;
@@ -210,7 +210,7 @@ fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
 }
 
 /// Swift `normalizedSystemVersion`: a two-part system version gains `.0`.
-fn normalized_system(value: &str) -> String {
+pub(crate) fn normalized_system(value: &str) -> String {
     if value.split('.').count() == 2 {
         format!("{value}.0")
     } else {
@@ -220,7 +220,7 @@ fn normalized_system(value: &str) -> String {
 
 /// Swift `ISO8601Timestamps.parseCanonicalPlain`: exactly
 /// `YYYY-MM-DDTHH:MM:SSZ`, a real instant, as seconds since the epoch.
-fn canonical_timestamp(value: &str) -> Option<i64> {
+pub(crate) fn canonical_timestamp(value: &str) -> Option<i64> {
     let bytes = value.as_bytes();
     if !value.is_ascii()
         || bytes.len() != 20

@@ -22,3 +22,21 @@ fn swift_update_lifecycle_process_oracle_replays() {
     );
     assert!(String::from_utf8_lossy(&output.stdout).contains("Replayed 20 actual Swift CLI cases"));
 }
+
+#[test]
+fn swift_update_consumer_refusals_replay_without_network_or_finder() {
+    let script =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/record-runtime-update-oracle.py");
+    let output = Command::new("python3")
+        .arg(script)
+        .args(["--consumer", "--replay-cli", env!("CARGO_BIN_EXE_arkdeck")])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Replayed 13 actual Swift CLI cases"));
+}
