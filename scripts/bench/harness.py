@@ -267,7 +267,10 @@ class IsolatedRuntime:
                 )
             if self.socket_path.exists():
                 try:
-                    with control.ControlClient(str(self.socket_path)) as client:
+                    with control.ControlClient(
+                        str(self.socket_path),
+                        timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds())),
+                    ) as client:
                         client.call("health")
                         return clocks.awake_seconds() - started
                 except (control.ControlError, OSError):

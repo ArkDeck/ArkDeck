@@ -10,10 +10,10 @@ harnesses are run.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import pathlib
 import shutil
-import subprocess
 import sys
 
 from . import baseline, clocks, harness, metrics
@@ -73,19 +73,9 @@ def _ratio(value: str) -> float:
 
 
 def _toolchain_facts(daemon: pathlib.Path, soak: pathlib.Path) -> dict[str, object]:
-    def digest(path: pathlib.Path) -> str | None:
-        binary = shutil.which("shasum")
-        if binary is None:
-            return None
-        completed = subprocess.run(
-            [binary, "-a", "256", str(path)],
-            stdout=subprocess.PIPE,
-            text=True,
-            check=False,
-        )
-        if completed.returncode != 0:
-            return None
-        return completed.stdout.split()[0]
+    def digest(path: pathlib.Path) -> str:
+        with path.open("rb") as binary:
+            return hashlib.file_digest(binary, "sha256").hexdigest()
 
     return {
         "daemonSha256": digest(daemon),
@@ -117,6 +107,24 @@ def capture_exit_code(unstable: list[str], disqualifiers: list[str]) -> int:
 
 
 def command_capture(arguments: argparse.Namespace) -> int:
+    toolchain = _toolchain_facts(arguments.daemon, arguments.soak)
+    recorder = None
+    if arguments.recovery_samples:
+        import uuid
+        arguments.out_dir.mkdir(parents=True, exist_ok=True)
+        raw = arguments.out_dir / f"recovery-samples-{uuid.uuid4().hex}.jsonl"
+        def recorder(sample):
+            # Append every attempt immediately, including failures; later errors
+            # cannot erase earlier samples. No host paths enter this artifact.
+            entry = {"atUtc": clocks.utc_now(), "toolchain": toolchain,
+                     "runIndex": index, "runtimeKind": arguments.runtime_kind,
+                     "buildConfiguration": arguments.build_configuration,
+                     **sample}
+            serialized = json.dumps(entry, sort_keys=True)
+            baseline.assert_no_host_identity(serialized)
+            with raw.open("a", encoding="utf-8") as output:
+                output.write(serialized + "\n")
+        print(f"bench: recovery attempts archived in {raw}", file=sys.stderr)
     context = metrics.RunContext(
         daemon_executable=arguments.daemon,
         soak_executable=arguments.soak,
@@ -127,6 +135,10 @@ def command_capture(arguments: argparse.Namespace) -> int:
         seed_seconds=arguments.seed_seconds,
         seed_jobs_per_cycle=arguments.seed_jobs_per_cycle,
         runtime_kind=arguments.runtime_kind,
+        recovery_samples=arguments.recovery_samples,
+        recovery_only=arguments.recovery_only,
+        recovery_require_quiet=not arguments.allow_loaded_host,
+        recovery_recorder=recorder,
     )
 
     results: dict[str, baseline.MetricResult] = {}
@@ -175,11 +187,18 @@ def command_capture(arguments: argparse.Namespace) -> int:
             shutil.rmtree(state_directory, ignore_errors=True)
 
         for name, values in samples.items():
-            unit, design_row, description = metrics.METRIC_DEFINITIONS[name]
+            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS)[name]
             result = results.setdefault(
                 name, baseline.MetricResult(name, unit, design_row, description)
             )
-            result.add_run(values, scale)
+            if name.startswith("daemon.warmStartRecovery"):
+                metric_scale = {
+                    k: v for k, v in scale.items()
+                    if k.startswith("recovery") and k != "recoverySamples"
+                }
+            else:
+                metric_scale = {k: v for k, v in scale.items() if not k.startswith("recovery")}
+            result.add_run(values, metric_scale)
 
         run_records.append(
             {
@@ -199,16 +218,23 @@ def command_capture(arguments: argparse.Namespace) -> int:
             file=sys.stderr,
         )
 
-    toolchain = _toolchain_facts(arguments.daemon, arguments.soak)
+    if toolchain != _toolchain_facts(arguments.daemon, arguments.soak):
+        raise ValueError("measured executables changed during capture")
     toolchain["buildConfiguration"] = arguments.build_configuration
     toolchain["runtimeKind"] = arguments.runtime_kind
     task, spike = baseline.document_identity(arguments.runtime_kind)
+    gaps = metrics.gap_definitions(arguments.runtime_kind)
+    for name in results:
+        gaps.pop(name, None)
+    for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
+        if name not in results and name not in gaps:
+            gaps[name] = baseline.Gap(name, row, "not requested in this capture", "a capture including this leg")
     document = baseline.build_document(
         host=harness.host_facts(),
         toolchain=toolchain,
         runs=run_records,
         metrics=results,
-        gaps=metrics.gap_definitions(arguments.runtime_kind),
+        gaps=gaps,
         task=task,
         spike=spike,
         baseline_eligible=not disqualifiers,
@@ -341,6 +367,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capture.add_argument("--runs", type=_minimum_runs, default=baseline.MINIMUM_RUNS)
+    capture.add_argument("--recovery-samples", type=_positive_int, default=0,
+                         help="fresh 10k Journal and 10k History fixtures per sample (Rust only)")
+    capture.add_argument("--recovery-only", action="store_true",
+                         help="capture only recovery and calibration; requires --recovery-samples")
     capture.add_argument("--cold-start-samples", type=_positive_int, default=50)
     capture.add_argument("--ipc-samples", type=_positive_int, default=1000)
     capture.add_argument(
@@ -421,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as error:  # noqa: BLE001 - the CLI reports, never traces
         # A comparison or capture refusal is a result, not a crash; a traceback
         # in a CI log buries the sentence that says what to do about it.
-        if type(error).__name__ in {"ComparisonError", "ControlError", "HostTooBusy"}:
+        if type(error).__name__ in {"ComparisonError", "ControlError", "HostTooBusy", "RecoveryFailed", "TimeoutExpired"}:
             print(f"bench: ERROR: {error}", file=sys.stderr)
             return 1
         raise

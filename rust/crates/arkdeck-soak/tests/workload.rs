@@ -165,3 +165,61 @@ fn refuses_unowned_nonempty_state_and_invalid_flags() {
         assert!(Configuration::parse(args.into_iter().map(str::to_owned)).is_err());
     }
 }
+
+#[test]
+fn recovery_seed_is_exact_fresh_and_replayed_by_production_owner() {
+    use arkdeck_hoststore::{JobStore, inspect_journal, recover_active_jobs};
+    let root = Root::new();
+    let manifest = arkdeck_soak::recovery::seed(&root.0, "journal", 20).unwrap();
+    assert_eq!(manifest["journalEventCount"], 20);
+    assert!(arkdeck_soak::recovery::seed(&root.0, "journal", 20).is_err());
+    let jobs = JobStore::open_owner(&root.0.join("jobs-state")).unwrap();
+    let recovered = recover_active_jobs(&jobs, None, arkdeck_hoststore::runtime_now).unwrap();
+    assert_eq!(recovered.statuses.len(), 1);
+    assert!(recovered.quarantined.is_empty());
+    assert!(recovered.refused.is_empty());
+    let record = jobs.read_snapshot("job-recovery-00000").unwrap();
+    assert_eq!(record.timeline, ["recovered: journal clean"]);
+    assert_eq!(record.state, "preflight");
+    assert_eq!(
+        inspect_journal(&root.0.join("jobs-state/jobs/job-recovery-00000"))
+            .unwrap()
+            .event_count,
+        20
+    );
+    let history = Root::new();
+    arkdeck_soak::recovery::seed(&history.0, "history", 20).unwrap();
+    let jobs = JobStore::open_owner(&history.0.join("jobs-state")).unwrap();
+    assert!(
+        recover_active_jobs(&jobs, None, arkdeck_hoststore::runtime_now)
+            .unwrap()
+            .statuses
+            .is_empty()
+    );
+    let page = jobs
+        .handle_resource("job.list", &serde_json::Map::new())
+        .unwrap();
+    assert_eq!(page["items"].as_array().unwrap().len(), 20);
+}
+
+#[test]
+fn recovery_seed_refuses_bad_workload_without_writing() {
+    let root = Root::new();
+    for (kind, count) in [("unknown", 20), ("journal", 0), ("history", 10001)] {
+        assert!(arkdeck_soak::recovery::seed(&root.0, kind, count).is_err());
+        assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
+    }
+}
+
+#[test]
+fn recovery_seed_refuses_foreign_root_and_final_symlink() {
+    let root = Root::new();
+    fs::write(root.0.join("foreign"), b"preserve").unwrap();
+    assert!(arkdeck_soak::recovery::seed(&root.0, "history", 2).is_err());
+    assert_eq!(fs::read(root.0.join("foreign")).unwrap(), b"preserve");
+    let empty = Root::new();
+    let link = root.0.join("linked");
+    std::os::unix::fs::symlink(&empty.0, &link).unwrap();
+    assert!(arkdeck_soak::recovery::seed(&link, "journal", 2).is_err());
+    assert_eq!(fs::read_dir(&empty.0).unwrap().count(), 0);
+}

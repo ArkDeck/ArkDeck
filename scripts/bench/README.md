@@ -92,8 +92,8 @@ capture keeps `TASK-XPA-023`/`SPK-1`, the identity of the committed Swift
 baseline, and a Rust capture carries `TASK-XPA-025`/`SPK-11`. The rows the
 harness cannot measure are declared per daemon, each with the reason that holds
 for that daemon (`metrics.gap_definitions(runtime_kind)`). Rust recovery and
-`job.reconcile` are implemented, but the capture does not yet time their
-required workloads; they remain measurement gaps. The first quiet-host Rust capture is
+`job.reconcile` are implemented. Recovery is measured only when explicitly
+enabled as described below; `job.reconcile` remains a measurement gap. The first quiet-host Rust capture is
 recorded beside its run record,
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md`,
 not in `baselines/`. A document in `baselines/` becomes the nightly lane's
@@ -191,3 +191,65 @@ release was observed inside the window at all.
 written and refuses a document carrying a home directory, a user name or any
 `/Users/<name>` or `/home/<name>` prefix.  Host facts are limited to OS, OS
 version, architecture, CPU count and Python version.
+
+## Rust recovery capture (TASK-XPA-025)
+
+Recovery is opt-in so the existing cold-start/RSS capture keeps its workload:
+
+```sh
+cd scripts
+python3 -m bench capture --runtime-kind rust --build-configuration release \
+  --daemon /private/tmp/task-target/release/arkdeck-agentd \
+  --soak /private/tmp/task-target/release/arkdeck-soak \
+  --recovery-samples 5 --recovery-only --runs 3 \
+  --out-dir /private/tmp/arkdeck-recovery
+```
+
+Omit `--recovery-only` to add the two recovery legs to the normal capture. Each
+independent run generates one pristine seed per workload. Each sample copies it
+to a new private root and verifies its input digest before daemon launch; the
+daemon never opens the template. All roots are deleted. Seed/copy preparation and validation
+are outside the timer. `arkdeck-soak --seed-recovery journal|history COUNT ROOT`
+requires an empty, absolute directory and bounds COUNT to 2..10000 (small counts
+are for tests; the measurement always uses 10000). It uses production JobStore
+and JournalWriter, never a device provider, Keychain, installed Runtime or CLI.
+The deterministic timestamp, IDs and warning contents are versioned as
+`rust-recovery-fixture-v1`; the digest of actual record/journal bytes and actual
+counts are captured before starting the real daemon.
+
+- `daemon.warmStartRecovery`: one active `preflight` Job, exactly 10000 journal
+  events: creation, queued-to-preflight transition and 9998 warnings. The daemon
+  must persist `recovered: journal clean`, return the exact Job/state and leave
+  journal bytes unchanged. This is clean replay, not unknown-intent recovery.
+- `daemon.warmStartRecovery.history`: 10000 terminal `succeeded` Job snapshots
+  and zero journal events/active Jobs. Like the existing terminal History test,
+  the seed goes directly through the repository, not 10000 provider executions.
+  All 10000 distinct IDs/states must be read back in pages of 250; every durable
+  snapshot must remain terminal without a recovery marker. This checks that
+  terminal history does not expand the startup recovery set.
+
+Both timers run from process spawn through **completion verification** using
+awake-work time, with a continuous-clock deadline. The reported total includes
+contract handshakes, pagination and durable snapshot readback. Each raw sample
+also records `spawnThroughHealthMilliseconds` and
+`completionVerificationMilliseconds` so History read cost is visible. These
+are end-to-end upper bounds, **not pure replay time**, and must not be declared
+passes against the old in-process replay budget. A successful health call alone
+never produces a recovery sample; the daemon's current startup order runs
+recovery before serving, and the workload-specific checks prove its effects.
+
+Before seed preparation and immediately before/after each formal sample the harness requires load < 4 and no cargo, rustc,
+xcodebuild or Python plan.py process. Coordinate the window with other sessions;
+`--allow-loaded-host` is advisory only. Each attempt is appended immediately to
+`recovery-samples-<unique-id>.jsonl`, including failed attempts, so a later error
+cannot discard earlier samples. The final baseline-format JSON also contains
+all measured recovery samples, both executable SHA-256s, declared build
+configuration, workload and completion counts. Timeouts, seed/recovery failures
+and missing/duplicate Jobs fail the capture; the owned daemon is stopped and the
+root removed even on failure. A subsequent attempt always starts a fresh root.
+
+The comparison identity includes fixture version, seed strategy, both 10k workload scales,
+page size and timing boundary. Recovery-only documents explicitly mark other
+legs unmeasured and are not replacements for full reference baselines. The
+existing three-run/30% spread rules and reference-host approval still apply;
+old cold-start/RSS instability and committed baselines are retained unchanged.

@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import time
 
-from . import baseline, clocks, control, harness
+from . import baseline, clocks, control, harness, recovery
 
 # A pure-CPU workload with no allocation growth and no syscall, sized to land in
 # the same millisecond range as the IPC round trips it normalises.
@@ -50,6 +50,17 @@ def calibration_sample() -> float:
         raise RuntimeError("calibration workload miscomputed")
     return elapsed * 1000.0
 
+
+RECOVERY_METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
+    "daemon.warmStartRecovery": (
+        "milliseconds", "I.2 rows 2 and 7 (10k Journal recovery)",
+        "spawn through verified clean replay marker and complete Job readback; includes verification",
+    ),
+    "daemon.warmStartRecovery.history": (
+        "milliseconds", "I.2 rows 2 and 7 (10k terminal History restart)",
+        "spawn through complete terminal History readback and zero recovery markers; includes verification",
+    ),
+}
 
 METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
     # metric id -> (unit, design row, description)
@@ -131,8 +142,8 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
             (
                 "JournalRecoveryContractTests in the Swift nightly slow lane "
                 "time the Swift engine, not this daemon; Rust journal recovery "
-                "and restart reconciliation are implemented, but this harness "
-                "does not time a 10k-event journal or 10k-Job recovery workload"
+                "and restart reconciliation are implemented; this capture does not "
+                "time them unless --recovery-samples enables both 10k workloads"
             )
             if rust
             else (
@@ -286,9 +297,21 @@ class RunContext:
         seed_seconds: int,
         seed_jobs_per_cycle: int,
         runtime_kind: str = "swift",
+        recovery_samples: int = 0,
+        recovery_only: bool = False,
+        recovery_require_quiet: bool = True,
+        recovery_recorder=None,
     ) -> None:
         if runtime_kind not in {"swift", "rust"}:
             raise ValueError("runtime_kind must be swift or rust")
+        if recovery_samples < 0 or (recovery_only and recovery_samples == 0):
+            raise ValueError("recovery-only requires positive recovery samples")
+        if (recovery_only or recovery_samples) and runtime_kind != "rust":
+            raise ValueError("recovery capture requires Rust")
+        self.recovery_samples = recovery_samples
+        self.recovery_only = recovery_only
+        self.recovery_require_quiet = recovery_require_quiet
+        self.recovery_recorder = recovery_recorder
         self.runtime_kind = runtime_kind
         self.daemon_executable = daemon_executable
         self.soak_executable = soak_executable
@@ -366,7 +389,7 @@ def execute_run(
     numbers instead of being reconstructed from the seed parameters.
     """
 
-    samples: dict[str, list[float]] = {name: [] for name in METRIC_DEFINITIONS}
+    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS)}
     scale: dict[str, object] = {
         "seedSeconds": context.seed_seconds,
         "seedJobsPerCycle": context.seed_jobs_per_cycle,
@@ -378,6 +401,37 @@ def execute_run(
 
     for _ in range(context.calibration_samples):
         samples["calibration.busyLoop"].append(calibration_sample())
+
+    if context.recovery_samples:
+        scale["recoveryFixtureVersion"] = recovery.VERSION
+        scale["recoveryJournalEventCount"] = recovery.COUNT
+        scale["recoveryHistoryJobCount"] = recovery.COUNT
+        scale["recoveryPageSize"] = recovery.PAGE_SIZE
+        scale["recoveryTimingBoundary"] = "spawn-through-completion-verification-v1"
+        scale["recoverySamples"] = []
+        scale["recoverySeedStrategy"] = "pristine-template-per-run-v1"
+        with recovery.FixtureSet(context.soak_executable) as fixtures:
+            for sample_index in range(context.recovery_samples):
+                for workload, name in recovery.METRICS.items():
+                    try:
+                        quiet = recovery.assert_quiet_host() if context.recovery_require_quiet else {"waived": True}
+                        elapsed, evidence = recovery.measure(
+                            context.daemon_executable, context.soak_executable, workload,
+                            require_quiet=context.recovery_require_quiet,
+                            fixture=fixtures.get(workload),
+                        )
+                    except Exception as error:
+                        if context.recovery_recorder:
+                            context.recovery_recorder({**getattr(error, "sample", {}), "workload": workload, "sampleIndex": sample_index, "status": "FAILED", "errorType": type(error).__name__})
+                        raise
+                    samples[name].append(elapsed)
+                    evidence["sampleIndex"] = sample_index
+                    evidence["quietHostBeforeSample"] = quiet
+                    scale["recoverySamples"].append(evidence)
+                    if context.recovery_recorder:
+                        context.recovery_recorder({"status": "MEASURED", **evidence})
+    if context.recovery_only:
+        return {name: values for name, values in samples.items() if values}, scale
 
     seeded = harness.seed_state_directory(
         context.soak_executable,

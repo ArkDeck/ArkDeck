@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+pub mod recovery;
+
 pub type Result<T> = std::result::Result<T, String>;
 fn error(value: impl std::fmt::Debug) -> String {
     format!("{value:?}")

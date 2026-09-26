@@ -25,11 +25,13 @@ MODULES = (
     "compare.py",
     "harness.py",
     "metrics.py",
+    "recovery.py",
 )
 STDLIB_ONLY = {
     "argparse",
     "ast",
     "datetime",
+    "hashlib",
     "json",
     "math",
     "os",
@@ -371,7 +373,7 @@ class MetricTableTests(unittest.TestCase):
     def test_rust_gaps_name_the_rust_blockers(self) -> None:
         gaps = metrics.gap_definitions("rust")
         recovery = gaps["daemon.warmStartRecovery"]
-        self.assertIn("does not time a 10k", recovery.reason)
+        self.assertIn("--recovery-samples", recovery.reason)
         self.assertIn("timed Rust 10k", recovery.blocked_by)
         self.assertNotIn("L.1 item 13", recovery.reason)
         self.assertNotIn("L.1 item 13", recovery.blocked_by)
