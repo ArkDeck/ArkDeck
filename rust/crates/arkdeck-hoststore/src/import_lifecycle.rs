@@ -161,28 +161,35 @@ impl ImportUploadStore {
             return Err(unreadable("different Artifact owner"));
         }
         let release = method == "artifact.import.release";
-        if release {
+        // Swift's handler judges the names, the identity and then a release's
+        // generation, all before the owner reads a record.
+        let generation = if release {
             if fields.len() != 2
                 || !fields.contains_key("importId")
                 || !fields.contains_key("generation")
             {
-                return Err(invalid());
+                return Err(closed());
             }
-        } else if method != "artifact.import.inspection" && method != "artifact.import.inspect"
-            || fields.len() != 1
-            || !(fields.contains_key("importId") || fields.contains_key("importRequestId"))
-        {
-            return Err(invalid());
-        }
-        let mut cache = self.verified.lock().map_err(unreadable)?;
-        let loaded = if let Some(id) = fields.get("importId") {
-            self.by_id(id.as_str().ok_or_else(invalid)?, &mut cache)?
+            identity(fields, "importId")?;
+            positive_generation(fields)?
         } else {
-            self.by_request(
-                fields["importRequestId"].as_str().ok_or_else(invalid)?,
-                &mut cache,
-            )?
-            .ok_or_else(absent)?
+            if method != "artifact.import.inspection" && method != "artifact.import.inspect"
+                || fields.len() != 1
+                || !(fields.contains_key("importId") || fields.contains_key("importRequestId"))
+            {
+                return Err(selector_required());
+            }
+            0
+        };
+        let selected = if fields.contains_key("importId") {
+            Ok(identity(fields, "importId")?)
+        } else {
+            Err(identity(fields, "importRequestId")?)
+        };
+        let mut cache = self.verified.lock().map_err(unreadable)?;
+        let loaded = match selected {
+            Ok(id) => self.by_id(id, &mut cache)?,
+            Err(request) => self.by_request(request, &mut cache)?.ok_or_else(absent)?,
         };
         let mut record = loaded.record;
         self.finish_release(artifacts, &record)?;
@@ -207,19 +214,37 @@ impl ImportUploadStore {
                 arkdeck_contract::validate_import_inspection(&value).map_err(unreadable)?; Ok(value)
             });
         }
-        let generation = import_decimal(&fields["generation"]).ok_or_else(invalid)?;
         if record.state == "released" && generation == 2 {
             return record.release_receipt.ok_or_else(invalid);
         }
-        if record.state != "committed" || generation != record.generation || holds != 0 {
-            return Err(conflict());
+        // Swift `RuntimeArtifactStore.releaseImport`'s refusals, in its order.
+        if record.state != "committed"
+            || generation != record.generation
+            || record
+                .receipt
+                .as_ref()
+                .and_then(|receipt| receipt["artifactId"].as_str())
+                .is_none()
+        {
+            return Err(failure(
+                "resourceConflict",
+                "release requires the exact committed Import generation",
+            ));
+        }
+        if holds != 0 {
+            return Err(failure(
+                "resourceConflict",
+                "Import is still used by an active materialization",
+            ));
         }
         if import_timestamp(now).is_none() {
             return Err(invalid());
         }
         let id = record.id.clone();
         jobs.with_import_references(&id, |active| {
-            if !active.is_empty() { return Err(conflict()); }
+            if !active.is_empty() {
+                return Err(failure("resourceConflict", "Import is still referenced by an active or uncertain Job"));
+            }
             let receipt=record.receipt.as_ref().ok_or_else(invalid)?;
             let reference=ImportReference::parse(receipt["lease"].as_str().ok_or_else(invalid)?)?.ok_or_else(invalid)?;
             self.resolve_guarded(artifacts,&reference,&mut cache)?;

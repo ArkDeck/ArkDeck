@@ -342,7 +342,20 @@ fn the_app_operates_no_import_it_did_not_begin_and_writes_nothing_trying() {
         ("artifact.import.commit", selector(&id)),
     ] {
         let error = refusal(&ingress.handle(&frame(method, params), root.peer()), method);
-        assert_eq!(error.code, "admissionDenied", "{method}");
+        // Swift's Import owner's words: begin finds the CLI's Import, the
+        // others an Import outside the App's uploads.
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "admissionDenied",
+                if method == "artifact.import.begin" {
+                    "Import was not created by the App transport"
+                } else {
+                    "Import is outside this App upload scope"
+                }
+            ),
+            "{method}"
+        );
         assert_eq!(
             error.details,
             json!({"phase":"importOwner","newDispatchCount":0})
@@ -386,7 +399,13 @@ fn a_lost_commit_answer_reaches_the_owner_once_and_is_never_rewritten() {
     );
     // The receipt is durable but its answer was lost inside the owner. The
     // App gets the owner's own uncertainty: not success, not pre-admission.
-    assert_eq!(error.code, "recordUnreadable");
+    assert_eq!(
+        (error.code.as_str(), error.message.as_str()),
+        (
+            "recordUnreadable",
+            "Import state or immutable content is unreadable"
+        )
+    );
     assert_eq!(error.details.unwrap()["phase"], "importOwner");
     let durable = record(&root, "app-lost-answer");
     assert_eq!(durable["state"], "committed");
@@ -424,6 +443,52 @@ fn a_lost_commit_answer_reaches_the_owner_once_and_is_never_rewritten() {
 /// .testCommitRefusalsCarryTheImportOwnersCodeMessageAndEvidence` records
 /// Swift's daemon answering each with the Import owner's code, message and
 /// zero-dispatch evidence.
+/// Swift's recorded refusal of `method` with this code and message.
+fn swift_refusal(method: &str, code: &str, message: &str) -> WireError {
+    let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+    )))
+    .unwrap();
+    corpus
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .find(|row| {
+            row["ok"] == false && row["error"]["code"] == code && row["error"]["message"] == message
+        })
+        .map(|row| serde_json::from_value(row["error"].clone()).unwrap())
+        .unwrap_or_else(|| panic!("no Swift frame of {method} answers {code}: {message}"))
+}
+
+/// Swift's `RuntimeImportControlHandler` without its Artifact or Target owner
+/// refuses every Import method in the words the corpus recorded; so does a
+/// Host composed without the Import owners (TASK-XPA-013).
+#[test]
+fn a_host_without_the_import_owners_refuses_as_swift_s_handler_does() {
+    let control = Control::new(crate::host::Host::from_environment()).unwrap();
+    for method in [
+        "artifact.import.begin",
+        "artifact.import.append",
+        "artifact.import.abort",
+        "artifact.import.commit",
+        "artifact.import.inspect",
+        "artifact.import.inspection",
+        "artifact.import.release",
+    ] {
+        let params = json!({"importId":"imp-00000000-0000-4000-8000-000000000001"});
+        let error = refusal(&control.handle_frame(&frame(method, params)), method);
+        let swift = swift_refusal(
+            method,
+            "operationUnavailable",
+            "Import owner services are unavailable",
+        );
+        assert_eq!(
+            (error.code, error.message, error.details),
+            (swift.code, swift.message, swift.details),
+            "{method}"
+        );
+    }
+}
+
 fn swift_commit_refusal(code: &str, message: &str) -> Option<WireError> {
     let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(
         "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.commit.jsonl",
@@ -631,7 +696,11 @@ fn malformed_uploads_other_kinds_and_foreign_peers_never_enter_the_owner() {
             &ingress.handle(&frame(method, begin("app-kind", kind)), root.peer()),
             method,
         );
-        assert_eq!(error.code, "admissionDenied", "{kind}");
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            ("admissionDenied", "Import is outside this App upload scope"),
+            "{kind}"
+        );
         assert_eq!(
             error.details,
             json!({"phase":"preAdmission","newDispatchCount":0})

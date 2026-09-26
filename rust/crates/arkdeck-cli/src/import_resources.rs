@@ -116,7 +116,30 @@ fn invalid() -> CliError {
 }
 #[cfg(target_os = "macos")]
 fn projection(value: Value) -> Result<ImportProjection, CliError> {
-    ImportProjection::parse(&value).map_err(|_| invalid())
+    ImportProjection::parse(&value).map_err(|_| projection_invalid())
+}
+// Swift's CLI refusals of an Import response it cannot accept
+// (`CLIImports.swift`, `ArtifactImportProjection`), in its words.
+#[cfg(target_os = "macos")]
+fn projection_invalid() -> CliError {
+    CliError::new(
+        "recordUnreadable",
+        "Runtime returned an invalid Import projection",
+    )
+}
+#[cfg(target_os = "macos")]
+fn source_changed() -> CliError {
+    CliError::new(
+        "artifactIntegrityFailed",
+        "Import source changed; staged data was not overwritten or aborted",
+    )
+}
+#[cfg(target_os = "macos")]
+fn timed_out() -> CliError {
+    CliError::new(
+        "clientTimeout",
+        "Import client timed out; inspect or retry the same request identity",
+    )
 }
 #[cfg(target_os = "macos")]
 fn uncertain(error: &CliError) -> bool {
@@ -147,26 +170,35 @@ pub fn execute_import(
             .checked_duration_since(Instant::now())
             .map(|v| v.as_millis() as u64)
             .filter(|n| *n > 0)
-            .ok_or_else(|| {
-                CliError::new(
-                    "clientTimeout",
-                    "Import timed out; inspect or retry the same request identity",
-                )
-            })
+            .ok_or_else(timed_out)
     };
     let mut send = |method: &str, params: Map<String, Value>| request(method, params, remaining()?);
     let fields = invocation.params.as_ref().ok_or_else(invalid)?;
     let result = (|| {
         if invocation.command == "artifact.import.list" {
+            // Swift `ArtifactImportProjection.validatePage`: the page, each
+            // row's projection, then the rows' order and identities.
+            let page_invalid = || {
+                CliError::new(
+                    "recordUnreadable",
+                    "Runtime returned an invalid Import page",
+                )
+            };
+            let order_changed = || {
+                CliError::new(
+                    "recordUnreadable",
+                    "Import snapshot order or owner identity changed",
+                )
+            };
             let value = send(invocation.method, fields.clone())?;
             arkdeck_contract::validate_method_value(invocation.method, "result", &value)
-                .map_err(|_| invalid())?;
+                .map_err(|_| page_invalid())?;
             let revision = value["snapshotRevision"]
                 .as_str()
                 .filter(|s| crate::session_resources::uuid(s))
-                .ok_or_else(invalid)?;
-            let rows = value["items"].as_array().ok_or_else(invalid)?;
-            let more = value["hasMore"].as_bool().ok_or_else(invalid)?;
+                .ok_or_else(page_invalid)?;
+            let rows = value["items"].as_array().ok_or_else(page_invalid)?;
+            let more = value["hasMore"].as_bool().ok_or_else(page_invalid)?;
             if value["schemaVersion"] != "arkdeck.cli.page/1"
                 || value["pageKind"] != "snapshot"
                 || value["order"] != "createdAtDescImportIdAsc"
@@ -186,16 +218,16 @@ pub fn execute_import(
                     !value["nextCursor"].is_null()
                 })
             {
-                return Err(invalid());
+                return Err(page_invalid());
             }
             let mut seen = std::collections::BTreeSet::new();
             let mut previous: Option<(f64, String)> = None;
             for row in rows {
-                let imported = ImportProjection::parse(row).map_err(|_| invalid())?;
+                let imported = ImportProjection::parse(row).map_err(|_| projection_invalid())?;
                 let created = row["createdAtUtc"]
                     .as_str()
                     .and_then(arkdeck_contract::import_timestamp)
-                    .ok_or_else(invalid)?;
+                    .ok_or_else(order_changed)?;
                 if !seen.insert(imported.id.clone())
                     || fields
                         .get("target")
@@ -205,7 +237,7 @@ pub fn execute_import(
                         created > *date || (created == *date && imported.id <= *id)
                     })
                 {
-                    return Err(invalid());
+                    return Err(order_changed());
                 }
                 previous = Some((created, imported.id));
             }
@@ -223,22 +255,27 @@ pub fn execute_import(
             return Ok(current.value);
         }
         if invocation.command == "artifact.import.release" {
+            // Swift `ArtifactImportReleaseProjection`, then its CLI's check
+            // that the receipt is the one it asked for.
+            let malformed =
+                || CliError::new("recordUnreadable", "Import release receipt is malformed");
             let value = send(invocation.method, fields.clone())?;
             arkdeck_contract::validate_method_value(invocation.method, "result", &value)
-                .map_err(|_| invalid())?;
-            let id = fields["importId"].as_str().ok_or_else(invalid)?;
-            let artifact = value["artifactId"].as_str().ok_or_else(invalid)?;
+                .map_err(|_| malformed())?;
+            let id = value["importId"]
+                .as_str()
+                .filter(|id| import_id(id))
+                .ok_or_else(malformed)?;
+            let artifact = value["artifactId"].as_str().ok_or_else(malformed)?;
             let released = value["releasedAtUtc"]
                 .as_str()
                 .and_then(arkdeck_contract::import_timestamp)
-                .ok_or_else(invalid)?;
+                .ok_or_else(malformed)?;
             let deadline = value["retention"]["deadlineUtc"]
                 .as_str()
                 .and_then(arkdeck_contract::import_timestamp)
-                .ok_or_else(invalid)?;
-            if fields["generation"] != "2"
-                || value["schemaVersion"] != "arkdeck.import-release/1"
-                || value["importId"] != id
+                .ok_or_else(malformed)?;
+            if value["schemaVersion"] != "arkdeck.import-release/1"
                 || value["owner"] != json!({"kind":"import","id":id})
                 || value["releasedGeneration"] != "2"
                 || value["generation"] != "3"
@@ -256,16 +293,30 @@ pub fn execute_import(
                 || value["retention"]["pinned"] != false
                 || deadline <= released
             {
-                return Err(invalid());
+                return Err(malformed());
+            }
+            if fields["importId"] != id || fields["generation"] != "2" {
+                return Err(CliError::new(
+                    "recordUnreadable",
+                    "Import release receipt does not match the requested owner and generation",
+                ));
             }
             return Ok(value);
         }
         if invocation.command == "artifact.import.inspect" {
+            // Swift `ArtifactImportInspectionProjection`, then its CLI's check
+            // that the inspection is of the Import it asked for.
+            let malformed = || {
+                CliError::new(
+                    "recordUnreadable",
+                    "Import reference inspection is malformed",
+                )
+            };
             let value = send("artifact.import.inspection", fields.clone())?;
             arkdeck_contract::validate_method_value("artifact.import.inspection", "result", &value)
-                .map_err(|_| invalid())?;
+                .map_err(|_| malformed())?;
             let imported =
-                arkdeck_contract::validate_import_inspection(&value).map_err(|_| invalid())?;
+                arkdeck_contract::validate_import_inspection(&value).map_err(|_| malformed())?;
             if fields
                 .get("importId")
                 .is_some_and(|v| v != &json!(imported.id))
@@ -273,7 +324,10 @@ pub fn execute_import(
                     .get("importRequestId")
                     .is_some_and(|v| v != &json!(imported.intent.request_id))
             {
-                return Err(invalid());
+                return Err(CliError::new(
+                    "recordUnreadable",
+                    "Import inspection returned another requested owner",
+                ));
             }
             return Ok(value);
         }
@@ -298,20 +352,26 @@ pub fn execute_import(
             },
         )
         .map_err(|e| {
+            // Swift `CLIImportSource`'s refusals: the deadline, a source that
+            // changed while it was read, one outside its kind's bound, and one
+            // that cannot be opened.
             if remaining().is_err() {
-                CliError::new(
-                    "clientTimeout",
-                    "Import source hashing exceeded the deadline",
-                )
-            } else {
-                CliError::new(
-                    if e.kind() == std::io::ErrorKind::InvalidData {
-                        "artifactIntegrityFailed"
-                    } else {
-                        "invalidInput"
-                    },
+                return timed_out();
+            }
+            match e.kind() {
+                std::io::ErrorKind::InvalidData => source_changed(),
+                std::io::ErrorKind::InvalidInput => CliError::new(
+                    "invalidInput",
+                    "Import source exceeds its registered regular-file bound",
+                ),
+                // Swift answers a short read artifactIntegrityFailed "Import
+                // source could not be read completely"; its code is left to
+                // the next change (TASK-XPA-013 X6).
+                std::io::ErrorKind::UnexpectedEof => CliError::new(
+                    "invalidInput",
                     format!("Import source cannot be opened within its registered bound: {e}"),
-                )
+                ),
+                _ => CliError::new("invalidInput", "Import source cannot be opened"),
             }
         })?;
         let selector = || request_fields("importRequestId", request_id);
@@ -324,15 +384,21 @@ pub fn execute_import(
             existing.intent.binding_revision
         } else {
             let target_value = send("target.show", request_fields("targetId", target))?;
+            let unbound = || {
+                CliError::new(
+                    "recordUnreadable",
+                    "target has no exact current binding reference",
+                )
+            };
             if target_value["schemaVersion"] != "arkdeck.target/1"
                 || target_value["targetId"] != target
             {
-                return Err(invalid());
+                return Err(unbound());
             }
             target_value["bindingRevision"]
                 .as_u64()
                 .filter(|n| *n > 0 && *n <= i64::MAX as u64)
-                .ok_or_else(invalid)?
+                .ok_or_else(unbound)?
         };
         let name = match kind {
             "flash-bundle" => "images.tar.gz".to_owned(),
@@ -352,7 +418,7 @@ pub fn execute_import(
         intent.validate().map_err(|_| {
             CliError::new(
                 "invalidInput",
-                "Import source metadata is outside its registered kind",
+                "Import requires registered metadata and exact target/binding references",
             )
         })?;
         if let Some(existing) = &existing
@@ -366,14 +432,11 @@ pub fn execute_import(
                     && old.device_profile == intent.device_profile
                     && (old.sha256 != intent.sha256 || old.byte_count != intent.byte_count)
                 {
-                    CliError::new(
-                        "artifactIntegrityFailed",
-                        "Import source changed; staged data remains under its original identity",
-                    )
+                    source_changed()
                 } else {
                     CliError::new(
                         "idempotencyConflict",
-                        "Import request identity names different metadata",
+                        "Import request identity already names different metadata",
                     )
                 },
             );
@@ -402,8 +465,14 @@ pub fn execute_import(
                 Err(error) => return Err(error),
             }
         };
-        if current.intent != intent || !import_id(&current.id) {
-            return Err(invalid());
+        if !import_id(&current.id) {
+            return Err(projection_invalid());
+        }
+        if current.intent != intent {
+            return Err(CliError::new(
+                "recordUnreadable",
+                "Import receipt changed the upload metadata",
+            ));
         }
         let mut recoveries = 0;
         while current.state == "inProgress" && current.next_offset < source.byte_count {
@@ -414,12 +483,7 @@ pub fn execute_import(
                     offset,
                     current.maximum_chunk_bytes.min(source.byte_count - offset) as usize,
                 )
-                .map_err(|_| {
-                    CliError::new(
-                        "artifactIntegrityFailed",
-                        "Import source changed; staged data remains resumable",
-                    )
-                })?;
+                .map_err(|_| source_changed())?;
             let append = json!({"importId":current.id,"generation":current.generation.to_string(),"offset":offset.to_string(),
                 "byteCount":chunk.len().to_string(),"sha256":sha256_hex(&chunk),"base64":encode_import_chunk(&chunk).map_err(|_| invalid())?});
             match send(
@@ -434,7 +498,10 @@ pub fn execute_import(
                         || next.generation != current.generation
                         || next.state != "inProgress"
                     {
-                        return Err(invalid());
+                        return Err(CliError::new(
+                            "recordUnreadable",
+                            "Import append returned another owner or offset",
+                        ));
                     }
                     current = next;
                 }
@@ -445,20 +512,20 @@ pub fn execute_import(
                         || recovered.intent != intent
                         || recovered.next_offset < offset
                     {
-                        return Err(invalid());
+                        return Err(CliError::new(
+                            "recordUnreadable",
+                            "Import recovery changed its owner or committed prefix",
+                        ));
                     }
                     current = recovered;
                 }
                 Err(error) => return Err(error),
             }
         }
-        source.check_identity().map_err(|_| {
-            CliError::new(
-                "artifactIntegrityFailed",
-                "Import source changed before commit",
-            )
-        })?;
+        source.check_identity().map_err(|_| source_changed())?;
         if matches!(current.state.as_str(), "inProgress" | "committing") {
+            let commit_owner_changed =
+                || CliError::new("recordUnreadable", "Import commit returned another owner");
             let owner = current.id.clone();
             let params = json!({"importId":owner,"generation":current.generation.to_string()})
                 .as_object()
@@ -469,7 +536,7 @@ pub fn execute_import(
                 Err(error) if uncertain(&error) => {
                     let recovered = projection(send("artifact.import.inspect", selector())?)?;
                     if recovered.id != owner || recovered.intent != intent {
-                        return Err(invalid());
+                        return Err(commit_owner_changed());
                     }
                     // A durable prefix does not prove publication failed. The
                     // publication owner has not joined this migration, so an
@@ -482,7 +549,7 @@ pub fn execute_import(
                 Err(error) => return Err(error),
             };
             if current.id != owner || current.intent != intent {
-                return Err(invalid());
+                return Err(commit_owner_changed());
             }
         }
         match current.state.as_str() {

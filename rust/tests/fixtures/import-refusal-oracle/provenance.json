@@ -1,0 +1,10 @@
+{
+  "command": "ARKDECK_IMPORT_REFUSAL_ORACLE_OUTPUT=<new path under /private/tmp> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter ImportRefusalOracleContractTests; without the variable the same test compares Swift's answers with cases.json byte for byte",
+  "determinism": "runtime identities are recorded by the names the replay substitutes: $liveImportId (an upload with the first 2048 bytes of the HAP), $committedImportId (a committed HAP, generation 2), $targetId (the one adopted Target) and $file (the CLI's source path); imp-00000000-0000-4000-8000-000000000001 and TGT-000000000000 are fixed identities no fixture holds; the HAP is the 4-byte ZIP magic followed by 4,092 bytes of 0x61, as DurableImportContractTests' fixture",
+  "files": {
+    "cases.json": "aa5de0a3bb908b11284f0f22bc459cf2c60e2c3761af2dd77af1f982ed96a033"
+  },
+  "recordedBy": "ImportRefusalOracleContractTests.testImportRefusalsTheCorpusDoesNotRecord, main d7273116f, macOS 27.0 (26A428)",
+  "source": "Swift's RuntimeControlPlaneHandler over an actual RuntimeArtifactStore, RuntimeTargetStore and RuntimeJobEngine (wire cases), and Swift's arkdeck CLI against that handler's daemon (cli cases); no device, no dispatch",
+  "why": "the artifact.import.* refusals whose Swift text the ControlFrames corpus holds no frame of, and the CLI's own refusals of an upload (TASK-XPA-013, same code, other text): the Rust Import owner and CLI replay them; the corpus stays append-only and is not a recording target here"
+}

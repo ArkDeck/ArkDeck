@@ -89,6 +89,13 @@ fn append(
         json!({"importId":id,"generation":"1","offset":offset.to_string(),"byteCount":bytes.len().to_string(),"sha256":sha256_hex(bytes),"base64":encode_import_chunk(bytes).unwrap()}),
     )
 }
+/// A refusal's code and message, which Swift's Import owner answers alike.
+fn refusal(error: WireError) -> (String, String) {
+    (error.code, error.message)
+}
+fn text(code: &str, message: &str) -> (String, String) {
+    (code.into(), message.into())
+}
 fn read(path: &Path) -> Value {
     serde_json::from_slice(&fs::read(path).unwrap()).unwrap()
 }
@@ -119,12 +126,18 @@ fn exact_upload_identity_survives_restart_and_append_retry_without_changing_gene
         checkpoint
     );
     assert_eq!(
-        append(&store, id, 1, b"wrong").unwrap_err().code,
-        "resourceConflict"
+        refusal(append(&store, id, 1, b"wrong").unwrap_err()),
+        text(
+            "resourceConflict",
+            "Import chunk overlaps different committed bytes"
+        )
     );
     assert_eq!(
-        append(&store, id, 9, b"gap").unwrap_err().code,
-        "resourceConflict"
+        refusal(append(&store, id, 9, b"gap").unwrap_err()),
+        text(
+            "resourceConflict",
+            "Import chunk does not start at the committed offset"
+        )
     );
     drop(store);
     let restarted = fixture.store();
@@ -176,7 +189,13 @@ fn begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existin
             unavailable,
         )
         .unwrap_err();
-    assert_eq!(denied.code, "operationUnavailable");
+    assert_eq!(
+        refusal(denied),
+        text(
+            "operationUnavailable",
+            "Import owner services are unavailable"
+        )
+    );
     assert!(names(&fixture.imports().join("records")).is_empty());
     assert!(names(&fixture.imports().join("payloads")).is_empty());
     for (revision, identity) in [
@@ -208,8 +227,11 @@ fn begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existin
     let mut other = metadata.clone();
     other["sha256"] = json!("b".repeat(64));
     assert_eq!(
-        call(&store, "begin", other).unwrap_err().code,
-        "idempotencyConflict"
+        refusal(call(&store, "begin", other).unwrap_err()),
+        text(
+            "idempotencyConflict",
+            "Import request identity already names different metadata"
+        )
     );
     let app = store
         .handle_resource(
@@ -220,14 +242,23 @@ fn begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existin
             binding,
         )
         .unwrap_err();
-    assert_eq!(app.code, "admissionDenied");
+    assert_eq!(
+        refusal(app),
+        text(
+            "admissionDenied",
+            "Import was not created by the App transport"
+        )
+    );
     assert_eq!(fs::read(fixture.record("one-owner")).unwrap(), before);
     assert_eq!(initial["nextOffset"], "0");
     let mut injected = metadata;
     injected["appOwned"] = json!(true);
     assert_eq!(
-        call(&store, "begin", injected).unwrap_err().code,
-        "invalidInput"
+        refusal(call(&store, "begin", injected).unwrap_err()),
+        text(
+            "invalidInput",
+            "Import requires registered metadata and exact target/binding references"
+        )
     );
 }
 #[test]
@@ -282,8 +313,11 @@ fn partial_and_synced_chunks_recover_only_the_uncommitted_suffix() {
         });
         let store = ImportUploadStore::open_with_fault(&fixture.artifacts, fault).unwrap();
         assert_eq!(
-            append(&store, id, 8, &payload[8..24]).unwrap_err().code,
-            "recordUnreadable"
+            refusal(append(&store, id, 8, &payload[8..24]).unwrap_err()),
+            text(
+                "recordUnreadable",
+                "Import state or immutable content is unreadable"
+            )
         );
         drop(store);
         let expected = if point == ImportUploadFault::AfterAppendCheckpoint {
@@ -366,8 +400,8 @@ fn begin_and_abort_crash_windows_remain_discoverable_and_cannot_resurrect_an_upl
     );
     assert_eq!(call(&store, "begin", metadata).unwrap(), aborted);
     assert_eq!(
-        append(&store, &id, 0, b"a").unwrap_err().code,
-        "resourceConflict"
+        refusal(append(&store, &id, 0, b"a").unwrap_err()),
+        text("resourceConflict", "Import generation or state changed")
     );
     assert!(!fixture.stage(&id).exists());
 }
@@ -413,8 +447,11 @@ fn one_owner_and_private_directory_bindings_prevent_foreign_writes() {
         .create(fixture.imports().join("payloads"))
         .unwrap();
     assert_eq!(
-        append(&store, id, 0, b"payload").unwrap_err().code,
-        "recordUnreadable"
+        refusal(append(&store, id, 0, b"payload").unwrap_err()),
+        text(
+            "recordUnreadable",
+            "Import state or immutable content is unreadable"
+        )
     );
     assert!(names(&fixture.imports().join("payloads")).is_empty());
     assert_eq!(
@@ -624,8 +661,11 @@ fn maximum_chunk_checkpoint_refuses_more_metadata_and_preserves_staged_bytes() {
     let before = fs::read(fixture.record("chunk-quota")).unwrap();
     let store = fixture.store();
     assert_eq!(
-        append(&store, id, 16_384, b"a").unwrap_err().code,
-        "quotaExceeded"
+        refusal(append(&store, id, 16_384, b"a").unwrap_err()),
+        text(
+            "quotaExceeded",
+            "Import upload exceeds its chunk metadata quota"
+        )
     );
     assert_eq!(fs::read(fixture.record("chunk-quota")).unwrap(), before);
     assert_eq!(fs::read(fixture.stage(id)).unwrap(), bytes[..16_384]);
@@ -808,8 +848,11 @@ fn interrupted_publication_requires_receipt_and_recovers_same_identity() {
         let id = initial["importId"].as_str().unwrap();
         append(&store, id, 0, bytes).unwrap();
         assert_eq!(
-            commit(&store, &artifacts, id).unwrap_err().code,
-            "recordUnreadable"
+            refusal(commit(&store, &artifacts, id).unwrap_err()),
+            text(
+                "recordUnreadable",
+                "Import state or immutable content is unreadable"
+            )
         );
         if fault == ImportUploadFault::AfterPublication {
             let params = json!({"owner":{"kind":"import","id":id}});
@@ -864,7 +907,13 @@ fn patch_publication_is_exact_and_sensitive_with_path_escape_refusal() {
         append(&store, id, 0, bytes).unwrap();
         let result = commit(&store, &artifacts, id);
         if !valid {
-            assert_eq!(result.unwrap_err().code, "invalidInput");
+            assert_eq!(
+                refusal(result.unwrap_err()),
+                text(
+                    "invalidInput",
+                    "Import content failed its registered format validator"
+                )
+            );
             continue;
         }
         let result = result.unwrap();
@@ -914,7 +963,13 @@ fn native_import_requires_registered_code_sign_structure_and_preserves_validatio
         append(&store, id, 0, bytes).unwrap();
         let result = commit(&store, &artifacts, id);
         if bytes == unsigned {
-            assert_eq!(result.unwrap_err().code, "invalidInput");
+            assert_eq!(
+                refusal(result.unwrap_err()),
+                text(
+                    "invalidInput",
+                    "Import content failed its registered format validator"
+                )
+            );
             assert!(!fixture.artifacts.join(id).exists());
         } else {
             let result = result.unwrap();
