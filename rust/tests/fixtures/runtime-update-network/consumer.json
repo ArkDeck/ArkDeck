@@ -1,0 +1,487 @@
+{
+  "cases" : [
+    {
+      "name" : "success",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "handedOff"
+          ],
+          "failureCode" : null,
+          "generation" : 5,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "handedOff",
+          "reveals" : 1,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "handedOff"
+          ],
+          "failureCode" : null,
+          "generation" : 5,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "handedOff",
+          "reveals" : 1,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        }
+      ]
+    },
+    {
+      "name" : "noConsent",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        }
+      ]
+    },
+    {
+      "name" : "lateCancel",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "handedOff"
+          ],
+          "failureCode" : null,
+          "generation" : 6,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "handedOff",
+          "reveals" : 1,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "handedOff"
+          ],
+          "failureCode" : null,
+          "generation" : 6,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "handedOff",
+          "reveals" : 1,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        }
+      ]
+    },
+    {
+      "name" : "revealFailure",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 1,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted"
+          ],
+          "failureCode" : null,
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "awaitingConsent",
+          "reveals" : 0,
+          "succeeded" : true,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "failed"
+          ],
+          "failureCode" : "handoff",
+          "generation" : 5,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 1,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "failed"
+          ],
+          "failureCode" : "handoff",
+          "generation" : 5,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 1,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 2
+        }
+      ]
+    },
+    {
+      "name" : "validationFailure",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "failed"
+          ],
+          "failureCode" : "artifact",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "failed"
+          ],
+          "failureCode" : "artifact",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "verificationStarted",
+            "failed"
+          ],
+          "failureCode" : "artifact",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 1
+        }
+      ]
+    },
+    {
+      "name" : "downloadFailure",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "network",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "network",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "network",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        }
+      ]
+    },
+    {
+      "name" : "downloadOverflow",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "download",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "download",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "failed"
+          ],
+          "failureCode" : "download",
+          "generation" : 3,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "failed",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        }
+      ]
+    },
+    {
+      "name" : "downloadCancelled",
+      "steps" : [
+        {
+          "action" : "download",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "cancelled"
+          ],
+          "failureCode" : null,
+          "generation" : 4,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "cancelled",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "handoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "cancelled"
+          ],
+          "failureCode" : null,
+          "generation" : 4,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "cancelled",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        },
+        {
+          "action" : "repeatHandoff",
+          "artifacts" : 0,
+          "cancellationRequested" : false,
+          "events" : [
+            "downloadStarted",
+            "cancelled"
+          ],
+          "failureCode" : null,
+          "generation" : 4,
+          "isBusy" : false,
+          "partials" : 0,
+          "phase" : "cancelled",
+          "reveals" : 0,
+          "succeeded" : false,
+          "updatedAtUtc" : "2026-09-26T00:00:00Z",
+          "validations" : 0
+        }
+      ]
+    }
+  ],
+  "feedBase64" : "eyJjYW5vbmljYWxQYXlsb2FkIjoiZXlKaGNtTm9hWFJsWTNSMWNtVnpJanBiSW1GeWJUWTBJbDBzSW1GeWRHbG1ZV04wSWpwN0ltSjVkR1ZNWlc1bmRHZ2lPak1zSW5Ob1lUSTFOaUk2SW1KaE56Z3hObUptT0dZd01XTm1aV0UwTVRReE5EQmtaVFZrWVdVeU1qSXpZakF3TXpZeFlUTTVOakUzTjJFNVkySTBNVEJtWmpZeFpqSXdNREUxWVdRaUxDSjFjbXdpT2lKb2RIUndjem92TDJkcGRHaDFZaTVqYjIwdlFYSnJSR1ZqYXk5QmNtdEVaV05yTDJFdVpHMW5JbjBzSW1WNGNHbHlaWE5CZENJNklqSXdNall0TURrdE1qZFVNREE2TURBNk1EQmFJaXdpYVhOemRXVmtRWFFpT2lJeU1ESTJMVEE1TFRJMVZEQXdPakF3T2pBd1dpSXNJbTFwYm1sdGRXMVRlWE4wWlcxV1pYSnphVzl1SWpvaU1UUXVNQzR3SWl3aWNtVnNaV0Z6WlU1dmRHVnpVM1Z0YldGeWVTSTZJa1pwZUhSMWNtVWlMQ0p6WlhGMVpXNWpaU0k2TVN3aWRtVnljMmx2YmlJNklqSXVNQzR3SW4wPSIsInBheWxvYWQiOnsiYXJjaGl0ZWN0dXJlcyI6WyJhcm02NCJdLCJhcnRpZmFjdCI6eyJieXRlTGVuZ3RoIjozLCJzaGEyNTYiOiJiYTc4MTZiZjhmMDFjZmVhNDE0MTQwZGU1ZGFlMjIyM2IwMDM2MWEzOTYxNzdhOWNiNDEwZmY2MWYyMDAxNWFkIiwidXJsIjoiaHR0cHM6Ly9naXRodWIuY29tL0Fya0RlY2svQXJrRGVjay9hLmRtZyJ9LCJleHBpcmVzQXQiOiIyMDI2LTA5LTI3VDAwOjAwOjAwWiIsImlzc3VlZEF0IjoiMjAyNi0wOS0yNVQwMDowMDowMFoiLCJtaW5pbXVtU3lzdGVtVmVyc2lvbiI6IjE0LjAuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiJGaXh0dXJlIiwic2VxdWVuY2UiOjEsInZlcnNpb24iOiIyLjAuMCJ9LCJwYXlsb2FkU0hBMjU2IjoiNzVkOGIzYjM2ZGY1ZDA3OWZmNTJlMjY2Nzk4OTA0MWE0Yzg5YzQ1ZTdjNDUwN2JmNGMwZjY0ZTQ1MzMwZjdhNiJ9",
+  "producer" : "RuntimeUpdateNetworkHandoffOracleTests"
+}
