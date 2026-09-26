@@ -33,25 +33,18 @@ pub struct SdkReleaseConfiguration {
 pub(crate) struct PreparedSdkRelease {
     pub configuration: SigningPresetConfiguration,
     directory: PathBuf,
-    previous: Option<PathBuf>,
-    committed: bool,
+    retained: bool,
 }
 impl PreparedSdkRelease {
-    /// Call only after the owner has durably published a stable credential.
-    pub fn commit(mut self) {
-        self.committed = true;
-        if let Some(old) = &self.previous
-            && old != &self.directory
-            && old.parent() == self.directory.parent()
-        {
-            // remove_dir_all never follows a symbolic link into source data.
-            let _ = fs::remove_dir_all(old);
-        }
+    /// The owner's durable directory tracking now owns its cleanup. Call
+    /// before attempting receipt publication, whose outcome can be unknown.
+    pub fn retain_for_transaction(&mut self) {
+        self.retained = true;
     }
 }
 impl Drop for PreparedSdkRelease {
     fn drop(&mut self) {
-        if !self.committed {
+        if !self.retained {
             let _ = fs::remove_dir_all(&self.directory);
         }
     }
@@ -63,6 +56,7 @@ pub(crate) fn prepare(
     configuration: &SdkReleaseConfiguration,
     secrets: &dyn SigningSecrets,
     timestamp: i64,
+    track: &mut dyn FnMut(&Path) -> Result<(), SigningError>,
 ) -> Result<PreparedSdkRelease, SigningError> {
     if !is_identifier(&configuration.project_ref) {
         return Err(SigningError::invalid("projectRef is malformed"));
@@ -112,6 +106,14 @@ pub(crate) fn prepare(
     let token = crate::signing_install::new_envelope_account()?;
     let uuid = token.split_once("|secret-envelope-").unwrap().1;
     let directory = store.root().join(format!("sdk-release-{uuid}"));
+    track(&directory)?;
+    if let Some(previous) = store
+        .load_validated(DEFAULT_PRESET_ID, false, secrets)
+        .ok()
+        .and_then(|receipt| receipt.managed_material_directory)
+    {
+        track(Path::new(&previous))?;
+    }
     fs::DirBuilder::new()
         .mode(0o700)
         .create(&directory)
@@ -127,13 +129,8 @@ pub(crate) fn prepare(
             key_alias: "openharmony application release".into(),
             managed_material_directory: Some(directory.clone()),
         },
-        previous: store
-            .load_validated(DEFAULT_PRESET_ID, false, secrets)
-            .ok()
-            .and_then(|r| r.managed_material_directory)
-            .map(PathBuf::from),
         directory,
-        committed: false,
+        retained: false,
     };
     let profile_copy = prepared.directory.join("OpenHarmonyProfileRelease.pem");
     write_private(&prepared.configuration.keystore, &read_pinned(&keystore)?)?;
@@ -153,6 +150,11 @@ pub(crate) fn prepare(
         &prepared.configuration.app_certificate,
         &application_chain(chain, &generated.app_certificate)?,
     )?;
+    #[cfg(test)]
+    if FIXTURE_PROFILE.with(|fixture| fixture.get()) {
+        write_private(&prepared.configuration.signed_profile, &generated.bytes)?;
+        return Ok(prepared);
+    }
     sign_profile(
         &java,
         &jar,
@@ -373,4 +375,246 @@ fn verify_profile(
     }
     let _ = fs::remove_file(verification);
     Ok(())
+}
+
+/// One exact private-root child; never follow a link into source material.
+pub(crate) fn remove_material(path: &Path) -> Result<bool, SigningError> {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(_) => return Err(SigningError::io("cannot inspect pending SDK material")),
+    };
+    let result = if metadata.is_dir() {
+        fs::remove_dir_all(path)
+    } else {
+        fs::remove_file(path)
+    };
+    result.map_err(|_| SigningError::io("cannot remove pending SDK material"))?;
+    Ok(true)
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FIXTURE_PROFILE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+#[cfg(test)]
+mod publication_tests {
+    use super::*;
+    use crate::{
+        credential_owner::{CredentialOwner, FINAL_LEDGER_FAILURE},
+        signing_install::{PUBLICATION_FAILURE, SigningSecretInstallation},
+        signing_preset::SecretPresence,
+    };
+    use arkdeck_platform::Secret;
+    use serde_json::json;
+    use std::{collections::BTreeMap, sync::Mutex};
+    #[derive(Default)]
+    struct Secrets(Mutex<BTreeMap<String, Secret>>);
+    impl SigningSecrets for Secrets {
+        fn read(&self, account: &str) -> Result<Secret, SigningError> {
+            self.0
+                .lock()
+                .unwrap()
+                .get(account)
+                .cloned()
+                .ok_or_else(|| SigningError::secret("fixture absent"))
+        }
+        fn presence(&self, account: &str) -> SecretPresence {
+            if self.0.lock().unwrap().contains_key(account) {
+                SecretPresence::Present
+            } else {
+                SecretPresence::Absent
+            }
+        }
+        fn trusted_daemon_fingerprint(&self) -> Result<Option<String>, SigningError> {
+            Ok(Some("a".repeat(64)))
+        }
+    }
+    impl SigningSecretInstallation for Secrets {
+        fn set_envelope(&self, account: &str, bytes: &[u8]) -> Result<(), SigningError> {
+            self.0
+                .lock()
+                .unwrap()
+                .insert(account.into(), Secret::from_slice(bytes));
+            Ok(())
+        }
+        fn remove_envelope(&self, account: &str) -> Result<bool, SigningError> {
+            Ok(self.0.lock().unwrap().remove(account).is_some())
+        }
+    }
+    impl crate::signing_removal::SigningSecretRemoval for Secrets {
+        fn remove_current(&self, account: &str) -> Result<bool, SigningError> {
+            self.remove_envelope(account)
+        }
+        fn remove_legacy(&self, _: &str) -> Result<bool, SigningError> {
+            Ok(false)
+        }
+    }
+    struct Fixture {
+        home: PathBuf,
+        root: PathBuf,
+        configuration: SdkReleaseConfiguration,
+    }
+    impl Fixture {
+        fn new() -> Self {
+            let home = PathBuf::from(format!(
+                "/private/tmp/arkdeck-sdk-publication-{:032x}",
+                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+            ));
+            fs::DirBuilder::new().mode(0o700).create(&home).unwrap();
+            let home = PathBuf::from(foundation_resolved_path(home.to_str().unwrap()).unwrap());
+            let sdk = home.join("sdk");
+            let lib = sdk.join("toolchains/lib");
+            fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(&lib)
+                .unwrap();
+            let write = |name: &str, bytes: &[u8]| {
+                let path = lib.join(name);
+                fs::write(&path, bytes).unwrap();
+                fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+            };
+            write("hap-sign-tool.jar", b"fixture");
+            write("OpenHarmony.p12", b"fixture-keystore");
+            let pem = "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n";
+            write("OpenHarmonyProfileRelease.pem", pem.repeat(3).as_bytes());
+            write("UnsgnedReleasedProfileTemplate.json",&serde_json::to_vec(&json!({"type":"release","app-distribution-type":"os_integration","issuer":"pki_internal","bundle-info":{"apl":"normal","app-feature":"hos_normal_app","distribution-certificate":pem}})).unwrap());
+            let java = home.join("java");
+            fs::write(&java, b"not executed: publication-boundary unit fixture").unwrap();
+            fs::set_permissions(&java, fs::Permissions::from_mode(0o700)).unwrap();
+            FIXTURE_PROFILE.with(|fixture| fixture.set(true));
+            Self {
+                root: home.join("preset"),
+                home,
+                configuration: SdkReleaseConfiguration {
+                    project_ref: "demo-app".into(),
+                    bundle_name: "com.example.app".into(),
+                    java_executable: java,
+                    sdk_root: sdk,
+                },
+            }
+        }
+        fn owner(&self) -> CredentialOwner {
+            CredentialOwner::new(SigningPresetStore::new(&self.root))
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            FIXTURE_PROFILE.with(|fixture| fixture.set(false));
+            PUBLICATION_FAILURE.with(|f| f.set(0));
+            FINAL_LEDGER_FAILURE.with(|f| f.set(0));
+            let _ = fs::remove_dir_all(&self.home);
+        }
+    }
+
+    #[test]
+    fn published_sdk_material_survives_unknown_receipt_and_failed_final_ledger() {
+        for prior in [false, true] {
+            for fault in [0, 1, 2] {
+                let f = Fixture::new();
+                let secrets = Secrets::default();
+                let owner = f.owner();
+                if prior {
+                    owner
+                        .install_sdk_release(
+                            &f.configuration,
+                            &secrets,
+                            "2026-09-26T00:00:00Z",
+                            1_000_000,
+                        )
+                        .unwrap();
+                }
+                if fault == 0 {
+                    PUBLICATION_FAILURE.with(|failure| failure.set(1));
+                } else {
+                    FINAL_LEDGER_FAILURE.with(|failure| failure.set(fault));
+                }
+                assert!(
+                    owner
+                        .install_sdk_release(
+                            &f.configuration,
+                            &secrets,
+                            "2026-09-26T01:00:00Z",
+                            1_003_600
+                        )
+                        .is_err()
+                );
+                let receipt = owner
+                    .store()
+                    .load_validated(DEFAULT_PRESET_ID, false, &secrets)
+                    .unwrap();
+                for file in [
+                    &receipt.keystore,
+                    &receipt.app_certificate,
+                    &receipt.signed_profile,
+                ] {
+                    assert!(Path::new(&file.path).is_file());
+                }
+                let ledger: Value = serde_json::from_slice(
+                    &fs::read(f.root.join(crate::credential_owner::LEDGER_FILE)).unwrap(),
+                )
+                .unwrap();
+                assert_eq!(ledger["state"], "replacingSecrets");
+                assert!(
+                    ledger["pendingMaterialDirectories"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|p| p.as_str() == receipt.managed_material_directory.as_deref())
+                );
+                assert!(owner.current().is_err());
+                assert!(f.owner().current().is_err());
+                if prior {
+                    let repaired = owner
+                        .install_sdk_release(
+                            &f.configuration,
+                            &secrets,
+                            "2026-09-26T02:00:00Z",
+                            1_007_200,
+                        )
+                        .unwrap();
+                    assert_eq!(owner.current().unwrap(), repaired);
+                }
+                owner.remove(&secrets).unwrap();
+                assert!(secrets.0.lock().unwrap().is_empty());
+                assert!(
+                    !fs::read_dir(&f.root)
+                        .unwrap()
+                        .filter_map(Result::ok)
+                        .any(|entry| entry
+                            .file_name()
+                            .to_string_lossy()
+                            .starts_with("sdk-release-"))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn pending_material_cleanup_refuses_an_outside_directory_before_mutation() {
+        let f = Fixture::new();
+        let secrets = Secrets::default();
+        let owner = f.owner();
+        owner
+            .install_sdk_release(
+                &f.configuration,
+                &secrets,
+                "2026-09-26T00:00:00Z",
+                1_000_000,
+            )
+            .unwrap();
+        let ledger_path = f.root.join(crate::credential_owner::LEDGER_FILE);
+        let mut ledger: Value = serde_json::from_slice(&fs::read(&ledger_path).unwrap()).unwrap();
+        ledger["state"] = json!("replacingSecrets");
+        ledger["pendingMaterialDirectories"] = json!([f.configuration.sdk_root]);
+        let bytes = serde_json::to_vec(&ledger).unwrap();
+        fs::write(&ledger_path, &bytes).unwrap();
+        let count = secrets.0.lock().unwrap().len();
+        assert!(owner.remove(&secrets).is_err());
+        assert!(f.configuration.sdk_root.exists());
+        assert_eq!(fs::read(&ledger_path).unwrap(), bytes);
+        assert_eq!(secrets.0.lock().unwrap().len(), count);
+    }
 }

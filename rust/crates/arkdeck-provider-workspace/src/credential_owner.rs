@@ -65,6 +65,12 @@ struct Ledger {
         skip_serializing_if = "Vec::is_empty"
     )]
     pending_envelope_accounts: Vec<String>,
+    #[serde(
+        rename = "pendingMaterialDirectories",
+        default,
+        skip_serializing_if = "Vec::is_empty"
+    )]
+    pending_material_directories: Vec<String>,
 }
 
 impl Ledger {
@@ -75,6 +81,7 @@ impl Ledger {
             credential_ref,
             preset_owners,
             pending_envelope_accounts: Vec::new(),
+            pending_material_directories: Vec::new(),
         }
     }
 
@@ -309,7 +316,9 @@ impl CredentialOwner {
             // Intentionally do not validate/adopt the receipt: uninstall is
             // also the exit from an unreadable or interrupted installation.
             let mut ledger = self.ledger_for_mutation(held)?;
-            ledger.state = if ledger.pending_envelope_accounts.is_empty() {
+            ledger.state = if ledger.pending_envelope_accounts.is_empty()
+                && ledger.pending_material_directories.is_empty()
+            {
                 "removing"
             } else {
                 "removingSecrets"
@@ -320,10 +329,16 @@ impl CredentialOwner {
                 for account in &ledger.pending_envelope_accounts {
                     secrets.remove_current(account)?;
                 }
-                crate::signing_removal::remove_preset(&self.store, secrets).and_then(|removal| {
-                    self.save(held, &Ledger::stable(None, Vec::new()))?;
-                    Ok(removal)
-                })
+                crate::signing_removal::remove_preset(&self.store, secrets).and_then(
+                    |mut removal| {
+                        for path in &ledger.pending_material_directories {
+                            removal.removed_managed_material |=
+                                crate::sdk_release::remove_material(std::path::Path::new(path))?;
+                        }
+                        self.save(held, &Ledger::stable(None, Vec::new()))?;
+                        Ok(removal)
+                    },
+                )
             })();
             if result.is_err() {
                 // Settle only the receipt that actually remains. A receipt
@@ -346,6 +361,7 @@ impl CredentialOwner {
         self.with_lock(|held| {
             let mut ledger = self.ledger_for_mutation(held)?;
             let prior_pending = ledger.pending_envelope_accounts.clone();
+            let prior_material = ledger.pending_material_directories.clone();
             ledger.state = "replacingSecrets".into();
             self.save(held, &ledger)?;
             let result = (|| {
@@ -371,7 +387,7 @@ impl CredentialOwner {
                     .store
                     .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
                 let reference = credential_reference(&receipt)?;
-                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
+                self.commit_replacement(held, &ledger, &receipt, &reference)?;
                 Ok(CredentialResource {
                     credential_ref: reference,
                     project_ref: receipt.project_ref,
@@ -383,6 +399,7 @@ impl CredentialOwner {
             if let Err(error) = &result
                 && !matches!(error, SigningError::MaintenanceUncertain(_))
                 && prior_pending.is_empty()
+                && prior_material.is_empty()
             {
                 // Only a synchronous, proven restoration may settle this
                 // guarded transaction. Crashes leave replacingSecrets and
@@ -418,6 +435,7 @@ impl CredentialOwner {
             }
             let mut ledger = self.ledger_for_mutation(held)?;
             let prior_pending = ledger.pending_envelope_accounts.clone();
+            let prior_material = ledger.pending_material_directories.clone();
             ledger.state = "replacingSecrets".into();
             self.save(held, &ledger)?;
             let result = (|| {
@@ -440,7 +458,7 @@ impl CredentialOwner {
                     .store
                     .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
                 let reference = credential_reference(&receipt)?;
-                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
+                self.commit_replacement(held, &ledger, &receipt, &reference)?;
                 Ok((
                     created,
                     CredentialResource {
@@ -455,6 +473,7 @@ impl CredentialOwner {
             if let Err(error) = &result
                 && !matches!(error, SigningError::MaintenanceUncertain(_))
                 && prior_pending.is_empty()
+                && prior_material.is_empty()
             {
                 // Only a synchronous, proven restoration may settle this
                 // guarded transaction. Crashes leave replacingSecrets and
@@ -479,11 +498,33 @@ impl CredentialOwner {
         self.with_lock(|held| {
             let mut ledger = self.ledger_for_mutation(held)?;
             let prior_pending = ledger.pending_envelope_accounts.clone();
+            let prior_material = ledger.pending_material_directories.clone();
             ledger.state = "replacingSecrets".into();
             self.save(held, &ledger)?;
+            let mut receipt_attempted = false;
             let result = (|| {
-                let prepared =
-                    crate::sdk_release::prepare(&self.store, configuration, secrets, timestamp)?;
+                let mut prepared = crate::sdk_release::prepare(
+                    &self.store,
+                    configuration,
+                    secrets,
+                    timestamp,
+                    &mut |path| {
+                        let path = path.to_str().ok_or_else(|| {
+                            SigningError::unsafe_file("SDK material path is not UTF-8")
+                        })?;
+                        if !self.valid_material_directory(path) {
+                            return Err(SigningError::unsafe_file(
+                                "SDK material path is outside the managed root",
+                            ));
+                        }
+                        ledger.pending_material_directories.push(path.into());
+                        ledger.pending_material_directories.sort();
+                        ledger.pending_material_directories.dedup();
+                        self.save(held, &ledger)
+                    },
+                )?;
+                prepared.retain_for_transaction();
+                receipt_attempted = true;
                 let passwords = crate::secret_envelope::SecretPair {
                     keystore: crate::signing_preset::public_sdk_release_password(),
                     key: crate::signing_preset::public_sdk_release_password(),
@@ -510,8 +551,7 @@ impl CredentialOwner {
                     .store
                     .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
                 let reference = credential_reference(&receipt)?;
-                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
-                prepared.commit();
+                self.commit_replacement(held, &ledger, &receipt, &reference)?;
                 Ok(CredentialResource {
                     credential_ref: reference,
                     project_ref: receipt.project_ref,
@@ -520,16 +560,98 @@ impl CredentialOwner {
                     reference_count: 0,
                 })
             })();
-            if let Err(error) = &result
-                && !matches!(error, SigningError::MaintenanceUncertain(_))
+            if result.is_err()
+                && !receipt_attempted
                 && prior_pending.is_empty()
+                && prior_material.is_empty()
+                && let Ok(receipt) = self.installed_receipt()
+                && self
+                    .retire_pending_material(held, &ledger, receipt.as_ref())
+                    .is_ok()
             {
                 ledger.state = "replacing".into();
                 ledger.pending_envelope_accounts.clear();
+                ledger.pending_material_directories.clear();
                 let _ = self.recover_mutation(held, &ledger);
             }
             result
         })
+    }
+
+    fn valid_material_directory(&self, path: &str) -> bool {
+        let path_object = std::path::Path::new(path);
+        crate::signing_action::is_standard_path(path)
+            && path_object.parent() == Some(self.store.root())
+            && path_object
+                .file_name()
+                .and_then(|name| name.to_str())
+                .and_then(|name| name.strip_prefix("sdk-release-"))
+                .is_some_and(crate::signing_preset::is_uuid)
+    }
+
+    fn retire_pending_material(
+        &self,
+        held: &Held,
+        ledger: &Ledger,
+        receipt: Option<&SigningPresetReceipt>,
+    ) -> Result<(), SigningError> {
+        self.revalidate(held)?;
+        for path in &ledger.pending_material_directories {
+            if !self.valid_material_directory(path) {
+                return Err(SigningError::unsafe_file(
+                    "pending SDK material path is invalid",
+                ));
+            }
+            if let Some(receipt) = receipt {
+                if receipt.managed_material_directory.as_deref() == Some(path.as_str()) {
+                    continue;
+                }
+                if [
+                    &receipt.java_executable,
+                    &receipt.signer_jar,
+                    &receipt.keystore,
+                    &receipt.app_certificate,
+                    &receipt.signed_profile,
+                ]
+                .iter()
+                .any(|file| std::path::Path::new(&file.path).starts_with(path))
+                {
+                    return Err(SigningError::MaintenanceUncertain(
+                        "replacement still references pending SDK source material".into(),
+                    ));
+                }
+            }
+            crate::sdk_release::remove_material(std::path::Path::new(path))?;
+        }
+        self.revalidate(held)
+    }
+
+    fn commit_replacement(
+        &self,
+        held: &Held,
+        ledger: &Ledger,
+        receipt: &SigningPresetReceipt,
+        reference: &str,
+    ) -> Result<(), SigningError> {
+        self.retire_pending_material(held, ledger, Some(receipt))?;
+        match self.save(held, &Ledger::stable(Some(reference.into()), Vec::new())) {
+            Ok(()) => Ok(()),
+            Err(SigningError::MaintenanceUncertain(_)) => {
+                // The stable rename may be visible. Only a successfully
+                // synchronized guard write proves that quarantine is back.
+                match self.save(held, ledger) {
+                    Ok(()) => Err(SigningError::MaintenanceUncertain("stable signing publication was uncertain; guarded tracking restored".into())),
+                    Err(_) => Err(SigningError::MaintenanceUncertain("stable signing publication and guard restoration are both uncertain; retained receipt/material require explicit maintenance".into())),
+                }
+            }
+            Err(_) => {
+                // save classifies all failures after possible publication as
+                // MaintenanceUncertain; here the prior durable guard remains.
+                Err(SigningError::MaintenanceUncertain(
+                    "stable signing ledger was not published; guarded tracking retained".into(),
+                ))
+            }
+        }
     }
 
     /// Both replacement and removal validate pins without adopting a broken
@@ -548,6 +670,11 @@ impl CredentialOwner {
                 "removingSecrets",
             ]
             .contains(&ledger.state.as_str())
+            || ledger.pending_material_directories.len() > MAX_OWNERS
+            || !ledger
+                .pending_material_directories
+                .iter()
+                .all(|path| self.valid_material_directory(path))
             || ledger.pending_envelope_accounts.len() > MAX_OWNERS
             || !ledger
                 .pending_envelope_accounts
@@ -655,6 +782,7 @@ impl CredentialOwner {
         if ledger.schema_version != LEDGER_SCHEMA
             || ledger.state != "stable"
             || !ledger.pending_envelope_accounts.is_empty()
+            || !ledger.pending_material_directories.is_empty()
             || ledger.preset_owners.len() > MAX_OWNERS
             || ledger.preset_owners != sorted
             || unique.len() != ledger.preset_owners.len()
@@ -677,6 +805,7 @@ impl CredentialOwner {
         if !["replacing", "removing"].contains(&ledger.state.as_str())
             || !ledger.preset_owners.is_empty()
             || !ledger.pending_envelope_accounts.is_empty()
+            || !ledger.pending_material_directories.is_empty()
         {
             return Err(SigningError::receipt(
                 "signing credential mutation record is invalid",
@@ -729,17 +858,35 @@ impl CredentialOwner {
                 "signing credential ledger exceeds its bound",
             ));
         }
+        #[cfg(test)]
+        if ledger.state == "stable" && FINAL_LEDGER_FAILURE.with(|failure| failure.get()) == 1 {
+            FINAL_LEDGER_FAILURE.with(|failure| failure.set(0));
+            return Err(SigningError::io(
+                "fixture stable ledger publication failure",
+            ));
+        }
         held.directory
             .publish_document(LEDGER_FILE, &bytes, MAX_LEDGER_BYTES)
             .map_err(|error| match error {
                 DocumentPublishError::BeforePublication(_) => {
                     SigningError::io("cannot write signing credential transaction")
                 }
-                DocumentPublishError::OutcomeUnknown(_) => SigningError::io(
-                    "signing credential transaction could not be published durably",
+                DocumentPublishError::OutcomeUnknown(_) => SigningError::MaintenanceUncertain(
+                    "signing credential transaction could not be published durably".into(),
                 ),
             })?;
-        self.revalidate(held)
+        #[cfg(test)]
+        if ledger.state == "stable" && FINAL_LEDGER_FAILURE.with(|failure| failure.replace(0)) == 2
+        {
+            return Err(SigningError::MaintenanceUncertain(
+                "fixture stable ledger sync failure after rename".into(),
+            ));
+        }
+        self.revalidate(held).map_err(|_| {
+            SigningError::MaintenanceUncertain(
+                "signing owner directory changed after ledger publication".into(),
+            )
+        })
     }
 
     /// Swift `revalidateOwnerDirectory(_:)`.
@@ -810,4 +957,9 @@ impl SigningSecrets for NoSecrets {
     fn trusted_daemon_fingerprint(&self) -> Result<Option<String>, SigningError> {
         Ok(None)
     }
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(crate) static FINAL_LEDGER_FAILURE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }

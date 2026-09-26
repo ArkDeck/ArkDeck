@@ -1,0 +1,200 @@
+[
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app"
+    ],
+    "exit": 64,
+    "stderr": "warning: `signing install-sdk-release` is deprecated; use `arkdeck runtime signing install-sdk-release`\narkdeck signing: signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app"
+    ],
+    "exit": 64,
+    "stderr": "warning: `signing install-sdk-release` is deprecated; use `arkdeck runtime signing install-sdk-release`\narkdeck signing: signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "relative-sdk",
+      "--java",
+      "/fixture/java",
+      "--bundle-name",
+      "com.example.app",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing install-sdk-release --sdk must be an absolute path\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "install-sdk-release",
+      "--sdk",
+      "/fixture/sdk",
+      "--java",
+      "relative-java",
+      "--bundle-name",
+      "com.example.app",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing install-sdk-release --java must be an absolute path\n",
+    "stdout": ""
+  }
+]

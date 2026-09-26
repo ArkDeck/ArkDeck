@@ -351,3 +351,36 @@ fn sdk_install_rejects_relative_material_paths_before_mutation() {
         assert!(secrets.0.lock().unwrap().is_empty());
     }
 }
+
+#[test]
+fn sdk_cli_replays_swift_relative_path_refusals_before_owner_or_keychain_access() {
+    let cases: Vec<Value> = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/signing-sdk/cases.json"
+    ))
+    .unwrap();
+    assert_eq!(cases.len(), 12);
+    for case in cases {
+        let home = Home::new();
+        fs::create_dir(&home.0).unwrap();
+        let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+            .args(
+                case["argv"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|value| value.as_str().unwrap()),
+            )
+            .env("HOME", &home.0)
+            .env("CFFIXED_USER_HOME", &home.0)
+            .stdin(Stdio::null())
+            .output()
+            .unwrap();
+        assert_eq!(
+            output.status.code(),
+            Some(case["exit"].as_i64().unwrap() as i32)
+        );
+        assert_eq!(output.stdout, case["stdout"].as_str().unwrap().as_bytes());
+        assert_eq!(output.stderr, case["stderr"].as_str().unwrap().as_bytes());
+        assert_eq!(fs::read_dir(&home.0).unwrap().count(), 0);
+    }
+}

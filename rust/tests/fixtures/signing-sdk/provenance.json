@@ -1,0 +1,7 @@
+{
+  "owners": [
+    "RuntimeCLI.runSigningAsync.install-sdk-release"
+  ],
+  "producer": "record-signing-sdk-oracle.py",
+  "swiftCliSha256": "632da710a17efdbca79661adfebb253f1c796b04247668e6ba907e4ee125a4d4"
+}

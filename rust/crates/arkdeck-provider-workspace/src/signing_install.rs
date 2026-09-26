@@ -242,7 +242,7 @@ pub(crate) fn publish_receipt(
 
 #[cfg(test)]
 thread_local! {
-    static PUBLICATION_FAILURE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
+    pub(crate) static PUBLICATION_FAILURE: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }
 
 pub(crate) fn prove_receipt_unchanged(

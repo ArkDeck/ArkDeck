@@ -30,7 +30,22 @@ pub(crate) fn remove_preset(
     secrets: &dyn SigningSecretRemoval,
 ) -> Result<SigningPresetRemoval, SigningError> {
     let receipt_path = store.receipt_path();
-    let directory = arkdeck_platform::HostDirectory::open(store.root())
+    // Signing receipt paths use Foundation's /tmp spelling; HostDirectory
+    // deliberately opens the physical /private/tmp spelling, as the owner
+    // lock already does. Keep managed-path comparison in the original form.
+    let canonical_root = store
+        .root()
+        .canonicalize()
+        .map_err(|_| SigningError::unsafe_file("signing preset root is unsafe"))?;
+    if canonical_root != store.root()
+        && store
+            .root()
+            .to_str()
+            .is_none_or(|root| crate::foundation_resolved_path(root).as_deref() != Some(root))
+    {
+        return Err(SigningError::unsafe_file("signing preset root is unsafe"));
+    }
+    let directory = arkdeck_platform::HostDirectory::open(&canonical_root)
         .map_err(|_| SigningError::unsafe_file("signing preset root is unsafe"))?;
     let receipt = match directory.read(RECEIPT_FILE, 1024 * 1024) {
         Ok(bytes) => decode_for_maintenance(&bytes),
