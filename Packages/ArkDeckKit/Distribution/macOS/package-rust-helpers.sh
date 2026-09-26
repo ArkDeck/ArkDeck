@@ -1,10 +1,12 @@
 #!/bin/bash
 # Lays out and signs the helper pair whose main programs are the Rust CLI and
 # daemon (CHG-2026-074 M5, G5 slice 20a), and keeps the Swift helper it
-# replaces beside it for one cycle. Its two callers own everything around it:
+# replaces beside it for one cycle. Its callers own everything around it:
 # build-helpers.sh with ARKDECK_HELPER_RUNTIME=rust is the release (validated
 # provisioning profiles, Developer ID with a secure timestamp, notarization,
-# stapling and Gatekeeper assessment), and build-unsigned-rust-helpers.sh is a
+# stapling and Gatekeeper assessment); build-local-helpers.sh uses the same
+# provisioned identities with debug binaries and no timestamp, for this Mac
+# only; and build-unsigned-rust-helpers.sh is a
 # structure check signed ad hoc that is never distributed. This script builds
 # nothing, validates no profile and notarizes nothing.
 #
