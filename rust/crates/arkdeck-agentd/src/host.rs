@@ -1158,6 +1158,20 @@ impl HostServices for Host {
                 details: None,
             });
         }
+        // Swift's App gateway without its Artifact owner refuses the App's
+        // follow-up uploads before the Runtime; a begin reaches the handler,
+        // which refuses it for its missing owners.
+        if method != "artifact.import.begin" && (self.imports.is_none() || self.artifacts.is_none())
+        {
+            return Err(WireError {
+                code: "admissionDenied".into(),
+                message: "Import is outside this App upload scope".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            });
+        }
         self.imports_for(method, params, true)
     }
 

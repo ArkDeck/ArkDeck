@@ -1106,6 +1106,7 @@ fn serve_runtime_service_refusal(
         message: refusal.message,
         details: refusal.details,
         command: None,
+        plain_exit: None,
     };
     let written =
         if emitted {
@@ -1743,6 +1744,13 @@ fn main() -> std::process::ExitCode {
             exit.into()
         }
         Err(error) => {
+            // Swift's plain `CLIError`: its group and words on stderr, nothing
+            // on stdout, and its own exit status, whatever the rendering.
+            if let Some(exit) = error.plain_exit {
+                let group = invocation.command.split('.').next().unwrap_or_default();
+                eprintln!("arkdeck {group}: {}", error.message);
+                return exit.into();
+            }
             if invocation.json {
                 if write_document(&arkdeck_cli::with_lifecycle(
                     failure_envelope(invocation.command, &error, id, true),

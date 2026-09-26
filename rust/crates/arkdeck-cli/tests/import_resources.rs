@@ -707,9 +707,9 @@ fn import_list_maps_only_closed_discovery_options() {
             .unwrap()
             .clone()
     );
+    // The registry bounds the state and the page size and knows no file.
     for args in [
         vec!["--state", "unknown"],
-        vec!["--target", "../target"],
         vec!["--page-size", "0"],
         vec!["--page-size", "1001"],
         vec!["--file", "source"],
@@ -718,6 +718,25 @@ fn import_list_maps_only_closed_discovery_options() {
         values.extend(args);
         assert!(parse(&argv(&values)).is_err());
     }
+    // Swift sends the target and the cursor as given, for the Runtime to judge.
+    assert_eq!(
+        parse(&argv(&[
+            "artifact",
+            "import",
+            "list",
+            "--target",
+            "../target",
+            "--cursor",
+            ""
+        ]))
+        .unwrap()
+        .params
+        .unwrap(),
+        json!({"target":"../target","cursor":""})
+            .as_object()
+            .unwrap()
+            .clone()
+    );
 }
 #[cfg(target_os = "macos")]
 #[test]

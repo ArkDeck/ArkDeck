@@ -226,11 +226,13 @@ impl<H: HostServices> AppIngress<H> {
                     | "flash.bind-current-loader"
             )
         {
-            return refusal(
-                &request.id,
-                "rejected",
-                "method is not available through the standalone App ingress",
-            );
+            return not_allowlisted(&request.id);
+        }
+        // Swift's App transport admits a begin only for complete, valid
+        // metadata of one of the App's three kinds, before anything reaches
+        // the Runtime.
+        if request.method == "artifact.import.begin" && !imports::admitted_begin(&request) {
+            return not_allowlisted(&request.id);
         }
         if job.is_none() && !closed_parameters(&request) {
             return refusal(
@@ -238,9 +240,6 @@ impl<H: HostServices> AppIngress<H> {
                 "invalidParams",
                 "App request requires its complete closed parameters",
             );
-        }
-        if let Some(refusal) = imports::out_of_scope(&request) {
-            return refusal;
         }
         // Retain the one-shot claim across the synchronous owner call, but
         // never hold the gate mutex while executing; a parallel cancel must enter.
@@ -404,4 +403,14 @@ fn canonical_decimal(value: Option<&Value>, minimum: i64) -> bool {
 fn refusal(id: &str, code: &str, message: &str) -> Vec<u8> {
     let response = Response::failure(id, code, message).value();
     encode_frame(&response, MAX_RESPONSE_BYTES).expect("bounded App ingress refusal")
+}
+/// Swift's App transport refusing a request outside its allowlist before the
+/// Runtime (`AgentXPCEndpoint.responseFrame`): this code and these words,
+/// and nothing else, whatever the method.
+fn not_allowlisted(id: &str) -> Vec<u8> {
+    refusal(
+        id,
+        "methodNotAllowlisted",
+        "Runtime transport refused this request",
+    )
 }

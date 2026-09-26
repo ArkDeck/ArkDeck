@@ -1480,7 +1480,13 @@ fn only_app_frames_reach_the_app_import_owner_and_never_a_console() {
         control.handle_app_frame(&health),
         control.handle_frame(&health)
     );
-    // A host without an App Import owner refuses, with zero dispatch.
+    // A host without an App Import owner refuses, with zero dispatch, as
+    // Swift's App gateway without its Artifact owner does
+    // (`tests/fixtures/import-app-refusal-oracle`, the cases without owners).
+    let oracle: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/import-app-refusal-oracle/cases.json"
+    ))
+    .unwrap();
     let (plain, reads) = setup();
     for method in [
         "artifact.import.begin",
@@ -1493,12 +1499,15 @@ fn only_app_frames_reach_the_app_import_owner_and_never_a_console() {
             .unwrap()
             .outcome
             .unwrap_err();
-        assert_eq!(error.code, "operationUnavailable", "{method}");
+        let swift = &oracle["app"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["method"] == method && case["owners"] == false)
+            .unwrap()["received"]["error"];
         assert_eq!(
-            error.details,
-            json!({"phase":"importOwner","newDispatchCount":0})
-                .as_object()
-                .cloned(),
+            json!({"code":error.code,"message":error.message,"details":error.details}),
+            *swift,
             "{method}"
         );
     }

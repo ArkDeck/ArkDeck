@@ -4,7 +4,9 @@
 //! maintenance and Debug probe over the production owners, whose probe runs a
 //! fake HDC, are `tests/spawning`'s (see `app_ingress_fake_hdc.rs` there).
 use super::*;
-use arkdeck_contract::{WireError, encode_import_chunk, sha256_hex, validate_method_value};
+use arkdeck_contract::{
+    Request, WireError, canonical_json, encode_import_chunk, sha256_hex, validate_method_value,
+};
 use arkdeck_hoststore::{
     ArtifactReadStore, ImportUploadFault, ImportUploadStore, JobStore, TargetStore,
 };
@@ -141,13 +143,17 @@ fn app_uploads_publish_once_as_app_owned_and_keep_their_owner_across_restart() {
             .count(),
         1
     );
-    // A local client reads the same Import; the App cannot (not admitted).
+    // A local client reads the same Import; the App cannot (not admitted,
+    // Swift's App transport refusal).
     let inspect = frame("artifact.import.inspect", json!({"importId":id}));
     assert_eq!(
         result(&control.handle_frame(&inspect), "artifact.import.inspect")["state"],
         "committed"
     );
-    assert_eq!(code(&ingress.handle(&inspect, root.peer())), "rejected");
+    assert_eq!(
+        code(&ingress.handle(&inspect, root.peer())),
+        "methodNotAllowlisted"
+    );
     // A native library upload left in progress stays the App's across a restart.
     let native = result(
         &call(
@@ -443,6 +449,197 @@ fn a_lost_commit_answer_reaches_the_owner_once_and_is_never_rewritten() {
 /// .testCommitRefusalsCarryTheImportOwnersCodeMessageAndEvidence` records
 /// Swift's daemon answering each with the Import owner's code, message and
 /// zero-dispatch evidence.
+/// The App oracle's HAP: the ZIP magic, then 4,092 bytes of `a`.
+fn oracle_hap() -> Vec<u8> {
+    let mut bytes = b"PK\x03\x04".to_vec();
+    bytes.resize(4096, b'a');
+    bytes
+}
+fn oracle_metadata(request: &str, bytes: &[u8]) -> Value {
+    json!({"schemaVersion":"arkdeck.import-intent/1","importRequestId":request,"kind":"hap",
+        "targetId":TARGET,"bindingRevision":"1","deviceProfile":null,"name":"fixture.hap",
+        "byteCount":bytes.len().to_string(),"sha256":sha256_hex(bytes)})
+}
+fn oracle_chunk(id: &str, bytes: &[u8]) -> Value {
+    json!({"importId":id,"generation":"1","offset":"0","byteCount":bytes.len().to_string(),
+        "sha256":sha256_hex(bytes),"base64":encode_import_chunk(bytes).unwrap()})
+}
+/// A recorded runtime identity, as this fixture's.
+fn substituted(value: &Value, names: &[(&str, &str)]) -> Value {
+    match value {
+        Value::String(text) => names
+            .iter()
+            .find(|(name, _)| name == text)
+            .map_or_else(|| value.clone(), |(_, actual)| json!(actual)),
+        Value::Object(fields) => Value::Object(
+            fields
+                .iter()
+                .map(|(key, value)| (key.clone(), substituted(value, names)))
+                .collect(),
+        ),
+        Value::Array(items) => Value::Array(items.iter().map(|v| substituted(v, names)).collect()),
+        _ => value.clone(),
+    }
+}
+
+/// What the App receives from Swift for the Import requests its transport
+/// refuses, or that the Runtime refuses without its Import owners
+/// (`rust/tests/fixtures/import-app-refusal-oracle`, "app"): the frame, byte
+/// for byte (TASK-XPA-013, X3, X4). A refusal at the door reaches no owner
+/// and writes nothing.
+#[test]
+fn app_transport_refusals_are_the_frames_swift_s_app_receives() {
+    let root = uploads();
+    let (control, reached) = compose(&root, None);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    let unowned = AppIngress::new(
+        Arc::new(Control::new(crate::host::Host::from_environment()).unwrap()),
+        root.peer().euid,
+    );
+    let local = |method, params| control.handle_frame(&frame(method, params));
+    let bytes = oracle_hap();
+    let live = result(
+        &local(
+            "artifact.import.begin",
+            oracle_metadata("oracle-live", &bytes),
+        ),
+        "artifact.import.begin",
+    )["importId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    result(
+        &local(
+            "artifact.import.append",
+            oracle_chunk(&live, &bytes[..2048]),
+        ),
+        "artifact.import.append",
+    );
+    let staged = result(
+        &local(
+            "artifact.import.begin",
+            oracle_metadata("oracle-committed", &bytes),
+        ),
+        "artifact.import.begin",
+    )["importId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    result(
+        &local("artifact.import.append", oracle_chunk(&staged, &bytes)),
+        "artifact.import.append",
+    );
+    let committed = result(
+        &local("artifact.import.commit", selector(&staged)),
+        "artifact.import.commit",
+    );
+    assert_eq!(committed["state"], "committed");
+    let names = [
+        ("$liveImportId", live.as_str()),
+        ("$committedImportId", staged.as_str()),
+        ("$targetId", TARGET),
+    ];
+    let oracle: Value = serde_json::from_str(include_str!(
+        "../../../../tests/fixtures/import-app-refusal-oracle/cases.json"
+    ))
+    .unwrap();
+    let cases = oracle["app"].as_array().unwrap();
+    assert_eq!(cases.len(), 11);
+    for case in cases {
+        let name = case["case"].as_str().unwrap();
+        let method = case["method"].as_str().unwrap();
+        let params = substituted(&case["params"], &names);
+        let request = serde_json::to_vec(&Request::new(
+            "import-app-oracle",
+            method,
+            params.as_object().cloned(),
+        ))
+        .unwrap();
+        let before = (
+            tree(&root.0),
+            ingress.dispatches.load(Ordering::Relaxed),
+            reached.lock().unwrap().len(),
+        );
+        let reply = if case["owners"] == true {
+            ingress.handle(&request, root.peer())
+        } else {
+            unowned.handle(&request, root.peer())
+        };
+        if name == "app.append.missingImport" {
+            // X5, a declared difference (#2132): the Rust owner, not a
+            // gateway read, judges App scope, and it has no such Import.
+            assert_eq!(code(&reply), "resourceNotFound", "{name}");
+            continue;
+        }
+        assert_eq!(
+            reply.trim_ascii_end(),
+            canonical_json(&case["received"]).unwrap().as_slice(),
+            "{name}: {}",
+            String::from_utf8_lossy(&reply)
+        );
+        if case["received"]["error"]["code"] == "methodNotAllowlisted" {
+            assert_eq!(
+                (
+                    tree(&root.0),
+                    ingress.dispatches.load(Ordering::Relaxed),
+                    reached.lock().unwrap().len(),
+                ),
+                before,
+                "{name} reached the Runtime"
+            );
+        }
+    }
+}
+
+/// This ingress answers every request outside its allowlist with Swift's
+/// App transport refusal, and with nothing else: the code and its words, no
+/// details, whatever the method, an Import method or not (TASK-XPA-013, X3).
+#[test]
+fn a_request_outside_the_app_allowlist_gets_swift_s_transport_refusal_and_nothing_else() {
+    let root = uploads();
+    let (control, reached) = compose(&root, None);
+    let ingress = AppIngress::new(control, root.peer().euid);
+    for method in [
+        "artifact.import.list",
+        "artifact.import.inspect",
+        "artifact.import.inspection",
+        "artifact.import.release",
+        // Swift's App transport admits these three; this ingress does not.
+        "artifact.inspect",
+        "job.status",
+        "session.list",
+        // Neither admits these.
+        "target.adopt",
+        "workspace.project.list",
+        "runtime.tool.list",
+    ] {
+        let reply = ingress.handle(&frame(method, json!({})), root.peer());
+        let value: Value = serde_json::from_slice(&reply).unwrap();
+        assert_eq!(
+            value.as_object().unwrap().keys().collect::<Vec<_>>(),
+            ["error", "id", "ok"],
+            "{method}"
+        );
+        assert_eq!(
+            value["error"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .collect::<Vec<_>>(),
+            ["code", "message"],
+            "{method}"
+        );
+        assert_eq!(
+            value,
+            json!({"id":"request-1","ok":false,"error":{"code":"methodNotAllowlisted",
+                "message":"Runtime transport refused this request"}}),
+            "{method}"
+        );
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+    assert!(reached.lock().unwrap().is_empty());
+}
+
 /// Swift's recorded refusal of `method` with this code and message.
 fn swift_refusal(method: &str, code: &str, message: &str) -> WireError {
     let corpus = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
@@ -687,25 +884,25 @@ fn malformed_uploads_other_kinds_and_foreign_peers_never_enter_the_owner() {
     malformed.push(("artifact.import.begin", profile));
     for (method, params) in malformed {
         let reply = ingress.handle(&frame(method, params.clone()), root.peer());
-        assert_eq!(code(&reply), "invalidParams", "{method} {params}");
+        // Swift's App transport refuses a begin whose metadata is not a
+        // complete, valid Import intent at its door; the other uploads'
+        // closed shapes are this ingress's own.
+        let expected = if method == "artifact.import.begin" {
+            "methodNotAllowlisted"
+        } else {
+            "invalidParams"
+        };
+        assert_eq!(code(&reply), expected, "{method} {params}");
     }
-    // Swift's App transport refuses other kinds before the owner.
+    // Swift's App transport refuses other kinds at its door, in its words.
     for kind in ["workspace-patch", "fixture"] {
         let method = "artifact.import.begin";
-        let error = refusal(
-            &ingress.handle(&frame(method, begin("app-kind", kind)), root.peer()),
-            method,
-        );
+        let reply = ingress.handle(&frame(method, begin("app-kind", kind)), root.peer());
         assert_eq!(
-            (error.code.as_str(), error.message.as_str()),
-            ("admissionDenied", "Import is outside this App upload scope"),
+            serde_json::from_slice::<Value>(&reply).unwrap(),
+            json!({"id":"request-1","ok":false,"error":{"code":"methodNotAllowlisted",
+                "message":"Runtime transport refused this request"}}),
             "{kind}"
-        );
-        assert_eq!(
-            error.details,
-            json!({"phase":"preAdmission","newDispatchCount":0})
-                .as_object()
-                .cloned()
         );
     }
     for peer in [
