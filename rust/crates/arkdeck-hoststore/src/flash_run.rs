@@ -37,6 +37,7 @@ use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::capability_store::{CapabilityQuery, Effect, UseOutcome};
 use crate::flash_facts::RockchipFacts;
 use crate::job_owner::arkforge_job_state::ArkForgeJobState;
+use crate::job_owner::flash_recovery::{OverwriteAdmission, OverwriteRefusal, RecoveryContext};
 use crate::job_plan::{
     FlashPlanner, FlashPlanning, JobPlanner, RockchipFactsPort, admission_blocker,
     canonical_inputs, delegated_arguments, is_flash, plan_completion_arguments,
@@ -279,21 +280,26 @@ impl FlashRunner<'_> {
                 .take_over_held_use(&mut run)
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
-        self.run(&mut run, &flash, descriptor, arkforge)?;
+        let established = self.run(&mut run, &flash, descriptor, arkforge)?;
         run.release(jobs, self.runner.sessions, &directory)?;
-        Ok(run.record.status())
+        let mut status = run.record.status();
+        if let Some(epoch) = established {
+            status["recoveryEpochId"] = json!(epoch);
+        }
+        Ok(status)
     }
 
     /// Swift `runOwned` from the admitted boundary, or from the confirmed
     /// safe boundary a reconcile reached: the running transition, the
-    /// admitted steps, and the terminal state their end decides.
+    /// admitted steps, and the terminal state their end decides. Answers the
+    /// superseding recovery epoch a complete overwrite established.
     fn run(
         &self,
         run: &mut Run,
         flash: &FlashExecution<'_>,
         descriptor: &CatalogOperation,
         state: ArkForgeJobState,
-    ) -> Result<(), RunRefusal> {
+    ) -> Result<Option<String>, RunRefusal> {
         let started = run.clock()?;
         run.record.start(&started);
         // Swift `completedStepIDs`: none from the admitted boundary; from a
@@ -330,8 +336,8 @@ impl FlashRunner<'_> {
             completed = job.completed;
             outcome
         });
-        match outcome {
-            Ok(()) => self.finalize(run, descriptor, &completed),
+        let settled = match outcome {
+            Ok(()) => return self.finalize(run, descriptor, &completed),
             Err(Stop::Refused(refusal)) => Err(refusal),
             Err(Stop::Unknown(reason)) => {
                 run.record.set_operation_failure(Some(failure(
@@ -381,7 +387,8 @@ impl FlashRunner<'_> {
                 self.close(run, &format!("artifact publication failed: {detail}"))?;
                 self.runner.settle_mutation(run, UseOutcome::Confirmed)
             }
-        }
+        };
+        settled.map(|()| None)
     }
 
     /// Swift `confirmedSucceededStepIDs`: every step whose confirmed outcome
@@ -425,13 +432,15 @@ impl FlashRunner<'_> {
     }
 
     /// Swift `runOwned` once every step is confirmed: `finalizing`, the
-    /// finalization product, `succeeded`, and the use's outcome.
+    /// finalization product, then `succeeded` — or, for a complete-overwrite
+    /// recovery, the superseding epoch established and `recovered` — and the
+    /// use's outcome. Answers the epoch established.
     fn finalize(
         &self,
         run: &mut Run,
         descriptor: &CatalogOperation,
         completed: &BTreeSet<String>,
-    ) -> Result<(), RunRefusal> {
+    ) -> Result<Option<String>, RunRefusal> {
         let from = run.record.state.clone();
         run.transition(&from, "finalizing", "steps-complete")?;
         if let Err(detail) = self.publish_final(run, descriptor, completed) {
@@ -448,13 +457,44 @@ impl FlashRunner<'_> {
             )?;
             run.finish()?;
             run.persist(self.runner.jobs)?;
-            return self.runner.settle_mutation(run, UseOutcome::Confirmed);
+            return self
+                .runner
+                .settle_mutation(run, UseOutcome::Confirmed)
+                .map(|()| None);
         }
         run.record.set_operation_failure(None);
-        run.transition("finalizing", "succeeded", "finalized")?;
+        let recovery = run
+            .record
+            .admission_evidence()
+            .is_some_and(|evidence| evidence.get("completeOverwriteRecovery").is_some());
+        let mut established = None;
+        if recovery {
+            // The covered intents keep their unknown outcomes; the epoch is
+            // what a reader consults instead.
+            let now = run.clock()?;
+            let epoch = self
+                .runner
+                .jobs
+                .establish_recovery_epoch(&run.record, &descriptor.reference(), &now)
+                .map_err(|_| uncertain())?;
+            run.record.timeline.push(format!(
+                "superseding recovery epoch {} established; original outcomes remain unknown",
+                epoch.epoch_id
+            ));
+            run.persist(self.runner.jobs)?;
+            run.transition(
+                "finalizing",
+                "recovered",
+                "complete overwrite, readback, reboot, rebind and postflight confirmed",
+            )?;
+            established = Some(epoch.epoch_id);
+        } else {
+            run.transition("finalizing", "succeeded", "finalized")?;
+        }
         run.finish()?;
         run.persist(self.runner.jobs)?;
-        self.runner.settle_mutation(run, UseOutcome::Confirmed)
+        self.runner.settle_mutation(run, UseOutcome::Confirmed)?;
+        Ok(established)
     }
 
     fn publisher(&self) -> ArtifactPublisher<'_> {
@@ -1078,37 +1118,49 @@ impl FlashRunner<'_> {
             workspace_revision: None,
             workspace_file_scopes_digest: None,
         };
-        // Swift `freshCompleteOverwriteRecoveryProof`: the facts that would
-        // prove a recovery are fresh and complete, and no recovery is
-        // admitted by this Runtime yet.
+        // Swift `freshCompleteOverwriteRecoveryProof`: facts complete enough
+        // to prove a recovery, and DEC-016 decided again against them. A
+        // recognition in history leaves this Flash ordinary.
         let facts = facts.ok_or_else(|| reject(drifted))?;
         if !crate::job_record::digest(&facts.tool_sha256) || facts.device_mode.is_empty() {
             return Err(Stop::Failed(
                 "completeOverwriteRecovery.freshTargetTopologyOrToolMissing".into(),
             ));
         }
-        let epochs = self
-            .runner
-            .jobs
-            .recovery_epochs()
-            .map_err(|_| Stop::Refused(uncertain()))?;
-        let superseded: BTreeSet<String> = epochs
-            .iter()
-            .filter(|epoch| {
-                crate::swift_decoding::same_text(
-                    &epoch.draft.stable_target_identity_sha256,
-                    &identity,
-                ) && epoch.draft.binding_revision == binding
-            })
-            .flat_map(|epoch| {
-                epoch
-                    .draft
-                    .covered_intents
-                    .iter()
-                    .map(|intent| intent.job_id.clone())
-            })
-            .collect();
+        let undurable = |detail: String| {
+            Stop::Failed(format!(
+                "authorizationRequired: capability admission could not become durable: {detail}"
+            ))
+        };
+        let jobs = self.runner.jobs;
         let store = owner.authority.capabilities;
+        let campaign = flash.lane.hardware_acceptance_campaign();
+        let recovery = match jobs
+            .complete_overwrite_admission(
+                store,
+                &descriptor.reference(),
+                &Value::Object(request.inputs.clone()),
+                &identity,
+                binding,
+                &run.clock()?,
+                campaign.as_deref(),
+            )
+            .map_err(|refusal| match refusal {
+                OverwriteRefusal::Blocked(reason) => Stop::Failed(format!(
+                    "non-overridable recovery blocker: {}",
+                    OverwriteRefusal::blocker(&reason)
+                )),
+                OverwriteRefusal::Failed(detail) => undurable(detail),
+            })? {
+            OverwriteAdmission::Recovery { context, .. } => Some(context),
+            OverwriteAdmission::Ordinary | OverwriteAdmission::Recognized(_) => None,
+        };
+        let mut superseded = jobs
+            .superseded_jobs(&identity, binding)
+            .map_err(|error| undurable(format!("{error:?}")))?;
+        if let Some(context) = &recovery {
+            superseded.extend(context.covered_jobs().map(str::to_owned));
+        }
         let denied = |error: String| {
             Stop::Failed(format!(
                 "authorizationRequired: capability denied before mutation: {error}"
@@ -1137,8 +1189,14 @@ impl FlashRunner<'_> {
                 )
             })?;
         if status["capability"]["issuer"]["kind"] == "runtimeDefaultPolicy" {
-            let fingerprint =
-                crate::capability_policy::recovery_policy_fingerprint(&query, false, None);
+            let fingerprint = crate::capability_policy::recovery_policy_fingerprint(
+                &query,
+                false,
+                recovery
+                    .as_ref()
+                    .map(RecoveryContext::policy_lines)
+                    .as_deref(),
+            );
             if !capability.starts_with(&format!("CAP-RT-POLICY-{}-G", &fingerprint[..40])) {
                 return Err(Stop::Failed(
                     "completeOverwriteRecovery.freshProofDrifted".into(),
@@ -1161,7 +1219,7 @@ impl FlashRunner<'_> {
                 &now,
             )
             .map_err(|error| denied(error.swift()))?;
-        let evidence = json!({
+        let mut evidence = json!({
             "kind": "runtimeCapability", "reference": capability,
             "admittedAtUTC": consumed.consumed_at_utc,
             "validUntilUTC": status["capability"]["expiresAtUTC"],
@@ -1174,6 +1232,12 @@ impl FlashRunner<'_> {
                 "artifactSHA256": resolved.sha256,
             },
         });
+        // The recovery's exact proof travels with the consumed authority, so
+        // a restart can prove the same boundary without replaying an intent.
+        if let Some(context) = &recovery {
+            evidence["completeOverwriteRecovery"] = context.value();
+            evidence["recoveryProviderExecutableSHA256"] = json!(facts.tool_sha256);
+        }
         run.record.set_admission_evidence(evidence.clone());
         run.record
             .timeline
@@ -1184,6 +1248,28 @@ impl FlashRunner<'_> {
                 "authorizationRequired: capability admission could not become durable".into(),
             )
         })?;
+        // Only once the consumed authority and its recovery proof are
+        // durable is the recovery-only state entered.
+        if let Some(context) = &recovery {
+            let entered = run
+                .transition(
+                    "running",
+                    "recoveringByCompleteOverwrite",
+                    "distinct complete-overwrite capability reserved; original intents not \
+                     replayed",
+                )
+                .and_then(|()| {
+                    run.record.timeline.push(format!(
+                        "recovery coverage {} for {} unknown intent(s)",
+                        context.covered_effect_set_sha256,
+                        context.covered_intents.len()
+                    ));
+                    run.persist(self.runner.jobs)
+                });
+            if entered.is_err() {
+                return Err(undurable("the recovery state could not be entered".into()));
+            }
+        }
         Ok(())
     }
 

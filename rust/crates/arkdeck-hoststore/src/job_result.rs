@@ -6,11 +6,11 @@
 //! Job's empty Artifact directory, reseal a payload or refresh its
 //! verification cache while it reads.
 //!
-//! Only Jobs of the operations this Runtime runs are read. An unreadable
-//! recovery-epoch store, or an epoch naming the Job as the Job that recovered
-//! (a `recoveryEpoch` the published schema still pins to null), degrades the
-//! evidence. A product the request chose not to take may stay missing; any
-//! other missing product fails the evidence.
+//! Only Jobs of the operations this Runtime runs are read. The superseding
+//! recovery epoch that names the Job as its recovery Job is its evidence's
+//! `recoveryEpoch`, and its authority's; an unreadable recovery-epoch store
+//! degrades the evidence. A product the request chose not to take may stay
+//! missing; any other missing product fails the evidence.
 use crate::artifact_read_owner::ArtifactReadStore;
 use crate::artifact_usage::decode_index;
 use crate::device_steps;
@@ -105,6 +105,9 @@ struct Facts {
     inventory_available: bool,
     missing: Vec<String>,
     degraded: bool,
+    /// The epoch that names this Job as its recovery Job, as the evidence
+    /// projects it, or null.
+    recovery_epoch: Value,
 }
 
 impl JobResultReader<'_> {
@@ -172,7 +175,7 @@ impl JobResultReader<'_> {
                 Map::new(),
             ));
         }
-        let status = record.status();
+        let status = self.jobs.indexed_status(&record);
         let is_terminal = terminal(&record.state);
         if method == "job.result" && !is_terminal {
             return Err(proven(
@@ -391,10 +394,11 @@ impl JobResultReader<'_> {
             blockers.insert("resultNotReady");
         }
         // Swift reads the recovery epochs for every snapshot and fails the
-        // read when they are unreadable. An epoch that names this Job as the
-        // Job that recovered is a `recoveryEpoch` the published evidence
-        // schema still pins to null, so that evidence degrades as well.
-        let degraded = self.jobs.recovery_epoch_names(job_id).unwrap_or(true);
+        // read when they are unreadable.
+        let (degraded, recovery_epoch) = match self.jobs.recovery_epoch_of(job_id) {
+            Ok(epoch) => (false, epoch.map_or(Value::Null, |epoch| epoch.evidence())),
+            Err(_) => (true, Value::Null),
+        };
         if degraded {
             blockers.insert("recordUnreadable");
         }
@@ -406,6 +410,7 @@ impl JobResultReader<'_> {
             inventory_available: inventory_available || declares_nothing,
             missing,
             degraded,
+            recovery_epoch,
         }
     }
 
@@ -642,6 +647,12 @@ fn render(record: &JobRecord, facts: &Facts, is_terminal: bool) -> (Value, Vec<V
     } else {
         let mut fields = record.evidence_fields();
         fields.insert("artifacts".into(), json!(facts.verified));
+        // Swift `encodeEvidence`: the epoch in the evidence and, when the
+        // Job was admitted under an authority, in that authority too.
+        fields.insert("recoveryEpoch".into(), facts.recovery_epoch.clone());
+        if let Some(authority) = fields.get_mut("authority").and_then(Value::as_object_mut) {
+            authority.insert("recoveryEpoch".into(), facts.recovery_epoch.clone());
+        }
         fields
     };
     fields.insert("blockers".into(), json!(blockers));

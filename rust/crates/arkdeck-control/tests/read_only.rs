@@ -1239,6 +1239,122 @@ fn every_recorded_commit_refusal_reaches_the_caller_as_the_import_owner_answered
     }
 }
 
+/// Every recorded answer of the Job reads and runs that names a superseding
+/// recovery epoch — a Job's `recoveryEpochId` or
+/// `supersededByRecoveryEpochId`, an evidence's `recoveryEpoch` — and the
+/// `job.submit` refusal Swift's handler answers without structured details are
+/// Swift's daemon's answers, and a Job owner answering one reaches the caller
+/// as it answered it, never rewritten as `internalError` (DEC-016,
+/// `TASK-XPA-017`). The corpus and the schemas compiled in are one view's, so
+/// this holds in each of check-contracts' views: the merge base's corpus
+/// predates the recovery stories and holds none of them.
+#[test]
+fn every_recorded_recovery_epoch_answer_reaches_the_caller_as_the_job_owner_answered_it() {
+    type Answer = Arc<std::sync::Mutex<Option<Result<Value, WireError>>>>;
+    struct JobOwner(Answer);
+    impl JobOwner {
+        fn answer(&self) -> Result<Value, WireError> {
+            self.0
+                .lock()
+                .unwrap()
+                .take()
+                .expect("one answer per request")
+        }
+    }
+    impl HostServices for JobOwner {
+        fn observed_at(&self) -> String {
+            panic!("a Job read the unrelated clock")
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("a Job read touched HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("a Job read touched device observations")
+        }
+        fn job_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert_eq!(method, "job.status");
+            self.answer()
+        }
+        fn job_result_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert!(matches!(method, "job.result" | "job.evidence"), "{method}");
+            self.answer()
+        }
+        fn job_run(&self, _: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+            self.answer()
+        }
+        fn job_submit(&self, _: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+            self.answer()
+        }
+    }
+    let answer = Answer::default();
+    let control = Control::new(JobOwner(Arc::clone(&answer))).unwrap();
+    let mut witnessed = 0;
+    for (method, corpus) in [
+        (
+            "job.status",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl"
+            ),
+        ),
+        (
+            "job.run",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl"
+            ),
+        ),
+        (
+            "job.result",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl"
+            ),
+        ),
+        (
+            "job.evidence",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.evidence.jsonl"
+            ),
+        ),
+        (
+            "job.submit",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.submit.jsonl"
+            ),
+        ),
+    ] {
+        for line in corpus.lines() {
+            let row: Value = serde_json::from_str(line).unwrap();
+            let names_an_epoch = line.contains("\"recoveryEpochId\":\"")
+                || line.contains("\"supersededByRecoveryEpochId\":\"")
+                || line.contains("\"recoveryEpoch\":{");
+            let bare_refusal = row["ok"] == false && row["error"]["details"] == json!({});
+            if !names_an_epoch && !bare_refusal {
+                continue;
+            }
+            witnessed += 1;
+            let recorded = if row["ok"] == true {
+                Ok(row["result"].clone())
+            } else {
+                Err(serde_json::from_value::<WireError>(row["error"].clone()).unwrap())
+            };
+            *answer.lock().unwrap() = Some(recorded.clone());
+            let response = call(&control, method, row["params"].clone());
+            assert_eq!(response.outcome, recorded, "{method}: {line}");
+        }
+    }
+    assert!(
+        matches!(witnessed, 0 | 8),
+        "{witnessed} recovery answers recorded"
+    );
+}
+
 #[test]
 fn only_app_frames_reach_the_app_import_owner_and_never_a_console() {
     type Calls = Arc<std::sync::Mutex<Vec<(&'static str, String)>>>;

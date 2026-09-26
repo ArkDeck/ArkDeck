@@ -658,6 +658,10 @@ impl JobRecord {
     pub(super) fn clear_outcome_unknown(&mut self) {
         self.unknown = false;
     }
+    /// Swift `RuntimeJobRecord.actualEffect`.
+    pub(crate) fn actual_effect(&self) -> Option<&str> {
+        self.effect.as_deref()
+    }
     pub(super) fn provider(&self) -> &str {
         &self.provider
     }

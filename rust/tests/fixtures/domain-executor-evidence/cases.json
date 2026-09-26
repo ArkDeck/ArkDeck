@@ -3325,6 +3325,391 @@
     }
   },
   {
+    "facts" : {
+      "actualEffect" : "destructive",
+      "actualStepKinds" : [
+        "waitForReconnect",
+        "probeDevice",
+        "flashPartition",
+        "verifyRemoteState",
+        "rebootDevice",
+        "captureRemoteStdout"
+      ],
+      "artifacts" : [
+        {
+          "bindingRevision" : 1,
+          "byteCount" : 947,
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-e9627bad470a98a590a3ff5b4cc5d5a3",
+          "sha256" : "374ba243f8fc0057d7fc21a9a5ad55a8ba3dc4de4dfc8e07937b83b17213cc74",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        },
+        {
+          "bindingRevision" : 1,
+          "byteCount" : 149,
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-efa3b1cc15ffc6007cb7884789429d54",
+          "sha256" : "6bbbd0aae2215135c309fd6df3b6e5bee70b801d187a69b01e7e2103aa06b657",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        },
+        {
+          "bindingRevision" : 1,
+          "byteCount" : 1852,
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-9613edca96488e3cf19e1056605803ba",
+          "sha256" : "5d3d0cddb7cd8a2f02b104ccf46ecb6bafa842463f75939a91d4aa4b859a9300",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        }
+      ],
+      "authority" : {
+        "admittedAtUtc" : "2026-09-25T00:00:00Z",
+        "artifactDigest" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "consumptionFingerprintSha256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+        "kind" : "runtimeCapability",
+        "planDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "recoveryEpoch" : {
+          "artifactSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+          "bindingRevision" : 1,
+          "confirmedStepIds" : [
+            "flash-partitions",
+            "verify-flash-readback",
+            "reboot-device",
+            "wait-for-hdc",
+            "rebind-and-verify-build",
+            "capture-post-flash-diagnostics"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+          "coveredIntents" : [
+            {
+              "intentEventId" : "intent-flash-partitions",
+              "jobId" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+              "observedAtUtc" : "2026-09-25T00:00:00Z",
+              "operationReference" : "flash.full-restore@1",
+              "possibleEffects" : [
+                "partition:uboot",
+                "partition:resource",
+                "partition:boot_linux",
+                "partition:ramdisk",
+                "partition:system",
+                "partition:vendor",
+                "partition:updater",
+                "partition:chip_ckm",
+                "partition:userdata"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochId" : "recovery-epoch-2205e795647f63f2be9109deed6a305b",
+          "epochSha256" : "ff3dc376f28644bf5f4fe296b2a85f2b206bc75df2bf871532f749a217201dd6",
+          "establishedAtUtc" : "2026-09-25T00:00:00Z",
+          "materializedPlanDigestSha256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operationReference" : "flash.full-restore@1",
+          "profileReference" : "dayu200",
+          "providerExecutableSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recoveryIntentEventId" : "intent-flash-partitions",
+          "recoveryJobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "resultingTargetEpochSha256" : "827eeeb56fe13b0fdaca4604d2a9fb42816f5e7d0b544ec104ccbb8c601b1a5b",
+          "source" : "distinctRecoveryExecution",
+          "stableTargetIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "uncertainEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+        },
+        "reference" : "CAP-RT-POLICY-B471EC589BCAD096209B47979C5A70C5A4571F26-G1",
+        "reservationId" : "idem-flash-recovery",
+        "stepSetDigest" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+        "targetBindingDigest" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+        "useOrdinal" : 1,
+        "validUntilUtc" : "2026-09-25T04:00:00Z"
+      },
+      "bindingRevision" : 1,
+      "blockers" : [
+
+      ],
+      "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "executionMode" : "execute",
+      "finishedAtUtc" : "2026-09-25T00:00:00Z",
+      "firstEvidenceStepAtUtc" : "2026-09-25T00:00:00Z",
+      "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+      "observation" : {
+        "bindingRevision" : 1,
+        "confirmationMethod" : "machineReadback",
+        "confirmedAtUtc" : "2026-09-25T00:00:00Z",
+        "firmware" : "OpenHarmony-7.0.0.36",
+        "model" : "DAYU200",
+        "preflightSteps" : [
+
+        ],
+        "providerId" : "arkforge",
+        "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetId" : "TGT-83405c84ff74",
+        "toolSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolVersion" : "arkforged native RockUSB",
+        "transport" : "usb"
+      },
+      "operationReference" : "flash.full-restore@1",
+      "outcomeUnknown" : false,
+      "providerId" : "arkforge",
+      "recoveryEpoch" : {
+        "artifactSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "bindingRevision" : 1,
+        "confirmedStepIds" : [
+          "flash-partitions",
+          "verify-flash-readback",
+          "reboot-device",
+          "wait-for-hdc",
+          "rebind-and-verify-build",
+          "capture-post-flash-diagnostics"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+        "coveredIntents" : [
+          {
+            "intentEventId" : "intent-flash-partitions",
+            "jobId" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+            "observedAtUtc" : "2026-09-25T00:00:00Z",
+            "operationReference" : "flash.full-restore@1",
+            "possibleEffects" : [
+              "partition:uboot",
+              "partition:resource",
+              "partition:boot_linux",
+              "partition:ramdisk",
+              "partition:system",
+              "partition:vendor",
+              "partition:updater",
+              "partition:chip_ckm",
+              "partition:userdata"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochId" : "recovery-epoch-2205e795647f63f2be9109deed6a305b",
+        "epochSha256" : "ff3dc376f28644bf5f4fe296b2a85f2b206bc75df2bf871532f749a217201dd6",
+        "establishedAtUtc" : "2026-09-25T00:00:00Z",
+        "materializedPlanDigestSha256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "operationReference" : "flash.full-restore@1",
+        "profileReference" : "dayu200",
+        "providerExecutableSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recoveryIntentEventId" : "intent-flash-partitions",
+        "recoveryJobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+        "resultingTargetEpochSha256" : "827eeeb56fe13b0fdaca4604d2a9fb42816f5e7d0b544ec104ccbb8c601b1a5b",
+        "source" : "distinctRecoveryExecution",
+        "stableTargetIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "uncertainEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+      },
+      "startedAtUtc" : "2026-09-25T00:00:00Z",
+      "targetId" : "TGT-83405c84ff74",
+      "terminalState" : "recovered"
+    },
+    "name" : "recorded21",
+    "value" : {
+      "actualEffect" : "destructive",
+      "actualStepKinds" : [
+        "waitForReconnect",
+        "probeDevice",
+        "flashPartition",
+        "verifyRemoteState",
+        "rebootDevice",
+        "captureRemoteStdout"
+      ],
+      "artifacts" : [
+        {
+          "bindingRevision" : 1,
+          "byteCount" : "947",
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-e9627bad470a98a590a3ff5b4cc5d5a3",
+          "sha256" : "374ba243f8fc0057d7fc21a9a5ad55a8ba3dc4de4dfc8e07937b83b17213cc74",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        },
+        {
+          "bindingRevision" : 1,
+          "byteCount" : "149",
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-efa3b1cc15ffc6007cb7884789429d54",
+          "sha256" : "6bbbd0aae2215135c309fd6df3b6e5bee70b801d187a69b01e7e2103aa06b657",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        },
+        {
+          "bindingRevision" : 1,
+          "byteCount" : "1852",
+          "bytesVerified" : true,
+          "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "providerId" : "arkforge",
+          "reference" : "arkdeck-artifact://job-0c7b2c3dec74aedc2746781f98fdc406/ART-9613edca96488e3cf19e1056605803ba",
+          "sha256" : "5d3d0cddb7cd8a2f02b104ccf46ecb6bafa842463f75939a91d4aa4b859a9300",
+          "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "targetId" : "TGT-83405c84ff74"
+        }
+      ],
+      "authority" : {
+        "admittedAtUtc" : "2026-09-25T00:00:00Z",
+        "artifactDigest" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "consumptionFingerprintSha256" : "b40a55593e07c30779812ec965c37b04ba5026754936f8a77fde01e316fdd774",
+        "kind" : "runtimeCapability",
+        "planDigest" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "recoveryEpoch" : {
+          "artifactSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+          "bindingRevision" : 1,
+          "confirmedStepIds" : [
+            "flash-partitions",
+            "verify-flash-readback",
+            "reboot-device",
+            "wait-for-hdc",
+            "rebind-and-verify-build",
+            "capture-post-flash-diagnostics"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+          "coveredIntents" : [
+            {
+              "intentEventId" : "intent-flash-partitions",
+              "jobId" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+              "observedAtUtc" : "2026-09-25T00:00:00Z",
+              "operationReference" : "flash.full-restore@1",
+              "possibleEffects" : [
+                "partition:uboot",
+                "partition:resource",
+                "partition:boot_linux",
+                "partition:ramdisk",
+                "partition:system",
+                "partition:vendor",
+                "partition:updater",
+                "partition:chip_ckm",
+                "partition:userdata"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochId" : "recovery-epoch-2205e795647f63f2be9109deed6a305b",
+          "epochSha256" : "ff3dc376f28644bf5f4fe296b2a85f2b206bc75df2bf871532f749a217201dd6",
+          "establishedAtUtc" : "2026-09-25T00:00:00Z",
+          "materializedPlanDigestSha256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+          "operationReference" : "flash.full-restore@1",
+          "profileReference" : "dayu200",
+          "providerExecutableSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "recoveryIntentEventId" : "intent-flash-partitions",
+          "recoveryJobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+          "resultingTargetEpochSha256" : "827eeeb56fe13b0fdaca4604d2a9fb42816f5e7d0b544ec104ccbb8c601b1a5b",
+          "source" : "distinctRecoveryExecution",
+          "stableTargetIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "uncertainEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+        },
+        "reference" : "CAP-RT-POLICY-B471EC589BCAD096209B47979C5A70C5A4571F26-G1",
+        "reservationId" : "idem-flash-recovery",
+        "stepSetDigest" : "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+        "targetBindingDigest" : "5bd06d30f901fa92e7f6e6c97cb1579b19e50502548d9d00cc556522a6783fc5",
+        "useOrdinal" : 1,
+        "validUntilUtc" : "2026-09-25T04:00:00Z"
+      },
+      "bindingRevision" : 1,
+      "blockers" : [
+
+      ],
+      "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "executionMode" : "execute",
+      "finishedAtUtc" : "2026-09-25T00:00:00Z",
+      "firstEvidenceStepAtUtc" : "2026-09-25T00:00:00Z",
+      "inventoryAvailable" : true,
+      "jobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+      "missingRequiredArtifacts" : [
+
+      ],
+      "observation" : {
+        "bindingRevision" : 1,
+        "confirmationMethod" : "machineReadback",
+        "confirmedAtUtc" : "2026-09-25T00:00:00Z",
+        "firmware" : "OpenHarmony-7.0.0.36",
+        "model" : "DAYU200",
+        "preflightSteps" : [
+
+        ],
+        "providerId" : "arkforge",
+        "stableIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "targetId" : "TGT-83405c84ff74",
+        "toolSha256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "toolVersion" : "arkforged native RockUSB",
+        "transport" : "usb"
+      },
+      "operationReference" : "flash.full-restore@1",
+      "outcomeUnknown" : false,
+      "parameters" : {
+        "artifactLease" : "lease-v1:imp-7bc9fbc7-3979-4440-9771-d78172a5119f:ART-8048c074232554064150238f1bf20a3f",
+        "deviceProfileRef" : "dayu200",
+        "intent" : "fullRestore",
+        "verification" : "full"
+      },
+      "providerId" : "arkforge",
+      "recoveryEpoch" : {
+        "artifactSha256" : "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+        "bindingRevision" : 1,
+        "confirmedStepIds" : [
+          "flash-partitions",
+          "verify-flash-readback",
+          "reboot-device",
+          "wait-for-hdc",
+          "rebind-and-verify-build",
+          "capture-post-flash-diagnostics"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+        "coveredIntents" : [
+          {
+            "intentEventId" : "intent-flash-partitions",
+            "jobId" : "job-e5349f3aa917c597f9044c2c9a1230e6",
+            "observedAtUtc" : "2026-09-25T00:00:00Z",
+            "operationReference" : "flash.full-restore@1",
+            "possibleEffects" : [
+              "partition:uboot",
+              "partition:resource",
+              "partition:boot_linux",
+              "partition:ramdisk",
+              "partition:system",
+              "partition:vendor",
+              "partition:updater",
+              "partition:chip_ckm",
+              "partition:userdata"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochId" : "recovery-epoch-2205e795647f63f2be9109deed6a305b",
+        "epochSha256" : "ff3dc376f28644bf5f4fe296b2a85f2b206bc75df2bf871532f749a217201dd6",
+        "establishedAtUtc" : "2026-09-25T00:00:00Z",
+        "materializedPlanDigestSha256" : "9ddf625692a74679bab6af60ef9a12a662149ec98609b9bfad147a7c50c34f04",
+        "operationReference" : "flash.full-restore@1",
+        "profileReference" : "dayu200",
+        "providerExecutableSha256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recoveryIntentEventId" : "intent-flash-partitions",
+        "recoveryJobId" : "job-0c7b2c3dec74aedc2746781f98fdc406",
+        "resultingTargetEpochSha256" : "827eeeb56fe13b0fdaca4604d2a9fb42816f5e7d0b544ec104ccbb8c601b1a5b",
+        "source" : "distinctRecoveryExecution",
+        "stableTargetIdentitySha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        "uncertainEffectSetSha256" : "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+      },
+      "schemaVersion" : "arkdeck.job-evidence/1",
+      "startedAtUtc" : "2026-09-25T00:00:00Z",
+      "status" : "verified",
+      "targetId" : "TGT-83405c84ff74",
+      "terminalState" : "recovered",
+      "traceProbeAfter" : null,
+      "traceProbeBefore" : null
+    }
+  },
+  {
     "name" : "schemaVersion2",
     "refusal" : "malformedResponse(\"Job evidence is not the current resource\")",
     "value" : {
