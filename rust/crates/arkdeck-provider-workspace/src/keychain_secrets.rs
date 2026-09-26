@@ -87,3 +87,18 @@ impl SigningSecrets for KeychainSigningSecrets {
             })
     }
 }
+
+impl crate::signing_removal::SigningSecretRemoval for KeychainSigningSecrets {
+    fn remove_current(&self, account: &str) -> Result<bool, SigningError> {
+        self.items
+            .remove(account)
+            .map_err(keychain_failure("Keychain removal"))
+    }
+
+    fn remove_legacy(&self, account: &str) -> Result<bool, SigningError> {
+        KeychainItems::outside_data_protection(KEYCHAIN_SERVICE)
+            .map_err(keychain_failure("legacy Keychain"))?
+            .remove(account)
+            .map_err(keychain_failure("legacy Keychain removal"))
+    }
+}

@@ -1,0 +1,107 @@
+[
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "remove"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "arkdeck runtime: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "remove",
+      "--output",
+      "json"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "arkdeck runtime: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "remove",
+      "--json"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "arkdeck runtime: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "remove"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "warning: `signing remove` is deprecated; use `arkdeck runtime signing remove`\narkdeck signing: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "remove",
+      "--output",
+      "json"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "arkdeck signing: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "remove",
+      "--json"
+    ],
+    "exit": 1,
+    "ledger": {
+      "presetOwners": [
+        "preset-a"
+      ],
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable"
+    },
+    "stderr": "arkdeck signing: invalid signing configuration: signing credential is referenced by an active workspace preset\n",
+    "stdout": ""
+  }
+]
