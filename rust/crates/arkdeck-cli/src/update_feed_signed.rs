@@ -352,7 +352,7 @@ mod tests {
         let key_id = fixture["keyId"].as_str().unwrap();
         let now = super::super::canonical_timestamp(fixture["now"].as_str().unwrap()).unwrap();
         let cases = fixture["cases"].as_array().unwrap();
-        assert_eq!(cases.len(), 10);
+        assert_eq!(cases.len(), 14);
         for case in cases {
             let envelope = unbase64(case["envelopeBase64"].as_str().unwrap()).unwrap();
             let expected = unbase64(case["payloadBase64"].as_str().unwrap()).unwrap();

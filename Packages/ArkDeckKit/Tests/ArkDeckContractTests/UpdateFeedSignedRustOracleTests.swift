@@ -32,13 +32,17 @@ final class UpdateFeedSignedRustOracleTests: XCTestCase {
       ("encodedSlash", 1, "dir%2Fa.dmg", issued),
       ("query", 1, "a.dmg?download=1", issued),
       ("unicodeDate", 1, "a.dmg", "2026-09-2éT00:00:00Z"),
+      ("encodedHost", 1, "https://%67ithub.com/ArkDeck/a.dmg", issued),
+      ("rawBracketsPath", 1, "[x].dmg", issued),
+      ("rawBracketsQuery", 1, "a.dmg?x=[1]", issued),
+      ("invalidUTF8Path", 1, "%FF.dmg", issued),
     ]
     for (name, sequence, path, timestamp) in cases {
       let payload = UpdateFeedPayload(
         sequence: sequence, version: "1.2.3", minimumSystemVersion: "14.0",
         architectures: ["arm64"], issuedAt: timestamp, expiresAt: "2026-09-27T00:00:00Z",
         artifact: UpdateArtifactDescriptor(
-          url: "https://github.com/ArkDeck/\(path)", byteLength: sequence,
+          url: path.hasPrefix("https://") ? path : "https://github.com/ArkDeck/\(path)", byteLength: sequence,
           sha256: String(repeating: "ab", count: 32)), releaseNotesSummary: "测试 release")
       let bytes = try UpdateFeedCodec.canonicalPayload(payload)
       let signature = try key.signature(for: UpdateFeedCodec.signatureInput(payload: bytes, keyID: keyID))

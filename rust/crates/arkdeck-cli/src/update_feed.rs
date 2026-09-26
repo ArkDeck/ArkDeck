@@ -289,8 +289,7 @@ fn ip_address(host: &str) -> bool {
 /// address, a path ending in `.dmg`, and a spelling it would write back as is.
 fn artifact_url(url: &str) -> bool {
     // `URLComponents(string:)` refuses a string outside the URL character set.
-    let legal =
-        |byte: u8| byte.is_ascii_alphanumeric() || b"-._~:/?#[]@!$&'()*+,;=%".contains(&byte);
+    let legal = |byte: u8| byte.is_ascii_alphanumeric() || b"-._~:/?#@!$&'()*+,;=%".contains(&byte);
     if !url.bytes().all(legal) {
         return false;
     }
@@ -327,7 +326,10 @@ fn artifact_url(url: &str) -> bool {
     if authority.contains('@') || authority.contains(':') || authority.is_empty() {
         return false;
     }
-    let host = authority.to_lowercase();
+    let Some(host) = decode(authority).and_then(|bytes| String::from_utf8(bytes).ok()) else {
+        return false;
+    };
+    let host = host.to_lowercase();
     let path = path_and_query.split('?').next().unwrap_or_default();
     ALLOWED_HOSTS.contains(&host.as_str())
         && !ip_address(&host)

@@ -64,6 +64,26 @@ cache; permitted read-only public fetch/cache access resolved those environmenta
 failures. No full local unified gate, App UI test, or real device acceptance ran.
 Contract input files were unchanged, so contract generation was not rerun.
 
+### URL review follow-up
+
+Independent review requested four more URL oracle rows. An actual second Swift
+run accepts a percent-encoded allowed hostname (`%67ithub.com`) and rejects raw
+square brackets in the path/query and invalid UTF-8 percent bytes in the path.
+The Rust helper now decodes the hostname before allowlist comparison and rejects
+raw brackets; no host is added to the allowlist. `signed.json` contains 14 actual
+CryptoKit-signed rows after the follow-up.
+
+- Swift single-class oracle: exit 0, 1 XCTest / 14 fixtures,
+  `/private/tmp/arkdeck-update-feed-swift-2.log`.
+- `cargo test -p arkdeck-cli --lib --test update_feed --test blocked_leaves --test argv_fixtures`
+  (same manifest/target/jobs): exit 0, **77 passed**, including all 31 CLI cases
+  and 14 signed rows, `/private/tmp/arkdeck-update-feed-url-tests.log`.
+- CLI all-target Clippy: exit 0,
+  `/private/tmp/arkdeck-update-feed-url-clippy.log`; fmt, diff check and SDD
+  also pass after this correction.
+- The 439-test full CLI run above belongs to the pre-follow-up implementation
+  `f5029c7a`; this focused rerun covers the subsequently changed URL behavior.
+
 ## CI
 
 No PR/run for this local slice. Remote push remains awaiting direct authorization
