@@ -12,6 +12,21 @@ cli_profile="${ARKDECK_CLI_PROVISIONING_PROFILE:-}"
 daemon_profile="${ARKDECK_DAEMON_PROVISIONING_PROFILE:-}"
 team_identifier="8AQTYW5FKR"
 keychain_group="$team_identifier.com.arkdeck.shared"
+helper_runtime="${ARKDECK_HELPER_RUNTIME:-swift}"
+rollback_helper="${ARKDECK_ROLLBACK_HELPER:-}"
+case "$helper_runtime" in
+  swift) ;;
+  rust)
+    if [[ "$rollback_helper" != /*.app || ! -d "$rollback_helper" || -L "$rollback_helper" ]]; then
+      echo "ARKDECK_ROLLBACK_HELPER must name the current Swift ArkDeckAgent.app to keep for one cycle" >&2
+      exit 64
+    fi
+    ;;
+  *)
+    echo "ARKDECK_HELPER_RUNTIME must be swift or rust" >&2
+    exit 64
+    ;;
+esac
 
 if [[ -z "$cli_profile" || -z "$daemon_profile" ]]; then
   echo "ARKDECK_CLI_PROVISIONING_PROFILE and ARKDECK_DAEMON_PROVISIONING_PROFILE are required" >&2
@@ -81,6 +96,31 @@ validate_profile() {
 
 validate_profile "cli" "$cli_profile" "$team_identifier.com.arkdeck.cli"
 validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd"
+
+if [[ "$helper_runtime" == rust ]]; then
+  # The provisioned local pair uses the release layout with debug binaries
+  # and no timestamp. Its signed rollback helper is retained without change.
+  rust_root="$(cd "$package_root/../../rust" && pwd)"
+  (cd "$rust_root" && cargo build --locked --target aarch64-apple-darwin \
+    -p arkdeck-cli -p arkdeck-agentd --bins)
+  target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
+    | plutil -extract target_directory raw -o - -)"
+  staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-local-helper-build.XXXXXX")"
+  bash "$distribution_root/package-rust-helpers.sh" \
+    "$target_directory/aarch64-apple-darwin/debug" "$staging_root" \
+    "$cli_profile" "$daemon_profile" "$identity" --timestamp=none "$rollback_helper"
+  printf '%s\n' \
+    "LOCAL DEVELOPMENT BUILD — not notarized, not stapled, and not for distribution." \
+    > "$staging_root/LOCAL-DEVELOPMENT-BUILD.txt"
+  mkdir -p "$(dirname "$output_root")"
+  mv "$staging_root" "$output_root"
+  staging_root=""
+  rm -rf "$profile_root"
+  trap - EXIT
+  echo "local development helper; do not distribute" >&2
+  echo "$output_root/ArkDeckCLI.app"
+  exit 0
+fi
 
 # Host helpers ship for Apple silicon only, including when Swift runs under Rosetta.
 swift build --package-path "$package_root" --arch arm64 -c debug --product arkdeck

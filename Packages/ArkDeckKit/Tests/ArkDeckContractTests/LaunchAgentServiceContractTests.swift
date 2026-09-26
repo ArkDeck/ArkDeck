@@ -317,6 +317,21 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     }
   }
 
+  func testLocalRustHelperBuildPublishesOnlyAfterItsBuildAndSigningGates() throws {
+    let process = Process()
+    process.executableURL = URL(filePath: "/usr/bin/python3")
+    process.arguments = [
+      packageRoot.appending(path: "Distribution/macOS/test-local-rust-helpers.py").path
+    ]
+    let output = Pipe()
+    process.standardOutput = output
+    process.standardError = output
+    try process.run()
+    let bytes = output.fileHandleForReading.readDataToEndOfFile()
+    process.waitUntilExit()
+    XCTAssertEqual(process.terminationStatus, 0, String(decoding: bytes, as: UTF8.self))
+  }
+
   func testProductionInstallerRejectsAnUnsignedHelperBeforeLaunchctl() throws {
     let production = LaunchAgentService(
       paths: paths, runner: runner, uid: 501,

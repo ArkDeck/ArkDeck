@@ -491,7 +491,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 
 1. P2：#2255 已合入；判据之外、停在 Loader 过渡上的 parked Flash Job 仍会带进 Rust，同一 target 两个及以上会让 Rust
    daemon 启动失败。若 1a 读出这种情况，先处理还是接受，由维护者定。
-2. P3/Q11：发布包是否公证；只签名不公证时 `build-local-helpers.sh` 还缺同样的 rust 开关（`rust-helper-packaging-run.md` §6 第 2 条）。
+2. P3/Q11：发布包是否公证。`build-local-helpers.sh` 已提供 `ARKDECK_HELPER_RUNTIME=rust`，构建带本地开发标记的 provisioned Debug helper，保留经校验的 Swift 回滚包；它只用于当前 Mac，不替代正式发布所需的公证。见 `evidence/runs/TASK-XPA-017/local-rust-helper-build-run.md`。采用哪种产物开窗仍由维护者决定。
 3. P4：20b Rust 基线是否为开窗条件。
 4. P5：4h soak 是否要在窗口所用提交上重跑。
 5. P6/S-1：签名写路径（S-1/S-2）；有签名预设的主机在 Rust 签名 owner 落地前 update 会被拒。

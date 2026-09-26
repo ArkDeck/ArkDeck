@@ -43,6 +43,13 @@ entitlements、Developer ID 和 hardened runtime，逐层执行严格 codesign �
 写入 `LOCAL-DEVELOPMENT-BUILD.txt`；产物只可用于当前 Mac 的 `agentd install/update`、签名预设和
 CLI 真机验证，绝不是发布物。正式发布仍只能运行 `build-helpers.sh`，其公证要求没有本地绕过开关。
 
+本地验证纯 Rust helper 时，在同一命令中增加 `ARKDECK_HELPER_RUNTIME=rust` 和
+`ARKDECK_ROLLBACK_HELPER=/absolute/ArkDeckAgent.app`。后者必须是当前 Swift daemon 加 Rust
+façade 的已签名 helper；脚本校验后原样保留到 `rollback/ArkDeckAgent.app`。Rust 模式用 Cargo
+构建 arm64 Debug CLI/daemon，通过共享打包步骤保留相同的 profile、Developer ID、hardened
+runtime 和严格签名校验，仍写入本地开发标记且不带时间戳。缺省模式仍是 Swift；构建本身不安装
+或切换 Runtime。Cargo 的 `CARGO_TARGET_DIR` 配置会被遵守。
+
 M5 切换窗口用的 Rust helper 也由 `build-helpers.sh` 发布：`ARKDECK_HELPER_RUNTIME=rust`（缺省
 `swift`，即上面的 Swift helper）以 Rust `arkdeck`/`arkdeck-agentd` 为两个包的主程序：包结构、
 Info.plist、provisioning profile、entitlements 与可执行名同 Swift helper（只少了只有 Swift 读的
