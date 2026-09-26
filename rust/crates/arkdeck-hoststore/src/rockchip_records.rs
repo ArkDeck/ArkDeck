@@ -210,6 +210,39 @@ impl RockchipRecordStore {
     }
 }
 
+/// Swift `RockchipRuntimeActionHosting`: what runs a host-managed Rockchip
+/// action for the dispatcher, and for the ArkForge lane's managed control.
+pub trait RockchipActionHosting: Send + Sync {
+    fn unavailable_reason(&self) -> Option<String>;
+
+    /// The result, its summary naming the durable receipt (`recordID`).
+    fn execute(
+        &self,
+        action: &RockchipAction,
+        descriptor: &HostAction,
+        provider_executable_sha256: &str,
+    ) -> Result<ExecutionResult, LaneFailure>;
+}
+
+/// Swift `RefusingRockchipRuntimeActionHost`: every action refused for one
+/// reason, which is also its unavailability.
+pub struct RefusingRockchipHost(pub String);
+
+impl RockchipActionHosting for RefusingRockchipHost {
+    fn unavailable_reason(&self) -> Option<String> {
+        Some(self.0.clone())
+    }
+
+    fn execute(
+        &self,
+        _action: &RockchipAction,
+        _descriptor: &HostAction,
+        _provider_executable_sha256: &str,
+    ) -> Result<ExecutionResult, LaneFailure> {
+        Err(LaneFailure::Failed(self.0.clone()))
+    }
+}
+
 /// Swift `DurableRockchipRuntimeActionHost`: an action validated against its
 /// descriptor, then run only behind its durable intent, or replayed from
 /// its receipt.
@@ -222,17 +255,18 @@ impl<E: RockchipActionExecutor> DurableRockchipHost<E> {
     pub fn new(executor: E, records: RockchipRecordStore) -> Self {
         Self { executor, records }
     }
+}
 
+impl<E: RockchipActionExecutor> RockchipActionHosting for DurableRockchipHost<E> {
     /// Swift `unavailableReason()`: the executor's, then the records'.
-    pub fn unavailable_reason(&self) -> Option<String> {
+    fn unavailable_reason(&self) -> Option<String> {
         self.executor
             .unavailable_reason()
             .or_else(|| self.records.unavailable_reason())
     }
 
-    /// Swift `execute(action:descriptor:providerExecutable:)`: the result,
-    /// its summary naming the durable receipt (`recordID`).
-    pub fn execute(
+    /// Swift `execute(action:descriptor:providerExecutable:)`.
+    fn execute(
         &self,
         action: &RockchipAction,
         descriptor: &HostAction,
@@ -626,16 +660,22 @@ fn same_members(existing: &Map<String, Value>, expected: &Value, fields: &[(&str
         .all(|(key, _)| existing.get(*key) == expected.get(*key))
 }
 
-/// Swift's `"\(error)"` of a dispatch failure.
-fn described(failure: &LaneFailure) -> String {
+/// Swift's `"\(error)"` of a lane or host failure, as a skipped step's reason
+/// quotes it. A diagnostic prints as Swift prints an enum case inside
+/// another's payload, qualified by its module and type.
+pub(crate) fn described(failure: &LaneFailure) -> String {
+    let quoted = swift_quoted;
     match failure {
-        LaneFailure::Failed(reason) => format!("failed({})", swift_quoted(reason)),
+        LaneFailure::Failed(reason) => format!("failed({})", quoted(reason)),
         LaneFailure::ConfirmedNotExecuted(reason) => {
-            format!("confirmedNotExecuted({})", swift_quoted(reason))
+            format!("confirmedNotExecuted({})", quoted(reason))
         }
-        LaneFailure::OutcomeUnknown(reason) => {
-            format!("outcomeUnknown({})", swift_quoted(reason))
-        }
+        LaneFailure::ConfirmedNotExecutedWithDiagnostic { reason, diagnostic } => format!(
+            "confirmedNotExecutedWithDiagnostic({}, diagnostic: \
+             ArkDeckWorkflows.RockchipFlashRuntimeDiagnostic.{diagnostic})",
+            quoted(reason)
+        ),
+        LaneFailure::OutcomeUnknown(reason) => format!("outcomeUnknown({})", quoted(reason)),
         LaneFailure::Other(description) => description.clone(),
     }
 }

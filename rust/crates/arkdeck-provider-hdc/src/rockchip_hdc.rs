@@ -36,6 +36,8 @@ const TARGET_LIST_VERSION: &str = "3.2.0f";
 const READ_CAPTURE_BYTES: usize = 64 * 1024;
 /// `verifyBoundBuild`'s property read: 15 s once the device is present.
 const PROPERTIES_READ_TIMEOUT: Duration = Duration::from_secs(15);
+/// `capturePostFlashDiagnostics`' grace beyond the capture's duration.
+const CAPTURE_GRACE: Duration = Duration::from_secs(15);
 /// Swift `properties(_:orderedKeys:)`: a longer value is not a fact.
 const MAXIMUM_PROPERTY_CHARACTERS: usize = 400;
 /// Swift `outputExcerpt`'s default limit.
@@ -412,6 +414,33 @@ impl<'a> RockchipHdcObserver<'a> {
             readback,
             receipts,
         })
+    }
+
+    /// Swift `capturePostFlashDiagnostics`: `hdc -t <key> shell hilog -x`
+    /// and the request's filters, under the request's duration and 15 s of
+    /// grace (not the E0 capture's 45-second floor) and its byte budget,
+    /// judged as every read here; a capture of nothing is refused.
+    pub fn capture_post_flash_hilog(
+        &self,
+        connect_key: &str,
+        filters: &[String],
+        duration: Duration,
+        byte_budget: usize,
+    ) -> Result<Receipt, RockchipHdcFailure> {
+        let mut arguments: Vec<String> = ["-t", connect_key, "shell", "hilog", "-x"]
+            .iter()
+            .map(|value| (*value).to_owned())
+            .collect();
+        arguments.extend(filters.iter().cloned());
+        let receipt = self.read(ProcessPlan {
+            arguments,
+            timeout: duration + CAPTURE_GRACE,
+            capture_bytes: byte_budget,
+        })?;
+        if receipt.stdout.is_empty() {
+            return Err(failed("post-flash HiLog capture returned no bytes"));
+        }
+        Ok(receipt)
     }
 
     /// Swift `run(executable:arguments:timeoutSeconds:budget:)` for a read
@@ -1394,6 +1423,72 @@ mod tests {
             "DAYU200 target unavailable"
         );
         assert_eq!(hdc.reads(), 0);
+    }
+
+    /// The capture is `hilog -x` and the filters on the exact key, for the
+    /// duration and its grace, within the budget, and its output is the
+    /// receipt's.
+    #[test]
+    fn the_hilog_capture_reads_the_bound_key_for_its_duration_and_budget() {
+        let hdc = Scripted::new(vec![Answer::Out("log line\n".to_owned())]);
+        let usb = UsbScript::default();
+        let clock = FakeClock::new();
+        let filters = vec!["arkdeck:*".to_owned(), "A00001".to_owned()];
+        let receipt = RockchipHdcObserver::new(&hdc, &usb, &clock)
+            .capture_post_flash_hilog(KEY, &filters, Duration::from_secs(5), 4096)
+            .unwrap();
+        assert_eq!(receipt.stdout, b"log line\n");
+        assert_eq!(
+            hdc.plans(),
+            [ProcessPlan {
+                arguments: ["-t", KEY, "shell", "hilog", "-x", "arkdeck:*", "A00001"]
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect(),
+                timeout: Duration::from_secs(20),
+                capture_bytes: 4096,
+            }]
+        );
+    }
+
+    /// A capture of nothing, or one that is not clean, fails; one that could
+    /// not be observed to its end is unknown.
+    #[test]
+    fn an_empty_or_unclean_capture_is_refused() {
+        let usb = UsbScript::default();
+        let clock = FakeClock::new();
+        for (answer, refusal) in [
+            (
+                Answer::Out(String::new()),
+                failed("post-flash HiLog capture returned no bytes"),
+            ),
+            (
+                Answer::Stderr("x", "busy"),
+                failed(
+                    "typed command lacked a clean, complete semantic receipt (stderrByteCount=4, \
+                     stdoutCapturedBytes=1); last output: x",
+                ),
+            ),
+            (
+                Answer::Fail(DispatchFailure::Unobservable(
+                    "process timed out before completion".to_owned(),
+                )),
+                RockchipHdcFailure::OutcomeUnknown(
+                    "process timed out before completion".to_owned(),
+                ),
+            ),
+        ] {
+            let hdc = Scripted::new(vec![answer]);
+            assert_eq!(
+                RockchipHdcObserver::new(&hdc, &usb, &clock).capture_post_flash_hilog(
+                    KEY,
+                    &[],
+                    Duration::from_secs(30),
+                    16 * 1024 * 1024
+                ),
+                Err(refusal)
+            );
+        }
     }
 
     #[test]

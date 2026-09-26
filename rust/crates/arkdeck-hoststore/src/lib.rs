@@ -379,8 +379,17 @@ pub use rockchip_action::{CaptureRequest, Expectation, RockchipAction};
 mod rockchip_records;
 #[cfg(target_os = "macos")]
 pub use rockchip_records::{
-    DurableRockchipHost, ExecutionResult, RockchipActionExecutor, RockchipRecordStore,
+    DurableRockchipHost, ExecutionResult, RefusingRockchipHost, RockchipActionExecutor,
+    RockchipActionHosting, RockchipRecordStore,
 };
+#[cfg(target_os = "macos")]
+mod rockchip_executor;
+#[cfg(target_os = "macos")]
+pub use rockchip_executor::{HdcResolver, RockchipExecutor};
+#[cfg(target_os = "macos")]
+mod rockchip_dispatcher;
+#[cfg(target_os = "macos")]
+pub use rockchip_dispatcher::NativeRockchipDispatcher;
 #[cfg(target_os = "macos")]
 mod rockchip_reactivation;
 #[cfg(target_os = "macos")]
