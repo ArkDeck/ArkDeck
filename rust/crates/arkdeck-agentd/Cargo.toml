@@ -22,5 +22,12 @@ arkdeck-provider-arkforge.workspace = true
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 arkforge-ipc.workspace = true
 
+# The daemon launches this test binary as its lane's stand-in `arkforged`,
+# which must take the daemon role before any test framework reads the
+# arguments.
+[[test]]
+name = "arkforged_owner_stop"
+harness = false
+
 [lints]
 workspace = true

@@ -140,6 +140,90 @@ fn a_refused_environment_or_capture_launches_nothing() {
     assert!(!witness.exists());
 }
 
+/// A paired server (Swift's `IdentityBoundDaemonLauncher`, which launches
+/// `arkforged`) its owner drops without stopping it is ended as its stop ends
+/// it, as Swift's `DaemonLifecycle` stops its generation when it is released:
+/// its end of input first, then TERM to its group, and KILL only once TERM's
+/// half second has passed; then it is reaped, its group with it. This stand-in
+/// ignores TERM and outlives its end of input, noting it: only that order lets
+/// it note the end, and only KILL ends it.
+#[test]
+fn a_dropped_paired_server_gets_its_end_of_input_then_term_then_kill() {
+    let scratch = Scratch::new("paired-drop");
+    let (secret, ended) = (scratch.0.join("secret"), scratch.0.join("input-ended"));
+    let tool = scratch.tool(&format!(
+        "trap '' TERM\nhead -c 32 > '{}'\ncat > /dev/null\n: > '{}'\nwhile :; do sleep 1; done",
+        secret.display(),
+        ended.display()
+    ));
+    let server = ManagedServer::launch_paired(&tool, &[], &[], &scratch.0, &[7; 32], 4096).unwrap();
+    let pid = server.launch_record().pid;
+    wait_for_bytes(&secret, 32);
+    let started = Instant::now();
+    drop(server);
+    let took = started.elapsed();
+    assert!(
+        ended.exists(),
+        "its end of input never reached it: its group was killed first"
+    );
+    assert!(
+        took >= Duration::from_millis(500),
+        "the drop ended {took:?} after it began, within TERM's grace: KILL came early"
+    );
+    assert_group_gone(pid);
+}
+
+/// The same drop sends TERM before any KILL: a stand-in that ends on TERM,
+/// noting it, is ended by it.
+#[test]
+fn a_dropped_paired_server_is_sent_term_before_kill() {
+    let scratch = Scratch::new("paired-term");
+    let (secret, termed) = (scratch.0.join("secret"), scratch.0.join("term"));
+    let tool = scratch.tool(&format!(
+        "trap ': > \"{}\"; exit 21' TERM\nhead -c 32 > '{}'\ncat > /dev/null\n\
+         while :; do sleep 1; done",
+        termed.display(),
+        secret.display()
+    ));
+    let server = ManagedServer::launch_paired(&tool, &[], &[], &scratch.0, &[7; 32], 4096).unwrap();
+    let pid = server.launch_record().pid;
+    wait_for_bytes(&secret, 32);
+    drop(server);
+    assert!(
+        termed.exists(),
+        "TERM never reached it before it was killed"
+    );
+    assert_group_gone(pid);
+}
+
+/// Waits for a stand-in to have written `bytes` to `file`: the paired
+/// secret, read whole before its owner may stop it.
+fn wait_for_bytes(file: &std::path::Path, bytes: u64) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while std::fs::metadata(file).map_or(true, |metadata| metadata.len() < bytes) {
+        assert!(Instant::now() < deadline, "the secret never arrived");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
+/// The dropped server is gone and reaped, and nothing of its process group
+/// runs.
+fn assert_group_gone(pid: i32) {
+    assert!(
+        !process_alive(pid),
+        "the dropped server (pid {pid}) still runs"
+    );
+    let group = std::process::Command::new("/usr/bin/pgrep")
+        .args(["-g", &pid.to_string()])
+        .output()
+        .unwrap();
+    assert!(
+        group.stdout.is_empty(),
+        "its group left: {}",
+        String::from_utf8_lossy(&group.stdout)
+    );
+}
+
 fn process_alive(pid: i32) -> bool {
     // SAFETY: signal 0 only checks whether the PID exists and may be signalled.
     unsafe { libc::kill(pid, 0) == 0 }

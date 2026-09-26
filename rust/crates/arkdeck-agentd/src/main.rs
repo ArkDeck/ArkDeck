@@ -284,15 +284,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // SIGINT are recorded, and the serving loop drains and stops for them.
     #[cfg(unix)]
     let stop = arkdeck_platform::StopSignal::install()?;
+    // The ArkForge lane either owner composes, whose daemon it stops after
+    // its drain and before the managed server. A start that fails once it is
+    // composed stops it on the way out, after the managed server
+    // (`arkforge_lane::Composed`), in the order of Swift's failed start
+    // (`main.swift` 1595-1602): declared first, it is dropped last.
+    #[cfg(target_os = "macos")]
+    let mut arkforge: Option<arkforge_lane::Composed> = None;
     // The managed server the isolated or the production owner starts, which
-    // it stops last; any failure once it is started stops it on the way out
-    // (`managed_hdc::Launched`).
+    // it stops last after its drain; any failure once it is started stops it
+    // on the way out, first (`managed_hdc::Launched`).
     #[cfg(target_os = "macos")]
     let mut managed_hdc: Option<managed_hdc::Launched> = None;
-    // The ArkForge lane either owner composes, whose daemon it stops after
-    // its drain and before the managed server.
-    #[cfg(target_os = "macos")]
-    let mut arkforge = None;
     let endpoint = match std::env::var_os("ARKDECK_ENDPOINT") {
         Some(path) => LocalEndpoint::new(path),
         None => default_user_endpoint()?,

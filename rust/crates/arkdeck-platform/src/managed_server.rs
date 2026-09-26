@@ -228,23 +228,7 @@ impl ManagedServer {
     /// Ends the server — TERM to its group, then KILL — or takes the end it
     /// already had, and collects what it wrote.
     pub fn stop(mut self) -> io::Result<ServerStop> {
-        // A paired server's end of input first, so that a server handling
-        // TERM cannot briefly keep serving an owner that is gone.
-        let paired = self.liveness.take().is_some();
-        let exit = match self.exit()? {
-            Some(exit) => exit,
-            None => {
-                if paired {
-                    drain_group_within(&self.child, PAIRED_TERMINATION_GRACE, PAIRED_KILL_GRACE);
-                } else {
-                    drain_group(&self.child);
-                }
-                match self.child.try_wait()? {
-                    Some(status) => classify(status),
-                    None => return Err(io::Error::other("server did not end after termination")),
-                }
-            }
-        };
+        let exit = self.end()?;
         self.child.kill_and_wait()?;
         self.stop.store(true, Ordering::Release);
         let deadline = Instant::now() + READER_CLEANUP_TIMEOUT;
@@ -256,6 +240,46 @@ impl ManagedServer {
             truncated: stdout_dropped || stderr_dropped,
             exit,
         })
+    }
+
+    /// The end `stop` gives a server, not yet reaped: a paired server's end
+    /// of input first, then TERM to its group, then KILL, each with its
+    /// grace; or the end it already had.
+    fn end(&mut self) -> io::Result<ServerExit> {
+        // A paired server's end of input first, so that a server handling
+        // TERM cannot briefly keep serving an owner that is gone.
+        let paired = self.liveness.take().is_some();
+        if let Some(exit) = self.exit()? {
+            return Ok(exit);
+        }
+        if paired {
+            drain_group_within(&self.child, PAIRED_TERMINATION_GRACE, PAIRED_KILL_GRACE);
+        } else {
+            drain_group(&self.child);
+        }
+        match self.child.try_wait()? {
+            Some(status) => Ok(classify(status)),
+            None => Err(io::Error::other("server did not end after termination")),
+        }
+    }
+}
+
+/// A paired server its owner lets go of without stopping it is ended as its
+/// stop ends it, as Swift's `DaemonLifecycle` stops the one `arkforged`
+/// generation it owns when it is released (`deinit`), with the same
+/// `stopDaemonProcessGroup`: its end of input, then TERM to its group, then
+/// KILL, then it is reaped. Left to the child's own drop, its group would be
+/// killed first and its input closed only after, so the daemon would never
+/// see its owner go. An unpaired server is still left to that drop, and a
+/// server `stop` ended has nothing left here.
+impl Drop for ManagedServer {
+    fn drop(&mut self) {
+        if self.liveness.is_none() {
+            return;
+        }
+        let _ = self.end();
+        let _ = self.child.kill_and_wait();
+        self.stop.store(true, Ordering::Release);
     }
 }
 

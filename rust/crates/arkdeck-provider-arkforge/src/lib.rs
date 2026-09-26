@@ -30,7 +30,7 @@ pub use flash_lane::{
 };
 #[cfg(target_os = "macos")]
 pub use lane::{
-    Absence, BUNDLE_PATH_KEY, CAMPAIGN_KEY, DAYU200_PROFILE, Lane, LaneInputs,
+    Absence, BUNDLE_PATH_KEY, CAMPAIGN_KEY, DAYU200_PROFILE, DaemonStop, Lane, LaneInputs,
     NATIVE_ROCKUSB_TOOLCHAIN, RETIRED_KEYS, daemon_arguments, device_profile_selector,
     verify_readiness,
 };

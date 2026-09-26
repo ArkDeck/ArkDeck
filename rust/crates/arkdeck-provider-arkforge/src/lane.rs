@@ -17,7 +17,7 @@ use arkdeck_platform::{ManagedServer, ServerStop, VerifiedTool};
 use arkforge_client::{ControllerClient, PublicClient, PublicRuntimeInfo};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 /// The one environment value that selects a lane.
@@ -411,9 +411,33 @@ impl Lane {
     /// Stops the owned generation, once: its end of input, then TERM to its
     /// group, then KILL. What it wrote comes back the first time.
     pub fn stop(&self) -> Option<ServerStop> {
-        let daemon = self.daemon.lock().ok()?.take()?;
-        daemon.stop().ok()
+        self.stop_daemon()?.stopped.ok()
     }
+
+    /// [`Lane::stop`], naming the process it stopped and how that ended, or
+    /// why the stop failed; `None` once the generation was stopped. A lock a
+    /// panic poisoned still hands the daemon over, to be stopped in the same
+    /// order.
+    pub fn stop_daemon(&self) -> Option<DaemonStop> {
+        let daemon = self
+            .daemon
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()?;
+        let pid = daemon.launch_record().pid;
+        Some(DaemonStop {
+            pid,
+            stopped: daemon.stop(),
+        })
+    }
+}
+
+/// What stopping a lane's daemon left: the process its launch recorded, and
+/// what its stop collected, or why the stop failed.
+#[derive(Debug)]
+pub struct DaemonStop {
+    pub pid: i32,
+    pub stopped: std::io::Result<ServerStop>,
 }
 
 impl Drop for Lane {

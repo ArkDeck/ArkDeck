@@ -5,10 +5,13 @@
 //! public socket there whether or not a lane was composed. When one validated
 //! release bundle is named, it composes the lane: it starts and pairs one
 //! `arkforged` generation in that directory, proves it ready, and stops it
-//! after its own drain (`main.swift` 1118-1200, 1617-1629). Absent is the
-//! normal state, written once to the log with what it means.
+//! after its own drain (`main.swift` 1118-1200, 1617-1629), or after its
+//! managed HDC server when a start fails once the lane is composed
+//! (1595-1602). Absent is the normal state, written once to the log with
+//! what it means.
 use arkdeck_hoststore::NativeRockUsbIdentity;
-use arkdeck_provider_arkforge::{Absence, Lane, LaneInputs};
+use arkdeck_platform::ServerExit;
+use arkdeck_provider_arkforge::{Absence, DaemonStop, Lane, LaneInputs};
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
@@ -93,6 +96,44 @@ impl Composed {
     }
 }
 
+/// A daemon that ends without its drain — a start that fails once the lane
+/// is composed, or serving that ends in an error — drops this, and the drop
+/// stops the lane's daemon there and then, as Swift's failed start stops it
+/// (`DaemonLifecycle.stop`, `main.swift` 1595-1602): its end of input, then
+/// TERM to its group, then KILL, each with its half second, and reaped. It
+/// names on stderr the process it stopped and how that ended, as the daemon
+/// does for its managed HDC server (`managed_hdc::Launched`). After the
+/// drain's own `stop` there is nothing left to stop, and nothing is written.
+impl Drop for Composed {
+    fn drop(&mut self) {
+        if let Ok(lane) = &self.lane
+            && let Some(stopped) = lane.stop_daemon()
+        {
+            eprintln!("arkdeck-agentd: {}", stopped_line(&stopped));
+        }
+    }
+}
+
+/// What a daemon ending without its drain reports of the `arkforged` it
+/// stopped: its PID, as its launch recorded it, and its end, or why the stop
+/// failed.
+fn stopped_line(stopped: &DaemonStop) -> String {
+    match &stopped.stopped {
+        Ok(stop) => format!(
+            "stopped the arkforged this daemon launched (pid {}), which {}",
+            stopped.pid,
+            match stop.exit {
+                ServerExit::Exited(status) => format!("exited with status {status}"),
+                ServerExit::Signalled(signal) => format!("ended on signal {signal}"),
+            }
+        ),
+        Err(error) => format!(
+            "the arkforged this daemon launched (pid {}) did not stop: {error}",
+            stopped.pid
+        ),
+    }
+}
+
 /// Swift's Flash planning as `main.swift` composes the ArkForge provider and
 /// the Rockchip dispatcher: the provider's availability (`unavailable`, none
 /// when it may flash) and the lane's `toolchain`, and the dispatcher's
@@ -156,5 +197,45 @@ pub(crate) fn compose(
         runtime_directory,
         inputs: inputs.ok(),
         lane,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use arkdeck_platform::ServerStop;
+
+    /// What a daemon ending without its drain writes of the `arkforged` it
+    /// stopped, beside the managed HDC server's line
+    /// (`managed_hdc::Stop::report`).
+    #[test]
+    fn a_daemon_ending_without_its_drain_names_the_arkforged_it_stopped() {
+        let stopped = |exit| DaemonStop {
+            pid: 4242,
+            stopped: Ok(ServerStop {
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+                truncated: false,
+                exit,
+            }),
+        };
+        assert_eq!(
+            stopped_line(&stopped(ServerExit::Exited(11))),
+            "stopped the arkforged this daemon launched (pid 4242), which exited with status 11"
+        );
+        assert_eq!(
+            stopped_line(&stopped(ServerExit::Signalled(9))),
+            "stopped the arkforged this daemon launched (pid 4242), which ended on signal 9"
+        );
+        assert_eq!(
+            stopped_line(&DaemonStop {
+                pid: 4242,
+                stopped: Err(std::io::Error::other(
+                    "server did not end after termination"
+                )),
+            }),
+            "the arkforged this daemon launched (pid 4242) did not stop: server did not end \
+             after termination"
+        );
     }
 }
