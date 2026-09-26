@@ -28,7 +28,9 @@ struct DeviceWorkspaceView: View {
         HStack(spacing: 0) {
           screenPane
           Divider()
-          inspector.frame(width: 320)
+          ScrollView { inspector }
+            .frame(width: 320)
+            .accessibilityIdentifier("device.inspector.scroll")
         }
       } else {
         ScrollView { VStack(spacing: 0) { screenPane.frame(height: 420); inspector } }
@@ -53,12 +55,18 @@ struct DeviceWorkspaceView: View {
       VStack(alignment: .leading, spacing: 2) {
         Text(model.targetName)
           .font(WorkspaceFont.sectionTitle)
+          .lineLimit(1)
+          .truncationMode(.middle)
+          .help(model.targetName)
         Text(model.targetDetail)
           .font(WorkspaceFont.caption)
           .foregroundStyle(.secondary)
           .monospaced()
+          .lineLimit(2)
+          .truncationMode(.middle)
+          .help(model.targetDetail)
       }
-      Spacer()
+      Spacer(minLength: WorkspaceMetrics.tightGap)
       Button {
         Task { await model.captureScreen() }
       } label: {
@@ -67,6 +75,7 @@ struct DeviceWorkspaceView: View {
             ? deviceText("device.screen.capturing") : deviceText("device.screen.capture"),
           systemImage: "camera")
       }
+      .fixedSize()
       .disabled(!model.canCapture || model.isCapturing)
       .accessibilityIdentifier("device.capture")
     }
@@ -202,10 +211,8 @@ struct DeviceWorkspaceView: View {
             .font(WorkspaceFont.caption)
             .foregroundStyle(.secondary)
         } else {
-          ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
-              ForEach(model.log) { entry in logRow(entry) }
-            }
+          VStack(alignment: .leading, spacing: 6) {
+            ForEach(model.log) { entry in logRow(entry) }
           }
         }
       }

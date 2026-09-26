@@ -640,7 +640,7 @@ select.inp{cursor:pointer}
 .device-workspace-shell p{margin:0}
 .device-workspace-shell .btn{min-height:24px;padding-block:2px;box-shadow:none;background:var(--panel2)}
 .device-toolbar{display:flex;align-items:center;gap:12px;padding:12px 20px;border-bottom:1px solid var(--line);flex:none}
-.device-target{min-width:0;display:flex;flex-direction:column;gap:2px}.device-target b{font-size:13px;font-weight:600}
+.device-target{min-width:0;display:flex;flex-direction:column;gap:2px}.device-target b{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .device-target span{font:11px var(--mono);color:var(--ink2);overflow-wrap:anywhere}.device-toolbar>.btn{margin-inline-start:auto;flex:none}
 .device-control-grid{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}
 .device-stage{min-width:0;min-height:0;display:grid;place-items:center;container-type:size;overflow:hidden}
@@ -1454,7 +1454,7 @@ function inspectorDetailHTML(selected){
     <details open><summary>${lc('阶段与时间线','Stages and timeline')}</summary><pre class="logtail" data-sync-id="jobInspector.timeline.entries">${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre></details>
     ${selected.standardLog?`<button class="btn" onclick="S.inspectorLog='${selected.id}';renderDrawer()">${inspectorCopy("jobInspector.action.readLog")} · ${esc(selected.standardLog)}</button>`:''}
     ${S.inspectorLog===selected.id?`<pre class="logtail" data-sync-id="jobInspector.log.text">UI fixture only\n${esc((selected.log||[selected.state]).slice(-200).join('\n'))}</pre>`:''}
-    <p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。敏感产物在 History 显式处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Handle sensitive Artifacts explicitly in History.')}</p></div>`;
+    <p class="hint">${lc('仅在选择后读取标准日志，最多 2 MiB、展示末 200 行。刷新清除旧日志，需显式再读。敏感产物在 History 处理。','Standard logs are read only on request: at most 2 MiB, showing the last 200 lines. Refresh clears the old log; read it again explicitly. Handle sensitive Artifacts in History.')}</p></div>`;
 }
 function inspectorBodyHTML(rows){
   if(S.inspector.availability==="loading")

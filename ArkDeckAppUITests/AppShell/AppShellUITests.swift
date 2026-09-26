@@ -410,6 +410,65 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
   }
 
+  /// A refresh outside the inspector must invalidate its independently loaded
+  /// detail, even when job.list returns exactly the same summary.
+  func testInspectorReloadsAfterHistoryRefreshInBothLanguages() {
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-devices",
+        "--ui-test-window-frame=1180x783", "-AppleLanguages", language,
+        "-AppleInterfaceStyle", language == "(en)" ? "Light" : "Dark",
+      ])
+      select("app.navigation.history", in: app)
+      app.buttons["jobInspector.toggle"].click()
+      let read = app.buttons["jobInspector.readLog.fixture-capture.log"]
+      XCTAssertTrue(read.waitForExistenceFast(timeout: 10))
+      scrollIntoView(read, in: app)
+      read.click()
+      let log = element("jobInspector.log.text", in: app)
+      XCTAssertTrue(log.waitForExistenceFast(timeout: 10))
+      app.buttons["history.refresh"].click()
+      XCTAssertTrue(log.waitForNonExistenceFast(timeout: 10),
+        "a refreshed History snapshot must invalidate the inspector's old detail and log")
+      XCTAssertTrue(read.waitForExistenceFast(timeout: 10))
+      scrollIntoView(read, in: app)
+      read.click()
+      XCTAssertTrue(log.waitForExistenceFast(timeout: 10))
+      let open = app.buttons["jobInspector.openRecord"]
+      scrollIntoView(open, in: app)
+      open.click()
+      assertDisplayed(element("history.detail.job", in: app), equals: "job-fixture-diagnostics")
+      let screenshot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      screenshot.name = "Inspector refreshed exact record \(language)"
+      screenshot.lifetime = .keepAlways
+      add(screenshot)
+      app.buttons["jobInspector.toggle"].click()
+      for size in [CGSize(width: 1180, height: 600), CGSize(width: 900, height: 600)] {
+        Self.resizeRecoveryWindow(in: app, to: size)
+        select("app.navigation.device", in: app)
+        XCTAssertTrue(element("device.screen.empty", in: app).waitForExistenceFast(timeout: 10))
+        XCTAssertTrue(app.buttons["device.capture"].isHittable)
+        let performance = element("device.performance", in: app)
+        scrollIntoView(performance, in: app)
+        XCTAssertTrue(performance.isHittable, "the full Device inspector must remain scrollable")
+        let deviceShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        deviceShot.name = "Device scrollable inspector \(language) \(Int(size.width))"
+        deviceShot.lifetime = .keepAlways
+        add(deviceShot)
+        select("app.navigation.debug", in: app)
+        let commands = app.buttons["debug.tab.commands"]
+        XCTAssertTrue(commands.waitForExistenceFast(timeout: 10))
+        commands.click()
+        XCTAssertTrue(app.buttons["debug.refresh"].isHittable)
+        let debugShot = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+        debugShot.name = "Debug availability \(language) \(Int(size.width))"
+        debugShot.lifetime = .keepAlways
+        add(debugShot)
+      }
+      app.terminate()
+    }
+  }
+
   private func checkHistorySavedFilterRestoresActivityAndExposesOneFilterSet(in app: XCUIApplication) {
     Self.resizeHistoryWindow(in: app, to: 1180)
     select("app.navigation.history", in: app)

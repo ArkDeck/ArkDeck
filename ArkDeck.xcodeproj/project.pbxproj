@@ -10,16 +10,19 @@
 		A19000000000000000000001 /* ArkDeckClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = A19000000000000000000002 /* ArkDeckClientKit */; };
 		A19000000000000000000003 /* ArkDeckClientKit in Test Frameworks */ = {isa = PBXBuildFile; productRef = A19000000000000000000002 /* ArkDeckClientKit */; };
 		F30000000000000000000201 /* DebugRemoteBuildBrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */; };
+		F31000000000000000000201 /* DebugWorkspaceRefreshState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31000000000000000000101 /* DebugWorkspaceRefreshState.swift */; };
 		F30000000000000000000202 /* SettingsWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000102 /* SettingsWorkspaceViewModel.swift */; };
 		F30000000000000000000203 /* HistoryFilterDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000103 /* HistoryFilterDependencies.swift */; };
 		F30000000000000000000204 /* TraceFlagTagEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000104 /* TraceFlagTagEditor.swift */; };
 		F30000000000000000000205 /* TraceFlagDraftEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000105 /* TraceFlagDraftEditor.swift */; };
 		F30000000000000000000211 /* DebugRemoteBuildBrowserViewModel.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */; };
+		F31000000000000000000211 /* DebugWorkspaceRefreshState.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F31000000000000000000101 /* DebugWorkspaceRefreshState.swift */; };
 		F30000000000000000000212 /* SettingsWorkspaceViewModel.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000102 /* SettingsWorkspaceViewModel.swift */; };
 		F30000000000000000000213 /* HistoryFilterDependencies.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000103 /* HistoryFilterDependencies.swift */; };
 		F30000000000000000000214 /* TraceFlagTagEditor.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000104 /* TraceFlagTagEditor.swift */; };
 		F30000000000000000000215 /* TraceFlagDraftEditor.swift in Test Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000105 /* TraceFlagDraftEditor.swift */; };
 		F30000000000000000000221 /* RemoteBuildSourceStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000121 /* RemoteBuildSourceStateTests.swift */; };
+		F31000000000000000000221 /* DebugWorkspaceRefreshStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31000000000000000000121 /* DebugWorkspaceRefreshStateTests.swift */; };
 		F30000000000000000000222 /* HistoryFilterDependenciesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000122 /* HistoryFilterDependenciesTests.swift */; };
 		F30000000000000000000223 /* TraceFlagTagEditorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000123 /* TraceFlagTagEditorTests.swift */; };
 		F30000000000000000000224 /* SettingsStorageStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000124 /* SettingsStorageStateTests.swift */; };
@@ -85,11 +88,13 @@
 
 /* Begin PBXFileReference section */
 		F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugRemoteBuildBrowserViewModel.swift; sourceTree = "<group>"; };
+		F31000000000000000000101 /* DebugWorkspaceRefreshState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugWorkspaceRefreshState.swift; sourceTree = "<group>"; };
 		F30000000000000000000102 /* SettingsWorkspaceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWorkspaceViewModel.swift; sourceTree = "<group>"; };
 		F30000000000000000000103 /* HistoryFilterDependencies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFilterDependencies.swift; sourceTree = "<group>"; };
 		F30000000000000000000104 /* TraceFlagTagEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceFlagTagEditor.swift; sourceTree = "<group>"; };
 		F30000000000000000000105 /* TraceFlagDraftEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TraceFlagDraftEditor.swift; sourceTree = "<group>"; };
 		F30000000000000000000121 /* RemoteBuildSourceStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/RemoteBuildSourceStateTests.swift; sourceTree = SOURCE_ROOT; };
+		F31000000000000000000121 /* DebugWorkspaceRefreshStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/DebugWorkspaceRefreshStateTests.swift; sourceTree = SOURCE_ROOT; };
 		F30000000000000000000122 /* HistoryFilterDependenciesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFilterDependenciesTests.swift; sourceTree = "<group>"; };
 		F30000000000000000000123 /* TraceFlagTagEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/TraceFlagTagEditorTests.swift; sourceTree = SOURCE_ROOT; };
 		F30000000000000000000124 /* SettingsStorageStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/SettingsStorageStateTests.swift; sourceTree = SOURCE_ROOT; };
@@ -380,6 +385,7 @@
 			children = (
 				A100000000000000000000B5 /* DebugWorkspaceView.swift */,
 				F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */,
+				F31000000000000000000101 /* DebugWorkspaceRefreshState.swift */,
 			);
 			path = Features/Debug;
 			sourceTree = "<group>";
@@ -439,6 +445,7 @@
 				F30000000000000000000131 /* FixtureStateLocation.swift */,
 				A100000000000000000000E1 /* ViewerUITests.swift */,
 				F30000000000000000000121 /* RemoteBuildSourceStateTests.swift */,
+				F31000000000000000000121 /* DebugWorkspaceRefreshStateTests.swift */,
 				F30000000000000000000122 /* HistoryFilterDependenciesTests.swift */,
 				F30000000000000000000123 /* TraceFlagTagEditorTests.swift */,
 				F30000000000000000000124 /* SettingsStorageStateTests.swift */,
@@ -611,6 +618,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F30000000000000000000201 /* DebugRemoteBuildBrowserViewModel.swift in Sources */,
+				F31000000000000000000201 /* DebugWorkspaceRefreshState.swift in Sources */,
 				F30000000000000000000202 /* SettingsWorkspaceViewModel.swift in Sources */,
 				F30000000000000000000203 /* HistoryFilterDependencies.swift in Sources */,
 				F30000000000000000000204 /* TraceFlagTagEditor.swift in Sources */,
@@ -651,11 +659,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				F30000000000000000000211 /* DebugRemoteBuildBrowserViewModel.swift in Test Sources */,
+				F31000000000000000000211 /* DebugWorkspaceRefreshState.swift in Test Sources */,
 				F30000000000000000000212 /* SettingsWorkspaceViewModel.swift in Test Sources */,
 				F30000000000000000000213 /* HistoryFilterDependencies.swift in Test Sources */,
 				F30000000000000000000214 /* TraceFlagTagEditor.swift in Test Sources */,
 				F30000000000000000000215 /* TraceFlagDraftEditor.swift in Test Sources */,
 				F30000000000000000000221 /* RemoteBuildSourceStateTests.swift in Sources */,
+				F31000000000000000000221 /* DebugWorkspaceRefreshStateTests.swift in Sources */,
 				F30000000000000000000222 /* HistoryFilterDependenciesTests.swift in Sources */,
 				F30000000000000000000223 /* TraceFlagTagEditorTests.swift in Sources */,
 				F30000000000000000000224 /* SettingsStorageStateTests.swift in Sources */,
