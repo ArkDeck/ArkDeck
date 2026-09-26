@@ -15,6 +15,16 @@ final class UpdateFeedSignedRustOracleTests: XCTestCase {
   }
 
   func testSignedCodecAndFieldBoundariesForRust() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let recording = ProcessInfo.processInfo.environment["ARKDECK_RUST_SIGNED_FEED_RECORD"] != nil
+    struct Recorded: Decodable {
+      struct Row: Decodable { let name: String; let envelopeBase64: String }
+      let cases: [Row]
+    }
+    let recorded: [Recorded.Row] = recording ? [] : try JSONDecoder().decode(
+      Recorded.self, from: Data(contentsOf:
+        repository.appending(path: "rust/tests/fixtures/update-feed/signed.json"))).cases
     let key = try Curve25519.Signing.PrivateKey(rawRepresentation: Data(repeating: 42, count: 32))
     let keyID = "fixture-key"
     let trust = try UpdateFeedTrust(keyID: keyID, rawPublicKey: key.publicKey.rawRepresentation)
@@ -45,8 +55,17 @@ final class UpdateFeedSignedRustOracleTests: XCTestCase {
           url: path.hasPrefix("https://") ? path : "https://github.com/ArkDeck/\(path)", byteLength: sequence,
           sha256: String(repeating: "ab", count: 32)), releaseNotesSummary: "测试 release")
       let bytes = try UpdateFeedCodec.canonicalPayload(payload)
-      let signature = try key.signature(for: UpdateFeedCodec.signatureInput(payload: bytes, keyID: keyID))
-      let envelope = try UpdateFeedCodec.assemble(canonicalPayload: bytes, signature: signature, keyID: keyID)
+      let envelope: Data
+      if recording {
+        let signature = try key.signature(for: UpdateFeedCodec.signatureInput(payload: bytes, keyID: keyID))
+        envelope = try UpdateFeedCodec.assemble(canonicalPayload: bytes, signature: signature, keyID: keyID)
+      } else {
+        // Fresh CryptoKit signatures differed across actual recording runs.
+        // Verify the recorded signed bytes and current payload/field outcomes;
+        // do not require a newly generated signature to match byte-for-byte.
+        let row = try XCTUnwrap(recorded.first { $0.name == name })
+        envelope = try XCTUnwrap(Data(base64Encoded: row.envelopeBase64))
+      }
       let decoded = try UpdateFeedCodec.decodeAndVerify(envelope, trust: trust)
       XCTAssertEqual(decoded.canonicalPayload, bytes)
       let result: String
@@ -71,10 +90,13 @@ final class UpdateFeedSignedRustOracleTests: XCTestCase {
       "publicKeyBase64": .string(key.publicKey.rawRepresentation.base64EncodedString()),
       "now": .string(issued), "cases": .array(rows),
     ])) + Data("\n".utf8)
-    var repository = URL(filePath: #filePath)
-    for _ in 0..<5 { repository.deleteLastPathComponent() }
-    try HDCOracleHarness.recordOrCompare(
-      ["signed.json": output], variable: "ARKDECK_RUST_SIGNED_FEED_RECORD",
-      oracle: repository.appending(path: "rust/tests/fixtures/update-feed"))
+    if recording {
+      try HDCOracleHarness.recordOrCompare(
+        ["signed.json": output], variable: "ARKDECK_RUST_SIGNED_FEED_RECORD",
+        oracle: repository.appending(path: "rust/tests/fixtures/update-feed"))
+    } else {
+      XCTAssertEqual(output, try Data(contentsOf:
+        repository.appending(path: "rust/tests/fixtures/update-feed/signed.json")))
+    }
   }
 }

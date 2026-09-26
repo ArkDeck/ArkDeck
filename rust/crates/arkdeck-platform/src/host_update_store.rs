@@ -64,7 +64,7 @@ impl HostDirectory {
         let name_c = segment(name)?;
         // SAFETY: immediate name under a retained root. NONBLOCK also prevents
         // a malicious FIFO lock entry from blocking before its type check.
-        let fd = unsafe {
+        let mut fd = unsafe {
             libc::openat(
                 self.0.as_raw_fd(),
                 name_c.as_ptr(),
@@ -76,6 +76,21 @@ impl HostDirectory {
                 0o600,
             )
         };
+        if fd < 0 && io::Error::last_os_error().kind() == io::ErrorKind::NotFound {
+            // On macOS, two concurrent O_CREAT|O_NOFOLLOW opens can report
+            // ENOENT to the loser even though the other opener created the
+            // permanent lock. Open that existing inode once, without create;
+            // never retry creation, follow a link, or repair a missing lock.
+            // SAFETY: same retained root and validated immediate name; the
+            // normal ownership/type/link checks below apply to this fd too.
+            fd = unsafe {
+                libc::openat(
+                    self.0.as_raw_fd(),
+                    name_c.as_ptr(),
+                    libc::O_RDWR | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK,
+                )
+            };
+        }
         if fd < 0 {
             return Err(io::Error::last_os_error());
         }
@@ -260,6 +275,60 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.0);
         }
+    }
+
+    #[test]
+    fn competing_first_lock_creators_hold_the_same_permanent_inode() {
+        let nonce = u64::from_ne_bytes(crate::random_bytes::<8>().unwrap());
+        let root = Root(std::env::temp_dir().join(format!("arkdeck-lock-race-{nonce:016x}")));
+        let directory = HostDirectory::open_update_store(&root.0).unwrap();
+        for index in 0..16 {
+            let name = format!(".lock-{index}");
+            let barrier = std::sync::Barrier::new(2);
+            let identities = std::thread::scope(|scope| {
+                let handles: Vec<_> = (0..2)
+                    .map(|_| {
+                        let directory = &directory;
+                        let name = &name;
+                        let barrier = &barrier;
+                        scope.spawn(move || {
+                            barrier.wait();
+                            let lock = directory.lock_update_record(name, true).unwrap();
+                            lock.validate_link(directory, name).unwrap();
+                            let metadata = directory.stat_at(name).unwrap();
+                            assert_eq!(metadata.st_mode & 0o777, 0o600);
+                            (metadata.st_dev, metadata.st_ino)
+                        })
+                    })
+                    .collect();
+                handles
+                    .into_iter()
+                    .map(|handle| handle.join().unwrap())
+                    .collect::<Vec<_>>()
+            });
+            assert_eq!(identities[0], identities[1]);
+        }
+        assert_eq!(directory.names(32).unwrap().len(), 16);
+    }
+
+    #[test]
+    fn lock_reopen_never_repairs_unsafe_or_unlinked_entries() {
+        let nonce = u64::from_ne_bytes(crate::random_bytes::<8>().unwrap());
+        let root = Root(std::env::temp_dir().join(format!("arkdeck-lock-refuse-{nonce:016x}")));
+        let directory = HostDirectory::open_update_store(&root.0).unwrap();
+        std::fs::write(root.0.join("source"), b"unchanged").unwrap();
+        std::os::unix::fs::symlink("source", root.0.join("symlink")).unwrap();
+        std::fs::hard_link(root.0.join("source"), root.0.join("hardlink")).unwrap();
+        std::fs::create_dir(root.0.join("directory")).unwrap();
+        for name in ["symlink", "hardlink", "directory"] {
+            assert!(directory.lock_update_record(name, true).is_err(), "{name}");
+        }
+        assert_eq!(std::fs::read(root.0.join("source")).unwrap(), b"unchanged");
+        let empty_path = root.0.join("removed");
+        let unlinked = HostDirectory::open_update_store(&empty_path).unwrap();
+        std::fs::remove_dir(&empty_path).unwrap();
+        assert!(unlinked.lock_update_record(".lock", true).is_err());
+        assert!(!empty_path.exists());
     }
 
     #[test]

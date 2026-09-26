@@ -82,6 +82,53 @@ unified gate, App UI acceptance, production update run or real device acceptance
 was executed. The serial direct-dependency tests exceeded the ten-minute target;
 no second heavy lane was started alongside them.
 
+### First-creation lock race and ordinary oracle replay follow-up
+
+A consumer watermark concurrency test exposed a first-creation race in the
+shared updater lock primitive. Concurrent macOS `openat` calls with
+`O_CREAT|O_NOFOLLOW|O_NONBLOCK` can return ENOENT to one opener even when the
+other created the permanent lock. A separate Python `os.open` reproduction and
+an unsandboxed Rust single-test run confirmed the observation. The primitive
+now opens the existing immediate name once without O_CREAT on that error only.
+It retains O_NOFOLLOW/O_CLOEXEC/O_NONBLOCK and all regular-file, ownership,
+single-link, mode, flock and linked-inode checks. It does not sleep, loop,
+delete/recreate the lock, repair a missing entry or retry a device operation.
+
+Native regression tests race two first creators over 16 separate lock names,
+prove they hold the same inode, and refuse linked/directory entries and an
+unlinked root. The original publication failure test remains in that group.
+Consumer replay tests also prove that two owners cannot accept different
+payload digests at one sequence. Logs include the original failure:
+`/private/tmp/arkdeck-runtime-update-replay-race-native.log`, and the corrected
+three-case replay run: `/private/tmp/arkdeck-runtime-update-replay-fixed.log`.
+Final native lock test group: **exit 0, three passed**,
+`/private/tmp/arkdeck-runtime-update-lock-race-final.log`.
+
+The state and signed-feed XCTest recorders shared fixture directories with
+other producers, but the generic harness's ordinary comparison demanded an
+exact whole-directory file set. Their normal mode now compares only each
+producer's own file, still byte-for-byte. Actual fresh CryptoKit recording also
+showed different signature bytes with identical key, payload and verdicts;
+the signed-feed replay now verifies the original signed envelope through
+CryptoKit and the current field verifier, comparing its payload and complete
+output to the committed fixture. It never replaces or weakens the fixture's
+signature. The third recording used to identify this difference remains at
+`/private/tmp/arkdeck-update-feed-signed-oracle-3/signed.json` and was not copied
+over the committed signed.json.
+
+`sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter
+'RuntimeUpdate.*RustOracleTests|UpdateFeedSignedRustOracleTests'` without record
+environment variables: **exit 0, three XCTests**, including the consumer replay
+class under development, `/private/tmp/arkdeck-runtime-update-swift-replay-final.log`.
+The preceding ordinary-mode run failed only the regenerated-signature byte
+comparison; it is retained at `/private/tmp/arkdeck-runtime-update-swift-replay-default.log`.
+The 11-crate checks above belong to the pre-follow-up owner implementation;
+these focused regressions cover this newly discovered boundary. Final candidate
+checks remain required before any authorized push. Platform/CLI all-target
+Clippy, fmt, diff check and SDD (121 acceptance IDs) pass for this follow-up;
+logs: `/private/tmp/arkdeck-runtime-update-followup-clippy.log` and
+`/private/tmp/arkdeck-runtime-update-followup-sdd.log`.
+
 ## CI
 
 No PR/run for this local slice. Remote push still awaits direct authorization in

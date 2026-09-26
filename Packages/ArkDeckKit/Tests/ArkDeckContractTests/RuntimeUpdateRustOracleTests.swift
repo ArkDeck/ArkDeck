@@ -92,8 +92,13 @@ final class RuntimeUpdateRustOracleTests: XCTestCase {
     ])) + Data("\n".utf8)
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
-    try HDCOracleHarness.recordOrCompare(
-      ["states.json": output], variable: "ARKDECK_RUST_UPDATE_STATE_RECORD",
-      oracle: repository.appending(path: "rust/tests/fixtures/runtime-update"))
+    if ProcessInfo.processInfo.environment["ARKDECK_RUST_UPDATE_STATE_RECORD"] != nil {
+      try HDCOracleHarness.recordOrCompare(
+        ["states.json": output], variable: "ARKDECK_RUST_UPDATE_STATE_RECORD",
+        oracle: repository.appending(path: "rust/tests/fixtures/runtime-update"))
+    } else {
+      XCTAssertEqual(output, try Data(contentsOf:
+        repository.appending(path: "rust/tests/fixtures/runtime-update/states.json")))
+    }
   }
 }
