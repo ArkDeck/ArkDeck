@@ -71,6 +71,7 @@ dependencies = [
  "arkdeck-contract",
  "arkdeck-platform",
  "arkdeck-provider-workspace",
+ "arkdeck-rockchip-binding",
  "serde_json",
  "unicode-segmentation",
 ]
@@ -113,6 +114,7 @@ dependencies = [
  "arkdeck-provider-arkforge",
  "arkdeck-provider-hdc",
  "arkdeck-provider-workspace",
+ "arkdeck-rockchip-binding",
  "arkforge-ipc",
  "libc",
  "serde",
@@ -150,6 +152,7 @@ version = "0.1.0"
 dependencies = [
  "arkdeck-contract",
  "arkdeck-platform",
+ "arkdeck-rockchip-binding",
  "hmac",
  "serde_json",
  "sha2",
@@ -166,6 +169,15 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "arkdeck-rockchip-binding"
+version = "0.1.0"
+dependencies = [
+ "arkdeck-contract",
+ "arkdeck-platform",
+ "serde_json",
 ]
 
 [[package]]

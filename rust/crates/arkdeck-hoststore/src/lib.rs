@@ -367,7 +367,8 @@ pub use flash_invocations::{FlashInvocations, InvocationBroker, MAXIMUM_DESTRUCT
 mod rockchip_binding;
 #[cfg(target_os = "macos")]
 pub use rockchip_binding::{
-    BindingError, BindingSnapshot, BoundTarget, LineageAdvance, RecoveryProof, RockchipBindingStore,
+    BindingError, BindingEvidence, BindingInstallation, BindingSnapshot, BoundTarget,
+    LineageAdvance, RecoveryProof, RockchipBindingStore, install_current_target,
 };
 #[cfg(target_os = "macos")]
 mod rockchip_reactivation;

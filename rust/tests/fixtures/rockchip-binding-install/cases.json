@@ -1,0 +1,1384 @@
+{
+  "steps" : [
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"USB registry unavailable\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 1,
+      "name" : "registryUnavailable",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : null
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"DAYU200 target unavailable\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 2,
+      "name" : "noDevice",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"DAYU200 target unavailable\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 3,
+      "name" : "unregisteredOnly",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 592,
+              "productName" : "\"Keyboard\"",
+              "registryEntryId" : null,
+              "serial" : "keyboard-serial",
+              "topology" : "1048576",
+              "vendorId" : 1452
+            },
+            {
+              "productId" : 20480,
+              "productName" : "\"Other Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "20971520",
+              "vendorId" : 8711
+            },
+            {
+              "productId" : 20480,
+              "productName" : null,
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "20971520",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"DAYU200 target ambiguous\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 4,
+      "name" : "twoBoards",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            },
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "1",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"the single USB identity is not a registered DAYU200 mode\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 5,
+      "name" : "emptyTopology",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"the single USB identity is not a registered DAYU200 mode\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 6,
+      "name" : "nonDecimalTopology",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "0x1200000",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "admissionRejected(\"the single USB identity is not a registered DAYU200 mode\")"
+      },
+      "entries" : [
+
+      ],
+      "index" : 7,
+      "name" : "emptySerial",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 1,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "18874368"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 8,
+      "name" : "install",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : false,
+          "revision" : 1,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "18874368"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 9,
+      "name" : "installAgain",
+      "rebind" : false,
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : false,
+          "revision" : 1,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "18874368"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 10,
+      "name" : "installAgainUnquotedName",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "HDC Device",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding differs from the only connected Loader; explicit rebind is required\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 11,
+      "name" : "loaderWithoutRebind",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding differs from the only connected Loader; explicit rebind is required\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 12,
+      "name" : "portMovedWithoutRebind",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "19922944",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding differs from the only connected Loader; explicit rebind is required\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 13,
+      "name" : "otherBoardWithoutRebind",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "20971520",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 2,
+          "serialDigestSha256" : "141ae682e83ee240b5ad4a3e5c2b123fe57fa487c9caa0bba2f06ac62a190375",
+          "usbTopology" : "17956864"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 527,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 14,
+      "name" : "rebindToLoader",
+      "rebind" : true,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 13578,
+              "productName" : null,
+              "registryEntryId" : null,
+              "serial" : "loader-serial-0451",
+              "topology" : "17956864",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : false,
+          "revision" : 2,
+          "serialDigestSha256" : "141ae682e83ee240b5ad4a3e5c2b123fe57fa487c9caa0bba2f06ac62a190375",
+          "usbTopology" : "17956864"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 527,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 15,
+      "name" : "rebindSameAgain",
+      "rebind" : true,
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : false,
+          "revision" : 2,
+          "serialDigestSha256" : "141ae682e83ee240b5ad4a3e5c2b123fe57fa487c9caa0bba2f06ac62a190375",
+          "usbTopology" : "17956864"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 527,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 16,
+      "name" : "installSameWithoutRebind",
+      "rebind" : false,
+      "setup" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 3,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "19922944"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 527,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 17,
+      "name" : "rebindToMovedPort",
+      "rebind" : true,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "19922944",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 1,
+          "serialDigestSha256" : "9ec17d940e52b73a8099491855579c72f8055732fa5218f8578c641706685682",
+          "usbTopology" : "20971520"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 275,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 18,
+      "name" : "rebindWithNothingInstalled",
+      "rebind" : true,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "1501ffff0000000000000000000beef1",
+              "topology" : "20971520",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : false,
+          "revision" : 1,
+          "serialDigestSha256" : "9ec17d940e52b73a8099491855579c72f8055732fa5218f8578c641706685682",
+          "usbTopology" : "20971520"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 275,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 19,
+      "name" : "rootModeRepaired",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "chmod",
+          "mode" : "755",
+          "path" : "ArkDeck"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 1,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "18874368"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 20,
+      "name" : "installAfterLockRemoved",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "644",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 21,
+      "name" : "bindingNotOwnerOnly",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "usb",
+          "devices" : [
+            {
+              "productId" : 20480,
+              "productName" : "\"HDC Device\"",
+              "registryEntryId" : 4294967362,
+              "serial" : "150100424a544e4600",
+              "topology" : "18874368",
+              "vendorId" : 8711
+            }
+          ]
+        },
+        {
+          "action" : "chmod",
+          "mode" : "644",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/binding-second-name"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 22,
+      "name" : "bindingHardLinked",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "link",
+          "existing" : "ArkDeck/rockchip-binding.json",
+          "path" : "ArkDeck/binding-second-name"
+        },
+        {
+          "action" : "chmod",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding size is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 23,
+      "name" : "bindingEmpty",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/binding-second-name"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/empty",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding size is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 65537,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 24,
+      "name" : "bindingOversized",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/oversized",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding schema is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 3,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 25,
+      "name" : "bindingNotAnObject",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/not-an-object",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding schema is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 73,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 26,
+      "name" : "bindingExtraKey",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/extra-key",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding cannot be decoded\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 61,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 27,
+      "name" : "bindingWrongTypes",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/wrong-types",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding snapshot is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 289,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 28,
+      "name" : "bindingSerialInEvidence",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/serial-in-evidence",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding snapshot is invalid\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 29,
+      "name" : "bindingRevisionZero",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "write",
+          "input" : "inputs/revision-zero",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding must be an owner-only regular file\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 30,
+      "name" : "bindingIsDirectory",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"durable binding cannot be opened\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/elsewhere.json"
+        },
+        {
+          "destination" : "elsewhere.json",
+          "kind" : "link",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 31,
+      "name" : "bindingSymbolicLink",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/valid",
+          "mode" : "600",
+          "path" : "ArkDeck/elsewhere.json"
+        },
+        {
+          "action" : "symlink",
+          "destination" : "elsewhere.json",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"binding lock must be an owner-only regular file\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "644",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 32,
+      "name" : "lockNotOwnerOnly",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/elsewhere.json"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/valid",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "chmod",
+          "mode" : "644",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"binding lock cannot be opened\")"
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "destination" : "elsewhere.lock",
+          "kind" : "link",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/elsewhere.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 33,
+      "name" : "lockSymbolicLink",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/empty",
+          "mode" : "600",
+          "path" : "ArkDeck/elsewhere.lock"
+        },
+        {
+          "action" : "symlink",
+          "destination" : "elsewhere.lock",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : "productionConfigurationUnavailable(\"binding root cannot be a symbolic link\")"
+      },
+      "entries" : [
+        {
+          "destination" : "moved",
+          "kind" : "link",
+          "path" : "ArkDeck"
+        },
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "moved"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "moved/rockchip-binding.json"
+        }
+      ],
+      "index" : 34,
+      "name" : "rootSymbolicLink",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/elsewhere.lock"
+        },
+        {
+          "action" : "mkdir",
+          "mode" : "700",
+          "path" : "moved"
+        },
+        {
+          "action" : "write",
+          "input" : "inputs/valid",
+          "mode" : "600",
+          "path" : "moved/rockchip-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "ArkDeck/rockchip-binding.json"
+        },
+        {
+          "action" : "remove",
+          "path" : "ArkDeck"
+        },
+        {
+          "action" : "symlink",
+          "destination" : "moved",
+          "path" : "ArkDeck"
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "receipt" : {
+          "created" : true,
+          "revision" : 1,
+          "serialDigestSha256" : "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+          "usbTopology" : "18874368"
+        }
+      },
+      "entries" : [
+        {
+          "kind" : "directory",
+          "mode" : "700",
+          "path" : "ArkDeck"
+        },
+        {
+          "bytes" : 0,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/.rockchip-binding.lock"
+        },
+        {
+          "bytes" : 261,
+          "kind" : "file",
+          "mode" : "600",
+          "path" : "ArkDeck/rockchip-binding.json"
+        }
+      ],
+      "index" : 35,
+      "name" : "installWithRootRemoved",
+      "rebind" : false,
+      "setup" : [
+        {
+          "action" : "remove",
+          "path" : "ArkDeck"
+        },
+        {
+          "action" : "remove",
+          "path" : "moved"
+        }
+      ]
+    }
+  ]
+}

@@ -21,7 +21,9 @@ use crate::job_owner::JobStore;
 use crate::job_record::JobRecord;
 use crate::post_flash_alias::PostFlashBinding;
 use crate::post_flash_alias_store::PostFlashAliasStore;
-use crate::rockchip_binding::{BindingSnapshot, RecoveryProof, RockchipBindingStore};
+use crate::rockchip_binding::{
+    BindingEvidence, BindingSnapshot, RecoveryProof, RockchipBindingStore,
+};
 use crate::strict_json::swift_quoted;
 use crate::target_document::{AliasResolutionDraft, AliasResolutionName};
 use crate::target_owner::TargetStore;

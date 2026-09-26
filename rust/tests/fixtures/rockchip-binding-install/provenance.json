@@ -1,0 +1,10 @@
+{
+  "applicationSupportRoot" : "/private/tmp/arkdeck-binding-install-oracle/ArkDeck",
+  "owners" : [
+    "RockchipProductBindingBootstrap.installCurrentTarget",
+    "RockchipProductUSBProbe.singleDAYU200",
+    "RockchipProductBindingStore.install"
+  ],
+  "producer" : "RockchipBindingInstallOracleContractTests.testSwiftInstallsTheBindingTheRustCLIReplays",
+  "root" : "/private/tmp/arkdeck-binding-install-oracle"
+}

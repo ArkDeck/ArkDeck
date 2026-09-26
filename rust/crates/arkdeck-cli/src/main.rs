@@ -1130,6 +1130,77 @@ fn serve_runtime_service_refusal(
     error.exit_code().into()
 }
 
+/// `flash install-binding [--rebind]` (Swift `runInstallBinding`): the DAYU200
+/// cross-mode binding installed in this process from one census of the
+/// host's I/O Registry, never through the Runtime. The receipt is the one
+/// document; a refusal escapes Swift's handler as its description, `arkdeck
+/// flash: <error>` on stderr and exit 1, in every output mode. Swift's handler
+/// does not warn that the leaf is legacy; a machine answer carries it in
+/// `meta.lifecycle`.
+fn serve_install_binding(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    #[cfg(target_os = "macos")]
+    {
+        let rebind = invocation
+            .params
+            .as_ref()
+            .is_some_and(|params| params.get("rebind") == Some(&json!(true)));
+        let Some(root) = arkdeck_platform::arkdeck_application_support_root() else {
+            eprintln!(
+                "arkdeck flash: the account's Application Support directory cannot be resolved"
+            );
+            return 1.into();
+        };
+        match arkdeck_cli::install_binding(rebind, &root, arkdeck_platform::usb_host_devices) {
+            Ok(installed) => {
+                let written = if invocation.json {
+                    write_document(&arkdeck_cli::with_lifecycle(
+                        success_envelope(
+                            invocation.command,
+                            arkdeck_cli::install_binding_result(&installed),
+                            id,
+                        ),
+                        invocation.command,
+                    ))
+                } else {
+                    writeln!(
+                        io::stdout().lock(),
+                        "{}",
+                        arkdeck_cli::install_binding_human(&installed)
+                    )
+                };
+                if written.is_err() {
+                    return 74.into();
+                }
+                0.into()
+            }
+            Err(error) => {
+                eprintln!("arkdeck flash: {error}");
+                1.into()
+            }
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let error = CliError::new(
+            "unsupportedOnPlatform",
+            "the DAYU200 cross-mode binding is installed from the macOS I/O Registry",
+        );
+        if invocation.json {
+            if write_document(&arkdeck_cli::with_lifecycle(
+                failure_envelope(invocation.command, &error, id, true),
+                invocation.command,
+            ))
+            .is_err()
+            {
+                return 74.into();
+            }
+        } else {
+            eprintln!("arkdeck: {}", error.message);
+        }
+        error.exit_code().into()
+    }
+}
+
 /// A domain leaf (Swift `runDomainOperation`): the typed request from the
 /// caller's options, the client-side executor's run, and its end as
 /// `emitAgentOutcome` renders it. A completed run is the receipt; a failed one
@@ -1582,6 +1653,9 @@ fn main() -> std::process::ExitCode {
         "maintainer.update-feed.prepare" | "update-feed.prepare"
     ) {
         return serve_update_feed_prepare(&invocation, id);
+    }
+    if invocation.command == "flash.install-binding" {
+        return serve_install_binding(&invocation, id);
     }
     if arkdeck_cli::domain_leaves::serves(invocation.command) {
         return serve_domain_leaf(&invocation, id);
