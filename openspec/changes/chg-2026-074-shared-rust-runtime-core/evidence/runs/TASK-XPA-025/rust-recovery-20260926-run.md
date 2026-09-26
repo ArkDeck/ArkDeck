@@ -94,10 +94,64 @@ per independent run; every sample gets a distinct copy/root/daemon. Before
 launch, every copied regular file must have a different inode from its source,
 and input hashes must match. Afterward, the template is verified unchanged.
 The preparation strategy is part of comparison identity. The 3 runs × 5 samples
-× 2 full-size workloads remain unchanged. Formal capture is awaiting an exclusive
-quiet-host window; no qualifying reference baseline is claimed here.
+× 2 full-size workloads remain unchanged.
+
+## Formal recovery capture
+
+Source head: `ed067a90d756e6a8c1475cf7699a8b49c0b7db40`. The existing release
+binaries and measurement code stayed fixed throughout the exclusive window.
+Command (from `scripts`):
+
+```sh
+python3 -m bench capture \
+  --daemon /private/tmp/arkdeck-xpa025-recovery-target/release/arkdeck-agentd \
+  --soak /private/tmp/arkdeck-xpa025-recovery-target/release/arkdeck-soak \
+  --runtime-kind rust --build-configuration release \
+  --recovery-only --recovery-samples 5 --runs 3 \
+  --out-dir /private/tmp/arkdeck-xpa025-recovery-formal-20260926
+```
+
+Exit 0; UTC 2026-09-26 13:45:41–13:56:15 (10m34s).
+[Full generated document](rust-recovery-formal-20260926.json) and
+[all 30 raw attempts](rust-recovery-attempts-20260926.jsonl) are copied unchanged
+from the capture output. Full command log: `/private/tmp/arkdeck-xpa025-formal-capture.log`.
+All 30 attempts are `MEASURED`: exactly 5 Journal and 5 History samples in each
+of 3 independent runs. No attempt failed, was removed or was retried. Every
+sample verified the full required counts, input digest, separate copy inodes,
+unchanged template and workload-specific completion proof. Each workload's
+input digest is identical across all 15 samples.
+
+| Metric | Unit | Run 1 p95 | Run 2 p95 | Run 3 p95 | p95 spread |
+| --- | --- | --- | --- | --- | --- |
+| `daemon.warmStartRecovery` | ms | 239.877 | 232.318 | 238.386 | 3.1713% |
+| `daemon.warmStartRecovery.history` | ms | 5010.210 | 5074.747 | 4965.640 | 2.1777% |
+| `calibration.busyLoop` | ms | 1.8485 | 1.9331 | 1.8620 | 4.5427% |
+
+The unchanged harness reports `PASS`, 3 measured metrics, 22 explicit gaps and
+`baselineEligible: true` for this measured subset. This is candidate eligibility,
+not baseline adoption, reference-host approval, full metric coverage or a G5
+completion. The host was arm64, 8 CPUs, macOS 27.0, Python 3.14.7; its OS differs
+from the design reference host. All before/start/end sample guards reported
+zero conflicting build processes, with one-minute loads from 1.804 to 3.766,
+strictly below 4. The coordinating session kept other builds stopped until the
+window was released after completion.
+
+The History p95 includes roughly 4.5 seconds of full readback, so its value near
+5 seconds is not a pure replay budget result. No old budget or threshold is
+raised or declared passed here. These documents remain beside this record,
+not under `scripts/bench/baselines/`. Earlier cold-start and RSS instability is
+still unresolved and its original evidence is preserved.
 
 ## CI
 
-Pending PR creation. Maintainer review and merge remain with the coordinating
-session; no baseline adoption or reference-host substitution is claimed.
+PR [#2271](https://github.com/ArkDeck/ArkDeck/pull/2271), implementation head
+`ed067a90d756e6a8c1475cf7699a8b49c0b7db40`:
+SDD Guard `36245984966` and Performance harness `36245985062` succeeded;
+Swift CI `36245985333` has successful Linux/Windows/host-independent Rust jobs,
+with the macOS Rust job still running at the evidence commit. Nightly/soak
+measurement jobs were skipped by the workflow; harness CI is not a performance
+capture. Required main contexts were read back as `guard` and `swift`.
+The evidence follow-up commit will receive its own CI; final status is reported
+in the PR and coordinating session without amending a green head. Maintainer
+review and merge remain with that session. No baseline adoption or reference-host
+substitution is claimed.
