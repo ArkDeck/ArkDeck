@@ -1,0 +1,1545 @@
+{
+  "baselineEligible": true,
+  "change": "CHG-2026-074-shared-rust-runtime-core",
+  "clocks": {
+    "awakeWorkClock": "CLOCK_UPTIME_RAW",
+    "continuousClock": "CLOCK_MONOTONIC"
+  },
+  "eligibilityReason": "release build measured on a quiet host with the required run count",
+  "gapCount": 22,
+  "generatedAtUtc": "2026-09-26T13:56:15Z",
+  "host": {
+    "arch": "arm64",
+    "cpuCount": 8,
+    "os": "Darwin",
+    "osVersion": "27.0",
+    "python": "3.14.7"
+  },
+  "measuredMetricCount": 3,
+  "metrics": {
+    "app.timeToInteractive": {
+      "blockedBy": "device window and UI lane",
+      "designRow": "I.2 row 3 (App time to interactive)",
+      "reason": "AppShellUITests asserts a connected device row before its 2s budget, so the measurement needs a real device and the UI lane",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.open": {
+      "blockedBy": "a maintainer ruling on the zero-copy artifact path",
+      "designRow": "I.2 row 6 (large artifact transfer, zero-copy leg)",
+      "reason": "artifact.open does not exist; whether to build it is itself one of the decisions section I.3 expects SPK-1 to unblock, so it cannot be baselined before it is decided",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.pagedRead": {
+      "blockedBy": "artifact fixture generation in the perf lane",
+      "designRow": "I.2 row 6 (large artifact transfer, paged base64 leg)",
+      "reason": "measurable in principle through artifact.read, but a seeded Job's Artifacts total a few kilobytes and the 128 MiB and 1 GiB fixtures are built only by the Swift opt-in slow artifact tests, not by this harness",
+      "status": "NOT_MEASURED"
+    },
+    "calibration.busyLoop": {
+      "aggregate": {
+        "p50": 1.8501249141991138,
+        "p95": 1.861958997324109,
+        "p99": 1.8842079443857074
+      },
+      "derivedBudget": 2.7929384959861636,
+      "description": "fixed CPU workload used as the ratio denominator",
+      "designRow": "noise control (design section I.2, ratio-based PR gate)",
+      "p95SpreadRatio": 0.045427,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 200,
+          "max": 1.880291965790093,
+          "min": 1.7199169378727674,
+          "p50": 1.8350830068811774,
+          "p95": 1.8484999891370535,
+          "p99": 1.8686670809984207
+        },
+        {
+          "count": 200,
+          "max": 2.047667047008872,
+          "min": 1.8402920104563236,
+          "p50": 1.8519579898566008,
+          "p95": 1.933082938194275,
+          "p99": 1.9838330335915089
+        },
+        {
+          "count": 200,
+          "max": 1.9412910332903266,
+          "min": 1.8390410114079714,
+          "p50": 1.8501249141991138,
+          "p95": 1.861958997324109,
+          "p99": 1.8842079443857074
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "daemon.busyResources": {
+      "blockedBy": "a harness leg that drives a Golden Journey loop on the isolated daemon",
+      "designRow": "I.2 row 8 (busy resource footprint)",
+      "reason": "the resource window samples an idle daemon only; a busy footprint needs a Golden Journey loop driving the daemon, and this harness is read-only by construction and submits no operation",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.coldStart": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 1 (daemon cold start)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleCpuPercent": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleOpenFileDescriptorCount": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleThreadCount": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.residentSetPlateau": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.residentSetSteady": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.warmStartRecovery": {
+      "aggregate": {
+        "p50": 209.48458299972117,
+        "p95": 238.3855419466272,
+        "p99": 238.3855419466272
+      },
+      "derivedBudget": 357.5783129199408,
+      "description": "spawn through verified clean replay marker and complete Job readback; includes verification",
+      "designRow": "I.2 rows 2 and 7 (10k Journal recovery)",
+      "p95SpreadRatio": 0.031713,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 5,
+          "max": 239.87737495917827,
+          "min": 200.58004197198898,
+          "p50": 219.9718749616295,
+          "p95": 239.87737495917827,
+          "p99": 239.87737495917827
+        },
+        {
+          "count": 5,
+          "max": 232.31750004924834,
+          "min": 174.01129193603992,
+          "p50": 207.2340410668403,
+          "p95": 232.31750004924834,
+          "p99": 232.31750004924834
+        },
+        {
+          "count": 5,
+          "max": 238.3855419466272,
+          "min": 172.99245891626924,
+          "p50": 209.48458299972117,
+          "p95": 238.3855419466272,
+          "p99": 238.3855419466272
+        }
+      ],
+      "scale": {
+        "recoveryFixtureVersion": "rust-recovery-fixture-v1",
+        "recoveryHistoryJobCount": 10000,
+        "recoveryJournalEventCount": 10000,
+        "recoveryPageSize": 250,
+        "recoverySeedStrategy": "pristine-template-per-run-v1",
+        "recoveryTimingBoundary": "spawn-through-completion-verification-v1"
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "daemon.warmStartRecovery.history": {
+      "aggregate": {
+        "p50": 4895.701417000964,
+        "p95": 5010.210292064585,
+        "p99": 5010.210292064585
+      },
+      "derivedBudget": 7515.315438096877,
+      "description": "spawn through complete terminal History readback and zero recovery markers; includes verification",
+      "designRow": "I.2 rows 2 and 7 (10k terminal History restart)",
+      "p95SpreadRatio": 0.021777,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 5,
+          "max": 5010.210292064585,
+          "min": 4844.9206670047715,
+          "p50": 4886.07895898167,
+          "p95": 5010.210292064585,
+          "p99": 5010.210292064585
+        },
+        {
+          "count": 5,
+          "max": 5074.747125036083,
+          "min": 4849.668790935539,
+          "p50": 4903.622915968299,
+          "p95": 5074.747125036083,
+          "p99": 5074.747125036083
+        },
+        {
+          "count": 5,
+          "max": 4965.64008295536,
+          "min": 4878.846084000543,
+          "p50": 4895.701417000964,
+          "p95": 4965.64008295536,
+          "p99": 4965.64008295536
+        }
+      ],
+      "scale": {
+        "recoveryFixtureVersion": "rust-recovery-fixture-v1",
+        "recoveryHistoryJobCount": 10000,
+        "recoveryJournalEventCount": 10000,
+        "recoveryPageSize": 250,
+        "recoverySeedStrategy": "pristine-template-per-run-v1",
+        "recoveryTimingBoundary": "spawn-through-completion-verification-v1"
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "ipc.health": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.jobList": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.jobStatus": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.namedPipe": {
+      "blockedBy": "a Windows performance capture with a named-pipe client",
+      "designRow": "I.2 row 4 (IPC, named-pipe leg)",
+      "reason": "the macOS capture uses Unix domain sockets and does not measure the Windows named-pipe transport",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.xpc": {
+      "blockedBy": "an absolute XPC measurement from a client the daemon accepts",
+      "designRow": "I.2 row 4 (IPC, XPC leg)",
+      "reason": "the XPC leg accepts only the signed App as its peer, and this harness is an unsigned Unix-domain-socket client; RuntimeXPCTransportCostTests publishes relative XPC cost only; the Rust daemon's XPC ingress is also opt-in (ARKDECK_APP_INGRESS=history)",
+      "status": "NOT_MEASURED"
+    },
+    "job.cancelReconcile": {
+      "blockedBy": "a Rust harness leg that submits, cancels and reconciles a Job, and a device window",
+      "designRow": "I.2 row 9 (cancel and reconcile latency)",
+      "reason": "the row times the cancellation of a running readOnly Job; this harness is read-only by construction and never submits the Job it would cancel, and the terminal leg needs an HDC child process on a real device; the Rust daemon supports job.reconcile, but this capture does not time a cancellation/reconciliation workload",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsPage": {
+      "blockedBy": "a fixture that produces a 1,000-event Job",
+      "designRow": "I.2 row 5 (job.events 1,000-row page)",
+      "reason": "job.events is published and read-only, but every seeded Job is an observe.device Job carrying a handful of events, not the 1,000-event Job the budget is written for; a page of a seeded Job would only budget its own scale",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsWait": {
+      "blockedBy": "a registry, schema and client change that publishes job.events.wait",
+      "designRow": "I.2 row 5 (job.events.wait idle CPU)",
+      "reason": "job.events.wait is a proposal in design section F.2 and is not in the published single v1 method table; only the job.events pull page exists",
+      "status": "NOT_MEASURED"
+    },
+    "job.journalAppend": {
+      "blockedBy": "a timed durable-append leg over a 1,000-event Job",
+      "designRow": "I.2 row 5 (journal append per event)",
+      "reason": "no leg times a durable journal append: this harness only reads, and the soak appends journals without timing them; the Swift per-event figure came from JournalRecoveryContractTests' opt-in journal benchmark, which times the Swift engine",
+      "status": "NOT_MEASURED"
+    },
+    "package.size": {
+      "blockedBy": "TASK-XPA-022 (Windows packaging) and a macOS installer producer",
+      "designRow": "I.2 row 12 (installer size and update delta)",
+      "reason": "no DMG or MSIX producer exists in the repository, so there is no artefact to size",
+      "status": "NOT_MEASURED"
+    },
+    "ui.frameResponse": {
+      "blockedBy": "UI lane",
+      "designRow": "I.2 row 11 (UI frame response)",
+      "reason": "needs the UI lane on both platforms",
+      "status": "NOT_MEASURED"
+    },
+    "viewer.scale": {
+      "blockedBy": "a maintainer ruling on wall-clock Viewer budgets, and the UI lane",
+      "designRow": "I.2 row 10 (Viewer build, search, hit-test, scroll)",
+      "reason": "build, search and hit-test are covered by the existing ratio gate in ViewerScalePerformanceTests, whose header refuses wall-clock budgets; the scroll leg needs the UI lane",
+      "status": "NOT_MEASURED"
+    }
+  },
+  "runs": [
+    {
+      "finishedAtUtc": "2026-09-26T13:49:23Z",
+      "index": 0,
+      "loadAverageOneMinuteEnd": 3.468,
+      "loadAverageOneMinuteStart": 1.847,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.warmStartRecovery",
+        "daemon.warmStartRecovery.history"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "recoveryFixtureVersion": "rust-recovery-fixture-v1",
+        "recoveryHistoryJobCount": 10000,
+        "recoveryJournalEventCount": 10000,
+        "recoveryPageSize": 250,
+        "recoverySamples": [
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.2926669381558895,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 200.58004197198898,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 1.8037109375
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 1.8037109375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 1.8466796875
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 27.98687492031604,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 193.2873750338331,
+            "templatePreparationMilliseconds": 21207.73945795372,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4473.989126039669,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4886.07895898167,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.095703125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.01708984375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 1.8037109375
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 3484.197875019163,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 412.0898329420015,
+            "templatePreparationMilliseconds": 146621.91149999853,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.27658299729228,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 239.87737495917827,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.96875
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.96875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.96875
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 30.60141601599753,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 232.600791961886,
+            "templatePreparationMilliseconds": 21207.73945795372,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4474.971291958354,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4844.9206670047715,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.89306640625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.96875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.96875
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 3506.7382500274107,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 369.9493750464171,
+            "templatePreparationMilliseconds": 146621.91149999853,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 6.491332896985114,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 208.66749994456768,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.89306640625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.89306640625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.89306640625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 28.209582902491093,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 202.17616704758257,
+            "templatePreparationMilliseconds": 21207.73945795372,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4481.065582949668,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4853.137832949869,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.06298828125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.9814453125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.89306640625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 3493.486999999732,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 372.07225000020117,
+            "templatePreparationMilliseconds": 146621.91149999853,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 5.483374930918217,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 219.9718749616295,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.06298828125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.06298828125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.06298828125
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 27.97625004313886,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 214.4885000307113,
+            "templatePreparationMilliseconds": 21207.73945795372,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4589.55291705206,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 5010.210292064585,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.212890625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.0576171875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.06298828125
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 3705.8266249950975,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 420.6573750125244,
+            "templatePreparationMilliseconds": 146621.91149999853,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.506624911911786,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 231.1899169581011,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.212890625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.212890625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.212890625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 30.07558290846646,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 223.6832920461893,
+            "templatePreparationMilliseconds": 21207.73945795372,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4490.538542042486,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4902.328792028129,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.46826171875
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.59619140625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.212890625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 3644.896375015378,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 411.79024998564273,
+            "templatePreparationMilliseconds": 146621.91149999853,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          }
+        ],
+        "recoverySeedStrategy": "pristine-template-per-run-v1",
+        "recoveryTimingBoundary": "spawn-through-completion-verification-v1",
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-26T13:45:41Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-26T13:52:32Z",
+      "index": 1,
+      "loadAverageOneMinuteEnd": 3.542,
+      "loadAverageOneMinuteStart": 3.468,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.warmStartRecovery",
+        "daemon.warmStartRecovery.history"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "recoveryFixtureVersion": "rust-recovery-fixture-v1",
+        "recoveryHistoryJobCount": 10000,
+        "recoveryJournalEventCount": 10000,
+        "recoveryPageSize": 250,
+        "recoverySamples": [
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 3.4291669726371765,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 174.01129193603992,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24853515625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24853515625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.46826171875
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 26.534290984272957,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 170.58212496340275,
+            "templatePreparationMilliseconds": 17440.680125029758,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4463.453665957786,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4849.668790935539,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.58203125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.5458984375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24853515625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 3405.603750026785,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 386.21512497775257,
+            "templatePreparationMilliseconds": 116465.79749998637,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 6.653251009993255,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 195.6878339406103,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.58203125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.58203125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.58203125
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 28.67833396885544,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 189.03458293061703,
+            "templatePreparationMilliseconds": 17440.680125029758,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4651.691125007346,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 5038.034582976252,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.16162109375
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.17578125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.58203125
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 3572.9280420346186,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 386.34345796890557,
+            "templatePreparationMilliseconds": 116465.79749998637,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 6.300457986071706,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 207.2340410668403,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.16162109375
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.16162109375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.16162109375
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 29.922417015768588,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 200.93358308076859,
+            "templatePreparationMilliseconds": 17440.680125029758,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4528.614167124033,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 5074.747125036083,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.658203125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.62890625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.16162109375
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 4023.7092080060393,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 546.1329579120502,
+            "templatePreparationMilliseconds": 116465.79749998637,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 6.7005009623244405,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 217.44133392348886,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.765625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.765625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.765625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 31.016791006550193,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 210.74083296116441,
+            "templatePreparationMilliseconds": 17440.680125029758,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4529.7647069673985,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4903.622915968299,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7041015625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.765625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.765625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 3521.0855830227956,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 373.8582090009004,
+            "templatePreparationMilliseconds": 116465.79749998637,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 5.4862500401213765,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 232.31750004924834,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7275390625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7275390625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7275390625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 28.31858303397894,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 226.83125000912696,
+            "templatePreparationMilliseconds": 17440.680125029758,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4492.234250064939,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4850.894500035793,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.5888671875
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7275390625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.7275390625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 3424.0807079477236,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 358.66024997085333,
+            "templatePreparationMilliseconds": 116465.79749998637,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          }
+        ],
+        "recoverySeedStrategy": "pristine-template-per-run-v1",
+        "recoveryTimingBoundary": "spawn-through-completion-verification-v1",
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-26T13:49:23Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-26T13:56:15Z",
+      "index": 2,
+      "loadAverageOneMinuteEnd": 2.999,
+      "loadAverageOneMinuteStart": 3.542,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.warmStartRecovery",
+        "daemon.warmStartRecovery.history"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "recoveryFixtureVersion": "rust-recovery-fixture-v1",
+        "recoveryHistoryJobCount": 10000,
+        "recoveryJournalEventCount": 10000,
+        "recoveryPageSize": 250,
+        "recoverySamples": [
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.322208839468658,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 172.99245891626924,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24462890625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24462890625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.54150390625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 25.747666019015014,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 165.67025007680058,
+            "templatePreparationMilliseconds": 21519.824832910672,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4482.611415907741,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4879.152999958023,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.2587890625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.48828125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 3.24462890625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 0,
+            "seedPreparationMilliseconds": 3326.0287499288097,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 396.54158405028284,
+            "templatePreparationMilliseconds": 147485.5032499181,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 5.293249967508018,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 209.19895800761878,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.2587890625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.2587890625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.2587890625
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 30.612875008955598,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 203.90570804011077,
+            "templatePreparationMilliseconds": 21519.824832910672,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4515.619791927747,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4895.701417000964,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.298828125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.23779296875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.2587890625
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 1,
+            "seedPreparationMilliseconds": 3384.8931660177186,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 380.08162507321686,
+            "templatePreparationMilliseconds": 147485.5032499181,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.374958018772304,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 209.48458299972117,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.298828125
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.298828125
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.298828125
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 26.882417034357786,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 202.10962498094887,
+            "templatePreparationMilliseconds": 21519.824832910672,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4552.746208035387,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4965.64008295536,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.32568359375
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.3544921875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.298828125
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 2,
+            "seedPreparationMilliseconds": 3547.4807920400053,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 412.8938749199733,
+            "templatePreparationMilliseconds": 147485.5032499181,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 7.049707928672433,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 238.3855419466272,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.32568359375
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.32568359375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.32568359375
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 28.716999921016395,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 231.33583401795477,
+            "templatePreparationMilliseconds": 21519.824832910672,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4508.956291945651,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4925.026000011712,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.72998046875
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.61962890625
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.32568359375
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 3,
+            "seedPreparationMilliseconds": 3683.567750034854,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 416.06970806606114,
+            "templatePreparationMilliseconds": 147485.5032499181,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          },
+          {
+            "activeJobCount": 1,
+            "actualJobCount": 1,
+            "actualJournalEventCount": 10000,
+            "completionVerificationMilliseconds": 8.390708011575043,
+            "copiedRegularFiles": 9,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "43a7885fac4bc3f64508902b5edfef84cf782e125bc5b65aad68ed84aa2c16e3",
+            "jobCount": 1,
+            "journalBytes": 2588954,
+            "journalEventCount": 10000,
+            "journalSha256": "668b54c4de6bd591899cea6f0524984276c0e71875350b69cd44e980dcd954d5",
+            "milliseconds": 225.6421250058338,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.72998046875
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.72998046875
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.72998046875
+            },
+            "recoveryMarkers": 1,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 28.3217920223251,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 217.25141699425876,
+            "templatePreparationMilliseconds": 21519.824832910672,
+            "templateUnchanged": true,
+            "verifiedJobs": 1,
+            "verifiedPages": 1,
+            "workload": "journal"
+          },
+          {
+            "activeJobCount": 0,
+            "actualJobCount": 10000,
+            "actualJournalEventCount": 0,
+            "completionVerificationMilliseconds": 4471.729209064506,
+            "copiedRegularFiles": 10006,
+            "copyIsolationVerified": true,
+            "fixtureVersion": "rust-recovery-fixture-v1",
+            "inputSha256": "8c388e6e3f0722f0aec56d75bebc71309724f840010f692a730258ece2bba31a",
+            "jobCount": 10000,
+            "journalBytes": 0,
+            "journalEventCount": 0,
+            "journalSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "milliseconds": 4878.846084000543,
+            "providerDispatchCount": 0,
+            "quietHostAtEnd": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.99853515625
+            },
+            "quietHostAtStart": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.91162109375
+            },
+            "quietHostBeforeSample": {
+              "conflictingBuildProcesses": 0,
+              "oneMinuteLoad": 2.72998046875
+            },
+            "recoveryMarkers": 0,
+            "sampleIndex": 4,
+            "seedPreparationMilliseconds": 3606.1631669290364,
+            "seedTimestamp": "2026-09-26T00:00:00Z",
+            "spawnThroughHealthMilliseconds": 407.11687493603677,
+            "templatePreparationMilliseconds": 147485.5032499181,
+            "templateUnchanged": true,
+            "verifiedJobs": 10000,
+            "verifiedPages": 40,
+            "workload": "history"
+          }
+        ],
+        "recoverySeedStrategy": "pristine-template-per-run-v1",
+        "recoveryTimingBoundary": "spawn-through-completion-verification-v1",
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-26T13:52:32Z"
+    }
+  ],
+  "schema": "arkdeck-perf-baseline-1.1.0",
+  "selfCheckPassed": true,
+  "spike": "SPK-11",
+  "spikeVerdict": "PASS",
+  "task": "TASK-XPA-025",
+  "toolchain": {
+    "buildConfiguration": "release",
+    "calibrationIterations": 60000,
+    "daemonSha256": "e7b855603956bde2fb24e520dc86b93ef8d1045de9ddeab8a97938d4f49d5a2f",
+    "runtimeKind": "rust",
+    "soakFixtureSha256": "38f92139d2292b15f89f2f2f6fc8ae261b3ff0e5c8626b745d4f2f0aa241be60"
+  },
+  "unstableMetrics": []
+}
