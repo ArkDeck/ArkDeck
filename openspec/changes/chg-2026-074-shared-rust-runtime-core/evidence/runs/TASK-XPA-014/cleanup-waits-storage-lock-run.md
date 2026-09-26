@@ -187,4 +187,9 @@ and never in it. The 1-minute load was 2 to 8.
 
 ## CI
 
-Pending.
+#2248, head `098b96787`, run 36208571913: every selected lane passed.
+- Rust workspace: macOS 14m35s, Ubuntu 2m12s, Windows 4m10s. Host-independent checks: 39s.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `f07a0e89a`. Recorded by the next slice (TASK-XPA-012, the Artifact list's own
+snapshots), as AGENTS.md has it.
