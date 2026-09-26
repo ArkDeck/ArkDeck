@@ -220,10 +220,6 @@ impl FlashInvocations {
         );
         answer.map_err(|error| match refused.take() {
             Some(error) => error,
-            None if error.code == "invalidCursor" => control_failure(
-                "invalidCursor",
-                "cursor is invalid, belongs to another query or its snapshot was reclaimed",
-            ),
             None => control_failure(&error.code, &error.message),
         })
     }

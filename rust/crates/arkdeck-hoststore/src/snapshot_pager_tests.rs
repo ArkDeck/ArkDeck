@@ -54,7 +54,7 @@ mod whole {
             if size + 2 > MAX_PAGE {
                 return Err(failure(
                     "inputTooLarge",
-                    "Resource projection exceeds its page bound",
+                    "resource projection exceeds its page bound",
                 ));
             }
             if current.len() == page_size || bytes + size > MAX_PAGE {
@@ -66,7 +66,7 @@ mod whole {
             if total > MAX_SNAPSHOT {
                 return Err(failure(
                     "operationUnavailable",
-                    "Snapshot exceeds its storage bound",
+                    "snapshot exceeds its storage bound",
                 ));
             }
             current.push(row);
@@ -89,7 +89,7 @@ mod whole {
         if bytes.len() > MAX_SNAPSHOT {
             return Err(failure(
                 "operationUnavailable",
-                "Snapshot exceeds its encoded storage bound",
+                "snapshot exceeds its encoded storage bound",
             ));
         }
         Ok((snapshot, bytes))
