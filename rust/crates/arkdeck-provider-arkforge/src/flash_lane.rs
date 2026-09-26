@@ -94,6 +94,11 @@ pub enum LaneFailure {
     Failed(String),
     /// The daemon confirmed nothing was executed.
     ConfirmedNotExecuted(String),
+    /// Swift `.confirmedNotExecutedWithDiagnostic`: confirmed not executed,
+    /// with the closed diagnostic an operator's timeline may show, as Swift
+    /// `RockchipFlashRuntimeDiagnostic`'s raw value. Only the Rockchip host's
+    /// Loader transition raises it.
+    ConfirmedNotExecutedWithDiagnostic { reason: String, diagnostic: String },
     /// Nobody can say what happened; never replayed.
     OutcomeUnknown(String),
     /// Anything else, as its description reads.

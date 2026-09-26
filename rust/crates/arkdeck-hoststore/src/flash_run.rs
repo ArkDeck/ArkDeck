@@ -44,6 +44,7 @@ use crate::job_plan::{
 };
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use crate::operation_request::OperationRequest;
+use crate::rockchip_records::described;
 use arkdeck_contract::sha256_hex;
 use arkdeck_provider_arkforge::{
     ActionReceipt, DeviceBinding, Execution, FlashLane, HostAction, LaneArtifact, LaneFailure,
@@ -123,20 +124,6 @@ impl From<RunRefusal> for Stop {
 }
 
 type Stepped<T> = Result<T, Stop>;
-
-/// Swift's `"\(error)"` of a lane or host failure, as a skipped step's reason
-/// quotes it.
-fn described(failure: &LaneFailure) -> String {
-    let quoted = crate::strict_json::swift_quoted;
-    match failure {
-        LaneFailure::Failed(reason) => format!("failed({})", quoted(reason)),
-        LaneFailure::ConfirmedNotExecuted(reason) => {
-            format!("confirmedNotExecuted({})", quoted(reason))
-        }
-        LaneFailure::OutcomeUnknown(reason) => format!("outcomeUnknown({})", quoted(reason)),
-        LaneFailure::Other(description) => description.clone(),
-    }
-}
 
 /// Swift `ProviderResolvedInputArtifact`: the flash bundle as this step
 /// resolved it.
@@ -1377,8 +1364,12 @@ impl FlashRunner<'_> {
                 run.persist(jobs)?;
                 return Err(Stop::Unknown(reason));
             }
-            Err(failure @ (LaneFailure::Failed(_) | LaneFailure::ConfirmedNotExecuted(_))) => {
-                let not_executed = matches!(failure, LaneFailure::ConfirmedNotExecuted(_));
+            Err(
+                failure @ (LaneFailure::Failed(_)
+                | LaneFailure::ConfirmedNotExecuted(_)
+                | LaneFailure::ConfirmedNotExecutedWithDiagnostic { .. }),
+            ) => {
+                let not_executed = !matches!(failure, LaneFailure::Failed(_));
                 let at = run.clock()?;
                 run.step_outcome_at(
                     id,
@@ -1391,7 +1382,10 @@ impl FlashRunner<'_> {
                 run.record.set_recovery(None, None, action);
                 run.persist(jobs)?;
                 return Err(match failure {
-                    LaneFailure::ConfirmedNotExecuted(reason) => Stop::NotExecuted(reason),
+                    LaneFailure::ConfirmedNotExecuted(reason)
+                    | LaneFailure::ConfirmedNotExecutedWithDiagnostic { reason, .. } => {
+                        Stop::NotExecuted(reason)
+                    }
                     LaneFailure::Failed(reason) => Stop::Failed(reason),
                     _ => unreachable!(),
                 });
@@ -1699,8 +1693,12 @@ impl FlashRunner<'_> {
                 ));
                 return Err(HostStop::Other(Stop::Unknown(reason)));
             }
-            Err(failure @ (LaneFailure::Failed(_) | LaneFailure::ConfirmedNotExecuted(_))) => {
-                let not_executed = matches!(failure, LaneFailure::ConfirmedNotExecuted(_));
+            Err(
+                failure @ (LaneFailure::Failed(_)
+                | LaneFailure::ConfirmedNotExecuted(_)
+                | LaneFailure::ConfirmedNotExecutedWithDiagnostic { .. }),
+            ) => {
+                let not_executed = !matches!(failure, LaneFailure::Failed(_));
                 let at = run
                     .clock()
                     .map_err(|refusal| HostStop::Other(refusal.into()))?;
@@ -1801,7 +1799,10 @@ fn correlated(
 fn lane_stop(failure: LaneFailure) -> Stop {
     match failure {
         LaneFailure::Failed(reason) => Stop::Failed(reason),
-        LaneFailure::ConfirmedNotExecuted(reason) => Stop::NotExecuted(reason),
+        LaneFailure::ConfirmedNotExecuted(reason)
+        | LaneFailure::ConfirmedNotExecutedWithDiagnostic { reason, .. } => {
+            Stop::NotExecuted(reason)
+        }
         LaneFailure::OutcomeUnknown(reason) => Stop::Unknown(reason),
         LaneFailure::Other(_) => Stop::Refused(uncertain()),
     }
