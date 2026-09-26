@@ -174,14 +174,19 @@ fn a_dropped_paired_server_gets_its_end_of_input_then_term_then_kill() {
 }
 
 /// The same drop sends TERM before any KILL: a stand-in that ends on TERM,
-/// noting it, is ended by it.
+/// noting it, is ended by it. It catches TERM itself, as a daemon may: it
+/// starts with TERM ignored (the next case), which `/bin/sh` cannot undo, so
+/// the stand-in is Perl. Perl runs a handler between its operations, so the
+/// stand-in waits in short steps: a TERM that lands just before a long
+/// sleep would wait for that sleep to end.
 #[test]
 fn a_dropped_paired_server_is_sent_term_before_kill() {
     let scratch = Scratch::new("paired-term");
     let (secret, termed) = (scratch.0.join("secret"), scratch.0.join("term"));
     let tool = scratch.tool(&format!(
-        "trap ': > \"{}\"; exit 21' TERM\nhead -c 32 > '{}'\ncat > /dev/null\n\
-         while :; do sleep 1; done",
+        "exec /usr/bin/perl -e '$SIG{{TERM}} = sub {{ open(my $f, \">\", $ARGV[0]); exit 21 }}; \
+         read(STDIN, my $s, 32); open(my $o, \">\", $ARGV[1]); print $o $s; close($o); \
+         1 while <STDIN>; select(undef, undef, undef, 0.01) while 1' '{}' '{}'",
         termed.display(),
         secret.display()
     ));
@@ -194,6 +199,122 @@ fn a_dropped_paired_server_is_sent_term_before_kill() {
         "TERM never reached it before it was killed"
     );
     assert_group_gone(pid);
+}
+
+/// Swift's daemon ignores SIGINT and SIGTERM before it starts any child
+/// (`main.swift` 377-378) and its launcher resets no disposition, so the
+/// `arkforged` it pairs starts with both ignored: TERM to its group, the
+/// second step of its stop, does nothing, and its end of input ends it. A
+/// paired server starts so, as the kernel's record of it shows and as it
+/// meets both signals, with this thread's signal mask and no descriptor
+/// but its three; this process keeps its own handling of both, and a
+/// server launched unpaired ignores only what this process ignores.
+#[test]
+fn a_paired_server_starts_with_sigint_and_sigterm_ignored_and_ends_at_its_end_of_input() {
+    let scratch = Scratch::new("paired-ignoring");
+    let [secret, mask, ready, leaked] =
+        ["secret", "mask", "ready", "leaked"].map(|name| scratch.0.join(name));
+    // A descriptor this process leaves open across `exec`, which the server
+    // must not receive.
+    // SAFETY: opens /dev/null for reading, without close-on-exec on purpose.
+    let open = unsafe { libc::open(c"/dev/null".as_ptr(), libc::O_RDONLY) };
+    assert!(open > 2);
+    // The shell hands over to Perl, which reports its mask and then reads
+    // its input to the end.
+    let tool = scratch.tool(&format!(
+        "head -c 32 > '{}'\nif [ -e /dev/fd/{open} ]; then : > '{}'; fi\n\
+         exec /usr/bin/perl -e 'use POSIX (); my $m = POSIX::SigSet->new; \
+         POSIX::sigprocmask(POSIX::SIG_BLOCK(), undef, $m); open(my $f, \">\", $ARGV[0]); \
+         print $f join(\",\", grep {{ $m->ismember($_) }} 1..31); close($f); \
+         open(my $r, \">\", $ARGV[1]); close($r); 1 while <STDIN>; exit 0' '{}' '{}'",
+        secret.display(),
+        leaked.display(),
+        mask.display(),
+        ready.display()
+    ));
+    let own = [disposition(libc::SIGINT), disposition(libc::SIGTERM)];
+    let server = ManagedServer::launch_paired(&tool, &[], &[], &scratch.0, &[7; 32], 4096).unwrap();
+    // SAFETY: closes the descriptor opened above, which nothing else owns.
+    unsafe { libc::close(open) };
+    assert_eq!([disposition(libc::SIGINT), disposition(libc::SIGTERM)], own);
+    let pid = server.launch_record().pid;
+    assert_eq!(ignored(pid), [true, true]);
+    wait_for(&ready);
+    for signal in [libc::SIGINT, libc::SIGTERM] {
+        // SAFETY: signals only this test's own server's process group.
+        assert_eq!(unsafe { libc::kill(-pid, signal) }, 0);
+    }
+    assert_eq!(server.stop().unwrap().exit, ServerExit::Exited(0));
+    assert_eq!(std::fs::read_to_string(&mask).unwrap(), blocked_here());
+    assert!(
+        !leaked.exists(),
+        "a descriptor this process leaves open reached the server"
+    );
+    assert_group_gone(pid);
+
+    // Unpaired, a server ignores only what this process ignores, as it would
+    // inherit it: nothing, unless this test itself was started so.
+    let scratch = Scratch::new("unpaired-inherited");
+    let tool = scratch.tool("exec /bin/sleep 600");
+    let server = ManagedServer::launch(&tool, &[], &[], 4096).unwrap();
+    assert_eq!(
+        ignored(server.launch_record().pid),
+        own.map(|handler| handler == libc::SIG_IGN)
+    );
+    server.stop().unwrap();
+}
+
+/// The signals this thread blocks, as Perl lists its own: their numbers
+/// from 1 to 31, joined by commas.
+fn blocked_here() -> String {
+    // SAFETY: zero is a valid sigset to receive this thread's mask into.
+    let mut mask: libc::sigset_t = unsafe { std::mem::zeroed() };
+    // SAFETY: reads this thread's mask, and changes nothing.
+    assert_eq!(
+        unsafe { libc::pthread_sigmask(libc::SIG_BLOCK, std::ptr::null(), &mut mask) },
+        0
+    );
+    (1..32)
+        // SAFETY: a valid sigset and a signal number in range.
+        .filter(|&signal| unsafe { libc::sigismember(&mask, signal) } == 1)
+        .map(|signal| signal.to_string())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+/// This process's own disposition of `signal`.
+fn disposition(signal: libc::c_int) -> libc::sighandler_t {
+    // SAFETY: zero is a valid sigaction to receive the current one into.
+    let mut current: libc::sigaction = unsafe { std::mem::zeroed() };
+    // SAFETY: reads, and changes nothing.
+    assert_eq!(
+        unsafe { libc::sigaction(signal, std::ptr::null(), &mut current) },
+        0
+    );
+    current.sa_sigaction
+}
+
+/// Whether the kernel's record of `pid` (`struct kinfo_proc`) has SIGINT and
+/// SIGTERM among the signals it ignores (`kp_proc.p_sigignore`, at byte 232
+/// of the 648 the SDK declares).
+fn ignored(pid: i32) -> [bool; 2] {
+    let mut record = [0u8; 648];
+    let mut size = record.len();
+    let mut name = [libc::CTL_KERN, libc::KERN_PROC, libc::KERN_PROC_PID, pid];
+    // SAFETY: a live four-entry MIB and a writable buffer of the declared size.
+    let status = unsafe {
+        libc::sysctl(
+            name.as_mut_ptr(),
+            4,
+            record.as_mut_ptr().cast(),
+            &mut size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    assert_eq!((status, size), (0, record.len()), "pid {pid} is not listed");
+    let ignoring = u32::from_ne_bytes(record[232..236].try_into().unwrap());
+    [libc::SIGINT, libc::SIGTERM].map(|signal| ignoring & (1 << (signal - 1)) != 0)
 }
 
 /// Waits for a stand-in to have written `bytes` to `file`: the paired

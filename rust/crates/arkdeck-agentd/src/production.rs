@@ -485,6 +485,17 @@ pub(crate) fn compose(
     let mut omitted = Vec::new();
     let state = HostDirectory::open(&layout.state)?;
     state.validate_path(&layout.state)?;
+    // The App ingress over that root, configured before any child starts:
+    // it reads only the root validated above, and Swift's listener cannot
+    // fail once its HDC server and `arkforged` run, so neither is left to
+    // stop for it.
+    let ingress = if layout.overridden {
+        None
+    } else {
+        Some(crate::app_ingress::Configuration::production(
+            &layout.state,
+        )?)
+    };
     for root in [
         &layout.targets,
         &layout.artifacts,
@@ -615,6 +626,11 @@ pub(crate) fn compose(
     // `ARKDECK_HDC_PATH` dispatch stays refused, as Swift's does, and no
     // HDC control action is composed.
     let controls = arkdeck_hoststore::ControlActionResources::open(&layout.control_actions)?;
+    // Declared before the managed server, so that a failure once both run
+    // stops the managed server first and `arkforged` after it, in the order
+    // of Swift's failed start (`main.swift` 1595-1602), as `main.rs` holds
+    // them.
+    let arkforge;
     let mut hdc_sha256 = None;
     let (host, managed) = match &inputs.hdc {
         None => {
@@ -668,7 +684,7 @@ pub(crate) fn compose(
     // observer and the facts' Loader observation read that directory's public
     // socket whether or not a lane runs; the facts measure the bundle's
     // daemon as Swift's `rockchipResolver` does.
-    let arkforge = crate::arkforge_lane::compose(
+    arkforge = crate::arkforge_lane::compose(
         &layout.state,
         |key| {
             inputs
@@ -712,18 +728,13 @@ pub(crate) fn compose(
             "{owner}: {name} is set, but this Runtime has not ported that owner yet"
         ));
     }
-    let ingress = if layout.overridden {
+    if ingress.is_none() {
         omitted.push(
             "App ingress com.arkdeck.agentd: the account home is overridden \
              (CFFIXED_USER_HOME), so the account's Mach service is not this Runtime's"
                 .into(),
         );
-        None
-    } else {
-        Some(crate::app_ingress::Configuration::production(
-            &layout.state,
-        )?)
-    };
+    }
     Ok(Composition {
         host,
         managed,

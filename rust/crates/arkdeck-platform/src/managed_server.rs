@@ -11,7 +11,7 @@
 //! `arkforged`) is also handed one secret on stdin, and the write end of that
 //! pipe stays with its owner as the server's liveness: its close is the
 //! server's end of input, the proof its owning generation is gone.
-use super::macos_process::{RunningChild, input_pipe, spawn_suspended};
+use super::macos_process::{RunningChild, input_pipe, spawn_suspended, spawn_suspended_ignoring};
 use super::tool_process::{
     MAX_CAPTURE_BYTES, capture, drain_group, drain_group_within, finish, poll, validate_environment,
 };
@@ -33,6 +33,11 @@ use std::time::{Duration, Instant};
 /// after KILL, short of launchd's own budget for the owner's exit.
 const PAIRED_TERMINATION_GRACE: Duration = Duration::from_millis(500);
 const PAIRED_KILL_GRACE: Duration = Duration::from_millis(500);
+
+/// What a paired server starts ignoring: SIGINT and SIGTERM, which Swift's
+/// daemon ignores before it starts any child (`main.swift` 377-378) and its
+/// `IdentityBoundDaemonLauncher` leaves ignored across `exec`.
+const PAIRED_IGNORED_SIGNALS: [libc::c_int; 2] = [libc::SIGINT, libc::SIGTERM];
 
 /// Swift `HDCManagedProcessLaunch`: what the spawn itself recorded, which no
 /// reader can manufacture later from a PID or an endpoint.
@@ -91,7 +96,7 @@ impl ManagedServer {
         environment: &[(OsString, OsString)],
         capture_bytes: usize,
     ) -> io::Result<Self> {
-        Self::spawn(tool, arguments, environment, None, None, capture_bytes)
+        Self::spawn(tool, arguments, environment, None, None, &[], capture_bytes)
     }
 
     /// Swift `IdentityBoundDaemonLauncher.launch`: the verified tool in its own
@@ -100,6 +105,14 @@ impl ManagedServer {
     /// and never kept. A child the whole secret did not reach is stopped and
     /// its launch refused: it could never pair, and nothing is left running
     /// unpaired.
+    ///
+    /// The child starts with SIGINT and SIGTERM ignored, as `arkforged` starts
+    /// under Swift's daemon, which ignores both before it starts any child
+    /// (`main.swift` 377-378) through a launcher that resets no disposition.
+    /// So TERM to its group, the second step of its stop, does nothing to it
+    /// unless it catches TERM itself, and its end of input ends it. This
+    /// process's own handling of both is untouched
+    /// (`macos_process::spawn_suspended_ignoring`).
     pub fn launch_paired(
         tool: &VerifiedTool,
         arguments: &[OsString],
@@ -117,6 +130,7 @@ impl ManagedServer {
             environment,
             Some(&directory),
             Some(&read),
+            &PAIRED_IGNORED_SIGNALS,
             capture_bytes,
         )?;
         drop(read);
@@ -140,6 +154,7 @@ impl ManagedServer {
         environment: &[(OsString, OsString)],
         working_directory: Option<&CString>,
         stdin: Option<&std::os::fd::OwnedFd>,
+        ignored: &[libc::c_int],
         capture_bytes: usize,
     ) -> io::Result<Self> {
         if capture_bytes == 0 || capture_bytes > MAX_CAPTURE_BYTES {
@@ -151,13 +166,19 @@ impl ManagedServer {
         // run — or end: a server that exits at once (Swift's
         // `foregroundExitReason`) is then an exit its owner sees, never a
         // launch that "could not be recorded" because a zombie has no birth.
-        let suspended = spawn_suspended(
-            tool,
-            arguments,
-            environment,
-            working_directory.map(CString::as_c_str),
-            stdin,
-        )?;
+        let working_directory = working_directory.map(CString::as_c_str);
+        let suspended = if ignored.is_empty() {
+            spawn_suspended(tool, arguments, environment, working_directory, stdin)?
+        } else {
+            spawn_suspended_ignoring(
+                tool,
+                arguments,
+                environment,
+                working_directory,
+                stdin,
+                ignored,
+            )?
+        };
         let pid = suspended.pid();
         let birth = process_birth(pid)
             .filter(|birth| birth.start_seconds > 0 && birth.start_microseconds < 1_000_000)

@@ -3,7 +3,7 @@ use super::{
 };
 use std::ffi::{CStr, CString, OsString};
 use std::fs::File;
-use std::io;
+use std::io::{self, Read, Write};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::{ffi::OsStrExt, fs::MetadataExt, process::ExitStatusExt};
 use std::process::ExitStatus;
@@ -241,20 +241,55 @@ pub(super) fn spawn_in(
 /// the spawn itself established can be recorded before `resume` lets it run
 /// — a server that ends at once is then an exit its owner sees, never a
 /// launch that could not be recorded. Dropped unresumed, it is killed.
-pub(super) struct SuspendedChild(RunningChild);
+pub(super) struct SuspendedChild {
+    child: RunningChild,
+    start: Start,
+}
+
+/// How `resume` lets a suspended child run.
+enum Start {
+    /// Created suspended by `posix_spawn`: SIGCONT.
+    Continue,
+    /// A forked copy waiting to become the tool (`spawn_suspended_ignoring`):
+    /// the byte it waits for, and its report, which its `exec` closes unread
+    /// and which otherwise carries the error that stopped it.
+    Handshake { start: File, report: File },
+}
 
 impl SuspendedChild {
     pub(super) fn pid(&self) -> libc::pid_t {
-        self.0.pid
+        self.child.pid
     }
 
     /// Lets the child run.
     pub(super) fn resume(self) -> io::Result<RunningChild> {
-        // SAFETY: retained, unreaped child PID still names the suspended process.
-        if unsafe { libc::kill(self.0.pid, libc::SIGCONT) } != 0 {
-            return Err(io::Error::last_os_error());
+        let Self { child, start } = self;
+        match start {
+            Start::Continue => {
+                // SAFETY: retained, unreaped child PID still names the suspended process.
+                if unsafe { libc::kill(child.pid, libc::SIGCONT) } != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+            }
+            Start::Handshake {
+                mut start,
+                mut report,
+            } => {
+                // A copy already gone takes no byte; its report says why.
+                let _ = start.write_all(&[1]);
+                drop(start);
+                let mut answer = Vec::new();
+                report.read_to_end(&mut answer)?;
+                if !answer.is_empty() {
+                    // It never became the tool; dropped here, it is reaped.
+                    return Err(match <[u8; 4]>::try_from(answer.as_slice()) {
+                        Ok(code) => io::Error::from_raw_os_error(i32::from_ne_bytes(code)),
+                        Err(_) => io::Error::other("the child's start report was cut short"),
+                    });
+                }
+            }
         }
-        Ok(self.0)
+        Ok(child)
     }
 }
 
@@ -458,7 +493,219 @@ fn spawn_suspended_at(
     drop(err_write);
     // Every failed check drops the suspended child and kills it before tool code.
     tool.revalidate()?;
-    Ok(SuspendedChild(child))
+    Ok(SuspendedChild {
+        child,
+        start: Start::Continue,
+    })
+}
+
+/// `spawn_suspended` for a child that starts with the `ignored` signals
+/// ignored, as a child of Swift's daemon starts with SIGINT and SIGTERM
+/// ignored: the daemon ignores both before it starts any child
+/// (`main.swift` 377-378), an ignored disposition survives `exec`, and its
+/// `IdentityBoundDaemonLauncher` resets none.
+///
+/// `posix_spawn` can reset a disposition to its default but never set one to
+/// ignore, and this process catches both signals (`StopSignal`): to ignore
+/// them here, even for the moment of one spawn, would drop a stop request and
+/// hand the ignore to any other child spawned meanwhile. So a forked copy of
+/// this thread ignores them in itself alone and waits. It is the child: its
+/// PID and birth are the tool's, and it has executed no tool code. `resume`
+/// sends the byte it waits for, and it becomes the tool on the retained inode
+/// with what `spawn_suspended` gives a child: the working directory, `stdin`
+/// or `/dev/null`, the two capture pipes and no other descriptor, its own
+/// process group, and this thread's signal mask. Every signal stays blocked
+/// in the copy until then, so no handler it inherited runs there, and from
+/// the fork to its `exec` it makes only async-signal-safe calls, over values
+/// made before the fork. A copy that cannot become the tool reports why and
+/// ends; the error is `resume`'s.
+pub(super) fn spawn_suspended_ignoring(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+    stdin: Option<&OwnedFd>,
+    ignored: &[libc::c_int],
+) -> io::Result<SuspendedChild> {
+    let launch = inode_launch_path(tool)?;
+    let (out_read, out_write) = pipe()?;
+    let (err_read, err_write) = pipe()?;
+    let (start_read, start_write) = input_pipe()?;
+    let (report_read, report_write) = input_pipe()?;
+    let (argv, env) = argv_and_environment(tool, args, environment)?;
+    let mut argv_pointers: Vec<*const libc::c_char> =
+        argv.iter().map(|argument| argument.as_ptr()).collect();
+    argv_pointers.push(std::ptr::null());
+    let mut env_pointers: Vec<*const libc::c_char> =
+        env.iter().map(|value| value.as_ptr()).collect();
+    env_pointers.push(std::ptr::null());
+    // SAFETY: zero is a valid empty sigaction and sigset; the fields the copy
+    // reads are set below.
+    let mut ignore: libc::sigaction = unsafe { std::mem::zeroed() };
+    ignore.sa_sigaction = libc::SIG_IGN;
+    // SAFETY: as above.
+    let (mut all, mut mask): (libc::sigset_t, libc::sigset_t) =
+        unsafe { (std::mem::zeroed(), std::mem::zeroed()) };
+    // SAFETY: owned, writable sigsets.
+    unsafe {
+        libc::sigemptyset(&mut ignore.sa_mask);
+        libc::sigfillset(&mut all);
+    }
+    // The child's mask is this thread's, as `posix_spawn` leaves it.
+    // SAFETY: an owned sigset; nothing is changed.
+    posix(unsafe { libc::pthread_sigmask(libc::SIG_BLOCK, std::ptr::null(), &mut mask) })?;
+    let plan = ForkPlan {
+        launch: &launch,
+        argv: &argv_pointers,
+        env: &env_pointers,
+        directory: working_directory.unwrap_or(c"/"),
+        stdin: stdin.map(AsRawFd::as_raw_fd),
+        stdout: out_write.as_raw_fd(),
+        stderr: err_write.as_raw_fd(),
+        start: start_read.as_raw_fd(),
+        start_peer: start_write.as_raw_fd(),
+        report: report_write.as_raw_fd(),
+        // SAFETY: getdtablesize takes nothing and only reads a limit.
+        descriptors: unsafe { libc::getdtablesize() },
+        ignored,
+        ignore: &ignore,
+        mask: &mask,
+    };
+    // Every signal blocked on this thread across the fork, so the copy
+    // starts with all of them blocked.
+    // SAFETY: an owned sigset; only this thread's mask changes.
+    posix(unsafe { libc::pthread_sigmask(libc::SIG_SETMASK, &all, std::ptr::null_mut()) })?;
+    // SAFETY: the copy runs `ForkPlan::become_tool` alone, which never returns.
+    let pid = unsafe { libc::fork() };
+    if pid == 0 {
+        // SAFETY: the forked copy, before any other call: see `become_tool`.
+        unsafe { plan.become_tool() }
+    }
+    let forked = io::Error::last_os_error();
+    // SAFETY: restores this thread's own mask, kept above.
+    unsafe { libc::pthread_sigmask(libc::SIG_SETMASK, &mask, std::ptr::null_mut()) };
+    if pid < 0 {
+        return Err(forked);
+    }
+    // Its own process group whichever of the two sets it first, so the
+    // group a drop kills is the copy's before it has become the tool.
+    // SAFETY: the copy is this process's unreaped child.
+    unsafe { libc::setpgid(pid, pid) };
+    let child = RunningChild {
+        pid,
+        reaped: false,
+        cleanup_attempted: false,
+        stdout: Some(out_read.into()),
+        stderr: Some(err_read.into()),
+    };
+    drop((out_write, err_write, start_read, report_write));
+    let suspended = SuspendedChild {
+        child,
+        start: Start::Handshake {
+            start: start_write.into(),
+            report: report_read.into(),
+        },
+    };
+    // A tool that no longer verifies runs nothing: the copy is killed unresumed.
+    tool.revalidate()?;
+    Ok(suspended)
+}
+
+/// What the forked copy of `spawn_suspended_ignoring` needs, made before the
+/// fork: it allocates nothing and reads only these.
+struct ForkPlan<'a> {
+    launch: &'a CStr,
+    argv: &'a [*const libc::c_char],
+    env: &'a [*const libc::c_char],
+    directory: &'a CStr,
+    stdin: Option<libc::c_int>,
+    stdout: libc::c_int,
+    stderr: libc::c_int,
+    start: libc::c_int,
+    /// The owner's end of the start, which the copy closes at once so that
+    /// the owner's close is an end it sees.
+    start_peer: libc::c_int,
+    report: libc::c_int,
+    descriptors: libc::c_int,
+    ignored: &'a [libc::c_int],
+    ignore: &'a libc::sigaction,
+    mask: &'a libc::sigset_t,
+}
+
+impl ForkPlan<'_> {
+    /// Ignores the signals, waits for the start, and becomes the tool with
+    /// the descriptors, directory and mask `spawn_suspended` gives a child;
+    /// otherwise reports the error and ends. Its owner's end of the start
+    /// without a byte ends it with nothing to report.
+    ///
+    /// # Safety
+    ///
+    /// Called only in the child of `fork` (every signal blocked), and first:
+    /// from here to `execve` or `_exit` only async-signal-safe calls are made.
+    unsafe fn become_tool(&self) -> ! {
+        let fail = || -> ! {
+            // SAFETY: this thread's errno, then one write to the report and
+            // the copy's end, all async-signal-safe.
+            unsafe {
+                let error = *libc::__error();
+                libc::write(
+                    self.report,
+                    std::ptr::from_ref(&error).cast(),
+                    std::mem::size_of::<libc::c_int>(),
+                );
+                libc::_exit(127)
+            }
+        };
+        // SAFETY: async-signal-safe calls on this copy's own state and on
+        // descriptors and values made before the fork.
+        unsafe {
+            libc::close(self.start_peer);
+            if libc::setpgid(0, 0) != 0 {
+                fail();
+            }
+            for &signal in self.ignored {
+                if libc::sigaction(signal, self.ignore, std::ptr::null_mut()) != 0 {
+                    fail();
+                }
+            }
+            let mut byte = 0u8;
+            loop {
+                match libc::read(self.start, std::ptr::from_mut(&mut byte).cast(), 1) {
+                    1 => break,
+                    -1 if *libc::__error() == libc::EINTR => {}
+                    _ => libc::_exit(127),
+                }
+            }
+            if libc::chdir(self.directory.as_ptr()) != 0 {
+                fail();
+            }
+            let input = match self.stdin {
+                Some(read) => read,
+                None => libc::open(c"/dev/null".as_ptr(), libc::O_RDONLY),
+            };
+            if input < 0
+                || libc::dup2(input, libc::STDIN_FILENO) < 0
+                || libc::dup2(self.stdout, libc::STDOUT_FILENO) < 0
+                || libc::dup2(self.stderr, libc::STDERR_FILENO) < 0
+            {
+                fail();
+            }
+            // `POSIX_SPAWN_CLOEXEC_DEFAULT`: nothing else crosses. The report
+            // stays open to the `exec`, which closes it (close-on-exec).
+            for descriptor in 3..self.descriptors {
+                if descriptor != self.report {
+                    libc::close(descriptor);
+                }
+            }
+            let error = libc::pthread_sigmask(libc::SIG_SETMASK, self.mask, std::ptr::null_mut());
+            if error != 0 {
+                *libc::__error() = error;
+                fail();
+            }
+            libc::execve(self.launch.as_ptr(), self.argv.as_ptr(), self.env.as_ptr());
+            fail()
+        }
+    }
 }
 
 /// argv[0] is the tool's real path, or the role it was given as its argument
