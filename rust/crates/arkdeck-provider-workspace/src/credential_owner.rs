@@ -467,6 +467,71 @@ impl CredentialOwner {
         })
     }
 
+    /// Build and verify managed SDK material under the same replacement
+    /// lock and pending-account protocol as explicit credential installation.
+    pub fn install_sdk_release(
+        &self,
+        configuration: &crate::sdk_release::SdkReleaseConfiguration,
+        secrets: &dyn crate::signing_install::SigningSecretInstallation,
+        installed_at_utc: &str,
+        timestamp: i64,
+    ) -> Result<CredentialResource, SigningError> {
+        self.with_lock(|held| {
+            let mut ledger = self.ledger_for_mutation(held)?;
+            let prior_pending = ledger.pending_envelope_accounts.clone();
+            ledger.state = "replacingSecrets".into();
+            self.save(held, &ledger)?;
+            let result = (|| {
+                let prepared =
+                    crate::sdk_release::prepare(&self.store, configuration, secrets, timestamp)?;
+                let passwords = crate::secret_envelope::SecretPair {
+                    keystore: crate::signing_preset::public_sdk_release_password(),
+                    key: crate::signing_preset::public_sdk_release_password(),
+                };
+                crate::signing_install::install_preset(
+                    &self.store,
+                    &held.directory,
+                    &prepared.configuration,
+                    &passwords,
+                    secrets,
+                    installed_at_utc,
+                    crate::signing_install::ReplacementTracking {
+                        prior: &prior_pending,
+                        stage: &mut |account| {
+                            ledger.pending_envelope_accounts.push(account.into());
+                            ledger.pending_envelope_accounts.sort();
+                            ledger.pending_envelope_accounts.dedup();
+                            self.save(held, &ledger)
+                        },
+                    },
+                )?;
+                self.revalidate(held)?;
+                let receipt = self
+                    .store
+                    .load_validated(DEFAULT_PRESET_ID, true, secrets)?;
+                let reference = credential_reference(&receipt)?;
+                self.save(held, &Ledger::stable(Some(reference.clone()), Vec::new()))?;
+                prepared.commit();
+                Ok(CredentialResource {
+                    credential_ref: reference,
+                    project_ref: receipt.project_ref,
+                    preset_id: receipt.preset_id,
+                    installed_at_utc: receipt.installed_at_utc,
+                    reference_count: 0,
+                })
+            })();
+            if let Err(error) = &result
+                && !matches!(error, SigningError::MaintenanceUncertain(_))
+                && prior_pending.is_empty()
+            {
+                ledger.state = "replacing".into();
+                ledger.pending_envelope_accounts.clear();
+                let _ = self.recover_mutation(held, &ledger);
+            }
+            result
+        })
+    }
+
     /// Both replacement and removal validate pins without adopting a broken
     /// receipt: explicit maintenance is also how such a receipt is repaired.
     fn ledger_for_mutation(&self, held: &Held) -> Result<Ledger, SigningError> {

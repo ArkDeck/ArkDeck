@@ -322,3 +322,32 @@ fn migrate_cli_replays_swift_refusals_before_keychain_access() {
         assert_eq!(fs::read_dir(&home.0).unwrap().count(), 0);
     }
 }
+
+#[test]
+fn sdk_install_rejects_relative_material_paths_before_mutation() {
+    use arkdeck_cli::signing_leaves::install_sdk_document;
+    for relative in ["sdk", "java"] {
+        let home = Home::new();
+        let secrets = Secrets::default();
+        let mut options =
+            json!({"sdk":"/fixture/sdk","java":"/fixture/java","bundleName":"com.example.app"});
+        options[relative] = json!("relative");
+        let error = install_sdk_document(
+            &home.0,
+            "runtime.signing.install-sdk-release",
+            options.as_object().unwrap(),
+            &secrets,
+            "2026-09-26T00:00:00Z",
+            1_000_000,
+        )
+        .unwrap_err();
+        assert_eq!(error.plain_exit, Some(64));
+        assert!(
+            error
+                .message
+                .contains(&format!("--{relative} must be an absolute path"))
+        );
+        assert!(!home.0.exists());
+        assert!(secrets.0.lock().unwrap().is_empty());
+    }
+}

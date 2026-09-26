@@ -551,6 +551,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--reviewed-plan-digest"
                 | "--project-ref"
                 | "--java"
+                | "--sdk"
+                | "--bundle-name"
                 | "--jar"
                 | "--keystore"
                 | "--certificate"
@@ -643,6 +645,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--mutation-request-id" => "mutationRequestId",
                         "--project" | "--project-ref" => "projectRef",
                         "--key-alias" => "keyAlias",
+                        "--bundle-name" => "bundleName",
                         "--build-profile" => "buildProfile",
                         "--preset" => "presetRef",
                         "--template" => "templateRef",
@@ -884,6 +887,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "support-bundle", "export"] => "runtime.support-bundle.export",
         // §12's superseded spelling of `runtime service`: the same handler,
         // reporting the name the caller typed (Swift `runAgentDaemon`).
+        ["runtime", "signing", "install-sdk-release"] => "runtime.signing.install-sdk-release",
+        ["signing", "install-sdk-release"] => "signing.install-sdk-release",
         ["runtime", "signing", "migrate-deveco"] => "runtime.signing.migrate-deveco",
         ["signing", "migrate-deveco"] => "signing.migrate-deveco",
         ["runtime", "signing", "install"] => "runtime.signing.install",
@@ -951,6 +956,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             *flag,
             "--project-ref"
                 | "--java"
+                | "--sdk"
+                | "--bundle-name"
                 | "--jar"
                 | "--keystore"
                 | "--certificate"
@@ -970,6 +977,8 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             | "signing.install"
             | "runtime.signing.migrate-deveco"
             | "signing.migrate-deveco"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
     ) {
         registry_parse::check(argv)?;
     }
@@ -1118,6 +1127,9 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "runtime.signing.install-sdk-release" | "signing.install-sdk-release" => {
+            &["sdk", "java", "bundleName", "projectRef"]
+        }
         "runtime.signing.migrate-deveco" | "signing.migrate-deveco" => {
             &["buildProfile", "daemon", "keyAlias"]
         }

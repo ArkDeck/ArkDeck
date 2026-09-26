@@ -18,6 +18,8 @@ pub fn serves(command: &str) -> bool {
             | "signing.remove"
             | "runtime.signing.install"
             | "signing.install"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
             | "runtime.signing.migrate-deveco"
             | "signing.migrate-deveco"
     )
@@ -156,6 +158,8 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
             | "signing.remove"
             | "runtime.signing.install"
             | "signing.install"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
             | "runtime.signing.migrate-deveco"
             | "signing.migrate-deveco"
     ) {
@@ -189,6 +193,28 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
                 })
             },
             &crate::utc_now(),
+        )
+    } else if matches!(
+        command,
+        "runtime.signing.install-sdk-release" | "signing.install-sdk-release"
+    ) {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| i64::try_from(duration.as_secs()).ok())
+            .ok_or_else(|| {
+                crate::CliError::new(
+                    "ioFailure",
+                    "current time is outside the signing profile range",
+                )
+            })?;
+        install_sdk_document(
+            &root,
+            command,
+            options,
+            &secrets,
+            &crate::utc_now(),
+            timestamp,
         )
     } else if matches!(
         command,
@@ -431,4 +457,52 @@ pub fn migrate_deveco_document(
         "operation":"migrate-deveco", "credential":projection(&resource),
         "createdEnvelopeItem":created}),
     )
+}
+
+/// Explicit SDK release installation. No search through PATH, ambient SDK or
+/// inferred workspace supplies any signing material.
+#[cfg(target_os = "macos")]
+pub fn install_sdk_document(
+    root: &std::path::Path,
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    secrets: &dyn arkdeck_provider_workspace::signing_install::SigningSecretInstallation,
+    now: &str,
+    timestamp: i64,
+) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::{
+        credential_owner::CredentialOwner, sdk_release::SdkReleaseConfiguration,
+        signing_preset::SigningPresetStore,
+    };
+    let spelling = command.replace('.', " ");
+    let required = |key: &str, flag: &str| {
+        options
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| crate::CliError::plain_usage(format!("{spelling} requires {flag}")))
+    };
+    let sdk = required("sdk", "--sdk")?;
+    let java = required("java", "--java")?;
+    for (flag, path) in [("--sdk", sdk), ("--java", java)] {
+        if !path.starts_with('/') {
+            return Err(crate::CliError::plain_usage(format!(
+                "{spelling} {flag} must be an absolute path"
+            )));
+        }
+    }
+    let configuration = SdkReleaseConfiguration {
+        project_ref: options
+            .get("projectRef")
+            .and_then(Value::as_str)
+            .unwrap_or("demo-app")
+            .into(),
+        bundle_name: required("bundleName", "--bundle-name")?.into(),
+        java_executable: java.into(),
+        sdk_root: sdk.into(),
+    };
+    CredentialOwner::new(SigningPresetStore::new(root))
+        .install_sdk_release(&configuration, secrets, now, timestamp)
+        .map(|resource| projection(&resource))
+        .map_err(signing_error)
 }
