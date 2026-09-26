@@ -156,6 +156,15 @@ impl SigningSecretInstallation for Secrets {
         Ok(self.values.lock().unwrap().remove(account).is_some())
     }
 }
+impl arkdeck_provider_workspace::signing_removal::SigningSecretRemoval for Secrets {
+    fn remove_current(&self, account: &str) -> Result<bool, SigningError> {
+        self.remove_envelope(account)
+    }
+    fn remove_legacy(&self, _: &str) -> Result<bool, SigningError> {
+        Ok(false)
+    }
+}
+
 fn pair(key: &[u8]) -> SecretPair {
     SecretPair {
         keystore: Secret::new(b"fixture-keystore".to_vec()),
@@ -278,7 +287,7 @@ fn a_missing_old_envelope_is_replaced_and_retained_for_explicit_cleanup() {
     assert_eq!(f.receipt()["supersededEnvelopeAccounts"], json!([old]));
 }
 #[test]
-fn publication_failure_removes_new_envelope_and_retains_recovery_marker() {
+fn unknown_publication_retains_tracked_envelope_until_explicit_cleanup() {
     let f = Fixture::new();
     let c = f.configuration();
     let secrets = f.secrets();
@@ -288,7 +297,9 @@ fn publication_failure_removes_new_envelope_and_retains_recovery_marker() {
             .install(&c, &pair(b"new"), &secrets, "2026-09-26T00:00:00Z")
             .is_err()
     );
-    assert!(secrets.values.lock().unwrap().is_empty());
+    assert_eq!(secrets.values.lock().unwrap().len(), 1);
+    let pending = f.ledger()["pendingEnvelopeAccounts"].clone();
+    assert_eq!(pending.as_array().unwrap().len(), 1);
     assert_eq!(f.ledger()["state"], "replacingSecrets");
     // A new process refuses the still-unreadable receipt, rather than
     // adopting a credential that was never durably installed.
@@ -298,7 +309,10 @@ fn publication_failure_removes_new_envelope_and_retains_recovery_marker() {
         .install(&c, &pair(b"retry"), &secrets, "2026-09-26T00:01:00Z")
         .unwrap();
     assert_eq!(f.ledger()["state"], "stable");
-    assert_eq!(secrets.values.lock().unwrap().len(), 1);
+    assert_eq!(secrets.values.lock().unwrap().len(), 2);
+    assert_eq!(f.receipt()["supersededEnvelopeAccounts"], pending);
+    f.owner().remove(&secrets).unwrap();
+    assert!(secrets.values.lock().unwrap().is_empty());
 }
 
 #[test]
@@ -329,7 +343,15 @@ fn rekey_reuses_envelope_preserving_receipt_bytes_and_public_reference() {
         .unwrap();
     let before = fs::read(f.root.join("preset-v1.json")).unwrap();
     let (created, current) = owner
-        .replace_secret_envelope(&pair(b"corrected"), None, &secrets)
+        .replace_secret_envelope(
+            &owner
+                .store()
+                .load_validated("openharmony-release@1", false, &secrets)
+                .unwrap(),
+            &pair(b"corrected"),
+            None,
+            &secrets,
+        )
         .unwrap();
     assert!(!created);
     assert_eq!(first, current);
@@ -346,7 +368,15 @@ fn rekey_reuses_envelope_preserving_receipt_bytes_and_public_reference() {
         b"corrected"
     );
     let (_, changed) = owner
-        .replace_secret_envelope(&pair(b"corrected"), Some("new-alias"), &secrets)
+        .replace_secret_envelope(
+            &owner
+                .store()
+                .load_validated("openharmony-release@1", false, &secrets)
+                .unwrap(),
+            &pair(b"corrected"),
+            Some("new-alias"),
+            &secrets,
+        )
         .unwrap();
     assert_ne!(changed.credential_ref, first.credential_ref);
     assert_eq!(changed.installed_at_utc, first.installed_at_utc);
@@ -368,7 +398,15 @@ fn rekey_missing_envelope_keeps_stale_account_for_cleanup() {
     let old = f.receipt()["secretEnvelopeAccount"].clone();
     secrets.values.lock().unwrap().clear();
     let (created, current) = owner
-        .replace_secret_envelope(&pair(b"corrected"), None, &secrets)
+        .replace_secret_envelope(
+            &owner
+                .store()
+                .load_validated("openharmony-release@1", false, &secrets)
+                .unwrap(),
+            &pair(b"corrected"),
+            None,
+            &secrets,
+        )
         .unwrap();
     assert!(created);
     assert_eq!(current, first);
@@ -391,7 +429,15 @@ fn rekey_refuses_pins_and_restores_previous_secret_after_failed_set() {
     let writes = secrets.writes.load(Ordering::SeqCst);
     assert!(
         owner
-            .replace_secret_envelope(&pair(b"bad"), None, &secrets)
+            .replace_secret_envelope(
+                &owner
+                    .store()
+                    .load_validated("openharmony-release@1", false, &secrets)
+                    .unwrap(),
+                &pair(b"bad"),
+                None,
+                &secrets
+            )
             .is_err()
     );
     assert_eq!(secrets.writes.load(Ordering::SeqCst), writes);
@@ -400,7 +446,15 @@ fn rekey_refuses_pins_and_restores_previous_secret_after_failed_set() {
     secrets.fail_once.store(true, Ordering::SeqCst);
     assert!(
         owner
-            .replace_secret_envelope(&pair(b"bad"), Some("changed"), &secrets)
+            .replace_secret_envelope(
+                &owner
+                    .store()
+                    .load_validated("openharmony-release@1", false, &secrets)
+                    .unwrap(),
+                &pair(b"bad"),
+                Some("changed"),
+                &secrets
+            )
             .is_err()
     );
     assert_eq!(before, f.receipt());
@@ -428,14 +482,30 @@ fn rekey_requires_old_value_before_write_and_reports_incomplete_rollback() {
     secrets.fail_reads.store(true, Ordering::SeqCst);
     assert!(
         owner
-            .replace_secret_envelope(&pair(b"new"), None, &secrets)
+            .replace_secret_envelope(
+                &owner
+                    .store()
+                    .load_validated("openharmony-release@1", false, &secrets)
+                    .unwrap(),
+                &pair(b"new"),
+                None,
+                &secrets
+            )
             .is_err()
     );
     assert_eq!(secrets.writes.load(Ordering::SeqCst), writes);
     secrets.fail_reads.store(false, Ordering::SeqCst);
     secrets.fail_all_writes.store(true, Ordering::SeqCst);
     let error = owner
-        .replace_secret_envelope(&pair(b"new"), None, &secrets)
+        .replace_secret_envelope(
+            &owner
+                .store()
+                .load_validated("openharmony-release@1", false, &secrets)
+                .unwrap(),
+            &pair(b"new"),
+            None,
+            &secrets,
+        )
         .unwrap_err();
     assert!(
         error
@@ -446,7 +516,7 @@ fn rekey_requires_old_value_before_write_and_reports_incomplete_rollback() {
 }
 
 #[test]
-fn rekey_receipt_failure_restores_old_value_or_removes_new_item() {
+fn rekey_unknown_receipt_failure_retains_new_secret_and_pending_cleanup() {
     for missing in [false, true] {
         let f = Fixture::new();
         let c = f.configuration();
@@ -465,21 +535,35 @@ fn rekey_receipt_failure_restores_old_value_or_removes_new_item() {
         secrets.block_publication.store(true, Ordering::SeqCst);
         assert!(
             owner
-                .replace_secret_envelope(&pair(b"new"), Some("changed"), &secrets)
+                .replace_secret_envelope(
+                    &owner
+                        .store()
+                        .load_validated("openharmony-release@1", false, &secrets)
+                        .unwrap(),
+                    &pair(b"new"),
+                    Some("changed"),
+                    &secrets
+                )
                 .is_err()
         );
         assert_eq!(f.ledger()["state"], "replacingSecrets");
-        if missing {
-            assert!(secrets.values.lock().unwrap().is_empty());
-        } else {
-            assert_eq!(
-                decode_envelope(secrets.read(&account).unwrap().as_bytes())
-                    .unwrap()
-                    .key
-                    .as_bytes(),
-                b"old"
-            );
+        assert_eq!(secrets.values.lock().unwrap().len(), 1);
+        let pending = f.ledger()["pendingEnvelopeAccounts"].clone();
+        let pending_account = pending[0].as_str().unwrap();
+        if !missing {
+            assert_eq!(pending_account, account);
         }
+        assert_eq!(
+            decode_envelope(secrets.read(pending_account).unwrap().as_bytes())
+                .unwrap()
+                .key
+                .as_bytes(),
+            b"new"
+        );
+        assert!(owner.current().is_err());
+        fs::remove_dir(f.root.join("preset-v1.json")).unwrap();
+        owner.remove(&secrets).unwrap();
+        assert!(secrets.values.lock().unwrap().is_empty());
     }
 }
 
@@ -504,7 +588,15 @@ fn guarded_replacement_does_not_bypass_existing_preset_pins() {
     assert!(owner.install(&c, &pair(b"new"), &secrets, "later").is_err());
     assert!(
         owner
-            .replace_secret_envelope(&pair(b"new"), None, &secrets)
+            .replace_secret_envelope(
+                &owner
+                    .store()
+                    .load_validated("openharmony-release@1", false, &secrets)
+                    .unwrap(),
+                &pair(b"new"),
+                None,
+                &secrets
+            )
             .is_err()
     );
     assert_eq!(secrets.writes.load(Ordering::SeqCst), writes);
@@ -513,4 +605,60 @@ fn guarded_replacement_does_not_bypass_existing_preset_pins() {
         bytes
     );
     assert!(owner.current().is_err());
+}
+
+#[test]
+fn authenticated_input_for_a_cannot_mutate_a_concurrently_installed_b() {
+    let f = Fixture::new();
+    let mut config = f.configuration();
+    let secrets = f.secrets();
+    let owner = f.owner();
+    owner
+        .install(
+            &config,
+            &pair(b"password-a"),
+            &secrets,
+            "2026-09-26T00:00:00Z",
+        )
+        .unwrap();
+    // Deterministic ordering: CLI has authenticated A, then another install
+    // completes B before the original caller enters the maintenance lock.
+    let expected_a = owner
+        .store()
+        .load_validated("openharmony-release@1", false, &secrets)
+        .unwrap();
+    config.key_alias = "credential-b".into();
+    owner
+        .install(
+            &config,
+            &pair(b"password-b"),
+            &secrets,
+            "2026-09-26T01:00:00Z",
+        )
+        .unwrap();
+    let receipt_before = fs::read(f.root.join("preset-v1.json")).unwrap();
+    let ledger_before = fs::read(f.root.join("credential-owner-v1.json")).unwrap();
+    let account = f.receipt()["secretEnvelopeAccount"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let secret_before = secrets.read(&account).unwrap();
+    let writes_before = secrets.writes.load(Ordering::SeqCst);
+    let error = owner
+        .replace_secret_envelope(&expected_a, &pair(b"password-a"), None, &secrets)
+        .unwrap_err();
+    assert!(matches!(error, SigningError::IdentityDrift(_)));
+    assert_eq!(
+        fs::read(f.root.join("preset-v1.json")).unwrap(),
+        receipt_before
+    );
+    assert_eq!(
+        fs::read(f.root.join("credential-owner-v1.json")).unwrap(),
+        ledger_before
+    );
+    assert_eq!(
+        secrets.read(&account).unwrap().as_bytes(),
+        secret_before.as_bytes()
+    );
+    assert_eq!(secrets.writes.load(Ordering::SeqCst), writes_before);
 }

@@ -4,6 +4,10 @@ The Rust CLI serves `runtime signing migrate-deveco` and legacy `signing
 migrate-deveco`. It validates the canonical installed daemon before opening
 maintenance Keychain access, authenticates the profile's keystore against the
 installed receipt, and decodes using that source's adjacent DevEco material.
+The owner revalidates the exact receipt authenticated by the CLI after taking
+its lock and before any ledger/secret mutation; a concurrently replaced
+credential is refused as identity drift. A deterministic A-authenticated,
+B-installed, A-migration fixture checks B receipt/ledger/secret byte stability.
 The owner refuses pinned credentials. Rekeying preserves installation time and
 file identities; alias changes produce the corresponding new credential ref.
 

@@ -420,6 +420,7 @@ pub fn migrate_deveco_document(
     };
     let (created, resource) = CredentialOwner::new(store)
         .replace_secret_envelope(
+            &receipt,
             &passwords,
             options.get("keyAlias").and_then(Value::as_str),
             secrets,

@@ -398,11 +398,24 @@ impl CredentialOwner {
     /// Explicit DevEco maintenance retains installation and file identity.
     pub fn replace_secret_envelope(
         &self,
+        expected: &SigningPresetReceipt,
         passwords: &crate::secret_envelope::SecretPair,
         key_alias: Option<&str>,
         secrets: &dyn crate::signing_install::SigningSecretInstallation,
     ) -> Result<(bool, CredentialResource), SigningError> {
         self.with_lock(|held| {
+            // CLI authenticates/decrypts before entering the owner. Another
+            // installation may complete in between; reject that stale input
+            // before even writing the mutation marker.
+            let actual = self
+                .store
+                .load_validated(DEFAULT_PRESET_ID, false, secrets)?;
+            self.revalidate(held)?;
+            if &actual != expected {
+                return Err(SigningError::drift(
+                    "signing credential changed after DevEco input authentication",
+                ));
+            }
             let mut ledger = self.ledger_for_mutation(held)?;
             let prior_pending = ledger.pending_envelope_accounts.clone();
             ledger.state = "replacingSecrets".into();

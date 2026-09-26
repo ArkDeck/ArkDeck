@@ -495,7 +495,15 @@ mod publication_tests {
                 .unwrap();
             PUBLICATION_FAILURE.with(|fail| fail.set(failure));
             assert!(matches!(
-                owner.replace_secret_envelope(&pair(b"new"), Some("changed"), &secrets),
+                owner.replace_secret_envelope(
+                    &owner
+                        .store()
+                        .load_validated("openharmony-release@1", false, &secrets)
+                        .unwrap(),
+                    &pair(b"new"),
+                    Some("changed"),
+                    &secrets
+                ),
                 Err(SigningError::MaintenanceUncertain(_))
             ));
             assert!(owner.current().is_err());
@@ -505,7 +513,15 @@ mod publication_tests {
                     .is_err()
             );
             let (_, repaired) = owner
-                .replace_secret_envelope(&pair(b"repaired"), Some("changed"), &secrets)
+                .replace_secret_envelope(
+                    &owner
+                        .store()
+                        .load_validated("openharmony-release@1", false, &secrets)
+                        .unwrap(),
+                    &pair(b"repaired"),
+                    Some("changed"),
+                    &secrets,
+                )
                 .unwrap();
             assert_eq!(owner.current().unwrap(), repaired);
         }
