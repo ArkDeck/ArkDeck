@@ -3,6 +3,7 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "inputTooLarge",
         "internalError",
         "invalidInput",
         "invalidParams",
@@ -11,6 +12,7 @@
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -314,8 +316,8 @@
   "x-arkdeck-method": "artifact.import.inspection",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 12,
+    "error": 5,
+    "request": 15,
     "result": 10
   }
 }

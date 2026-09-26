@@ -59,8 +59,8 @@
       "successes": 8
     },
     "artifact.import.inspection": {
-      "errors": 2,
-      "requests": 9,
+      "errors": 5,
+      "requests": 12,
       "successes": 7
     },
     "artifact.import.list": {
@@ -69,8 +69,8 @@
       "successes": 9
     },
     "artifact.import.release": {
-      "errors": 3,
-      "requests": 4,
+      "errors": 4,
+      "requests": 5,
       "successes": 1
     },
     "artifact.inspect": {
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 464,
-    "requests": 1039,
+    "errors": 468,
+    "requests": 1043,
     "successes": 575
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "f88ef9a19caaf283f97f18af94461937593dd8c72370d5d3f7cb71a6dcb8a608",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "7566c7319c49b4e28e2e00ca2c02c72ed1f079e97baa2a71003d8e9927a063ec",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "63c124aec88512eebfb95d01b55e0ab5bb6fbf1849e309d482658d0849177149"
+    "spec/control/methods": "b38aea77594ba3f88b154b9a89a58bec7133c9b750fcdca4cba1f27f43e435b5"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -759,16 +759,16 @@
       "sha256": "bddcfb6d5eefbcb28a4b1f8054e252df79328dd93bca7e00b4deed5dafe2f2fb"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl": {
-      "blob": "d446f0a57e4d8172be8cc178791913b4205710fb",
-      "sha256": "c959dffb4754b5caed7d7e3358493c071d8afd097adf9754bc1576f95d6d79b1"
+      "blob": "7c77552e8a8f312eb7283969bc7d0ef56c4fba72",
+      "sha256": "5c89d8aa1b10e7259072c068c76f731fda45715213a90c4e889a99f16a3ff9c6"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.list.jsonl": {
       "blob": "84a220dd1f6327a6f8379de02a96cf83c341d33f",
       "sha256": "0c8f418cb9c4b2a20b0c22fe0238db52520df164068d3f5b9eab0a14d68aabea"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.release.jsonl": {
-      "blob": "bc8d17342a3eb333df97a38c54cfbcf99429034d",
-      "sha256": "4b846b31f65bbf236fdd9ab7702b9f8033a4b0e90e369d46ed34d22c064f9e68"
+      "blob": "b2fddb4387cfb84f921dbdd217d1389d073abd6f",
+      "sha256": "f3c763344c2bae1360d8852b2a2e4da7f17ac4f32d97c1be98cd88aabe5177d8"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.inspect.jsonl": {
       "blob": "0fc0b0cf1ec3f3a9964ef92273638e5b611d8ec3",
@@ -1355,16 +1355,16 @@
       "sha256": "f69c9934839409a2e985d99176bce72acb9940a84911d28f24a42d142c007aae"
     },
     "spec/control/methods/artifact.import.inspection.json": {
-      "blob": "cad79a29ebfd27bdc951bafa101e66ec3b6df1cc",
-      "sha256": "ab361fc309a5022751f72a8e34377438219630cd3a32a308c8321a4ef12c1bbb"
+      "blob": "3af919e5736420b98217b650806d7ea8814434de",
+      "sha256": "abc2a8409153a438d39ab648b564c011b07cb5d808ba9c0443b72f348b24a30d"
     },
     "spec/control/methods/artifact.import.list.json": {
       "blob": "0972e4114b0da074b7abf19e2949577cc79cb2bb",
       "sha256": "fd6b4f324753e1ea6159036fb5f82f023f7b05fe53b78e2bbacc435e8e97618b"
     },
     "spec/control/methods/artifact.import.release.json": {
-      "blob": "5daba656641f779ca4d4a1ef4faac9ef9f34c2fa",
-      "sha256": "e1dab01d428a9e7d1a8d3f28d7b19df65f40c0d05f33d33f5d66f8a9ac306a9a"
+      "blob": "73b820477fb427e33513fcde6c4d9600233ce8b7",
+      "sha256": "065914db937c4dece883f864578b2aac931498c220f66961839656671669a945"
     },
     "spec/control/methods/artifact.inspect.json": {
       "blob": "1c1cc64ab9814f917082fba069eb3fa1c3dc701d",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "eae73fcf3080a70649d3e8df8f8f2debf223ceebf9cf893a17fdf9df4d038d1d",
+  "inputDigest": "b0f5f9b992a72d209803edbf3c2c9a149941ecec088225ddd02873825b1a27c4",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

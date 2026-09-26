@@ -12,6 +12,7 @@
         "recordUnreadable",
         "rejected",
         "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -136,8 +137,8 @@
   "x-arkdeck-method": "artifact.import.release",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 3,
-    "request": 4,
+    "error": 4,
+    "request": 5,
     "result": 1
   }
 }

@@ -1267,6 +1267,81 @@ fn every_recorded_commit_refusal_reaches_the_caller_as_the_import_owner_answered
     }
 }
 
+/// Every refusal of `artifact.import.inspection` and `artifact.import.release`
+/// in their recorded corpora is Swift's daemon's answer, and an Import owner
+/// answering it reaches the caller as it was answered: code, message and
+/// zero-dispatch evidence, never rewritten as `internalError`. As for the
+/// commit, the corpus and the schema compiled in are one view's: the Import
+/// owner's `resourceNotFound` and the inspection's `inputTooLarge`
+/// (`TASK-XPA-017`) are published exactly where the view's corpus holds a
+/// frame of them.
+#[test]
+fn every_recorded_inspection_and_release_refusal_reaches_the_caller_as_the_import_owner_answered_it()
+ {
+    type Answer = Arc<std::sync::Mutex<Option<(&'static str, WireError)>>>;
+    struct ImportOwner(Answer);
+    impl HostServices for ImportOwner {
+        fn observed_at(&self) -> String {
+            panic!("an Import read the unrelated clock")
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("an Import read touched HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("an Import read touched device observations")
+        }
+        fn import_resource(
+            &self,
+            method: &str,
+            _: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            let (expected, answer) = self
+                .0
+                .lock()
+                .unwrap()
+                .take()
+                .expect("one answer per request");
+            assert_eq!(method, expected);
+            Err(answer)
+        }
+    }
+    let answer = Answer::default();
+    let control = Control::new(ImportOwner(Arc::clone(&answer))).unwrap();
+    for (method, corpus, codes) in [
+        (
+            "artifact.import.inspection",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl"
+            ),
+            &["resourceNotFound", "inputTooLarge"][..],
+        ),
+        (
+            "artifact.import.release",
+            include_str!(
+                "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.release.jsonl"
+            ),
+            &["resourceNotFound"][..],
+        ),
+    ] {
+        let mut recorded_codes = std::collections::BTreeSet::new();
+        for line in corpus.lines() {
+            let row: Value = serde_json::from_str(line).unwrap();
+            if row["ok"] == true {
+                continue;
+            }
+            let recorded: WireError = serde_json::from_value(row["error"].clone()).unwrap();
+            *answer.lock().unwrap() = Some((method, recorded.clone()));
+            let response = call(&control, method, row["params"].clone());
+            assert_eq!(response.outcome.unwrap_err(), recorded, "{line}");
+            recorded_codes.insert(recorded.code);
+        }
+        for code in codes {
+            let published = validate_method_value(method, "errorCode", &json!(code)).is_ok();
+            assert_eq!(recorded_codes.contains(*code), published, "{method} {code}");
+        }
+    }
+}
+
 /// Every recorded answer of the Job reads and runs that names a superseding
 /// recovery epoch — a Job's `recoveryEpochId` or
 /// `supersededByRecoveryEpochId`, an evidence's `recoveryEpoch` — and the

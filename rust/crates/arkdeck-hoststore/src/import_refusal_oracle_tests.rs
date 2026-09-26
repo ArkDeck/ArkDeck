@@ -75,10 +75,11 @@ impl Fixture {
                 .handle_resource(method, params, NOW, false, resolve),
         }
     }
-    /// A queued analyzer Job whose input is the committed Import's lease.
-    fn admit_referencing_job(&self, lease: &str) {
-        let request = OperationRequest::decode(&serde_json::to_vec(&json!({"documentType":"runtime-operation-request","schemaVersion":"1.0.0","requestId":"req-oracle-reference","idempotencyKey":"idem-oracle-reference","target":{"targetId":"TGT-fixture"},"operation":{"id":"analyzer.extract-crash-signature","version":1},"inputs":{"sourceArtifactRef":lease}})).unwrap()).unwrap();
-        let value = json!({"jobID":"job-oracle-reference","request":request.canonical_value(),"originalSubmissionRequest":request.canonical_value(),"operationReference":"analyzer.extract-crash-signature@1","catalogDigest":arkdeck_contract::CATALOG_DIGEST,"providerID":"analyzer","createdAtUTC":NOW,"state":"queued","outcomeUnknown":false,"timeline":[],"actualStepKinds":[],"skipReasons":{}});
+    /// A queued analyzer Job whose input is the committed Import's lease, the
+    /// `index`th of its kind.
+    fn admit_referencing_job(&self, lease: &str, index: usize) {
+        let request = OperationRequest::decode(&serde_json::to_vec(&json!({"documentType":"runtime-operation-request","schemaVersion":"1.0.0","requestId":format!("req-oracle-reference-{index}"),"idempotencyKey":format!("idem-oracle-reference-{index}"),"target":{"targetId":"TGT-fixture"},"operation":{"id":"analyzer.extract-crash-signature","version":1},"inputs":{"sourceArtifactRef":lease}})).unwrap()).unwrap();
+        let value = json!({"jobID":format!("job-oracle-reference-{index}"),"request":request.canonical_value(),"originalSubmissionRequest":request.canonical_value(),"operationReference":"analyzer.extract-crash-signature@1","catalogDigest":arkdeck_contract::CATALOG_DIGEST,"providerID":"analyzer","createdAtUTC":NOW,"state":"queued","outcomeUnknown":false,"timeline":[],"actualStepKinds":[],"skipReasons":{}});
         let record = JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
         self.jobs.admit(&record, &request.fingerprint()).unwrap();
     }
@@ -200,7 +201,7 @@ fn swift_recorded_refusals_the_corpus_lacks_are_answered_in_swift_s_words() {
             }
             "release.activeJob" => {
                 drop(hold.take());
-                fixture.admit_referencing_job(&lease);
+                fixture.admit_referencing_job(&lease, 0);
                 None
             }
             "begin.targetStoreUnreadable" => {
@@ -220,6 +221,39 @@ fn swift_recorded_refusals_the_corpus_lacks_are_answered_in_swift_s_words() {
 
 /// Swift's recorded refusal of `method` with this code and message.
 fn corpus_refusal(method: &str, code: &str, message: &str) -> Value {
+    recorded_refusal(method, code, message)
+        .unwrap_or_else(|| panic!("no Swift frame of {method} answers {code}: {message}"))
+}
+
+/// check-contracts' published view: this checkout's code with the merge
+/// base's contract inputs, the corpus among them.
+fn published_view() -> bool {
+    let inputs =
+        arkdeck_contract::strict_json(arkdeck_contract::CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// The Import owner's refusal with this code and message, which a corpus
+/// frame TASK-XPA-017 appended records. Wherever this view's corpus holds the
+/// frame, the answer is that frame, byte for byte. The published view's corpus
+/// is the merge base's and may predate it: only there may the frame be
+/// missing, and the owner is held to the same answer without its witness.
+fn appended_refusal(method: &str, code: &str, message: &str) -> Value {
+    let answer = json!({"code":code,"message":message,
+        "details":{"newDispatchCount":0,"phase":"importOwner"}});
+    match recorded_refusal(method, code, message) {
+        Some(swift) => assert_eq!(swift, answer, "{method} {code}"),
+        None => assert!(
+            published_view(),
+            "no Swift frame of {method} answers {code}: {message}"
+        ),
+    }
+    answer
+}
+
+/// Swift's recorded refusal of `method` with this code and message, if this
+/// view's corpus holds one.
+fn recorded_refusal(method: &str, code: &str, message: &str) -> Option<Value> {
     let corpus = match method {
         "artifact.import.abort" => include_str!(
             "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.abort.jsonl"
@@ -252,8 +286,7 @@ fn corpus_refusal(method: &str, code: &str, message: &str) -> Value {
                 && frame["error"]["code"] == code
                 && frame["error"]["message"] == message
         })
-        .unwrap_or_else(|| panic!("no Swift frame of {method} answers {code}: {message}"))["error"]
-        .clone()
+        .map(|frame| frame["error"].clone())
 }
 
 #[test]
@@ -374,6 +407,63 @@ fn corpus_import_refusals_are_answered_as_swift_s_daemon_answered_them() {
             "{method} {params}"
         );
     }
+    // An Import this Runtime never began, by either selector, and its
+    // release (TASK-XPA-017).
+    for (method, params) in [
+        (
+            "artifact.import.inspection",
+            json!({"importId":"imp-00000000-0000-0000-0000-000000000001"}),
+        ),
+        (
+            "artifact.import.inspection",
+            json!({"importRequestId":"never-began"}),
+        ),
+        (
+            "artifact.import.release",
+            json!({"importId":"imp-00000000-0000-0000-0000-000000000001","generation":"2"}),
+        ),
+    ] {
+        assert_eq!(
+            answer(fixture.call(method, &params)),
+            appended_refusal(method, "resourceNotFound", "Import does not exist"),
+            "{method} {params}"
+        );
+    }
+}
+
+/// Swift's inspection reports at most 1,000 active Jobs referencing an
+/// Import, and refuses the inspection of one more referenced than that with
+/// the corpus's `inputTooLarge` (`RuntimeAdmissionService.
+/// activeImportReferenceJobs`, TASK-XPA-017). This owner holds the same
+/// bound: 1,000 are reported, the 1,001st refuses as Swift refused it.
+#[test]
+fn an_inspection_past_its_job_bound_is_refused_as_swift_s_daemon_refused_it() {
+    let fixture = Fixture::new();
+    let (_, committed, lease) = uploads(&fixture);
+    let inspection = json!({ "importId": committed });
+    for index in 0..1000 {
+        fixture.admit_referencing_job(&lease, index);
+    }
+    let reported = fixture
+        .call("artifact.import.inspection", &inspection)
+        .unwrap();
+    assert_eq!(reported["references"]["state"], "referenced");
+    assert_eq!(
+        reported["references"]["activeJobIds"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1000
+    );
+    fixture.admit_referencing_job(&lease, 1000);
+    assert_eq!(
+        answer(fixture.call("artifact.import.inspection", &inspection)),
+        appended_refusal(
+            "artifact.import.inspection",
+            "inputTooLarge",
+            "Import reference inspection exceeds its Job bound"
+        )
+    );
 }
 
 /// Swift guards concurrent begins of one request identity in memory and
