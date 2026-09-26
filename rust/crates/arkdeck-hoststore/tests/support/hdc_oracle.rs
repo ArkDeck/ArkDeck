@@ -290,9 +290,8 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
                 let jobs = &owners.jobs;
                 match owners
                     .artifacts
-                    .handle_list(params, &jobs.snapshot_directory(), |job| {
-                        jobs.read_snapshot(job).map(|_| ())
-                    }) {
+                    .handle_list(params, |job| jobs.read_snapshot(job).map(|_| ()))
+                {
                     // The pager's revision is its own; the oracle labels it.
                     Ok(mut result) => {
                         result["snapshotRevision"] = json!("<snapshotRevision>");

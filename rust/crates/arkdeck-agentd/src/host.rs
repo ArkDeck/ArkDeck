@@ -1321,33 +1321,12 @@ impl HostServices for Host {
                 message: "Import owner is unavailable".into(),
                 details: None,
             })?;
-            let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
-                code: "operationUnavailable".into(),
-                message: "Artifact snapshot storage is unavailable".into(),
-                details: None,
-            })?;
-            return imports.artifact_resource(
-                artifacts,
-                method,
-                params,
-                &jobs.snapshot_directory(),
-            );
+            return imports.artifact_resource(artifacts, method, params);
         }
         if method == "artifact.list" {
-            // The pages are kept in the Job owner's snapshot directory, never
-            // in the Artifact root, whose every entry the quota and Trace
-            // census read.
-            let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
-                code: "operationUnavailable".into(),
-                message: "Artifact Job owner is unavailable".into(),
-                details: Some(serde_json::Map::from_iter([
-                    ("phase".into(), serde_json::json!("artifactOwner")),
-                    ("newDispatchCount".into(), serde_json::json!(0)),
-                ])),
-            })?;
-            return artifacts.handle_list(params, &jobs.snapshot_directory(), |job| {
-                self.require_artifact_job(job)
-            });
+            // The pages are kept where Swift keeps them, below the Artifact
+            // root's Import namespace, apart from the Job list's.
+            return artifacts.handle_list(params, |job| self.require_artifact_job(job));
         }
         artifacts.handle_resource(method, params, |job| self.require_artifact_job(job))
     }

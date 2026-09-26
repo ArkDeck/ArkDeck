@@ -230,11 +230,9 @@ fn rust_completes_the_swift_host_only_agent_execution() {
                     Err(error) => answer(Err(error)),
                 },
                 "job.result" | "job.evidence" => answer(reader.handle(method, &params)),
-                "artifact.list" => answer(artifacts.handle_list(
-                    &params,
-                    &jobs.snapshot_directory(),
-                    |job| jobs.read_snapshot(job).map(|_| ()),
-                )),
+                "artifact.list" => answer(
+                    artifacts.handle_list(&params, |job| jobs.read_snapshot(job).map(|_| ())),
+                ),
                 other => panic!("{name}: the oracle sent {other}"),
             };
             let recorded = &exchange["answer"];

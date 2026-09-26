@@ -1442,8 +1442,14 @@ action in the same write.
 
 `artifact.list` pages a Job's Artifacts as Swift's `RuntimeSnapshotPager` does
 (`createdAtDescArtifactIdAsc`, cursors `<revision>.<token>`, 1 to 1,000 per
-page, 100 by default); the snapshots live with the Job owner
-(`jobs-state/cli-job-snapshots`), not in the Artifact root.
+page, 100 by default). Its snapshots live where Swift's `artifactInventory`
+keeps them, `.imports-v1/artifact-snapshots` below the Artifact root, made on
+the first list: the Artifact quota and usage census skip the Import namespace,
+and the Job owner's `cli-job-snapshots` keeps the Job list's alone, so neither
+pager reclaims the other's snapshots. A Runtime of before kept them in
+`cli-job-snapshots`; they are not moved. Their cursors are answered as
+reclaimed (`invalidCursor`), and the Job owner's pager reclaims them as its
+oldest.
 
 An execution that names no target, for an operation that binds a device, takes
 one observation through the Target observation owner and, when a person must

@@ -101,4 +101,9 @@ No contract input changes, and no code changes.
 
 ## CI
 
-Pending.
+#2250, head `a230e42ad`, run 36208949503: every selected lane passed. The Rust lanes were not
+selected, since the change is a run record alone.
+- `guard`; `swift` aggregate. `swift-tests` was not selected.
+
+It merged as `fbdb9be17`. Recorded by a later slice (TASK-XPA-012, the Artifact list's own
+snapshots), as AGENTS.md has it.

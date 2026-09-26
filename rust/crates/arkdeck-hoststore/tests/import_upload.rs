@@ -807,12 +807,7 @@ fn publication_preserves_exact_bytes_receipt_identity_and_restart() {
     );
     let params = json!({"owner":{"kind":"import","id":id},"artifactId":receipt["artifactId"]});
     let inspected = store
-        .artifact_resource(
-            &artifacts,
-            "artifact.inspect",
-            params.as_object().unwrap(),
-            &fixture.root.join("snapshots"),
-        )
+        .artifact_resource(&artifacts, "artifact.inspect", params.as_object().unwrap())
         .unwrap();
     assert_eq!(inspected["owner"]["kind"], "import");
     assert_eq!(inspected["redactionApplied"], false);
@@ -858,12 +853,7 @@ fn interrupted_publication_requires_receipt_and_recovers_same_identity() {
             let params = json!({"owner":{"kind":"import","id":id}});
             assert_eq!(
                 store
-                    .artifact_resource(
-                        &artifacts,
-                        "artifact.list",
-                        params.as_object().unwrap(),
-                        &fixture.root.join("snapshots")
-                    )
+                    .artifact_resource(&artifacts, "artifact.list", params.as_object().unwrap())
                     .unwrap_err()
                     .code,
                 "recordUnreadable"
@@ -921,24 +911,14 @@ fn patch_publication_is_exact_and_sensitive_with_path_escape_refusal() {
             json!({"owner":{"kind":"import","id":id},"artifactId":result["receipt"]["artifactId"]});
         assert_eq!(
             store
-                .artifact_resource(
-                    &artifacts,
-                    "artifact.read",
-                    params.as_object().unwrap(),
-                    &fixture.root.join("snapshots")
-                )
+                .artifact_resource(&artifacts, "artifact.read", params.as_object().unwrap())
                 .unwrap_err()
                 .code,
             "sensitiveAccessDenied"
         );
         params["allowSensitive"] = json!(true);
         let read = store
-            .artifact_resource(
-                &artifacts,
-                "artifact.read",
-                params.as_object().unwrap(),
-                &fixture.root.join("snapshots"),
-            )
+            .artifact_resource(&artifacts, "artifact.read", params.as_object().unwrap())
             .unwrap();
         assert_eq!(read["base64"], encode_import_chunk(bytes).unwrap());
     }
@@ -1143,7 +1123,7 @@ fn import_discovery_snapshot_export_and_receipt_metadata_poisoning() {
     );
     let output = fixture.root.join("export");
     fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
-    let exported=store.artifact_resource(&artifacts,"artifact.export",json!({"owner":{"kind":"import","id":id},"artifactId":aid,"destinationDirectory":output}).as_object().unwrap(),&fixture.root.join("snapshots")).unwrap();
+    let exported=store.artifact_resource(&artifacts,"artifact.export",json!({"owner":{"kind":"import","id":id},"artifactId":aid,"destinationDirectory":output}).as_object().unwrap()).unwrap();
     assert_eq!(exported["owner"]["kind"], "import");
     assert_eq!(
         fs::read(output.join(format!("{aid}-fixture.hap"))).unwrap(),
@@ -1160,8 +1140,7 @@ fn import_discovery_snapshot_export_and_receipt_metadata_poisoning() {
                 "artifact.inspect",
                 json!({"owner":{"kind":"import","id":id},"artifactId":aid})
                     .as_object()
-                    .unwrap(),
-                &fixture.root.join("snapshots")
+                    .unwrap()
             )
             .unwrap_err()
             .code,
@@ -1197,7 +1176,7 @@ fn receipt_identity_digest_generation_and_validation_corruption_cannot_supply_by
         let mut changed = original.clone();
         changed["receipt"][key] = value;
         fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
-        assert_eq!(store.artifact_resource(&artifacts,"artifact.read",json!({"owner":{"kind":"import","id":id},"artifactId":done["receipt"]["artifactId"]}).as_object().unwrap(),&fixture.root.join("snapshots")).unwrap_err().code,"recordUnreadable","{key}");
+        assert_eq!(store.artifact_resource(&artifacts,"artifact.read",json!({"owner":{"kind":"import","id":id},"artifactId":done["receipt"]["artifactId"]}).as_object().unwrap()).unwrap_err().code,"recordUnreadable","{key}");
     }
 }
 #[test]
@@ -1400,16 +1379,10 @@ fn release_is_durable_idempotent_and_preserves_historical_artifact_reads() {
         .code,
         "resourceConflict"
     );
-    let snapshots = fixture.root.join("snapshots");
     let request =
         json!({"owner":{"kind":"import","id":id},"artifactId":committed["receipt"]["artifactId"]});
     let inspected = store
-        .artifact_resource(
-            &artifacts,
-            "artifact.inspect",
-            request.as_object().unwrap(),
-            &snapshots,
-        )
+        .artifact_resource(&artifacts, "artifact.inspect", request.as_object().unwrap())
         .unwrap();
     assert_eq!(inspected["lease"], Value::Null);
     assert_eq!(inspected["retention"]["pinned"], false);
@@ -1507,11 +1480,6 @@ fn the_retention_sweep_reclaims_a_released_import_at_its_deadline_and_keeps_its_
         .unwrap(),
         release
     );
-    let snapshots = fixture.root.join("snapshots");
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&snapshots)
-        .unwrap();
     let listed = store
         .artifact_resource(
             &artifacts,
@@ -1519,19 +1487,13 @@ fn the_retention_sweep_reclaims_a_released_import_at_its_deadline_and_keeps_its_
             json!({"owner":{"kind":"import","id":id},"pageSize":10})
                 .as_object()
                 .unwrap(),
-            &snapshots,
         )
         .unwrap();
     assert_eq!(listed["items"], json!([]));
     let request = json!({"owner":{"kind":"import","id":id},"artifactId":artifact});
     assert_eq!(
         store
-            .artifact_resource(
-                &artifacts,
-                "artifact.inspect",
-                request.as_object().unwrap(),
-                &snapshots,
-            )
+            .artifact_resource(&artifacts, "artifact.inspect", request.as_object().unwrap())
             .unwrap_err()
             .code,
         "resourceNotFound"

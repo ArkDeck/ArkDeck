@@ -13,6 +13,8 @@ const MAX_INDEX: usize = 16 * 1024 * 1024;
 const IMPORT_NAMESPACE: &str = ".imports-v1";
 const IMPORT_OWNER_LOCK: &str = ".owner.lock";
 const IMPORT_SKELETON: [&str; 3] = ["records", "identities", "payloads"];
+/// Where `artifact.list` keeps its pages, below the Import namespace.
+const LIST_SNAPSHOTS: &str = "artifact-snapshots";
 /// The most entries one listing of the Trace retention census reads: the
 /// Artifact root's Job directories, bounded as the quota census and the
 /// retention sweep bound them, or the members of one directory below it. The
@@ -190,6 +192,27 @@ impl ArtifactReadStore {
         }
         self.root.validate_path(&self.path)?;
         self.root.private_child(id)
+    }
+
+    /// Swift `artifactInventory`'s snapshot directory,
+    /// `.imports-v1/artifact-snapshots` (`RuntimeArtifactStore.swift:1096–1099`):
+    /// inside the private Import metadata tree, which neither the Artifact
+    /// quota nor its usage census counts and no Job's history holds, and apart
+    /// from every other pager's. It is made on the first list, as Swift's
+    /// pager makes it, and opened, not made again, after that.
+    pub(crate) fn list_snapshots(&self) -> io::Result<PathBuf> {
+        fn private_directory(parent: &HostDirectory, name: &str) -> io::Result<HostDirectory> {
+            match parent.child(name) {
+                Err(error) if error.kind() == io::ErrorKind::NotFound => parent.private_child(name),
+                found => found,
+            }
+        }
+        self.root.validate_path(&self.path)?;
+        private_directory(
+            &private_directory(&self.root, IMPORT_NAMESPACE)?,
+            LIST_SNAPSHOTS,
+        )?;
+        Ok(self.path.join(IMPORT_NAMESPACE).join(LIST_SNAPSHOTS))
     }
 
     pub(crate) fn index(&self, id: &str) -> io::Result<(HostDirectory, Vec<u8>, Vec<Value>)> {
