@@ -183,6 +183,14 @@ class WorkloadScaleTests(unittest.TestCase):
         self.assertIn("seedSeconds: 6 vs 4", result["comparisons"][0]["reason"])
         self.assertFalse(result["passed"])
 
+    def test_rss_phase_method_and_window_are_comparison_identity(self) -> None:
+        current = dict(WORKLOAD, residentSetPhaseMethod="observed-release-v2", idleWindowSeconds=120)
+        for other in (dict(WORKLOAD), dict(current, idleWindowSeconds=600)):
+            result = compare.compare(scaled(document(rss=10), current),
+                                     scaled(document(rss=10), other))
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["comparisons"][0]["comparable"])
+
     def test_release_observations_may_differ_between_runs(self) -> None:
         # A document whose runs disagree only on the resident-set release
         # observation keeps every scale as a list; the workload is still one.

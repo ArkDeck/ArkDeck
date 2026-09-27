@@ -110,7 +110,7 @@ the document records why, stays advisory, and must not be committed.
 | --- | --- |
 | release build | Design section I.2 pins both reference hosts to release builds; a debug build is a different program. |
 | each phase on its own daemon | Cold start, IPC and the resource window each get a fresh process. Sampling resources on the daemon that just answered thousands of requests measures a served-then-quiet footprint, not an idle one. |
-| quiet host (1-minute load average at most half the CPU count) | Wall-clock percentiles on a loaded host are this repository's documented flake mode (`ViewerScalePerformanceTests.swift`). The guard runs at the start of every run. `--quiet-wait-seconds N` lets a run wait up to N seconds for a loaded host to go quiet instead of refusing the whole capture at once; the run still starts only on a quiet host, and each run records its wait (`quietWaitSeconds`). `--allow-loaded-host` waives the requirement and downgrades the run to advisory instead of lying about it. It disqualifies unconditionally, not only when the guard trips: a shared runner is often quiet at the start of a run and busy during it, which the start-of-run guard cannot see. |
+| quiet host (1-minute load < 4 and at most half the CPU count; no cargo/rustc/xcodebuild/plan.py) | Checked before each run, around cold-start samples and IPC, and throughout the idle window. A failure preserves already appended observations and refuses the capture. `--quiet-wait-seconds N` waits only at run entry; `--allow-loaded-host` explicitly waives the checks and always makes the capture advisory. |
 | at least three independent runs | Section I.3. |
 | p95 spread at most 30% across those runs | Section I.3's failure criterion: a wider spread means host load is being measured, not the product. |
 
@@ -176,14 +176,38 @@ because the same p95 over a smaller data set is not the same result.  The
 resident-set release observations recorded alongside them are not inputs and
 take no part in that check.
 
-The resident set is reported as two metrics, not one.  An idle daemon holds its
-start-up working set for tens of seconds and then returns most of it in a single
-step; the release has been observed anywhere from 4 s to 82 s after start, while
-the levels either side of it are flat to within a fraction of a percent.
-Percentiles taken across the step describe neither level, so the series is split
-at the largest qualifying drop and `daemon.residentSetPlateau` and
-`daemon.residentSetSteady` are reported separately, alongside whether the
-release was observed inside the window at all.
+The resident set is split at the largest consecutive downward step of at least
+25%. `daemon.residentSetPlateau` contains pre-release observations;
+`daemon.residentSetSteady` requires an observed release. A flat trace does not
+prove that a release happened before the first sample. If any run has no
+release, the complete document reports steady as `NOT_MEASURED`, retains any
+partial measurements, and is not baseline-eligible. No samples are removed.
+Coverage gaps do not waive instability: a quiet release capture still exits 2
+if another measured metric is unstable. A stable but incomplete capture exits 0
+with explicit gaps and `baselineEligible: false`; exit 0 alone never adopts a
+baseline. Only explicit debug/loaded-host advisory captures waive that exit.
+`residentSetPhaseMethod: observed-release-v2` and `idleWindowSeconds` belong to
+the RSS comparison identity; old fallback-to-plateau results are not comparable.
+
+Every capture writes append-only `capture-samples-<id>.jsonl` with binary hashes,
+run/sample identities, startup diagnostics, resource read start/end elapsed
+times and host guards. Resource trajectories also appear once per run in the
+JSON, rather than being copied into every metric scale. Release time uses the
+elapsed clock at the RSS read, not its array index. Sampling and reader overhead
+mean that a nominal 120-second window need not produce 120 observations.
+
+Cold start preserves the historical measurement boundary: spawn through the
+contract-verifying health handshake **and the subsequent explicit health call**.
+The previous description said “first health” but the code performed both.
+Diagnostics expose spawn-return, first socket observation, contract verification,
+final health and connection attempts; they do not subtract waiting or outliers.
+A failed attempt remains in the raw log, and capture failure cleans the fixture.
+
+The proposed independent Rust environment is Apple M3 / 8 cores / 16 GB /
+macOS 27 / Xcode 27, release. Its candidate measurements stay in task evidence
+until reviewed; the existing Swift reference remains unchanged. A newer-host
+capture is not a regression result for the old host, and `NOT_MEASURED` rows
+remain gaps even if every measured subset is stable.
 
 ## Privacy
 
