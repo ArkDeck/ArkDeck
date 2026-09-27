@@ -1,0 +1,435 @@
+{
+  "baselineEligible": false,
+  "change": "CHG-2026-074-shared-rust-runtime-core",
+  "clocks": {
+    "awakeWorkClock": "CLOCK_UPTIME_RAW",
+    "continuousClock": "CLOCK_MONOTONIC"
+  },
+  "eligibilityReason": "built debug; design section I.2 pins the reference hosts to release builds; recorded with --allow-loaded-host, so the quiet-host requirement was waived; p95 moved more than 30% between runs for job.eventsDrain",
+  "gapCount": 22,
+  "generatedAtUtc": "2026-09-27T04:45:44Z",
+  "host": {
+    "arch": "arm64",
+    "cpuCount": 8,
+    "os": "Darwin",
+    "osVersion": "27.0",
+    "python": "3.14.7"
+  },
+  "measuredMetricCount": 3,
+  "metrics": {
+    "app.timeToInteractive": {
+      "blockedBy": "device window and UI lane",
+      "designRow": "I.2 row 3 (App time to interactive)",
+      "reason": "AppShellUITests asserts a connected device row before its 2s budget, so the measurement needs a real device and the UI lane",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.open": {
+      "blockedBy": "a maintainer ruling on the zero-copy artifact path",
+      "designRow": "I.2 row 6 (large artifact transfer, zero-copy leg)",
+      "reason": "artifact.open does not exist; whether to build it is itself one of the decisions section I.3 expects SPK-1 to unblock, so it cannot be baselined before it is decided",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.pagedRead": {
+      "blockedBy": "artifact fixture generation in the perf lane",
+      "designRow": "I.2 row 6 (large artifact transfer, paged base64 leg)",
+      "reason": "measurable in principle through artifact.read, but a seeded Job's Artifacts total a few kilobytes and the 128 MiB and 1 GiB fixtures are built only by the Swift opt-in slow artifact tests, not by this harness",
+      "status": "NOT_MEASURED"
+    },
+    "calibration.busyLoop": {
+      "aggregate": {
+        "p50": 1.8613749416545033,
+        "p95": 1.9047079840674996,
+        "p99": 1.9047079840674996
+      },
+      "derivedBudget": 2.8570619761012495,
+      "description": "fixed CPU workload used as the ratio denominator",
+      "designRow": "noise control (design section I.2, ratio-based PR gate)",
+      "p95SpreadRatio": 0.014307,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 10,
+          "max": 1.9047079840674996,
+          "min": 1.8584589706733823,
+          "p50": 1.8695410108193755,
+          "p95": 1.9047079840674996,
+          "p99": 1.9047079840674996
+        },
+        {
+          "count": 10,
+          "max": 1.9191669998690486,
+          "min": 1.8282909877598286,
+          "p50": 1.851834007538855,
+          "p95": 1.9191669998690486,
+          "p99": 1.9191669998690486
+        },
+        {
+          "count": 10,
+          "max": 1.8919159192591906,
+          "min": 1.830750028602779,
+          "p50": 1.8613749416545033,
+          "p95": 1.8919159192591906,
+          "p99": 1.8919159192591906
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "daemon.busyResources": {
+      "blockedBy": "a harness leg that drives a Golden Journey loop on the isolated daemon",
+      "designRow": "I.2 row 8 (busy resource footprint)",
+      "reason": "the resource window samples an idle daemon only; a busy footprint needs a Golden Journey loop driving the daemon, and this harness is read-only by construction and submits no operation",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.coldStart": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 1 (daemon cold start)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleCpuPercent": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleOpenFileDescriptorCount": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.idleThreadCount": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.residentSetPlateau": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.residentSetSteady": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.warmStartRecovery": {
+      "blockedBy": "a timed Rust 10k recovery workload in this capture",
+      "designRow": "I.2 rows 2 and 7 (warm start and 10k journal/history recovery)",
+      "reason": "JournalRecoveryContractTests in the Swift nightly slow lane time the Swift engine, not this daemon; Rust journal recovery and restart reconciliation are implemented; this capture does not time them unless --recovery-samples enables both 10k workloads",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.health": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.jobList": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.jobStatus": {
+      "blockedBy": "a capture including this leg",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "reason": "not requested in this capture",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.namedPipe": {
+      "blockedBy": "a Windows performance capture with a named-pipe client",
+      "designRow": "I.2 row 4 (IPC, named-pipe leg)",
+      "reason": "the macOS capture uses Unix domain sockets and does not measure the Windows named-pipe transport",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.xpc": {
+      "blockedBy": "an absolute XPC measurement from a client the daemon accepts",
+      "designRow": "I.2 row 4 (IPC, XPC leg)",
+      "reason": "the XPC leg accepts only the signed App as its peer, and this harness is an unsigned Unix-domain-socket client; RuntimeXPCTransportCostTests publishes relative XPC cost only; the Rust daemon's XPC ingress is also opt-in (ARKDECK_APP_INGRESS=history)",
+      "status": "NOT_MEASURED"
+    },
+    "job.cancelReconcile": {
+      "blockedBy": "a Rust harness leg that submits, cancels and reconciles a Job, and a device window",
+      "designRow": "I.2 row 9 (cancel and reconcile latency)",
+      "reason": "the row times the cancellation of a running readOnly Job; this harness is read-only by construction and never submits the Job it would cancel, and the terminal leg needs an HDC child process on a real device; the Rust daemon supports job.reconcile, but this capture does not time a cancellation/reconciliation workload",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsDrain": {
+      "aggregate": {
+        "p50": 27.560458052903414,
+        "p95": 27.560458052903414,
+        "p99": 27.560458052903414
+      },
+      "derivedBudget": 41.34068707935512,
+      "description": "all 1000 events over actual bounded pages; not the 1000-row single-page budget",
+      "designRow": "I.2 Job event throughput (complete drain)",
+      "p95SpreadRatio": 0.426657,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 1,
+          "max": 26.254083961248398,
+          "min": 26.254083961248398,
+          "p50": 26.254083961248398,
+          "p95": 26.254083961248398,
+          "p99": 26.254083961248398
+        },
+        {
+          "count": 1,
+          "max": 38.012958015315235,
+          "min": 38.012958015315235,
+          "p50": 38.012958015315235,
+          "p95": 38.012958015315235,
+          "p99": 38.012958015315235
+        },
+        {
+          "count": 1,
+          "max": 27.560458052903414,
+          "min": 27.560458052903414,
+          "p50": 27.560458052903414,
+          "p95": 27.560458052903414,
+          "p99": 27.560458052903414
+        }
+      ],
+      "scale": {
+        "journalAppendBoundary": "JournalWriter.append-call-through-return-v1",
+        "journalDrainBoundary": "all-pages-contract-handshakes-readback-v1",
+        "journalEventCount": 1000,
+        "journalFixtureVersion": "rust-journal-measurement-v1",
+        "journalRequestedPageSize": 1000
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": false,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "job.eventsPage": {
+      "blockedBy": "a reviewed resolution of the single-page target versus production page bound",
+      "designRow": "I.2 row 5 (job.events 1,000-row page)",
+      "reason": "job.events is published; the opt-in journal leg provides a 1000-event fixture, but the production 1 MiB page bound includes a per-row estimate and prevents a full 1000-row single page. job.eventsDrain measures complete multi-page readback, not this single-page budget",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsWait": {
+      "blockedBy": "a registry, schema and client change that publishes job.events.wait",
+      "designRow": "I.2 row 5 (job.events.wait idle CPU)",
+      "reason": "job.events.wait is a proposal in design section F.2 and is not in the published single v1 method table; only the job.events pull page exists",
+      "status": "NOT_MEASURED"
+    },
+    "job.journalAppend": {
+      "aggregate": {
+        "p50": 3.028792,
+        "p95": 4.017083,
+        "p99": 4.408792
+      },
+      "derivedBudget": 6.025624500000001,
+      "description": "production JournalWriter.append call through durable return, one 1000-event Job",
+      "designRow": "I.2 Job event throughput",
+      "p95SpreadRatio": 0.226729,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 1000,
+          "max": 8.316666,
+          "min": 1.305,
+          "p50": 2.9665,
+          "p95": 3.154542,
+          "p99": 3.6778340000000003
+        },
+        {
+          "count": 1000,
+          "max": 11.291916,
+          "min": 1.381792,
+          "p50": 3.2910830000000004,
+          "p95": 4.065333,
+          "p99": 4.682083
+        },
+        {
+          "count": 1000,
+          "max": 8.979542,
+          "min": 1.356,
+          "p50": 3.028792,
+          "p95": 4.017083,
+          "p99": 4.408792
+        }
+      ],
+      "scale": {
+        "journalAppendBoundary": "JournalWriter.append-call-through-return-v1",
+        "journalDrainBoundary": "all-pages-contract-handshakes-readback-v1",
+        "journalEventCount": 1000,
+        "journalFixtureVersion": "rust-journal-measurement-v1",
+        "journalRequestedPageSize": 1000
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "package.size": {
+      "blockedBy": "TASK-XPA-022 (Windows packaging) and a macOS installer producer",
+      "designRow": "I.2 row 12 (installer size and update delta)",
+      "reason": "no DMG or MSIX producer exists in the repository, so there is no artefact to size",
+      "status": "NOT_MEASURED"
+    },
+    "ui.frameResponse": {
+      "blockedBy": "UI lane",
+      "designRow": "I.2 row 11 (UI frame response)",
+      "reason": "needs the UI lane on both platforms",
+      "status": "NOT_MEASURED"
+    },
+    "viewer.scale": {
+      "blockedBy": "a maintainer ruling on wall-clock Viewer budgets, and the UI lane",
+      "designRow": "I.2 row 10 (Viewer build, search, hit-test, scroll)",
+      "reason": "build, search and hit-test are covered by the existing ratio gate in ViewerScalePerformanceTests, whose header refuses wall-clock budgets; the scroll leg needs the UI lane",
+      "status": "NOT_MEASURED"
+    }
+  },
+  "runs": [
+    {
+      "finishedAtUtc": "2026-09-27T04:45:37Z",
+      "index": 0,
+      "loadAverageOneMinuteEnd": 3.326,
+      "loadAverageOneMinuteStart": 3.326,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "job.eventsDrain",
+        "job.journalAppend"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "journalAppendBoundary": "JournalWriter.append-call-through-return-v1",
+        "journalDrainBoundary": "all-pages-contract-handshakes-readback-v1",
+        "journalEventCount": 1000,
+        "journalFixtureVersion": "rust-journal-measurement-v1",
+        "journalRequestedPageSize": 1000,
+        "journalSamples": [
+          {
+            "actualJobCount": 1,
+            "actualJournalEventCount": 1000,
+            "actualPageCount": 3,
+            "durability": "production-append-return-fsync-F_FULLFSYNC",
+            "eventRowCount": 1000,
+            "inputSha256": "823842531d8de373d053932b41e2f8f2724bb0867b4a68d12ca5c27be9014e99",
+            "journalBytes": 267954,
+            "journalSha256": "a5d713e090967bd7bb2f8d4e6e6a02f83685a8122f65e479c3420baadc6bfa0b",
+            "serializedProjectionBytes": 805589
+          }
+        ],
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-27T04:45:34Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-27T04:45:40Z",
+      "index": 1,
+      "loadAverageOneMinuteEnd": 3.38,
+      "loadAverageOneMinuteStart": 3.326,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "job.eventsDrain",
+        "job.journalAppend"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "journalAppendBoundary": "JournalWriter.append-call-through-return-v1",
+        "journalDrainBoundary": "all-pages-contract-handshakes-readback-v1",
+        "journalEventCount": 1000,
+        "journalFixtureVersion": "rust-journal-measurement-v1",
+        "journalRequestedPageSize": 1000,
+        "journalSamples": [
+          {
+            "actualJobCount": 1,
+            "actualJournalEventCount": 1000,
+            "actualPageCount": 3,
+            "durability": "production-append-return-fsync-F_FULLFSYNC",
+            "eventRowCount": 1000,
+            "inputSha256": "823842531d8de373d053932b41e2f8f2724bb0867b4a68d12ca5c27be9014e99",
+            "journalBytes": 267954,
+            "journalSha256": "a5d713e090967bd7bb2f8d4e6e6a02f83685a8122f65e479c3420baadc6bfa0b",
+            "serializedProjectionBytes": 805589
+          }
+        ],
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-27T04:45:37Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-27T04:45:44Z",
+      "index": 2,
+      "loadAverageOneMinuteEnd": 3.38,
+      "loadAverageOneMinuteStart": 3.38,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "job.eventsDrain",
+        "job.journalAppend"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": null,
+        "journalAppendBoundary": "JournalWriter.append-call-through-return-v1",
+        "journalDrainBoundary": "all-pages-contract-handshakes-readback-v1",
+        "journalEventCount": 1000,
+        "journalFixtureVersion": "rust-journal-measurement-v1",
+        "journalRequestedPageSize": 1000,
+        "journalSamples": [
+          {
+            "actualJobCount": 1,
+            "actualJournalEventCount": 1000,
+            "actualPageCount": 3,
+            "durability": "production-append-return-fsync-F_FULLFSYNC",
+            "eventRowCount": 1000,
+            "inputSha256": "823842531d8de373d053932b41e2f8f2724bb0867b4a68d12ca5c27be9014e99",
+            "journalBytes": 267954,
+            "journalSha256": "a5d713e090967bd7bb2f8d4e6e6a02f83685a8122f65e479c3420baadc6bfa0b",
+            "serializedProjectionBytes": 805589
+          }
+        ],
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-27T04:45:40Z"
+    }
+  ],
+  "schema": "arkdeck-perf-baseline-1.1.0",
+  "selfCheckPassed": true,
+  "spike": "SPK-11",
+  "spikeVerdict": "UNSTABLE",
+  "task": "TASK-XPA-025",
+  "toolchain": {
+    "buildConfiguration": "debug",
+    "calibrationIterations": 60000,
+    "daemonSha256": "3c929eb2445e3d7d2ae0b3ebb96cccd1812e64234effb594d35f79161b211925",
+    "runtimeKind": "rust",
+    "soakFixtureSha256": "1042af4a0f2a8cfed21f9c6d090b04e0b871185085d67e4f69af4f6e97d2b4a9"
+  },
+  "unstableMetrics": [
+    "job.eventsDrain"
+  ]
+}

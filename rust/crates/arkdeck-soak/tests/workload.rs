@@ -223,3 +223,60 @@ fn recovery_seed_refuses_foreign_root_and_final_symlink() {
     assert!(arkdeck_soak::recovery::seed(&link, "journal", 2).is_err());
     assert_eq!(fs::read_dir(&empty.0).unwrap().count(), 0);
 }
+
+#[test]
+fn measured_journal_emits_every_append_and_drains_production_pages() {
+    let root = Root::new();
+    let result = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck-soak"))
+        .arg("--measure-journal")
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(
+        result.status.success(),
+        "{}",
+        String::from_utf8_lossy(&result.stderr)
+    );
+    let records: Vec<serde_json::Value> = String::from_utf8(result.stdout)
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str(line).unwrap())
+        .collect();
+    assert_eq!(records.len(), 1001);
+    for (index, record) in records[..1000].iter().enumerate() {
+        assert_eq!(record["sequence"], index);
+        assert_eq!(record["status"], "MEASURED");
+        assert!(record["milliseconds"].as_f64().unwrap() >= 0.0);
+    }
+    assert_eq!(records[1000]["manifest"]["journalEventCount"], 1000);
+    let jobs = arkdeck_hoststore::JobStore::open_owner(&root.0.join("jobs-state")).unwrap();
+    let mut params = serde_json::json!({"jobId":"job-recovery-00000", "pageSize":1000});
+    let mut count = 0;
+    let mut pages = 0;
+    loop {
+        let page = jobs
+            .handle_resource("job.events", params.as_object().unwrap())
+            .unwrap();
+        let items = page["items"].as_array().unwrap();
+        assert!(!items.is_empty());
+        for item in items {
+            count += 1;
+            assert_eq!(item["streamPosition"], count.to_string());
+        }
+        pages += 1;
+        if page["hasMore"] == false {
+            break;
+        }
+        params["afterCursor"] = page["nextCursor"].clone();
+        assert!(pages < 10);
+    }
+    assert_eq!(count, 1000);
+    assert!(pages > 1, "the production byte cap must not be bypassed");
+    let refused = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck-soak"))
+        .arg("--measure-journal")
+        .arg(&root.0)
+        .output()
+        .unwrap();
+    assert!(!refused.status.success());
+    assert!(refused.stdout.is_empty());
+}

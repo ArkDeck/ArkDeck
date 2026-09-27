@@ -1,6 +1,24 @@
 #[cfg(target_os = "macos")]
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--measure-journal") {
+        let result = if args.len() == 2 {
+            arkdeck_soak::recovery::measure_journal(std::path::Path::new(&args[1]))
+        } else {
+            Err("usage: --measure-journal ABSOLUTE_EMPTY_ROOT".to_owned())
+        };
+        match result {
+            Ok(manifest) => println!(
+                "{}",
+                serde_json::json!({"kind":"journalComplete", "manifest":manifest})
+            ),
+            Err(error) => {
+                eprintln!("journal measurement failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if args.first().map(String::as_str) == Some("--seed-recovery") {
         let result = (|| {
             if args.len() != 4 {

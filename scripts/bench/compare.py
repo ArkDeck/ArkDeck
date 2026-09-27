@@ -65,6 +65,11 @@ ABSOLUTE_BUDGETS: dict[str, float] = {
 # observations of one run rather than inputs and legitimately differ between
 # runs, so they take no part in the comparability check.
 WORKLOAD_SCALE_FIELDS = (
+    "journalFixtureVersion",
+    "journalEventCount",
+    "journalRequestedPageSize",
+    "journalAppendBoundary",
+    "journalDrainBoundary",
     "residentSetPhaseMethod",
     "idleWindowSeconds",
     "recoveryFixtureVersion",

@@ -277,3 +277,32 @@ page size and timing boundary. Recovery-only documents explicitly mark other
 legs unmeasured and are not replacements for full reference baselines. The
 existing three-run/30% spread rules and reference-host approval still apply;
 old cold-start/RSS instability and committed baselines are retained unchanged.
+
+## Durable Journal append and complete event drain (opt-in)
+
+Rust `capture --journal-samples N --journal-only` adds fresh 1-Job × 1,000-event
+fixtures per sample, retaining the existing three-run stability rule. Each
+`job.journalAppend` interval brackets production `JournalWriter.append` through
+its synchronous durable return (including validation/encoding and the existing
+fsync/F_FULLFSYNC barriers). Event construction, fixture setup and stdout logging
+are outside that interval. All 1,000 observations, including failed attempts,
+are emitted by the soak fixture. Capture retains bounded original stdout (1 MiB)
+and stderr (64 KiB), total byte counts/hashes, exit code or timeout before parsing,
+so malformed trailing output cannot erase a successful append prefix.
+The clock is Rust `std::time::Instant`; no fake delay or static throughput count.
+
+`job.eventsDrain` measures the complete 1,000-event readback, including connection
+handshakes, pagination and complete client validation. Report serialization,
+byte counting and JSONL writes occur after the timing endpoint; partial-page
+reports survive a failed drain.
+The fixture uses the production event session identity. Closed row/data shapes,
+row cursor/type, exact Job/session/kind/timestamp and transition data, each ID and position,
+high water, cursor progress and final count is verified. The final journal hash
+must match its input. Actual page counts and serialized projection bytes are
+recorded (the latter are not claimed as socket wire bytes).
+
+The production 1 MiB page bound remains: requesting pageSize 1,000 produces
+multiple actual pages. `job.eventsPage` remains an explicit gap; drain duration
+is **not** compared with the 50 ms single-page budget. Fixture version, counts,
+page request and timing boundaries are comparison identity. No provider/device
+is involved. Each sample owns a fresh temporary root, removed on every exit.

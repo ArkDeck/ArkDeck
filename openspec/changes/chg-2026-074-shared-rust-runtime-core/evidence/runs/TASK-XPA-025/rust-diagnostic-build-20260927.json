@@ -1,0 +1,35 @@
+{
+  "sourceHead": "82f0971ce5f122bde47d9cd850f6df4e0b277da1",
+  "configuration": "release",
+  "cargoArguments": [
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "rust/Cargo.toml",
+    "-p",
+    "arkdeck-agentd",
+    "-p",
+    "arkdeck-soak"
+  ],
+  "buildJobs": 2,
+  "features": "default",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustflags": "",
+  "encodedRustflags": "",
+  "profile": {
+    "panic": "abort",
+    "lto": "thin",
+    "strip": "debuginfo"
+  },
+  "daemonSha256": "3c929eb2445e3d7d2ae0b3ebb96cccd1812e64234effb594d35f79161b211925",
+  "soakFixtureSha256": "c77de3f9a78b9799d335a8cee661f8732c8cc99f409b9c241fbc2dad89f27ffc",
+  "calibrationIterations": 60000,
+  "diagnosticScriptSha256": "c057f49c108ecf3bfe856e19393cf6df6c353e486ccbb3a3c1ceec5f6d1795da",
+  "inputGitObjects": {
+    "rust": "4fd4ed0545f75e795607d4a11df3979e1ace9cee",
+    "scripts/bench": "564f220672b12a6c529a18574209bef24e2ac9bb",
+    "Packages/ArkDeckKit/Contracts/control-protocol.json": "f3e047b6a3ca68e43b14f2a6049e971a2962a0d1"
+  }
+}

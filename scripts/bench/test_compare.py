@@ -400,3 +400,17 @@ class RenderTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class JournalComparisonIdentityTests(unittest.TestCase):
+    def test_each_changed_journal_input_refuses_comparison(self):
+        fields = dict(journalFixtureVersion='rust-journal-measurement-v1',
+                      journalEventCount=1000, journalRequestedPageSize=1000,
+                      journalAppendBoundary='JournalWriter.append-call-through-return-v1',
+                      journalDrainBoundary='all-pages-contract-handshakes-readback-v1')
+        for field in fields:
+            changed = dict(fields)
+            changed[field] = 'different'
+            result = compare.compare(scaled(document(a=1), fields), scaled(document(a=1), changed))
+            self.assertFalse(result['passed'], field)
+            self.assertFalse(result['comparisons'][0]['comparable'], field)
