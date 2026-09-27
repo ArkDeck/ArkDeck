@@ -1,0 +1,12 @@
+[
+  {
+    "file": "rust-artifact-ci-36297065896-linux.log.gz",
+    "sourceBytes": 213265,
+    "sourceSha256": "2f853b5a45a841f9976067377aeb18508edda26efd507a402dbe256564bc0121"
+  },
+  {
+    "file": "rust-artifact-ci-36297065896-windows.log.gz",
+    "sourceBytes": 213921,
+    "sourceSha256": "f5fd96da9a556a3c1dafdd0987e7e2eedf76022dea95f45ad15530b242647031"
+  }
+]

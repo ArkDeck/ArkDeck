@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import time
 
-from . import baseline, clocks, control, harness, recovery, journal
+from . import baseline, clocks, control, harness, recovery, journal, artifact
 
 # A pure-CPU workload with no allocation growth and no syscall, sized to land in
 # the same millisecond range as the IPC round trips it normalises.
@@ -215,11 +215,15 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
         "artifact.pagedRead": baseline.Gap(
             "artifact.pagedRead",
             "I.2 row 6 (large artifact transfer, paged base64 leg)",
-            "measurable in principle through artifact.read, but a seeded Job's "
-            "Artifacts total a few kilobytes and the 128 MiB and 1 GiB "
-            "fixtures are built only by the Swift opt-in slow artifact tests, "
-            "not by this harness",
-            "artifact fixture generation in the perf lane",
+            "128 MiB InputArtifact paged read requires the opt-in artifact leg; "
+            "1 GiB and 1 MiB are separately named scales. Ordinary Job Artifacts "
+            "and copy counts are not established by an Import fixture",
+            "a capture with --artifact-samples and a validated 128 MiB input",
+        ),
+        "artifact.copyCount": baseline.Gap(
+            "artifact.copyCount", "I.2 large Artifact copies",
+            "paged read validates bytes but does not instrument physical copies; sampled RSS is not a copy count",
+            "copy instrumentation with a defined end-to-end boundary",
         ),
         "artifact.open": baseline.Gap(
             "artifact.open",
@@ -305,6 +309,9 @@ class RunContext:
         require_quiet: bool = False,
         journal_samples: int = 0,
         journal_only: bool = False,
+        artifact_samples: int = 0,
+        artifact_only: bool = False,
+        artifact_sizes: tuple[int, ...] = (128 * 1024 * 1024, 1024 * 1024 * 1024),
     ) -> None:
         if runtime_kind not in {"swift", "rust"}:
             raise ValueError("runtime_kind must be swift or rust")
@@ -316,6 +323,15 @@ class RunContext:
             raise ValueError("journal-only requires positive journal samples")
         if (journal_samples and runtime_kind != "rust") or (journal_only and recovery_only):
             raise ValueError("journal capture requires Rust and separate only modes")
+        if (artifact_samples < 0 or (artifact_only and not artifact_samples)
+                or (artifact_samples and runtime_kind != "rust")
+                or sum((artifact_only, journal_only, recovery_only)) > 1
+                or not artifact_sizes or len(set(artifact_sizes)) != len(artifact_sizes)
+                or any(size not in artifact.artifact_fixture.SIZES for size in artifact_sizes)):
+            raise ValueError("invalid opt-in artifact workload")
+        self.artifact_samples = artifact_samples
+        self.artifact_only = artifact_only
+        self.artifact_sizes = artifact_sizes
         self.journal_samples = journal_samples
         self.journal_only = journal_only
         self.recovery_samples = recovery_samples
@@ -400,7 +416,7 @@ def execute_run(
     numbers instead of being reconstructed from the seed parameters.
     """
 
-    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS)}
+    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS | artifact.DEFINITIONS)}
     scale: dict[str, object] = {
         "seedSeconds": context.seed_seconds,
         "seedJobsPerCycle": context.seed_jobs_per_cycle,
@@ -461,7 +477,20 @@ def execute_run(
                 samples[name].extend(values)
             scale["journalSamples"].append(facts.pop("journalEvidence"))
             scale.update(facts)
-    if context.recovery_only or context.journal_only:
+    if context.artifact_samples:
+        scale["artifactSamples"] = []
+        scale["artifactMetricScales"] = {}
+        for sample_index in range(context.artifact_samples):
+            for size in context.artifact_sizes:
+                def artifact_record(entry):
+                    record({"leg": "artifact", "sampleIndex": sample_index, "payloadBytes": size, **entry})
+                elapsed, facts = artifact.measure(context.daemon_executable, context.soak_executable,
+                                                  size, artifact_record, context.require_quiet)
+                name = artifact.metric_id(size)
+                samples[name].append(elapsed)
+                scale["artifactSamples"].append(facts.pop("artifactEvidence"))
+                scale["artifactMetricScales"][name] = facts
+    if context.recovery_only or context.journal_only or context.artifact_only:
         return {name: values for name, values in samples.items() if values}, scale
 
     seeded = harness.seed_state_directory(

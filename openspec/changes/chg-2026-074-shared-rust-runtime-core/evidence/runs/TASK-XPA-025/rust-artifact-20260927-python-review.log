@@ -1,0 +1,120 @@
+................s......bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpjjstd6fx/perf/capture-samples-e0e03125cb7a4551ad57582e354695ec.jsonl
+bench: run 1/3 complete (1 metrics)
+bench: run 2/3 complete (1 metrics)
+bench: run 3/3 complete (1 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpjjstd6fx/perf/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=1 gaps=24 baselineEligible=True
+.bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpz1nxathw/perf/capture-samples-82f23ea9ffd44cb69aed845113e0102c.jsonl
+bench: run 1/3 complete (1 metrics)
+bench: run 2/3 complete (1 metrics)
+bench: run 3/3 complete (1 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpz1nxathw/perf/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=1 gaps=24 baselineEligible=True
+.....usage: bench capture [-h] --daemon DAEMON --soak SOAK
+                     [--runtime-kind {swift,rust}] --out-dir OUT_DIR
+                     [--build-configuration {release,debug}] [--runs RUNS]
+                     [--recovery-samples RECOVERY_SAMPLES] [--recovery-only]
+                     [--journal-samples JOURNAL_SAMPLES] [--journal-only]
+                     [--artifact-samples ARTIFACT_SAMPLES] [--artifact-only]
+                     [--artifact-sizes-mib {1,128,1024} [{1,128,1024} ...]]
+                     [--cold-start-samples COLD_START_SAMPLES]
+                     [--ipc-samples IPC_SAMPLES] [--idle-seconds IDLE_SECONDS]
+                     [--calibration-samples CALIBRATION_SAMPLES]
+                     [--seed-seconds SEED_SECONDS]
+                     [--seed-jobs-per-cycle SEED_JOBS_PER_CYCLE]
+                     [--quiet-wait-seconds QUIET_WAIT_SECONDS]
+                     [--allow-loaded-host]
+bench capture: error: argument --quiet-wait-seconds: -1 must not be negative
+.bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpqrqiiu98/perf/capture-samples-d384c2cc3fe24807b3e912e3dc31bd12.jsonl
+bench: run 1/3 complete (1 metrics)
+bench: run 2/3 complete (1 metrics)
+bench: run 3/3 complete (1 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpqrqiiu98/perf/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=1 gaps=24 baselineEligible=False
+.bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp4jnauz4s/perf/capture-samples-380face81ee143fe858465d3326cf263.jsonl
+bench: run 1/3 complete (1 metrics)
+bench: run 2/3 complete (1 metrics)
+bench: run 3/3 complete (1 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp4jnauz4s/perf/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=1 gaps=24 baselineEligible=True
+.bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmprv53cbzz/perf/capture-samples-1fda607477594831a2ee59ff4af0a59c.jsonl
+bench: run 1/3 complete (1 metrics)
+bench: run 2/3 complete (1 metrics)
+bench: run 3/3 complete (1 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmprv53cbzz/perf/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=1 gaps=24 baselineEligible=True
+.....................bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmprrl7fvz1/capture-samples-e2457ee4ba1c4133b5c8161fda4a57a5.jsonl
+bench: run 1/3 complete (2 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmprrl7fvz1/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp8qr63rv4/capture-samples-24572b36684e405899bb339983047f49.jsonl
+bench: run 1/3 complete (2 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp8qr63rv4/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: advisory capture; instability is not an error here
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpk2al0b0e/capture-samples-1e27c070ff00417381fd46f228ef56a4.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpk2al0b0e/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpf1vyfrqf/capture-samples-2d072529102c4dafa292c99d1f8307c6.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpf1vyfrqf/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: advisory capture; instability is not an error here
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpixxe13bh/capture-samples-6fa07d8754bb42bc8b1535bdfdc0b26c.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (3 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpixxe13bh/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp_upwfv00/capture-samples-be3d0dbb1c364231be0e0f112706139c.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (3 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmp_upwfv00/perf-baseline-2026-09-27.json
+bench: verdict=UNSTABLE measured=2 gaps=23 baselineEligible=False
+bench: unstable p95 across runs: daemon.coldStart
+bench: advisory capture; instability is not an error here
+.bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpibfxg554/capture-samples-32f05df20580479e82bdf7aa5c6e1f7e.jsonl
+bench: run 1/3 complete (2 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpibfxg554/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=2 gaps=23 baselineEligible=False
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpa_6t18c0/capture-samples-f675204254204ce0b414e2647be51e62.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (2 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpa_6t18c0/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=2 gaps=23 baselineEligible=False
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpeq752ybl/capture-samples-9face485f46a49e4b95ef7d6b9b7009e.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (3 metrics)
+bench: run 3/3 complete (2 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpeq752ybl/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=2 gaps=23 baselineEligible=False
+....................................................................................................................................ssbench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpb5ilxjs7/recovery-samples-beb120ab04a142edb1f571e8978050e1.jsonl
+bench: raw observations archived in /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpb5ilxjs7/capture-samples-beb120ab04a142edb1f571e8978050e1.jsonl
+bench: run 1/3 complete (3 metrics)
+bench: run 2/3 complete (3 metrics)
+bench: run 3/3 complete (3 metrics)
+bench: wrote /var/folders/kq/6vwvyjds2nx0tc3g0xt_19br0000gn/T/tmpb5ilxjs7/perf-baseline-2026-09-27.json
+bench: verdict=PASS measured=3 gaps=23 baselineEligible=True
+...............
+----------------------------------------------------------------------
+Ran 203 tests in 0.233s
+
+OK (skipped=3)
