@@ -64,7 +64,8 @@ class ArtifactRangeTests(unittest.TestCase):
     def test_wrong_identity_digest_offsets_counts_eof_and_encoding_refuse(self):
         changes = [('artifactId','wrong'),('artifactDigest','0'*64),('byteCount',True),
                    ('byteCount',3),('offset',1),('nextOffset',3),('totalByteCount',5),
-                   ('eof',False),('eof',1),('base64','not-base64'),('base64','YWJjZA===')]
+                   ('eof',False),('eof',1),('base64','not-base64'),('base64','YWJjZA==='),
+                   ('base64','YWJjZA==é'),('base64','YWJj\nZA==')]
         for key,value in changes:
             candidate = page(); candidate[key] = value
             with self.subTest(key=key, value=value), self.assertRaises(ValueError):
@@ -72,6 +73,42 @@ class ArtifactRangeTests(unittest.TestCase):
         candidate = page(); candidate['extra'] = 1
         with self.assertRaises(ValueError):
             artifact.validate_page(candidate, receipt(), 0, 4)
+
+    def test_canonical_encoding_across_chunk_boundaries_and_final_padding(self):
+        alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+        for size in (48*1024-1, 48*1024, 48*1024+1, 48*1024+2, 2*48*1024+1):
+            data = (bytes(range(256))*((size+255)//256))[:size]
+            candidate = page(data, total=size)
+            self.assertEqual(artifact.validate_page(candidate, receipt(), 0, size), data)
+            if size % 3:
+                text = candidate['base64']
+                position = -3 if size % 3 == 1 else -2
+                index = alphabet.index(text[position])
+                candidate['base64'] = text[:position] + alphabet[index+1] + text[position+1:]
+                # Strict decoding alone accepts nonzero unused padding bits.
+                self.assertEqual(base64.b64decode(candidate['base64'], validate=True), data)
+                with self.assertRaisesRegex(ValueError, 'encoding'):
+                    artifact.validate_page(candidate, receipt(), 0, size)
+
+    def test_extra_base64_padding_after_complete_chunk_refuses(self):
+        data = b'x'*(48*1024)
+        candidate = page(data, total=len(data))
+        candidate['base64'] += '===='
+        with self.assertRaises(ValueError):
+            artifact.validate_page(candidate, receipt(), 0, len(data))
+
+    def test_canonical_reencoding_never_materializes_another_full_page(self):
+        data = b'x'*(4*1024*1024)
+        candidate = page(data, total=len(data))
+        encode = base64.b64encode
+        sizes = []
+        def bounded(chunk):
+            sizes.append(len(chunk))
+            return encode(chunk)
+        with patch.object(artifact.base64, 'b64encode', side_effect=bounded):
+            self.assertEqual(artifact.validate_page(candidate, receipt(), 0, len(data)), data)
+        self.assertEqual(sum(sizes), len(data))
+        self.assertLessEqual(max(sizes), 48*1024)
 
     def test_missing_rss_does_not_become_zero_or_peak_claim(self):
         result = artifact.rss_summary([{'unmeasured':'ps failed'}])
@@ -251,6 +288,29 @@ class IncrementalArtifactTransportTests(ArtifactTransportTests):
                 client._exchange({'id':'test'})
         self.assertEqual(client.failure_evidence['receivedByteCount'],len(wire))
         self.assertEqual(client.failure_evidence['receivedSha256'],hashlib.sha256(wire).hexdigest())
+
+    def test_exact_transport_bound_includes_terminator(self):
+        from . import control
+        import json
+        response = {'id':'test', 'ok':True, 'result':'edge'}
+        wire = json.dumps(response).encode()+b'\n'
+        for bound in (len(wire), len(wire)-1):
+            client = self.client([wire[:-1], wire[-1:]])
+            with patch.object(control, 'MAXIMUM_RESPONSE_BYTES', bound):
+                if bound == len(wire):
+                    self.assertEqual(client._exchange({'id':'test'}), response)
+                    self.assertEqual(client._socket.recv.call_count, 2)
+                else:
+                    with self.assertRaisesRegex(control.ControlError, 'transport limit'):
+                        client._exchange({'id':'test'})
+
+    def test_utf8_and_bom_survive_fragmented_decoding_without_unused_tail(self):
+        import json
+        response = {'id':'test', 'ok':True, 'result':'恢复 🧪'}
+        payload = json.dumps(response, ensure_ascii=False).encode('utf-8')+b'\n'
+        for wire in (payload, b'\xef\xbb\xbf'+payload):
+            client = self.client([wire[i:i+1] for i in range(len(wire))])
+            self.assertEqual(client._exchange({'id':'test'}), response)
 
     def test_extra_frame_carriage_return_and_duplicate_keys_refuse(self):
         from . import control

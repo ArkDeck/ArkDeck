@@ -353,10 +353,22 @@ publication RSS test is a different boundary and is not relabeled as readback
 compliance. Missing RSS is unmeasured rather than zero. Debug or small-scale
 functional checks do not qualify either target-size performance baseline.
 
-The artifact-only measurement client uses an incremental bounded receive buffer,
-scans each new fragment for framing, decodes one JSON document, and releases each
-decoded page after digest accumulation. It retains the same frame/shape/base64/
+The artifact-only measurement client uses a fixed transport-bound receive buffer,
+scans each new fragment for framing, and decodes only the initialized prefix.
+It avoids growing/shrinking multi-MiB receive allocations. Canonical base64 is
+verified by re-encoding every decoded byte in 48 KiB input chunks (3-byte aligned),
+including final padding, without constructing another full-page encoded string.
+Each decoded page is released after digest accumulation. It retains the same frame/shape/base64/
 identity/range/digest checks, continuous deadline and bounded error evidence.
 `artifactReaderVersion` is comparison identity: the new instrument must not be
 compared as though it were the earlier immutable-buffer reader. Default UDS
 microbenchmark calls retain their existing exchange path.
+
+The `clientBytes` RSS field here samples the Python benchmark process, not the
+Swift App, Swift ClientKit or Rust CLI. It exposes instrument-side costs in the
+I.2 large Artifact paged-transfer measurement; it cannot establish those product
+clients' RSS budgets or the separate 128 MiB Swift publication/redaction gate.
+Reader v4 changes allocation behavior, not the 4 MiB page size, 0.2 s RSS sampling,
+timing endpoints, strict validation, fixture sizes or performance thresholds.
+Small bounded allocation diagnostics are not target-size acceptance. The older
+v2/v3 records remain unchanged and are not comparable as the same instrument.
