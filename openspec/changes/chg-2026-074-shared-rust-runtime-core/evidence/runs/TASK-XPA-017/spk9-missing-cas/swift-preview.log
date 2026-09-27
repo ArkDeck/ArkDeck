@@ -1,0 +1,41 @@
+ArkDeck API-baseline scratch: /Users/fuhanfeng/Library/Caches/com.arkdeck.ArkDeck/SwiftPM/ArkDeckKit/api-baseline-build (0MB)
+ArkDeck SwiftPM cache: /Users/fuhanfeng/Library/Caches/com.arkdeck.ArkDeck/SwiftPM/ArkDeckKit
+ArkDeck SwiftPM worktree: /Users/fuhanfeng/.codex/worktrees/d79c22c2-6d92-440c-9b2b-8f0ec99119ea/ArkDeck
+warning: 'bigint': /Users/fuhanfeng/Library/Caches/com.arkdeck.ArkDeck/SwiftPM/ArkDeckKit/build/checkouts/BigInt/Package.swift:18:19: warning: 'v4' is deprecated: watchOS 9.0 is the oldest supported version [#DeprecatedDeclaration]
+16 |         .iOS(.v12),
+17 |         .tvOS(.v12),
+18 |         .watchOS(.v4),
+   |                   `- warning: 'v4' is deprecated: watchOS 9.0 is the oldest supported version [#DeprecatedDeclaration]
+19 |         .macCatalyst(.v13),
+20 |         .visionOS(.v1),
+
+[#DeprecatedDeclaration]: <https://docs.swift.org/compiler/documentation/diagnostics/deprecated-declaration>
+Test Suite 'Selected tests' started at 2026-09-27 15:19:17.580.
+Test Suite 'ArkDeckTraceAdapterTests.xctest' started at 2026-09-27 15:19:17.581.
+Test Suite 'ArkDeckTraceAdapterTests.xctest' passed at 2026-09-27 15:19:17.581.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-09-27 15:19:17.581.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'Selected tests' started at 2026-09-27 15:19:17.658.
+Test Suite 'ArkDeckCoreTests.xctest' started at 2026-09-27 15:19:17.658.
+Test Suite 'ArkDeckCoreTests.xctest' passed at 2026-09-27 15:19:17.658.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-09-27 15:19:17.659.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds
+Test Suite 'Selected tests' started at 2026-09-27 15:19:17.722.
+Test Suite 'ArkDeckContractTests.xctest' started at 2026-09-27 15:19:17.723.
+Test Suite 'ArkForgeMissingArchiveLiveTests' started at 2026-09-27 15:19:17.723.
+Test Case '-[ArkDeckContractTests.ArkForgeMissingArchiveLiveTests testRealDaemonMissingArchivePreview]' started.
+Test Case '-[ArkDeckContractTests.ArkForgeMissingArchiveLiveTests testRealDaemonMissingArchivePreview]' passed (0.005 seconds).
+Test Suite 'ArkForgeMissingArchiveLiveTests' passed at 2026-09-27 15:19:17.728.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.005 (0.005) seconds
+Test Suite 'ArkDeckContractTests.xctest' passed at 2026-09-27 15:19:17.728.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.005 (0.005) seconds
+Test Suite 'Selected tests' passed at 2026-09-27 15:19:17.728.
+	 Executed 1 test, with 0 failures (0 unexpected) in 0.005 (0.006) seconds
+Test Suite 'Selected tests' started at 2026-09-27 15:19:17.805.
+Test Suite 'ArkDeckClientKitTests.xctest' started at 2026-09-27 15:19:17.806.
+Test Suite 'ArkDeckClientKitTests.xctest' passed at 2026-09-27 15:19:17.806.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.000) seconds
+Test Suite 'Selected tests' passed at 2026-09-27 15:19:17.806.
+	 Executed 0 tests, with 0 failures (0 unexpected) in 0.000 (0.001) seconds

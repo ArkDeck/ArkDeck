@@ -1,0 +1,10 @@
+{
+  "archiveSHA256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "calls": [
+    "controller.inspectArtifact"
+  ],
+  "outcome": "bundleNotInLaneStore",
+  "owner": "rust",
+  "profileReference": "org.openharmony.dayu200@1.0.0",
+  "refusalCode": "ARTIFACT_NOT_FOUND"
+}

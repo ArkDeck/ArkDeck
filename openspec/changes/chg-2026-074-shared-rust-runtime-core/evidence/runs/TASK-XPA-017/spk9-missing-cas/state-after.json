@@ -1,0 +1,30 @@
+{
+  "controller.sock": {
+    "kind": "socket",
+    "mode": 384
+  },
+  "public.sock": {
+    "kind": "socket",
+    "mode": 384
+  },
+  "store": {
+    "kind": "directory",
+    "mode": 493
+  },
+  "store/jobs": {
+    "kind": "directory",
+    "mode": 493
+  },
+  "store/leases": {
+    "kind": "directory",
+    "mode": 448
+  },
+  "store/objects": {
+    "kind": "directory",
+    "mode": 448
+  },
+  "store/staging": {
+    "kind": "directory",
+    "mode": 448
+  }
+}
