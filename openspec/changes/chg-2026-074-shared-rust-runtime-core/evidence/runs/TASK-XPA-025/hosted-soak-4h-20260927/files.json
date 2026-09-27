@@ -1,0 +1,16 @@
+{
+  "analysis.json": {
+    "bytes": 10659,
+    "sha256": "444baeff4c516d81e32da092001cb764934063dddded7ed8e9bc3e1268fdc803"
+  },
+  "run.log.gz": {
+    "bytes": 8713,
+    "sha256": "f4d6a23228c5b208fb800adc0a00ac62f33ae824f10467c7c20ab598f813287e",
+    "uncompressedBytes": 47425,
+    "uncompressedSHA256": "98ee842e6bd561f6d092f2144faa34e727807395e1a06e022298d50439ced44c"
+  },
+  "runtime-soak-metrics.json": {
+    "bytes": 972,
+    "sha256": "3b65aab0b5c3d692313cfd174bfad660827df024fb31b9df51a748966edbf2e7"
+  }
+}
