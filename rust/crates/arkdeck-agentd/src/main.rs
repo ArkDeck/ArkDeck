@@ -64,6 +64,7 @@ mod workspace_project_control;
 
 use arkdeck_control::Control;
 use arkdeck_platform::{LocalEndpoint, LocalListener, default_user_endpoint};
+#[cfg(unix)]
 use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::Duration;

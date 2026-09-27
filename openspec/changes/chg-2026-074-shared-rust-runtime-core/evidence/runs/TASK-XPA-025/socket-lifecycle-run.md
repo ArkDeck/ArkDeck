@@ -90,14 +90,27 @@ and no remaining socket. FD stayed 15; RSS high-water growth was 704,512 bytes.
 These are short lifecycle observations, not a performance budget result.
 
 Source Rust tree: `8e0cec34d2e6331654be9fed47de5790402c4e15` (final base plus this
-change; subsequent edits are evidence only). Binary SHA-256:
+change as tested at initial PR head `d22ec944`; the subsequent Windows import
+fix is described below). Binary SHA-256:
 `c9ab8e5f1d124e54d83f1174fbd454ba44c2531938be42547b9a565c977b0c1c`.
 Raw command/identity/metrics: [socket-lifecycle-smoke.json](socket-lifecycle-smoke.json).
 Per-cycle output: [socket-lifecycle-smoke.log](socket-lifecycle-smoke.log).
 
 ## CI
 
-Pending bot PR and exact-head GitHub checks. No local unified gate was run.
+PR #2292, initial head `d22ec944c689ec110980965db4c82826d17dcb51`:
+run `36306460839` failed Windows Clippy (job `108584110525`) because the extracted
+frame loop left `std::io::{self, Write}` unused in the Windows binary. Linux
+passed; macOS was still running when the failure was diagnosed. Guard run
+`36306460523` passed. The fix gates that import with `#[cfg(unix)]`, matching
+all remaining uses, without suppressing warnings or changing Unix behavior.
+The smoke's recorded source tree and binary identity above remain unchanged;
+those records describe the actual tested snapshot, not the follow-up commit.
+
+Follow-up local checks: workspace format and diff check exit 0. No local
+build/test was started because the shared host was in the fixed-base performance
+capture window. Windows compilation/lint is delegated to the new exact-head CI
+run, pending after push. No local unified gate was run.
 
 This change does not revise the prior four-hour owner-only evidence at source
 `443e805ef7529e61a9860ccae7011c072142e52a` (run `36291225535`). It does not provide a
