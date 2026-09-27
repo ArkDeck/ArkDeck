@@ -56,6 +56,55 @@ use support::hdc_oracle::{self, Owners, exchange};
 /// Every call Swift's runs and continuations made.
 const CALLS: usize = 108;
 
+#[test]
+fn historical_terminal_digest_never_authorizes_run_or_compensation() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let hdc = owners.hdc(&debug_hap::NoDispatch);
+    owners
+        .admitter(&hdc, &owners.default_root)
+        .handle(
+            exchange(&cases, "stillRunning.submit")["params"]
+                .as_object()
+                .unwrap(),
+        )
+        .unwrap();
+    let job = cases["jobs"]["stillRunning"].as_str().unwrap();
+    let mut record = support::document(&fixture, &format!("store/jobs/{job}/job-record.json"));
+    record["admissionEvidence"]["runtimeCapabilityCorrelation"]["stepSetDigestSHA256"] =
+        json!("e498f179320e17d223c85768dabed4a5d8719768b55ecf2ce8e70c1f83f9ac44");
+    let decoded = JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap();
+    owners
+        .jobs
+        .persist(&decoded, &fixed_now().unwrap())
+        .unwrap();
+    let record_before = fs::read(owners.job_file(job, "job-record.json")).unwrap();
+    let journal_before = fs::read(owners.job_file(job, "journal.jsonl")).unwrap();
+    let capability_before = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+    let publisher = owners.publisher();
+    let refusal = owners
+        .runner(&hdc, &publisher, true)
+        .handle(&Map::from_iter([("jobId".into(), json!(job))]))
+        .unwrap_err();
+    assert_eq!(refusal.code, "resourceConflict");
+    assert!(refusal.message.contains("failed, not runnable"));
+    assert!(owners.calls().is_empty());
+    assert_eq!(
+        fs::read(owners.job_file(job, "job-record.json")).unwrap(),
+        record_before
+    );
+    assert_eq!(
+        fs::read(owners.job_file(job, "journal.jsonl")).unwrap(),
+        journal_before
+    );
+    assert_eq!(
+        debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+        capability_before
+    );
+}
+
 /// Every recorded request, answered in order by the Rust owners. Every
 /// answer must be Swift's, its message included, and so must each call the
 /// fake received, the Target document and everything the replay leaves below

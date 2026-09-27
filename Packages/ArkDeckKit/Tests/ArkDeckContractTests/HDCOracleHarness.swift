@@ -573,7 +573,9 @@ enum HDCOracleHarness {
 
   /// What a reader observes of the Job index without writing: layout,
   /// pragmas and every row, each row's record by its digest.
-  static func index(of state: URL) throws -> JSONValue {
+  static func index(
+    of state: URL, normalizeRecord: (Data) -> Data = { $0 }
+  ) throws -> JSONValue {
     var handle: OpaquePointer?
     let path = state.appending(path: RuntimeJobRepository.filename).path
     guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
@@ -605,7 +607,7 @@ enum HDCOracleHarness {
               let bytes =
                 sqlite3_column_blob(statement, column).map { Data(bytes: $0, count: count) }
                 ?? Data()
-              return .string(SHA256Hex.string(of: machineIndependent(bytes)))
+              return .string(SHA256Hex.string(of: normalizeRecord(machineIndependent(bytes))))
             default:
               return .null
             }

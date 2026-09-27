@@ -418,6 +418,46 @@ fn normalized(text: &str) -> String {
     out
 }
 
+#[test]
+fn index_digest_labels_measured_wait_but_preserves_outcome() {
+    use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
+    let _lock = exclusive();
+    let root = lay_down();
+    let store = root.join("store");
+    let mut db = HostSqlite::open(&store.join("runtime-jobs.sqlite3"), false, true).unwrap();
+    db.execute(
+        "CREATE TABLE runtime_job(job_id TEXT, idempotency_key TEXT, request_hash TEXT, \
+         state TEXT, admission_sequence INTEGER, created_at_utc TEXT, created_at_order_key TEXT, \
+         updated_at_utc TEXT, version INTEGER, initial_record_json BLOB)",
+        &[],
+    )
+    .unwrap();
+    db.execute(
+        "INSERT INTO runtime_job VALUES('job', 'key', 'hash', 'recovered', 1, 'now', 'order', 'now', 1, NULL)",
+        &[],
+    ).unwrap();
+    let mut index = |wait: u32, outcome: &str, normalize: bool| {
+        let record = format!(r#"{{"state":"{outcome}","timeline":["consume wait {wait} ms"]}}"#);
+        db.execute(
+            "UPDATE runtime_job SET initial_record_json = ?",
+            &[Sql::Blob(record.into_bytes())],
+        )
+        .unwrap();
+        support::index_normalized(&store, |bytes| {
+            if normalize {
+                normalized(&String::from_utf8_lossy(bytes)).into_bytes()
+            } else {
+                bytes.to_vec()
+            }
+        })
+    };
+    let zero = index(0, "recovered", true);
+    assert_eq!(zero, index(1, "recovered", true));
+    assert_eq!(zero, index(10001, "recovered", true));
+    assert_ne!(zero, index(1, "waitingForRecovery", true));
+    assert_ne!(index(0, "recovered", false), index(1, "recovered", false));
+}
+
 fn normalized_value(value: &Value) -> Value {
     serde_json::from_str(&normalized(&value.to_string())).unwrap()
 }
@@ -525,85 +565,6 @@ fn rust_incidental(path: &str) -> bool {
         || path.starts_with(JOB_SNAPSHOTS)
 }
 
-/// A Flash record's timeline measures how long its run waited for the lane's
-/// prewarm (`consume wait <ms> ms`), which the oracle labels wherever it
-/// records text; the Job index's `recordSHA256` hashes the record as the
-/// store holds it. A row whose digest differs is held to Swift's by the wait
-/// that reproduces it, every other byte unchanged: the recorded wait, which
-/// the fake lane makes 0, first, then any one wait.
-fn measured_waits(store: &Path, index: &mut Value, swift: &Value) {
-    const LABEL: &str = "consume wait ";
-    let expected: BTreeMap<String, String> = swift["rows"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|row| {
-            (
-                row["jobId"].as_str().unwrap().to_owned(),
-                row["recordSHA256"].as_str().unwrap_or_default().to_owned(),
-            )
-        })
-        .collect();
-    let mut db =
-        arkdeck_platform::HostSqlite::open(&store.join("runtime-jobs.sqlite3"), true, false)
-            .unwrap();
-    let mut records = BTreeMap::new();
-    for row in db
-        .query(
-            "SELECT job_id, initial_record_json FROM runtime_job",
-            &[],
-            64 << 20,
-        )
-        .unwrap()
-    {
-        if let (
-            arkdeck_platform::SqliteValue::Text(job),
-            arkdeck_platform::SqliteValue::Blob(bytes),
-        ) = (&row[0], &row[1])
-        {
-            records.insert(job.clone(), String::from_utf8_lossy(bytes).into_owned());
-        }
-    }
-    let digest =
-        |text: &str| arkdeck_contract::sha256_hex(&support::machine_independent(text.as_bytes()));
-    // `text` with its measured waits spelled `waits` in turn.
-    let spelled = |text: &str, waits: &dyn Fn(usize) -> u32| {
-        let mut out = String::new();
-        let mut rest = text;
-        let mut seen = 0;
-        while let Some(at) = rest.find(LABEL) {
-            let (head, tail) = rest.split_at(at + LABEL.len());
-            out.push_str(head);
-            let digits = tail.bytes().take_while(u8::is_ascii_digit).count();
-            if digits > 0 && tail[digits..].starts_with(" ms") {
-                out.push_str(&waits(seen).to_string());
-                seen += 1;
-                rest = &tail[digits..];
-            } else {
-                rest = tail;
-            }
-        }
-        out.push_str(rest);
-        (out, seen)
-    };
-    for row in index["rows"].as_array_mut().unwrap() {
-        let job = row["jobId"].as_str().unwrap_or_default().to_owned();
-        let (Some(wanted), Some(record)) = (expected.get(&job), records.get(&job)) else {
-            continue;
-        };
-        if row["recordSHA256"] == json!(wanted) || !record.contains(LABEL) {
-            continue;
-        }
-        let (zero, waits) = spelled(record, &|_| 0);
-        let found = digest(&zero) == *wanted
-            || (waits == 1
-                && (1..=10_000).any(|wait| digest(&spelled(record, &|_| wait).0) == *wanted));
-        if found {
-            row["recordSHA256"] = json!(wanted);
-        }
-    }
-}
-
 /// What `story` left below the root against what Swift's left: the Job
 /// index, every entry's kind and mode, and every regular file's bytes, each
 /// Job record's machine facts labelled. A payload's verification cache pins
@@ -614,9 +575,10 @@ fn measured_waits(store: &Path, index: &mut Value, swift: &Value) {
 fn leftovers(story: &str, root: &Path) -> Vec<String> {
     let recorded = fixture().join("stories").join(story);
     let mut differences = Vec::new();
-    let mut index = support::index(&root.join("store"));
+    let index = support::index_normalized(&root.join("store"), |bytes| {
+        normalized(&String::from_utf8_lossy(bytes)).into_bytes()
+    });
     let swift_index = support::document(&recorded, "index.json");
-    measured_waits(&root.join("store"), &mut index, &swift_index);
     if index != swift_index {
         differences.push(format!("{story}: the Job index differs: {index}"));
     }
