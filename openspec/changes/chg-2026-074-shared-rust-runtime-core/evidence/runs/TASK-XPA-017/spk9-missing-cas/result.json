@@ -1,0 +1,85 @@
+{
+  "arkdeckCommit": "face946d3ada54227b612cbc538d042e111e11b7",
+  "arkdeckDiffSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "arkdeckWorktreeStatus": "?? Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeMissingArchiveLiveTests.swift\n?? rust/crates/arkdeck-provider-arkforge/tests/live_preview_missing.rs\n?? scripts/ci/run-spk9-preview-missing.py\n?? scripts/ci/test_spk9_preview_missing.py",
+  "arkforgeCommit": "c1dc0553b42627581583abfba3fec34d13343282",
+  "arkforgeTree": "cfdcb9dbe048b20d690a0f5406b14e79ef4a21b2",
+  "carrierSources": {
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeMissingArchiveLiveTests.swift": "96198331d09354968baaad0809f2353bbe69408371ef071083fe86ac25952897",
+    "rust/crates/arkdeck-provider-arkforge/tests/live_preview_missing.rs": "9f319be929eb27035712afd6dfb2b11256dc620da34fd3059930a976edda9455",
+    "scripts/ci/run-spk9-preview-missing.py": "124fcbfe806c689dc9157b28d3845ec26120e3e7832f91b1389b4f5e67fe4efb"
+  },
+  "commands": [
+    [
+      "rustc",
+      "--version",
+      "--verbose"
+    ],
+    [
+      "swift",
+      "--version"
+    ],
+    [
+      "cargo",
+      "build",
+      "--locked",
+      "--manifest-path",
+      "/Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/Cargo.toml",
+      "-p",
+      "arkforged",
+      "--bin",
+      "arkforged",
+      "--message-format=json"
+    ],
+    [
+      "cargo",
+      "test",
+      "--locked",
+      "--manifest-path",
+      "/Users/fuhanfeng/.codex/worktrees/d79c22c2-6d92-440c-9b2b-8f0ec99119ea/ArkDeck/rust/Cargo.toml",
+      "-p",
+      "arkdeck-provider-arkforge",
+      "--test",
+      "live_preview_missing",
+      "--no-run",
+      "--message-format=json"
+    ],
+    [
+      "sh",
+      "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+      "test",
+      "--filter",
+      "ArkForgeMissingArchiveLiveTests"
+    ],
+    [
+      "/private/tmp/arkforge-controller-materialization-target/debug/arkforged",
+      "--runtime-dir",
+      "/private/tmp/as9-dsmrrqd6"
+    ],
+    [
+      "/private/tmp/arkdeck-takeover-d79c-target/debug/deps/live_preview_missing-2e646908dc1a3121",
+      "real_daemon_missing_archive_preview",
+      "--exact",
+      "--ignored",
+      "--nocapture"
+    ],
+    [
+      "sh",
+      "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+      "test",
+      "--filter",
+      "ArkForgeMissingArchiveLiveTests",
+      "--skip-build"
+    ]
+  ],
+  "daemonPath": "/private/tmp/arkforge-controller-materialization-target/debug/arkforged",
+  "daemonSHA256": "0c42f6e7af2080a753fde595040601c27900bbc636d62b2a5f36cabb07e9e8b1",
+  "hardwareEvidence": false,
+  "result": "pass",
+  "runtimeDirectory": "/private/tmp/as9-dsmrrqd6",
+  "runtimeRemoved": true,
+  "rustTestPath": "/private/tmp/arkdeck-takeover-d79c-target/debug/deps/live_preview_missing-2e646908dc1a3121",
+  "rustTestSHA256": "cdd75a3ce0ba59980f78e31d6ca44b510f0222d144566b9c2c8954b8b1f984c9",
+  "scope": "SPK-9 missing-CAS host refusal subset only",
+  "stateUnchanged": true
+}

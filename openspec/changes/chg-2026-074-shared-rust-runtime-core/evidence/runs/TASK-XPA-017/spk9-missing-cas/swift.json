@@ -1,0 +1,12 @@
+{
+  "archiveSHA256" : "0000000000000000000000000000000000000000000000000000000000000000",
+  "calls" : [
+    "controller.inspectArtifact"
+  ],
+  "daemonSHA256" : "0c42f6e7af2080a753fde595040601c27900bbc636d62b2a5f36cabb07e9e8b1",
+  "executionReady" : false,
+  "outcome" : "bundleNotInLaneStore",
+  "owner" : "swift",
+  "profileReference" : "org.openharmony.dayu200@1.0.0",
+  "refusalCode" : "ARTIFACT_NOT_FOUND"
+}

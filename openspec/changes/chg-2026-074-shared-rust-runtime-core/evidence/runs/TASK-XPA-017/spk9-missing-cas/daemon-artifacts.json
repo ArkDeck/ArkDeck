@@ -1,0 +1,67 @@
+[
+  {
+    "executable": null,
+    "features": [],
+    "filenames": [
+      "/private/tmp/arkforge-controller-materialization-target/debug/deps/libarkforged-821637564c0ae2b1.rlib",
+      "/private/tmp/arkforge-controller-materialization-target/debug/deps/libarkforged-821637564c0ae2b1.rmeta"
+    ],
+    "fresh": true,
+    "manifest_path": "/Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged/Cargo.toml",
+    "package_id": "path+file:///Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged#0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "lib"
+      ],
+      "doc": true,
+      "doctest": true,
+      "edition": "2024",
+      "kind": [
+        "lib"
+      ],
+      "name": "arkforged",
+      "src_path": "/Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged/src/lib.rs",
+      "test": true
+    }
+  },
+  {
+    "executable": "/private/tmp/arkforge-controller-materialization-target/debug/arkforged",
+    "features": [],
+    "filenames": [
+      "/private/tmp/arkforge-controller-materialization-target/debug/arkforged"
+    ],
+    "fresh": true,
+    "manifest_path": "/Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged/Cargo.toml",
+    "package_id": "path+file:///Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged#0.1.0",
+    "profile": {
+      "debug_assertions": true,
+      "debuginfo": 2,
+      "opt_level": "0",
+      "overflow_checks": true,
+      "test": false
+    },
+    "reason": "compiler-artifact",
+    "target": {
+      "crate_types": [
+        "bin"
+      ],
+      "doc": true,
+      "doctest": false,
+      "edition": "2024",
+      "kind": [
+        "bin"
+      ],
+      "name": "arkforged",
+      "src_path": "/Users/fuhanfeng/.cargo/git/checkouts/arkforge-2dee4a7784fc6b13/c1dc055/crates/arkforged/src/main.rs",
+      "test": true
+    }
+  }
+]

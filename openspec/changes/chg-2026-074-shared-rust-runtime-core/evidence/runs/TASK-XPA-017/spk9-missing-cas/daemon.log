@@ -1,0 +1,3 @@
+arkforged 0.1.0 listening: public=/private/tmp/as9-dsmrrqd6/public.sock controller=/private/tmp/as9-dsmrrqd6/controller.sock
+dispatch: native RockUSB port (TEST_UNIT_READY/READ_LBA/GPT/WRITE_LBA/DEVICE_RESET); arkforged-build-sha256=0c42f6e7af2080a753fde595040601c27900bbc636d62b2a5f36cabb07e9e8b1
+execution: not ready (NO_PAIRED_AUTHORITY)
