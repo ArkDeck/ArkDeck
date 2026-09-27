@@ -189,7 +189,6 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
-      CARGO_BUILD_JOBS: 2
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
