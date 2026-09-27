@@ -13,8 +13,8 @@
 //! control-action owner (`hdc_control_action.rs`), which previews and holds
 //! the actions and requests a restart's impact approval, and it hands the
 //! approvals to the human-action owner (`human_action.rs`); the
-//! tool-selection owner is not composed here, so a selection is unavailable
-//! before any parameter is read.
+//! tool-selection owner is composed alongside the registered HDC. Without
+//! that owner, selection stays unavailable before any parameter is read.
 use crate::agent_execution::ActionRow;
 use crate::control_action_value::digest;
 use crate::hdc_control_action::{HdcControlActions, ImpactSource};
@@ -56,7 +56,7 @@ fn hdc_owner_unavailable() -> WireError {
 /// The handler checks for its tool-selection owner before it reads any
 /// parameter, as for the lifecycle methods. Swift composes that owner only
 /// beside a started HDC server host, its impact source and the registry
-/// adapter; no composition here has one, with or without a managed server.
+/// adapter.
 fn tool_selection_owner_unavailable() -> WireError {
     refused(
         "operationUnavailable",
@@ -163,7 +163,7 @@ fn unknown_method() -> WireError {
 
 /// The union control-action owner, with its private pager directory, over
 /// the HDC control-action owner when the daemon's HDC server host started,
-/// and never over a tool-selection owner.
+/// and the tool-selection owner when the registered HDC is composed.
 pub struct ControlActionResources {
     /// Swift's `RuntimeSnapshotPager` over the owner's directory.
     pages: SnapshotPager,
@@ -172,6 +172,7 @@ pub struct ControlActionResources {
     gate: Mutex<()>,
     /// Swift's `hdc` owner.
     hdc: Option<HdcControlActions>,
+    tools: Option<crate::ToolSelectionActions>,
 }
 
 impl ControlActionResources {
@@ -182,6 +183,7 @@ impl ControlActionResources {
             pages: SnapshotPager::open_serialized(path)?,
             gate: Mutex::new(()),
             hdc: None,
+            tools: None,
         })
     }
 
@@ -192,6 +194,35 @@ impl ControlActionResources {
         self
     }
 
+    pub fn with_tools(mut self, tools: crate::ToolSelectionActions) -> Self {
+        self.tools = Some(tools);
+        self
+    }
+
+    /// Resolve a unique action owner, including when retained stores collide.
+    fn tool_owner(&self, id: &str) -> Result<bool, WireError> {
+        let hdc = self
+            .hdc
+            .as_ref()
+            .map(|h| h.list_records())
+            .transpose()?
+            .is_some_and(|rows| rows.iter().any(|r| r.id() == id));
+        let tool = self
+            .tools
+            .as_ref()
+            .map(|t| t.list_records())
+            .transpose()?
+            .is_some_and(|rows| rows.iter().any(|r| r.id() == id));
+        match (hdc, tool) {
+            (true, true) => Err(refused(
+                "recordUnreadable",
+                "control-action identity has multiple owners",
+            )),
+            (false, false) => Err(refused("resourceNotFound", "control action does not exist")),
+            _ => Ok(tool),
+        }
+    }
+
     /// Called only after the combined human-action owner resolved the exact
     /// approval and the transport proved a foreground console peer.
     pub fn issue_interactive_challenge(
@@ -200,14 +231,42 @@ impl ControlActionResources {
         reference: &str,
     ) -> Result<Value, WireError> {
         let _gate = self.gate.lock().map_err(|_| unreadable())?;
-        self.hdc
+        let mut rows = self
+            .hdc
             .as_ref()
-            .ok_or_else(hdc_owner_unavailable)?
-            .issue_interactive_challenge(action, reference)
+            .map(|h| h.human_action_rows(None))
+            .transpose()?
+            .unwrap_or_default();
+        rows.extend(
+            self.tools
+                .as_ref()
+                .map(|t| t.human_action_rows(None))
+                .transpose()?
+                .unwrap_or_default(),
+        );
+        let matches: Vec<_> = rows
+            .iter()
+            .filter(|r| r.id == action && r.value["resumeReference"] == reference)
+            .collect();
+        if matches.len() != 1 {
+            return Err(refused("resourceNotFound", "human action does not exist"));
+        }
+        let id = matches[0].value["owner"]["id"]
+            .as_str()
+            .ok_or_else(unreadable)?;
+        if self.tool_owner(id)? {
+            self.tools
+                .as_ref()
+                .ok_or_else(tool_selection_owner_unavailable)?
+                .issue_interactive_challenge(action, reference)
+        } else {
+            self.hdc
+                .as_ref()
+                .ok_or_else(hdc_owner_unavailable)?
+                .issue_interactive_challenge(action, reference)
+        }
     }
 
-    /// The Runtime supplies the driver and impact source after resolving the
-    /// unique approval owner. They are never deserialized from an RPC frame.
     pub fn consume_interactive_challenge(
         &self,
         action: &str,
@@ -217,11 +276,40 @@ impl ControlActionResources {
         source: &dyn ImpactSource,
         driver: &dyn crate::HdcLifecycleDriver,
     ) -> Result<Value, WireError> {
+        self.consume_with_drivers(action, reference, response, jobs, source, (driver, None))
+    }
+
+    /// These ports are supplied by the Runtime, never decoded from a frame.
+    pub fn consume_with_drivers(
+        &self,
+        action: &str,
+        reference: &str,
+        response: &str,
+        jobs: &crate::JobStore,
+        source: &dyn ImpactSource,
+        drivers: (
+            &dyn crate::HdcLifecycleDriver,
+            Option<&dyn crate::ToolSelectionDriver>,
+        ),
+    ) -> Result<Value, WireError> {
         let _gate = self.gate.lock().map_err(|_| unreadable())?;
-        self.hdc
-            .as_ref()
-            .ok_or_else(hdc_owner_unavailable)?
-            .consume_interactive_challenge(action, reference, response, jobs, source, driver)
+        if self.tool_owner(action)? {
+            let driver = drivers.1.ok_or_else(|| {
+                refused(
+                    "admissionDenied",
+                    "interactive tool selection is unavailable",
+                )
+            })?;
+            self.tools
+                .as_ref()
+                .ok_or_else(tool_selection_owner_unavailable)?
+                .consume_interactive_challenge(action, reference, response, jobs, source, driver)
+        } else {
+            self.hdc
+                .as_ref()
+                .ok_or_else(hdc_owner_unavailable)?
+                .consume_interactive_challenge(action, reference, response, jobs, source, drivers.0)
+        }
     }
 
     /// The handler's answer, with its checks in its order, over this owner.
@@ -252,21 +340,28 @@ impl ControlActionResources {
                 let _gate = self.gate.lock().map_err(|_| unreadable())?;
                 hdc.restart(id, preview, value, source)
             }
-            "runtime.tool.select" => Err(tool_selection_owner_unavailable()),
+            "runtime.tool.select" => {
+                let (Some(tools), Some(source)) = (&self.tools, source) else {
+                    return Err(tool_selection_owner_unavailable());
+                };
+                let _gate = self.gate.lock().map_err(|_| unreadable())?;
+                tools.select(params, source)
+            }
             "control-action.show" | "control-action.reconcile" => {
                 let id = exact_identity(params)?;
                 let _gate = self.gate.lock().map_err(|_| unreadable())?;
-                // Swift `actionOwner`: the one owner holding the identity.
-                let Some((hdc, source)) = hdc else {
-                    return Err(refused("resourceNotFound", "control action does not exist"));
-                };
-                if !hdc.list_records()?.iter().any(|record| record.id() == id) {
-                    return Err(refused("resourceNotFound", "control action does not exist"));
-                }
-                if method == "control-action.show" {
-                    hdc.show(id)
+                if self.tool_owner(id)? {
+                    self.tools
+                        .as_ref()
+                        .ok_or_else(tool_selection_owner_unavailable)?
+                        .show(id, source.ok_or_else(tool_selection_owner_unavailable)?)
                 } else {
-                    hdc.reconcile(id, source)
+                    let (hdc, source) = hdc.ok_or_else(hdc_owner_unavailable)?;
+                    if method == "control-action.show" {
+                        hdc.show(id)
+                    } else {
+                        hdc.reconcile(id, source)
+                    }
                 }
             }
             "control-action.list" => {
@@ -280,16 +375,26 @@ impl ControlActionResources {
 
     /// Swift's union `humanActionResourceRows`: the impact approvals its
     /// owners hold (only those of the action `owner` names, when given) —
-    /// the HDC owner's, since no tool-selection owner is composed.
+    /// both owners' approvals without refreshing their age.
     pub(crate) fn human_action_rows(
         &self,
         owner: Option<&str>,
     ) -> Result<Vec<ActionRow>, WireError> {
         let _gate = self.gate.lock().map_err(|_| unreadable())?;
-        match &self.hdc {
-            Some(hdc) => hdc.human_action_rows(owner),
-            None => Ok(Vec::new()),
-        }
+        let mut rows = self
+            .hdc
+            .as_ref()
+            .map(|h| h.human_action_rows(owner))
+            .transpose()?
+            .unwrap_or_default();
+        rows.extend(
+            self.tools
+                .as_ref()
+                .map(|t| t.human_action_rows(owner))
+                .transpose()?
+                .unwrap_or_default(),
+        );
+        Ok(rows)
     }
 
     /// Swift's union `list`: its filter check, then every action the owners
@@ -322,6 +427,14 @@ impl ControlActionResources {
                 .is_none_or(|kind| kind == "hdcLifecycle")
         {
             values.extend(hdc.list_records()?.iter().map(|record| record.projection()));
+        }
+        if let Some(tools) = &self.tools
+            && request
+                .filters
+                .get("kind")
+                .is_none_or(|kind| kind == "runtimeToolSelection")
+        {
+            values.extend(tools.list_records()?.iter().map(|r| r.projection()));
         }
         if let Some(state) = request.filters.get("state") {
             values.retain(|value| value.get("state") == Some(state));

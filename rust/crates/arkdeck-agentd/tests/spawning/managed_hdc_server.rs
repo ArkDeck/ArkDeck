@@ -908,3 +908,431 @@ fn an_unrelated_server_in_the_replacements_place_is_neither_stopped_nor_inherite
     );
     unrelated.stop().unwrap();
 }
+
+/// Two distinct native fixture executables exercise the selected-tool path,
+/// the real private registry ledger and restart settlement. No installed HDC.
+#[test]
+fn selected_tool_stays_frozen_until_a_new_graph_verifies_and_publishes_it() {
+    use arkdeck_contract::WireError;
+    use arkdeck_hoststore::{
+        DurableSelectionOutcome, OwnerContext, SelectionCandidate, StartupSelection,
+        ToolRegistryStore, ToolSelectionActions, ToolSelectionRegistry,
+    };
+    use serde_json::json;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    struct Registry(ToolRegistryStore, bool);
+    impl ToolSelectionRegistry for Registry {
+        fn candidate(
+            &self,
+            tool: &str,
+            generation: u64,
+            pending: Option<&str>,
+        ) -> Result<SelectionCandidate, WireError> {
+            ToolSelectionRegistry::candidate(&self.0, tool, generation, pending)
+        }
+        fn prepare(
+            &self,
+            action: &str,
+            tool: &str,
+            generation: u64,
+        ) -> Result<StartupSelection, WireError> {
+            ToolSelectionRegistry::prepare(&self.0, action, tool, generation)
+        }
+        fn fail(&self, action: &str, reason: &str) -> Result<(), WireError> {
+            if self.1 {
+                Err(WireError {
+                    code: "recordUnreadable".into(),
+                    message: "fixture fail write refused".into(),
+                    details: None,
+                })
+            } else {
+                ToolSelectionRegistry::fail(&self.0, action, reason)
+            }
+        }
+        fn outcome(&self, action: &str) -> Result<DurableSelectionOutcome, WireError> {
+            self.0.selection_outcome(action)
+        }
+        fn acknowledge(&self, action: &str) -> Result<(), WireError> {
+            self.0.acknowledge_selection_outcome(action)
+        }
+    }
+    struct BeforeLaunchFailure;
+    impl arkdeck_hoststore::ToolSelectionDriver for BeforeLaunchFailure {
+        fn restart_selected(
+            &self,
+            _: &StartupSelection,
+            _: &arkdeck_hoststore::ImpactReading,
+            _: &arkdeck_hoststore::ToolSelectionAudit<'_>,
+        ) -> Result<(), WireError> {
+            Err(WireError {
+                code: "admissionDenied".into(),
+                message: "fixture failed before launch".into(),
+                details: None,
+            })
+        }
+    }
+    let _turn = crate::turn();
+    for (lose_identity, fail_before_launch) in [(false, false), (true, false), (false, true)] {
+        let (fake, old_source) = fake_options(true, false);
+        let new_source = fake.0.join("new-hdc");
+        let source = fake.0.join("new-hdc.c");
+        // A retained executable restarts its own inode, not its original
+        // registration source; both fixtures share only their private marker.
+        let code = FAKE_HDC
+            .replace("(char *)SELF_PATH", "argv[0]")
+            .replace("execv(SELF_PATH, args)", "execv(argv[0], args)")
+            + "\nconst char selected_fixture_variant[] = \"selected HDC\";\n";
+        std::fs::write(&source, code).unwrap();
+        let compiled = std::process::Command::new("cc")
+            .args(["-O0", "-o"])
+            .arg(&new_source)
+            .arg(&source)
+            .arg(format!("-DRESTART_DIR=\"{}\"", fake.0.display()))
+            .arg(format!("-DSELF_PATH=\"{}\"", new_source.display()))
+            .arg(format!("-DRECORD_CALLS=\"{}/calls\"", fake.0.display()))
+            .arg(format!("-DOWNER_PID={}", std::process::id()))
+            .output()
+            .unwrap();
+        assert!(compiled.status.success(), "{compiled:?}");
+        let new_hash = arkdeck_contract::sha256_hex(&std::fs::read(&new_source).unwrap());
+        let hashes = [old_source.sha256().to_owned(), new_hash.clone()];
+        assert_ne!(hashes[0], hashes[1]);
+        let identities: arkdeck_hoststore::PublishedIdentities = Arc::new(move |hash| {
+            hashes
+                .iter()
+                .any(|h| h == hash)
+                .then(|| json!({"version":"3.2.0d","profileReferences":["fixture-hdc"]}))
+        });
+        let registry_path = fake.0.join("registry");
+        let registry = ToolRegistryStore::open_or_create(&registry_path)
+            .unwrap()
+            .with_published_identities(identities.clone());
+        registry
+            .adopt_installed_hdc(old_source.path(), "2026-09-27T00:00:00Z")
+            .unwrap();
+        let new = registry
+            .register(&new_source, "2026-09-27T00:00:00Z")
+            .unwrap();
+        let initial = registry.startup_selection().unwrap().unwrap();
+        let old = VerifiedTool::open(&initial.executable, &initial.executable_sha256).unwrap();
+        let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+        let managed = Launched::new(daemon_start(&old, endpoint).unwrap());
+        let h = managed.server();
+        let state = h.state(h.endpoint()).unwrap();
+        let source=Impacts(arkdeck_hoststore::ImpactReading {impact:arkdeck_hoststore::Impact::new(json!({
+            "serverEndpointRef":arkdeck_provider_hdc::server_endpoint_ref(h.endpoint()),"endpoint":h.endpoint(),"serverOwnership":"arkDeckManaged",
+            "serverGeneration":state.generation.to_string(),"serverHealth":"healthy","serverVersion":"3.2.0d",
+            "tool":{"reference":null,"executablePath":old.path(),"source":"runtimeConfiguration","sha256":old.sha256(),"signature":null,"version":"3.2.0d","trust":"unverified"},
+            "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],"otherClientsMayExist":true,"affectedDeviceObservations":[],
+            "criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},"interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},
+            "recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+        }).as_object().unwrap().clone()).unwrap(),relations:vec![],blocker:None});
+        let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
+        root.private_child("selection-actions").unwrap();
+        root.private_child("selection-jobs").unwrap();
+        let clock = Arc::new(AtomicU64::new(1_800_000_000_000));
+        let now = clock.clone();
+        let mut context = OwnerContext::production().unwrap();
+        context.clock = Box::new(move || Some(now.load(Ordering::SeqCst)));
+        let owner = ToolSelectionActions::open(
+            &fake.0.join("selection-actions"),
+            context,
+            Box::new(Registry(registry, fail_before_launch)),
+        )
+        .unwrap();
+        let jobs = arkdeck_hoststore::JobStore::open_owner(&fake.0.join("selection-jobs")).unwrap();
+        let row=owner.select(json!({"actionRequestId":"select-new","tool":new["toolRef"],"expectedActiveGeneration":"1"}).as_object().unwrap(),&source).unwrap();
+        assert_eq!(row["state"], "awaitingImpactApproval", "{row}");
+        let id = row["controlActionId"].as_str().unwrap();
+        let human = &row["humanAction"];
+        let reference = human["resumeReference"].as_str().unwrap();
+        let challenge = owner
+            .issue_interactive_challenge(human["actionId"].as_str().unwrap(), reference)
+            .unwrap();
+        let result = owner.consume_interactive_challenge(
+            id,
+            reference,
+            challenge["challenge"].as_str().unwrap(),
+            &jobs,
+            &source,
+            if fail_before_launch {
+                &BeforeLaunchFailure
+            } else {
+                h.as_ref()
+            },
+        );
+        if fail_before_launch {
+            assert_eq!(result.unwrap_err().code, "recordUnreadable");
+            clock.fetch_add(600_000, Ordering::SeqCst);
+            assert_eq!(
+                owner.show(id, &source).unwrap()["state"],
+                "dispatchPrepared"
+            );
+            assert_eq!(owner.list_records().unwrap()[0].state(), "dispatchPrepared");
+            let registry = ToolRegistryStore::open_existing(&registry_path)
+                .unwrap()
+                .with_published_identities(identities);
+            let pending = registry.startup_selection().unwrap().unwrap();
+            let records = arkdeck_hoststore::ToolSelectionRecords::open(
+                &fake.0.join("selection-actions/records"),
+            )
+            .unwrap();
+            let recovered = crate::tool_selection_startup::recover_prelaunch(
+                &registry,
+                &records,
+                pending,
+                clock.load(Ordering::SeqCst),
+            )
+            .unwrap();
+            assert_eq!(recovered.tool_ref, initial.tool_ref);
+            assert!(recovered.pending_action_id.is_none());
+            assert_eq!(records.load(id).unwrap().unwrap().state(), "failed");
+            assert_eq!(
+                records.load(id).unwrap().unwrap().value()["dispatchCount"],
+                0
+            );
+            assert_eq!(
+                registry.selection_outcome(id).unwrap(),
+                DurableSelectionOutcome::Absent
+            );
+            assert!(!h.requires_recomposition());
+            assert!(managed.stop().unwrap().server.is_ok());
+            let mut starts = vec![];
+            let (next, _) = crate::tool_selection_startup::start_and_settle(
+                &registry,
+                recovered,
+                |selection| {
+                    starts.push(selection.tool_ref.clone());
+                    let tool =
+                        VerifiedTool::open(&selection.executable, &selection.executable_sha256)
+                            .map_err(|e| e.to_string())?;
+                    daemon_start(&tool, endpoint).map(Launched::new)
+                },
+            )
+            .unwrap();
+            assert_eq!(starts, [initial.tool_ref]);
+            assert!(next.stop().unwrap().server.is_ok());
+            let calls = std::fs::read_to_string(fake.0.join("calls")).unwrap();
+            assert!(
+                !calls.contains("kill -r"),
+                "no selected-tool launch: {calls}"
+            );
+            continue;
+        }
+        let result = result.unwrap();
+        assert_eq!(result["state"], "outcomeUnknown", "{result}");
+        assert_eq!(result["dispatchCount"], 1);
+        assert!(h.requires_recomposition());
+        assert!(jobs.acquire_hdc_lifecycle_interlock().is_err());
+        let dispatch = DevelopmentHdc::new(
+            ProcessDispatch::new(
+                VerifiedTool::open(old.path(), old.sha256()).unwrap(),
+                Some(&endpoint.port().to_string()),
+            ),
+            Some(Arc::clone(h)),
+        );
+        assert!(
+            dispatch.dispatch(&plan()).is_err(),
+            "old provider graph cannot dispatch through the new executable"
+        );
+        let registry = ToolRegistryStore::open_existing(&registry_path)
+            .unwrap()
+            .with_published_identities(identities);
+        let pending = registry.startup_selection().unwrap().unwrap();
+        assert_eq!(pending.pending_action_id.as_deref(), Some(id));
+        let selected = VerifiedTool::open(&pending.executable, &pending.executable_sha256).unwrap();
+        let replacement = LoopbackServerLease::acquire(&selected, endpoint).unwrap();
+        if lose_identity {
+            // No automatic stop when the retained executable no longer proves
+            // the selected process. Fixture cleanup owns this fake separately.
+            std::fs::rename(
+                &pending.executable,
+                pending.executable.with_extension("moved"),
+            )
+            .unwrap();
+            let stopped = managed.stop().unwrap();
+            assert!(matches!(stopped.replacement, ReplacementStop::Unproved(_)));
+            assert!(
+                reachable(endpoint),
+                "an unproved replacement must not be terminated"
+            );
+            continue;
+        }
+        let stopped = managed.stop().unwrap();
+        assert_eq!(stopped.replacement, ReplacementStop::Ended);
+        assert!(!reachable(endpoint));
+        assert!(replacement.revalidate().is_err());
+        let (next, active) =
+            crate::tool_selection_startup::start_and_settle(&registry, pending, |selection| {
+                let tool = VerifiedTool::open(&selection.executable, &selection.executable_sha256)
+                    .map_err(|e| e.to_string())?;
+                daemon_start(&tool, endpoint).map(Launched::new)
+            })
+            .unwrap();
+        assert_eq!(active.tool_ref, new["toolRef"].as_str().unwrap());
+        assert!(matches!(
+            registry.selection_outcome(id).unwrap(),
+            DurableSelectionOutcome::Succeeded {
+                active_generation: 2,
+                ..
+            }
+        ));
+        assert_eq!(owner.show(id, &source).unwrap()["state"], "succeeded");
+        assert!(matches!(
+            registry.selection_outcome(id).unwrap(),
+            DurableSelectionOutcome::Absent
+        ));
+        assert!(next.stop().unwrap().server.is_ok());
+        let calls = std::fs::read_to_string(fake.0.join("calls")).unwrap();
+        assert_eq!(
+            calls
+                .lines()
+                .filter(|line| line.contains("kill -r"))
+                .count(),
+            1,
+            "no replay: {calls}"
+        );
+    }
+}
+
+#[test]
+fn selection_cleanup_uses_selected_inode_even_when_executable_sha_is_unchanged() {
+    use arkdeck_contract::WireError;
+    use arkdeck_hoststore::{
+        DurableSelectionOutcome, OwnerContext, SelectionCandidate, SelectionSnapshot,
+        StartupSelection, ToolSelectionActions, ToolSelectionRegistry,
+    };
+    use serde_json::json;
+    let _turn = crate::turn();
+    let (fake, _) = fake_options(true, false);
+    let old_path = fake.0.join("hdc");
+    let code = FAKE_HDC
+        .replace("(char *)SELF_PATH", "argv[0]")
+        .replace("execv(SELF_PATH, args)", "execv(argv[0], args)");
+    std::fs::write(fake.0.join("fake-hdc.c"), code).unwrap();
+    let compiled = std::process::Command::new("cc")
+        .args(["-O0", "-o"])
+        .arg(&old_path)
+        .arg(fake.0.join("fake-hdc.c"))
+        .arg(format!("-DRESTART_DIR=\"{}\"", fake.0.display()))
+        .arg(format!("-DSELF_PATH=\"{}\"", old_path.display()))
+        .arg(format!("-DRECORD_CALLS=\"{}/calls\"", fake.0.display()))
+        .arg(format!("-DOWNER_PID={}", std::process::id()))
+        .output()
+        .unwrap();
+    assert!(compiled.status.success(), "{compiled:?}");
+    let new_path = fake.0.join("same-sha-different-inode");
+    std::fs::copy(&old_path, &new_path).unwrap();
+    use std::os::unix::fs::MetadataExt;
+    assert_ne!(
+        std::fs::metadata(&old_path).unwrap().ino(),
+        std::fs::metadata(&new_path).unwrap().ino()
+    );
+    let hash = arkdeck_contract::sha256_hex(&std::fs::read(&old_path).unwrap());
+    let tool = VerifiedTool::open(&old_path, &hash).unwrap();
+    let selected = VerifiedTool::open(&new_path, &hash).unwrap();
+    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+    let managed = Launched::new(daemon_start(&tool, endpoint).unwrap());
+    let h = managed.server();
+    // Scripted registry facts isolate executable identity from content identity:
+    // distinct registered tool content may retain the same executable bytes.
+    struct Registry {
+        hash: String,
+        path: PathBuf,
+    }
+    impl Registry {
+        fn row(&self, c: char) -> Value {
+            json!({"schemaVersion":"arkdeck.runtime-tool/1","kind":"hdc","platform":"macos","toolRef":format!("tool:sha256:{}",c.to_string().repeat(64)),
+        "generation":"1","contentDigest":c.to_string().repeat(64),"executableSHA256":self.hash,
+        "trust":{"policy":"arkdeck.host-tool-inspection/1","registeredIdentity":true,"signature":"adHoc","toolVersion":"3.2.0d","profileReferences":[]}})
+        }
+    }
+    impl ToolSelectionRegistry for Registry {
+        fn candidate(
+            &self,
+            _: &str,
+            _: u64,
+            _: Option<&str>,
+        ) -> Result<SelectionCandidate, WireError> {
+            Ok(SelectionCandidate {
+                selection: SelectionSnapshot {
+                    active_tool_ref: self.row('a')["toolRef"].as_str().unwrap().into(),
+                    active_generation: 1,
+                    active_tool: self.row('a'),
+                    pending_action_id: None,
+                    pending_tool_ref: None,
+                },
+                new_tool: self.row('b'),
+            })
+        }
+        fn prepare(
+            &self,
+            action: &str,
+            tool: &str,
+            generation: u64,
+        ) -> Result<StartupSelection, WireError> {
+            Ok(StartupSelection {
+                tool_ref: tool.into(),
+                active_generation: generation,
+                pending_action_id: Some(action.into()),
+                executable: self.path.clone(),
+                executable_sha256: self.hash.clone(),
+                dependencies: vec![],
+            })
+        }
+        fn fail(&self, _: &str, _: &str) -> Result<(), WireError> {
+            Ok(())
+        }
+        fn outcome(&self, _: &str) -> Result<DurableSelectionOutcome, WireError> {
+            Ok(DurableSelectionOutcome::Pending)
+        }
+        fn acknowledge(&self, _: &str) -> Result<(), WireError> {
+            Ok(())
+        }
+    }
+    let state = h.state(h.endpoint()).unwrap();
+    let source=Impacts(arkdeck_hoststore::ImpactReading {impact:arkdeck_hoststore::Impact::new(json!({
+        "serverEndpointRef":arkdeck_provider_hdc::server_endpoint_ref(h.endpoint()),"endpoint":h.endpoint(),"serverOwnership":"arkDeckManaged","serverGeneration":state.generation.to_string(),"serverHealth":"healthy","serverVersion":"3.2.0d",
+        "tool":{"reference":null,"executablePath":tool.path(),"source":"runtimeConfiguration","sha256":hash,"signature":null,"version":"3.2.0d","trust":"unverified"},
+        "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],"otherClientsMayExist":true,"affectedDeviceObservations":[],"criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},
+        "interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},"recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+    }).as_object().unwrap().clone()).unwrap(),relations:vec![],blocker:None});
+    let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
+    root.private_child("selection").unwrap();
+    root.private_child("jobs").unwrap();
+    let owner = ToolSelectionActions::open(
+        &fake.0.join("selection"),
+        OwnerContext::production().unwrap(),
+        Box::new(Registry {
+            hash,
+            path: new_path,
+        }),
+    )
+    .unwrap();
+    let jobs = arkdeck_hoststore::JobStore::open_owner(&fake.0.join("jobs")).unwrap();
+    let row=owner.select(json!({"actionRequestId":"same-hash","tool":format!("tool:sha256:{}","b".repeat(64)),"expectedActiveGeneration":"1"}).as_object().unwrap(),&source).unwrap();
+    let human = &row["humanAction"];
+    let reference = human["resumeReference"].as_str().unwrap();
+    let c = owner
+        .issue_interactive_challenge(human["actionId"].as_str().unwrap(), reference)
+        .unwrap();
+    let result = owner
+        .consume_interactive_challenge(
+            row["controlActionId"].as_str().unwrap(),
+            reference,
+            c["challenge"].as_str().unwrap(),
+            &jobs,
+            &source,
+            h.as_ref(),
+        )
+        .unwrap();
+    assert_eq!(result["state"], "outcomeUnknown");
+    let replacement = LoopbackServerLease::acquire(&selected, endpoint).unwrap();
+    assert!(
+        LoopbackServerLease::acquire(&tool, endpoint).is_err(),
+        "the old inode must not identify the replacement"
+    );
+    assert_eq!(managed.stop().unwrap().replacement, ReplacementStop::Ended);
+    assert!(replacement.revalidate().is_err());
+    assert!(!reachable(endpoint));
+}

@@ -51,6 +51,7 @@ pub struct JobStore {
     /// Readers cover final admission; a lifecycle exclusively freezes the
     /// participant inventory. Acquisition never waits behind a lifecycle.
     hdc_lifecycle: std::sync::RwLock<()>,
+    hdc_recomposition: std::sync::atomic::AtomicBool,
     /// Swift's resident runtime records that are ahead of their durable
     /// record: a `job.reconcile` that failed after its journal moved keeps
     /// what it had journaled in memory, never on disk. Every read of the Job
@@ -70,6 +71,16 @@ const RECORD_BOUND: usize = 16 * 1024 * 1024;
 #[must_use = "keep the interlock until the lifecycle outcome or recovery is durable"]
 pub struct HdcLifecycleInterlock<'a> {
     _guard: std::sync::RwLockWriteGuard<'a, ()>,
+    recomposition: &'a std::sync::atomic::AtomicBool,
+}
+
+impl HdcLifecycleInterlock<'_> {
+    /// A selected executable requires a new provider graph. This latch has
+    /// no reset in this process; dropping the borrowed lock cannot reopen it.
+    pub fn retain_until_restart(&self) {
+        self.recomposition
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
 }
 
 pub(crate) struct JobAdmissionInterlock<'a> {
@@ -124,6 +135,15 @@ impl JobStore {
                 "the HDC lifecycle interlock is unavailable",
             ),
         })?;
+        if self
+            .hdc_recomposition
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return Err(failure(
+                "resourceConflict",
+                "HDC tool selection requires Runtime recomposition before new Job admission",
+            ));
+        }
         Ok(JobAdmissionInterlock {
             jobs: self,
             _guard: guard,
@@ -147,13 +167,25 @@ impl JobStore {
                     "the HDC lifecycle interlock is unavailable",
                 ),
             })?;
+        if self
+            .hdc_recomposition
+            .load(std::sync::atomic::Ordering::Acquire)
+        {
+            return Err(failure(
+                "resourceConflict",
+                "HDC tool selection requires Runtime recomposition before another lifecycle action",
+            ));
+        }
         if !self.current_jobs()?.is_empty() {
             return Err(failure(
                 "factsDrifted",
                 "current Runtime Jobs block the HDC lifecycle action",
             ));
         }
-        Ok(HdcLifecycleInterlock { _guard: guard })
+        Ok(HdcLifecycleInterlock {
+            _guard: guard,
+            recomposition: &self.hdc_recomposition,
+        })
     }
 
     pub fn open(path: &Path) -> io::Result<Self> {
@@ -191,6 +223,7 @@ impl JobStore {
             root,
             activity: std::sync::Mutex::new(()),
             hdc_lifecycle: std::sync::RwLock::new(()),
+            hdc_recomposition: std::sync::atomic::AtomicBool::new(false),
             resident: Default::default(),
             session_verdicts: Default::default(),
         })

@@ -12,8 +12,8 @@
 //! Each transition takes its instant and the random identities Swift draws
 //! (`UUID()` for the action, preview, approval, challenge and receipt) from its
 //! caller, so a Swift record's timeline can be played again exactly. The
-//! owner that observes the impact, asks the registry and drives the lifecycle
-//! is not here: it needs the HDC restart (C2).
+//! companion owner observes impact, consults the registry and drives the
+//! identity-bound HDC lifecycle through the shared control-action surface.
 use crate::control_action::{identifier, refused};
 use crate::control_action_approval::{ImpactApproval, InteractionChallenge, InteractionReceipt};
 use crate::control_action_store::{ActionStore, StoredAction};
@@ -26,6 +26,12 @@ use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
 use std::io;
 use std::path::Path;
+
+#[path = "tool_selection_owner.rs"]
+mod owner;
+pub use owner::{
+    ToolSelectionActions, ToolSelectionAudit, ToolSelectionDriver, ToolSelectionRegistry,
+};
 
 /// An action's life: `expiresAt` is `createdAt` plus 300 s.
 const LIFETIME_MS: u64 = 300_000;

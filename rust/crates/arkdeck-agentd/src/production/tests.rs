@@ -308,7 +308,7 @@ fn base64(text: &str) -> Vec<u8> {
 }
 
 #[test]
-fn the_registry_adopts_the_configured_hdc_once_and_a_pending_selection_refuses() {
+fn the_registry_adopts_once_and_returns_pending_selection_for_durable_startup_checks() {
     let home = Home::new();
     let layout = home.layout();
     fs::DirBuilder::new()
@@ -352,13 +352,30 @@ fn the_registry_adopts_the_configured_hdc_once_and_a_pending_selection_refuses()
             .tool_ref,
         tools.references["a"]
     );
-    // A pending selection refuses the start and is left as it is.
+    // A pending selection is handed to startup with its exact identity. A
+    // missing durable control action still refuses before any server start.
     registry.register(&tools.paths["b"], now).unwrap();
     registry
         .prepare_selection("select-b", &tools.references["b"], "1")
         .unwrap();
-    let refused = registered_hdc(&registry, &tools.paths["a"], now).unwrap_err();
-    assert!(refused.contains("select-b is pending"), "{refused}");
+    let pending = registered_hdc(&registry, &tools.paths["a"], now).unwrap();
+    assert_eq!(pending.tool_ref, tools.references["b"]);
+    assert_eq!(pending.active_generation, 1);
+    assert_eq!(pending.pending_action_id.as_deref(), Some("select-b"));
+    let records = home.0.join("selection-records");
+    fs::DirBuilder::new().mode(0o700).create(&records).unwrap();
+    let records = arkdeck_hoststore::ToolSelectionRecords::open(&records).unwrap();
+    let refused = crate::tool_selection_startup::recover_prelaunch(
+        &registry,
+        &records,
+        pending,
+        1_800_000_000_000,
+    )
+    .unwrap_err();
+    assert!(
+        refused.contains("lost its durable control action"),
+        "{refused}"
+    );
     assert_eq!(
         registry
             .startup_selection()

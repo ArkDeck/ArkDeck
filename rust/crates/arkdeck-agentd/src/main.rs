@@ -55,6 +55,10 @@ mod managed_hdc;
 mod operation_availability_control;
 #[cfg(target_os = "macos")]
 mod production;
+#[cfg(target_os = "macos")]
+mod tool_selection_startup;
+#[cfg(all(test, target_os = "macos"))]
+mod tool_selection_startup_tests;
 #[cfg(all(test, target_os = "macos"))]
 mod workspace_project_control;
 
@@ -871,6 +875,12 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(arkforge) = &arkforge {
             arkforge.stop();
         }
+        #[cfg(target_os = "macos")]
+        let recompose = managed_hdc
+            .as_ref()
+            .is_some_and(|h| h.server().requires_recomposition());
+        #[cfg(not(target_os = "macos"))]
+        let recompose = false;
         // Swift stops its HDC host next. Unlike Swift, which lets go of its
         // instance lock at the end of the drain, the transport directory and
         // every store stay owned until the process ends, so a successor never
@@ -886,7 +896,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!("arkdeck-agentd stopped");
         let _ = io::stdout().flush();
-        std::process::exit(0);
+        std::process::exit(if recompose { 70 } else { 0 });
     }
     #[cfg(not(unix))]
     unreachable!("only a stop request ends accepting");

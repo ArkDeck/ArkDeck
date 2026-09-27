@@ -72,7 +72,7 @@ fn outcome(value: &Value) -> bool {
             _ => false,
         }
 }
-fn valid_payload(kind: &str, p: &Value) -> bool {
+pub(crate) fn valid_payload(kind: &str, p: &Value) -> bool {
     let Some(f) = p.as_object() else {
         return false;
     };

@@ -178,7 +178,8 @@ pub use hdc_control_action::{
 mod tool_selection;
 #[cfg(target_os = "macos")]
 pub use tool_selection::{
-    SelectionImpact, ToolFacts, ToolSelectionIntent, ToolSelectionRecord, ToolSelectionRecords,
+    SelectionImpact, ToolFacts, ToolSelectionActions, ToolSelectionAudit, ToolSelectionDriver,
+    ToolSelectionIntent, ToolSelectionRecord, ToolSelectionRecords, ToolSelectionRegistry,
 };
 #[cfg(target_os = "macos")]
 mod hdc_impact_source;
