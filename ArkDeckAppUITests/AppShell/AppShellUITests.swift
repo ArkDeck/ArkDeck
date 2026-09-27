@@ -477,7 +477,7 @@ final class AppShellUITests: XCTestCase {
   func testDebugAvailabilityAtMinimumWindowInBothLanguages() throws {
     guard ProcessInfo.processInfo.environment["ARKDECK_REAL_RUNTIME_DEBUG_READONLY_ACCEPTANCE"] == "1"
     else {
-      throw XCTSkip("Debug availability reads the installed Runtime; explicit read-only acceptance required")
+      throw XCTSkip("Select installed Debug integration only with a compatible Runtime and target; fixture-only run")
     }
     for language in ["(en)", "(zh-Hans)"] {
       let app = launch(arguments: [
