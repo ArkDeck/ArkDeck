@@ -469,7 +469,19 @@ impl JobRecord {
                         .ok_or_else(|| unreadable(()))?;
                     let expected =
                         crate::job_plan::step_set_digest(descriptor, inputs).map_err(unreadable)?;
-                    if correlation["stepSetDigestSHA256"] != expected {
+                    // Swift #1773 added compensation lines without changing
+                    // the Catalog digest. Earlier terminal records retain the
+                    // exact normal-step digest. Reading one grants no replay
+                    // or compensation authority; uncertain/active records
+                    // still require the complete current digest.
+                    if correlation["stepSetDigestSHA256"] != expected
+                        && !(terminal(&self.state)
+                            && !self.unknown
+                            && correlation["stepSetDigestSHA256"]
+                                == crate::job_plan::historical_hap_step_set_digest(
+                                    descriptor, inputs,
+                                ))
+                    {
                         return Err(unreadable(()));
                     }
                 }
@@ -1070,6 +1082,81 @@ mod mutation_provenance_tests {
 #[cfg(test)]
 mod hap_provenance_tests {
     use super::*;
+
+    #[test]
+    fn terminal_hap_before_compensation_digest_can_be_read_without_upgrading_it() {
+        let mut record: Value = serde_json::from_slice(include_bytes!(
+            "../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json"
+        )).unwrap();
+        // The exact fourteen normal steps in the pre-#1773 Swift producer.
+        // Independently matched to the 2026-09-07 historical failed HAP Job;
+        // use the existing fake-HDC fixture, never copy local authority data.
+        const HISTORICAL: &str = "e498f179320e17d223c85768dabed4a5d8719768b55ecf2ce8e70c1f83f9ac44";
+        record["admissionEvidence"]["runtimeCapabilityCorrelation"]["stepSetDigestSHA256"] =
+            json!(HISTORICAL);
+        assert_eq!(record["state"], "failed");
+        assert_eq!(record["outcomeUnknown"], false);
+        let bytes = serde_json::to_vec(&record).unwrap();
+        let decoded = JobRecord::decode(&bytes).expect("exact old terminal provenance");
+        assert_eq!(
+            decoded.value().unwrap(),
+            record,
+            "no authority, outcome or digest migration"
+        );
+
+        for state in STATES.iter().filter(|state| !terminal(state)) {
+            let mut active = record.clone();
+            active["state"] = json!(state);
+            assert!(
+                JobRecord::decode(&serde_json::to_vec(&active).unwrap()).is_err(),
+                "{state}"
+            );
+        }
+        for state in STATES.iter().filter(|state| terminal(state)) {
+            let mut unknown = record.clone();
+            unknown["state"] = json!(state);
+            unknown["outcomeUnknown"] = json!(true);
+            assert!(
+                JobRecord::decode(&serde_json::to_vec(&unknown).unwrap()).is_err(),
+                "unknown {state}"
+            );
+        }
+        for digest in ["0".repeat(64), "f".repeat(64), "malformed".into()] {
+            let mut wrong = record.clone();
+            wrong["admissionEvidence"]["runtimeCapabilityCorrelation"]["stepSetDigestSHA256"] =
+                json!(digest);
+            assert!(JobRecord::decode(&serde_json::to_vec(&wrong).unwrap()).is_err());
+        }
+        for (input, value) in [
+            ("captureDiagnostics", json!(false)),
+            ("cleanupPolicy", json!("retain")),
+            ("postRunAbilityState", json!("running")),
+        ] {
+            let mut changed_selection = record.clone();
+            changed_selection["request"]["inputs"][input] = value;
+            assert!(
+                JobRecord::decode(&serde_json::to_vec(&changed_selection).unwrap()).is_err(),
+                "old digest must still match exact selection: {input}"
+            );
+        }
+        for field in [
+            "reservationID",
+            "planDigestSHA256",
+            "targetBindingDigestSHA256",
+            "artifactSHA256",
+        ] {
+            let mut wrong = record.clone();
+            wrong["admissionEvidence"]["runtimeCapabilityCorrelation"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(
+                JobRecord::decode(&serde_json::to_vec(&wrong).unwrap()).is_err(),
+                "{field}"
+            );
+        }
+    }
+
     #[test]
     fn reopening_native_hap_rejects_missing_artifact_and_changed_step_correlation() {
         let bytes = include_bytes!(
