@@ -24,6 +24,7 @@ regeneration or cannot be read.
 from __future__ import annotations
 
 import importlib.util
+import os
 import pathlib
 import subprocess
 import sys
@@ -51,8 +52,11 @@ def main(run=subprocess.run, generator=None) -> int:
             file=sys.stderr,
         )
         return 1
+    command = ("cargo", "test", "--workspace", "--no-fail-fast")
+    if os.environ.get("ARKDECK_RUST_TEST_WORKERS") == "2":
+        command = (sys.executable, str(REPO_ROOT / "rust/scripts/run-workspace-tests.py"))
     return run(
-        ("cargo", "test", "--workspace", "--no-fail-fast"),
+        command,
         cwd=REPO_ROOT / "rust",
         check=False,
     ).returncode

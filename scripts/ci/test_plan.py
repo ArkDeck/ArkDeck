@@ -571,6 +571,7 @@ class CommandSelectionTests(unittest.TestCase):
         )
         self.assertLess(generator, commands.index("cargo fmt --all --check"))
         regressions = commands.index(f"{sys.executable} rust/scripts/test_contract_checks.py")
+        execution_regressions = commands.index(f"{sys.executable} rust/scripts/test_ci_execution.py")
         parity = commands.index(f"{sys.executable} rust/scripts/check-contracts.py")
         fetch = commands.index("cargo fetch --locked")
         clippy = commands.index("cargo clippy --workspace --all-targets -- -D warnings")
@@ -580,7 +581,8 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertLess(fetch, clippy)
         self.assertLess(clippy, workspace_tests)
         self.assertLess(workspace_tests, regressions)
-        self.assertLess(regressions, parity)
+        self.assertLess(regressions, execution_regressions)
+        self.assertLess(execution_regressions, parity)
         self.assertLess(parity, commands.index("cargo deny --locked check"))
         self.assertNotIn(f"{sys.executable} rust/scripts/check-readonly.py", commands)
         self.assertNotIn("xcodebuild", "\n".join(commands))
@@ -599,6 +601,7 @@ class CommandSelectionTests(unittest.TestCase):
     def test_contract_or_dependency_policy_failure_cannot_pass_local_gate(self):
         for command in (
             (sys.executable, "rust/scripts/test_contract_checks.py"),
+            (sys.executable, "rust/scripts/test_ci_execution.py"),
             (sys.executable, "rust/scripts/check-contracts.py"),
             ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
             (sys.executable, "rust/scripts/workspace-tests.py"),

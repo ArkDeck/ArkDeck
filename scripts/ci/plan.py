@@ -585,6 +585,7 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
                 (sys.executable, "rust/scripts/workspace-tests.py"),
                 (sys.executable, "rust/scripts/test_contract_checks.py"),
+                (sys.executable, "rust/scripts/test_ci_execution.py"),
                 (sys.executable, "rust/scripts/check-contracts.py"),
                 ("cargo", "deny", "--locked", "check"),
                 ("cargo", "vet", "--locked", "--no-registry-suggestions"),

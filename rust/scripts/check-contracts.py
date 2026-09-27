@@ -2,7 +2,7 @@
 """Run equal Rust conformance checks on published and candidate Swift inputs.
 
 The published inputs are read from Git at the merge-base with origin/main; the
-candidate inputs are this checkout's. Only temporary, task-owned source views
+candidate inputs are this checkout's. Only isolated, task-owned source views
 are generated. The checkout's manifest and generated Rust remain unchanged.
 Both views use the current Rust implementation; they are independent host
 tests, never installed Runtime or device acceptance.
@@ -43,6 +43,7 @@ def load_module(name: str, path: Path, contents: bytes | None = None):
 
 
 contract = load_module("arkdeck_contract_generator", ROOT / "rust/scripts/generate-contract.py")
+ci_workspace = load_module("arkdeck_contract_ci_workspace", Path(__file__).with_name("ci-workspace.py"))
 
 
 def write_json(path: Path, value: dict) -> None:
@@ -114,6 +115,8 @@ def commands(view: Path, output: Path, *, owners: bool = False,
             (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
             (["cargo", "test", "--workspace", "--locked"], rust),
         ]
+        if os.environ.get("ARKDECK_RUST_TEST_WORKERS") == "2":
+            native[1] = ([sys.executable, str(rust / "scripts/run-workspace-tests.py")], rust)
     result = native + [
         (["cargo", "run", "--package", "arkdeck-platform", "--example", "windows_spk3",
           "--locked", "--", "process-selftest"], rust),
@@ -168,6 +171,7 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
     # Cargo target. No binary from the other view can reach the frame checker.
     environment = os.environ.copy()
     environment["CARGO_TARGET_DIR"] = str(view / "rust/target")
+    environment["ARKDECK_RUST_TEST_VIEW"] = "candidate" if info["kind"] == "candidate" else "published"
     # A candidate of the published inputs is the checkout the lane already
     # linted and tested; see commands().
     checkout_tested = (info["kind"] == "candidate"
@@ -267,6 +271,10 @@ def check(output_root: Path) -> Path:
             view = Path(directory) / name
             try:
                 materialize(view, inputs, info, published_info, rust_source, catalogs[name], review_source)
+                if os.environ.get("ARKDECK_RUST_STABLE_VIEWS") == "1":
+                    stable = temporary_root / name
+                    ci_workspace.sync_tree(view, stable, preserve=(("rust", "target"),))
+                    view = stable
                 run_view(view, output / name, info, published_info)
             except (OSError, ValueError, subprocess.CalledProcessError) as error:
                 failures.append({"view": name, "error": str(error)})

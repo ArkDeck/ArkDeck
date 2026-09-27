@@ -93,6 +93,10 @@ jobs:
         working-directory: .
         run: python rust/scripts/test_contract_checks.py
 
+      - name: Rust CI cache and test scheduling regression tests
+        working-directory: .
+        run: python rust/scripts/test_ci_execution.py
+
       # One ArkForge revision for both lanes: the Rust pin, locked, must be the
       # one Package.swift pins, and ArkForge's own wire and StepPermit vectors
       # must still hold at it (from the checkout the fetch above cached).
@@ -161,6 +165,8 @@ jobs:
 
   workspace:
     name: Rust workspace (${{ matrix.os }})
+    # Reject inexpensive policy failures before allocating three native hosts.
+    needs: policy
     strategy:
       fail-fast: false
       matrix:
@@ -183,6 +189,10 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
+      CARGO_BUILD_JOBS: 2
+      ARKDECK_RUST_CACHE_ROOT: ${{ runner.temp }}/arkdeck-rust-build
+      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
+      ARKDECK_RUST_TEST_REPORT_DIR: ${{ runner.temp }}/rust-test-timings
     steps:
       - name: Checkout exact revision with runner Git
         working-directory: .
@@ -222,12 +232,34 @@ jobs:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh ../scripts/ci/arkforge-cargo-fetch.sh
 
+      # Cargo fingerprints include source mtimes and absolute paths. Restore
+      # both the stable source mirror and its products, then synchronize exact
+      # checkout bytes without retimestamping unchanged files. Toolchain, image,
+      # build flags and dependency manifests must match even for prefix hits.
+      - name: Identify compatible Rust build products
+        id: rust-cache-key
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py key
+
+      - name: Restore trusted Rust build products
+        id: rust-build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
+          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}
+          restore-keys: ${{ steps.rust-cache-key.outputs.key }}-
+
+      - name: Synchronize exact sources and fresh Git references
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py prepare
+
       # The contract steps around these regenerate from the checkout or build
       # their own source views under rust/target. These two steps are the only
       # ones that compile and run the checkout itself, so without them a red
       # workspace reaches main behind a green lane.
       - name: Lint the workspace, its tests and its examples
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings
 
       # Wrapped: two `corpus_parity` cases assert the checkout equals its
       # committed manifest. The wrapper names an edited-but-not-regenerated
@@ -238,7 +270,7 @@ jobs:
       # merge-base with main.
       - name: Workspace tests
         working-directory: .
-        run: python rust/scripts/workspace-tests.py
+        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py
 
       # The Rust helper pair's release layout (G5 slice 20a,
       # Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh), laid
@@ -253,14 +285,35 @@ jobs:
         run: |
           set -eu
           output="$RUNNER_TEMP/arkdeck-unsigned-rust-helpers"
-          ARKDECK_RUST_HELPER_BINARIES="$PWD/rust/target/debug" \
+          ARKDECK_RUST_HELPER_BINARIES="$ARKDECK_RUST_CACHE_ROOT/workspace/rust/target/debug" \
           ARKDECK_UNSIGNED_HELPER_OUTPUT="$output" \
             bash Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
           python Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
 
       - name: Published consumer and candidate contract parity
         working-directory: .
-        run: python rust/scripts/check-contracts.py
+        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"
+
+      # PRs may read main's cache, but only a successful protected-main run
+      # publishes executable products. Each contract view retains its own target.
+      - name: Save trusted Rust build products
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.rust-build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
+          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}
+
+      - name: Preserve Rust test timing and queue logs
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: rust-test-timings-${{ matrix.os }}
+          path: ${{ env.ARKDECK_RUST_TEST_REPORT_DIR }}
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Preserve actual read-only recordings
         if: always()
