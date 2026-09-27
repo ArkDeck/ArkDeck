@@ -50,7 +50,10 @@ package struct HDCNativeCodeSignHelperArtifact: Sendable {
     {
       return packaged
     }
+    // Development reads the same package-level resource as the Rust packager.
     let sourceFallback = URL(filePath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
       .deletingLastPathComponent()
       .deletingLastPathComponent()
       .appending(

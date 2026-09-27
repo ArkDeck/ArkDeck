@@ -206,6 +206,7 @@ class PathClassificationTests(unittest.TestCase):
             "Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh",
             "Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh",
             "Packages/ArkDeckKit/Distribution/macOS/package-rust-helpers.sh",
+            "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable",
             "Packages/ArkDeckKit/Distribution/macOS/ArkDeckAgent.entitlements",
         ):
             with self.subTest(path=path):

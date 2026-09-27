@@ -3426,7 +3426,7 @@ mod tests {
         let recorded = &cases["codeSignHelper"];
         assert_eq!(recorded["sha256"], HELPER_SHA256);
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources")
+            .join("../../../Packages/ArkDeckKit/Resources")
             .join("OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable");
         let Ok(bytes) = std::fs::read(&path) else {
             return;

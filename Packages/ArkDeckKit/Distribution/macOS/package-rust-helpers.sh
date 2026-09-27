@@ -46,7 +46,7 @@ fi
 distribution_root="$(cd "$(dirname "$0")" && pwd)"
 package_root="$(cd "$distribution_root/../.." && pwd)"
 team_identifier="8AQTYW5FKR"
-code_sign_helper="$package_root/Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
+code_sign_helper="$package_root/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable"
 # The production requirement the Rust CLI's helper validator and the App's XPC
 # peer check hold the daemon to; an ad hoc signature can only be held to the
 # identifier.
