@@ -575,6 +575,61 @@ class ContractChecksTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "candidate Catalog generated input drift"):
             runner.check(self.root / "outputs")
 
+    def test_stable_views_keep_separate_products_and_refresh_changed_inputs(self):
+        self.drift_and_regenerate()
+        visits = {}
+        stamps = {}
+
+        def check_view(view, output, info, published_info):
+            name = "candidate" if info["kind"] == "candidate" else "published"
+            self.assertEqual(view, self.root / "rust/target/contract-check" / name)
+            count = visits.get(name, 0)
+            visits[name] = count + 1
+            # Included fixture bytes can change without changing the Rust
+            # include_str! statement. They must invalidate Cargo too.
+            generated = view / contract.CORPUS / "health.jsonl"
+            product = view / "rust/target/product"
+            if count == 0:
+                product.parent.mkdir()
+                product.write_text(name)
+                os.utime(generated, ns=(1_000_000_000, 1_000_000_000))
+                stamps[name] = generated.read_bytes()
+                (view / "stale-input").write_text("obsolete")
+            else:
+                self.assertEqual(product.read_text(), name)
+                self.assertFalse((view / "stale-input").exists())
+                if count == 1 or name == "published":
+                    self.assertEqual(generated.stat().st_mtime_ns, 1_000_000_000)
+                    self.assertEqual(generated.read_bytes(), stamps[name])
+                else:
+                    self.assertNotEqual(generated.read_bytes(), stamps[name])
+                    self.assertGreater(generated.stat().st_mtime_ns, 1_000_000_000)
+
+        with patch.dict(os.environ, {"ARKDECK_RUST_STABLE_VIEWS": "1"}), patch.object(runner, "run_view", check_view):
+            runner.check(self.root / "outputs")
+            runner.check(self.root / "outputs")
+            self.drift_and_regenerate()
+            runner.check(self.root / "outputs")
+        self.assertEqual(visits, {"published": 3, "candidate": 3})
+
+    def test_parallel_view_keeps_native_checks_and_labels_its_own_timing_report(self):
+        self.drift_and_regenerate()
+        for info, label in ((self.published_info, "published"),
+                            (contract.candidate(contract.working_inputs(), self.commit, self.commit), "candidate")):
+            calls = []
+
+            def run(argv, *, cwd, env, check):
+                self.assertEqual(env["ARKDECK_RUST_TEST_VIEW"], label)
+                self.assertEqual(env["CARGO_TARGET_DIR"], str(self.root / label / "rust/target"))
+                calls.append(argv)
+                return subprocess.CompletedProcess(argv, 0)
+
+            with patch.dict(os.environ, {"ARKDECK_RUST_TEST_WORKERS": "2"}):
+                runner.run_view(self.root / label, self.root / "outputs" / label, info, self.published_info, run=run)
+            self.assertEqual(calls[0][1], "clippy")
+            self.assertEqual(calls[1], [sys.executable, str(self.root / label / "rust/scripts/run-workspace-tests.py")])
+            self.assertEqual([argv[1] for argv in calls[2:4]], ["run", "build"])
+
 
 class SchemaVocabularyTests(unittest.TestCase):
     @staticmethod

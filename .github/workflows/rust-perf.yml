@@ -114,6 +114,10 @@ jobs:
     if: github.event_name == 'schedule' && github.event.schedule == '0 17 * * *'
     needs: harness-tests
     runs-on: macos-26
+    concurrency:
+      group: arkdeck-macos-background
+      cancel-in-progress: false
+      queue: max
     # Measured locally (warm build, release): three runs at full sample counts
     # take about nine minutes, most of it the 120 s resource window per run.
     timeout-minutes: 60
@@ -203,6 +207,10 @@ jobs:
       || github.event_name == 'workflow_dispatch'
     needs: harness-tests
     runs-on: macos-26
+    concurrency:
+      group: arkdeck-macos-background
+      cancel-in-progress: false
+      queue: max
     # A GitHub-hosted job is capped at six hours, so the design's 24-hour
     # weekly soak cannot run here. Four hours plus a cold build fits with the
     # margin the slow lanes use; the full 24-hour figure is recorded as an open

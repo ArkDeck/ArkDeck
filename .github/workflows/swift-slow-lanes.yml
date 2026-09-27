@@ -59,6 +59,12 @@ jobs:
   host-store-shadow:
     if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'host-store-shadow'
     runs-on: macos-26
+    # Background macOS work shares one slot across both slow/performance
+    # workflows. Keep every queued lane; default concurrency replaces pending.
+    concurrency:
+      group: arkdeck-macos-background
+      cancel-in-progress: false
+      queue: max
     timeout-minutes: 30
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
@@ -106,6 +112,10 @@ jobs:
   slow-lanes:
     if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'slow-lanes'
     runs-on: macos-26
+    concurrency:
+      group: arkdeck-macos-background
+      cancel-in-progress: false
+      queue: max
     # Measured locally (warm build): the four lanes take ~170s total
     # (artifact 73s, runtime 38s, history 3s, journal 52s; peak RSS ~1.2 GB).
     # 30 minutes covers a cold CI build with the same margin swift-ci uses.
@@ -134,6 +144,10 @@ jobs:
   ui-tests:
     if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'ui-tests'
     runs-on: macos-26
+    concurrency:
+      group: arkdeck-macos-background
+      cancel-in-progress: false
+      queue: max
     # Its own runner, deliberately: XCUITest drives a real window server and
     # these tests are load-sensitive. Sharing a machine with another lane
     # produces batches of wait timeouts that look like product failures and
