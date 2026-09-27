@@ -1,0 +1,59 @@
+arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-performance/rust/crates/arkdeck-platform)
+├── libc feature "default"
+│   ├── libc v0.2.189
+│   └── libc feature "std"
+│       └── libc v0.2.189
+└── sha2 feature "default"
+    ├── sha2 v0.10.9
+    │   ├── cfg-if feature "default"
+    │   │   └── cfg-if v1.0.4
+    │   ├── cpufeatures feature "default"
+    │   │   └── cpufeatures v0.2.17
+    │   └── digest feature "default"
+    │       ├── digest v0.10.7
+    │       │   ├── block-buffer feature "default"
+    │       │   │   └── block-buffer v0.10.4
+    │       │   │       └── generic-array feature "default"
+    │       │   │           └── generic-array v0.14.7
+    │       │   │               └── typenum feature "default"
+    │       │   │                   └── typenum v1.20.1
+    │       │   │               [build-dependencies]
+    │       │   │               └── version_check feature "default"
+    │       │   │                   └── version_check v0.9.4
+    │       │   └── crypto-common feature "default"
+    │       │       └── crypto-common v0.1.6
+    │       │           ├── generic-array feature "default" (*)
+    │       │           ├── generic-array feature "more_lengths"
+    │       │           │   └── generic-array v0.14.7 (*)
+    │       │           └── typenum feature "default" (*)
+    │       └── digest feature "core-api"
+    │           ├── digest v0.10.7 (*)
+    │           └── digest feature "block-buffer"
+    │               └── digest v0.10.7 (*)
+    └── sha2 feature "std"
+        ├── sha2 v0.10.9 (*)
+        └── digest feature "std"
+            ├── digest v0.10.7 (*)
+            ├── digest feature "alloc"
+            │   └── digest v0.10.7 (*)
+            └── crypto-common feature "std"
+                └── crypto-common v0.1.6 (*)
+[dev-dependencies]
+├── serde_json feature "default"
+│   ├── serde_json v1.0.151
+│   │   ├── memchr v2.8.3
+│   │   ├── serde_core v1.0.228
+│   │   ├── itoa feature "default"
+│   │   │   └── itoa v1.0.15
+│   │   └── zmij feature "default"
+│   │       └── zmij v1.0.21
+│   └── serde_json feature "std"
+│       ├── serde_json v1.0.151 (*)
+│       ├── memchr feature "std"
+│       │   ├── memchr v2.8.3
+│       │   └── memchr feature "alloc"
+│       │       └── memchr v2.8.3
+│       └── serde_core feature "std"
+│           └── serde_core v1.0.228
+└── serde_json feature "float_roundtrip"
+    └── serde_json v1.0.151 (*)

@@ -13,6 +13,12 @@ allocation-meter = []
 [dependencies]
 sha2.workspace = true
 
+# sha2 0.10 selects the ARM SHA instruction backend only with `asm`.
+# The dependency dispatches by runtime CPU capability and retains soft fallback;
+# every byte, full-file digest and descriptor/path revalidation is unchanged.
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+sha2 = { workspace = true, features = ["asm"] }
+
 [dev-dependencies]
 serde_json.workspace = true
 

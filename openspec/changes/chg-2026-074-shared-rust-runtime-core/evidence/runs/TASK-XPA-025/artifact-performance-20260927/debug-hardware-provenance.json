@@ -1,0 +1,22 @@
+{
+  "source": "67854ee232c8e1cee62d343abb6b08a6f7cccf17",
+  "configuration": "debug/default features/macOS ARM64 asm",
+  "cargoBuildJobs": 2,
+  "cargoIncremental": 0,
+  "files": {
+    "arkdeck-agentd": {
+      "sha256": "cfc5bac974490bf1840a81e5a03f875e79f5d0bd7d7b1d9bcaa97b45378393f6",
+      "bytes": 50706368
+    },
+    "arkdeck-soak": {
+      "sha256": "95b4680c7f6a1fd6a6d4d26a5d4cd56c20a35b15387acb5535b8d9522f76fa14",
+      "bytes": 26698224
+    }
+  },
+  "testGroups": 240,
+  "passed": 1985,
+  "failed": 0,
+  "ignored": 23,
+  "freeBeforeCleanup": 6719528960,
+  "freeAfterCleanup": 11025367040
+}

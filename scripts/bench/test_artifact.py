@@ -95,7 +95,7 @@ class ArtifactRangeTests(unittest.TestCase):
         self.assertEqual(entries[-1]['status'], 'FAILED')
 
     def test_changed_scale_or_boundary_refuses_comparison(self):
-        fields = {'artifactArchiveSha256':'a'*64, 'artifactTemplateSha256':'b'*64,
+        fields = {'artifactReaderVersion':artifact.READER_VERSION, 'artifactArchiveSha256':'a'*64, 'artifactTemplateSha256':'b'*64,
                   'artifactPayloadBytes':128*1024*1024, 'artifactOwnerKind':'import',
                   'artifactImportKind':'flash-bundle', 'artifactPageBytes':4*1024*1024,
                   'artifactTimingBoundary':artifact.TIMING, 'artifactFixtureVersion':artifact_fixture.VERSION,
@@ -227,3 +227,122 @@ class ArtifactReadLoopTests(unittest.TestCase):
         process=next(row for row in rows if row['kind']=='artifactSeedProcess')
         self.assertTrue(process['timedOut'])
         self.assertEqual(process['stdout']['text'],'partial')
+
+
+class IncrementalArtifactTransportTests(ArtifactTransportTests):
+    def test_valid_response_across_arbitrary_fragment_boundaries(self):
+        import json
+        response = {'id':'read-1','ok':True,'result':page()}
+        wire = json.dumps(response).encode()+b'\n'
+        for fragments in ([wire], [wire[:-1],wire[-1:]],
+                          [wire[i:i+1] for i in range(len(wire))],
+                          [wire[:37],wire[37:83],wire[83:]]):
+            with self.subTest(sizes=[len(chunk) for chunk in fragments]):
+                client = self.client(fragments)
+                self.assertEqual(client._exchange({'id':'read-1'}),response)
+                self.assertIsNone(client.failure_evidence)
+
+    def test_oversize_response_refuses_even_if_valid_json_terminates(self):
+        from . import control
+        wire=b'{"id":"test","ok":true,"result":"'+b'x'*100+b'"}\n'
+        client=self.client([wire[:50],wire[50:]])
+        with patch.object(control,'MAXIMUM_RESPONSE_BYTES',64):
+            with self.assertRaisesRegex(control.ControlError,'transport limit'):
+                client._exchange({'id':'test'})
+        self.assertEqual(client.failure_evidence['receivedByteCount'],len(wire))
+        self.assertEqual(client.failure_evidence['receivedSha256'],hashlib.sha256(wire).hexdigest())
+
+    def test_extra_frame_carriage_return_and_duplicate_keys_refuse(self):
+        from . import control
+        cases = [b'{"id":"test","ok":true,"result":{}}\n{}\n',
+                 b'{"id":"test","ok":true,"result":{}}\r\n',
+                 b'{"id":"test","ok":true,"ok":false,"result":{}}\n',
+                 b'{"id":"test","ok":true,"result":{"x":1,"x":2}}\n']
+        for wire in cases:
+            client=self.client([wire[:19],wire[19:]])
+            with self.subTest(wire=wire), self.assertRaises(control.ControlError):
+                client._exchange({'id':'test'})
+            self.assertEqual(client.failure_evidence['receivedSha256'],hashlib.sha256(wire).hexdigest())
+
+    def test_successive_responses_do_not_retain_previous_frame(self):
+        import json
+        responses=[{'id':str(i),'ok':True,'result':{'value':i}} for i in range(2)]
+        client=self.client([json.dumps(row).encode()+b'\n' for row in responses])
+        for row in responses:
+            self.assertEqual(client._exchange({'id':row['id']}),row)
+
+    def test_reader_version_change_refuses_old_instrument_comparison(self):
+        old={'artifactReaderVersion':'bounded-json-v1','artifactPayloadBytes':128*1024*1024}
+        new={**old,'artifactReaderVersion':artifact.READER_VERSION}
+        self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
+        old.pop('artifactReaderVersion')
+        self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
+
+
+class ArtifactClientLifetimeTests(unittest.TestCase):
+    def test_context_exit_releases_the_instrument_without_waiting_for_gc(self):
+        import weakref
+        from . import control
+        client=control.ControlClient('/fixture')
+        client.configure_measurement(None,capture_failure=True)
+        reference=weakref.ref(client)
+        client.__exit__(None,None,None)
+        del client
+        self.assertIsNone(reference())
+
+    def test_connection_renewal_still_refuses_expired_budget_before_sending(self):
+        from . import control
+        deadline=Mock(budget_seconds=600)
+        deadline.remaining_seconds.return_value=-1
+        client=control.ControlClient('/fixture')
+        client.configure_measurement(deadline,capture_failure=True)
+        client.close()  # Pagination renews a connection after 64 requests.
+        socket=Mock()
+        with patch.object(control.socket,'socket',return_value=socket):
+            client.connect()
+        with self.assertRaisesRegex(control.ControlError,'deadline'):
+            client._exchange({'id':'test'})
+        socket.sendall.assert_not_called()
+        self.assertEqual(client.failure_evidence['budgetSeconds'],600)
+        client.__exit__(None,None,None)
+
+    def test_exceptional_context_exit_does_not_retain_the_client(self):
+        import weakref
+        from . import control
+        class LocalClient(control.ControlClient):
+            def connect(self):
+                self._socket=Mock()
+            def verify_contract(self):
+                self._verified=True
+        def use_client():
+            client=LocalClient('/fixture')
+            client.configure_measurement(None,capture_failure=True)
+            reference=weakref.ref(client)
+            try:
+                with client:
+                    raise ValueError('consumer failed')
+            except ValueError:
+                pass
+            return reference
+        self.assertIsNone(use_client()())
+
+    def test_sixty_fifth_page_renews_and_reverifies_without_losing_content(self):
+        from unittest.mock import MagicMock
+        data=b'x'*65; expected=receipt(data); state={'reads':0,'verified':True}
+        client=MagicMock();client.__enter__.return_value=client;client.failure_evidence=None
+        def call(method,params):
+            if not state['verified'] or state['reads']>=64:
+                raise RuntimeError('connection requires renewal and contract verification')
+            state['reads']+=1; offset=params['offset']
+            result=page(b'x',offset,len(data));result['artifactDigest']=expected['artifactDigest']
+            return result
+        client.call.side_effect=call
+        client.close.side_effect=lambda:state.update(verified=False)
+        client.connect.side_effect=lambda:state.update(reads=0)
+        client.verify_contract.side_effect=lambda:state.update(verified=True)
+        runtime=Mock();runtime.client.return_value=client
+        with patch.object(artifact,'RssSampler') as sampler:
+            sampler.return_value.stop.return_value=[]
+            _,proof=artifact.read_all(runtime,expected,len(data),lambda row:None)
+        self.assertEqual(proof['actualPageCount'],65)
+        self.assertEqual(proof['sha256'],hashlib.sha256(data).hexdigest())

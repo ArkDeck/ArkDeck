@@ -124,3 +124,20 @@ added. `imports.lock` adds only the four matching publisher records; configured
 audit sources and existing assertions stay unchanged. Details and validation
 are in `update-feed-dependency-review.md` under this change's TASK-XPA-018 run
 records. Maintainer PR review and installed/device acceptance remain separate.
+
+## macOS ARM64 SHA backend
+
+TASK-XPA-025 enables the existing sha2 0.10.9 `asm` feature only for macOS ARM64.
+The minimized locked build graph adds sha2-asm 0.6.4, cc 1.2.5 and shlex 1.3.0;
+cc/shlex have complete source-audit chains from the existing Bytecode Alliance
+and Mozilla imports. find-msvc-tools is not in this graph.
+
+After independent review by the coordinating task within the user's authorized
+macOS implementation and PR work, sha2-asm alone uses bounded publisher trust:
+5059/newpavlov, [2024-05-07, 2024-05-08), plus the exact 0.6.4 allowlist and locked
+archive checksum. This is publisher provenance, not complete source audit or
+separate per-package user approval. No other policy/window/source is widened.
+The applied facts, risks, original failures and final gate results are recorded
+in TASK-XPA-025/artifact-performance-20260927/dependency-review.md under the
+CHG-2026-074 run records. Native compatible-lock tests and final PR CI remain
+separate requirements; policy success is not performance acceptance.

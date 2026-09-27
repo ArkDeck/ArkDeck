@@ -1,0 +1,42 @@
+{
+  "archive": "/Users/fuhanfeng/.cargo/registry/cache/index.crates.io-1949cf8c6b5b557f/sha2-asm-0.6.4.crate",
+  "sha256": "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab",
+  "files": [
+    {
+      "file": "Cargo.toml",
+      "bytes": 1099,
+      "sha256": "2e9b996d8c49f3280b77b4eba9b65b86f89fc8efbb1173303ceb6ec516209ef4",
+      "extracted_copy_matches_archive": true
+    },
+    {
+      "file": "Cargo.toml.orig",
+      "bytes": 395,
+      "sha256": "2b4274f08845134aa2df9306bd0a27ba06ddb47fb466551fa0a1baded610d8e1",
+      "extracted_copy_matches_archive": true
+    },
+    {
+      "file": "build.rs",
+      "bytes": 1023,
+      "sha256": "18aca9b9fb49fa1c3a30a7b7721dfdd4481f0bb9f8fa2ee6b90e7779fdc04604",
+      "extracted_copy_matches_archive": true
+    },
+    {
+      "file": "src/lib.rs",
+      "bytes": 1523,
+      "sha256": "ed85be224ad198be2f55f7b617f43689dc9c42a23d09a9cb8a81fa0663a39e69",
+      "extracted_copy_matches_archive": true
+    },
+    {
+      "file": "src/sha256_aarch64_apple.S",
+      "bytes": 7344,
+      "sha256": "e471374ee121a2f235f0b49a7c8d6972d869c398aea82a2c090f6e6b73ba5074",
+      "extracted_copy_matches_archive": true
+    },
+    {
+      "file": "LICENSE",
+      "bytes": 1114,
+      "sha256": "85010e75aef5bdcd10b9ce39e8865dfab508f620f9ddb6ca6e54833fe97f36fa",
+      "extracted_copy_matches_archive": true
+    }
+  ]
+}

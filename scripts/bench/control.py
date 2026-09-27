@@ -72,7 +72,12 @@ class ControlClient:
         return self
 
     def __exit__(self, *_exception: object) -> None:
-        self.close()
+        try:
+            self.close()
+        finally:
+            # configure_measurement installs a bound method on this instance.
+            # Drop that self-cycle when the context ends, not on reconnect.
+            self.__dict__.pop("_exchange", None)
 
     def connect(self) -> None:
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -171,7 +176,10 @@ class ControlClient:
         except OSError as error:
             raise ControlError(f"request transport failed: {error}") from error
         self._exchange_stage = "receive"
-        while b"\n" not in self._buffer:
+        if self._buffer:
+            raise ControlError("unexpected buffered response frame")
+        received = bytearray()
+        while True:
             try:
                 self._bound_io()
                 chunk = self._socket.recv(65536)
@@ -184,11 +192,16 @@ class ControlClient:
             self._bound_io()
             if not chunk:
                 raise ControlError("daemon closed the connection")
-            self._buffer += chunk
-            if len(self._buffer) > MAXIMUM_RESPONSE_BYTES:
+            # Refuse before growing the buffer beyond its transport bound.
+            if len(received) + len(chunk) > MAXIMUM_RESPONSE_BYTES:
                 raise ControlError("response frame exceeds its transport limit")
+            newline = chunk.find(b"\n")
+            if b"\r" in chunk or (newline != -1 and newline != len(chunk) - 1):
+                raise ControlError("unexpected extra response frame")
+            received.extend(chunk)
+            if newline != -1:
+                break
         self._exchange_stage = "decode"
-        line, _, self._buffer = self._buffer.partition(b"\n")
         def unique(pairs):
             result = {}
             for key, value in pairs:
@@ -196,9 +209,9 @@ class ControlClient:
                     raise ControlError("duplicate response key")
                 result[key] = value
             return result
-        if self._buffer or b"\r" in line:
-            raise ControlError("unexpected extra response frame")
-        response = json.loads(line, object_pairs_hook=unique)
+        # json.loads accepts bytearray and trailing LF: no full-frame partition
+        # or repeated immutable-prefix copies. The JSON text is decoded once.
+        response = json.loads(received, object_pairs_hook=unique)
         if not isinstance(response, dict) or response.get("id") != frame["id"]:
             raise ControlError("response identity mismatch")
         expected = {"id", "ok", "result"} if response.get("ok") is True else {"id", "ok", "error"}

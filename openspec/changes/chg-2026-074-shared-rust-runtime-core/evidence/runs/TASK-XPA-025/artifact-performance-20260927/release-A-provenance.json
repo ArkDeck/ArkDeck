@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "78c6ad7d8ff4f6e34f00d0cc76d8df48f4b97ea2",
+  "baseCommit": "56c321bec2c6e0e82a1e4453fc50fc393e370ddf",
+  "profile": "release default features software SHA",
+  "cargoBuildJobs": 2,
+  "cargoIncremental": 0,
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "files": {
+    "arkdeck-agentd": {
+      "sha256": "302ea6950e83b5614e10775657c788f7b05a501a9af0edd8a7f860a647fb225f",
+      "bytes": 12420688
+    },
+    "arkdeck-soak": {
+      "sha256": "29eff21e18bb62cf4b6aeef8b3cb90f4bbf4d3f7259f0ae51715bad023c6b373",
+      "bytes": 5963568
+    }
+  }
+}

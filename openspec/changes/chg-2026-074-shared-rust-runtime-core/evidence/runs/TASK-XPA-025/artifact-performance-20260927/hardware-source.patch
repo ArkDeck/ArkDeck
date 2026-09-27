@@ -1,0 +1,115 @@
+diff --git a/rust/Cargo.lock b/rust/Cargo.lock
+index 85dc8d4de..295496110 100644
+--- a/rust/Cargo.lock
++++ b/rust/Cargo.lock
+@@ -239,6 +239,16 @@ dependencies = [
+  "generic-array",
+ ]
+ 
++[[package]]
++name = "cc"
++version = "1.4.5"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "005ec2760ca554fae18df7a11195552ec576cd665632a881bc011d5bb2fd4d80"
++dependencies = [
++ "find-msvc-tools",
++ "shlex",
++]
++
+ [[package]]
+ name = "cfg-if"
+ version = "1.0.4"
+@@ -347,6 +357,12 @@ version = "0.2.9"
+ source = "registry+https://github.com/rust-lang/crates.io-index"
+ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
+ 
++[[package]]
++name = "find-msvc-tools"
++version = "0.1.12"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "3e0f1c7c3a72c66fd80abe965175f7523475c0489a87d3ff9d6e8c87d87a9d2d"
++
+ [[package]]
+ name = "generic-array"
+ version = "0.14.7"
+@@ -506,8 +522,24 @@ dependencies = [
+  "cfg-if",
+  "cpufeatures",
+  "digest",
++ "sha2-asm",
+ ]
+ 
++[[package]]
++name = "sha2-asm"
++version = "0.6.4"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
++dependencies = [
++ "cc",
++]
++
++[[package]]
++name = "shlex"
++version = "2.0.1"
++source = "registry+https://github.com/rust-lang/crates.io-index"
++checksum = "f8fadd59c855ef2080decdef8ff161eb6661b86933c9d82e5ba29dc602a55aba"
++
+ [[package]]
+ name = "signature"
+ version = "2.2.0"
+diff --git a/rust/crates/arkdeck-platform/Cargo.toml b/rust/crates/arkdeck-platform/Cargo.toml
+index 636e68578..18f20f830 100644
+--- a/rust/crates/arkdeck-platform/Cargo.toml
++++ b/rust/crates/arkdeck-platform/Cargo.toml
+@@ -13,6 +13,12 @@ allocation-meter = []
+ [dependencies]
+ sha2.workspace = true
+ 
++# sha2 0.10 selects the ARM SHA instruction backend only with `asm`.
++# The dependency dispatches by runtime CPU capability and retains soft fallback;
++# every byte, full-file digest and descriptor/path revalidation is unchanged.
++[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
++sha2 = { workspace = true, features = ["asm"] }
++
+ [dev-dependencies]
+ serde_json.workspace = true
+ 
+diff --git a/rust/crates/arkdeck-platform/tests/sha256_backend.rs b/rust/crates/arkdeck-platform/tests/sha256_backend.rs
+new file mode 100644
+index 000000000..39ecea81d
+--- /dev/null
++++ b/rust/crates/arkdeck-platform/tests/sha256_backend.rs
+@@ -0,0 +1,33 @@
++//! Known SHA-256 answers independent of the chosen CPU backend.
++use sha2::{Digest, Sha256};
++
++#[test]
++fn sha256_standard_answers_survive_backend_selection() {
++    // FIPS 180-4 examples, including padding across the 512-bit block boundary.
++    for (input, expected) in [
++        (
++            b"abc".as_slice(),
++            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
++        ),
++        (
++            b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq".as_slice(),
++            "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1",
++        ),
++    ] {
++        for width in [1, 7, 64, 65] {
++            let mut hash = Sha256::new();
++            for chunk in input.chunks(width) {
++                hash.update(chunk);
++            }
++            assert_eq!(format!("{:x}", hash.finalize()), expected);
++        }
++    }
++    let mut hash = Sha256::new();
++    for _ in 0..1000 {
++        hash.update([b'a'; 1000]);
++    }
++    assert_eq!(
++        format!("{:x}", hash.finalize()),
++        "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
++    );
++}

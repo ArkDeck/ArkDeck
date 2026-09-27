@@ -1,0 +1,15 @@
+loop 0 traced (40399, 324582) RSS {'daemonBytes': {'baselineBytes': 31080448, 'sampledPeakBytes': 31080448, 'sampledGrowthBytes': 0}, 'clientBytes': {'baselineBytes': 31080448, 'sampledPeakBytes': 31080448, 'sampledGrowthBytes': 0}} gc (490, 9, 0)
+loop 1 traced (59990, 361592) RSS {'daemonBytes': {'baselineBytes': 31277056, 'sampledPeakBytes': 31277056, 'sampledGrowthBytes': 0}, 'clientBytes': {'baselineBytes': 31277056, 'sampledPeakBytes': 31277056, 'sampledGrowthBytes': 0}} gc (501, 9, 0)
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/control.py:186: size=21.9 KiB (+21.9 KiB), count=2 (+2), average=11.0 KiB
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:337: size=13.2 KiB (+13.2 KiB), count=252 (+252), average=53 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:365: size=9480 B (+9480 B), count=79 (+79), average=120 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:137: size=5056 B (+5056 B), count=94 (+94), average=54 B
+/private/tmp/arkdeck-reader-loop-diagnostic.py:24: size=1282 B (+1282 B), count=15 (+15), average=85 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:139: size=1024 B (+1024 B), count=32 (+32), average=32 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: size=968 B (+968 B), count=33 (+33), average=29 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:112: size=648 B (+648 B), count=2 (+2), average=324 B
+/private/tmp/arkdeck-reader-loop-diagnostic.py:18: size=648 B (+648 B), count=2 (+2), average=324 B
+<frozen abc>:123: size=503 B (+503 B), count=5 (+5), average=101 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:159: size=384 B (+384 B), count=5 (+5), average=77 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/tracemalloc.py:560: size=328 B (+328 B), count=1 (+1), average=328 B
+retainedFrames [] count 0

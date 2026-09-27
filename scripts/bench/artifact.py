@@ -16,6 +16,7 @@ RESERVE_BYTES = 4 * 1024 ** 3
 READ_BUDGET = 600
 TIMING = 'first-read-through-complete-client-digest-v1'
 RSS_INTERVAL = .2
+READER_VERSION = 'bounded-incremental-json-v3'
 
 
 def definition(size):
@@ -137,6 +138,7 @@ def read_all(runtime, receipt, total, record, budget=READ_BUDGET):
                               'eof': failed_page['eof']})
                 offset += len(decoded)
                 failed_page = None
+                del decoded
             actual = digest.hexdigest()
             if actual != receipt['artifactDigest'] or deadline.expired():
                 raise ValueError('artifact final digest or deadline differs')
@@ -199,6 +201,7 @@ def measure(daemon, soak, count, record, require_quiet=True):
             record({'kind': 'artifactReadComplete', 'milliseconds': elapsed, **proof})
             guard()
         return elapsed, {'artifactFixtureVersion': artifact_fixture.VERSION,
+            'artifactReaderVersion': READER_VERSION,
             'artifactArchiveSha256': fixture['sha256'],
             'artifactTemplateSha256': fixture['templateSha256'],
             'artifactOwnerKind': 'import', 'artifactImportKind': 'flash-bundle',
