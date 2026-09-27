@@ -187,12 +187,20 @@ pub fn machine_independent(bytes: &[u8]) -> Vec<u8> {
 /// The facts the Swift oracle records of the Job index, each record's
 /// digest taken over its machine-independent reading.
 pub fn index(path: &Path) -> Value {
+    index_normalized(path, |bytes| bytes.to_vec())
+}
+
+/// An oracle may label its measured host facts before hashing each record.
+/// Every other byte, and every other index column, remains part of the proof.
+pub fn index_normalized(path: &Path, normalize: impl Fn(&[u8]) -> Vec<u8>) -> Value {
     let mut db = HostSqlite::open(&path.join("runtime-jobs.sqlite3"), true, false).unwrap();
     let cell = |value: &Sql| match value {
         Sql::Null => Value::Null,
         Sql::Integer(n) => json!(n),
         Sql::Text(text) => json!(text),
-        Sql::Blob(bytes) => json!(arkdeck_contract::sha256_hex(&machine_independent(bytes))),
+        Sql::Blob(bytes) => json!(arkdeck_contract::sha256_hex(&normalize(
+            &machine_independent(bytes)
+        ))),
     };
     let mut query = |sql: &str| db.query(sql, &[], 64 << 20).unwrap();
     let schema: Vec<Value> =

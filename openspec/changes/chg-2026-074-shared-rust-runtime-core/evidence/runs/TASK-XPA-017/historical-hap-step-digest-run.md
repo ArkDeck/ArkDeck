@@ -78,8 +78,54 @@ gate were not run.
 
 ## CI
 
-The bot PR and exact-head CI results will be recorded in the PR delivery
-after push, without amending a green head.
+PR #2276, head `771c4a75`, Swift CI run `36293349702`: Rust macOS,
+Linux, Windows, host-independent checks and design-system checks passed;
+SDD Guard run `36293349607` passed. The Swift test lane failed in
+`FlashRunOracleContractTests.testSwiftSubmitsAndRunsEveryFlashStoryAsTheRustRuntimeReplays`.
+The aggregate `swift` therefore failed. App build was not selected.
+Raw job log: `/private/tmp/arkdeck-pr2276-swift-ci.log`.
+
+The failure is exactly reproducible without running a device or changing any
+production record. In the checked-in `flash-run/stories/recovery` fixture,
+`job-0c7b2c3dec74aedc2746781f98fdc406/job-record.json`, replace only
+`consume wait <ms> ms` by `consume wait 0 ms`: SHA-256 is
+`23e107cecd0ec573c6e832be2c75829ae5be848d28568e2f44c89209dd22ace7`
+(the recorded index digest). Replacing it by `consume wait 1 ms` yields
+`fa7243b45d2952f4a98f80e4ef92e7918b9d7fcc8dba9b066db088851570c436`
+(the CI-produced digest). File and response comparisons already labelled this
+host timing, but the index hashed the unlabelled SQLite BLOB.
+
+The follow-up applies that same existing Flash normalization before the index
+record hash in both Swift and Rust. Other HDC oracle callers keep their default
+machine-fact-only normalization. It removes Rust's search through 0–10,000 ms
+to find an old digest. The seven Flash index fixtures now hash their already
+recorded, labelled Job bytes; every prior affected digest was independently
+verified against those same bytes with a zero-millisecond wait. No fixture
+record, outcome, field, permission or non-digest index value changed.
+Database-path regression cases cover waits of 0, 1 and 10,001 ms, require an
+outcome change to remain observable, and check that the default index path
+still distinguishes raw waits. This fixes test determinism, not Runtime
+admission or the historical reader. Follow-up local and exact-head CI results
+are recorded below and in the PR delivery.
+
+## Follow-up local targeted checks
+
+For the CI-discovered oracle fix, with the same isolated cargo target and
+`CARGO_BUILD_JOBS=2`, one build/test lane at a time:
+
+- `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter FlashRunOracleContractTests`:
+  exit 0, 2 tests; `/private/tmp/arkdeck-pr2276-oracle-swift.log`.
+- `cargo test --manifest-path rust/Cargo.toml -p arkdeck-hoststore --test flash_run`:
+  exit 0, 13 tests; `/private/tmp/arkdeck-pr2276-oracle-rust.log`.
+- `cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-hoststore --all-targets -- -D warnings`:
+  exit 0; `/private/tmp/arkdeck-pr2276-oracle-clippy.log`.
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`: exit 0 after
+  applying the formatter's line wrapping; `/private/tmp/arkdeck-pr2276-oracle-fmt.log`.
+- `sh scripts/check-sdd.sh`: exit 0; `/private/tmp/arkdeck-pr2276-oracle-sdd.log`.
+
+Only test/oracle code and this run record changed in the follow-up. The earlier
+three-crate checks and historical-record Swift test were not repeated; neither
+contract generation nor the full local unified gate was run.
 
 ## Remaining cutover gate
 

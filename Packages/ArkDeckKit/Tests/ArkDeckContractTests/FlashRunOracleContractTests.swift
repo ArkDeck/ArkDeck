@@ -4,6 +4,7 @@
 import CryptoKit
 import Darwin
 import Foundation
+import SQLite3
 import XCTest
 
 @testable import ArkDeckAgentDaemon
@@ -40,7 +41,7 @@ import XCTest
 /// One line of a Job's timeline measures time on the host's monotonic clock:
 /// how long the run waited for the lane's archive prewarm before consuming its
 /// capability. The oracle keeps that line with its measurement labelled
-/// (`consume wait <ms> ms`), in answers and files alike.
+/// (`consume wait <ms> ms`), in answers, files and index record digests alike.
 ///
 /// Record a new oracle with `ARKDECK_RUST_FLASH_RUN_RECORD=/private/tmp/<new
 /// directory>`; otherwise the checked-in oracle must match byte for byte.
@@ -686,11 +687,54 @@ final class FlashRunOracleContractTests: XCTestCase {
     }
     files["stories/\(story)/tree.json"] = try encoded(.array(tree))
     files["stories/\(story)/index.json"] = try encoded(
-      try HDCOracleHarness.index(of: root.appending(path: "store", directoryHint: .isDirectory)))
+      try HDCOracleHarness.index(
+        of: root.appending(path: "store", directoryHint: .isDirectory),
+        normalizeRecord: normalized))
     return files
   }
 
   // MARK: The oracle
+
+  /// Exercise the database BLOB path, not only text normalization: a measured
+  /// wait must not change the oracle digest, while an outcome change must.
+  func testIndexDigestLabelsMeasuredWaitButPreservesOutcome() throws {
+    let directory = FileManager.default.temporaryDirectory.appending(
+      path: "flash-index-\(UUID().uuidString)", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    var handle: OpaquePointer?
+    XCTAssertEqual(
+      sqlite3_open(directory.appending(path: RuntimeJobRepository.filename).path, &handle),
+      SQLITE_OK)
+    let db = try XCTUnwrap(handle)
+    defer { sqlite3_close(db) }
+    func execute(_ sql: String) throws {
+      guard sqlite3_exec(db, sql, nil, nil, nil) == SQLITE_OK else {
+        throw CocoaError(.fileWriteUnknown)
+      }
+    }
+    try execute("""
+      CREATE TABLE runtime_job(job_id TEXT, idempotency_key TEXT, request_hash TEXT,
+        state TEXT, admission_sequence INTEGER, created_at_utc TEXT, created_at_order_key TEXT,
+        updated_at_utc TEXT, version INTEGER, initial_record_json BLOB);
+      INSERT INTO runtime_job VALUES('job', 'key', 'hash', 'recovered', 1, 'now', 'order', 'now', 1, NULL);
+      """)
+    func index(wait: Int, outcome: String, normalize: Bool) throws -> JSONValue {
+      try execute("""
+        UPDATE runtime_job SET initial_record_json = CAST(
+          '{"state":"\(outcome)","timeline":["consume wait \(wait) ms"]}' AS BLOB);
+        """)
+      return try HDCOracleHarness.index(
+        of: directory, normalizeRecord: normalize ? Self.normalized : { $0 })
+    }
+    let zero = try index(wait: 0, outcome: "recovered", normalize: true)
+    XCTAssertEqual(zero, try index(wait: 1, outcome: "recovered", normalize: true))
+    XCTAssertEqual(zero, try index(wait: 10001, outcome: "recovered", normalize: true))
+    XCTAssertNotEqual(zero, try index(wait: 1, outcome: "waitingForRecovery", normalize: true))
+    XCTAssertNotEqual(
+      try index(wait: 0, outcome: "recovered", normalize: false),
+      try index(wait: 1, outcome: "recovered", normalize: false))
+  }
 
   func testSwiftSubmitsAndRunsEveryFlashStoryAsTheRustRuntimeReplays() async throws {
     let lock = open(Self.lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
