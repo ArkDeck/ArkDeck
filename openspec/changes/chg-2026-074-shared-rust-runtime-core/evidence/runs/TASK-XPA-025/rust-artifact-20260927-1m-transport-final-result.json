@@ -1,0 +1,47 @@
+{
+  "functionalOnly": true,
+  "baselineEligible": false,
+  "milliseconds": 18.916749977506697,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 1048576,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 1048576,
+      "sha256": "5a721548af8cd1e8d196c51c7a0900f0b738056bf761dc5865ed1566c8b6112d",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 1028096,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 1048576,
+      "actualPageCount": 1,
+      "effectiveBytesPerSecond": 55431086.27258003,
+      "effectiveDecimalMBPerSecond": 55.431086272580025,
+      "effectiveMiBPerSecond": 52.863203308658626,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.01937029103282839,
+          "daemonBytes": 19873792,
+          "clientBytes": 33226752
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 19873792,
+          "sampledPeakBytes": 19873792,
+          "sampledGrowthBytes": 0
+        },
+        "clientBytes": {
+          "baselineBytes": 33226752,
+          "sampledPeakBytes": 33226752,
+          "sampledGrowthBytes": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,522 @@
+{
+  "functionalOnly": true,
+  "baselineEligible": false,
+  "milliseconds": 21640.16312500462,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 134217728,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 134217728,
+      "sha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 134187008,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 134217728,
+      "actualPageCount": 32,
+      "effectiveBytesPerSecond": 6202251.213389195,
+      "effectiveDecimalMBPerSecond": 6.202251213389195,
+      "effectiveMiBPerSecond": 5.914927686108775,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.01418350008316338,
+          "daemonBytes": 19906560,
+          "clientBytes": 33308672
+        },
+        {
+          "elapsedSeconds": 0.2389286250108853,
+          "daemonBytes": 20381696,
+          "clientBytes": 33341440
+        },
+        {
+          "elapsedSeconds": 0.46396783308591694,
+          "daemonBytes": 24739840,
+          "clientBytes": 33341440
+        },
+        {
+          "elapsedSeconds": 0.7768839170457795,
+          "daemonBytes": 41615360,
+          "clientBytes": 392904704
+        },
+        {
+          "elapsedSeconds": 1.0005203750915825,
+          "daemonBytes": 41648128,
+          "clientBytes": 391102464
+        },
+        {
+          "elapsedSeconds": 1.2259020420024171,
+          "daemonBytes": 41648128,
+          "clientBytes": 391102464
+        },
+        {
+          "elapsedSeconds": 1.5391166250919923,
+          "daemonBytes": 41648128,
+          "clientBytes": 397049856
+        },
+        {
+          "elapsedSeconds": 1.764694374985993,
+          "daemonBytes": 41664512,
+          "clientBytes": 390217728
+        },
+        {
+          "elapsedSeconds": 1.9903154580388218,
+          "daemonBytes": 41664512,
+          "clientBytes": 390217728
+        },
+        {
+          "elapsedSeconds": 2.2160908330697566,
+          "daemonBytes": 41664512,
+          "clientBytes": 287883264
+        },
+        {
+          "elapsedSeconds": 2.4414521669968963,
+          "daemonBytes": 41664512,
+          "clientBytes": 287883264
+        },
+        {
+          "elapsedSeconds": 2.6667176249902695,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 2.8923977080266923,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 3.11772841704078,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 3.3430028749862686,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 3.5684782080352306,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 3.7936575000640005,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 4.018819416989572,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 4.2447026669979095,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 4.470130250090733,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 4.68661370803602,
+          "daemonBytes": 41664512,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 4.9121209169970825,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 5.137646917020902,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 5.362792707979679,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 5.588492374983616,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 5.813507792074233,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 6.0388857499929145,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 6.264502792037092,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 6.489889707998373,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 6.715070875012316,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 6.93692412506789,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 7.153338458039798,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 7.378828583052382,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 7.604521166998893,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 7.829698625020683,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 8.054942333023064,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 8.273248750017956,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 8.498750542057678,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 8.724077166989446,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 8.950252917013131,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 9.175681250053458,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 9.401278542005457,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 9.627063708030619,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 9.85263575008139,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 10.078100000042468,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 10.304063791991211,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 10.529415083001368,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 10.754743958008476,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 10.980638750013895,
+          "daemonBytes": 41680896,
+          "clientBytes": 287899648
+        },
+        {
+          "elapsedSeconds": 11.206817083060741,
+          "daemonBytes": 41680896,
+          "clientBytes": 256065536
+        },
+        {
+          "elapsedSeconds": 11.432437125011347,
+          "daemonBytes": 41680896,
+          "clientBytes": 256065536
+        },
+        {
+          "elapsedSeconds": 11.65834970807191,
+          "daemonBytes": 41680896,
+          "clientBytes": 261668864
+        },
+        {
+          "elapsedSeconds": 11.883663667016663,
+          "daemonBytes": 41680896,
+          "clientBytes": 261668864
+        },
+        {
+          "elapsedSeconds": 12.10922737501096,
+          "daemonBytes": 41680896,
+          "clientBytes": 261668864
+        },
+        {
+          "elapsedSeconds": 12.33515591698233,
+          "daemonBytes": 41680896,
+          "clientBytes": 267272192
+        },
+        {
+          "elapsedSeconds": 12.560708875069395,
+          "daemonBytes": 41680896,
+          "clientBytes": 267272192
+        },
+        {
+          "elapsedSeconds": 12.78621141705662,
+          "daemonBytes": 41680896,
+          "clientBytes": 267272192
+        },
+        {
+          "elapsedSeconds": 13.003714292077348,
+          "daemonBytes": 41680896,
+          "clientBytes": 272875520
+        },
+        {
+          "elapsedSeconds": 13.229577457997948,
+          "daemonBytes": 41680896,
+          "clientBytes": 272875520
+        },
+        {
+          "elapsedSeconds": 13.44857587502338,
+          "daemonBytes": 41680896,
+          "clientBytes": 272875520
+        },
+        {
+          "elapsedSeconds": 13.670504000037909,
+          "daemonBytes": 41680896,
+          "clientBytes": 278478848
+        },
+        {
+          "elapsedSeconds": 13.895692542078905,
+          "daemonBytes": 41680896,
+          "clientBytes": 278478848
+        },
+        {
+          "elapsedSeconds": 14.121546417009085,
+          "daemonBytes": 41680896,
+          "clientBytes": 278478848
+        },
+        {
+          "elapsedSeconds": 14.347409749985673,
+          "daemonBytes": 41680896,
+          "clientBytes": 284082176
+        },
+        {
+          "elapsedSeconds": 14.572582249995321,
+          "daemonBytes": 41680896,
+          "clientBytes": 284082176
+        },
+        {
+          "elapsedSeconds": 14.797367333085276,
+          "daemonBytes": 41680896,
+          "clientBytes": 284082176
+        },
+        {
+          "elapsedSeconds": 15.020613542059436,
+          "daemonBytes": 41680896,
+          "clientBytes": 289685504
+        },
+        {
+          "elapsedSeconds": 15.245958958053961,
+          "daemonBytes": 41680896,
+          "clientBytes": 289685504
+        },
+        {
+          "elapsedSeconds": 15.471455792081542,
+          "daemonBytes": 41680896,
+          "clientBytes": 289685504
+        },
+        {
+          "elapsedSeconds": 15.697761750081554,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 15.920045249979012,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 16.145401458023116,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 16.371226333081722,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 16.596920083044097,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 16.81805954198353,
+          "daemonBytes": 41680896,
+          "clientBytes": 295288832
+        },
+        {
+          "elapsedSeconds": 17.044358083046973,
+          "daemonBytes": 41680896,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 17.27030283305794,
+          "daemonBytes": 41680896,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 17.508552583050914,
+          "daemonBytes": 41680896,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 17.73457050009165,
+          "daemonBytes": 41680896,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 17.95975741709117,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 18.185396792017855,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 18.411458250018768,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 18.636756250052713,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 18.86189058306627,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 19.080889417091385,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 19.30518591706641,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 19.530589333036914,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 19.75398437504191,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 19.979458500049077,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 20.201850250014104,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 20.42730154201854,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 20.652415208052844,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 20.877653792034835,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 21.10365237505175,
+          "daemonBytes": 41697280,
+          "clientBytes": 295960576
+        },
+        {
+          "elapsedSeconds": 21.330403625033796,
+          "daemonBytes": 41713664,
+          "clientBytes": 207044608
+        },
+        {
+          "elapsedSeconds": 21.55587933305651,
+          "daemonBytes": 41713664,
+          "clientBytes": 207044608
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 19906560,
+          "sampledPeakBytes": 41713664,
+          "sampledGrowthBytes": 21807104
+        },
+        "clientBytes": {
+          "baselineBytes": 33308672,
+          "sampledPeakBytes": 397049856,
+          "sampledGrowthBytes": 363741184
+        }
+      }
+    }
+  }
+}

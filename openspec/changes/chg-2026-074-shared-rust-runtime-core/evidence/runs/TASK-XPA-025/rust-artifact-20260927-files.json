@@ -1,0 +1,50 @@
+[
+  {
+    "attempt": "1m-attempt1",
+    "file": "rust-artifact-20260927-1m-attempt1-samples.jsonl.gz",
+    "sourceBytes": 1237,
+    "sourceSha256": "1d7d705221663db247603b4d2f9c68defcbc6f5df52d06c1afd918c58015232c"
+  },
+  {
+    "attempt": "1m-attempt2",
+    "file": "rust-artifact-20260927-1m-attempt2-samples.jsonl.gz",
+    "sourceBytes": 2985,
+    "sourceSha256": "f68c12cf9dd07dcd8fb3f3a52fbd02bd59337aa86375a3c1c4ebcfa49f72aef5"
+  },
+  {
+    "attempt": "1m-attempt3",
+    "file": "rust-artifact-20260927-1m-attempt3-result.json",
+    "sourceBytes": 1602,
+    "sourceSha256": "0cf4c4fe04d2c9f4ae9830eff6d7bafea98e17e7a813469a1b3e5d542d6c48e9"
+  },
+  {
+    "attempt": "1m-attempt3",
+    "file": "rust-artifact-20260927-1m-attempt3-samples.jsonl.gz",
+    "sourceBytes": 3704,
+    "sourceSha256": "705fdd919d84d2889cca07a2b7bdf578663adca28386f6399ea06c90e30f39eb"
+  },
+  {
+    "attempt": "128m-attempt1",
+    "file": "rust-artifact-20260927-128m-attempt1-result.json",
+    "sourceBytes": 14792,
+    "sourceSha256": "6b32f1e215c6d4c49dd85d3b18c88c32225fe5fc660f136d22e7cbb61b2a9675"
+  },
+  {
+    "attempt": "128m-attempt1",
+    "file": "rust-artifact-20260927-128m-attempt1-samples.jsonl.gz",
+    "sourceBytes": 36886,
+    "sourceSha256": "8f28b15c50a9eacd7b07969b88385f105c84278100220fd097d4832e7c1532c8"
+  },
+  {
+    "attempt": "1m-transport-final",
+    "file": "rust-artifact-20260927-1m-transport-final-result.json",
+    "sourceBytes": 1611,
+    "sourceSha256": "9d7c29244059197072be0771f27b7f04f43d3c884d5945fe7e7fa3d0d3af3eff"
+  },
+  {
+    "attempt": "1m-transport-final",
+    "file": "rust-artifact-20260927-1m-transport-final-samples.jsonl.gz",
+    "sourceBytes": 3712,
+    "sourceSha256": "614c4f4fcd283e7ea41d04c538dc083981db352843857a59a9236e1a251f8705"
+  }
+]

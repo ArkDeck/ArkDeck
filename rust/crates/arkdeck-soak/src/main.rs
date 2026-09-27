@@ -1,6 +1,29 @@
 #[cfg(target_os = "macos")]
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.first().map(String::as_str) == Some("--seed-artifact-bench") {
+        let result = (|| {
+            if args.len() != 4 {
+                return Err("usage: --seed-artifact-bench ROOT BYTE_COUNT SHA256".to_owned());
+            }
+            arkdeck_soak::artifact_bench::seed(
+                std::path::Path::new(&args[1]),
+                args[2].parse::<u64>().map_err(|e| e.to_string())?,
+                &args[3],
+            )
+        })();
+        match result {
+            Ok(receipt) => println!(
+                "{}",
+                serde_json::json!({"kind":"artifactReady", "receipt":receipt})
+            ),
+            Err(error) => {
+                eprintln!("artifact fixture failed: {error}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
     if args.first().map(String::as_str) == Some("--measure-journal") {
         let result = if args.len() == 2 {
             arkdeck_soak::recovery::measure_journal(std::path::Path::new(&args[1]))

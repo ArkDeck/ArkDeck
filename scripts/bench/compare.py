@@ -65,6 +65,16 @@ ABSOLUTE_BUDGETS: dict[str, float] = {
 # observations of one run rather than inputs and legitimately differ between
 # runs, so they take no part in the comparability check.
 WORKLOAD_SCALE_FIELDS = (
+    "artifactFixtureVersion",
+    "artifactArchiveSha256",
+    "artifactTemplateSha256",
+    "artifactOwnerKind",
+    "artifactImportKind",
+    "artifactPayloadBytes",
+    "artifactPageBytes",
+    "artifactTimingBoundary",
+    "artifactRssIntervalSeconds",
+    "artifactCachePolicy",
     "journalFixtureVersion",
     "journalEventCount",
     "journalRequestedPageSize",

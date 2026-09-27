@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/private/tmp/arkdeck-artifact-smoke.py", line 8, in <module>
+    elapsed, scale = artifact.measure('/private/tmp/arkdeck-xpa025-pinned-82f0971c/arkdeck-agentd', '/private/tmp/arkdeck-xpa025-journal-target/debug/arkdeck-soak',int(sys.argv[2])*1024*1024,record,False)
+                     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 185, in measure
+    raise ValueError('Artifact owner publication failed')
+ValueError: Artifact owner publication failed
+Traceback (most recent call last):
+  File "/private/tmp/arkdeck-artifact-smoke.py", line 8, in <module>
+    elapsed, scale = artifact.measure('/private/tmp/arkdeck-xpa025-pinned-82f0971c/arkdeck-agentd', '/private/tmp/arkdeck-xpa025-journal-target/debug/arkdeck-soak',int(sys.argv[2])*1024*1024,record,False)
+                     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 185, in measure
+    raise ValueError('Artifact owner publication failed')
+ValueError: Artifact owner publication failed

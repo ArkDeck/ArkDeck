@@ -1,0 +1,36 @@
+Traceback (most recent call last):
+  File "/private/tmp/arkdeck-artifact-smoke.py", line 8, in <module>
+    elapsed, scale = artifact.measure('/private/tmp/arkdeck-xpa025-pinned-82f0971c/arkdeck-agentd', '/private/tmp/arkdeck-xpa025-journal-target/debug/arkdeck-soak',int(sys.argv[2])*1024*1024,record,False)
+                     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 195, in measure
+    elapsed, proof = read_all(runtime, receipt, count, record)
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 131, in read_all
+    failed_page = client.call('artifact.read', {'owner': receipt['owner'],
+        'artifactId': receipt['artifactId'], 'offset': str(offset), 'maxBytes': PAGE_BYTES})
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/control.py", line 143, in call
+    result, _ = self.timed_call(method, params)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/control.py", line 169, in timed_call
+    raise ControlError(
+        f"{method} refused: {error.get('code')}: {error.get('message')}"
+    )
+bench.control.ControlError: artifact.read refused: invalidInput: Artifact requires one exact owner and bounded typed options
+Traceback (most recent call last):
+  File "/private/tmp/arkdeck-artifact-smoke.py", line 8, in <module>
+    elapsed, scale = artifact.measure('/private/tmp/arkdeck-xpa025-pinned-82f0971c/arkdeck-agentd', '/private/tmp/arkdeck-xpa025-journal-target/debug/arkdeck-soak',int(sys.argv[2])*1024*1024,record,False)
+                     ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 195, in measure
+    elapsed, proof = read_all(runtime, receipt, count, record)
+                     ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/artifact.py", line 131, in read_all
+    failed_page = client.call('artifact.read', {'owner': receipt['owner'],
+        'artifactId': receipt['artifactId'], 'offset': str(offset), 'maxBytes': PAGE_BYTES})
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/control.py", line 143, in call
+    result, _ = self.timed_call(method, params)
+                ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/scripts/bench/control.py", line 169, in timed_call
+    raise ControlError(
+        f"{method} refused: {error.get('code')}: {error.get('message')}"
+    )
+bench.control.ControlError: artifact.read refused: invalidInput: Artifact requires one exact owner and bounded typed options

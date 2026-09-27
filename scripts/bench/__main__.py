@@ -147,6 +147,9 @@ def command_capture(arguments: argparse.Namespace) -> int:
         require_quiet=not arguments.allow_loaded_host,
         journal_samples=getattr(arguments, "journal_samples", 0),
         journal_only=getattr(arguments, "journal_only", False),
+        artifact_samples=getattr(arguments, "artifact_samples", 0),
+        artifact_only=getattr(arguments, "artifact_only", False),
+        artifact_sizes=tuple(size * 1024 * 1024 for size in getattr(arguments, "artifact_sizes_mib", (128, 1024))),
     )
 
     results: dict[str, baseline.MetricResult] = {}
@@ -199,7 +202,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
             shutil.rmtree(state_directory, ignore_errors=True)
 
         for name, values in samples.items():
-            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS)[name]
+            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS | metrics.artifact.DEFINITIONS)[name]
             result = results.setdefault(
                 name, baseline.MetricResult(name, unit, design_row, description)
             )
@@ -208,13 +211,15 @@ def command_capture(arguments: argparse.Namespace) -> int:
                     k: v for k, v in scale.items()
                     if k.startswith("recovery") and k != "recoverySamples"
                 }
+            elif name in metrics.artifact.DEFINITIONS:
+                metric_scale = scale["artifactMetricScales"][name]
             elif name in metrics.journal.DEFINITIONS:
                 metric_scale = {k: v for k, v in scale.items()
                                 if k.startswith("journal") and k != "journalSamples"}
             else:
                 metric_scale = {
                     k: v for k, v in scale.items()
-                    if not k.startswith(("recovery", "journal")) and k not in {
+                    if not k.startswith(("recovery", "journal", "artifact")) and k not in {
                         "residentSetRawSamples", "unmeasured",
                         "residentSetPhaseMethod", "idleWindowSeconds",
                     }
@@ -252,6 +257,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
     # Coverage gaps disqualify a baseline but must not waive instability.
     # Only the caller's debug/loaded-host declaration makes a run advisory.
     advisory_reasons = list(disqualifiers)
+    if getattr(arguments, "artifact_samples", 0) and 1 in getattr(arguments, "artifact_sizes_mib", ()):
+        disqualifiers.append("1 MiB artifact scale is correctness-only, not an I.2 target baseline")
     incomplete = {}
     for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
         missing = [run["index"] for run in run_records
@@ -418,6 +425,11 @@ def build_parser() -> argparse.ArgumentParser:
                          help="fresh 1000-event durable append and full drain samples per run (Rust)")
     capture.add_argument("--journal-only", action="store_true",
                          help="only journal metrics and calibration; requires --journal-samples")
+    capture.add_argument("--artifact-samples", type=_positive_int, default=0,
+                         help="opt-in validated flash-bundle InputArtifact reads per size/run (Rust)")
+    capture.add_argument("--artifact-only", action="store_true")
+    capture.add_argument("--artifact-sizes-mib", type=int, choices=(1, 128, 1024), nargs="+", default=(128, 1024),
+                         help="1 MiB is functional-only scale, not target-size qualification")
     capture.add_argument("--cold-start-samples", type=_positive_int, default=50)
     capture.add_argument("--ipc-samples", type=_positive_int, default=1000)
     capture.add_argument(

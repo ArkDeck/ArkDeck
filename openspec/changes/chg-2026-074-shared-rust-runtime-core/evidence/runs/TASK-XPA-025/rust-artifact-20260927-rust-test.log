@@ -1,0 +1,43 @@
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-platform)
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-contract)
+   Compiling arkdeck-rockchip-binding v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-rockchip-binding)
+   Compiling arkdeck-provider-hdc v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-provider-hdc)
+   Compiling arkdeck-provider-arkforge v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-provider-arkforge)
+   Compiling arkdeck-provider-workspace v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-provider-workspace)
+   Compiling arkdeck-bootstrap v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-bootstrap)
+   Compiling arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-hoststore)
+   Compiling arkdeck-soak v0.1.0 (/private/tmp/arkdeck-xpa025-artifact-read/rust/crates/arkdeck-soak)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 22.03s
+     Running unittests src/lib.rs (/private/tmp/arkdeck-xpa025-journal-target/debug/deps/arkdeck_soak-42acc5c7335c5e2c)
+
+running 2 tests
+test clock_tests::suspend_jump_expires_overall_budget_without_remaining_awake_wait ... ok
+test recovery_refusal_tests::complete_outstanding_intent_and_unknown_outcome_refuse_without_dispatch_or_repair ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running unittests src/main.rs (/private/tmp/arkdeck-xpa025-journal-target/debug/deps/arkdeck_soak-0d316558aaa5c895)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/workload.rs (/private/tmp/arkdeck-xpa025-journal-target/debug/deps/workload-119e3474265f62cf)
+
+running 7 tests
+test recovery_seed_refuses_bad_workload_without_writing ... ok
+test refuses_unowned_nonempty_state_and_invalid_flags ... ok
+test artifact_seed_refuses_foreign_or_wrong_size_input_without_publication ... ok
+test recovery_seed_refuses_foreign_root_and_final_symlink ... ok
+test recovery_seed_is_exact_fresh_and_replayed_by_production_owner ... ok
+test measured_journal_emits_every_append_and_drains_production_pages ... ok
+test production_workload_reopens_and_verifies_all_outputs_and_refuses_corruption ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.58s
+
+   Doc-tests arkdeck_soak
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
