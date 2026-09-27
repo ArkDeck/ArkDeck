@@ -352,3 +352,11 @@ copy count; this reader cannot establish the ≤3-copy target. Swift's 128 MiB
 publication RSS test is a different boundary and is not relabeled as readback
 compliance. Missing RSS is unmeasured rather than zero. Debug or small-scale
 functional checks do not qualify either target-size performance baseline.
+
+The artifact-only measurement client uses an incremental bounded receive buffer,
+scans each new fragment for framing, decodes one JSON document, and releases each
+decoded page after digest accumulation. It retains the same frame/shape/base64/
+identity/range/digest checks, continuous deadline and bounded error evidence.
+`artifactReaderVersion` is comparison identity: the new instrument must not be
+compared as though it were the earlier immutable-buffer reader. Default UDS
+microbenchmark calls retain their existing exchange path.

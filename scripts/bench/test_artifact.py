@@ -95,7 +95,7 @@ class ArtifactRangeTests(unittest.TestCase):
         self.assertEqual(entries[-1]['status'], 'FAILED')
 
     def test_changed_scale_or_boundary_refuses_comparison(self):
-        fields = {'artifactArchiveSha256':'a'*64, 'artifactTemplateSha256':'b'*64,
+        fields = {'artifactReaderVersion':artifact.READER_VERSION, 'artifactArchiveSha256':'a'*64, 'artifactTemplateSha256':'b'*64,
                   'artifactPayloadBytes':128*1024*1024, 'artifactOwnerKind':'import',
                   'artifactImportKind':'flash-bundle', 'artifactPageBytes':4*1024*1024,
                   'artifactTimingBoundary':artifact.TIMING, 'artifactFixtureVersion':artifact_fixture.VERSION,
@@ -227,3 +227,53 @@ class ArtifactReadLoopTests(unittest.TestCase):
         process=next(row for row in rows if row['kind']=='artifactSeedProcess')
         self.assertTrue(process['timedOut'])
         self.assertEqual(process['stdout']['text'],'partial')
+
+
+class IncrementalArtifactTransportTests(ArtifactTransportTests):
+    def test_valid_response_across_arbitrary_fragment_boundaries(self):
+        import json
+        response = {'id':'read-1','ok':True,'result':page()}
+        wire = json.dumps(response).encode()+b'\n'
+        for fragments in ([wire], [wire[:-1],wire[-1:]],
+                          [wire[i:i+1] for i in range(len(wire))],
+                          [wire[:37],wire[37:83],wire[83:]]):
+            with self.subTest(sizes=[len(chunk) for chunk in fragments]):
+                client = self.client(fragments)
+                self.assertEqual(client._exchange({'id':'read-1'}),response)
+                self.assertIsNone(client.failure_evidence)
+
+    def test_oversize_response_refuses_even_if_valid_json_terminates(self):
+        from . import control
+        wire=b'{"id":"test","ok":true,"result":"'+b'x'*100+b'"}\n'
+        client=self.client([wire[:50],wire[50:]])
+        with patch.object(control,'MAXIMUM_RESPONSE_BYTES',64):
+            with self.assertRaisesRegex(control.ControlError,'transport limit'):
+                client._exchange({'id':'test'})
+        self.assertEqual(client.failure_evidence['receivedByteCount'],len(wire))
+        self.assertEqual(client.failure_evidence['receivedSha256'],hashlib.sha256(wire).hexdigest())
+
+    def test_extra_frame_carriage_return_and_duplicate_keys_refuse(self):
+        from . import control
+        cases = [b'{"id":"test","ok":true,"result":{}}\n{}\n',
+                 b'{"id":"test","ok":true,"result":{}}\r\n',
+                 b'{"id":"test","ok":true,"ok":false,"result":{}}\n',
+                 b'{"id":"test","ok":true,"result":{"x":1,"x":2}}\n']
+        for wire in cases:
+            client=self.client([wire[:19],wire[19:]])
+            with self.subTest(wire=wire), self.assertRaises(control.ControlError):
+                client._exchange({'id':'test'})
+            self.assertEqual(client.failure_evidence['receivedSha256'],hashlib.sha256(wire).hexdigest())
+
+    def test_successive_responses_do_not_retain_previous_frame(self):
+        import json
+        responses=[{'id':str(i),'ok':True,'result':{'value':i}} for i in range(2)]
+        client=self.client([json.dumps(row).encode()+b'\n' for row in responses])
+        for row in responses:
+            self.assertEqual(client._exchange({'id':row['id']}),row)
+
+    def test_reader_version_change_refuses_old_instrument_comparison(self):
+        old={'artifactReaderVersion':'bounded-json-v1','artifactPayloadBytes':128*1024*1024}
+        new={**old,'artifactReaderVersion':artifact.READER_VERSION}
+        self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
+        old.pop('artifactReaderVersion')
+        self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
