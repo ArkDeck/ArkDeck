@@ -1,0 +1,10 @@
+{
+  "recomputedMetrics": 9,
+  "allRunQuantilesMatch": true,
+  "allAggregateQuantilesMatch": true,
+  "allStabilityDecisionsMatch": true,
+  "sourceAndBinaryHashesUnchanged": true,
+  "baselineEligible": false,
+  "steady": "NOT_MEASURED",
+  "baselineSHA256": "39a7b2efc2e37ef39566a02b018d236560ed515b6a05c99086e8b0751b8a8ba4"
+}

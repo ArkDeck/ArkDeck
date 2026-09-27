@@ -101,6 +101,11 @@ comparison reference (the lane takes the last file by name), and whether this
 host's newer macOS and Xcode can stand in for the reference host of design
 section I.2 is a maintainer decision.
 
+The [2026-09-27 formal-scale capture](../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/formal-scale-20260927/README.md)
+retains all three runs and nine stable measured metrics, but remains ineligible
+for baseline adoption: post-release RSS was not observed and 16 gaps remain.
+Its exit 0 and subset stability verdict do not establish SPK-11/G5 completion.
+
 ## What decides whether a run counts
 
 A capture is only baseline-eligible when all of the following hold; otherwise

@@ -1,0 +1,98 @@
+[
+  {
+    "run": 0,
+    "sampleCounts": {
+      "calibration.busyLoop": 200,
+      "daemon.coldStart": 50,
+      "daemon.idleCpuPercent": 545,
+      "daemon.idleOpenFileDescriptorCount": 545,
+      "daemon.idleThreadCount": 545,
+      "daemon.residentSetPlateau": 545,
+      "ipc.health": 1000,
+      "ipc.jobList": 1000,
+      "ipc.jobStatus": 1000
+    },
+    "idleSamples": 545,
+    "idleLastStart": 600.4161394168623,
+    "rssMin": 21397504,
+    "rssMax": 21397504,
+    "releaseObserved": false,
+    "actualSeedTotal": 20,
+    "actualSeedStates": {
+      "cancelled": 2,
+      "succeeded": 18
+    },
+    "activeJobs": 0,
+    "firstPageRows": 20,
+    "runtimeCleanup": [
+      true
+    ],
+    "stateCleanup": [
+      true
+    ]
+  },
+  {
+    "run": 1,
+    "sampleCounts": {
+      "calibration.busyLoop": 200,
+      "daemon.coldStart": 50,
+      "daemon.idleCpuPercent": 545,
+      "daemon.idleOpenFileDescriptorCount": 545,
+      "daemon.idleThreadCount": 545,
+      "daemon.residentSetPlateau": 545,
+      "ipc.health": 1000,
+      "ipc.jobList": 1000,
+      "ipc.jobStatus": 1000
+    },
+    "idleSamples": 545,
+    "idleLastStart": 600.3843349588569,
+    "rssMin": 21348352,
+    "rssMax": 21348352,
+    "releaseObserved": false,
+    "actualSeedTotal": 20,
+    "actualSeedStates": {
+      "cancelled": 2,
+      "succeeded": 18
+    },
+    "activeJobs": 0,
+    "firstPageRows": 20,
+    "runtimeCleanup": [
+      true
+    ],
+    "stateCleanup": [
+      true
+    ]
+  },
+  {
+    "run": 2,
+    "sampleCounts": {
+      "calibration.busyLoop": 200,
+      "daemon.coldStart": 50,
+      "daemon.idleCpuPercent": 545,
+      "daemon.idleOpenFileDescriptorCount": 545,
+      "daemon.idleThreadCount": 545,
+      "daemon.residentSetPlateau": 545,
+      "ipc.health": 1000,
+      "ipc.jobList": 1000,
+      "ipc.jobStatus": 1000
+    },
+    "idleSamples": 545,
+    "idleLastStart": 600.4114074171521,
+    "rssMin": 21331968,
+    "rssMax": 21331968,
+    "releaseObserved": false,
+    "actualSeedTotal": 20,
+    "actualSeedStates": {
+      "cancelled": 2,
+      "succeeded": 18
+    },
+    "activeJobs": 0,
+    "firstPageRows": 20,
+    "runtimeCleanup": [
+      true
+    ],
+    "stateCleanup": [
+      true
+    ]
+  }
+]
