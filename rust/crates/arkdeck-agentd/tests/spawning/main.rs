@@ -50,6 +50,9 @@ mod host;
 #[allow(dead_code)]
 #[path = "../../src/managed_hdc.rs"]
 mod managed_hdc;
+#[allow(dead_code)]
+#[path = "../../src/tool_selection_startup.rs"]
+mod tool_selection_startup;
 
 mod app_ingress_fake_hdc;
 mod debug_read_control;

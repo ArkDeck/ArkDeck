@@ -33,8 +33,9 @@
 //! instance, nothing here runs before both locks are held.
 //!
 //! What it cannot prove it refuses: an `ARKDECK_HDC_PATH` the account's
-//! bootstrap registry cannot select, a pending tool selection it has no owner
-//! to settle, an endpoint another server holds, a recovery that fails — each
+//! bootstrap registry cannot select, a pending tool selection whose durable
+//! boundary cannot be settled, an endpoint another server holds, a recovery
+//! that fails — each
 //! ends the start with its reason, as Swift's does (exit 69 here, 1 there).
 //! Beside the registered HDC it starts as its managed server it reads the
 //! Runtime's own trusted USB relations, as Swift's daemon reads
@@ -397,9 +398,8 @@ impl Inputs {
 /// selection, that file is adopted as its first, as Swift's
 /// `adoptInstalledHDC` adopts it; the registry's startup selection — never
 /// the configured path once a selection exists — is the executable the
-/// managed server runs. A pending selection refuses the start: this Runtime
-/// composes no tool-selection owner to publish or fail it, and the selection
-/// is left as it is.
+/// managed server runs. A pending selection is returned to the startup
+/// transaction, which verifies its server before publishing or restoring it.
 pub(crate) fn registered_hdc(
     registry: &arkdeck_hoststore::ToolRegistryStore,
     configured: &Path,
@@ -420,12 +420,6 @@ pub(crate) fn registered_hdc(
         .startup_selection()
         .map_err(refused)?
         .ok_or("the registered HDC selection is absent after its adoption")?;
-    if let Some(action) = &selection.pending_action_id {
-        return Err(format!(
-            "HDC tool selection {action} is pending; this Runtime composes no tool-selection \
-             owner to settle it, so nothing was started and the selection is left as it is"
-        ));
-    }
     Ok(selection)
 }
 
@@ -644,6 +638,40 @@ pub(crate) fn compose(
         Some(configured) => {
             let registry = arkdeck_hoststore::ToolRegistryStore::open_existing(&layout.bootstrap)?;
             let selection = registered_hdc(&registry, configured, now)?;
+            let selection = if selection.pending_action_id.is_some() {
+                let records = arkdeck_hoststore::ToolSelectionRecords::open(
+                    &layout.state.join("tool-selection-control-actions/records"),
+                )?;
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .and_then(|d| u64::try_from(d.as_millis()).ok())
+                    .ok_or("tool-selection startup time is unavailable")?;
+                crate::tool_selection_startup::recover_prelaunch(
+                    &registry, &records, selection, now,
+                )?
+            } else {
+                selection
+            };
+            let endpoint =
+                arkdeck_provider_hdc::EndpointSelection::select(inputs.server_port.as_deref())?;
+            let (managed, selection) = crate::tool_selection_startup::start_and_settle(
+                &registry,
+                selection,
+                |selection| {
+                    let tool = arkdeck_platform::VerifiedTool::open(
+                        &selection.executable,
+                        &selection.executable_sha256,
+                    )
+                    .map_err(|error| error.to_string())?;
+                    crate::managed_hdc::ManagedHdc::start(
+                        &tool,
+                        &selection.executable.to_string_lossy(),
+                        endpoint,
+                    )
+                    .map(crate::managed_hdc::Launched::new)
+                },
+            )?;
             hdc_sha256 = Some(selection.executable_sha256.clone());
             let tool = || {
                 arkdeck_platform::VerifiedTool::open(
@@ -651,13 +679,6 @@ pub(crate) fn compose(
                     &selection.executable_sha256,
                 )
             };
-            let endpoint =
-                arkdeck_provider_hdc::EndpointSelection::select(inputs.server_port.as_deref())?;
-            let managed = crate::managed_hdc::Launched::new(crate::managed_hdc::ManagedHdc::start(
-                &tool()?,
-                &selection.executable.to_string_lossy(),
-                endpoint,
-            )?);
             managed.server().monitor_foreground_exit()?;
             state
                 .private_child("hdc-control-actions")?
@@ -665,6 +686,15 @@ pub(crate) fn compose(
             let controls = controls.with_hdc(arkdeck_hoststore::HdcControlActions::open(
                 &layout.hdc_control_actions,
                 arkdeck_hoststore::OwnerContext::production().map_err(|error| error.message)?,
+            )?);
+            let tool_actions = layout.state.join("tool-selection-control-actions");
+            state
+                .private_child("tool-selection-control-actions")?
+                .validate_path(&tool_actions)?;
+            let controls = controls.with_tools(arkdeck_hoststore::ToolSelectionActions::open(
+                &tool_actions,
+                arkdeck_hoststore::OwnerContext::production().map_err(|e| e.message)?,
+                Box::new(registry),
             )?);
             let dispatch =
                 arkdeck_provider_hdc::ProcessDispatch::new(tool()?, inputs.server_port.as_deref());

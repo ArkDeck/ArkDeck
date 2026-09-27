@@ -66,6 +66,7 @@ pub(crate) struct ManagedHdc {
     supervisor: Mutex<Option<SupervisedServer>>,
     ownership: Mutex<DispatchOwnership>,
     foreground: Mutex<ForegroundLifecycle>,
+    recomposition: std::sync::atomic::AtomicBool,
 }
 
 /// A replacement is owned only after an audited restart and a fresh kernel
@@ -75,6 +76,7 @@ enum DispatchOwnership {
     Original,
     Pending,
     Replacement(LoopbackServerLease),
+    SelectedReplacement(LoopbackServerLease, Box<VerifiedTool>),
     Unknown,
     Stopped,
 }
@@ -133,7 +135,13 @@ impl ManagedHdc {
             supervisor: Mutex::new(Some(supervised)),
             ownership: Mutex::new(DispatchOwnership::Original),
             foreground: Mutex::default(),
+            recomposition: std::sync::atomic::AtomicBool::new(false),
         })
+    }
+
+    pub(crate) fn requires_recomposition(&self) -> bool {
+        self.recomposition
+            .load(std::sync::atomic::Ordering::Acquire)
     }
 
     /// The configured executable, by the path it was configured with.
@@ -303,7 +311,10 @@ impl ManagedHdc {
         let pid = server.launch().pid;
         let server = server.stop();
         let replacement = match ownership {
-            DispatchOwnership::Replacement(lease) => self.end_replacement(&lease),
+            DispatchOwnership::Replacement(lease) => self.end_replacement(&lease, &self.tool),
+            DispatchOwnership::SelectedReplacement(lease, tool) => {
+                self.end_replacement(&lease, &tool)
+            }
             DispatchOwnership::Pending | DispatchOwnership::Unknown => ReplacementStop::Uncertain,
             DispatchOwnership::Original | DispatchOwnership::Stopped => ReplacementStop::None,
         };
@@ -321,16 +332,15 @@ impl ManagedHdc {
     /// the tool still verifies, the retained proof still holds, and a fresh
     /// two-scan proof names exactly that process as the endpoint's owner.
     /// Anything else there is left as it is.
-    fn end_replacement(&self, lease: &LoopbackServerLease) -> ReplacementStop {
+    fn end_replacement(&self, lease: &LoopbackServerLease, tool: &VerifiedTool) -> ReplacementStop {
         let proved = || -> Result<(), String> {
             let endpoint = self
                 .endpoint()
                 .parse()
                 .map_err(|_| "the selected endpoint is unavailable".to_owned())?;
-            self.tool.revalidate().map_err(|error| error.to_string())?;
+            tool.revalidate().map_err(|error| error.to_string())?;
             lease.revalidate().map_err(|error| error.to_string())?;
-            let fresh =
-                LoopbackServerLease::acquire(&self.tool, endpoint).map_err(|e| e.to_string())?;
+            let fresh = LoopbackServerLease::acquire(tool, endpoint).map_err(|e| e.to_string())?;
             if fresh.identity() != lease.identity() {
                 return Err("another process now owns the endpoint".into());
             }

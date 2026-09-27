@@ -43,7 +43,7 @@ use std::io;
 use std::path::Path;
 
 #[path = "hdc_control_lifecycle.rs"]
-mod lifecycle;
+pub(crate) mod lifecycle;
 pub use lifecycle::{HdcLifecycleAudit, HdcLifecycleDriver};
 
 /// An action's and its preview's life: `expiresAt` is `createdAt` plus 300 s.
@@ -436,7 +436,7 @@ impl Impact {
         &self.value
     }
 
-    fn critical_gate_is_clear(&self) -> bool {
+    pub(crate) fn critical_gate_is_clear(&self) -> bool {
         self.value
             .get("criticalJobGate")
             .and_then(|gate| gate.get("state"))
@@ -1168,7 +1168,7 @@ fn permits(from: &str, to: &str) -> bool {
 /// One reading of the impact source: the impact, the private continuity
 /// relations of its observations, and the source's own reason, if any, that
 /// the preview cannot be approved.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ImpactReading {
     pub impact: Impact,
     pub relations: Vec<Value>,

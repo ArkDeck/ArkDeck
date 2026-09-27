@@ -86,6 +86,19 @@ impl StopSignal {
         Ok(Self { read })
     }
 
+    /// A Runtime-owned composition change uses the same drain as a signal.
+    /// No external signal is sent and no other process is affected.
+    pub fn request_current() -> io::Result<()> {
+        if STOP_WRITE.load(Ordering::Acquire) < 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::NotConnected,
+                "the Runtime stop signal is not installed",
+            ));
+        }
+        record_stop(0);
+        Ok(())
+    }
+
     /// Whether a stop has been requested; never consumes the request.
     pub fn requested(&self) -> bool {
         readable_now(self.read.as_raw_fd())

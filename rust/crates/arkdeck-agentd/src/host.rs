@@ -1572,8 +1572,13 @@ impl HostServices for Host {
                                 "interactive HDC lifecycle execution is unavailable",
                             )
                         })?;
-                        controls.consume_interactive_challenge(
-                            id, reference, response, jobs, source, driver,
+                        controls.consume_with_drivers(
+                            id,
+                            reference,
+                            response,
+                            jobs,
+                            source,
+                            (driver, Some(driver)),
                         )
                     })
                 })()
@@ -1641,7 +1646,7 @@ impl HostServices for Host {
     /// isolated composition makes — over the HDC control-action owner and the
     /// impact source of its managed HDC server, when it started one — or,
     /// without it, as Swift's handler answers with no control-action owner.
-    /// Neither composes a tool-selection owner.
+    /// Production also composes the registered tool-selection owner.
     #[cfg(target_os = "macos")]
     fn control_action(
         &self,

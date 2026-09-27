@@ -4,7 +4,9 @@
 //! a command, audit, Supervisor state or replacement process identity.
 use super::*;
 use arkdeck_contract::{WireError, canonical_json, sha256_hex};
-use arkdeck_hoststore::{HdcLifecycleAudit, HdcLifecycleDriver, ImpactReading};
+use arkdeck_hoststore::{
+    HdcLifecycleAudit, HdcLifecycleDriver, ImpactReading, ToolSelectionAudit, ToolSelectionDriver,
+};
 use arkdeck_provider_hdc::{
     LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, PostDispatchObservation,
     PreparedLifecycle,
@@ -142,12 +144,75 @@ impl Drop for LaunchWindow<'_> {
     }
 }
 
+trait LifecycleAudit {
+    fn append(&self, kind: &str, id: &str, payload: Value) -> Result<(), WireError>;
+}
+impl LifecycleAudit for HdcLifecycleAudit<'_> {
+    fn append(&self, kind: &str, id: &str, payload: Value) -> Result<(), WireError> {
+        HdcLifecycleAudit::append(self, kind, id, payload).map(|_| ())
+    }
+}
+impl LifecycleAudit for ToolSelectionAudit<'_> {
+    fn append(&self, kind: &str, id: &str, payload: Value) -> Result<(), WireError> {
+        ToolSelectionAudit::append(self, kind, id, payload)
+    }
+}
 impl HdcLifecycleDriver for ManagedHdc {
     fn restart(
         &self,
         reading: &ImpactReading,
         audit: &HdcLifecycleAudit<'_>,
     ) -> Result<(), WireError> {
+        self.restart_with_tool(None, reading, audit)
+    }
+}
+
+impl ToolSelectionDriver for ManagedHdc {
+    fn restart_selected(
+        &self,
+        selected: &arkdeck_hoststore::StartupSelection,
+        reading: &ImpactReading,
+        audit: &ToolSelectionAudit<'_>,
+    ) -> Result<(), WireError> {
+        // Once the durable marker is present, even unwinding must drain this
+        // provider graph. The ordinary stop ends only the proved replacement.
+        struct Recompose<'a, 'b> {
+            managed: &'a ManagedHdc,
+            audit: &'a ToolSelectionAudit<'b>,
+        }
+        impl Drop for Recompose<'_, '_> {
+            fn drop(&mut self) {
+                if self.audit.entered() {
+                    self.managed
+                        .recomposition
+                        .store(true, std::sync::atomic::Ordering::Release);
+                    let _ = arkdeck_platform::StopSignal::request_current();
+                }
+            }
+        }
+        let _recompose = Recompose {
+            managed: self,
+            audit,
+        };
+        let tool = VerifiedTool::open(&selected.executable, &selected.executable_sha256).map_err(
+            |error| {
+                failure(
+                    "admissionDenied",
+                    format!("selected HDC identity is unavailable: {error}"),
+                )
+            },
+        )?;
+        self.restart_with_tool(Some(tool), reading, audit)
+    }
+}
+impl ManagedHdc {
+    fn restart_with_tool(
+        &self,
+        selected: Option<VerifiedTool>,
+        reading: &ImpactReading,
+        audit: &dyn LifecycleAudit,
+    ) -> Result<(), WireError> {
+        let tool = selected.as_ref().unwrap_or(&self.tool);
         let scope = Scope::approved(reading, self.endpoint())?;
         self.current().map_err(drift)?;
         if self.state(self.endpoint()).as_ref() != Some(&scope.server) {
@@ -178,17 +243,16 @@ impl HdcLifecycleDriver for ManagedHdc {
             .endpoint()
             .parse()
             .map_err(|_| drift("selected endpoint is unavailable"))?;
-        let command = LifecycleCommand::new(LifecycleAction::Restart, endpoint, &self.tool);
+        let command = LifecycleCommand::new(LifecycleAction::Restart, endpoint, tool);
         let actual = json!({"stepId":step_id,"executable":command.executable,"argv":command.arguments,"endpoint":self.endpoint()});
         audit.append("actualCommand", &audit_id, actual.clone())?;
-        let prepared =
-            PreparedLifecycle::prepare(&self.tool, command, scope.server.generation as u64)
-                .map_err(|e| {
-                    failure(
-                        "admissionDenied",
-                        format!("HDC lifecycle preparation refused: {e}"),
-                    )
-                })?;
+        let prepared = PreparedLifecycle::prepare(tool, command, scope.server.generation as u64)
+            .map_err(|e| {
+                failure(
+                    "admissionDenied",
+                    format!("HDC lifecycle preparation refused: {e}"),
+                )
+            })?;
         let identity = prepared.identity();
         let mut marker = actual.as_object().unwrap().clone();
         marker.extend(json!({"authorizedExecutable":identity.authorized_path,"inodeLaunchPath":identity.inode_launch_path,
@@ -226,7 +290,7 @@ impl HdcLifecycleDriver for ManagedHdc {
             } => {
                 // Keep the exact new identity, not merely a numeric generation
                 // or a process found later at this port.
-                match LoopbackServerLease::acquire(&self.tool, endpoint) {
+                match LoopbackServerLease::acquire(tool, endpoint) {
                     Ok(lease)
                         if generation(lease.identity()) == Some(resulting_generation)
                             && resulting_generation > scope.server.generation as u64
@@ -265,7 +329,7 @@ impl HdcLifecycleDriver for ManagedHdc {
             && matches!(*ownership, DispatchOwnership::Pending);
         let known = outcome["result"] == "succeeded"
             && matches
-            && self.tool.revalidate().is_ok()
+            && tool.revalidate().is_ok()
             && replacement.as_ref().is_some_and(|l| l.revalidate().is_ok());
         let reason = if known {
             "durable lifecycle outcome reconciled against unchanged supervisor scope"
@@ -298,7 +362,10 @@ impl HdcLifecycleDriver for ManagedHdc {
                     .map_err(|_| drift("replacement generation is unrepresentable"))?,
                 ..scope.server
             });
-            *ownership = DispatchOwnership::Replacement(lease);
+            *ownership = match selected {
+                None => DispatchOwnership::Replacement(lease),
+                Some(tool) => DispatchOwnership::SelectedReplacement(lease, Box::new(tool)),
+            };
         } else {
             if let Some(state) = state.as_mut() {
                 state.healthy = false;

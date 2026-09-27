@@ -139,8 +139,7 @@ struct Ledger<'a> {
 }
 
 /// The control action of the HDC tool selection pending in the bootstrap
-/// store at `path`, as the cutover preflight reads it (the production
-/// composition refuses to start beside one it has no owner to settle): the
+/// store at `path`, as the cutover preflight reads it: the
 /// tool index read whole — it is published atomically — without the store's
 /// lock, without creating an absent index and without verifying any tool. An
 /// absent store or index holds no selection.
