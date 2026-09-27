@@ -1,0 +1,24 @@
+{
+  "utc": "2026-09-27T07:06:00Z",
+  "kind": "prebuildDiskAdmission",
+  "attempt": 2,
+  "previousAttempt": "prebuild-admission.json",
+  "sourceCommit": "8616a8220a82cdc4200804b31d5408eea7953ee3",
+  "conditionChange": {
+    "owner": "Runtime task 01a0dd36-6b29-7be0-aad3-9b47c4e9b9ca",
+    "action": "owner removed only inactive debug/incremental after all own processes ended",
+    "path": "/private/tmp/arkdeck-takeover-d79c-target/debug/incremental",
+    "reportedLogicalBytes": 6113977336,
+    "reportedDuKiB": 5284416,
+    "reportedFreeBeforeKiB": 5040000,
+    "reportedFreeAfterKiB": 9360000
+  },
+  "payloadBytes": 1073741824,
+  "releaseBuildStarted": false,
+  "captureStarted": false,
+  "baselineEligible": false,
+  "freeBytes": 9584640000,
+  "requiredFreeBytes": 7583301632,
+  "reserveBytes": 4294967296,
+  "status": "PASS"
+}

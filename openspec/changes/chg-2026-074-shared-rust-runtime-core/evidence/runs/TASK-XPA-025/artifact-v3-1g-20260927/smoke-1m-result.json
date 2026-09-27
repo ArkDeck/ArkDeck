@@ -1,0 +1,50 @@
+{
+  "status": "complete",
+  "milliseconds": 10.218667099252343,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactReaderVersion": "bounded-incremental-json-v3",
+    "artifactArchiveSha256": "5a721548af8cd1e8d196c51c7a0900f0b738056bf761dc5865ed1566c8b6112d",
+    "artifactTemplateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 1048576,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 1048576,
+      "sha256": "5a721548af8cd1e8d196c51c7a0900f0b738056bf761dc5865ed1566c8b6112d",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 1028096,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 1048576,
+      "actualPageCount": 1,
+      "effectiveBytesPerSecond": 102613774.36169928,
+      "effectiveDecimalMBPerSecond": 102.61377436169929,
+      "effectiveMiBPerSecond": 97.86012111825875,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.014881958020851016,
+          "daemonBytes": 20086784,
+          "clientBytes": 45842432
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 20086784,
+          "sampledPeakBytes": 20086784,
+          "sampledGrowthBytes": 0
+        },
+        "clientBytes": {
+          "baselineBytes": 45842432,
+          "sampledPeakBytes": 45842432,
+          "sampledGrowthBytes": 0
+        }
+      }
+    }
+  },
+  "baselineEligible": false
+}
