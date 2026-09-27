@@ -196,7 +196,7 @@ fn incomplete(location: &[String]) -> WireError {
     crate::job_record::failure(
         "recordUnreadable",
         &format!(
-            "Runtime mutation state continuity cannot be proved: retained Session {named} has no Manifest and no failed publication of this Runtime accounts for it; runtime storage status and session cleanup name it; move it out of the Session root once reviewed; original state is preserved"
+            "Runtime mutation state continuity cannot be proved: retained Session {named} has no Manifest and no failed publication of this Runtime accounts for it; inspect it with read-only `arkdeck runtime storage status`; preserve the original Session and any unresolved outcomes; cutover and device mutation remain blocked until complete state continuity is proved"
         ),
     )
 }
