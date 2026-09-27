@@ -16,9 +16,9 @@
 //! What it accepts is the parser's to read, which judges what the values mean
 //! as Swift's handlers do. For an executable leaf it also says what Swift's
 //! parser answers ([`Accepted`]), which the argv fixtures record
-//! (`machine_contracts`). Help or `--version` without a leaf, a node path,
-//! `arkdeck help <path>`, a leaf that is not executable and `--version` after
-//! a leaf are left to the parser.
+//! (`machine_contracts`). Global `--version` also returns an accepted local
+//! entry. Root help, a node path, `arkdeck help <path>` and a leaf that is not
+//! executable are left to the parser.
 //!
 //! The CLI spec (§5.1) lets a global option stand ahead of the command path
 //! or after the leaf's arguments, and this CLI reads `--control-request-id`,
@@ -132,6 +132,7 @@ enum Global {
 /// `CLIInvocation`).
 #[derive(Debug)]
 pub(crate) enum Accepted {
+    Version(String),
     /// `arkdeck help`.
     RootHelp,
     LeafHelp(&'static str),
@@ -277,10 +278,14 @@ pub(crate) fn leaf(argv: &[String]) -> Option<&'static str> {
 /// Swift's registry pass over `argv`; see the module. `None` where it
 /// leaves the answer to the parser.
 pub(crate) fn check(argv: &[String]) -> Result<Option<Accepted>, CliError> {
+    check_exact(&as_swift_reads(argv))
+}
+
+/// Version is a local entry and accepts only Swift's actual global options.
+pub(crate) fn check_exact(argv: &[String]) -> Result<Option<Accepted>, CliError> {
     if argv.is_empty() {
         return Ok(None);
     }
-    let argv = &as_swift_reads(argv);
     let mut state = State::default();
     let mut index = 0;
     // Phase 1: the global options ahead of the command path.
@@ -300,6 +305,9 @@ pub(crate) fn check(argv: &[String]) -> Result<Option<Accepted>, CliError> {
     }
     // A bare `--version` or `--help` is a complete request.
     if index == argv.len() {
+        if state.version {
+            return version(&state).map(Some);
+        }
         return Ok(None);
     }
     // Phase 2: the command path.
@@ -451,7 +459,7 @@ fn check_leaf(
         return help(&state).map(|()| Some(Accepted::LeafHelp(command)));
     }
     if state.version {
-        return Ok(None);
+        return version(&state).map(Some);
     }
     // `--output` is position-global but leaf-scoped: given in both regions it
     // is still one option given twice.
@@ -505,6 +513,19 @@ fn check_leaf(
             handler_arguments: argv[path_start..].to_vec(),
         }),
     })
+}
+
+fn version(state: &State) -> Result<Accepted, CliError> {
+    let mode = state.output.as_deref().unwrap_or("human");
+    if !matches!(mode, "human" | "json") {
+        return Err(refusal(
+            "invalidOption",
+            "--version --output must be human|json".into(),
+            json!({"value": mode}),
+            None,
+        ));
+    }
+    Ok(Accepted::Version(mode.to_owned()))
 }
 
 /// Swift `validate(leaf:path:provided:positionals:)`.

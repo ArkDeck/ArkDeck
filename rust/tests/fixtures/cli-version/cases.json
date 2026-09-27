@@ -1,0 +1,315 @@
+{
+  "producer": "CLIVersionOracleContractTests",
+  "runs": [
+    {
+      "argv": [
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--output",
+        "human"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--output",
+        "json"
+      ],
+      "exitCode": 0,
+      "stdout": "{\"command\":\"version\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"buildIdentity\":\"sha256:<executable>\",\"canonicalJsonVersion\":\"arkdeck.cli.canonical-json/1\",\"cliProductVersion\":\"0.1.0\",\"commandRegistrySchemaVersion\":\"arkdeck.cli.command-registry/1\",\"controlContractIdentity\":\"1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\",\"controlProtocolVersion\":\"1.0.0\",\"errorRegistryVersion\":\"arkdeck.cli.error-registry/1\",\"eventSchemaVersion\":\"arkdeck.cli.event/1\",\"machineContractVersion\":\"arkdeck.cli.contracts/1\",\"nextActionSchemaVersion\":\"arkdeck.cli.next-action/1\",\"pageSchemaVersion\":\"arkdeck.cli.page/1\",\"resultSchemaVersion\":\"arkdeck.cli.result/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--output",
+        "json",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "{\"command\":\"version\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"buildIdentity\":\"sha256:<executable>\",\"canonicalJsonVersion\":\"arkdeck.cli.canonical-json/1\",\"cliProductVersion\":\"0.1.0\",\"commandRegistrySchemaVersion\":\"arkdeck.cli.command-registry/1\",\"controlContractIdentity\":\"1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\",\"controlProtocolVersion\":\"1.0.0\",\"errorRegistryVersion\":\"arkdeck.cli.error-registry/1\",\"eventSchemaVersion\":\"arkdeck.cli.event/1\",\"machineContractVersion\":\"arkdeck.cli.contracts/1\",\"nextActionSchemaVersion\":\"arkdeck.cli.next-action/1\",\"pageSchemaVersion\":\"arkdeck.cli.page/1\",\"resultSchemaVersion\":\"arkdeck.cli.result/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--help"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--help",
+        "--version",
+        "--output",
+        "json"
+      ],
+      "exitCode": 0,
+      "stdout": "{\"command\":\"version\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"buildIdentity\":\"sha256:<executable>\",\"canonicalJsonVersion\":\"arkdeck.cli.canonical-json/1\",\"cliProductVersion\":\"0.1.0\",\"commandRegistrySchemaVersion\":\"arkdeck.cli.command-registry/1\",\"controlContractIdentity\":\"1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\",\"controlProtocolVersion\":\"1.0.0\",\"errorRegistryVersion\":\"arkdeck.cli.error-registry/1\",\"eventSchemaVersion\":\"arkdeck.cli.event/1\",\"machineContractVersion\":\"arkdeck.cli.contracts/1\",\"nextActionSchemaVersion\":\"arkdeck.cli.next-action/1\",\"pageSchemaVersion\":\"arkdeck.cli.page/1\",\"resultSchemaVersion\":\"arkdeck.cli.result/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--version"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: --version was given more than once\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "--output",
+        "jsonl"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"registry.parse\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"value\":\"jsonl\"},\"message\":\"--version --output must be human|json\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--output",
+        "yaml"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: --version --output must be human|json\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "--output"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: --output requires a value\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "--output",
+        "json",
+        "--output",
+        "json"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: --output was given more than once\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "--unknown"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: unknown option --unknown before the command path; run `arkdeck commands` to list the published surface\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "unknown"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: unknown command `unknown`; run `arkdeck commands` to list the published surface\n"
+    },
+    {
+      "argv": [
+        "runtime",
+        "--version"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: `runtime` needs a subcommand before any option: health|hdc|service|signing|bundle|tool|support-bundle|update|storage\n"
+    },
+    {
+      "argv": [
+        "--version",
+        "runtime"
+      ],
+      "exitCode": 64,
+      "stdout": "",
+      "stderr": "arkdeck: `runtime` needs a subcommand: health|hdc|service|signing|bundle|tool|support-bundle|update|storage\n"
+    },
+    {
+      "argv": [
+        "doctor",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "doctor"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--output",
+        "json",
+        "doctor",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "{\"command\":\"version\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"buildIdentity\":\"sha256:<executable>\",\"canonicalJsonVersion\":\"arkdeck.cli.canonical-json/1\",\"cliProductVersion\":\"0.1.0\",\"commandRegistrySchemaVersion\":\"arkdeck.cli.command-registry/1\",\"controlContractIdentity\":\"1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\",\"controlProtocolVersion\":\"1.0.0\",\"errorRegistryVersion\":\"arkdeck.cli.error-registry/1\",\"eventSchemaVersion\":\"arkdeck.cli.event/1\",\"machineContractVersion\":\"arkdeck.cli.contracts/1\",\"nextActionSchemaVersion\":\"arkdeck.cli.next-action/1\",\"pageSchemaVersion\":\"arkdeck.cli.page/1\",\"resultSchemaVersion\":\"arkdeck.cli.result/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "doctor",
+        "--version",
+        "--output",
+        "json"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "doctor",
+        "--help",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck doctor — read-only Runtime, Catalog, provider and storage health summary\n\nusage: arkdeck doctor [--deep] [--require-healthy] [--output <human|json>] [--json] [--control-request-id <id>]\n\noptions:\n  --deep                            run bounded live HDC, storage and recovery checks\n  --require-healthy                 exit 69 when the completed report contains a blocker\n  --output <human|json>             output mode; machine modes emit one arkdeck.cli.result/1 document\n  --json                            legacy: print the raw reply as JSON, without the result envelope\n  --control-request-id <id>         correlate this control-plane call; not a Job or request identity\nat most one of: --output, --json\n\noutput modes: human, json\n\ntalks to arkdeck-agentd over the current user's private local socket.\ntyped operation inputs come from `arkdeck operation describe`, not here.\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--output",
+        "json",
+        "doctor",
+        "--help",
+        "--version"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"registry.parse\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"message\":\"help renders human text only; use `arkdeck commands --output json` for the machine projection of the command surface\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "runtime",
+        "update",
+        "check",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--output",
+        "json",
+        "runtime",
+        "update",
+        "check",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "{\"command\":\"version\",\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":true,\"result\":{\"buildIdentity\":\"sha256:<executable>\",\"canonicalJsonVersion\":\"arkdeck.cli.canonical-json/1\",\"cliProductVersion\":\"0.1.0\",\"commandRegistrySchemaVersion\":\"arkdeck.cli.command-registry/1\",\"controlContractIdentity\":\"1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\",\"controlProtocolVersion\":\"1.0.0\",\"errorRegistryVersion\":\"arkdeck.cli.error-registry/1\",\"eventSchemaVersion\":\"arkdeck.cli.event/1\",\"machineContractVersion\":\"arkdeck.cli.contracts/1\",\"nextActionSchemaVersion\":\"arkdeck.cli.next-action/1\",\"pageSchemaVersion\":\"arkdeck.cli.page/1\",\"resultSchemaVersion\":\"arkdeck.cli.result/1\"},\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "commands",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "completion",
+        "--version"
+      ],
+      "exitCode": 0,
+      "stdout": "arkdeck 0.1.0\n  command registry schema         arkdeck.cli.command-registry/1\n  control protocol                1.0.0\n  control contract identity       1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633\n  machine contract                arkdeck.cli.contracts/1\n    resultSchemaVersion           arkdeck.cli.result/1\n    pageSchemaVersion             arkdeck.cli.page/1\n    eventSchemaVersion            arkdeck.cli.event/1\n    nextActionSchemaVersion       arkdeck.cli.next-action/1\n    errorRegistryVersion          arkdeck.cli.error-registry/1\n    canonicalJsonVersion          arkdeck.cli.canonical-json/1\n  build identity                  sha256:<executable>\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "agent",
+        "chat",
+        "--version",
+        "--output",
+        "json"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"agent.chat\",\"error\":{\"attentionRequired\":false,\"code\":\"commandRemoved\",\"controlRequestRetryable\":false,\"details\":{\"command\":\"agent.chat\",\"lifecycleStatus\":\"removed\",\"removalVersion\":null,\"replacementArgvPattern\":\"arkdeck agent run\"},\"message\":\"`agent chat` is retired: use `arkdeck agent run`\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "maintainer",
+        "update-feed",
+        "prepare",
+        "--version",
+        "1.2.3",
+        "--output",
+        "json"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"maintainer.update-feed.prepare\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"command\":\"maintainer.update-feed.prepare\",\"option\":\"--sequence\"},\"message\":\"`maintainer update-feed prepare` requires --sequence <n>\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--control-request-id",
+        "ctl-explicit",
+        "--output",
+        "json"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"registry.parse\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"option\":\"--control-request-id\"},\"message\":\"unknown option --control-request-id before the command path; run `arkdeck commands` to list the published surface\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--version",
+        "--socket",
+        "/missing",
+        "--output",
+        "json"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"registry.parse\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"option\":\"--socket\"},\"message\":\"unknown option --socket before the command path; run `arkdeck commands` to list the published surface\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "--output",
+        "json",
+        "doctor",
+        "--version",
+        "--unknown"
+      ],
+      "exitCode": 64,
+      "stdout": "{\"command\":\"doctor\",\"error\":{\"attentionRequired\":false,\"code\":\"invalidOption\",\"controlRequestRetryable\":false,\"details\":{\"command\":\"doctor\",\"option\":\"--unknown\"},\"message\":\"`doctor` does not accept --unknown; run `arkdeck help doctor` for its options\"},\"meta\":{\"cliVersion\":\"0.1.0\",\"controlRequestId\":\"ctl-<uuid>\"},\"ok\":false,\"schemaVersion\":\"arkdeck.cli.result/1\"}\n",
+      "stderr": ""
+    }
+  ]
+}
