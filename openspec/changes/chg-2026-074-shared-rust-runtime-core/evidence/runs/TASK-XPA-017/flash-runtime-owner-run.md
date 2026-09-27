@@ -119,7 +119,29 @@ lanes remain the PR CI's responsibility. The installed Runtime was untouched.
 
 ## CI
 
-Pending the bot PR's exact-head checks. Results will be recorded in the PR body
+PR #2282 run `36297499647` failed its Swift lane on head `a9b575cf`:
+`ArchitectureBoundaryContractTests` and `AutoUpdateContractTests` still asserted
+the previous ArkForge revision. All Rust lanes and the App build passed. The
+original failed-step log is `/private/tmp/arkdeck-pr2282-ci-failed.log`.
+Both tests now assert the reviewed merged revision `c1dc0553b42627581583abfba3fec34d13343282`;
+their exact dependency, identity, entitlement and disclosure checks remain intact.
+Main `56c321be` was integrated without conflicts, retaining the already-reviewed
+CI execution improvements and Artifact measurement dependency edge. This was a
+code failure, not an invalid-run rerun.
+
+### Local targeted checks for the pin assertion correction
+
+`python3 rust/scripts/check-arkforge-pin.py`, `sh scripts/check-sdd.sh` and
+`git diff --check` exited 0. Logs are
+`/private/tmp/arkdeck-pr2282-pin-fix-{pins,sdd}.log`.
+The two affected Swift test classes have not yet run locally: the shared host's
+single test window is occupied by an active HDC regression. Under the product
+loop's delivery priority, this assertion-only correction is pushed for CI while
+that valid run continues. The earlier production checks above remain evidence
+for the earlier head; the corrected exact head must pass CI before merge.
+No preview implementation is included.
+
+Pending the corrected head's checks. Results will be recorded in the PR body
 without amending an already-green head. Protected main still requires both
 `guard` and `swift` (read back through the GitHub branch-protection API).
 Local checks do not constitute maintainer approval or hardware acceptance.
