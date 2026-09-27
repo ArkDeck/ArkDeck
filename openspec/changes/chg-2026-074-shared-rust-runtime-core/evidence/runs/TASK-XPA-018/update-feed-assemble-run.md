@@ -89,3 +89,30 @@ CryptoKit-signed rows after the follow-up.
 No PR/run for this local slice. Remote push remains awaiting direct authorization
 in this thread after automatic approval review rejected it. Local verification
 does not imply dependency-gate success, maintainer approval, or merge.
+
+## PR #2272 shared oracle directory follow-up
+
+Swift CI run `36281612981`, job `108514421331`, failed the old
+`CLIUpdateFeedOracleContractTests` directory inventory assertion after this
+branch added `signed.json`. The CLI producer owns only `cases.json` and
+`provenance.json`; the signed-feed producer owns `signed.json`. The caller now
+asserts its exact produced key set and compares both owned files byte for byte,
+while the signed-feed test retains its separate complete comparison. Record mode
+still calls the unchanged harness, requiring a new directory under `/private/tmp`.
+No recorded bytes, production code or global harness assertion changed.
+
+### Local targeted checks
+
+`sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter
+'CLIUpdateFeedOracleContractTests|UpdateFeedSignedRustOracleTests'`: exit 0,
+two XCTest tests; `/private/tmp/arkdeck-pr2272-feed-oracle-fix.log`.
+`sh scripts/check-sdd.sh` and `git diff --check`: exit 0; logs
+`/private/tmp/arkdeck-pr2272-feed-oracle-sdd.log` and
+`/private/tmp/arkdeck-pr2272-feed-oracle-diff.log`. No full suite was repeated
+for this Swift test-only compatibility fix.
+
+### CI
+
+PR #2272's original run failed at the assertion described above; the new head
+requires its own CI result. The independent four-package cargo-vet audit gap
+remains unresolved.
