@@ -1569,13 +1569,16 @@ fn main() -> std::process::ExitCode {
                     .command
                     .is_some_and(arkdeck_cli::runtime_update::serves)
                 && error.details.get("value").and_then(Value::as_str) == Some("jsonl");
-            if machine || update_jsonl_refusal {
+            let version_jsonl_refusal = output_values == ["jsonl"]
+                && error.message == "--version --output must be human|json";
+            if machine || update_jsonl_refusal || version_jsonl_refusal {
                 let command = error.command.unwrap_or("registry.parse");
-                let parse_id = if update_parse_refusal {
-                    &fallback_id
-                } else {
-                    parse_id
-                };
+                let parse_id =
+                    if update_parse_refusal || arkdeck_cli::version::is_root_request(&args) {
+                        &fallback_id
+                    } else {
+                        parse_id
+                    };
                 if write_document(&arkdeck_cli::with_lifecycle(
                     failure_envelope(command, &error, parse_id, false),
                     command,
@@ -1595,6 +1598,21 @@ fn main() -> std::process::ExitCode {
             return error.exit_code().into();
         }
     };
+    if invocation.command == "version" {
+        let result = arkdeck_cli::version::result();
+        let written = if invocation.json {
+            write_document(&arkdeck_cli::local_success_envelope(
+                "version",
+                result,
+                &fallback_id,
+            ))
+        } else {
+            io::stdout()
+                .lock()
+                .write_all(format!("{}\n", arkdeck_cli::version::human(&result)).as_bytes())
+        };
+        return if written.is_ok() { 0.into() } else { 74.into() };
+    }
     if invocation.command == "help" || (invocation.help && invocation.command != "commands") {
         // `arkdeck help <path>` renders that path; `<leaf> --help` renders the
         // leaf's own, both from the registry (Swift `CLIHelpRenderer`).

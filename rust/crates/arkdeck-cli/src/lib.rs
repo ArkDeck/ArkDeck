@@ -99,6 +99,7 @@ pub mod signing_leaves;
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
 pub const CLI_VERSION: &str = "0.1.0";
+pub mod version;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -395,6 +396,9 @@ pub fn valid_correlation(id: &str) -> bool {
 /// narrows what is accepted.
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if let Some(answer) = command_registry::answer_by_name(argv) {
+        return answer;
+    }
+    if let Some(answer) = version::answer(argv) {
         return answer;
     }
     if let Some(answer) = runtime_update::answer(argv) {

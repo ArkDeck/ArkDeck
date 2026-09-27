@@ -519,7 +519,7 @@ fn error_registry_document() -> Value {
 
 /// Swift `canonicalVectorsSchemaVersion` and `CLICanonicalJSON.version`.
 const CANONICAL_VECTORS_SCHEMA_VERSION: &str = "arkdeck.cli.canonical-json-vectors/1";
-const CANONICAL_JSON_VERSION: &str = "arkdeck.cli.canonical-json/1";
+pub const CANONICAL_JSON_VERSION: &str = "arkdeck.cli.canonical-json/1";
 
 /// Swift `canonicalVectorInputs`: values a port must encode as this build
 /// does.
@@ -1305,6 +1305,7 @@ fn parsed(argv: &[String]) -> Result<Accepted, CliError> {
 /// the registry publishes it as legacy or deprecated.
 fn outcome(argv: &[String]) -> Value {
     match parsed(argv) {
+        Ok(Accepted::Version(mode)) => json!({"outcome": "version", "outputMode": mode}),
         Ok(Accepted::RootHelp) => json!({"outcome": "rootHelp"}),
         Ok(Accepted::LeafHelp(command)) => json!({"outcome": "leafHelp", "command": command}),
         Ok(Accepted::Commands(mode)) => json!({"outcome": "commands", "outputMode": mode}),
