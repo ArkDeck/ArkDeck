@@ -1,0 +1,508 @@
+{
+  "workflowRun": 36291225535,
+  "commit": "443e805ef7529e61a9860ccae7011c072142e52a",
+  "conclusion": "success",
+  "runnerLabel": "macos-26",
+  "runnerImage": "macos-26-arm64",
+  "osVersion": "26.6.2 (25G83)",
+  "imageVersion": "20260907.0351.1",
+  "durationSeconds": 14401,
+  "configuredDurationSeconds": 14400,
+  "configuredOwnerReopenIntervalSeconds": 300,
+  "cycleSamples": 48,
+  "finalSnapshots": 1,
+  "recoveredPreflightJobs": 48,
+  "daemonProcessRestarts": 0,
+  "residentHighWaterGrowthMiB": 6.5625,
+  "residentHighWaterFinalMiB": 21.65625,
+  "fileDescriptorGrowth": 0,
+  "terminalJobs": 480,
+  "activeJobs": 0,
+  "cleanupDebt": 0,
+  "metricsSHA256": "3b65aab0b5c3d692313cfd174bfad660827df024fb31b9df51a748966edbf2e7",
+  "scope": "hosted production-owner lifecycle with simulated provider; not socket IPC, 24h, current main, installed Runtime or real device evidence",
+  "samples": [
+    {
+      "cycle": 1,
+      "jobs": 10,
+      "active": 1,
+      "recovered": 0,
+      "rssBytes": 15826944,
+      "rssGrowthBytes": 0,
+      "fdCount": 19,
+      "stateBytes": 474287
+    },
+    {
+      "cycle": 2,
+      "jobs": 20,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 16056320,
+      "rssGrowthBytes": 229376,
+      "fdCount": 19,
+      "stateBytes": 944961
+    },
+    {
+      "cycle": 3,
+      "jobs": 30,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 16334848,
+      "rssGrowthBytes": 507904,
+      "fdCount": 19,
+      "stateBytes": 1436509
+    },
+    {
+      "cycle": 4,
+      "jobs": 40,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 16482304,
+      "rssGrowthBytes": 655360,
+      "fdCount": 19,
+      "stateBytes": 1949836
+    },
+    {
+      "cycle": 5,
+      "jobs": 50,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 16793600,
+      "rssGrowthBytes": 966656,
+      "fdCount": 19,
+      "stateBytes": 2484946
+    },
+    {
+      "cycle": 6,
+      "jobs": 60,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 16973824,
+      "rssGrowthBytes": 1146880,
+      "fdCount": 19,
+      "stateBytes": 3041843
+    },
+    {
+      "cycle": 7,
+      "jobs": 70,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 17268736,
+      "rssGrowthBytes": 1441792,
+      "fdCount": 19,
+      "stateBytes": 3636911
+    },
+    {
+      "cycle": 8,
+      "jobs": 80,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 17399808,
+      "rssGrowthBytes": 1572864,
+      "fdCount": 19,
+      "stateBytes": 4237380
+    },
+    {
+      "cycle": 9,
+      "jobs": 90,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 17629184,
+      "rssGrowthBytes": 1802240,
+      "fdCount": 19,
+      "stateBytes": 4867826
+    },
+    {
+      "cycle": 10,
+      "jobs": 100,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 17776640,
+      "rssGrowthBytes": 1949696,
+      "fdCount": 19,
+      "stateBytes": 5520098
+    },
+    {
+      "cycle": 11,
+      "jobs": 110,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 17940480,
+      "rssGrowthBytes": 2113536,
+      "fdCount": 19,
+      "stateBytes": 6185986
+    },
+    {
+      "cycle": 12,
+      "jobs": 120,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18087936,
+      "rssGrowthBytes": 2260992,
+      "fdCount": 19,
+      "stateBytes": 6873680
+    },
+    {
+      "cycle": 13,
+      "jobs": 130,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18268160,
+      "rssGrowthBytes": 2441216,
+      "fdCount": 19,
+      "stateBytes": 7587275
+    },
+    {
+      "cycle": 14,
+      "jobs": 140,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18448384,
+      "rssGrowthBytes": 2621440,
+      "fdCount": 19,
+      "stateBytes": 8322675
+    },
+    {
+      "cycle": 15,
+      "jobs": 150,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18595840,
+      "rssGrowthBytes": 2768896,
+      "fdCount": 19,
+      "stateBytes": 9075785
+    },
+    {
+      "cycle": 16,
+      "jobs": 160,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18743296,
+      "rssGrowthBytes": 2916352,
+      "fdCount": 19,
+      "stateBytes": 9850701
+    },
+    {
+      "cycle": 17,
+      "jobs": 170,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 18890752,
+      "rssGrowthBytes": 3063808,
+      "fdCount": 19,
+      "stateBytes": 10640084
+    },
+    {
+      "cycle": 18,
+      "jobs": 180,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19070976,
+      "rssGrowthBytes": 3244032,
+      "fdCount": 19,
+      "stateBytes": 11425468
+    },
+    {
+      "cycle": 19,
+      "jobs": 190,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19251200,
+      "rssGrowthBytes": 3424256,
+      "fdCount": 19,
+      "stateBytes": 12214967
+    },
+    {
+      "cycle": 20,
+      "jobs": 200,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19415040,
+      "rssGrowthBytes": 3588096,
+      "fdCount": 19,
+      "stateBytes": 13004486
+    },
+    {
+      "cycle": 21,
+      "jobs": 210,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19546112,
+      "rssGrowthBytes": 3719168,
+      "fdCount": 19,
+      "stateBytes": 13794025
+    },
+    {
+      "cycle": 22,
+      "jobs": 220,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19644416,
+      "rssGrowthBytes": 3817472,
+      "fdCount": 19,
+      "stateBytes": 14579488
+    },
+    {
+      "cycle": 23,
+      "jobs": 230,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19808256,
+      "rssGrowthBytes": 3981312,
+      "fdCount": 19,
+      "stateBytes": 15369067
+    },
+    {
+      "cycle": 24,
+      "jobs": 240,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 19955712,
+      "rssGrowthBytes": 4128768,
+      "fdCount": 19,
+      "stateBytes": 16154570
+    },
+    {
+      "cycle": 25,
+      "jobs": 250,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 20070400,
+      "rssGrowthBytes": 4243456,
+      "fdCount": 19,
+      "stateBytes": 16940094
+    },
+    {
+      "cycle": 26,
+      "jobs": 260,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 20512768,
+      "rssGrowthBytes": 4685824,
+      "fdCount": 19,
+      "stateBytes": 17733907
+    },
+    {
+      "cycle": 27,
+      "jobs": 270,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 20758528,
+      "rssGrowthBytes": 4931584,
+      "fdCount": 19,
+      "stateBytes": 18523712
+    },
+    {
+      "cycle": 28,
+      "jobs": 280,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 20905984,
+      "rssGrowthBytes": 5079040,
+      "fdCount": 19,
+      "stateBytes": 19309421
+    },
+    {
+      "cycle": 29,
+      "jobs": 290,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21004288,
+      "rssGrowthBytes": 5177344,
+      "fdCount": 19,
+      "stateBytes": 20103323
+    },
+    {
+      "cycle": 30,
+      "jobs": 300,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21053440,
+      "rssGrowthBytes": 5226496,
+      "fdCount": 19,
+      "stateBytes": 20889032
+    },
+    {
+      "cycle": 31,
+      "jobs": 310,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21118976,
+      "rssGrowthBytes": 5292032,
+      "fdCount": 19,
+      "stateBytes": 21674741
+    },
+    {
+      "cycle": 32,
+      "jobs": 320,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21184512,
+      "rssGrowthBytes": 5357568,
+      "fdCount": 19,
+      "stateBytes": 22464546
+    },
+    {
+      "cycle": 33,
+      "jobs": 330,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21266432,
+      "rssGrowthBytes": 5439488,
+      "fdCount": 19,
+      "stateBytes": 23258447
+    },
+    {
+      "cycle": 34,
+      "jobs": 340,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21348352,
+      "rssGrowthBytes": 5521408,
+      "fdCount": 19,
+      "stateBytes": 24048252
+    },
+    {
+      "cycle": 35,
+      "jobs": 350,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21479424,
+      "rssGrowthBytes": 5652480,
+      "fdCount": 19,
+      "stateBytes": 24838057
+    },
+    {
+      "cycle": 36,
+      "jobs": 360,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21561344,
+      "rssGrowthBytes": 5734400,
+      "fdCount": 19,
+      "stateBytes": 25623767
+    },
+    {
+      "cycle": 37,
+      "jobs": 370,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21610496,
+      "rssGrowthBytes": 5783552,
+      "fdCount": 19,
+      "stateBytes": 26409476
+    },
+    {
+      "cycle": 38,
+      "jobs": 380,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21676032,
+      "rssGrowthBytes": 5849088,
+      "fdCount": 19,
+      "stateBytes": 27195185
+    },
+    {
+      "cycle": 39,
+      "jobs": 390,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21790720,
+      "rssGrowthBytes": 5963776,
+      "fdCount": 19,
+      "stateBytes": 27989086
+    },
+    {
+      "cycle": 40,
+      "jobs": 400,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21872640,
+      "rssGrowthBytes": 6045696,
+      "fdCount": 19,
+      "stateBytes": 28778891
+    },
+    {
+      "cycle": 41,
+      "jobs": 410,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 21987328,
+      "rssGrowthBytes": 6160384,
+      "fdCount": 19,
+      "stateBytes": 29568696
+    },
+    {
+      "cycle": 42,
+      "jobs": 420,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22085632,
+      "rssGrowthBytes": 6258688,
+      "fdCount": 19,
+      "stateBytes": 30358423
+    },
+    {
+      "cycle": 43,
+      "jobs": 430,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22151168,
+      "rssGrowthBytes": 6324224,
+      "fdCount": 19,
+      "stateBytes": 31143976
+    },
+    {
+      "cycle": 44,
+      "jobs": 440,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22265856,
+      "rssGrowthBytes": 6438912,
+      "fdCount": 19,
+      "stateBytes": 31937721
+    },
+    {
+      "cycle": 45,
+      "jobs": 450,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22396928,
+      "rssGrowthBytes": 6569984,
+      "fdCount": 19,
+      "stateBytes": 32731466
+    },
+    {
+      "cycle": 46,
+      "jobs": 460,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22495232,
+      "rssGrowthBytes": 6668288,
+      "fdCount": 19,
+      "stateBytes": 33517019
+    },
+    {
+      "cycle": 47,
+      "jobs": 470,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22577152,
+      "rssGrowthBytes": 6750208,
+      "fdCount": 19,
+      "stateBytes": 34302572
+    },
+    {
+      "cycle": 48,
+      "jobs": 480,
+      "active": 1,
+      "recovered": 1,
+      "rssBytes": 22708224,
+      "rssGrowthBytes": 6881280,
+      "fdCount": 19,
+      "stateBytes": 35100413
+    }
+  ],
+  "workloadOwnerOpenCount": 49,
+  "metricsOwnerOpenCount": 49
+}
