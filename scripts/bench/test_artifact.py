@@ -298,9 +298,51 @@ class ArtifactClientLifetimeTests(unittest.TestCase):
         client.configure_measurement(deadline,capture_failure=True)
         client.close()  # Pagination renews a connection after 64 requests.
         socket=Mock()
-        client._socket=socket
+        with patch.object(control.socket,'socket',return_value=socket):
+            client.connect()
         with self.assertRaisesRegex(control.ControlError,'deadline'):
             client._exchange({'id':'test'})
         socket.sendall.assert_not_called()
         self.assertEqual(client.failure_evidence['budgetSeconds'],600)
         client.__exit__(None,None,None)
+
+    def test_exceptional_context_exit_does_not_retain_the_client(self):
+        import weakref
+        from . import control
+        class LocalClient(control.ControlClient):
+            def connect(self):
+                self._socket=Mock()
+            def verify_contract(self):
+                self._verified=True
+        def use_client():
+            client=LocalClient('/fixture')
+            client.configure_measurement(None,capture_failure=True)
+            reference=weakref.ref(client)
+            try:
+                with client:
+                    raise ValueError('consumer failed')
+            except ValueError:
+                pass
+            return reference
+        self.assertIsNone(use_client()())
+
+    def test_sixty_fifth_page_renews_and_reverifies_without_losing_content(self):
+        from unittest.mock import MagicMock
+        data=b'x'*65; expected=receipt(data); state={'reads':0,'verified':True}
+        client=MagicMock();client.__enter__.return_value=client;client.failure_evidence=None
+        def call(method,params):
+            if not state['verified'] or state['reads']>=64:
+                raise RuntimeError('connection requires renewal and contract verification')
+            state['reads']+=1; offset=params['offset']
+            result=page(b'x',offset,len(data));result['artifactDigest']=expected['artifactDigest']
+            return result
+        client.call.side_effect=call
+        client.close.side_effect=lambda:state.update(verified=False)
+        client.connect.side_effect=lambda:state.update(reads=0)
+        client.verify_contract.side_effect=lambda:state.update(verified=True)
+        runtime=Mock();runtime.client.return_value=client
+        with patch.object(artifact,'RssSampler') as sampler:
+            sampler.return_value.stop.return_value=[]
+            _,proof=artifact.read_all(runtime,expected,len(data),lambda row:None)
+        self.assertEqual(proof['actualPageCount'],65)
+        self.assertEqual(proof['sha256'],hashlib.sha256(data).hexdigest())
