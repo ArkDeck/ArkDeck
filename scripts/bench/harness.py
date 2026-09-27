@@ -252,7 +252,13 @@ class IsolatedRuntime:
             environment["ARKDECK_ENDPOINT"] = str(self.socket_path)
         else:
             arguments.extend(["--state-dir", str(self.state_directory)])
-        self.start_diagnostics = {"connectionAttempts": 0}
+        self.start_diagnostics = {
+            "observationVersion": "startup-observation-v2",
+            "connectionAttempts": 0, "connectionFailures": 0,
+            "socketPollCount": 0, "lastSocketNegativeSeconds": None,
+            "pollSleepCount": 0, "pollSleepTotalSeconds": 0.0,
+            "pollSleepMaxSeconds": 0.0,
+        }
         started = clocks.awake_seconds()
         self.process = subprocess.Popen(
             arguments,
@@ -268,25 +274,57 @@ class IsolatedRuntime:
                     f"daemon exited with status {self.process.returncode} before "
                     "answering health"
                 )
+            self.start_diagnostics["socketPollCount"] += 1
             if self.socket_path.exists():
                 self.start_diagnostics.setdefault("socketObservedSeconds", clocks.awake_seconds() - started)
                 self.start_diagnostics["connectionAttempts"] += 1
+                # These completion fields describe this connection attempt only.
+                for field in ("connectReturnedSeconds", "contractVerifiedSeconds", "healthySeconds"):
+                    self.start_diagnostics.pop(field, None)
+                phase = "connect"
                 try:
-                    with control.ControlClient(
+                    client = control.ControlClient(
                         str(self.socket_path),
                         timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds())),
-                    ) as client:
+                    )
+                    try:
+                        client.connect()
+                        self.start_diagnostics["connectReturnedSeconds"] = clocks.awake_seconds() - started
+                        phase = "contract"
+                        client.verify_contract()
                         self.start_diagnostics["contractVerifiedSeconds"] = clocks.awake_seconds() - started
+                        phase = "health"
                         client.call("health")
                         elapsed = clocks.awake_seconds() - started
                         self.start_diagnostics["healthySeconds"] = elapsed
+                        phase = "close"
                         return elapsed
-                except (control.ControlError, OSError):
-                    pass
-            # Polling without a pause would spend a core on failed connects and
-            # inflate the very number being measured.  One millisecond bounds
-            # the quantisation error far below the sub-second reading.
-            time.sleep(0.001)
+                    finally:
+                        try:
+                            client.close()
+                        except Exception:
+                            phase = "close"
+                            raise
+                except (control.ControlError, OSError) as error:
+                    self.start_diagnostics["connectionFailures"] += 1
+                    self.start_diagnostics["lastConnectionFailure"] = {
+                        "attempt": self.start_diagnostics["connectionAttempts"],
+                        "phase": phase, "errorType": type(error).__name__,
+                        "elapsedSeconds": clocks.awake_seconds() - started,
+                    }
+            else:
+                self.start_diagnostics["lastSocketNegativeSeconds"] = clocks.awake_seconds() - started
+            # Keep the historical pause; its requested 1 ms is not a bound on
+            # scheduler delay. Observe actual awake elapsed time, never subtract it.
+            sleep_started = clocks.awake_seconds()
+            self.start_diagnostics["pollSleepCount"] += 1
+            try:
+                time.sleep(0.001)
+            finally:
+                slept = clocks.awake_seconds() - sleep_started
+                self.start_diagnostics["pollSleepTotalSeconds"] += slept
+                self.start_diagnostics["pollSleepMaxSeconds"] = max(
+                    self.start_diagnostics["pollSleepMaxSeconds"], slept)
         raise DaemonStartFailed(
             f"daemon did not answer health within {budget_seconds:.0f}s"
         )

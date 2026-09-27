@@ -199,8 +199,28 @@ mean that a nominal 120-second window need not produce 120 observations.
 Cold start preserves the historical measurement boundary: spawn through the
 contract-verifying health handshake **and the subsequent explicit health call**.
 The previous description said “first health” but the code performed both.
-Diagnostics expose spawn-return, first socket observation, contract verification,
-final health and connection attempts; they do not subtract waiting or outliers.
+Raw startup diagnostics now declare `observationVersion: startup-observation-v2`.
+They retain spawn-return, first socket observation, contract verification, final
+health and connection attempts, and add `connectReturnedSeconds`,
+`socketPollCount`, `lastSocketNegativeSeconds`, `pollSleepCount`,
+`pollSleepTotalSeconds` and `pollSleepMaxSeconds`. Durations use the awake-work
+clock relative to the original spawn origin (sleep totals/max are durations);
+no absolute monotonic instant is persisted. A null last-negative observation
+means no poll saw a missing socket. Requested sleep remains 1 ms; actual sleep
+can be longer and is never subtracted or treated as a 1 ms quantization bound.
+
+Connection completion timestamps belong to the most recent connection attempt;
+retry clears the prior attempt's fields. `connectionFailures` and the bounded
+`lastConnectionFailure` record retain attempt index, phase, exception type and
+elapsed time without unbounded per-poll history. Connect, contract, health and
+close failures preserve existing retry/cleanup behavior. Observations accumulate
+in memory; the existing capture recorder writes once after startup returns or
+fails, outside the measured interval. Clock reads/counters add small instrument
+overhead; no subtraction is made. The metric boundary, defaults, fixture, sample
+count, thresholds and comparison rules are unchanged. This versions diagnostics,
+not the control protocol or a new metric, and never retrofits old raw records.
+Socket appearance is not recovery completion; no segment implies dyld, signature,
+I/O or scheduler causation by itself.
 A failed attempt remains in the raw log, and capture failure cleans the fixture.
 
 The proposed independent Rust environment is Apple M3 / 8 cores / 16 GB /
