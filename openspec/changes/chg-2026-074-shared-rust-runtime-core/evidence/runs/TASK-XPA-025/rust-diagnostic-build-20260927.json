@@ -1,0 +1,29 @@
+{
+  "sourceHead": "82f0971ce5f122bde47d9cd850f6df4e0b277da1",
+  "configuration": "release",
+  "cargoArguments": [
+    "build",
+    "--locked",
+    "--release",
+    "--manifest-path",
+    "rust/Cargo.toml",
+    "-p",
+    "arkdeck-agentd",
+    "-p",
+    "arkdeck-soak"
+  ],
+  "buildJobs": 2,
+  "features": "default",
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustflags": "",
+  "encodedRustflags": "",
+  "profile": {
+    "panic": "abort",
+    "lto": "thin",
+    "strip": "debuginfo"
+  },
+  "daemonSha256": "3c929eb2445e3d7d2ae0b3ebb96cccd1812e64234effb594d35f79161b211925",
+  "soakFixtureSha256": "c77de3f9a78b9799d335a8cee661f8732c8cc99f409b9c241fbc2dad89f27ffc",
+  "calibrationIterations": 60000
+}
