@@ -44,7 +44,7 @@ review. RSS ceiling scope remains a product decision; neither 64 MiB nor the
 ## Local targeted checks
 
 - `PYTHONPATH=scripts python3 -m unittest discover -s scripts/bench -t scripts`:
-  exit 0, 172 tests, 2 optional real-daemon integration tests skipped;
+  exit 0, 173 tests, 2 optional real-daemon integration tests skipped;
   `/private/tmp/arkdeck-xpa025-stability-python.log`.
 - `sh scripts/check-sdd.sh`: exit 0;
   `/private/tmp/arkdeck-xpa025-stability-sdd.log`.
@@ -63,3 +63,15 @@ Pending the implementation PR. The coordinator independently dispatched a full
 4-hour soak against main `443e805e`, run `36291225535`; it is not this branch's
 result, a 24-hour soak, or device acceptance. Nightly reference-host mismatch
 skips and the remaining NOT_MEASURED rows remain explicit limitations.
+
+## Review correction
+
+Review of head `83f87122` reproduced an exit-code regression: missing steady
+made an otherwise formal unstable cold-start capture exit 0. Coverage failure
+is now separated from the caller's explicit advisory declaration. Full/partial
+missing steady plus unstable cold-start tests require exit 2 for quiet release
+and preserve exit 0 only for explicitly advisory captures. A stable incomplete
+subset exits 0 with NOT_MEASURED and baselineEligible false; it is not adopted.
+The first head's CI was green (harness `36291639537`, guard `36291639535`, Swift
+aggregate `36291639703`), but that does not validate the corrected head; its CI
+will be checked separately.

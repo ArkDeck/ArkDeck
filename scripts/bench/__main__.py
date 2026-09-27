@@ -244,6 +244,9 @@ def command_capture(arguments: argparse.Namespace) -> int:
     toolchain["runtimeKind"] = arguments.runtime_kind
     task, spike = baseline.document_identity(arguments.runtime_kind)
     gaps = metrics.gap_definitions(arguments.runtime_kind)
+    # Coverage gaps disqualify a baseline but must not waive instability.
+    # Only the caller's debug/loaded-host declaration makes a run advisory.
+    advisory_reasons = list(disqualifiers)
     incomplete = {}
     for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
         missing = [run["index"] for run in run_records
@@ -298,12 +301,12 @@ def command_capture(arguments: argparse.Namespace) -> int:
             + ", ".join(document["unstableMetrics"]),
             file=sys.stderr,
         )
-        if disqualifiers:
+        if advisory_reasons:
             print(
                 "bench: advisory capture; instability is not an error here",
                 file=sys.stderr,
             )
-    return capture_exit_code(list(document["unstableMetrics"]), disqualifiers)
+    return capture_exit_code(list(document["unstableMetrics"]), advisory_reasons)
 
 
 def command_select_baseline(arguments: argparse.Namespace) -> int:

@@ -182,6 +182,10 @@ The resident set is split at the largest consecutive downward step of at least
 prove that a release happened before the first sample. If any run has no
 release, the complete document reports steady as `NOT_MEASURED`, retains any
 partial measurements, and is not baseline-eligible. No samples are removed.
+Coverage gaps do not waive instability: a quiet release capture still exits 2
+if another measured metric is unstable. A stable but incomplete capture exits 0
+with explicit gaps and `baselineEligible: false`; exit 0 alone never adopts a
+baseline. Only explicit debug/loaded-host advisory captures waive that exit.
 `residentSetPhaseMethod: observed-release-v2` and `idleWindowSeconds` belong to
 the RSS comparison identity; old fallback-to-plateau results are not comparable.
 

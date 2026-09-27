@@ -472,30 +472,39 @@ if __name__ == "__main__":
 
 
 class MissingResidentPhaseTests(unittest.TestCase):
+    def capture(self, measured_runs, unstable=False, advisory=False):
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory)
+            calls = []
+            def execute(context, root):
+                index = len(calls)
+                calls.append(index)
+                samples = {"daemon.residentSetPlateau": [20.0],
+                           "daemon.coldStart": [10.0 * (index + 1) if unstable else 10.0]}
+                scale = {"residentSetPhaseMethod": "observed-release-v2",
+                         "idleWindowSeconds": 120,
+                         "residentSetRawSamples": [{"elapsedSeconds": 1.2, "bytes": 20.0}]}
+                if index < measured_runs:
+                    samples["daemon.residentSetSteady"] = [10.0]
+                else:
+                    scale["unmeasured"] = {"daemon.residentSetSteady": "release not observed"}
+                return samples, scale
+            with mock.patch.object(main.metrics, "execute_run", side_effect=execute), \
+                 mock.patch.object(main, "_toolchain_facts", return_value={}), \
+                 mock.patch.object(main.harness, "wait_for_quiet_host", return_value=(0.5, 0.0)), \
+                 mock.patch.object(main.harness, "load_average", return_value=(0.5, 0.5, 0.5)):
+                args = ["capture", "--daemon", main.__file__, "--soak", main.__file__,
+                        "--runtime-kind", "rust", "--out-dir", str(out)]
+                if advisory:
+                    args.append("--allow-loaded-host")
+                code = main.main(args)
+            return code, json.loads(next(out.glob('perf-baseline-*.json')).read_text())
+
     def test_missing_phase_never_becomes_an_eligible_partial_baseline(self):
         for measured_runs in (0, 1, 2):
-            with self.subTest(measured_runs=measured_runs), tempfile.TemporaryDirectory() as directory:
-                out = pathlib.Path(directory)
-                calls = []
-                def execute(context, root):
-                    index = len(calls)
-                    calls.append(index)
-                    samples = {"daemon.residentSetPlateau": [20.0]}
-                    scale = {"residentSetPhaseMethod": "observed-release-v2",
-                             "idleWindowSeconds": 120,
-                             "residentSetRawSamples": [{"elapsedSeconds": 1.2, "bytes": 20.0}]}
-                    if index < measured_runs:
-                        samples["daemon.residentSetSteady"] = [10.0]
-                    else:
-                        scale["unmeasured"] = {"daemon.residentSetSteady": "release not observed"}
-                    return samples, scale
-                with mock.patch.object(main.metrics, "execute_run", side_effect=execute), \
-                     mock.patch.object(main, "_toolchain_facts", return_value={}), \
-                     mock.patch.object(main.harness, "wait_for_quiet_host", return_value=(0.5, 0.0)), \
-                     mock.patch.object(main.harness, "load_average", return_value=(0.5, 0.5, 0.5)):
-                    main.main(["capture", "--daemon", main.__file__, "--soak", main.__file__,
-                               "--runtime-kind", "rust", "--out-dir", str(out)])
-                doc = json.loads(next(out.glob('perf-baseline-*.json')).read_text())
+            with self.subTest(measured_runs=measured_runs):
+                code, doc = self.capture(measured_runs)
+                self.assertEqual(code, 0)  # Stable subset, explicit incomplete JSON.
                 self.assertFalse(doc['baselineEligible'])
                 steady = doc['metrics']['daemon.residentSetSteady']
                 self.assertEqual(steady['status'], 'NOT_MEASURED')
@@ -507,3 +516,15 @@ class MissingResidentPhaseTests(unittest.TestCase):
                 self.assertNotIn('residentSetRawSamples', doc['metrics']['daemon.residentSetPlateau']['scale'])
                 self.assertEqual(len(doc['runs']), 3)
                 self.assertIn('residentSetRawSamples', doc['runs'][0]['scale'])
+
+    def test_missing_phase_does_not_waive_an_unstable_formal_metric(self):
+        for measured_runs in (0, 1, 2):
+            for advisory in (False, True):
+                with self.subTest(measured_runs=measured_runs, advisory=advisory):
+                    code, doc = self.capture(measured_runs, unstable=True, advisory=advisory)
+                    self.assertEqual(code, 0 if advisory else 2)
+                    self.assertEqual(doc['spikeVerdict'], 'UNSTABLE')
+                    self.assertEqual(doc['unstableMetrics'], ['daemon.coldStart'])
+                    self.assertFalse(doc['baselineEligible'])
+                    self.assertEqual(doc['metrics']['daemon.residentSetSteady']['status'], 'NOT_MEASURED')
+                    self.assertEqual(len(doc['metrics']['daemon.coldStart']['runs']), 3)
