@@ -1,5 +1,9 @@
 # Signed update feed dependency review
 
+Current disposition (2026-09-27): the user approved the bounded publisher-trust
+proposal for the four exact releases below. See the authorization follow-up at
+the end. The initial investigation below is retained as historical evidence.
+
 The Rust CLI needs Ed25519 verification to preserve Swift `UpdateFeedCodec`.
 The implementation pins `ed25519-dalek =2.2.0`, defaults disabled, `fast`
 enabled. It uses `VerifyingKey::verify_strict`; no production signing key,
@@ -56,3 +60,46 @@ does not make that decision. Local fixture results do not replace the gate.
 No remote branch or PR for this local change. The active thread's remote push
 authorization is still pending after automatic approval review rejected the push.
 No CI result or maintainer approval is claimed.
+
+## Authorized bounded trust follow-up — 2026-09-27
+
+After the remaining CI failure was identified as four missing audit chains,
+registry discovery again found no complete imported coverage. The user was
+shown the exact four-release, single-publication-day proposal and replied
+"同意，推送". This authorizes those trust rules and pushing them to PR #2272;
+it does not certify a source audit or approve release/device acceptance.
+
+| Package | Publisher | UTC trust interval `[start, end)` |
+| --- | --- | --- |
+| curve25519-dalek 4.1.3 | rozbb / 6979 | 2024-06-18 → 2024-06-19 |
+| curve25519-dalek-derive 0.1.1 | rozbb / 6979 | 2023-10-31 → 2023-11-01 |
+| ed25519 2.2.3 | tarcieri / 267 | 2023-10-15 → 2023-10-16 |
+| ed25519-dalek 2.2.0 | rozbb / 6979 | 2025-07-09 → 2025-07-10 |
+
+Registry checks reconfirmed all four checksums against Cargo.lock, numeric
+publishers and non-yanked status. Raw checks are retained at
+`/private/tmp/arkdeck-pr2272-bounded-trust/checked-facts.json`. The proposal
+adds four trust entries and four matching publisher records only. Existing
+trusts, imported audits, source URLs, dependency versions and checksums stay
+unchanged. There are no exemptions, locally certified audits, future windows
+or automatic renewals. A compromised publisher or defective release remains a
+risk that this policy check cannot exclude.
+
+### Local targeted checks
+
+On the applied repository policy, `cargo vet --locked --no-registry-suggestions`
+and `cargo deny --locked check` both exit 0; logs are
+`/private/tmp/arkdeck-pr2272-authorized-vet.log` and
+`/private/tmp/arkdeck-pr2272-authorized-deny.log`. A structured before/after
+comparison confirms only the four authorized trust/publisher entries changed.
+`sh scripts/check-sdd.sh` and `git diff --check` exit 0; logs are
+`/private/tmp/arkdeck-pr2272-authorized-sdd.log` and
+`/private/tmp/arkdeck-pr2272-authorized-diff.log`. Vet success means the configured
+policy is satisfied, not that all source was audited. No production code or
+dependency version changed, so runtime tests were not repeated.
+
+### CI
+
+PR #2272 head `361f2a6b` passed full Swift and all three Rust platform lanes;
+run `36282047104` failed only at cargo-vet for these four missing policies.
+The policy follow-up requires its own pushed-head CI result.

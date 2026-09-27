@@ -36,12 +36,40 @@ user-id = 5059
 user-login = "newpavlov"
 user-name = "Artyom Pavlov"
 
+[[publisher.curve25519-dalek]]
+version = "4.1.3"
+when = "2024-06-18"
+user-id = 6979
+user-login = "rozbb"
+user-name = "Michael Rosenberg"
+
+[[publisher.curve25519-dalek-derive]]
+version = "0.1.1"
+when = "2023-10-31"
+user-id = 6979
+user-login = "rozbb"
+user-name = "Michael Rosenberg"
+
 [[publisher.digest]]
 version = "0.10.7"
 when = "2023-05-19"
 user-id = 267
 user-login = "tarcieri"
 user-name = "Tony Arcieri"
+
+[[publisher.ed25519]]
+version = "2.2.3"
+when = "2023-10-15"
+user-id = 267
+user-login = "tarcieri"
+user-name = "Tony Arcieri"
+
+[[publisher.ed25519-dalek]]
+version = "2.2.0"
+when = "2025-07-09"
+user-id = 6979
+user-login = "rozbb"
+user-name = "Michael Rosenberg"
 
 [[publisher.generic-array]]
 version = "0.14.7"
