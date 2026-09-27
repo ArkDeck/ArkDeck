@@ -4,7 +4,8 @@
 
 use crate::flash_session::{ControlPerformer, client_error};
 use crate::{
-    AssessmentSource, DeviceBinding, ExecutionClient, LaneArtifact, LaneConnections, PlanSource,
+    AssessmentFailure, AssessmentSource, DeviceBinding, ExecutionClient, LaneArtifact,
+    LaneConnections, PlanConnections, PlanSource,
 };
 use arkforge_client::{ControllerClient, DeviceObservationView, MaterializeInput, PublicClient};
 use arkforge_ipc::messages::MaterializePlanResponse;
@@ -30,10 +31,13 @@ impl NativeLaneConnections {
     }
 }
 
-impl LaneConnections for NativeLaneConnections {
+/// Inspection and assessment connections to one owned daemon generation.
+pub struct NativePlanConnections(pub PathBuf);
+
+impl PlanConnections for NativePlanConnections {
     fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
         ControllerClient::connect_with_read_timeout(
-            &self.runtime_directory,
+            &self.0,
             ControllerClient::MATERIALIZATION_READ_TIMEOUT,
         )
         .map(|client| Box::new(client) as Box<dyn PlanSource>)
@@ -42,13 +46,24 @@ impl LaneConnections for NativeLaneConnections {
 
     fn public(&self) -> Result<Box<dyn AssessmentSource>, String> {
         PublicClient::connect_with_read_timeout(
-            &self.runtime_directory,
+            &self.0,
             ControllerClient::MATERIALIZATION_READ_TIMEOUT,
         )
         .map(|client| Box::new(client) as Box<dyn AssessmentSource>)
         .map_err(|error| client_error(&error))
     }
+}
 
+impl PlanConnections for NativeLaneConnections {
+    fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
+        NativePlanConnections(self.runtime_directory.clone()).controller()
+    }
+    fn public(&self) -> Result<Box<dyn AssessmentSource>, String> {
+        NativePlanConnections(self.runtime_directory.clone()).public()
+    }
+}
+
+impl LaneConnections for NativeLaneConnections {
     fn execution(&self) -> Result<Box<dyn ExecutionClient>, String> {
         // Swift's ordinary controller timeout. These are read-idle bounds,
         // not an absolute deadline for the entire Flash or an archive write.
@@ -102,11 +117,17 @@ impl AssessmentSource for PublicClient {
         artifact_id: &str,
         profile_id: &str,
         observation_id: &str,
-    ) -> Result<MaterializePlanResponse, String> {
+    ) -> Result<MaterializePlanResponse, AssessmentFailure> {
         // The public API omits every controller/authority field and itself
         // refuses a Plan reply. The lane checks that boundary again.
         self.flash_assess(artifact_id, profile_id, observation_id)
             .map(MaterializePlanResponse::Assessment)
-            .map_err(|error| client_error(&error))
+            .map_err(|error| {
+                if error.code == "PUBLIC_ASSESSMENT_VIOLATION" {
+                    AssessmentFailure::ExecutableReply(client_error(&error))
+                } else {
+                    AssessmentFailure::Client(client_error(&error))
+                }
+            })
     }
 }

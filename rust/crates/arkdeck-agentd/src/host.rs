@@ -214,9 +214,9 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     device_access: Option<arkdeck_provider_arkforge::DeviceAccessObserver>,
     /// Swift's `ComposedLanePlanPreviewer`, which exists only with a composed
-    /// ArkForge lane: the profile that lane was composed for.
+    /// ArkForge lane, holding only that generation's read-only preview ports.
     #[cfg(target_os = "macos")]
-    lane_plan_preview: Option<String>,
+    lane_plan_preview: Option<std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>>,
     /// Swift `ProductRockchipLoaderBindingCoordinator`: the binding of the
     /// Application Support root, the Runtime's records below it, the census
     /// and ArkForge's Loader observation.
@@ -1022,11 +1022,14 @@ impl Host {
     }
 
     /// `flash.lanePlanPreview` previews through the ArkForge lane composed
-    /// for `profile`, over this host's Target store and Rockchip facts; none
+    /// over this host's Target store and Rockchip facts; none
     /// without a lane, as Swift composes its previewer only with one.
     #[cfg(target_os = "macos")]
-    pub fn with_lane_plan_preview(mut self, profile: Option<String>) -> Self {
-        self.lane_plan_preview = profile;
+    pub fn with_lane_plan_preview(
+        mut self,
+        previewer: Option<std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>>,
+    ) -> Self {
+        self.lane_plan_preview = previewer;
         self
     }
 
@@ -2655,7 +2658,12 @@ impl HostServices for Host {
     /// this host's, measured over its HDC — or, with no facts composed, the
     /// provider's refusal to resolve any.
     #[cfg(target_os = "macos")]
-    fn flash_lane_plan_preview(&self, target_id: &str) -> Result<serde_json::Value, WireError> {
+    fn flash_lane_plan_preview(
+        &self,
+        target_id: &str,
+        _profile: &str,
+        archive_sha256: &str,
+    ) -> Result<serde_json::Value, WireError> {
         let Some(targets) = &self.targets else {
             return Err(WireError {
                 code: "internalError".into(),
@@ -2667,23 +2675,29 @@ impl HostServices for Host {
             .hdc
             .as_deref()
             .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch);
-        let previewer = |target: &str| {
-            arkdeck_hoststore::preview_before_lane(
-                match &self.flash_facts {
-                    Some(facts) => facts.current_facts(targets, hdc, target),
-                    None => Err("production ArkForge target facts are not registered".to_owned()),
-                },
-                target,
-            )
-        };
+        let previewer = self.lane_plan_preview.as_ref().map(|lane| {
+            move |target: &str| {
+                arkdeck_hoststore::preview_before_lane(
+                    match &self.flash_facts {
+                        Some(facts) => facts.current_facts(targets, hdc, target),
+                        None => {
+                            Err("production ArkForge target facts are not registered".to_owned())
+                        }
+                    },
+                    target,
+                    &|topology| lane.preview(archive_sha256, topology),
+                )
+            }
+        });
         arkdeck_hoststore::lane_plan_preview(
             targets,
             target_id,
-            self.lane_plan_preview
+            previewer
                 .as_ref()
-                .map(|_| &previewer as &dyn Fn(&str) -> arkdeck_hoststore::LanePreview),
+                .map(|preview| preview as &dyn Fn(&str) -> arkdeck_hoststore::LanePreview),
         )
     }
+
     #[cfg(target_os = "macos")]
     fn flash_device_access(&self) -> Result<serde_json::Value, WireError> {
         let Some(observer) = &self.device_access else {

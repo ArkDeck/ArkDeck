@@ -41,12 +41,15 @@ impl ExecutionClient for arkforge_client::ControllerClient {
     }
 }
 
-/// Production connects to the one owned daemon and creates performers over
-/// the dispatcher's shared durable Rockchip host. Tests replace only these
-/// external ports; no fake receipt is part of a production configuration.
-pub trait LaneConnections: Send + Sync {
+/// Inspection and materialization over the one owned daemon generation.
+/// Tests replace these external ports; production uses the pinned SDK.
+pub trait PlanConnections: Send + Sync {
     fn controller(&self) -> Result<Box<dyn PlanSource>, String>;
     fn public(&self) -> Result<Box<dyn AssessmentSource>, String>;
+}
+
+/// Execution ports are absent from the read-only preview owner.
+pub trait LaneConnections: PlanConnections {
     fn execution(&self) -> Result<Box<dyn ExecutionClient>, String>;
     fn performer(&self, job_id: &str, binding: &DeviceBinding) -> Box<dyn ControlPerformer>;
 }
@@ -175,7 +178,8 @@ impl LaneHost {
                 binding,
                 purpose,
                 &self.support,
-            )?;
+            )
+            .map_err(|error| error.detail)?;
             Ok((client, materialized))
         };
         let (mut client, (plan, observed_mode)) = before_start().map_err(|error| {

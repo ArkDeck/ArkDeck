@@ -429,6 +429,16 @@ impl Lane {
         )
     }
 
+    /// A preview owns only assessment connections and the configured support
+    /// evidence. It does not retain the pairing secret or execution ports.
+    pub fn preview_host(&self) -> crate::LanePreviewHost {
+        crate::LanePreviewHost::new(
+            Box::new(crate::NativePlanConnections(self.runtime_directory.clone())),
+            self.authority_support.clone(),
+            self.profile_reference.clone(),
+        )
+    }
+
     /// Stops the owned generation, once: its end of input, then TERM to its
     /// group, then KILL. What it wrote comes back the first time.
     pub fn stop(&self) -> Option<ServerStop> {

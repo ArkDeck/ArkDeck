@@ -8,10 +8,6 @@
 //! each preview names. Every answer must be Swift's, byte for byte, and every
 //! exchange must make exactly the HDC calls Swift's made.
 //!
-//! One declared difference: where Swift's preview went on to ask the lane's
-//! daemon (the oracle records the calls it received), this Runtime's stops,
-//! with the same Target and revision, and answers `previewFailed` with why.
-//!
 //! The oracle's live probe had no USB port, while this Runtime's reads the
 //! census: the port only names an HDC-normal alias's current topology among
 //! the server facts, which `flash.prerequisites` does not project. Host tests
@@ -22,9 +18,7 @@ use arkdeck_contract::{
     validate_method_value,
 };
 use arkdeck_control::Control;
-use arkdeck_hoststore::{
-    FlashHostFacts, LANE_PREVIEW_UNAVAILABLE, NativeRockUsbIdentity, TargetStore,
-};
+use arkdeck_hoststore::{FlashHostFacts, NativeRockUsbIdentity, TargetStore};
 use arkdeck_platform::{RegistryUnavailable, UsbHostDevice, VerifiedTool};
 use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver, ProcessDispatch};
 use serde_json::{Value, json};
@@ -151,12 +145,26 @@ impl LoaderObserver for Loader {
     }
 }
 
+/// The oracle scripts an empty lane store. The native client and complete
+/// preview materialization sequence are covered by provider fixtures.
+struct EmptyStorePreview(Arc<Mutex<Vec<String>>>);
+impl arkdeck_provider_arkforge::LanePlanPreview for EmptyStorePreview {
+    fn preview(&self, digest: &str, _topology: &str) -> arkdeck_provider_arkforge::LanePreview {
+        self.0
+            .lock()
+            .unwrap()
+            .push(format!("inspectArtifact {digest}"));
+        arkdeck_provider_arkforge::LanePreview::BundleNotInLaneStore
+    }
+}
+
 /// What the setup has named so far.
 struct Scene {
     census: Census,
     rockusb: NativeRockUsbIdentity,
     loader: Loader,
     probe: bool,
+    lane_calls: Arc<Mutex<Vec<String>>>,
 }
 
 impl Scene {
@@ -168,6 +176,7 @@ impl Scene {
                 "DAYU200 target unavailable".to_owned()
             )))),
             probe: true,
+            lane_calls: Arc::default(),
         }
     }
 
@@ -187,7 +196,10 @@ impl Scene {
         .with_rockusb(self.rockusb.clone())
         .with_loader_observer(Box::new(self.loader.clone()));
         let host = crate::host::Host::from_environment().with_lane_plan_preview(
-            (composition != "noLane").then(|| "org.openharmony.dayu200".to_owned()),
+            (composition != "noLane").then(|| {
+                Arc::new(EmptyStorePreview(self.lane_calls.clone()))
+                    as Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>
+            }),
         );
         let host = if composition == "noTargetStore" {
             host
@@ -329,7 +341,7 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
     let root = Root::new();
     let mut scene = Scene::new();
     let mut compared = 0;
-    let mut declared = 0;
+    let mut reached_lane = 0;
     // What the setup last wrote to each path, or `None` once it removed it.
     let mut written: BTreeMap<String, Option<(String, String)>> = BTreeMap::new();
     for exchange in cases["exchanges"].as_array().unwrap() {
@@ -357,22 +369,19 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
             exchange["composition"].as_str().unwrap_or("lane"),
         );
         let answer = call(&control, index, method, exchange["params"].clone());
-        let expected = if exchange["laneCalls"]
-            .as_array()
-            .is_some_and(|calls| !calls.is_empty())
-        {
-            // The declared difference: Swift's preview asked the lane's
-            // daemon, whose store the oracle scripted empty; this one stops
-            // before it, for the same Target at the same revision.
-            let swift = &exchange["answer"]["result"];
-            assert_eq!(swift["state"], "bundleNotInLaneStore", "{index} {name}");
-            declared += 1;
-            json!({"ok": true, "result": {
-                "targetId": swift["targetId"], "bindingRevision": swift["bindingRevision"],
-                "state": "previewFailed", "reason": LANE_PREVIEW_UNAVAILABLE}})
-        } else {
-            published(method, &exchange["answer"])
-        };
+        let expected = published(method, &exchange["answer"]);
+        let lane_calls = std::mem::take(&mut *scene.lane_calls.lock().unwrap());
+        assert_eq!(
+            json!(lane_calls),
+            exchange
+                .get("laneCalls")
+                .cloned()
+                .unwrap_or_else(|| json!([])),
+            "{index} {name}: lane calls"
+        );
+        if !lane_calls.is_empty() {
+            reached_lane += 1;
+        }
         assert_eq!(answer, expected, "{index} {name}");
         assert_eq!(
             hdc.calls(),
@@ -382,7 +391,7 @@ fn the_rust_daemon_replays_the_swift_flash_host_facts_oracle() {
         compared += 1;
     }
     assert!(compared >= 74, "every recorded exchange replays");
-    assert_eq!(declared, 8, "the previews that reached the lane");
+    assert_eq!(reached_lane, 8, "the previews that reached the lane");
     // The reads wrote nothing: the Application Support root holds what the
     // setup last wrote, byte for byte and in its mode, and nothing else.
     let mut left: Vec<String> = fs::read_dir(&root.0)

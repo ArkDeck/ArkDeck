@@ -444,7 +444,12 @@ pub trait HostServices: Send + Sync {
     /// `flash.lanePlanPreview` once its target, the supported profile and an
     /// archive digest were read. A host without a Target store answers as
     /// Swift's daemon without one does.
-    fn flash_lane_plan_preview(&self, _target_id: &str) -> Result<Value, WireError> {
+    fn flash_lane_plan_preview(
+        &self,
+        _target_id: &str,
+        _profile: &str,
+        _archive_sha256: &str,
+    ) -> Result<Value, WireError> {
         Err(WireError {
             code: "internalError".into(),
             message: "lane plan preview is not configured".into(),
@@ -1419,7 +1424,7 @@ impl<H: HostServices> Control<H> {
             },
             // As Swift's handler: three strings, the one supported profile
             // and 64 hexadecimal digits as Swift's `Character` reads them,
-            // before the Target store; the digest is read, never used here.
+            // before the Target store; pass the normalized digest to the owner.
             "flash.lanePlanPreview" => match (
                 params.get("targetId").and_then(Value::as_str),
                 params.get("profileReference").and_then(Value::as_str),
@@ -1428,7 +1433,11 @@ impl<H: HostServices> Control<H> {
                 (Some(target), Some("dayu200"), Some(digest)) if swift_hex_digest(digest) => {
                     Response {
                         id: request.id.clone(),
-                        outcome: self.host.flash_lane_plan_preview(target),
+                        outcome: self.host.flash_lane_plan_preview(
+                            target,
+                            "dayu200",
+                            &digest.to_lowercase(),
+                        ),
                     }
                 }
                 _ => Response::failure(
