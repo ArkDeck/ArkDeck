@@ -429,6 +429,10 @@ mod lane {
         let scene = Scene::new("org.openharmony.dayu200", "ready");
         let lane = scene.compose().unwrap();
         assert_eq!(lane.profile_reference(), "org.openharmony.dayu200@1.0.0");
+        assert_eq!(
+            lane.preview_host().profile_reference(),
+            "org.openharmony.dayu200@1.0.0"
+        );
         assert_eq!(lane.daemon_sha256(), scene.inputs().daemon_sha256);
         assert!(lane.assessment_only_reason().is_some());
         // The secret reached it whole, on stdin, and never in its arguments.

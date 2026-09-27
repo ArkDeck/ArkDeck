@@ -435,11 +435,7 @@ impl Lane {
         crate::LanePreviewHost::new(
             Box::new(crate::NativePlanConnections(self.runtime_directory.clone())),
             self.authority_support.clone(),
-            self.profile_reference
-                .split('@')
-                .next()
-                .unwrap_or_default()
-                .to_owned(),
+            self.profile_reference.clone(),
         )
     }
 

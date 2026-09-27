@@ -185,7 +185,7 @@ fn native_preview_uses_sdk_inspection_and_discovery_without_import_or_execution(
         let preview = LanePreviewHost::new(
             Box::new(NativePlanConnections(root.0.clone())),
             support(),
-            "org.openharmony.dayu200".into(),
+            "org.openharmony.dayu200@1.0.0".into(),
         );
         let result = preview.preview(&"ee".repeat(32), "17956864");
         controller.join().unwrap();
@@ -297,7 +297,10 @@ fn plan_reply(kind: SessionKind, mode: &str, payload: &[u8]) -> Vec<u8> {
         fields.insert(field, value);
     }
     assert_eq!(fields[&1].as_str(1).unwrap(), "ee".repeat(32));
-    assert_eq!(fields[&2].as_str(2).unwrap(), "org.openharmony.dayu200");
+    assert_eq!(
+        fields[&2].as_str(2).unwrap(),
+        "org.openharmony.dayu200@1.0.0"
+    );
     assert_eq!(fields[&3].as_str(3).unwrap(), "OBS-preview");
     let mechanics = "99".repeat(32);
     if kind == SessionKind::Public {

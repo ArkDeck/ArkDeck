@@ -72,6 +72,7 @@ impl PlanSource for Port {
             self.public, input.authority_support_state
         ));
         if script.preview {
+            assert_eq!(input.profile_id, "org.openharmony.dayu200@1.0.0");
             assert_eq!(
                 hex(input.stable_identity_sha256),
                 arkdeck_contract::sha256_hex(b"17956864")
@@ -561,7 +562,7 @@ fn preview_materializes_read_only_and_preserves_structured_refusals() {
         let preview = LanePreviewHost::new(
             Box::new(Connections(script.clone())),
             Configuration::new(&"22".repeat(32), &"33".repeat(32), campaign),
-            "org.openharmony.dayu200".into(),
+            "org.openharmony.dayu200@1.0.0".into(),
         );
         let result = preview.preview(&"55".repeat(32), "17956864");
         match result {
@@ -629,7 +630,7 @@ fn preview_store_miss_never_imports_or_opens_an_assessment() {
     let preview = LanePreviewHost::new(
         Box::new(Connections(script.clone())),
         Configuration::new(&"22".repeat(32), &"33".repeat(32), ""),
-        "org.openharmony.dayu200".into(),
+        "org.openharmony.dayu200@1.0.0".into(),
     );
     assert_eq!(
         preview.preview(&"55".repeat(32), "17956864"),

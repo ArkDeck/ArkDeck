@@ -25,7 +25,8 @@ unchanged. These are host fixtures, not hardware evidence.
 
 ## Local targeted checks
 
-On main `fe75fe28c54da1056982f31263449653d7f7f874`, all checks ran with
+Initial implementation baseline (before the exact-profile correction below),
+on main `fe75fe28c54da1056982f31263449653d7f7f874`, all checks ran with
 `CARGO_BUILD_JOBS=2`, one coordinated local lane, and private target
 `/private/tmp/arkdeck-takeover-d79c-target`:
 
@@ -62,9 +63,37 @@ installed Runtime or device actions are part of this work. No local unified gate
 is planned. The broker, real-device equivalence acceptance and G5 remain outside
 this read-only implementation.
 
+## Exact profile selector correction
+
+Review against the real daemon registry found that preview composition stripped
+`@version` from the profile reference. ArkForge registers profiles as `id@version`,
+so a stored archive could fail with `PROFILE_NOT_FOUND`. Preview now preserves
+`org.openharmony.dayu200@1.0.0` through composition and both SDK assessments.
+The composition fixture and decoded SDK request assertions cover this boundary.
+The execution owner already preserves the exact reference through installation,
+Host storage, prewarm/prepare and materialization; no execution change was needed.
+
+Incremental checks after the correction used the same private target and one
+coordinated lane; all exited 0:
+
+- Provider full tests: 99 passed.
+- `cargo test --locked --manifest-path rust/Cargo.toml -p arkdeck-hoststore flash`:
+  21 passed.
+- The same command for `arkdeck-agentd`: 18 passed, one existing child fixture ignored.
+- All-target Clippy for those three crates, and workspace formatting: exit 0.
+
+These 138 passing tests are incremental validation, distinct from the initial
+1,079-test baseline. Logs are
+`/private/tmp/arkdeck-preview-profile-fix-<crate>-{clippy,test}.log` and
+`/private/tmp/arkdeck-preview-profile-fix-fmt.log`. Swift source is unchanged;
+the five earlier Swift checks were not repeated. The new PR head requires fresh CI.
+SDD and diff checks exited 0 after updating this record; SDD log:
+`/private/tmp/arkdeck-preview-profile-fix-sdd.log`.
+
 ## CI
 
-Pending the dedicated bot PR's exact-head checks. Results will be recorded in
+PR #2284: initial run `36301048345` covers the superseded `a779585f` head;
+it does not validate the exact-profile correction. Fresh-head CI is pending. Results will be recorded in
 the PR body without amending a green head. The prerequisite execution work and
 CI fix in PR #2282 were merged as `423a27e2`; this branch also includes the
 independently merged HDC owner from PR #2283.

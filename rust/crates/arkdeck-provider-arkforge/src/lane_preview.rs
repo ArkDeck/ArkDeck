@@ -29,20 +29,24 @@ pub trait LanePlanPreview: Send + Sync {
 pub struct LanePreviewHost {
     connections: Box<dyn PlanConnections>,
     support: Configuration,
-    profile_id: String,
+    profile_reference: String,
 }
 
 impl LanePreviewHost {
     pub fn new(
         connections: Box<dyn PlanConnections>,
         support: Configuration,
-        profile_id: String,
+        profile_reference: String,
     ) -> Self {
         Self {
             connections,
             support,
-            profile_id,
+            profile_reference,
         }
+    }
+    /// The exact loaded profile selector, including its version.
+    pub fn profile_reference(&self) -> &str {
+        &self.profile_reference
     }
 }
 
@@ -62,7 +66,7 @@ impl LanePlanPreview for LanePreviewHost {
         let artifact = LaneArtifact {
             path: Default::default(),
             sha256: archive_sha256.into(),
-            profile_id: self.profile_id.clone(),
+            profile_id: self.profile_reference.clone(),
         };
         let binding = DeviceBinding {
             connect_key: String::new(),
