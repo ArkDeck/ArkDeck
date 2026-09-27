@@ -154,7 +154,8 @@ def prepare(source: Path, root: Path) -> Path:
     git(mirror, "init", "--quiet")
     git(mirror, "config", "core.autocrlf", "false")
     objects = git(source, "rev-parse", "--path-format=absolute", "--git-path", "objects")
-    (mirror / ".git/objects/info/alternates").write_text(objects + "\n")
+    # Git's alternates parser treats a Windows CR as part of the object path.
+    (mirror / ".git/objects/info/alternates").write_bytes((objects + "\n").encode("utf-8"))
     head = git(source, "rev-parse", "HEAD")
     main = git(source, "rev-parse", "refs/remotes/origin/main")
     git(mirror, "update-ref", "--no-deref", "HEAD", head)

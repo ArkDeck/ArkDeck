@@ -91,6 +91,9 @@ class WorkspaceCacheTests(unittest.TestCase):
         self.assertEqual(cache.git(mirror, "rev-parse", "origin/main"), old)
         self.assertNotIn("fixture-secret", (mirror / ".git/config").read_text())
         self.assertEqual(cache.git(mirror, "show", "origin/main:rust/src/lib.rs"), "// first")
+        expected_objects = self.git("rev-parse", "--path-format=absolute", "--git-path", "objects")
+        self.assertEqual((mirror / ".git/objects/info/alternates").read_bytes(),
+                         expected_objects.encode("utf-8") + b"\n")
         self.assertEqual(cache.git(mirror, "diff", "--name-only"), "")
         child = mirror / "fixture-git"
         child.mkdir()
