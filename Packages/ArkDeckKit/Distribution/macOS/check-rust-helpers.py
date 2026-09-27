@@ -58,7 +58,7 @@ DISTRIBUTION = Path(__file__).resolve().parent
 REPO = DISTRIBUTION.parents[3]
 CODE_SIGN_HELPER_SOURCE = (
     REPO
-    / "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign"
+    / "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign"
     / "arkdeck-code-sign-enable"
 )
 ANALYZER_ORACLE = REPO / "rust/tests/fixtures/crash-ledger-analyzer/oracle.json"

@@ -354,12 +354,12 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         "unavailable"
     );
     // Composed with a verified helper, the operation loses that reason and
-    // keeps only what this composition is still missing. The helper
-    // ArkDeckWorkflows carries is read when this checkout has it: the
+    // keeps only what this composition is still missing. The shared package
+    // resource is read when this checkout has it: the
     // isolated contract view keeps only `rust/`, so its absence is not a
     // failure.
     let bundled = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources")
+        .join("../../../Packages/ArkDeckKit/Resources")
         .join("OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable");
     // The Job owner is this composition's; the first Control holds it
     // until it goes.

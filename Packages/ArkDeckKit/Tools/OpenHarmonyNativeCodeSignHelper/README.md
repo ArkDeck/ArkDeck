@@ -7,14 +7,20 @@ For publish, it copies the verified staging file beside the target, preserves
 the target owner and mode, enables and reads back code signing, and only then
 performs the atomic rename. A failed enable cannot replace the live library.
 
-The checked-in arm64 resource is reproducibly built with the OpenHarmony SDK:
+The single checked-in arm64 resource lives in
+`Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable`, shared by the
+SwiftPM resource declaration and the Rust helper packager. Both retain the
+`ArkDeckKit_ArkDeckWorkflows.bundle` name and its `OpenHarmonyNativeCodeSign`
+resource subdirectory.
+The source below remains the helper's only implementation. From the package
+root, reproduce the resource with the OpenHarmony SDK:
 
 ```sh
 /Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native/llvm/bin/aarch64-unknown-linux-ohos-clang \
   -O2 -g0 -static -Wl,--build-id=sha1,--strip-all \
-  -o Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable \
+  -o Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable \
   Tools/OpenHarmonyNativeCodeSignHelper/main.c
-chmod 644 Sources/ArkDeckWorkflows/Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable
+chmod 644 Resources/OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable
 ```
 
 The `chmod` is not optional. The linker leaves the file executable, the host

@@ -53,7 +53,10 @@ RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
 # (G5 slice 20a, #2218) run in the Rust lane's macOS workspace job, over the
 # binaries that job builds. A change to them must run that lane, or it merges
 # unchecked (#2236 did: its fix to the check skipped the lane that runs it).
-RUST_PACKAGING_PREFIXES = ("Packages/ArkDeckKit/Distribution/macOS/",)
+RUST_PACKAGING_PREFIXES = (
+    "Packages/ArkDeckKit/Distribution/macOS/",
+    "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/",
+)
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",

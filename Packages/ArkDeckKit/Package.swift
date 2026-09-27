@@ -86,7 +86,8 @@ let package = Package(
       ],
       exclude: ["AgentComposition"],
       resources: [
-        .copy("Resources/OpenHarmonyNativeCodeSign")
+        // Shared with the Rust helper packager; keep this target's bundle name.
+        .copy("../../Resources/OpenHarmonyNativeCodeSign")
       ],
       linkerSettings: [
         .linkedFramework("Security"),
