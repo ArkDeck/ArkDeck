@@ -766,8 +766,11 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
   it stops (a Journal that is the Job's own as far as it goes, the outcome audit
   only with the whole Journal, empty locks). Anything else is refused, naming
   the Session: "retained Session <path> has no Manifest and no failed
-  publication of this Runtime accounts for it; runtime storage status and
-  session cleanup name it; move it out of the Session root once reviewed".
+  publication of this Runtime accounts for it; inspect it with read-only
+  `arkdeck runtime storage status`; preserve the original Session and any
+  unresolved outcomes; cutover and device mutation remain blocked until complete
+  state continuity is proved". Moving a Session or confirming a review does not
+  replace the mechanical proof required by `POL-RECOVERY-001`.
   Swift's scan never refuses such a Session: it looks only at the Session root's
   direct children, so in the `yyyy/mm/session-*` layout it reads no Session at
   all. `JobStore::require_retained_sessions` runs the same scan over one

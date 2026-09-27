@@ -2632,9 +2632,9 @@ fn a_cutover_names_what_only_the_swift_runtime_can_settle() {
     home.install();
     let message = "Runtime mutation state continuity cannot be proved: retained Session \
                    2026/07/session-job-a has no Manifest and no failed publication of this \
-                   Runtime accounts for it; runtime storage status and session cleanup name \
-                   it; move it out of the Session root once reviewed; original state is \
-                   preserved";
+                   Runtime accounts for it; inspect it with read-only `arkdeck runtime storage status`; \
+                   preserve the original Session and any unresolved outcomes; cutover and device \
+                   mutation remain blocked until complete state continuity is proved";
     let blocks = json!([
         {"kind": "loaderTransitionAwaitingBinding", "jobId": "job-flash",
             "targetId": "target-dayu200", "expectedBindingRevision": 3},
