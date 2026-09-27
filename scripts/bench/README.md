@@ -327,8 +327,10 @@ an untouched 4 GiB reserve. Generation is bounded to 120 s, publication to 600 s
 and readback to 600 s. Only each sample's own temporary root is removed.
 Every seed failure records bounded stdout/stderr, hashes and timeout/exit facts.
 Each size has a distinct metric/scale; the 128 MiB metric is artifact.pagedRead.
+Both generated archive SHA-256 and source template SHA-256 are comparison
+identity, so same-size input byte changes refuse comparison.
 
-The timer starts before the first page admission/read on a contract-verified
+The timer starts at the first page read on a contract-verified
 connection and ends after all payload bytes and the final client SHA-256 are
 verified. Connection renewal after 64 requests is included. Every page's actual
 production full-file hash remains in the measured cost. Publication/startup are
@@ -336,7 +338,8 @@ outside the read interval; no warm-up read, first-sample removal, cache eviction
 or subtraction disguises that cost. OS cache state is not claimed as cold.
 Base64 is strictly decoded and checked for canonical encoding, closed frame
 shape, exact identities/digest/ranges/counts and EOF. Formal runs check quiet-host
-admission before every page (included in elapsed cost) and after completion.
+admission at phase boundaries: before generation, after publication, after daemon
+startup, and after read completion. No per-page process scan enters read timing.
 The same continuous deadline bounds each send and receive, including sustained
 fragment progress. On transport/decode failure, optional fixture-only evidence
 retains a 64 KiB prefix, hash/count of all received bytes, phase and budget.

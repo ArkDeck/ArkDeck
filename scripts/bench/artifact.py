@@ -107,10 +107,9 @@ def rss_summary(rows):
     return result
 
 
-def read_all(runtime, receipt, total, record, budget=READ_BUDGET, require_quiet=False):
+def read_all(runtime, receipt, total, record, budget=READ_BUDGET):
     deadline = clocks.Deadline(budget)
     pages = []
-    quiet_observations = []
     failed_page = None
     digest = hashlib.sha256()
     offset = 0
@@ -121,8 +120,6 @@ def read_all(runtime, receipt, total, record, budget=READ_BUDGET, require_quiet=
         started = clocks.awake_seconds()
         try:
             while offset < total:
-                if require_quiet:
-                    quiet_observations.append(recovery.assert_quiet_host())
                 if deadline.expired():
                     raise TimeoutError('artifact read deadline')
                 client.set_timeout(max(.001, min(30., deadline.remaining_seconds())))
@@ -146,8 +143,6 @@ def read_all(runtime, receipt, total, record, budget=READ_BUDGET, require_quiet=
             elapsed = clocks.awake_seconds() - started
         finally:
             rss = sampler.stop()
-            for observation in quiet_observations:
-                record({'kind': 'artifactPageQuietHost', **observation})
             if client.failure_evidence is not None:
                 record({'kind': 'artifactTransportFailure', **client.failure_evidence})
             # No page report serialization/file writes inside the timing interval.
@@ -200,10 +195,12 @@ def measure(daemon, soak, count, record, require_quiet=True):
         with harness.IsolatedRuntime(daemon, root, runtime_kind='rust') as runtime:
             runtime.start()
             guard()
-            elapsed, proof = read_all(runtime, receipt, count, record, require_quiet=require_quiet)
+            elapsed, proof = read_all(runtime, receipt, count, record)
             record({'kind': 'artifactReadComplete', 'milliseconds': elapsed, **proof})
             guard()
         return elapsed, {'artifactFixtureVersion': artifact_fixture.VERSION,
+            'artifactArchiveSha256': fixture['sha256'],
+            'artifactTemplateSha256': fixture['templateSha256'],
             'artifactOwnerKind': 'import', 'artifactImportKind': 'flash-bundle',
             'artifactPayloadBytes': count, 'artifactPageBytes': PAGE_BYTES,
             'artifactTimingBoundary': TIMING, 'artifactRssIntervalSeconds': RSS_INTERVAL,

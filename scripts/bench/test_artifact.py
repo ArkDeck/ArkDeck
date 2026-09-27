@@ -95,12 +95,13 @@ class ArtifactRangeTests(unittest.TestCase):
         self.assertEqual(entries[-1]['status'], 'FAILED')
 
     def test_changed_scale_or_boundary_refuses_comparison(self):
-        fields = {'artifactPayloadBytes':128*1024*1024, 'artifactOwnerKind':'import',
+        fields = {'artifactArchiveSha256':'a'*64, 'artifactTemplateSha256':'b'*64,
+                  'artifactPayloadBytes':128*1024*1024, 'artifactOwnerKind':'import',
                   'artifactImportKind':'flash-bundle', 'artifactPageBytes':4*1024*1024,
                   'artifactTimingBoundary':artifact.TIMING, 'artifactFixtureVersion':artifact_fixture.VERSION,
                   'artifactRssIntervalSeconds':.2, 'artifactCachePolicy':'fresh-owner-first-read-no-OS-cache-eviction'}
         for field in fields:
-            other = dict(fields); other[field] = 'different'
+            other = dict(fields); other[field] = 'c'*64 if field.endswith('Sha256') else 'different'
             result = compare.compare(scaled(document(a=1), fields), scaled(document(a=1), other))
             self.assertFalse(result['passed'], field)
 
@@ -122,6 +123,8 @@ class RealArtifactOwnerTests(unittest.TestCase):
         elapsed, proof = artifact.measure(daemon, soak, 1024*1024, observations.append, False)
         self.assertGreater(elapsed, 0)
         self.assertEqual(proof['artifactOwnerKind'], 'import')
+        self.assertEqual(proof['artifactArchiveSha256'], proof['artifactEvidence']['sha256'])
+        self.assertEqual(proof['artifactTemplateSha256'], proof['artifactEvidence']['templateSha256'])
         self.assertEqual(proof['artifactEvidence']['payloadBytes'], 1024*1024)
         self.assertEqual(proof['artifactEvidence']['actualPageCount'], 1)
         self.assertTrue(any(row['kind']=='artifactReadComplete' for row in observations))

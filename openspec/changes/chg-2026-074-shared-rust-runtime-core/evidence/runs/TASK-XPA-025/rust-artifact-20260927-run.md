@@ -22,8 +22,9 @@ OS cache eviction. Memory is 0.2-second sampled process RSS, not exact peak/copi
 
 Disk admission reserves 4 GiB plus three payload copies and 64 MiB metadata.
 Generation/publication/read budgets are 120/600/600 seconds. The final instrument
-adds per-page formal quiet checks, continuous exchange deadlines, and bounded raw
-transport failure evidence. Those changes followed the 128 MiB smoke; their real
+uses phase-boundary quiet checks (before generation, after publication, after
+daemon startup, and after read completion), continuous exchange deadlines, and
+bounded raw transport failure evidence. No per-page process scan enters timing. Those changes followed the 128 MiB smoke; their real
 integration is separately recorded as `1m-transport-final`. No result from the
 older 128 MiB driver is relabeled as final-instrument performance.
 
@@ -94,5 +95,11 @@ through the normal harness and requires pinned source/build inputs.
 
 ## CI
 
-Pending artifact PR after the reviewed Journal prerequisite PR #2277 is merged.
+Artifact PR #2281 follows merged Journal prerequisite #2277. Review added archive
+and template SHA-256 comparison identity; changed valid hashes with unchanged
+scale/version refuse comparison. Quiet admission is explicitly phase-boundary
+only. Python 203 tests (3 opt-in skips), SDD and diff checks passed after this
+review correction; adjacent `python-review.log` and `sdd-review.log` retain output.
+No Rust rebuild or large-payload rerun was performed for these Python/doc edits.
+CI for the updated artifact head is pending.
 CI green is validation, not maintainer approval or baseline adoption.

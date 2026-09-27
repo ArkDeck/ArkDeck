@@ -66,6 +66,8 @@ ABSOLUTE_BUDGETS: dict[str, float] = {
 # runs, so they take no part in the comparability check.
 WORKLOAD_SCALE_FIELDS = (
     "artifactFixtureVersion",
+    "artifactArchiveSha256",
+    "artifactTemplateSha256",
     "artifactOwnerKind",
     "artifactImportKind",
     "artifactPayloadBytes",
