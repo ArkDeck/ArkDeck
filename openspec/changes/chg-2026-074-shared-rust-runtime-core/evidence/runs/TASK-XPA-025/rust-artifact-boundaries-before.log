@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/private/tmp/arkdeck-check-boundaries.py", line 8, in <module>
+    namespace['assert_boundaries']()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/private/tmp/arkdeck-xpa025-artifact-read/rust/scripts/check-readonly.py", line 131, in assert_boundaries
+    assert internal == allowed[name], f"unexpected dependency edge: {name}"
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: unexpected dependency edge: arkdeck-soak

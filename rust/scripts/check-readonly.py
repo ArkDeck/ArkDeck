@@ -109,8 +109,10 @@ def assert_boundaries() -> None:
         # ArkForge's own client crate; no other ArkDeck crate reaches ArkForge.
         "arkdeck-provider-arkforge": {"arkdeck-contract", "arkdeck-platform"},
         # Measurement composition only: in-memory provider, production owners,
-        # and self-resource sampling. No client or daemon transport dependency.
-        "arkdeck-soak": {"arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
+        # and self-resource sampling. The InputArtifact fixture uses the pure
+        # contract ImportIntent/chunk codec/digest API for production owner input.
+        # No client or daemon transport dependency.
+        "arkdeck-soak": {"arkdeck-contract", "arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
     }
     # ArkForge's crates come from its repository at one pinned revision; only
     # the lane's provider depends on them, and only on its protocol and pure

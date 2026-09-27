@@ -103,3 +103,19 @@ review correction; adjacent `python-review.log` and `sdd-review.log` retain outp
 No Rust rebuild or large-payload rerun was performed for these Python/doc edits.
 CI for the updated artifact head is pending.
 CI green is validation, not maintainer approval or baseline adoption.
+
+### CI dependency-map correction
+
+CI run 36297065896 at head 16ca4640 failed in Linux job 108557844537 and
+Windows job 108557844562: `check-readonly.py::assert_boundaries` rejected the
+new soak -> arkdeck-contract edge. Raw job logs are retained losslessly with
+uncompressed hashes. This was a code failure, not an invalid/noisy run.
+
+The exact dependency map now adds only arkdeck-contract for the host fixture's
+pure ImportIntent/chunk codec/digest API. It adds no transport or authority owner;
+the exact-set assertion is unchanged. Local system Python lacks jsonschema, so
+the isolated check driver executes the actual assert_boundaries AST function
+with its real ROOT/tomllib inputs, avoiding unrelated daemon/schema imports.
+It reproduced the same failure before the correction and passed afterward
+(exit 0; before/after logs and driver adjacent). No Rust rebuild, full local gate
+or large-I/O capture was run. Updated-head CI must validate the complete lane.
