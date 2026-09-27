@@ -217,6 +217,7 @@ class IsolatedRuntime:
         self.state_directory = state_directory
         self.socket_path = state_directory / SOCKET_NAME
         self.process: subprocess.Popen | None = None
+        self.start_diagnostics: dict[str, object] = {}
         if len(str(self.socket_path).encode("utf-8")) > MAXIMUM_SOCKET_PATH_BYTES:
             raise ValueError(
                 f"socket path {self.socket_path} exceeds {MAXIMUM_SOCKET_PATH_BYTES} "
@@ -224,11 +225,11 @@ class IsolatedRuntime:
             )
 
     def start(self, budget_seconds: float = 60.0) -> float:
-        """Start the daemon and return awake-work seconds to first healthy call.
+        """Start the daemon and return awake-work seconds through verified health.
 
-        The measurement brackets process spawn through the first successful
-        `health` response, which is the cold-start definition in design
-        section I.2.
+        The historical boundary includes the contract-verifying health handshake
+        and the following explicit health response. Diagnostics preserve that
+        boundary; they do not substitute socket appearance or CPU time.
         """
 
         if self.process is not None and self.process.poll() is None:
@@ -251,6 +252,7 @@ class IsolatedRuntime:
             environment["ARKDECK_ENDPOINT"] = str(self.socket_path)
         else:
             arguments.extend(["--state-dir", str(self.state_directory)])
+        self.start_diagnostics = {"connectionAttempts": 0}
         started = clocks.awake_seconds()
         self.process = subprocess.Popen(
             arguments,
@@ -258,6 +260,7 @@ class IsolatedRuntime:
             stderr=subprocess.DEVNULL,
             env=environment,
         )
+        self.start_diagnostics["spawnReturnedSeconds"] = clocks.awake_seconds() - started
         deadline = clocks.Deadline(budget_seconds)
         while not deadline.expired():
             if self.process.poll() is not None:
@@ -266,13 +269,18 @@ class IsolatedRuntime:
                     "answering health"
                 )
             if self.socket_path.exists():
+                self.start_diagnostics.setdefault("socketObservedSeconds", clocks.awake_seconds() - started)
+                self.start_diagnostics["connectionAttempts"] += 1
                 try:
                     with control.ControlClient(
                         str(self.socket_path),
                         timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds())),
                     ) as client:
+                        self.start_diagnostics["contractVerifiedSeconds"] = clocks.awake_seconds() - started
                         client.call("health")
-                        return clocks.awake_seconds() - started
+                        elapsed = clocks.awake_seconds() - started
+                        self.start_diagnostics["healthySeconds"] = elapsed
+                        return elapsed
                 except (control.ControlError, OSError):
                     pass
             # Polling without a pause would spend a core on failed connects and

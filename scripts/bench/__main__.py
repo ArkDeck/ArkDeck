@@ -108,14 +108,14 @@ def capture_exit_code(unstable: list[str], disqualifiers: list[str]) -> int:
 
 def command_capture(arguments: argparse.Namespace) -> int:
     toolchain = _toolchain_facts(arguments.daemon, arguments.soak)
-    recorder = None
-    if arguments.recovery_samples:
-        import uuid
-        arguments.out_dir.mkdir(parents=True, exist_ok=True)
-        raw = arguments.out_dir / f"recovery-samples-{uuid.uuid4().hex}.jsonl"
-        def recorder(sample):
-            # Append every attempt immediately, including failures; later errors
-            # cannot erase earlier samples. No host paths enter this artifact.
+    import uuid
+    arguments.out_dir.mkdir(parents=True, exist_ok=True)
+    capture_id = uuid.uuid4().hex
+
+    def make_recorder(prefix):
+        raw = arguments.out_dir / f"{prefix}-{capture_id}.jsonl"
+        def record(sample):
+            # Every attempt is appended before subsequent guards can fail.
             entry = {"atUtc": clocks.utc_now(), "toolchain": toolchain,
                      "runIndex": index, "runtimeKind": arguments.runtime_kind,
                      "buildConfiguration": arguments.build_configuration,
@@ -124,7 +124,11 @@ def command_capture(arguments: argparse.Namespace) -> int:
             baseline.assert_no_host_identity(serialized)
             with raw.open("a", encoding="utf-8") as output:
                 output.write(serialized + "\n")
-        print(f"bench: recovery attempts archived in {raw}", file=sys.stderr)
+        print(f"bench: raw observations archived in {raw}", file=sys.stderr)
+        return record
+
+    recorder = make_recorder("recovery-samples") if arguments.recovery_samples else None
+    capture_recorder = make_recorder("capture-samples")
     context = metrics.RunContext(
         daemon_executable=arguments.daemon,
         soak_executable=arguments.soak,
@@ -139,6 +143,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
         recovery_only=arguments.recovery_only,
         recovery_require_quiet=not arguments.allow_loaded_host,
         recovery_recorder=recorder,
+        capture_recorder=capture_recorder,
+        require_quiet=not arguments.allow_loaded_host,
     )
 
     results: dict[str, baseline.MetricResult] = {}
@@ -181,8 +187,12 @@ def command_capture(arguments: argparse.Namespace) -> int:
         try:
             samples, scale = metrics.execute_run(context, state_directory)
         except (metrics.RunFailed, harness.DaemonStartFailed) as error:
+            capture_recorder({"kind": "run", "status": "FAILED", "errorType": type(error).__name__})
             print(f"bench: run {index} failed: {error}", file=sys.stderr)
             return 1
+        except Exception as error:
+            capture_recorder({"kind": "run", "status": "FAILED", "errorType": type(error).__name__})
+            raise
         finally:
             shutil.rmtree(state_directory, ignore_errors=True)
 
@@ -197,7 +207,17 @@ def command_capture(arguments: argparse.Namespace) -> int:
                     if k.startswith("recovery") and k != "recoverySamples"
                 }
             else:
-                metric_scale = {k: v for k, v in scale.items() if not k.startswith("recovery")}
+                metric_scale = {
+                    k: v for k, v in scale.items()
+                    if not k.startswith("recovery") and k not in {
+                        "residentSetRawSamples", "unmeasured",
+                        "residentSetPhaseMethod", "idleWindowSeconds",
+                    }
+                }
+                if name.startswith("daemon.residentSet"):
+                    for field in ("residentSetPhaseMethod", "idleWindowSeconds"):
+                        if field in scale:
+                            metric_scale[field] = scale[field]
             result.add_run(values, metric_scale)
 
         run_records.append(
@@ -224,6 +244,19 @@ def command_capture(arguments: argparse.Namespace) -> int:
     toolchain["runtimeKind"] = arguments.runtime_kind
     task, spike = baseline.document_identity(arguments.runtime_kind)
     gaps = metrics.gap_definitions(arguments.runtime_kind)
+    incomplete = {}
+    for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
+        missing = [run["index"] for run in run_records
+                   if name in run["scale"].get("unmeasured", {})]
+        if missing:
+            reason = f"not measured in runs {missing}: " + "; ".join(sorted({
+                run["scale"]["unmeasured"][name] for run in run_records
+                if name in run["scale"].get("unmeasured", {})
+            }))
+            partial = results.pop(name, None)
+            incomplete[name] = partial.as_document() if partial else None
+            gaps[name] = baseline.Gap(name, row, reason, "complete phase observations in every run")
+            disqualifiers.append(f"{name}: {reason}")
     for name in results:
         gaps.pop(name, None)
     for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
@@ -244,6 +277,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
             else "release build measured on a quiet host with the required run count"
         ),
     )
+    for name, partial in incomplete.items():
+        document["metrics"][name]["partialMeasurement"] = partial
     serialized = baseline.serialize(document)
 
     arguments.out_dir.mkdir(parents=True, exist_ok=True)

@@ -233,11 +233,11 @@ def measure(daemon, soak, workload: str, budget_seconds: float = 60.0, *, requir
 
 
 def assert_quiet_host() -> dict:
-    """Repository measurement gate; evaluated before every recovery sample."""
+    """Repository measurement gate shared by recovery and ordinary capture."""
     import re
     load = harness.assert_host_is_quiet()
     if load >= 4:
-        raise harness.HostTooBusy("recovery measurement requires one-minute load < 4")
+        raise harness.HostTooBusy("performance measurement requires one-minute load < 4")
     processes = subprocess.run(["ps", "-axo", "comm=,args="], capture_output=True,
                                text=True, check=True, timeout=10)
     for line in processes.stdout.splitlines():
@@ -248,5 +248,5 @@ def assert_quiet_host() -> dict:
         arguments = fields[1] if len(fields) > 1 else ""
         if (command in {"cargo", "rustc", "xcodebuild"}
                 or (command.lower().startswith("python") and re.search(r"(?:^|[ /])plan\.py(?:\s|$)", arguments))):
-            raise harness.HostTooBusy(f"recovery measurement refused while {command} is running")
+            raise harness.HostTooBusy(f"performance measurement refused while {command} is running")
     return {"oneMinuteLoad": load, "conflictingBuildProcesses": 0}

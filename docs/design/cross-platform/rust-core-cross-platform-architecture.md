@@ -674,6 +674,8 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 
 约定：**硬件/OS/构建**统一为两组参考主机：macOS = Apple M3 / 8 核 / 16 GB / macOS 26.6 / Xcode 26.6 release（本机实测配置）；Windows = 待 SPK-3 选定的 Windows 11 x64（推荐 8 核/16 GB）与 ARM64 各一台，release 构建；数据规模在表内注明。预算标「拟」表示无基线依据，由 SPK-1 取得基线后按下述规则定稿：**预算 = 基线 p95 × 1.5 与产品上限二者取小**；回归阈值 = 相对已归档基线中位数 +20%（PR 微基准）/ +10%（nightly）。计数类指标的推导预算取 `ceil(p95 × 1.5)`；时延类取推导值向上保留三位有效数字。
 
+TASK-XPA-025 的当前 Rust 采集主机硬件仍为 Apple M3 / 8 核 / 16 GB，系统为 macOS 27 / Xcode 27。新增该组合的独立 Rust release 基线环境，候选数据先留在任务 evidence，经维护者对实现和实测 PR review 后才采纳到 `baselines/`；不修改历史 Swift JSON，不把新 OS 与旧 OS 的 host mismatch skip 当作回归通过。原有预算、30% 跨 run 稳定性限制及未测指标保持。RSS 采集改为必须观察到释放才报告 post-release steady；未观察到时保留原始轨迹、原因和其他 run 的部分数据，不能用 plateau 替代。释放时间从实际 elapsed 读取，旧记录中的样本序号不追溯改写为秒。此采集修正不替代注 2 的产品上限适用阶段决定。
+
 SPK-1 已提交结果为 2026-09-04 的 release/静机/3 次独立 run，实际 store 为 30 个终态 Job；冷启动 p95 波动 23.6%，三项 UDS IPC 最大 6.8%，均低于 30%。下表同步 [原始 JSON](../../../scripts/bench/baselines/perf-baseline-2026-09-04.json) 的 p50/p95/p99 与按既有公式计算的预算值；[测量报告](spk-1-macos-performance-baseline.md)保留过程。本次没有重跑测量，post-SVC 当前二进制须重新采集，不能直接沿用旧二进制结果声称性能通过。规则边界：
 
 - **量测下限**：基线 p95 落在仪器分辨率上时（如 idle CPU 用 `ps` 读到 0.0%），`p95 × 1.5` 推出 0，没有实现能满足。此时**产品上限原样保留**，不做推导。

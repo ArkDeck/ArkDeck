@@ -444,7 +444,7 @@ class ResidentSetSplitTests(unittest.TestCase):
         plateau, steady, index = metrics.split_at_release(series)
         self.assertIsNone(index)
         self.assertEqual(plateau, series)
-        self.assertEqual(steady, series)
+        self.assertEqual(steady, [])
 
     def test_small_wobble_is_not_a_release(self) -> None:
         series = [50.0, 49.5, 50.2, 49.8, 50.1]
@@ -462,7 +462,7 @@ class ResidentSetSplitTests(unittest.TestCase):
             plateau, steady, index = metrics.split_at_release(series)
             self.assertIsNone(index)
             self.assertEqual(plateau, series)
-            self.assertEqual(steady, series)
+            self.assertEqual(steady, [])
 
     def test_the_release_fraction_is_pinned(self) -> None:
         self.assertEqual(metrics.RESIDENT_SET_RELEASE_FRACTION, 0.25)
@@ -596,3 +596,55 @@ class StaticImportAudit(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+class CaptureTraceTests(unittest.TestCase):
+    def context(self, **extra):
+        return metrics.RunContext(
+            daemon_executable=pathlib.Path('/daemon'), soak_executable=pathlib.Path('/soak'),
+            cold_start_samples=0, ipc_samples=0, idle_seconds=5, calibration_samples=0,
+            seed_seconds=1, seed_jobs_per_cycle=1, **extra)
+
+    def test_release_time_uses_elapsed_clock_and_raw_series_is_preserved(self):
+        recorder = mock.Mock()
+        values = []
+        for rss in (100, 40):
+            resource = harness.ProcessResources()
+            resource.resident_set_bytes = rss
+            values.append(resource)
+        with mock.patch.object(harness, 'seed_state_directory') as seed, \
+             mock.patch.object(harness, 'IsolatedRuntime') as runtime_class, \
+             mock.patch.object(harness, 'sample_process_resources', side_effect=values), \
+             mock.patch.object(clocks, 'awake_seconds', side_effect=[100, 101.25, 101.5, 103.5, 103.75]), \
+             mock.patch.object(clocks, 'Deadline') as deadline, \
+             mock.patch.object(metrics.time, 'sleep'):
+            seed.return_value.returncode = 0
+            runtime_class.return_value.client.return_value.__enter__.return_value.call.return_value = {
+                'items': [{'jobId': 'job-one'}]}
+            deadline.return_value.expired.side_effect = [False, False, True]
+            samples, scale = metrics.execute_run(self.context(capture_recorder=recorder), pathlib.Path('/state'))
+        self.assertEqual(scale['residentSetReleaseAtSeconds'], 3.5)
+        self.assertEqual(scale['residentSetRawSamples'], [
+            {'elapsedSeconds': 1.25, 'bytes': 100.0}, {'elapsedSeconds': 3.5, 'bytes': 40.0}])
+        self.assertEqual(samples['daemon.residentSetSteady'], [40.0])
+        self.assertEqual(recorder.call_count, 2)
+        self.assertEqual(recorder.call_args.args[0]['finishedAtSeconds'], 3.75)
+
+    def test_guard_failure_after_start_keeps_sample_and_stops_daemon(self):
+        recorder = mock.Mock()
+        context = self.context(capture_recorder=recorder, require_quiet=True)
+        context.cold_start_samples = 1
+        with mock.patch.object(harness, 'seed_state_directory') as seed, \
+             mock.patch.object(harness, 'IsolatedRuntime') as runtime_class, \
+             mock.patch.object(metrics.recovery, 'assert_quiet_host',
+                               side_effect=[{}, {}, harness.HostTooBusy('busy')]):
+            seed.return_value.returncode = 0
+            runtime = runtime_class.return_value
+            runtime.start.return_value = .1
+            runtime.start_diagnostics = {'healthySeconds': .1}
+            with self.assertRaises(harness.HostTooBusy):
+                metrics.execute_run(context, pathlib.Path('/state'))
+            self.assertGreaterEqual(runtime.stop.call_count, 1)
+        observations = [call.args[0] for call in recorder.call_args_list]
+        self.assertEqual(observations[-1]['kind'], 'coldStart')
+        self.assertEqual(observations[-1]['milliseconds'], 100)

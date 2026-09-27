@@ -67,7 +67,7 @@ METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
     "daemon.coldStart": (
         "milliseconds",
         "I.2 row 1 (daemon cold start)",
-        "process spawn through the first successful health response",
+        "process spawn through contract-verifying health handshake and explicit health response",
     ),
     "ipc.health": (
         "milliseconds",
@@ -301,6 +301,8 @@ class RunContext:
         recovery_only: bool = False,
         recovery_require_quiet: bool = True,
         recovery_recorder=None,
+        capture_recorder=None,
+        require_quiet: bool = False,
     ) -> None:
         if runtime_kind not in {"swift", "rust"}:
             raise ValueError("runtime_kind must be swift or rust")
@@ -312,6 +314,8 @@ class RunContext:
         self.recovery_only = recovery_only
         self.recovery_require_quiet = recovery_require_quiet
         self.recovery_recorder = recovery_recorder
+        self.capture_recorder = capture_recorder
+        self.require_quiet = require_quiet
         self.runtime_kind = runtime_kind
         self.daemon_executable = daemon_executable
         self.soak_executable = soak_executable
@@ -338,9 +342,8 @@ def split_at_release(
     """Split a resident-set series at its largest qualifying downward step.
 
     Returns `(plateau, steady, index)`.  With no qualifying step the whole
-    series is both the plateau and the steady state, and the index is `None`;
-    the caller records that so a reader can tell a flat daemon from one whose
-    release was simply not observed inside the window.
+    series remains the plateau, steady is empty, and the index is `None`.
+    No observation of a release means no measurement of the post-release phase.
     """
 
     best_index: int | None = None
@@ -352,7 +355,7 @@ def split_at_release(
             best_drop = drop
             best_index = index
     if best_index is None:
-        return list(samples), list(samples), None
+        return list(samples), [], None
     return samples[:best_index], samples[best_index:], best_index
 
 
@@ -399,6 +402,15 @@ def execute_run(
         "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
     }
 
+    def record(entry):
+        if context.capture_recorder:
+            context.capture_recorder(entry)
+
+    def guard(phase):
+        if context.require_quiet:
+            record({"kind": "quietHost", "phase": phase, **recovery.assert_quiet_host()})
+
+    guard("run-start")
     for _ in range(context.calibration_samples):
         samples["calibration.busyLoop"].append(calibration_sample())
 
@@ -454,10 +466,23 @@ def execute_run(
         # same populated state directory, which is what design section I.2
         # describes.  Every start is paired with a stop so that each sample is a
         # genuine cold start rather than the first one plus a long-lived server.
-        for _ in range(context.cold_start_samples):
-            elapsed = runtime.start()
+        for sample_index in range(context.cold_start_samples):
+            guard("cold-start-before")
+            try:
+                elapsed = runtime.start()
+            except Exception as error:
+                record({"kind": "coldStart", "sampleIndex": sample_index,
+                        "status": "FAILED", "errorType": type(error).__name__,
+                        "diagnostics": runtime.start_diagnostics})
+                raise
             samples["daemon.coldStart"].append(elapsed * 1000.0)
+            record({"kind": "coldStart", "sampleIndex": sample_index,
+                    "status": "MEASURED", "milliseconds": elapsed * 1000.0,
+                    "diagnostics": runtime.start_diagnostics})
             runtime.stop()
+            guard("cold-start-after")
+
+        guard("ipc-before")
 
         runtime.start()
         with runtime.client() as client:
@@ -484,6 +509,8 @@ def execute_run(
                     samples["ipc.jobStatus"].append(elapsed * 1000.0)
         runtime.stop()
 
+        guard("ipc-after")
+
         # The resource window needs a daemon that has served nothing but its own
         # health check.  Sampling the process that just answered thousands of
         # requests measures a served-then-quiet resident set, and calling that
@@ -494,15 +521,25 @@ def execute_run(
             raise RunFailed("the daemon stopped before the idle window")
         pid = runtime.process.pid
         resident_series: list[float] = []
+        resident_times: list[float] = []
+        resource_started = clocks.awake_seconds()
+        scale["residentSetPhaseMethod"] = "observed-release-v2"
+        scale["idleWindowSeconds"] = context.idle_seconds
         idle_deadline = clocks.Deadline(max(1, context.idle_seconds))
         while not idle_deadline.expired():
             # One sample per second: the resource readers shell out, and
             # sampling as fast as they return would make the harness itself the
             # busiest thing on an otherwise idle host.
             time.sleep(1.0)
+            guard("idle-sample-before")
+            sample_started = clocks.awake_seconds() - resource_started
             sample = harness.sample_process_resources(pid)
+            elapsed = clocks.awake_seconds() - resource_started
+            record({"kind": "idleResources", "startedAtSeconds": sample_started,
+                    "finishedAtSeconds": elapsed, **sample.as_document()})
             if sample.resident_set_bytes is not None:
                 resident_series.append(float(sample.resident_set_bytes))
+                resident_times.append(sample_started)
             if sample.cpu_percent is not None:
                 samples["daemon.idleCpuPercent"].append(sample.cpu_percent)
             if sample.thread_count is not None:
@@ -515,7 +552,17 @@ def execute_run(
         samples["daemon.residentSetPlateau"] = plateau
         samples["daemon.residentSetSteady"] = steady
         scale["residentSetReleaseObserved"] = release_index is not None
-        scale["residentSetReleaseAtSeconds"] = release_index
+        scale["residentSetReleaseAtSeconds"] = (
+            resident_times[release_index] if release_index is not None else None
+        )
+        scale["residentSetRawSamples"] = [
+            {"elapsedSeconds": elapsed, "bytes": value}
+            for elapsed, value in zip(resident_times, resident_series)
+        ]
+        if not steady:
+            scale["unmeasured"] = {"daemon.residentSetSteady":
+                "no qualifying release observed in the fixed idle window; post-release RSS is not measured"}
+        guard("idle-after")
         scale["residentSetSampleCount"] = len(resident_series)
     finally:
         runtime.stop()
