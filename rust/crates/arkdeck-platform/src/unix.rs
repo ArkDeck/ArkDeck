@@ -193,10 +193,23 @@ impl LocalListener {
     /// requested, whichever is ready first; a requested stop wins over a
     /// waiting connection, which is then never accepted.
     pub fn accept_until(&mut self, stop: &StopSignal) -> io::Result<Option<LocalConnection>> {
+        self.accept_until_descriptor(stop.as_raw_fd())
+    }
+
+    /// An independently owned serving generation can stop without installing
+    /// process-global signal handlers. A set latch wins over a queued peer.
+    pub fn accept_until_latch(&mut self, stop: &Latch) -> io::Result<Option<LocalConnection>> {
+        self.accept_until_descriptor(stop.as_raw_fd())
+    }
+
+    fn accept_until_descriptor(
+        &mut self,
+        stop: std::os::fd::RawFd,
+    ) -> io::Result<Option<LocalConnection>> {
         loop {
             let mut descriptors = [
                 libc::pollfd {
-                    fd: stop.as_raw_fd(),
+                    fd: stop,
                     events: libc::POLLIN,
                     revents: 0,
                 },

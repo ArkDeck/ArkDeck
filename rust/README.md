@@ -2766,10 +2766,21 @@ verifies published Artifact evidence and journals, and fails on unresolved
 intents, cleanup debt or excessive RSS/FD growth. Every cycle prints its
 resident set, its growth against the first cycle, the descriptor count and the
 state size, so a failed resource gate leaves a series rather than one number. The default duration is 24
-hours. Unlike the Swift fixture it calls the owners directly instead of going
-through the daemon's socket, so it exercises no IPC itself;
-`scripts/bench capture --runtime-kind rust` uses it to seed each run's store and
-then measures the isolated release `arkdeck-agentd` over its socket (SPK-11).
+hours. Each cycle now binds a private `d/ctl.sock`, serves the shared
+`arkdeck-agentd` control loop, and sends new Jobs through the existing bounded
+client (health plus one business request per connection, like Swift). Clean
+preflight recovery still calls the production runner directly, as Swift does.
+A cycle closes its clients, stops accepting, drains for at most five seconds,
+and releases its owners before reopening; incomplete drain fails the run and
+retains the old generation's listener lease until its handlers release state.
+This is a same-process server/owner lifecycle, not an OS-process restart or an
+installed launchd service. The canonical socket path must fit 103 bytes; longer
+roots are rejected before owner state is published. The benchmark helper's short
+`adkb.*` roots and the hosted workflow's `/tmp/adksoak.*` roots fit this boundary.
+`scripts/bench capture --runtime-kind rust` uses the fixture to seed each run's
+store, then measures the isolated release daemon over its socket (SPK-11).
+Historical owner-only soak results retain their original source and scope;
+the new transport coverage needs its own run record.
 Neither the soak nor a capture approves a budget, commits a reference baseline
 or provides hardware acceptance evidence. See
 [the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)

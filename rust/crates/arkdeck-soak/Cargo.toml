@@ -7,6 +7,9 @@ license.workspace = true
 publish.workspace = true
 
 [target.'cfg(target_os = "macos")'.dependencies]
+arkdeck-agentd.workspace = true
+arkdeck-client.workspace = true
+arkdeck-control.workspace = true
 arkdeck-contract.workspace = true
 arkdeck-hoststore.workspace = true
 arkdeck-platform.workspace = true

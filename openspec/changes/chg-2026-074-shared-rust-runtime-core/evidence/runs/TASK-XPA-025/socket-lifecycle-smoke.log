@@ -1,0 +1,5 @@
+Rust soak cycle=1 jobs=10 active=1 recovered=0 rssBytes=21725184 rssGrowthBytes=0 fdCount=15 stateBytes=474359 simulatedProvider=true
+Rust soak cycle=2 jobs=20 active=1 recovered=1 rssBytes=22085632 rssGrowthBytes=360448 fdCount=15 stateBytes=945111 simulatedProvider=true
+Rust soak cycle=3 jobs=30 active=1 recovered=1 rssBytes=22265856 rssGrowthBytes=540672 fdCount=15 stateBytes=1436738 simulatedProvider=true
+Rust soak cycle=4 jobs=40 active=1 recovered=1 rssBytes=22429696 rssGrowthBytes=704512 fdCount=15 stateBytes=1950145 simulatedProvider=true
+ArkDeck Rust soak completed simulatedProvider=true terminalJobs=40 verifiedArtifactJobs=36

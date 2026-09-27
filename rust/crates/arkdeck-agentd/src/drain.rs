@@ -9,7 +9,7 @@
 //! (#2004's first run), so a connection's thread here waits for the start of
 //! its next frame on the socket and on the drain's `closing` latch together,
 //! and the drain sets the latch as it shuts the connections down.
-use arkdeck_platform::{ConnectionCloser, Latch, LocalConnection};
+use arkdeck_platform::{ConnectionCloser, Latch, ListenerLock, LocalConnection};
 use std::collections::HashMap;
 use std::io;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
@@ -26,6 +26,10 @@ struct State {
     requests: usize,
     next: u64,
     connections: HashMap<u64, ConnectionCloser>,
+    // A timed-out handler still owns its registration. Keep the listening
+    // generation locked until the last handler lets go, even if a fixture
+    // returns an error rather than exiting like the production daemon.
+    listener_lock: Option<Arc<ListenerLock>>,
 }
 
 /// One open connection, let go of when its thread drops it.
@@ -80,11 +84,15 @@ impl Serving {
         }
     }
 
+    pub(crate) fn retain_listener_lock(&self, lock: Arc<ListenerLock>) {
+        self.state().listener_lock = Some(lock);
+    }
+
     /// Swift `drainAndStop` once its listener is closed: waits until no frame
     /// is being answered, ends every open connection, idle ones included,
     /// and waits until each has been let go — all within one deadline, past
     /// which it returns with whatever is still running.
-    pub(crate) fn drain(&self, deadline: Instant) {
+    pub(crate) fn drain(&self, deadline: Instant) -> bool {
         let mut state = self.state();
         while state.requests > 0 {
             let Some(left) = deadline.checked_duration_since(Instant::now()) else {
@@ -110,6 +118,13 @@ impl Serving {
                 .unwrap_or_else(PoisonError::into_inner)
                 .0;
         }
+        let complete = state.requests == 0 && state.connections.is_empty();
+        if complete {
+            // Only the caller's token retains the listener lock on success;
+            // a registration finishing its Drop cannot delay the next bind.
+            state.listener_lock = None;
+        }
+        complete
     }
 }
 

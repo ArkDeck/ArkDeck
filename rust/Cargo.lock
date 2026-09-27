@@ -187,7 +187,10 @@ dependencies = [
 name = "arkdeck-soak"
 version = "0.1.0"
 dependencies = [
+ "arkdeck-agentd",
+ "arkdeck-client",
  "arkdeck-contract",
+ "arkdeck-control",
  "arkdeck-hoststore",
  "arkdeck-platform",
  "arkdeck-provider-hdc",

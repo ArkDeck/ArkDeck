@@ -111,8 +111,12 @@ def assert_boundaries() -> None:
         # Measurement composition only: in-memory provider, production owners,
         # and self-resource sampling. The InputArtifact fixture uses the pure
         # contract ImportIntent/chunk codec/digest API for production owner input.
-        # No client or daemon transport dependency.
-        "arkdeck-soak": {"arkdeck-contract", "arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
+        # The socket lifecycle reuses the agentd server library and existing
+        # Client/Control, never its production Host/device composition.
+        "arkdeck-soak": {
+            "arkdeck-agentd", "arkdeck-client", "arkdeck-control", "arkdeck-contract",
+            "arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc",
+        },
     }
     # ArkForge's crates come from its repository at one pinned revision; only
     # the lane's provider depends on them, and only on its protocol and pure
