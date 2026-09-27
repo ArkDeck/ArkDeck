@@ -175,7 +175,7 @@ class JournalRowContractTests(unittest.TestCase):
             with self.subTest(mutation=mutate), self.assertRaises(ValueError):
                 JournalTests().drain([item])
 
-    def test_state_transition_and_final_row_cursor_must_match_fixture(self):
+    def test_state_transition_matches_fixture_but_cursors_are_opaque(self):
         for field in ('fromState', 'toState'):
             item = page(0, 1000, False)
             item['items'][1]['data'][field] = 'wrong'
@@ -183,5 +183,4 @@ class JournalRowContractTests(unittest.TestCase):
                 JournalTests().drain([item])
         item = page(0, 1000, False)
         item['nextCursor'] = 'unrelated-cursor'
-        with self.assertRaises(ValueError):
-            JournalTests().drain([item])
+        JournalTests().drain([item])

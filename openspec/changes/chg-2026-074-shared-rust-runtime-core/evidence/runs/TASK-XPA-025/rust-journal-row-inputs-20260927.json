@@ -1,0 +1,35 @@
+{
+  "benchRebasedHead": "1f639373133e3a36a136f92655adffcf66e80d3d",
+  "benchSourceFiles": {
+    "scripts/bench/__init__.py": "62f8de82d66d4c5700630dbdeb7f937424cb5751bb279b986abc12815e09b7f5",
+    "scripts/bench/__main__.py": "802986cf7a179edba3191d366b7537165fe5126ad34998d7dfeb172b071a9967",
+    "scripts/bench/baseline.py": "f60bd1eba430764f50bc05ca9ce016220a6fb81de91fde0e4f2bc7cd0c4627f6",
+    "scripts/bench/clocks.py": "f0d741eb61f06e903d58866748fe15b45b60ad5a99b061c1d16eb3c37ad4aab9",
+    "scripts/bench/compare.py": "a9c9fc97774f89e62c5a4465fc91e185c72128f1cbe3f7c2585c635f6037d993",
+    "scripts/bench/control.py": "fb8f8d02eff5fdcb45c6fbda2f1aeb5c23078f82c5a2057ca190ad1ba28e94c4",
+    "scripts/bench/harness.py": "416cab70092974ca0269741e9d2d05b46e1a4371a08a7381cc6fc3089df33f04",
+    "scripts/bench/journal.py": "a46697f0bae435b32f6554770884d7d3c2ce62ddcd7a3b3ed37745e83f5c005b",
+    "scripts/bench/metrics.py": "48130500537d35dc0923318ddc1fe7e9eea9839a485149518067287657882e25",
+    "scripts/bench/recovery.py": "4700b8936fd688e196495429460e6ce1927472e3e8223a43c3f705156f527903",
+    "scripts/bench/test_baseline.py": "fbba082be500231c8563539cb5b9c035c004f82b1668da7597781ea54dca7c05",
+    "scripts/bench/test_compare.py": "9b8849822d9fc65140cbab5008774053e8ed70e22c5e9ea991d2e750de3ff34c",
+    "scripts/bench/test_harness.py": "d7345eaa1d358c14f1b35a677a7eeeee74126be8295c27415ab3414c1a6a8706",
+    "scripts/bench/test_journal.py": "5fdd1fc14af3e132b616ab702daee3698eed0bc9b8ceaf2f4f922871bb968ba9",
+    "scripts/bench/test_recovery.py": "1b5a65ef1748ecbb4629abade2e349f21685cc291d9326f29cdee9a82dc7a4ac"
+  },
+  "rawRecords": {
+    "row-refused": {
+      "byteCount": 750218,
+      "sha256": "e9bcbaefa901cfbdb8fdbf3a2c9d938a5cc762983b0061ffc65d587c2ab774bc"
+    },
+    "row-validated": {
+      "byteCount": 2253279,
+      "sha256": "f7e4148a0ca9543c9159e65fd5c81f21733d3a53a821adcf92ed7dfb06ee3ab9"
+    }
+  },
+  "daemonSource": "82f0971ce5f122bde47d9cd850f6df4e0b277da1",
+  "daemonBuild": "release",
+  "soakSource": "ce2423beed7f1539330018bfd934b12b1642b55a fixture source on base 82f0971ce",
+  "soakBuild": "debug (existing binary, not rebuilt after rebase)",
+  "purpose": "harness row validation only, not current-main Runtime acceptance"
+}

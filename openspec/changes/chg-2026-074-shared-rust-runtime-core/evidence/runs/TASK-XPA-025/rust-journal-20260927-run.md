@@ -78,3 +78,31 @@ exit 0, 186 tests, 2 optional recovery checks skipped;
 `/private/tmp/arkdeck-journal-python-row-contract.log`. Real-daemon revalidation
 of this stronger consumer awaits its coordinated window; the earlier actual
 integration is retained without relabeling it as validation of this correction.
+
+## Rebased actual row-validation check
+
+Rebased without conflict onto main `4d6e12932cba0b0debbba0d7727a0c2bfbb6028e`;
+bench head before the final cursor correction was `1f639373`. The first real
+check refused an extra assumption that the final row cursor equals nextCursor.
+Production `job_events.rs` encrypts each cursor using a fresh random nonce, so
+equivalent positions do not imply equal opaque strings. This non-contractual
+assumption was removed; required strings, uniqueness, complete row/data shape,
+fixture origin and actual stream progress remain checked. The refusal's full
+raw prefix and failure record are retained as `rust-journal-row-refused-20260927.jsonl.gz`.
+
+The corrected actual check completed all three 1,000-event runs and 3 pages/run.
+Command/options were the same advisory/debug journal-only integration as above,
+using pinned source-82 release daemon and the previously built Debug soak from
+the original fixture implementation. No Rust rebuild or current-main Runtime
+acceptance is claimed. Exact bench source hashes and raw hashes are in
+`rust-journal-row-inputs-20260927.json`; binary hashes remain in the result JSON.
+`rust-journal-row-validated-20260927.json` records **UNSTABLE job.eventsDrain**
+and **baselineEligible false**. Exit 0 reflects explicit advisory mode, not a
+performance pass. Its complete raw observations are archived as lossless gzip.
+
+Python regression after the correction: 186 tests pass, 2 optional skips;
+`/private/tmp/arkdeck-journal-python-opaque-cursor.log`. Actual integration exit 0:
+`/private/tmp/arkdeck-journal-row-integration-fixed-20260927.log`. The earlier
+refusal log remains `/private/tmp/arkdeck-journal-row-integration-20260927.log`.
+SDD and diff checks pass after evidence updates; no unrelated Rust suite was rerun
+for this Python-only correction. The local window was explicitly released.

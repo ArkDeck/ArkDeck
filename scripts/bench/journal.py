@@ -125,8 +125,8 @@ def drain(runtime, record, budget_seconds=30):
                 index = len(ids)
                 validate_row(row, index, row_cursors)
                 ids.add(row['eventId'])
-            if page['items'][-1]['cursor'] != page['nextCursor']:
-                raise ValueError('page cursor differs from final row cursor')
+            # Opaque cursors are independently encrypted with random nonces;
+            # equivalent positions need not have equal ciphertext strings.
             if page['hasMore'] is False:
                 break  # A valid terminal page still carries its resume cursor.
             if len(ids) >= COUNT:
