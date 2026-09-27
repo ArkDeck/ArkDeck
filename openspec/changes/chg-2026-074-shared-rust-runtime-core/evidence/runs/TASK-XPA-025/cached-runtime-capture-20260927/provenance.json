@@ -1,0 +1,56 @@
+{
+  "sourceCommit": "4c3ed7491a96921a5a48f908f168cd27438e1064",
+  "preparedAtUtc": "2026-09-27T08:30:27Z",
+  "sourceTree": "1b6a45d52c9780168cf3050fee31bc2f8005c90e",
+  "rustTree": "86bae49866e0a856682e45b69fcde609149fe10f",
+  "benchTree": "2e7716418d4d1b979f0d714cbbd105a1b064c54e",
+  "cargoLockSha256": "4e06dad7b626eaa4f1039cb1409e5d5c1c78628a5b30838cb994ad7e9915c59f",
+  "artifactReaderVersion": "fixed-buffer-chunked-canonical-json-v4",
+  "artifactSizesMiB": [
+    128,
+    1024
+  ],
+  "artifactAttemptsPerSize": 1,
+  "readBudgetSeconds": 600,
+  "startupObservationVersion": "startup-observation-v2",
+  "baseline": {
+    "runs": 3,
+    "coldStartSamples": 50,
+    "ipcSamples": 1000,
+    "idleSeconds": 600,
+    "calibrationSamples": 200,
+    "seedSeconds": 6,
+    "seedJobsPerCycle": 10,
+    "quietWaitSeconds": 0
+  },
+  "requireQuiet": true,
+  "retryUnchangedRejection": false,
+  "fixedAtUtc": "2026-09-27T08:32:36.223042+00:00",
+  "profile": "release default features, target macOS ARM64 sha2 asm",
+  "cargoBuildJobs": 2,
+  "cargoIncremental": 0,
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustFlags": null,
+  "encodedRustFlags": null,
+  "host": {
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.0\nBuildVersion:\t\t26A428",
+    "xcode": "Xcode 27.0\nBuild version 27A266a",
+    "sdk": "27.0",
+    "cpu": "Apple M3",
+    "logicalCpus": "8",
+    "memoryBytes": "17179869184",
+    "architecture": "arm64",
+    "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.3.34.2)]"
+  },
+  "files": {
+    "arkdeck-agentd": {
+      "sha256": "310ac44296a8d6a68c4d8b9fd30f9f9f2f19b7668bcf19f60c801be42b854cf9",
+      "bytes": 13309280
+    },
+    "arkdeck-soak": {
+      "sha256": "4f9356b59dda0226cd573679e14f5e3a911c4dceae937f9f10bff53ecbfee2bd",
+      "bytes": 5964720
+    }
+  }
+}

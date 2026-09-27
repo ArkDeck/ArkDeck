@@ -1,0 +1,353 @@
+{
+  "sourceCommit": "4c3ed7491a96921a5a48f908f168cd27438e1064",
+  "inputFilesVerified": 20,
+  "binariesVerified": 2,
+  "baselineEligible": false,
+  "artifact": {
+    "artifact-128m": {
+      "pageCount": 32,
+      "verifiedBytes": 134217728,
+      "completeRecord": {
+        "actualPageCount": 32,
+        "effectiveBytesPerSecond": 129408945.55333665,
+        "effectiveDecimalMBPerSecond": 129.40894555333665,
+        "effectiveMiBPerSecond": 123.41398768743196,
+        "kind": "artifactReadComplete",
+        "milliseconds": 1037.1595829492435,
+        "payloadBytes": 134217728,
+        "rssSamples": [
+          {
+            "clientBytes": 47218688,
+            "daemonBytes": 20070400,
+            "elapsedSeconds": 0.01368479197844863
+          },
+          {
+            "clientBytes": 57147392,
+            "daemonBytes": 41975808,
+            "elapsedSeconds": 0.2549775829538703
+          },
+          {
+            "clientBytes": 57147392,
+            "daemonBytes": 41992192,
+            "elapsedSeconds": 0.49809712497517467
+          },
+          {
+            "clientBytes": 57147392,
+            "daemonBytes": 41992192,
+            "elapsedSeconds": 0.7374775420175865
+          },
+          {
+            "clientBytes": 57147392,
+            "daemonBytes": 42008576,
+            "elapsedSeconds": 0.9890112919965759
+          }
+        ],
+        "rssSummary": {
+          "clientBytes": {
+            "baselineBytes": 47218688,
+            "sampledGrowthBytes": 9928704,
+            "sampledPeakBytes": 57147392
+          },
+          "daemonBytes": {
+            "baselineBytes": 20070400,
+            "sampledGrowthBytes": 21938176,
+            "sampledPeakBytes": 42008576
+          }
+        },
+        "sha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+        "utc": "2026-09-27T08:33:07Z"
+      },
+      "quietLoads": [
+        3.05419921875,
+        2.8896484375,
+        2.8896484375,
+        2.8896484375
+      ]
+    },
+    "artifact-1g": {
+      "pageCount": 256,
+      "verifiedBytes": 1073741824,
+      "completeRecord": {
+        "actualPageCount": 256,
+        "effectiveBytesPerSecond": 124859539.34720889,
+        "effectiveDecimalMBPerSecond": 124.8595393472089,
+        "effectiveMiBPerSecond": 119.07533583374871,
+        "kind": "artifactReadComplete",
+        "milliseconds": 8599.597833002917,
+        "payloadBytes": 1073741824,
+        "rssSamples": [
+          {
+            "clientBytes": 20873216,
+            "daemonBytes": 20070400,
+            "elapsedSeconds": 0.013710750034078956
+          },
+          {
+            "clientBytes": 29507584,
+            "daemonBytes": 21446656,
+            "elapsedSeconds": 0.2382910830201581
+          },
+          {
+            "clientBytes": 29507584,
+            "daemonBytes": 21446656,
+            "elapsedSeconds": 0.4624810409732163
+          },
+          {
+            "clientBytes": 45367296,
+            "daemonBytes": 42778624,
+            "elapsedSeconds": 0.6976739999372512
+          },
+          {
+            "clientBytes": 45596672,
+            "daemonBytes": 42778624,
+            "elapsedSeconds": 0.9491843750001863
+          },
+          {
+            "clientBytes": 45596672,
+            "daemonBytes": 42778624,
+            "elapsedSeconds": 1.2005229579517618
+          },
+          {
+            "clientBytes": 45596672,
+            "daemonBytes": 42795008,
+            "elapsedSeconds": 1.4540292079327628
+          },
+          {
+            "clientBytes": 45596672,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 1.7065734160132706
+          },
+          {
+            "clientBytes": 45613056,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 1.9520526659907773
+          },
+          {
+            "clientBytes": 45613056,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 2.2095007080351934
+          },
+          {
+            "clientBytes": 45613056,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 2.445295332930982
+          },
+          {
+            "clientBytes": 45629440,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 2.6866824160097167
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 2.9433037500130013
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 3.1965793749550357
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 3.445895583019592
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 3.681403083028272
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 3.9242157909320667
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 4.161016708007082
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 4.407140583032742
+          },
+          {
+            "clientBytes": 45645824,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 4.630687708035111
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 4.883933707955293
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 5.139133124961518
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 5.371651583001949
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 5.617774624959566
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 5.871938165975735
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 6.121262541040778
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 6.350702374940738
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42762240,
+            "elapsedSeconds": 6.588180999970064
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 6.831790208001621
+          },
+          {
+            "clientBytes": 45727744,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 7.084695791010745
+          },
+          {
+            "clientBytes": 45744128,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 7.338883457938209
+          },
+          {
+            "clientBytes": 45760512,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 7.569503832957707
+          },
+          {
+            "clientBytes": 45760512,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 7.815512166009285
+          },
+          {
+            "clientBytes": 45760512,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 8.06949216593057
+          },
+          {
+            "clientBytes": 45760512,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 8.323571707936935
+          },
+          {
+            "clientBytes": 45760512,
+            "daemonBytes": 42811392,
+            "elapsedSeconds": 8.548012832994573
+          }
+        ],
+        "rssSummary": {
+          "clientBytes": {
+            "baselineBytes": 20873216,
+            "sampledGrowthBytes": 24887296,
+            "sampledPeakBytes": 45760512
+          },
+          "daemonBytes": {
+            "baselineBytes": 20070400,
+            "sampledGrowthBytes": 22740992,
+            "sampledPeakBytes": 42811392
+          }
+        },
+        "sha256": "ba5eb9d725c43a044fd910e491dceccda54c9a84cfbc711138d89e059dfe62a0",
+        "utc": "2026-09-27T08:34:09Z"
+      },
+      "quietLoads": [
+        2.0859375,
+        1.986328125,
+        1.986328125,
+        1.99462890625
+      ]
+    }
+  },
+  "coldStart": [
+    {
+      "count": 50,
+      "min": 25.06495895795524,
+      "p50": 28.87891698628664,
+      "p95": 42.94866696000099,
+      "p99": 69.27233398891985,
+      "max": 69.27233398891985
+    },
+    {
+      "count": 50,
+      "min": 26.26012498512864,
+      "p50": 28.481250046752393,
+      "p95": 32.24908304400742,
+      "p99": 68.76566703431308,
+      "max": 68.76566703431308
+    },
+    {
+      "count": 50,
+      "min": 26.16295893676579,
+      "p50": 28.70149991940707,
+      "p95": 36.63829201832414,
+      "p99": 71.80445897392929,
+      "max": 71.80445897392929
+    }
+  ],
+  "idle": [
+    {
+      "sampleCount": 545,
+      "firstStartSeconds": 1.0833068750798702,
+      "lastFinishSeconds": 600.0124356671004,
+      "minRssBytes": 21266432,
+      "maxRssBytes": 21266432,
+      "releaseIndex": null,
+      "steadySampleCount": 0
+    },
+    {
+      "sampleCount": 546,
+      "firstStartSeconds": 1.0776029999833554,
+      "lastFinishSeconds": 601.0829555829987,
+      "minRssBytes": 21463040,
+      "maxRssBytes": 21463040,
+      "releaseIndex": null,
+      "steadySampleCount": 0
+    },
+    {
+      "sampleCount": 108,
+      "firstStartSeconds": 1.0775271249003708,
+      "lastFinishSeconds": 118.85726724995766,
+      "minRssBytes": 21413888,
+      "maxRssBytes": 21413888,
+      "releaseIndex": null,
+      "steadySampleCount": 0
+    }
+  ],
+  "coldStartP95SpreadRatio": 0.29203282485554516,
+  "failure": {
+    "atUtc": "2026-09-27T09:01:08Z",
+    "buildConfiguration": "release",
+    "errorType": "HostTooBusy",
+    "kind": "run",
+    "runIndex": 2,
+    "runtimeKind": "rust",
+    "status": "FAILED",
+    "toolchain": {
+      "calibrationIterations": 60000,
+      "daemonSha256": "310ac44296a8d6a68c4d8b9fd30f9f9f2f19b7668bcf19f60c801be42b854cf9",
+      "soakFixtureSha256": "4f9356b59dda0226cd573679e14f5e3a911c4dceae937f9f10bff53ecbfee2bd"
+    }
+  }
+}

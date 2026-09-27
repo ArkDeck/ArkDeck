@@ -1,0 +1,11 @@
+{
+  "utc": "2026-09-27T08:30:27Z",
+  "kind": "prebuildDiskAdmission",
+  "sourceCommit": "4c3ed7491a96921a5a48f908f168cd27438e1064",
+  "payloadBytes": 1073741824,
+  "attempt": 1,
+  "freeBytes": 9666560000,
+  "requiredFreeBytes": 7583301632,
+  "reserveBytes": 4294967296,
+  "status": "PASS"
+}

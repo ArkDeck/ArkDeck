@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "4c3ed7491a96921a5a48f908f168cd27438e1064",
+  "preparedAtUtc": "2026-09-27T08:30:27Z",
+  "sourceTree": "1b6a45d52c9780168cf3050fee31bc2f8005c90e",
+  "rustTree": "86bae49866e0a856682e45b69fcde609149fe10f",
+  "benchTree": "2e7716418d4d1b979f0d714cbbd105a1b064c54e",
+  "cargoLockSha256": "4e06dad7b626eaa4f1039cb1409e5d5c1c78628a5b30838cb994ad7e9915c59f",
+  "artifactReaderVersion": "fixed-buffer-chunked-canonical-json-v4",
+  "artifactSizesMiB": [
+    128,
+    1024
+  ],
+  "artifactAttemptsPerSize": 1,
+  "readBudgetSeconds": 600,
+  "startupObservationVersion": "startup-observation-v2",
+  "baseline": {
+    "runs": 3,
+    "coldStartSamples": 50,
+    "ipcSamples": 1000,
+    "idleSeconds": 600,
+    "calibrationSamples": 200,
+    "seedSeconds": 6,
+    "seedJobsPerCycle": 10,
+    "quietWaitSeconds": 0
+  },
+  "requireQuiet": true,
+  "retryUnchangedRejection": false
+}
