@@ -230,9 +230,9 @@ fn typed_install(host: &ServiceHost, options: &Map<String, Value>) -> Result<Val
             format!("{command} requires an exact bundle and bundle generation"),
         ));
     };
-    // Ruling 3: nothing is pinned while a signing receipt would need the new
-    // daemon's identity re-recorded (Swift does that before `bootstrap`).
-    refuse_while_signing(host, &command)?;
+    // Refuse invalid public signing material before acquiring a bundle pin.
+    // A valid credential is refreshed against the installed helper below.
+    validate_signing_refresh(host, &command)?;
     let (bundles, tools) = bootstrap_stores(host).map_err(|error| registry_failure(error, ""))?;
     let installation = ReferenceOwner::service_installation();
     // Pin and revalidate the exact bundle generation before publishing an
@@ -424,7 +424,7 @@ fn update_request(
             .map_err(|refusal| PlainFailure::new(1, refusal.to_string()))?,
         None => None,
     };
-    refuse_while_signing(host, &command)?;
+    validate_signing_refresh(host, &command)?;
     Ok(InstallRequest {
         bundle,
         hdc,
@@ -436,22 +436,14 @@ fn update_request(
     })
 }
 
-/// Ruling 3: Swift re-records the replacement daemon's identity in the
-/// signing receipt before launchd starts it (`refreshSigningAccessIfInstalled`);
-/// with no Rust signing owner yet, an installed preset refuses the install
-/// before anything changes.
-fn refuse_while_signing(host: &ServiceHost, command: &str) -> Result<(), PlainFailure> {
+/// Validate public credential material before changing the service. The
+/// locked identity refresh runs against the installed helper before bootstrap.
+fn validate_signing_refresh(host: &ServiceHost, command: &str) -> Result<(), PlainFailure> {
     if host.paths.signing_receipt.exists() {
-        return Err(PlainFailure::new(
-            69,
-            format!(
-                "{command} is refused while an OpenHarmony signing preset is \
-                 installed ({}): the replacement daemon's identity must be re-recorded in that \
-                 receipt before launchd starts it, and the Rust CLI has no signing-credential \
-                 owner yet (Q8); nothing was changed",
-                text(&host.paths.signing_receipt)
-            ),
-        ));
+        crate::signing_leaves::validate_refresh(host.paths.signing_receipt.parent().unwrap())
+            .map_err(|error| PlainFailure::new(69, format!(
+                "{command} is refused: the installed OpenHarmony signing preset cannot be validated for identity refresh: {error}; nothing was changed"
+            )))?;
     }
     Ok(())
 }
@@ -577,6 +569,22 @@ fn install(host: &ServiceHost, request: InstallRequest) -> Result<Value, PlainFa
     );
     write_owned_atomically(&host.paths.receipt, &foundation_pretty_json(&receipt))
         .map_err(failed)?;
+    if host.paths.signing_receipt.exists()
+        && let Err(detail) = (host.refresh_signing_access)(
+            host.paths.signing_receipt.parent().unwrap(),
+            &host.paths.installed_daemon,
+        )
+    {
+        // Swift restores the validated replacement's read-only service
+        // before surfacing maintenance failure. Signing still validates
+        // the receipt and actual envelope independently at dispatch.
+        if let Err(recovery) = host.bootstrap() {
+            return Err(failed(ServiceError::Launchctl(format!(
+                "credential refresh failed ({detail}); replacement daemon recovery failed ({recovery})"
+            ))));
+        }
+        return Err(PlainFailure::new(1, detail));
+    }
     host.bootstrap().map_err(failed)?;
     let mut document = receipt;
     if let Some(mut cutover) = cutover {

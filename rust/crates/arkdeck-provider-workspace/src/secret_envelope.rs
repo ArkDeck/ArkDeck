@@ -60,19 +60,29 @@ pub fn decode_envelope(bytes: &[u8]) -> Result<SecretPair, SigningError> {
 /// accepts any member order, so the Keychain value need not be byte-equal to
 /// a Swift-written one.
 pub fn encode_envelope(keystore: &[u8], key: &[u8]) -> Secret {
-    let mut keystore = crate::base64::encode(keystore);
-    let mut key = crate::base64::encode(key);
-    let text = format!(
-        "{{\"schemaVersion\":\"{}\",\"keystorePassword\":\"{}\",\"keyPassword\":\"{}\"}}",
-        SECRET_ENVELOPE_SCHEMA.replace('/', "\\/"),
-        keystore.replace('/', "\\/"),
-        key.replace('/', "\\/"),
-    );
-    for text in [&mut keystore, &mut key] {
-        let mut bytes = std::mem::take(text).into_bytes();
-        wipe(&mut bytes);
-    }
-    Secret::new(text.into_bytes())
+    // Keep even the temporary base64 copies in wiped buffers. Formatting
+    // through `String::replace` would leave untracked secret-bearing copies.
+    let keystore = Secret::new(crate::base64::encode(keystore).into_bytes());
+    let key = Secret::new(crate::base64::encode(key).into_bytes());
+    let mut bytes =
+        br#"{"schemaVersion":"arkdeck-openharmony-signing-secret\/v1","keystorePassword":""#
+            .to_vec();
+    // Reserve before appending any secret bytes so growth cannot leave a
+    // freed allocation containing an unwiped prefix of the envelope.
+    bytes.reserve(2 * keystore.len() + 2 * key.len() + br#"","keyPassword":""#.len() + 2);
+    let append = |output: &mut Vec<u8>, value: &[u8]| {
+        for &byte in value {
+            if byte == b'/' {
+                output.push(b'\\');
+            }
+            output.push(byte);
+        }
+    };
+    append(&mut bytes, keystore.as_bytes());
+    bytes.extend_from_slice(br#"","keyPassword":""#);
+    append(&mut bytes, key.as_bytes());
+    bytes.extend_from_slice(br#""}"#);
+    Secret::new(bytes)
 }
 
 /// Swift `validateSecret(_:)`: non-empty, at most 4 096 bytes, and no NUL,

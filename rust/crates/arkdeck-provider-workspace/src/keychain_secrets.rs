@@ -1,6 +1,7 @@
 //! Swift `LoginKeychainSigningSecretStore` as a [`SigningSecrets`] source:
 //! the preset's envelope in the Data Protection Keychain under the helpers'
-//! shared access group, read without user interaction, and the installed
+//! shared access group, read without user interaction by Runtime composition,
+//! with a separate interactive maintenance constructor, and the installed
 //! daemon's code identity that a receipt is bound to.
 use crate::SigningError;
 use crate::signing_preset::{KEYCHAIN_SERVICE, SecretPresence, SigningSecrets};
@@ -21,6 +22,19 @@ impl KeychainSigningSecrets {
         Ok(Self {
             items: KeychainItems::data_protection(KEYCHAIN_SERVICE, DAEMON_KEYCHAIN_ACCESS_GROUP)
                 .map_err(keychain_failure("Keychain"))?,
+            daemon: Some(daemon_executable),
+        })
+    }
+
+    /// Explicit maintenance CLI's interactive Keychain policy. Runtime
+    /// composition continues to call `installed`, which never prompts.
+    pub fn for_maintenance(daemon_executable: PathBuf) -> Result<Self, SigningError> {
+        Ok(Self {
+            items: KeychainItems::data_protection_for_maintenance(
+                KEYCHAIN_SERVICE,
+                DAEMON_KEYCHAIN_ACCESS_GROUP,
+            )
+            .map_err(keychain_failure("Keychain"))?,
             daemon: Some(daemon_executable),
         })
     }
@@ -100,5 +114,19 @@ impl crate::signing_removal::SigningSecretRemoval for KeychainSigningSecrets {
             .map_err(keychain_failure("legacy Keychain"))?
             .remove(account)
             .map_err(keychain_failure("legacy Keychain removal"))
+    }
+}
+
+impl crate::signing_install::SigningSecretInstallation for KeychainSigningSecrets {
+    fn set_envelope(&self, account: &str, bytes: &[u8]) -> Result<(), SigningError> {
+        self.items
+            .set(account, bytes)
+            .map_err(keychain_failure("Keychain write"))
+    }
+
+    fn remove_envelope(&self, account: &str) -> Result<bool, SigningError> {
+        self.items
+            .remove(account)
+            .map_err(keychain_failure("Keychain removal"))
     }
 }

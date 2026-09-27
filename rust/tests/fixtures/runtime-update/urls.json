@@ -1,0 +1,157 @@
+{
+  "artifacts" : [
+    {
+      "error" : null,
+      "input" : "https://github.com/ArkDeck/a.dmg",
+      "url" : "https://github.com/ArkDeck/a.dmg"
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "http://github.com/ArkDeck/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "HTTPS://github.com/ArkDeck/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://user@github.com/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://github.com:443/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://github.com/a.dmg#fragment",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://github.com/a.dmg#",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://evil.example/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : "redirectRejected",
+      "input" : "https://127.0.0.1/a.dmg",
+      "url" : null
+    },
+    {
+      "error" : null,
+      "input" : "https://%67ithub.com/a.dmg",
+      "url" : "https://%67ithub.com/a.dmg"
+    },
+    {
+      "error" : null,
+      "input" : "https://GITHUB.COM/a.dmg",
+      "url" : "https://GITHUB.COM/a.dmg"
+    },
+    {
+      "error" : "invalidInitialURL",
+      "input" : "https://github.com/a b.dmg",
+      "url" : null
+    },
+    {
+      "error" : null,
+      "input" : "https://github.com/a%20b.dmg",
+      "url" : "https://github.com/a%20b.dmg"
+    },
+    {
+      "error" : null,
+      "input" : "https://github.com/%FF.dmg",
+      "url" : "https://github.com/%FF.dmg"
+    },
+    {
+      "error" : "invalidInitialURL",
+      "input" : "https://github.com/%ZZ.dmg",
+      "url" : null
+    },
+    {
+      "error" : "invalidInitialURL",
+      "input" : "https://github.com/a.dmg?x=[1]",
+      "url" : null
+    }
+  ],
+  "feeds" : [
+    {
+      "accept" : "application/vnd.arkdeck.update-feed.v1+json",
+      "appVersion" : "1.2.3",
+      "architecture" : "arm64",
+      "cookies" : false,
+      "method" : "GET",
+      "osVersion" : "14.0.0",
+      "url" : "https://github.com/ArkDeck/ArkDeck/releases/latest/download/arkdeck-update-feed-v1.json?appVersion=1.2.3&osVersion=14.0.0&arch=arm64",
+      "userAgent" : "ArkDeck-Update/1"
+    },
+    {
+      "accept" : "application/vnd.arkdeck.update-feed.v1+json",
+      "appVersion" : "1.2.3+query?",
+      "architecture" : "arm&64",
+      "cookies" : false,
+      "method" : "GET",
+      "osVersion" : "14 0",
+      "url" : "https://github.com/ArkDeck/ArkDeck/releases/latest/download/arkdeck-update-feed-v1.json?appVersion=1.2.3+query?&osVersion=14%200&arch=arm%2664",
+      "userAgent" : "ArkDeck-Update/1"
+    }
+  ],
+  "producer" : "RuntimeUpdateURLRustOracleTests",
+  "redirects" : [
+    {
+      "count" : 1,
+      "error" : null,
+      "proposed" : "https://release-assets.githubusercontent.com/a.dmg?appVersion=1&osVersion=14&arch=arm64&token=x%2By&empty&AppVersion=keep",
+      "url" : "https://release-assets.githubusercontent.com/a.dmg?token=x+y&empty&AppVersion=keep"
+    },
+    {
+      "count" : 5,
+      "error" : null,
+      "proposed" : "https://objects.githubusercontent.com/a.dmg?%61ppVersion=1&token=a%2Fb%3Fc%26d",
+      "url" : "https://objects.githubusercontent.com/a.dmg?token=a/b?c%26d"
+    },
+    {
+      "count" : 1,
+      "error" : null,
+      "proposed" : "https://github.com/a.dmg?appVersion=1",
+      "url" : "https://github.com/a.dmg?"
+    },
+    {
+      "count" : 1,
+      "error" : null,
+      "proposed" : "https://github.com/a.dmg?",
+      "url" : "https://github.com/a.dmg?"
+    },
+    {
+      "count" : 6,
+      "error" : "redirectLimitExceeded",
+      "proposed" : "https://github.com/a.dmg",
+      "url" : null
+    },
+    {
+      "count" : 1,
+      "error" : "redirectRejected",
+      "proposed" : "http://github.com/a.dmg",
+      "url" : null
+    },
+    {
+      "count" : 1,
+      "error" : "redirectRejected",
+      "proposed" : "https://user@github.com/a.dmg",
+      "url" : null
+    },
+    {
+      "count" : 1,
+      "error" : "redirectRejected",
+      "proposed" : "https://github.com/a.dmg#",
+      "url" : null
+    }
+  ]
+}

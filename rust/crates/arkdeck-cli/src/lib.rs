@@ -13,7 +13,6 @@ mod bootstrap_resources;
 mod failure_mapping;
 use failure_mapping::Transport;
 pub use failure_mapping::{BOUNDED_READ_ONLY_METHODS, bounded_read_only};
-pub mod blocked_leaves;
 mod debug_probe;
 mod debug_templates;
 pub mod domain_executor;
@@ -21,6 +20,7 @@ pub mod domain_leaves;
 pub mod error_registry;
 mod feature_coverage;
 mod flash_leaves;
+pub mod runtime_update;
 pub mod support_bundle;
 mod trace_inspect;
 pub mod ui_dump;
@@ -93,6 +93,8 @@ pub mod runtime_service;
 pub mod runtime_service_install;
 #[cfg(target_os = "macos")]
 pub mod runtime_service_verify;
+#[cfg(target_os = "macos")]
+pub mod signing_inputs;
 pub mod signing_leaves;
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
@@ -395,7 +397,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if let Some(answer) = command_registry::answer_by_name(argv) {
         return answer;
     }
-    if let Some(answer) = blocked_leaves::answer(argv) {
+    if let Some(answer) = runtime_update::answer(argv) {
         return answer;
     }
     if let Some(answer) = update_feed::answer(argv) {
@@ -547,6 +549,16 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--maximum-wait"
                 | "--maximum-wait-seconds"
                 | "--reviewed-plan-digest"
+                | "--project-ref"
+                | "--java"
+                | "--sdk"
+                | "--bundle-name"
+                | "--jar"
+                | "--keystore"
+                | "--certificate"
+                | "--profile"
+                | "--key-alias"
+                | "--build-profile"
                 | "--daemon"
                 | "--hdc"
                 | "--workspace-project"
@@ -631,7 +643,10 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
                         "--registration-request-id" => "registrationRequestId",
                         "--mutation-request-id" => "mutationRequestId",
-                        "--project" => "projectRef",
+                        "--project" | "--project-ref" => "projectRef",
+                        "--key-alias" => "keyAlias",
+                        "--bundle-name" => "bundleName",
+                        "--build-profile" => "buildProfile",
                         "--preset" => "presetRef",
                         "--template" => "templateRef",
                         "--toolchain" => "toolchainRef",
@@ -872,6 +887,12 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "support-bundle", "export"] => "runtime.support-bundle.export",
         // §12's superseded spelling of `runtime service`: the same handler,
         // reporting the name the caller typed (Swift `runAgentDaemon`).
+        ["runtime", "signing", "install-sdk-release"] => "runtime.signing.install-sdk-release",
+        ["signing", "install-sdk-release"] => "signing.install-sdk-release",
+        ["runtime", "signing", "migrate-deveco"] => "runtime.signing.migrate-deveco",
+        ["signing", "migrate-deveco"] => "signing.migrate-deveco",
+        ["runtime", "signing", "install"] => "runtime.signing.install",
+        ["signing", "install"] => "signing.install",
         ["runtime", "signing", "status"] => "runtime.signing.status",
         ["signing", "status"] => "signing.status",
         ["runtime", "signing", "remove"] => "runtime.signing.remove",
@@ -928,6 +949,40 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
     // The LaunchAgent leaves connect to no caller-named Runtime and take no
     // correlation identity.
     let service = is_runtime_service(command);
+    // These new option spellings must not become aliases on unrelated leaves
+    // merely because their internal parameter keys overlap (notably projectRef).
+    if seen.iter().any(|flag| {
+        matches!(
+            *flag,
+            "--project-ref"
+                | "--java"
+                | "--sdk"
+                | "--bundle-name"
+                | "--jar"
+                | "--keystore"
+                | "--certificate"
+                | "--profile"
+                | "--key-alias"
+                | "--build-profile"
+        ) && !command_registry::declares(command, flag)
+    }) {
+        return Err(CliError::new(
+            "invalidOption",
+            "the option does not belong to this command",
+        ));
+    }
+    if matches!(
+        command,
+        "runtime.signing.install"
+            | "signing.install"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
+    ) {
+        registry_parse::check(argv)?;
+    }
+
     // The legacy `--json` is the leaf's where the registry declares it, as
     // Swift's registry does on nearly every leaf, and never beside `--output`.
     if legacy_json && (!command_registry::declares(command, "--json") || mode.is_some()) {
@@ -1072,6 +1127,22 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "runtime.signing.install-sdk-release" | "signing.install-sdk-release" => {
+            &["sdk", "java", "bundleName", "projectRef"]
+        }
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco" => {
+            &["buildProfile", "daemon", "keyAlias"]
+        }
+        "runtime.signing.install" | "signing.install" => &[
+            "java",
+            "jar",
+            "keystore",
+            "certificate",
+            "profile",
+            "keyAlias",
+            "projectRef",
+            "buildProfile",
+        ],
         "debug.probe" | "trace.probe" => &["targetId"],
         "maintainer.contracts.export" | "maintainer.contracts.check" => {
             &["contractsDirectory", "fixturesDirectory"]
@@ -1819,6 +1890,7 @@ fn parse_argv(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("session.")
             || command.starts_with("human-action.")
             || is_runtime_service(command)
+            || signing_leaves::serves(command)
             || domain_leaves::serves(command)
             || command.starts_with("maintainer.contracts.")
             || command.starts_with("runtime.support-bundle.")

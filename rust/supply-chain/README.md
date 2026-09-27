@@ -107,3 +107,20 @@ locked `aes-gcm 0.10.3` (with `aes`, `alloc`) and the existing `hmac`/`sha2` to
 open DevEco Studio's AES-128-GCM password envelopes at the signing install
 boundary. No crate, version, checksum or trust entry changes; the new use is a
 dependency edge on already-locked releases and is named here for review.
+
+## Signed update feed dependencies
+
+On 2026-09-27 the user approved the concrete four-package, single-publication-day
+trust proposal for PR #2272 / TASK-XPA-018 ("同意，推送"). The rules cover only
+`curve25519-dalek 4.1.3` (rozbb, 2024-06-18),
+`curve25519-dalek-derive 0.1.1` (rozbb, 2023-10-31),
+`ed25519 2.2.3` (tarcieri, 2023-10-15), and
+`ed25519-dalek 2.2.0` (rozbb, 2025-07-09). Each end date is the next UTC day,
+exclusive. Exact allowlist versions and Cargo.lock checksums remain required.
+
+This is publisher trust, not source-audit certification. No existing trust
+window is widened, no future release window is granted, and no exemption is
+added. `imports.lock` adds only the four matching publisher records; configured
+audit sources and existing assertions stay unchanged. Details and validation
+are in `update-feed-dependency-review.md` under this change's TASK-XPA-018 run
+records. Maintainer PR review and installed/device acceptance remain separate.

@@ -12,7 +12,16 @@ use serde_json::{Value, json};
 pub fn serves(command: &str) -> bool {
     matches!(
         command,
-        "runtime.signing.status" | "signing.status" | "runtime.signing.remove" | "signing.remove"
+        "runtime.signing.status"
+            | "signing.status"
+            | "runtime.signing.remove"
+            | "signing.remove"
+            | "runtime.signing.install"
+            | "signing.install"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
     )
 }
 
@@ -130,7 +139,8 @@ pub fn remove_document(
 }
 
 #[cfg(target_os = "macos")]
-pub fn run(command: &str) -> Result<Value, crate::CliError> {
+pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
+    let command = invocation.command;
     use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
     use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
     let no_home = || {
@@ -142,7 +152,17 @@ pub fn run(command: &str) -> Result<Value, crate::CliError> {
     if matches!(command, "runtime.signing.status" | "signing.status") {
         return status().ok_or_else(no_home);
     }
-    if !matches!(command, "runtime.signing.remove" | "signing.remove") {
+    if !matches!(
+        command,
+        "runtime.signing.remove"
+            | "signing.remove"
+            | "runtime.signing.install"
+            | "signing.install"
+            | "runtime.signing.install-sdk-release"
+            | "signing.install-sdk-release"
+            | "runtime.signing.migrate-deveco"
+            | "signing.migrate-deveco"
+    ) {
         return Err(crate::CliError::new(
             "invalidCommand",
             "unsupported signing subcommand",
@@ -150,12 +170,339 @@ pub fn run(command: &str) -> Result<Value, crate::CliError> {
     }
     let root = SigningPresetStore::default_root().ok_or_else(no_home)?;
     let daemon = KeychainSigningSecrets::default_daemon_executable().ok_or_else(no_home)?;
-    KeychainSigningSecrets::installed(daemon)
-        .and_then(|secrets| remove_document(&root, &secrets))
-        .map_err(|error| crate::CliError {
-            // Swift's generic catch for SigningError: stderr, exit 1, even
-            // when the requested success rendering was JSON.
-            plain_exit: Some(1),
-            ..crate::CliError::new("ioFailure", error.to_string())
-        })
+    let empty = serde_json::Map::new();
+    let options = invocation.params.as_ref().unwrap_or(&empty);
+    if matches!(
+        command,
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
+    ) {
+        validate_migration_daemon(command, options, &daemon)?;
+    }
+    let secrets = KeychainSigningSecrets::for_maintenance(daemon).map_err(signing_error)?;
+    if matches!(command, "runtime.signing.install" | "signing.install") {
+        let empty = serde_json::Map::new();
+        install_document(
+            &root,
+            command,
+            invocation.params.as_ref().unwrap_or(&empty),
+            &secrets,
+            &mut |prompt| {
+                arkdeck_platform::read_terminal_secret(prompt).map_err(|error| crate::CliError {
+                    plain_exit: Some(error.exit_code),
+                    ..crate::CliError::new("ioFailure", error.message)
+                })
+            },
+            &crate::utc_now(),
+        )
+    } else if matches!(
+        command,
+        "runtime.signing.install-sdk-release" | "signing.install-sdk-release"
+    ) {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|duration| i64::try_from(duration.as_secs()).ok())
+            .ok_or_else(|| {
+                crate::CliError::new(
+                    "ioFailure",
+                    "current time is outside the signing profile range",
+                )
+            })?;
+        install_sdk_document(
+            &root,
+            command,
+            options,
+            &secrets,
+            &crate::utc_now(),
+            timestamp,
+        )
+    } else if matches!(
+        command,
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
+    ) {
+        migrate_deveco_document(&root, options, &secrets)
+    } else {
+        remove_document(&root, &secrets).map_err(signing_error)
+    }
+}
+
+/// Before changing a service installation, reject an unreadable or drifted
+/// preset using public file identities only. This probe creates no owner
+/// ledger and never opens or reads the Keychain.
+#[cfg(target_os = "macos")]
+pub fn validate_refresh(
+    root: &std::path::Path,
+) -> Result<(), arkdeck_provider_workspace::SigningError> {
+    use arkdeck_provider_workspace::signing_preset::{DEFAULT_PRESET_ID, SigningPresetStore};
+    SigningPresetStore::new(root)
+        .load_validated(DEFAULT_PRESET_ID, false, &Unanswerable)
+        .map(|_| ())
+}
+
+/// Production `beforeBootstrap`: bind the still-installed credential to the
+/// freshly verified, installed helper. Identity comes from the platform's
+/// code-signature check, never from the caller's JSON or a supplied digest.
+#[cfg(target_os = "macos")]
+pub fn refresh_installed_identity(
+    root: &std::path::Path,
+    daemon: &std::path::Path,
+) -> Result<(), String> {
+    use arkdeck_provider_workspace::credential_owner::CredentialOwner;
+    use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
+    use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
+    let secrets =
+        KeychainSigningSecrets::installed(daemon.to_owned()).map_err(|e| e.to_string())?;
+    CredentialOwner::new(SigningPresetStore::new(root))
+        .refresh_daemon_identity(&secrets)
+        .map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "macos")]
+fn signing_error(error: arkdeck_provider_workspace::SigningError) -> crate::CliError {
+    crate::CliError {
+        plain_exit: Some(1),
+        ..crate::CliError::new("ioFailure", error.to_string())
+    }
+}
+
+/// Explicit CLI installation. Secret readers are injected only at this Rust
+/// boundary for fixtures; public argv/JSON never accepts plaintext passwords.
+#[cfg(target_os = "macos")]
+pub fn install_document(
+    root: &std::path::Path,
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    secrets: &dyn arkdeck_provider_workspace::signing_install::SigningSecretInstallation,
+    read_secret: &mut dyn FnMut(&str) -> Result<arkdeck_platform::Secret, crate::CliError>,
+    now: &str,
+) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::{
+        credential_owner::CredentialOwner, deveco_password::decode_if_needed,
+        secret_envelope::SecretPair, signing_install::SigningPresetConfiguration,
+        signing_preset::SigningPresetStore,
+    };
+    use std::path::{Path, PathBuf};
+    let spelling = command.replace('.', " ");
+    let required = |key: &str, flag: &str| {
+        options
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| crate::CliError::plain_usage(format!("{spelling} requires {flag}")))
+    };
+    let java = required("java", "--java")?;
+    let jar = required("jar", "--jar")?;
+    let keystore = required("keystore", "--keystore")?;
+    let certificate = required("certificate", "--certificate")?;
+    let profile = required("profile", "--profile")?;
+    for (flag, path) in [
+        ("--java", java),
+        ("--jar", jar),
+        ("--keystore", keystore),
+        ("--certificate", certificate),
+        ("--profile", profile),
+    ] {
+        if !path.starts_with('/') {
+            return Err(crate::CliError::plain_usage(format!(
+                "{spelling} {flag} must be an absolute path"
+            )));
+        }
+    }
+    let (keystore_password, key_password) =
+        if let Some(path) = options.get("buildProfile").and_then(Value::as_str) {
+            if !path.starts_with('/') {
+                return Err(crate::CliError::plain_usage(format!(
+                    "{spelling} --build-profile must be an absolute path"
+                )));
+            }
+            let material = crate::signing_inputs::read_deveco_profile(Path::new(path))?;
+            // Compare standardized paths without following symlinks, as Swift's
+            // CLI does before binding the adjacent DevEco material.
+            if lexical_absolute(&material.store_file) != lexical_absolute(Path::new(keystore)) {
+                return Err(crate::CliError::plain_usage(format!(
+                    "{spelling} --build-profile names a different storeFile than --keystore"
+                )));
+            }
+            (material.keystore, material.key)
+        } else {
+            (
+                read_secret("Keystore password: ")?,
+                read_secret("Key password: ")?,
+            )
+        };
+    let passwords = SecretPair {
+        keystore: decode_if_needed(keystore_password.as_bytes(), Path::new(keystore))
+            .map_err(signing_error)?,
+        key: decode_if_needed(key_password.as_bytes(), Path::new(keystore))
+            .map_err(signing_error)?,
+    };
+    let configuration = SigningPresetConfiguration {
+        project_ref: options
+            .get("projectRef")
+            .and_then(Value::as_str)
+            .unwrap_or("demo-app")
+            .into(),
+        java_executable: PathBuf::from(java),
+        signer_jar: PathBuf::from(jar),
+        keystore: PathBuf::from(keystore),
+        app_certificate: PathBuf::from(certificate),
+        signed_profile: PathBuf::from(profile),
+        key_alias: required("keyAlias", "--key-alias")?.into(),
+        managed_material_directory: None,
+    };
+    CredentialOwner::new(SigningPresetStore::new(root))
+        .install(&configuration, &passwords, secrets, now)
+        .map(|resource| projection(&resource))
+        .map_err(signing_error)
+}
+
+#[cfg(target_os = "macos")]
+fn lexical_absolute(path: &std::path::Path) -> std::path::PathBuf {
+    let mut result = std::path::PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                result.pop();
+            }
+            other => result.push(other.as_os_str()),
+        }
+    }
+    result
+}
+
+/// Reject caller-selected daemons before opening the maintenance Keychain.
+#[cfg(target_os = "macos")]
+pub fn validate_migration_daemon(
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    installed: &std::path::Path,
+) -> Result<(), crate::CliError> {
+    let spelling = command.replace('.', " ");
+    let profile = options
+        .get("buildProfile")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let daemon = options.get("daemon").and_then(Value::as_str).unwrap_or("");
+    if !profile.starts_with('/') || !daemon.starts_with('/') {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} requires --build-profile and --daemon absolute paths"
+        )));
+    }
+    if lexical_absolute(std::path::Path::new(daemon)) != installed
+        || arkdeck_provider_workspace::foundation_resolved_path(daemon).as_deref()
+            != installed.to_str()
+    {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} --daemon must name the canonical installed LaunchAgent daemon"
+        )));
+    }
+    Ok(())
+}
+
+/// The authenticated build-profile's adjacent material is the decryption
+/// anchor; only a measured match to the installed keystore may replace it.
+#[cfg(target_os = "macos")]
+pub fn migrate_deveco_document(
+    root: &std::path::Path,
+    options: &serde_json::Map<String, Value>,
+    secrets: &dyn arkdeck_provider_workspace::signing_install::SigningSecretInstallation,
+) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::{
+        credential_owner::CredentialOwner,
+        deveco_password::decode_if_needed,
+        secret_envelope::SecretPair,
+        signing_preset::{DEFAULT_PRESET_ID, SigningPresetStore},
+    };
+    let store = SigningPresetStore::new(root);
+    let receipt = store
+        .load_validated(DEFAULT_PRESET_ID, false, secrets)
+        .map_err(signing_error)?;
+    let profile = options
+        .get("buildProfile")
+        .and_then(Value::as_str)
+        .ok_or_else(|| crate::CliError::plain_usage("migrate-deveco requires --build-profile"))?;
+    let material = crate::signing_inputs::read_deveco_profile(std::path::Path::new(profile))?;
+    let source = arkdeck_provider_workspace::measure(
+        material.store_file.to_str().unwrap(),
+        "DevEco build-profile keystore",
+        false,
+        true,
+    )
+    .map_err(signing_error)?;
+    if source.sha256 != receipt.keystore.sha256 || source.byte_count != receipt.keystore.byte_count
+    {
+        return Err(signing_error(
+            arkdeck_provider_workspace::SigningError::IdentityDrift(
+                "DevEco build-profile keystore does not match the installed preset".into(),
+            ),
+        ));
+    }
+    let passwords = SecretPair {
+        keystore: decode_if_needed(material.keystore.as_bytes(), &material.store_file)
+            .map_err(signing_error)?,
+        key: decode_if_needed(material.key.as_bytes(), &material.store_file)
+            .map_err(signing_error)?,
+    };
+    let (created, resource) = CredentialOwner::new(store)
+        .replace_secret_envelope(
+            &receipt,
+            &passwords,
+            options.get("keyAlias").and_then(Value::as_str),
+            secrets,
+        )
+        .map_err(signing_error)?;
+    Ok(
+        json!({"schemaVersion":"arkdeck.signing-credential-maintenance/1",
+        "operation":"migrate-deveco", "credential":projection(&resource),
+        "createdEnvelopeItem":created}),
+    )
+}
+
+/// Explicit SDK release installation. No search through PATH, ambient SDK or
+/// inferred workspace supplies any signing material.
+#[cfg(target_os = "macos")]
+pub fn install_sdk_document(
+    root: &std::path::Path,
+    command: &str,
+    options: &serde_json::Map<String, Value>,
+    secrets: &dyn arkdeck_provider_workspace::signing_install::SigningSecretInstallation,
+    now: &str,
+    timestamp: i64,
+) -> Result<Value, crate::CliError> {
+    use arkdeck_provider_workspace::{
+        credential_owner::CredentialOwner, sdk_release::SdkReleaseConfiguration,
+        signing_preset::SigningPresetStore,
+    };
+    let spelling = command.replace('.', " ");
+    let required = |key: &str, flag: &str| {
+        options
+            .get(key)
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+            .ok_or_else(|| crate::CliError::plain_usage(format!("{spelling} requires {flag}")))
+    };
+    let sdk = required("sdk", "--sdk")?;
+    let java = required("java", "--java")?;
+    for (flag, path) in [("--sdk", sdk), ("--java", java)] {
+        if !path.starts_with('/') {
+            return Err(crate::CliError::plain_usage(format!(
+                "{spelling} {flag} must be an absolute path"
+            )));
+        }
+    }
+    let configuration = SdkReleaseConfiguration {
+        project_ref: options
+            .get("projectRef")
+            .and_then(Value::as_str)
+            .unwrap_or("demo-app")
+            .into(),
+        bundle_name: required("bundleName", "--bundle-name")?.into(),
+        java_executable: java.into(),
+        sdk_root: sdk.into(),
+    };
+    CredentialOwner::new(SigningPresetStore::new(root))
+        .install_sdk_release(&configuration, secrets, now, timestamp)
+        .map(|resource| projection(&resource))
+        .map_err(signing_error)
 }

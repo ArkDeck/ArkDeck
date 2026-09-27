@@ -977,7 +977,7 @@ fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
         eprintln!("{warning}");
     }
     #[cfg(target_os = "macos")]
-    let answer = arkdeck_cli::signing_leaves::run(invocation.command);
+    let answer = arkdeck_cli::signing_leaves::run(invocation);
     #[cfg(not(target_os = "macos"))]
     let answer: Result<Value, CliError> = Err(CliError::new(
         "unsupportedOnPlatform",
@@ -1354,7 +1354,7 @@ fn render_agent_answer(
     }
 }
 
-/// `maintainer update-feed prepare` and its deprecated spelling: the prepared
+/// `maintainer update-feed prepare|assemble` and its deprecated spelling: the prepared
 /// payload's facts, as the runbook's lines in the human rendering; a refusal
 /// as Swift's session makes it, or a plain diagnostic where Swift's handler
 /// throws its plain error.
@@ -1376,7 +1376,12 @@ fn serve_update_feed_prepare(invocation: &Invocation, id: &str) -> std::process:
         })
         .unwrap_or_default();
     let root = invocation.command.split('.').next().unwrap_or_default();
-    match update_feed::prepare(&options) {
+    let answer = if invocation.command.ends_with(".assemble") {
+        update_feed::assemble(&options)
+    } else {
+        update_feed::prepare(&options)
+    };
+    match answer {
         Answer::Prepared { document, lines } => {
             let written = if invocation.json {
                 write_document(&arkdeck_cli::with_lifecycle(
@@ -1413,32 +1418,42 @@ fn serve_update_feed_prepare(invocation: &Invocation, id: &str) -> std::process:
     }
 }
 
-/// A registry leaf whose subsystem the Rust CLI has not ported: answered
-/// `blockedByProductDefect` in the caller's rendering, and nothing dispatched
-/// (`blocked_leaves`). A deprecated spelling still says so.
-fn serve_blocked_leaf(invocation: &Invocation, id: &str) -> std::process::ExitCode {
-    let error = arkdeck_cli::blocked_leaves::refusal(invocation.command);
-    let written =
-        if invocation.json {
-            write_document(&arkdeck_cli::with_lifecycle(
-                failure_envelope(invocation.command, &error, id, false),
-                invocation.command,
-            ))
-        } else if invocation.legacy_json {
-            io::stdout().lock().write_all(&arkdeck_cli::legacy_document(
-                &arkdeck_cli::legacy_failure(&error),
-            ))
-        } else {
-            if let Some(warning) = arkdeck_cli::legacy_warning(invocation.command) {
-                eprintln!("{warning}");
-            }
+fn serve_runtime_update(invocation: &Invocation, id: &str) -> std::process::ExitCode {
+    let answer = arkdeck_cli::runtime_update::run(invocation);
+    let written = match &answer {
+        Ok(result) if invocation.json => {
+            io::stdout()
+                .lock()
+                .write_all(&arkdeck_cli::runtime_update::render_document(
+                    &success_envelope(invocation.command, result.clone(), id),
+                ))
+        }
+        Ok(result) if invocation.legacy_json => io::stdout()
+            .lock()
+            .write_all(&arkdeck_cli::legacy_document(result)),
+        Ok(result) => writeln!(
+            io::stdout().lock(),
+            "{}",
+            arkdeck_cli::human_rendering(result)
+        ),
+        Err(error) if invocation.json => {
+            write_document(&failure_envelope(invocation.command, error, id, true))
+        }
+        Err(error) if invocation.legacy_json => io::stdout().lock().write_all(
+            &arkdeck_cli::legacy_document(&arkdeck_cli::legacy_failure(error)),
+        ),
+        Err(error) => {
             eprintln!("arkdeck: {}", error.message);
             Ok(())
-        };
+        }
+    };
     if written.is_err() {
         return 74.into();
     }
-    error.exit_code().into()
+    match answer {
+        Ok(_) => 0.into(),
+        Err(error) => error.exit_code().into(),
+    }
 }
 
 /// `runtime support-bundle preview|export`: the preview or the export
@@ -1543,8 +1558,24 @@ fn main() -> std::process::ExitCode {
     let invocation = match parse(&args) {
         Ok(invocation) => invocation,
         Err(error) => {
-            if machine {
+            // Swift stamps updater registry refusals before constructing a
+            // runtime session, with a fresh parse correlation. Unsupported
+            // JSONL still emits one JSON refusal, though no leaf emits JSONL.
+            let update_parse_refusal = error
+                .command
+                .is_some_and(arkdeck_cli::runtime_update::serves);
+            let update_jsonl_refusal = output_values == ["jsonl"]
+                && error
+                    .command
+                    .is_some_and(arkdeck_cli::runtime_update::serves)
+                && error.details.get("value").and_then(Value::as_str) == Some("jsonl");
+            if machine || update_jsonl_refusal {
                 let command = error.command.unwrap_or("registry.parse");
+                let parse_id = if update_parse_refusal {
+                    &fallback_id
+                } else {
+                    parse_id
+                };
                 if write_document(&arkdeck_cli::with_lifecycle(
                     failure_envelope(command, &error, parse_id, false),
                     command,
@@ -1647,15 +1678,18 @@ fn main() -> std::process::ExitCode {
     if invocation.command.starts_with("maintainer.contracts.") {
         return serve_maintainer_contracts(&invocation, id);
     }
-    if arkdeck_cli::blocked_leaves::blocks(invocation.command) {
-        return serve_blocked_leaf(&invocation, id);
+    if arkdeck_cli::runtime_update::serves(invocation.command) {
+        return serve_runtime_update(&invocation, id);
     }
     if invocation.command.starts_with("runtime.support-bundle.") {
         return serve_support_bundle(&invocation, id);
     }
     if matches!(
         invocation.command,
-        "maintainer.update-feed.prepare" | "update-feed.prepare"
+        "maintainer.update-feed.prepare"
+            | "update-feed.prepare"
+            | "maintainer.update-feed.assemble"
+            | "update-feed.assemble"
     ) {
         return serve_update_feed_prepare(&invocation, id);
     }

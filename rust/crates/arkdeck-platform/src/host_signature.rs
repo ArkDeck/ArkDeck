@@ -1,12 +1,17 @@
 //! Read-only macOS signing metadata used by bootstrap content inspection.
 //! This does not assess execution, clear quarantine or grant Provider support.
 use sha2::{Digest, Sha256};
+#[path = "host_update_signature.rs"]
+mod update;
 use std::{
     ffi::c_void,
     fs, io,
     os::unix::{ffi::OsStrExt, fs::MetadataExt},
     path::Path,
     ptr,
+};
+pub use update::{
+    HostUpdateSigningError, running_update_team, validate_running_update_code, validate_update_code,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -1,0 +1,176 @@
+[
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "runtime",
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck runtime: runtime signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon"
+    ],
+    "exit": 64,
+    "stderr": "warning: `signing migrate-deveco` is deprecated; use `arkdeck runtime signing migrate-deveco`\narkdeck signing: signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon"
+    ],
+    "exit": 64,
+    "stderr": "warning: `signing migrate-deveco` is deprecated; use `arkdeck runtime signing migrate-deveco`\narkdeck signing: signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--output",
+      "json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "relative.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing migrate-deveco requires --build-profile and --daemon absolute paths\n",
+    "stdout": ""
+  },
+  {
+    "argv": [
+      "signing",
+      "migrate-deveco",
+      "--build-profile",
+      "/fixture/build-profile.json5",
+      "--daemon",
+      "/fixture/uninstalled-daemon",
+      "--json"
+    ],
+    "exit": 64,
+    "stderr": "arkdeck signing: signing migrate-deveco --daemon must name the canonical installed LaunchAgent daemon\n",
+    "stdout": ""
+  }
+]

@@ -56,6 +56,16 @@ allow = [
     "cfg-if@1.0.4",
     "cpufeatures@0.2.17",
     "crypto-common@0.1.6",
+    # Signed update feed verification (TASK-XPA-018). The separate cargo-vet
+    # cargo-vet dependency policy remains in force; this is only version pinning.
+    "curve25519-dalek@4.1.3",
+    "curve25519-dalek-derive@0.1.1",
+    "ed25519@2.2.3",
+    "ed25519-dalek@2.2.0",
+    "fiat-crypto@0.2.9",
+    "rustc_version@0.4.1",
+    "semver@1.0.28",
+    "signature@2.2.0",
     "digest@0.10.7",
     "generic-array@0.14.7",
     "hmac@0.12.1",

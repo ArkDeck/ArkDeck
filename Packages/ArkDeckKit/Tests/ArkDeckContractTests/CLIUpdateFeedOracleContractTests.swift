@@ -191,6 +191,19 @@ final class CLIUpdateFeedOracleContractTests: XCTestCase {
             .string("UpdateFeedCodec"), .string("UpdateFeedVerifier"),
           ]),
         ])) + Data("\n".utf8)
-    try HDCOracleHarness.recordOrCompare(output, variable: Self.recordVariable, oracle: Self.oracle)
+    XCTAssertEqual(Set(output.keys), Set(["cases.json", "provenance.json"]))
+    if ProcessInfo.processInfo.environment[Self.recordVariable] != nil {
+      // Keep the harness's new-/private/tmp-directory restriction for recording.
+      try HDCOracleHarness.recordOrCompare(output, variable: Self.recordVariable, oracle: Self.oracle)
+    } else {
+      // This directory also contains signed.json, owned and compared by
+      // UpdateFeedSignedRustOracleTests. Compare every file this producer owns.
+      for (path, produced) in output.sorted(by: { $0.key < $1.key }) {
+        let recorded = try Data(contentsOf: Self.oracle.appending(path: path))
+        XCTAssertEqual(
+          recorded, produced,
+          "\(path)\(HDCOracleHarness.firstDifference(recorded: recorded, produced: produced))")
+      }
+    }
   }
 }

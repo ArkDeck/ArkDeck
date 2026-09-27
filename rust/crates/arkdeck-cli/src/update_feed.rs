@@ -1,5 +1,5 @@
-//! `arkdeck maintainer update-feed prepare` and its deprecated
-//! `update-feed prepare` spelling: Swift's `RuntimeCLI.prepareUpdateFeed`
+//! `arkdeck maintainer update-feed prepare|assemble` and its deprecated
+//! `update-feed` spelling: Swift's `RuntimeCLI` update-feed handlers
 //! with `UpdateFeedCodec` and `UpdateFeedVerifier.validateUnsignedPayloadForSigning`.
 //!
 //! A maintainer names a release artifact and its facts; this measures the
@@ -17,6 +17,9 @@ use crate::CliError;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+
+#[path = "update_feed_signed.rs"]
+pub mod signed;
 
 /// Swift `UpdateFeedTrust.productionKeyID`.
 pub const PRODUCTION_KEY_ID: &str = "arkdeck-update-2026-07-b949b102";
@@ -63,7 +66,7 @@ pub fn options(argv: &[String]) -> BTreeMap<String, String> {
 
 /// Swift `URL(filePath:).standardizedFileURL.path`: a relative path against
 /// the working directory, then standardized.
-fn standardized_file(path: &str) -> String {
+pub(crate) fn standardized_file(path: &str) -> String {
     let absolute = if path.starts_with('/') {
         path.to_owned()
     } else {
@@ -97,7 +100,7 @@ fn standardized_file(path: &str) -> String {
     lexical
 }
 
-/// `argv` answered when it names `update-feed prepare` in either spelling:
+/// `argv` answered when it names an update-feed leaf in either spelling:
 /// Swift's registry pass judges it, and an argv Swift would dispatch becomes
 /// the leaf's invocation, its options as Swift's `CLIOptions` reads them.
 pub(crate) fn answer(argv: &[String]) -> Option<Result<crate::Invocation, CliError>> {
@@ -105,7 +108,10 @@ pub(crate) fn answer(argv: &[String]) -> Option<Result<crate::Invocation, CliErr
     let command = registry_parse::leaf(argv).filter(|command| {
         matches!(
             *command,
-            "maintainer.update-feed.prepare" | "update-feed.prepare"
+            "maintainer.update-feed.prepare"
+                | "update-feed.prepare"
+                | "maintainer.update-feed.assemble"
+                | "update-feed.assemble"
         )
     })?;
     let (help, handler) = match registry_parse::check(argv) {
@@ -185,7 +191,7 @@ fn feed_failure(error: FeedError, doing: &str) -> CliError {
 
 /// Swift `UpdateSemanticVersion(_:)`: three dot-separated decimal numbers
 /// without leading zeros.
-fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
     let parts: Vec<&str> = value.split('.').collect();
     if parts.len() != 3 {
         return None;
@@ -204,7 +210,7 @@ fn semantic_version(value: &str) -> Option<(u64, u64, u64)> {
 }
 
 /// Swift `normalizedSystemVersion`: a two-part system version gains `.0`.
-fn normalized_system(value: &str) -> String {
+pub(crate) fn normalized_system(value: &str) -> String {
     if value.split('.').count() == 2 {
         format!("{value}.0")
     } else {
@@ -214,9 +220,10 @@ fn normalized_system(value: &str) -> String {
 
 /// Swift `ISO8601Timestamps.parseCanonicalPlain`: exactly
 /// `YYYY-MM-DDTHH:MM:SSZ`, a real instant, as seconds since the epoch.
-fn canonical_timestamp(value: &str) -> Option<i64> {
+pub(crate) fn canonical_timestamp(value: &str) -> Option<i64> {
     let bytes = value.as_bytes();
-    if bytes.len() != 20
+    if !value.is_ascii()
+        || bytes.len() != 20
         || bytes[4] != b'-'
         || bytes[7] != b'-'
         || bytes[10] != b'T'
@@ -282,9 +289,28 @@ fn ip_address(host: &str) -> bool {
 /// address, a path ending in `.dmg`, and a spelling it would write back as is.
 fn artifact_url(url: &str) -> bool {
     // `URLComponents(string:)` refuses a string outside the URL character set.
-    let legal =
-        |byte: u8| byte.is_ascii_alphanumeric() || b"-._~:/?#[]@!$&'()*+,;=%".contains(&byte);
+    let legal = |byte: u8| byte.is_ascii_alphanumeric() || b"-._~:/?#@!$&'()*+,;=%".contains(&byte);
     if !url.bytes().all(legal) {
+        return false;
+    }
+    // URLComponents percent-decodes `.path`, but preserves valid escape
+    // spelling in `.url.absoluteString`. A malformed escape is re-escaped
+    // by Foundation, so the required round-trip equality rejects it.
+    let decode = |text: &str| -> Option<Vec<u8>> {
+        let mut result = Vec::new();
+        let mut bytes = text.bytes();
+        while let Some(byte) = bytes.next() {
+            if byte == b'%' {
+                let high = char::from(bytes.next()?).to_digit(16)?;
+                let low = char::from(bytes.next()?).to_digit(16)?;
+                result.push((high * 16 + low) as u8);
+            } else {
+                result.push(byte);
+            }
+        }
+        Some(result)
+    };
+    if decode(url).is_none() {
         return false;
     }
     let Some(rest) = url.strip_prefix("https://") else {
@@ -300,9 +326,16 @@ fn artifact_url(url: &str) -> bool {
     if authority.contains('@') || authority.contains(':') || authority.is_empty() {
         return false;
     }
-    let host = authority.to_lowercase();
+    let Some(host) = decode(authority).and_then(|bytes| String::from_utf8(bytes).ok()) else {
+        return false;
+    };
+    let host = host.to_lowercase();
     let path = path_and_query.split('?').next().unwrap_or_default();
-    ALLOWED_HOSTS.contains(&host.as_str()) && !ip_address(&host) && path.ends_with(".dmg")
+    ALLOWED_HOSTS.contains(&host.as_str())
+        && !ip_address(&host)
+        && decode(path)
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+            .is_some_and(|path| path.ends_with(".dmg"))
 }
 
 /// Swift `measureArtifact`: its bytes and SHA-256, the file opened without
@@ -363,6 +396,118 @@ fn io_failure(error: &std::io::Error, doing: &str) -> CliError {
         "ioFailure"
     };
     CliError::new(code, format!("{doing} failed: {error}"))
+}
+
+fn signed_failure(reason: &str, doing: &str) -> CliError {
+    let code = match reason {
+        "feedTooLarge" | "payloadTooLarge" => "inputTooLarge",
+        "invalidSignature" | "unknownKey" => "artifactIntegrityFailed",
+        _ => "invalidInput",
+    };
+    let mut error = CliError::new(code, format!("{doing} failed: {reason}"));
+    error.details.insert("reason".into(), json!(reason));
+    error
+}
+
+/// Reads only the bytes the codec can accept plus one overflow sentinel.
+fn read_bounded(path: &str, maximum: usize) -> std::io::Result<Vec<u8>> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take(maximum as u64 + 1)
+        .read_to_end(&mut bytes)?;
+    Ok(bytes)
+}
+
+fn read_failure(error: &std::io::Error, path: &str) -> CliError {
+    if error.kind() == std::io::ErrorKind::NotFound {
+        let name = Path::new(path)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy();
+        return CliError::new(
+            "resourceNotFound",
+            format!(
+                "reading {path} failed: The file “{name}” couldn’t be opened because there is no such file."
+            ),
+        );
+    }
+    io_failure(error, &format!("reading {path}"))
+}
+
+/// The release maintainer assembles already-signed public material. No private
+/// key or caller-selected trust root enters this command.
+pub fn assemble(options: &BTreeMap<String, String>) -> Answer {
+    let (Some(payload_path), Some(signature_path), Some(out)) = (
+        options.get("--payload"),
+        options.get("--signature"),
+        options.get("--out"),
+    ) else {
+        return Answer::Plain {
+            exit_code: 64,
+            message: "assemble requires --payload, --signature and --out".into(),
+        };
+    };
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (payload_path, signature_path, out);
+        Answer::Refused(CliError::new(
+            "unsupportedOnPlatform",
+            "the update feed maintainer tools are macOS-only",
+        ))
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let payload = match read_bounded(payload_path, MAXIMUM_PAYLOAD_BYTES) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                return Answer::Refused(read_failure(&error, payload_path));
+            }
+        };
+        let signature = match read_bounded(signature_path, 64) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                return Answer::Refused(read_failure(&error, signature_path));
+            }
+        };
+        let verified = (|| {
+            let envelope = signed::assemble(&payload, &signature, PRODUCTION_KEY_ID)?;
+            let (decoded, _) = signed::decode_and_verify(
+                &envelope,
+                PRODUCTION_KEY_ID,
+                &signed::PRODUCTION_PUBLIC_KEY,
+            )?;
+            Ok::<_, signed::Error>((envelope, decoded))
+        })();
+        let (envelope, decoded) = match verified {
+            Ok(value) => value,
+            Err(error) => return Answer::Refused(signed_failure(error, "assembling the feed")),
+        };
+        let now = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+            Ok(duration) => i64::try_from(duration.as_secs()).unwrap_or(i64::MAX),
+            Err(_) => -1,
+        };
+        if let Err(error) = signed::validate_at(&decoded, now) {
+            return Answer::Refused(signed_failure(error, "verifying and writing the feed"));
+        }
+        // The maintainer's replay store is empty and in-memory; installed
+        // version is 0.0.0. Unsupported OS is a successful no-update result,
+        // not a refusal to publish, so it cannot change this output.
+        let output = standardized_file(out);
+        if let Err(error) = write_atomically(Path::new(&output), &envelope) {
+            return Answer::Refused(io_failure(&error, "verifying and writing the feed"));
+        }
+        let digest = arkdeck_contract::sha256_hex(&envelope);
+        Answer::Prepared {
+            lines: vec![
+                format!("feed: {output}"),
+                format!("feed sha256: {digest}"),
+                "self-verification: valid".into(),
+            ],
+            document: json!({"feedPath":output,"feedSha256":digest,
+                "keyId":PRODUCTION_KEY_ID,"selfVerified":true}),
+        }
+    }
 }
 
 /// Swift `prepareUpdateFeed`.
@@ -430,7 +575,7 @@ pub fn prepare(options: &BTreeMap<String, String>) -> Answer {
         ) {
             return Answer::Refused(feed_failure(error, doing));
         }
-        let canonical = match arkdeck_contract::canonical_json(&payload) {
+        let canonical = match signed::canonical(&payload) {
             Ok(bytes) => bytes,
             Err(_) => return Answer::Refused(feed_failure(FeedError::Payload, doing)),
         };

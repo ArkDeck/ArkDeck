@@ -36,7 +36,11 @@ mod temporary_directory;
 #[cfg(unix)]
 pub use temporary_directory::foundation_temporary_directory;
 mod secret;
+#[cfg(target_os = "macos")]
+mod terminal_secret;
 pub use secret::{Secret, wipe};
+#[cfg(target_os = "macos")]
+pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;
@@ -57,8 +61,20 @@ pub use keychain::{
 #[cfg(target_os = "macos")]
 mod host_signature;
 #[cfg(target_os = "macos")]
+mod host_url;
+#[cfg(target_os = "macos")]
+mod update_http;
+#[cfg(target_os = "macos")]
 pub use host_signature::{
-    NativeCodeSignature, inspect_deveco_publisher_signature, inspect_native_code_signature,
+    HostUpdateSigningError, NativeCodeSignature, inspect_deveco_publisher_signature,
+    inspect_native_code_signature, running_update_team, validate_running_update_code,
+    validate_update_code,
+};
+#[cfg(target_os = "macos")]
+pub use host_url::{
+    HostDiagnosticLevel, HostUpdateContext, HostUrlParts, host_diagnostic_log, host_file_url,
+    host_update_context, host_update_record_attempt, host_update_reveal, host_url_with_query,
+    host_url_without_query_names, inspect_host_url,
 };
 #[cfg(all(unix, not(target_os = "macos")))]
 pub use unix::LoopbackServerLease;
@@ -67,6 +83,8 @@ pub use unix::{
     ConnectionCloser, ListenerLock, LocalConnection, LocalListener, Readiness,
     default_user_endpoint,
 };
+#[cfg(target_os = "macos")]
+pub use update_http::{UpdateHttpError, UpdateHttpEvents, UpdateHttpRequest, stream_update_http};
 #[cfg(unix)]
 mod stop_signal;
 #[cfg(unix)]
@@ -167,11 +185,12 @@ mod host_store;
 #[cfg(target_os = "macos")]
 pub use host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
-    HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
-    HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal, HostJournalAppender,
-    HostReadLock, HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint,
-    OwnerOnlyReadFailure, PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval,
-    UploadChunkCheckpoint, UploadWritePoint,
+    HostDiagnosticWriter, HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass,
+    HostEntryKind, HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal,
+    HostJournalAppender, HostReadLock, HostUpdateDownload, HostUploadFile, HostUploadReader,
+    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+    PreparedSessionRemoval, PreparedTraceRemoval, UpdateDownloadError, UploadChunkCheckpoint,
+    UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]

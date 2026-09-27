@@ -86,6 +86,39 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertEqual(try owner.current().referenceCount, 0)
   }
 
+  func testRustSecretTransactionStatesCannotBeRecoveredBySwift() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (receipt, resource) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    let ledgerURL = fixture.store.credentialOwnerRootURL.appending(
+      path: "credential-owner-v1.json")
+    for state in ["replacingSecrets", "removingSecrets"] {
+      let ledger: [String: Any] = [
+        "schemaVersion": "arkdeck.signing-credential-owner/1",
+        "state": state, "credentialRef": resource.credentialRef,
+        "presetOwners": [String](),
+        "pendingEnvelopeAccounts": [try XCTUnwrap(receipt.secretEnvelopeAccount)],
+      ]
+      let bytes = try JSONSerialization.data(withJSONObject: ledger, options: [.sortedKeys])
+      try bytes.write(to: ledgerURL, options: .atomic)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+      XCTAssertThrowsError(try owner.current())
+      XCTAssertThrowsError(try owner.resolve(resource.credentialRef))
+      XCTAssertThrowsError(try OpenHarmonySigningCredentialOwner(store: fixture.store).current())
+      var bodyRan = false
+      XCTAssertThrowsError(
+        try owner.replace { bodyRan = true } as (Void, OpenHarmonySigningCredentialResource))
+      XCTAssertFalse(bodyRan)
+      XCTAssertEqual(try Data(contentsOf: ledgerURL), bytes)
+    }
+  }
+
   func testCredentialOwnerBlocksReplacementAndRemovalWhilePinned() throws {
     let fixture = try makeFixture(mode: "success")
     let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)

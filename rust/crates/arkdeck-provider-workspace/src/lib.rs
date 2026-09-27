@@ -34,9 +34,17 @@ pub mod deveco_password;
 mod error;
 #[cfg(unix)]
 mod file_identity;
+#[cfg(target_os = "macos")]
+pub mod sdk_release;
+#[cfg(target_os = "macos")]
+mod sdk_release_profile;
 pub mod secret_envelope;
 pub mod signing_action;
+#[cfg(target_os = "macos")]
+pub mod signing_install;
 pub mod signing_preset;
+#[cfg(target_os = "macos")]
+pub mod signing_rekey;
 #[cfg(target_os = "macos")]
 pub mod signing_removal;
 

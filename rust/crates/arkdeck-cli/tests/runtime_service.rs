@@ -11,6 +11,9 @@
 //! oracle (`rust/tests/fixtures/agent-execution/cases.json`).
 #![cfg(target_os = "macos")]
 
+#[path = "support/signing_fixture.rs"]
+mod signing_fixture;
+
 use arkdeck_bootstrap::{
     BundleRegistryReadStore, PublishedIdentities, ReferenceOwner, ToolRegistryStore,
 };
@@ -496,6 +499,7 @@ fn host<'a>(home: &Home, launchd: &'a Launchd) -> ServiceHost<'a> {
         launchctl: launchd,
         validate_daemon_bundle: &canonical,
         validate_facade: &signed,
+        refresh_signing_access: &|_, _| panic!("test must supply an isolated signing owner"),
         // The stand-in trust for the registry's retained test bundles.
         bundle_trust: Arc::new(|bundle: &Path| bundle.canonicalize()),
         hdc_identities: None,
@@ -2026,7 +2030,8 @@ fn update_refuses_its_options_and_a_signing_preset_before_anything_changes() {
     let failure = answer.failure.unwrap();
     assert_eq!(failure.exit_code, 69);
     assert!(
-        failure.message.contains("signing preset") && failure.message.contains("Q8"),
+        failure.message.contains("signing preset")
+            && failure.message.contains("cannot be validated"),
         "{}",
         failure.message
     );
@@ -2345,7 +2350,7 @@ fn update_to_a_rust_daemon_that_does_not_analyze_crash_ledgers_is_refused_by_nam
     }
 }
 
-/// An installed signing preset refuses the update before the new helper's
+/// An invalid signing preset refuses the update before the new helper's
 /// daemon is asked anything, whether or not it would analyze crash ledgers.
 #[test]
 fn a_signing_preset_refuses_the_cutover_before_the_helper_runs() {
@@ -2369,7 +2374,8 @@ fn a_signing_preset_refuses_the_cutover_before_the_helper_runs() {
     let failure = answer.failure.unwrap();
     assert_eq!(failure.exit_code, 69);
     assert!(
-        failure.message.contains("signing preset") && failure.message.contains("Q8"),
+        failure.message.contains("signing preset")
+            && failure.message.contains("cannot be validated"),
         "{}",
         failure.message
     );
@@ -3858,4 +3864,135 @@ fn the_cli_refuses_the_options_these_leaves_do_not_take() {
             "{argv:?}"
         );
     }
+}
+
+/// Refresh follows installed-helper verification. As Swift does, a failed
+/// refresh still restores the validated replacement's read-only service.
+#[test]
+fn signing_identity_refresh_precedes_bootstrap_and_failure_restores_validated_service() {
+    for rust in [false, true] {
+        for refresh_fails in [false, true] {
+            let home = Home::new();
+            home.install();
+            let daemon = if rust {
+                Daemon::Rust {
+                    first: preflight_document(&home, json!([]), false),
+                    held: preflight_document(&home, json!([]), true),
+                    busy: None,
+                    analyzer: Analyzer::Answers,
+                }
+            } else {
+                Daemon::Swift
+            };
+            let helper = Helper::new(&home, "src", &daemon);
+            signing_fixture::install(home.paths.signing_receipt.parent().unwrap());
+            let launchd = Launchd::loaded();
+            let refreshed = AtomicBool::new(false);
+            let refresh = |root: &Path, installed: &Path| {
+                assert_eq!(root, home.paths.signing_receipt.parent().unwrap());
+                assert_eq!(installed, home.paths.installed_daemon);
+                assert!(installed.exists());
+                assert!(home.paths.plist.exists());
+                assert!(home.paths.receipt.exists());
+                assert!(!launchd.loaded.load(Ordering::SeqCst));
+                assert!(
+                    !launchd
+                        .calls()
+                        .iter()
+                        .any(|call| call.starts_with("bootstrap "))
+                );
+                refreshed.store(true, Ordering::SeqCst);
+                if refresh_fails {
+                    Err("fixture identity refresh refused".into())
+                } else {
+                    Ok(())
+                }
+            };
+            let mut service = host(&home, &launchd);
+            service.refresh_signing_access = &refresh;
+            let answer = update_leaf(&service, &update_options(&helper, &home));
+            assert!(refreshed.load(Ordering::SeqCst), "{:?}", answer.failure);
+            if refresh_fails {
+                assert!(
+                    answer
+                        .failure
+                        .unwrap()
+                        .message
+                        .contains("fixture identity refresh refused")
+                );
+                assert!(launchd.loaded.load(Ordering::SeqCst));
+                assert!(
+                    launchd
+                        .calls()
+                        .iter()
+                        .any(|call| call.starts_with("bootstrap "))
+                );
+            } else {
+                assert!(answer.failure.is_none(), "{:?}", answer.failure);
+                assert!(
+                    launchd
+                        .calls()
+                        .iter()
+                        .any(|call| call.starts_with("bootstrap "))
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn signing_identity_and_bootstrap_failures_report_both_causes() {
+    let home = Home::new();
+    home.install();
+    let helper = Helper::new(&home, "src", &Daemon::Swift);
+    signing_fixture::install(home.paths.signing_receipt.parent().unwrap());
+    let launchd = Launchd::loaded();
+    launchd.bootstrap.lock().unwrap().push_back(1);
+    let mut service = host(&home, &launchd);
+    service.refresh_signing_access = &|_, _| Err("fixture identity refused".into());
+    let answer = update_leaf(&service, &update_options(&helper, &home));
+    let failure = answer.failure.unwrap();
+    assert_eq!(failure.exit_code, 1);
+    assert!(
+        failure
+            .message
+            .contains("credential refresh failed (fixture identity refused)"),
+        "{}",
+        failure.message
+    );
+    assert!(
+        failure
+            .message
+            .contains("replacement daemon recovery failed (launchctl failed:"),
+        "{}",
+        failure.message
+    );
+    assert!(!launchd.loaded.load(Ordering::SeqCst));
+}
+
+#[test]
+fn typed_install_refreshes_signing_before_bootstrap_and_finalizes_pin() {
+    let home = Home::new();
+    let registry = Registry::new(&home);
+    let bundle = registry.register(&Helper::new(&home, "src", &Daemon::Swift));
+    let tool = registry.register_hdc();
+    signing_fixture::install(home.paths.signing_receipt.parent().unwrap());
+    let launchd = Launchd::default();
+    let refreshed = AtomicBool::new(false);
+    let refresh = |root: &Path, daemon: &Path| {
+        assert_eq!(root, home.paths.signing_receipt.parent().unwrap());
+        assert_eq!(daemon, home.paths.installed_daemon);
+        assert!(home.paths.receipt.exists());
+        assert!(!launchd.loaded.load(Ordering::SeqCst));
+        refreshed.store(true, Ordering::SeqCst);
+        Ok(())
+    };
+    let mut service = typed_host(&home, &launchd, &registry);
+    service.refresh_signing_access = &refresh;
+    let answer = install_leaf(&service, &typed_options(&bundle, "1", &tool, "1"));
+    assert!(answer.failure.is_none(), "{:?}", answer.failure);
+    assert!(answer.refusal.is_none(), "{:?}", answer.refusal);
+    assert!(refreshed.load(Ordering::SeqCst));
+    assert!(launchd.loaded.load(Ordering::SeqCst));
+    assert_eq!(registry.references(&bundle), installation_pin());
 }

@@ -8,8 +8,8 @@
 //! The receipt is a durable format read after the cutover (T0): it decodes
 //! with exactly Swift's `CodingKeys`, and a document with one more key is
 //! refused rather than silently narrowed. Only reading and validation are
-//! here; the install, re-key and uninstall writers stay with the maintenance
-//! CLI until it is ported.
+//! here; explicit installation/removal live in separate maintenance modules,
+//! and the re-key writer remains to be ported.
 use crate::SigningError;
 use crate::secret_envelope::{SecretPair, decode_envelope, validate_secret};
 use arkdeck_platform::Secret;

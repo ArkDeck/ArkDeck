@@ -30,10 +30,25 @@ pub(crate) fn remove_preset(
     secrets: &dyn SigningSecretRemoval,
 ) -> Result<SigningPresetRemoval, SigningError> {
     let receipt_path = store.receipt_path();
-    let directory = arkdeck_platform::HostDirectory::open(store.root())
+    // Signing receipt paths use Foundation's /tmp spelling; HostDirectory
+    // deliberately opens the physical /private/tmp spelling, as the owner
+    // lock already does. Keep managed-path comparison in the original form.
+    let canonical_root = store
+        .root()
+        .canonicalize()
+        .map_err(|_| SigningError::unsafe_file("signing preset root is unsafe"))?;
+    if canonical_root != store.root()
+        && store
+            .root()
+            .to_str()
+            .is_none_or(|root| crate::foundation_resolved_path(root).as_deref() != Some(root))
+    {
+        return Err(SigningError::unsafe_file("signing preset root is unsafe"));
+    }
+    let directory = arkdeck_platform::HostDirectory::open(&canonical_root)
         .map_err(|_| SigningError::unsafe_file("signing preset root is unsafe"))?;
     let receipt = match directory.read(RECEIPT_FILE, 1024 * 1024) {
-        Ok(bytes) => decode_for_removal(&bytes),
+        Ok(bytes) => decode_for_maintenance(&bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         // Do not destroy the tracking receipt if its bytes cannot be read
         // safely: that could strand live envelope items under unknown names.
@@ -109,9 +124,11 @@ pub(crate) fn remove_preset(
 }
 
 /// Swift's uninstall uses JSONDecoder directly, which ignores extra keys.
-/// Keep that behavior only at explicit cleanup: the Runtime's strict receipt
+/// Keep that behavior only for explicit maintenance tracking: the Runtime's strict receipt
 /// decoder and all signing/admission validation remain unchanged.
-fn decode_for_removal(bytes: &[u8]) -> Option<crate::signing_preset::SigningPresetReceipt> {
+pub(crate) fn decode_for_maintenance(
+    bytes: &[u8],
+) -> Option<crate::signing_preset::SigningPresetReceipt> {
     if bytes.len() > 1024 * 1024 {
         return None;
     }
@@ -150,10 +167,10 @@ fn decode_for_removal(bytes: &[u8]) -> Option<crate::signing_preset::SigningPres
         let identity = object.get_mut(name)?.as_object_mut()?;
         identity.retain(|key, _| matches!(key.as_str(), "path" | "sha256" | "byteCount"));
         // Swift's receipt decoder accepts an Int here, including a negative
-        // value in a damaged record. Cleanup uses no file size or digest:
+        // value in a damaged record. Maintenance tracking uses no file size or digest:
         // preserve its account/material tracking instead of falling back to
         // "no receipt" and orphaning those resources. Normalize only this
-        // unused cleanup value before the strict unsigned type is decoded.
+        // unused tracking value before the strict unsigned type is decoded.
         let count = identity.get("byteCount")?.as_i64()?;
         if count < 0 {
             identity.insert("byteCount".into(), serde_json::json!(0));

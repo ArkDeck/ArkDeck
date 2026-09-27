@@ -1,0 +1,952 @@
+{
+  "producer": "record-runtime-update-oracle.py",
+  "executableSha256": "632da710a17efdbca79661adfebb253f1c796b04247668e6ba907e4ee125a4d4",
+  "stateFixtureSha256": "a3bc16e3b189d2617b9ecdf8a956fc9de381217a6ee0034fb9df889d446b20f5",
+  "cases": [
+    {
+      "name": "checkAwaitingConsent",
+      "leaf": "check",
+      "state": "awaitingConsent",
+      "liveLease": false,
+      "defect": null,
+      "argv": [
+        "runtime",
+        "update",
+        "check",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.check",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "check"
+          },
+          "message": "the update lifecycle is not in a state that accepts this transition"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "awaitingConsent": {
+              "artifact": {
+                "downloaded": {
+                  "byteLength": 1024,
+                  "identity": {
+                    "byteLength": 1024,
+                    "changedNanoseconds": 6,
+                    "changedSeconds": 5,
+                    "device": 1,
+                    "inode": 2,
+                    "mode": 33024,
+                    "modifiedNanoseconds": 4,
+                    "modifiedSeconds": 3
+                  },
+                  "sha256": "abababababababababababababababababababababababababababababababab",
+                  "url": "<cache-uri>/12345678-1234-1234-1234-123456789abc.dmg"
+                },
+                "teamIdentifier": "FIXTURE123"
+              },
+              "feed": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "keep.txt"
+      ]
+    },
+    {
+      "name": "downloadIdle",
+      "leaf": "download",
+      "state": "idle",
+      "liveLease": false,
+      "defect": null,
+      "argv": [
+        "runtime",
+        "update",
+        "download",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.download",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "download"
+          },
+          "message": "the update lifecycle is not in a state that accepts this transition"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "idle": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "keep.txt"
+      ]
+    },
+    {
+      "name": "handoffNoConsent",
+      "leaf": "handoff",
+      "state": "awaitingConsent",
+      "liveLease": false,
+      "defect": null,
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 64,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": false,
+          "code": "invalidOption",
+          "controlRequestRetryable": false,
+          "details": {
+            "command": "runtime.update.handoff",
+            "option": "--consent"
+          },
+          "message": "`runtime update handoff` requires --consent <reveal-in-finder>"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlRequestId": "<parse-generated-id>"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "awaitingConsent": {
+              "artifact": {
+                "downloaded": {
+                  "byteLength": 1024,
+                  "identity": {
+                    "byteLength": 1024,
+                    "changedNanoseconds": 6,
+                    "changedSeconds": 5,
+                    "device": 1,
+                    "inode": 2,
+                    "mode": 33024,
+                    "modifiedNanoseconds": 4,
+                    "modifiedSeconds": 3
+                  },
+                  "sha256": "abababababababababababababababababababababababababababababababab",
+                  "url": "<cache-uri>/12345678-1234-1234-1234-123456789abc.dmg"
+                },
+                "teamIdentifier": "FIXTURE123"
+              },
+              "feed": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "handoffWrongConsent",
+      "leaf": "handoff",
+      "state": "awaitingConsent",
+      "liveLease": false,
+      "defect": "badConsent",
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle",
+        "--consent",
+        "not-consent"
+      ],
+      "exit": 64,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": false,
+          "code": "invalidOption",
+          "controlRequestRetryable": false,
+          "details": {
+            "command": "runtime.update.handoff",
+            "option": "--consent",
+            "value": "not-consent"
+          },
+          "message": "`runtime update handoff` --consent must be one of reveal-in-finder"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlRequestId": "<parse-generated-id>"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "awaitingConsent": {
+              "artifact": {
+                "downloaded": {
+                  "byteLength": 1024,
+                  "identity": {
+                    "byteLength": 1024,
+                    "changedNanoseconds": 6,
+                    "changedSeconds": 5,
+                    "device": 1,
+                    "inode": 2,
+                    "mode": 33024,
+                    "modifiedNanoseconds": 4,
+                    "modifiedSeconds": 3
+                  },
+                  "sha256": "abababababababababababababababababababababababababababababababab",
+                  "url": "<cache-uri>/12345678-1234-1234-1234-123456789abc.dmg"
+                },
+                "teamIdentifier": "FIXTURE123"
+              },
+              "feed": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "handoffConsentIdle",
+      "leaf": "handoff",
+      "state": "idle",
+      "liveLease": false,
+      "defect": "consent",
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle",
+        "--consent",
+        "reveal-in-finder"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "handoff"
+          },
+          "message": "the update lifecycle is not in a state that accepts this transition"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "idle": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "keep.txt"
+      ]
+    },
+    {
+      "name": "handoffUnsealedArtifact",
+      "leaf": "handoff",
+      "state": "awaitingConsent",
+      "liveLease": false,
+      "defect": "consent",
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle",
+        "--consent",
+        "reveal-in-finder"
+      ],
+      "exit": 2,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": true,
+          "code": "artifactIntegrityFailed",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "handoff"
+          },
+          "message": "the downloaded update failed content verification"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 9,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "failed": {
+              "_0": "handoff"
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "keep.txt"
+      ]
+    },
+    {
+      "name": "liveCheck",
+      "leaf": "check",
+      "state": "checking",
+      "liveLease": true,
+      "defect": null,
+      "argv": [
+        "runtime",
+        "update",
+        "check",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.check",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "check"
+          },
+          "message": "another process owns the active update operation"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "activeOperationID": "ABCDEF01-2345-6789-ABCD-EF0123456789",
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "checking": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "liveDownload",
+      "leaf": "download",
+      "state": "available",
+      "liveLease": true,
+      "defect": null,
+      "argv": [
+        "runtime",
+        "update",
+        "download",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.download",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "download"
+          },
+          "message": "another process owns the active update operation"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "available": {
+              "_0": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "liveHandoff",
+      "leaf": "handoff",
+      "state": "awaitingConsent",
+      "liveLease": true,
+      "defect": "consent",
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle",
+        "--consent",
+        "reveal-in-finder"
+      ],
+      "exit": 65,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": false,
+          "code": "resourceConflict",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "handoff"
+          },
+          "message": "another process owns the active update operation"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "awaitingConsent": {
+              "artifact": {
+                "downloaded": {
+                  "byteLength": 1024,
+                  "identity": {
+                    "byteLength": 1024,
+                    "changedNanoseconds": 6,
+                    "changedSeconds": 5,
+                    "device": 1,
+                    "inode": 2,
+                    "mode": 33024,
+                    "modifiedNanoseconds": 4,
+                    "modifiedSeconds": 3
+                  },
+                  "sha256": "abababababababababababababababababababababababababababababababab",
+                  "url": "<cache-uri>/12345678-1234-1234-1234-123456789abc.dmg"
+                },
+                "teamIdentifier": "FIXTURE123"
+              },
+              "feed": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "jsonlCheck",
+      "leaf": "check",
+      "state": "awaitingConsent",
+      "liveLease": false,
+      "defect": "jsonl",
+      "argv": [
+        "runtime",
+        "update",
+        "check",
+        "--output",
+        "jsonl",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 64,
+      "document": {
+        "command": "runtime.update.check",
+        "error": {
+          "attentionRequired": false,
+          "code": "invalidOption",
+          "controlRequestRetryable": false,
+          "details": {
+            "command": "runtime.update.check",
+            "value": "jsonl"
+          },
+          "message": "--output must be one of human|json"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlRequestId": "<parse-generated-id>"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "awaitingConsent": {
+              "artifact": {
+                "downloaded": {
+                  "byteLength": 1024,
+                  "identity": {
+                    "byteLength": 1024,
+                    "changedNanoseconds": 6,
+                    "changedSeconds": 5,
+                    "device": 1,
+                    "inode": 2,
+                    "mode": 33024,
+                    "modifiedNanoseconds": 4,
+                    "modifiedSeconds": 3
+                  },
+                  "sha256": "abababababababababababababababababababababababababababababababab",
+                  "url": "<cache-uri>/12345678-1234-1234-1234-123456789abc.dmg"
+                },
+                "teamIdentifier": "FIXTURE123"
+              },
+              "feed": {
+                "canonicalPayload": "eyJhcmNoaXRlY3R1cmVzIjpbImFybTY0Il0sImFydGlmYWN0Ijp7ImJ5dGVMZW5ndGgiOjEwMjQsInNoYTI1NiI6ImFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWJhYmFiYWIiLCJ1cmwiOiJodHRwczovL2dpdGh1Yi5jb20vQXJrRGVjay9BcmtEZWNrL2EuZG1nIn0sImV4cGlyZXNBdCI6IjIwMjYtMDktMjdUMDA6MDA6MDBaIiwiaXNzdWVkQXQiOiIyMDI2LTA5LTI2VDAwOjAwOjAwWiIsIm1pbmltdW1TeXN0ZW1WZXJzaW9uIjoiMTQuMCIsInJlbGVhc2VOb3Rlc1N1bW1hcnkiOiLmtYvor5UgcmVsZWFzZSIsInNlcXVlbmNlIjoxODQ0Njc0NDA3MzcwOTU1MTYxNSwidmVyc2lvbiI6IjEuMi4zIn0=",
+                "payload": {
+                  "architectures": [
+                    "arm64"
+                  ],
+                  "artifact": {
+                    "byteLength": 1024,
+                    "sha256": "abababababababababababababababababababababababababababababababab",
+                    "url": "https://github.com/ArkDeck/ArkDeck/a.dmg"
+                  },
+                  "expiresAt": "2026-09-27T00:00:00Z",
+                  "issuedAt": "2026-09-26T00:00:00Z",
+                  "minimumSystemVersion": "14.0",
+                  "releaseNotesSummary": "测试 release",
+                  "sequence": 18446744073709551615,
+                  "version": "1.2.3"
+                },
+                "payloadSHA256": "5103696910b36e258d019bd199c787256ba8016139b3fba5d9272cdad80fbd57"
+              }
+            }
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "jsonlDownload",
+      "leaf": "download",
+      "state": "idle",
+      "liveLease": false,
+      "defect": "jsonl",
+      "argv": [
+        "runtime",
+        "update",
+        "download",
+        "--output",
+        "jsonl",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 64,
+      "document": {
+        "command": "runtime.update.download",
+        "error": {
+          "attentionRequired": false,
+          "code": "invalidOption",
+          "controlRequestRetryable": false,
+          "details": {
+            "command": "runtime.update.download",
+            "value": "jsonl"
+          },
+          "message": "--output must be one of human|json"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlRequestId": "<parse-generated-id>"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "idle": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "jsonlHandoff",
+      "leaf": "handoff",
+      "state": "idle",
+      "liveLease": false,
+      "defect": "jsonl",
+      "argv": [
+        "runtime",
+        "update",
+        "handoff",
+        "--output",
+        "jsonl",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 64,
+      "document": {
+        "command": "runtime.update.handoff",
+        "error": {
+          "attentionRequired": false,
+          "code": "invalidOption",
+          "controlRequestRetryable": false,
+          "details": {
+            "command": "runtime.update.handoff",
+            "value": "jsonl"
+          },
+          "message": "--output must be one of human|json"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlRequestId": "<parse-generated-id>"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "idle": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": false
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    },
+    {
+      "name": "corruptCheck",
+      "leaf": "check",
+      "state": "idle",
+      "liveLease": false,
+      "defect": "newline",
+      "argv": [
+        "runtime",
+        "update",
+        "check",
+        "--output",
+        "json",
+        "--control-request-id",
+        "ctl-update-oracle"
+      ],
+      "exit": 2,
+      "document": {
+        "command": "runtime.update.check",
+        "error": {
+          "attentionRequired": true,
+          "code": "recordUnreadable",
+          "controlRequestRetryable": false,
+          "details": {
+            "phase": "check"
+          },
+          "message": "the durable update lifecycle record is not trustworthy"
+        },
+        "meta": {
+          "cliVersion": "0.1.0",
+          "controlProtocolVersion": "1.0.0",
+          "controlRequestId": "ctl-update-oracle"
+        },
+        "ok": false,
+        "schemaVersion": "arkdeck.cli.result/1"
+      },
+      "stderr": "",
+      "record": {
+        "document": {
+          "cancellationRequested": false,
+          "generation": 7,
+          "schemaVersion": "arkdeck.runtime-update-state/1",
+          "state": {
+            "idle": {}
+          },
+          "updatedAtUTC": "<timestamp>"
+        },
+        "mode": 256,
+        "trailingNewline": true
+      },
+      "cacheEntries": [
+        "12345678-1234-1234-1234-123456789abc.dmg",
+        "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.dmg",
+        "keep.txt",
+        "orphan.part"
+      ]
+    }
+  ]
+}

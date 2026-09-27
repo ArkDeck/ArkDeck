@@ -1,0 +1,497 @@
+{
+  "cases" : [
+    {
+      "event" : "checkStarted",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000000.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 226
+    },
+    {
+      "event" : "available",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000000.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000001.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.available"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 456
+    },
+    {
+      "event" : "noUpdate",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000000.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000001.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.available"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000002.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.no-update"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 684
+    },
+    {
+      "event" : "downloadStarted",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000000.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000001.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.available"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000002.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.no-update"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000003.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 915
+    },
+    {
+      "event" : "verificationStarted",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000001.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.available"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000002.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.no-update"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000003.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000004.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 924
+    },
+    {
+      "event" : "failed",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000002.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.check",
+              "fields" : {
+                "publicCode" : "update.no-update"
+              },
+              "level" : "info",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000003.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000004.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000005.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.failed"
+              },
+              "level" : "error",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 927
+    },
+    {
+      "event" : "cancelled",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000003.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000004.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000005.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.failed"
+              },
+              "level" : "error",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000006.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.cancelled"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 932
+    },
+    {
+      "event" : "handedOff",
+      "files" : [
+        {
+          "name" : "diagnostics-00000000000000000004.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.started"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000005.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.verification",
+              "fields" : {
+                "publicCode" : "update.failed"
+              },
+              "level" : "error",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000006.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.download",
+              "fields" : {
+                "publicCode" : "update.cancelled"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        },
+        {
+          "name" : "diagnostics-00000000000000000007.jsonl",
+          "records" : [
+            {
+              "category" : "workflow",
+              "correlationId" : "<correlation>",
+              "eventName" : "update.handoff",
+              "fields" : {
+                "publicCode" : "update.handoff"
+              },
+              "level" : "notice",
+              "schemaVersion" : "1.0.0",
+              "timestamp" : "2026-09-26T00:00:00.122Z"
+            }
+          ]
+        }
+      ],
+      "totalBytes" : 931
+    }
+  ],
+  "now" : "2026-09-26T00:00:00.123Z",
+  "producer" : "RuntimeUpdateLoggingRustOracleTests",
+  "timestampCases" : [
+    {
+      "timestamp" : "2026-09-26T00:00:00.000Z",
+      "unixSeconds" : "1790380800.0"
+    },
+    {
+      "timestamp" : "2026-09-26T00:00:00.000Z",
+      "unixSeconds" : "1790380800.001"
+    },
+    {
+      "timestamp" : "2026-09-26T00:00:00.122Z",
+      "unixSeconds" : "1790380800.123"
+    },
+    {
+      "timestamp" : "2026-09-26T00:00:00.500Z",
+      "unixSeconds" : "1790380800.5"
+    },
+    {
+      "timestamp" : "2026-09-26T00:00:00.999Z",
+      "unixSeconds" : "1790380800.999"
+    },
+    {
+      "timestamp" : "2026-09-26T00:00:01.000Z",
+      "unixSeconds" : "1790380801.0"
+    }
+  ],
+  "unixSeconds" : "1790380800.123"
+}
