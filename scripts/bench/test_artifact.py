@@ -277,3 +277,30 @@ class IncrementalArtifactTransportTests(ArtifactTransportTests):
         self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
         old.pop('artifactReaderVersion')
         self.assertFalse(compare.compare(scaled(document(a=1),old),scaled(document(a=1),new))['passed'])
+
+
+class ArtifactClientLifetimeTests(unittest.TestCase):
+    def test_context_exit_releases_the_instrument_without_waiting_for_gc(self):
+        import weakref
+        from . import control
+        client=control.ControlClient('/fixture')
+        client.configure_measurement(None,capture_failure=True)
+        reference=weakref.ref(client)
+        client.__exit__(None,None,None)
+        del client
+        self.assertIsNone(reference())
+
+    def test_connection_renewal_still_refuses_expired_budget_before_sending(self):
+        from . import control
+        deadline=Mock(budget_seconds=600)
+        deadline.remaining_seconds.return_value=-1
+        client=control.ControlClient('/fixture')
+        client.configure_measurement(deadline,capture_failure=True)
+        client.close()  # Pagination renews a connection after 64 requests.
+        socket=Mock()
+        client._socket=socket
+        with self.assertRaisesRegex(control.ControlError,'deadline'):
+            client._exchange({'id':'test'})
+        socket.sendall.assert_not_called()
+        self.assertEqual(client.failure_evidence['budgetSeconds'],600)
+        client.__exit__(None,None,None)

@@ -72,7 +72,12 @@ class ControlClient:
         return self
 
     def __exit__(self, *_exception: object) -> None:
-        self.close()
+        try:
+            self.close()
+        finally:
+            # configure_measurement installs a bound method on this instance.
+            # Drop that self-cycle when the context ends, not on reconnect.
+            self.__dict__.pop("_exchange", None)
 
     def connect(self) -> None:
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

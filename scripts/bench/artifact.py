@@ -16,7 +16,7 @@ RESERVE_BYTES = 4 * 1024 ** 3
 READ_BUDGET = 600
 TIMING = 'first-read-through-complete-client-digest-v1'
 RSS_INTERVAL = .2
-READER_VERSION = 'bounded-incremental-json-v2'
+READER_VERSION = 'bounded-incremental-json-v3'
 
 
 def definition(size):
