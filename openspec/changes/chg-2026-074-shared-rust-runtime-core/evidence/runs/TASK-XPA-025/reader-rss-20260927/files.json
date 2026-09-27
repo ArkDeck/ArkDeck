@@ -1,0 +1,116 @@
+[
+  {
+    "file": "ascii.json",
+    "sourceBytes": 2246,
+    "sourceSha256": "aa99ae97dd33e03f38e06c6d6af5c64bb9ecd9ddc12dde14e541fcfe794beb86",
+    "storedSha256": "aa99ae97dd33e03f38e06c6d6af5c64bb9ecd9ddc12dde14e541fcfe794beb86"
+  },
+  {
+    "file": "b64decode.json",
+    "sourceBytes": 2250,
+    "sourceSha256": "e7c73cabe15c9ab956717e7fc4589e1225867ce0b5a7a9ab5c4daf8ef63e8ca2",
+    "storedSha256": "e7c73cabe15c9ab956717e7fc4589e1225867ce0b5a7a9ab5c4daf8ef63e8ca2"
+  },
+  {
+    "file": "b64encode-chunks.json",
+    "sourceBytes": 2245,
+    "sourceSha256": "7dd05bae901693682fbcf6c1bdffca2341f683962f634673618bcac168e74cc2",
+    "storedSha256": "7dd05bae901693682fbcf6c1bdffca2341f683962f634673618bcac168e74cc2"
+  },
+  {
+    "file": "b64encode.json",
+    "sourceBytes": 2265,
+    "sourceSha256": "5e4329e929cc2797515654dd46fe451f56756fb5b2d52abf32da30dbaeadea98",
+    "storedSha256": "5e4329e929cc2797515654dd46fe451f56756fb5b2d52abf32da30dbaeadea98"
+  },
+  {
+    "file": "diagnose.py",
+    "sourceBytes": 2607,
+    "sourceSha256": "6d7d504af35437225894404f227ed3c15da79f86c7381a26984614022cbafac8",
+    "storedSha256": "6d7d504af35437225894404f227ed3c15da79f86c7381a26984614022cbafac8"
+  },
+  {
+    "file": "diagnostic-provenance.json",
+    "sourceBytes": 665,
+    "sourceSha256": "194a1081c34559aee3b44204909707e4dc6962cffc86d038dffb7dd80c3e6a38",
+    "storedSha256": "194a1081c34559aee3b44204909707e4dc6962cffc86d038dffb7dd80c3e6a38"
+  },
+  {
+    "file": "isolate.py",
+    "sourceBytes": 2367,
+    "sourceSha256": "fce751226d6b353121dcf1f53ab18cedcc49c248f094a7fbb8ea5ed0c95c0495",
+    "storedSha256": "fce751226d6b353121dcf1f53ab18cedcc49c248f094a7fbb8ea5ed0c95c0495"
+  },
+  {
+    "file": "json.json",
+    "sourceBytes": 2260,
+    "sourceSha256": "06f9dbbba72c349c6dba03228589cf897d5a2db834fffa29ee3624a3616a09af",
+    "storedSha256": "06f9dbbba72c349c6dba03228589cf897d5a2db834fffa29ee3624a3616a09af"
+  },
+  {
+    "file": "python-tests-permitted.log.gz",
+    "sourceBytes": 8427,
+    "sourceSha256": "3b98da5174968ae76c225d411ac94bea825d724d06fae8de742904c167e5b867",
+    "storedSha256": "25ffbbdbb6b5ae49ec377ffa88b1937d4f51c36cf055a7f258016eb5e764d60f"
+  },
+  {
+    "file": "python-tests.log.gz",
+    "sourceBytes": 10524,
+    "sourceSha256": "e413b0332e624185ef5460ae073000e7aeba07a8b1cdb7ff4d9c98b9a79dcefe",
+    "storedSha256": "b25f672a44b4f0a656f1891b7a9682eb741f0d11d7082f63172cf85d0b5c69a5"
+  },
+  {
+    "file": "receive-fixed.json",
+    "sourceBytes": 2266,
+    "sourceSha256": "784bfe0df40514b0ed638933f22f138632f39419c9fe879944d9246e61994a17",
+    "storedSha256": "784bfe0df40514b0ed638933f22f138632f39419c9fe879944d9246e61994a17"
+  },
+  {
+    "file": "receive.json",
+    "sourceBytes": 2251,
+    "sourceSha256": "eb29232d3e0283d71bb635bb72be3a029d8942af1c6afb6373db0cc67ab512cf",
+    "storedSha256": "eb29232d3e0283d71bb635bb72be3a029d8942af1c6afb6373db0cc67ab512cf"
+  },
+  {
+    "file": "run.md",
+    "sourceBytes": 7657,
+    "sourceSha256": "a9f7c93a314522a0a57bce7c6270dc4fb0e537b76445b504f2083e2f83c783e0",
+    "storedSha256": "a9f7c93a314522a0a57bce7c6270dc4fb0e537b76445b504f2083e2f83c783e0"
+  },
+  {
+    "file": "sdd.log.gz",
+    "sourceBytes": 78,
+    "sourceSha256": "77c173762c4c60a0fcd6a3a4c9c36c4a7c095abedaa2b91ba823397a223eb6f0",
+    "storedSha256": "ecd8cba184d0e7f8b803b91f10bd43c327a6be4c5d9014868d7e5c061243106f"
+  },
+  {
+    "file": "v3-stages.json",
+    "sourceBytes": 10355,
+    "sourceSha256": "138986112f703c233151416d396d1d5274c41fbba2efc80ee4fe4759e209aeb6",
+    "storedSha256": "138986112f703c233151416d396d1d5274c41fbba2efc80ee4fe4759e209aeb6"
+  },
+  {
+    "file": "v4-measured/artifact.py",
+    "sourceBytes": 11426,
+    "sourceSha256": "3a334b935a7e7c58c66715c792b7b4359d342e3c3917d0e3878fd43ad1e6b0ce",
+    "storedSha256": "3a334b935a7e7c58c66715c792b7b4359d342e3c3917d0e3878fd43ad1e6b0ce"
+  },
+  {
+    "file": "v4-measured/control.py",
+    "sourceBytes": 12720,
+    "sourceSha256": "c58bf0bd1f8225cea16f0ce0233d57fda7bf86d34deefac044059398ebd25b5f",
+    "storedSha256": "c58bf0bd1f8225cea16f0ce0233d57fda7bf86d34deefac044059398ebd25b5f"
+  },
+  {
+    "file": "v4-stages.json",
+    "sourceBytes": 10349,
+    "sourceSha256": "67fbcb4de165cad60ffe66a9194bea9833e79be54f37bd1d88e1dacc17b369fb",
+    "storedSha256": "67fbcb4de165cad60ffe66a9194bea9833e79be54f37bd1d88e1dacc17b369fb"
+  },
+  {
+    "file": "validate.json",
+    "sourceBytes": 2265,
+    "sourceSha256": "549fb42c600e55ff605a819c2c026dba86accc7d444157e95fbf9a6c29a360e1",
+    "storedSha256": "549fb42c600e55ff605a819c2c026dba86accc7d444157e95fbf9a6c29a360e1"
+  }
+]

@@ -59,8 +59,8 @@ def validate_page(page, receipt, offset, total, maximum=PAGE_BYTES):
     # Whole-page b64encode allocates then shrinks a multi-MiB native buffer.
     view = memoryview(decoded)
     encoded_offset = 0
-    for chunk_offset in range(0, len(decoded), 48 * 1024):
-        canonical = base64.b64encode(view[chunk_offset:chunk_offset + 48 * 1024]).decode('ascii')
+    for offset in range(0, len(decoded), 48 * 1024):
+        canonical = base64.b64encode(view[offset:offset + 48 * 1024]).decode('ascii')
         if page['base64'][encoded_offset:encoded_offset + len(canonical)] != canonical:
             raise ValueError('artifact base64 count/encoding differs')
         encoded_offset += len(canonical)

@@ -1,0 +1,112 @@
+{
+  "mode": "receive-fixed",
+  "count": 12,
+  "pageBytes": 4194304,
+  "diagnosticOnly": true,
+  "rows": [
+    {
+      "iteration": -1,
+      "rss": 45760512,
+      "live": 432,
+      "peak": 512,
+      "mallocInUse": 19519792,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 0,
+      "rss": 54247424,
+      "live": 24490,
+      "peak": 8521749,
+      "mallocInUse": 19551200,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 1,
+      "rss": 54247424,
+      "live": 24989,
+      "peak": 8522256,
+      "mallocInUse": 19552656,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 2,
+      "rss": 54247424,
+      "live": 25488,
+      "peak": 8522763,
+      "mallocInUse": 19552896,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 3,
+      "rss": 54247424,
+      "live": 25987,
+      "peak": 8523270,
+      "mallocInUse": 19553136,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 4,
+      "rss": 54247424,
+      "live": 26518,
+      "peak": 8523809,
+      "mallocInUse": 19553376,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 5,
+      "rss": 54247424,
+      "live": 27009,
+      "peak": 8524316,
+      "mallocInUse": 19553616,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 6,
+      "rss": 54247424,
+      "live": 27508,
+      "peak": 8524823,
+      "mallocInUse": 19555904,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 7,
+      "rss": 54247424,
+      "live": 28007,
+      "peak": 8525330,
+      "mallocInUse": 19556144,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 8,
+      "rss": 54247424,
+      "live": 30090,
+      "peak": 8527421,
+      "mallocInUse": 19557200,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 9,
+      "rss": 54247424,
+      "live": 30589,
+      "peak": 8527928,
+      "mallocInUse": 19557440,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 10,
+      "rss": 54247424,
+      "live": 31088,
+      "peak": 8528435,
+      "mallocInUse": 19557680,
+      "mallocReserved": 40714240
+    },
+    {
+      "iteration": 11,
+      "rss": 54247424,
+      "live": 31683,
+      "peak": 8529038,
+      "mallocInUse": 19558064,
+      "mallocReserved": 40714240
+    }
+  ]
+}

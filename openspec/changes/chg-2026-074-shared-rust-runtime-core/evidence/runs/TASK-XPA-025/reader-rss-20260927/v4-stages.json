@@ -1,0 +1,479 @@
+{
+  "python": "3.14.7 (main, Aug  5 2026, 10:29:49) [Clang 21.0.0 (clang-2100.3.34.2)]",
+  "pageBytes": 4194304,
+  "pageCount": 12,
+  "diagnosticOnly": true,
+  "rows": [
+    {
+      "stage": "before",
+      "live": 432,
+      "peak": 512,
+      "rss": 36388864,
+      "malloc": {
+        "blocks": 7307,
+        "inUse": 9903056,
+        "maxInUse": 0,
+        "reserved": 34996224
+      },
+      "gcCount": [
+        374,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5671071,
+      "peak": 19654474,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8058,
+        "inUse": 15621264,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        426,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9865949,
+      "peak": 19654474,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8200,
+        "inUse": 19840464,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        429,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5672831,
+      "peak": 19656254,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8243,
+        "inUse": 15630928,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        434,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9867667,
+      "peak": 19656254,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8256,
+        "inUse": 19841904,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        437,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5674560,
+      "peak": 19657992,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8285,
+        "inUse": 15631936,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        443,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9869413,
+      "peak": 19657992,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8304,
+        "inUse": 19847184,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        446,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5676558,
+      "peak": 19659976,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8367,
+        "inUse": 15638160,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        452,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9871722,
+      "peak": 19659976,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8404,
+        "inUse": 19849760,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        455,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5678930,
+      "peak": 19662356,
+      "rss": 56164352,
+      "malloc": {
+        "blocks": 8453,
+        "inUse": 15640288,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        461,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9874094,
+      "peak": 19662356,
+      "rss": 56180736,
+      "malloc": {
+        "blocks": 8484,
+        "inUse": 19851696,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        464,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5681270,
+      "peak": 19664696,
+      "rss": 56180736,
+      "malloc": {
+        "blocks": 8531,
+        "inUse": 15642160,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        470,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9876434,
+      "peak": 19664696,
+      "rss": 56180736,
+      "malloc": {
+        "blocks": 8562,
+        "inUse": 19853568,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        473,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5683528,
+      "peak": 19666962,
+      "rss": 56197120,
+      "malloc": {
+        "blocks": 8611,
+        "inUse": 15644112,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        479,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9878684,
+      "peak": 19666962,
+      "rss": 56197120,
+      "malloc": {
+        "blocks": 8642,
+        "inUse": 19855520,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        482,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5685613,
+      "peak": 19669063,
+      "rss": 56197120,
+      "malloc": {
+        "blocks": 8681,
+        "inUse": 15645792,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        488,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 10199048,
+      "peak": 19669063,
+      "rss": 56197120,
+      "malloc": {
+        "blocks": 8712,
+        "inUse": 19857200,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        514,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5689031,
+      "peak": 19938421,
+      "rss": 56279040,
+      "malloc": {
+        "blocks": 8905,
+        "inUse": 15922016,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        507,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9884091,
+      "peak": 19938421,
+      "rss": 56279040,
+      "malloc": {
+        "blocks": 8890,
+        "inUse": 19870224,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        509,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5691035,
+      "peak": 19938421,
+      "rss": 56279040,
+      "malloc": {
+        "blocks": 8929,
+        "inUse": 15660496,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        512,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9886199,
+      "peak": 19938421,
+      "rss": 56279040,
+      "malloc": {
+        "blocks": 8960,
+        "inUse": 19871904,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        515,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5693215,
+      "peak": 19938421,
+      "rss": 56295424,
+      "malloc": {
+        "blocks": 9003,
+        "inUse": 15662272,
+        "maxInUse": 0,
+        "reserved": 40681472
+      },
+      "gcCount": [
+        519,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9888313,
+      "peak": 19938421,
+      "rss": 56311808,
+      "malloc": {
+        "blocks": 9032,
+        "inUse": 19873632,
+        "maxInUse": 0,
+        "reserved": 44908544
+      },
+      "gcCount": [
+        522,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-exchange",
+      "live": 5695456,
+      "peak": 19938421,
+      "rss": 56311808,
+      "malloc": {
+        "blocks": 9079,
+        "inUse": 15664096,
+        "maxInUse": 0,
+        "reserved": 40665088
+      },
+      "gcCount": [
+        527,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-base64",
+      "live": 9890564,
+      "peak": 19938421,
+      "rss": 56328192,
+      "malloc": {
+        "blocks": 9108,
+        "inUse": 19875456,
+        "maxInUse": 0,
+        "reserved": 44892160
+      },
+      "gcCount": [
+        529,
+        10,
+        0
+      ]
+    },
+    {
+      "stage": "after-read",
+      "live": 30904,
+      "peak": 19938421,
+      "rss": 56295424,
+      "malloc": {
+        "blocks": 9059,
+        "inUse": 9976192,
+        "maxInUse": 0,
+        "reserved": 34996224
+      },
+      "gcCount": [
+        502,
+        10,
+        0
+      ]
+    }
+  ],
+  "topLive": [
+    "/private/tmp/arkdeck-reader-rss-20260927/diagnose.py:17: size=12.8 KiB, count=179, average=73 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:555: size=3424 B, count=29, average=118 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:337: size=3291 B, count=63, average=52 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1031: size=1534 B, count=26, average=59 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:365: size=1440 B, count=12, average=120 B",
+    "/private/tmp/arkdeck-reader-rss-20260927/diagnose.py:15: size=1124 B, count=36, average=31 B",
+    "<frozen os>:690: size=1008 B, count=18, average=56 B",
+    "/private/tmp/arkdeck-reader-rss-20260927/diagnose.py:16: size=664 B, count=20, average=33 B",
+    "/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:148: size=608 B, count=14, average=43 B",
+    "<frozen abc>:123: size=431 B, count=4, average=108 B",
+    "/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:150: size=352 B, count=11, average=32 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/contextlib.py:539: size=352 B, count=6, average=59 B",
+    "/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:170: size=296 B, count=3, average=99 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:361: size=224 B, count=7, average=32 B",
+    "/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:1920: size=176 B, count=2, average=88 B"
+  ],
+  "sampledRss": {
+    "daemonBytes": {
+      "baselineBytes": 36388864,
+      "sampledPeakBytes": 56197120,
+      "sampledGrowthBytes": 19808256
+    },
+    "clientBytes": {
+      "baselineBytes": 36388864,
+      "sampledPeakBytes": 56197120,
+      "sampledGrowthBytes": 19808256
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "v3SourceCommit": "3c9bec11b9ae48fc484c59c1b50b89eb0cf1df3a",
+  "v4Source": "uncommitted bounded allocation fix on that base; archived exact measured files",
+  "finalChangeAfterDiagnostic": "rename chunk loop offset local for clarity; tests/docs added, no behavior change",
+  "measuredFiles": {
+    "control.py": "c58bf0bd1f8225cea16f0ce0233d57fda7bf86d34deefac044059398ebd25b5f",
+    "artifact.py": "3a334b935a7e7c58c66715c792b7b4359d342e3c3917d0e3878fd43ad1e6b0ce"
+  },
+  "python": "Python 3.14.7",
+  "scope": "12 pages of 4MiB; fake in-memory response stream; no actual daemon/target-size acceptance",
+  "forcedCollection": false,
+  "allocatorTrim": false
+}
