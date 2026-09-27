@@ -10,6 +10,7 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
+arkdeck-agentd = { path = "crates/arkdeck-agentd" }
 arkdeck-contract = { path = "crates/arkdeck-contract" }
 arkdeck-platform = { path = "crates/arkdeck-platform" }
 arkdeck-bootstrap = { path = "crates/arkdeck-bootstrap" }

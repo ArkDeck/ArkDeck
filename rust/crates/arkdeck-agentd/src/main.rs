@@ -36,8 +36,6 @@ mod development_admission;
 mod development_mutation;
 #[cfg(target_os = "macos")]
 mod development_usb;
-#[cfg(unix)]
-mod drain;
 #[cfg(target_os = "macos")]
 mod facade;
 #[cfg(target_os = "macos")]
@@ -64,19 +62,14 @@ mod tool_selection_startup_tests;
 #[cfg(all(test, target_os = "macos"))]
 mod workspace_project_control;
 
-use arkdeck_contract::MAX_REQUEST_BYTES;
 use arkdeck_control::Control;
-use arkdeck_platform::{LocalEndpoint, LocalListener, default_user_endpoint, read_frame};
-use std::io::{self, BufReader, Write};
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use arkdeck_platform::{LocalEndpoint, LocalListener, default_user_endpoint};
+use std::io::{self, Write};
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Swift `drainAndStop(deadline: 20)`: one cutoff for the frames being
 /// answered and the connections still open.
-#[cfg(unix)]
 const DRAIN_DEADLINE: Duration = Duration::from_secs(20);
 
 /// How long a connection may wait for its next byte.
@@ -755,13 +748,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     }
     let control = Arc::new(Control::new(host)?);
     #[cfg(target_os = "macos")]
-    let mut listener = if let Some(listener) = development_listener {
+    let listener = if let Some(listener) = development_listener {
         listener
     } else {
         LocalListener::bind(&endpoint)?
     };
-    #[cfg(not(target_os = "macos"))]
-    let mut listener = LocalListener::bind(&endpoint)?;
+    #[cfg(all(unix, not(target_os = "macos")))]
+    let listener = LocalListener::bind(&endpoint)?;
+    #[cfg(not(unix))]
+    let listener = LocalListener::bind(&endpoint)?;
     #[cfg(target_os = "macos")]
     if let Some(configuration) = app_ingress {
         // The isolated or the production composition, which owns no Swift
@@ -777,108 +772,29 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(socket) = &production_socket {
         production::report(&format!("arkdeck-agentd listening on {}", socket.display()));
     }
-    let active = Arc::new(AtomicUsize::new(0));
-    #[cfg(unix)]
-    let serving = Arc::new(drain::Serving::new()?);
-    loop {
-        #[cfg(unix)]
-        let accepted = listener.accept_until(&stop);
-        #[cfg(not(unix))]
-        let accepted = listener.accept().map(Some);
-        let connection = match accepted {
-            Ok(Some(connection)) => connection,
-            // A stop was requested: nothing more is accepted.
-            Ok(None) => break,
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    io::ErrorKind::Interrupted | io::ErrorKind::PermissionDenied
-                ) =>
-            {
-                continue;
-            }
-            Err(error) => return Err(error.into()),
-        };
-        if active.fetch_add(1, Ordering::AcqRel) >= 16 {
-            active.fetch_sub(1, Ordering::AcqRel);
-            continue;
-        }
-        #[cfg(unix)]
-        let Some(registered) = serving.register(&connection) else {
-            active.fetch_sub(1, Ordering::AcqRel);
-            continue;
-        };
-        let control = Arc::clone(&control);
-        let active = Arc::clone(&active);
-        #[cfg(unix)]
-        let serving = Arc::clone(&serving);
-        std::thread::spawn(move || {
-            struct Active(Arc<AtomicUsize>);
-            impl Drop for Active {
-                fn drop(&mut self) {
-                    self.0.fetch_sub(1, Ordering::AcqRel);
-                }
-            }
-            let _active = Active(active);
+    let socket_drain = arkdeck_agentd::serve_control(
+        listener,
+        Arc::clone(&control),
+        |listener| {
             #[cfg(unix)]
-            let _registered = registered;
-            if connection.set_read_timeout(Some(CONNECTION_IDLE)).is_err()
-                || connection.set_write_timeout(Some(CONNECTION_IDLE)).is_err()
             {
-                return;
+                listener.accept_until(&stop)
             }
-            let mut reader = BufReader::new(connection);
-            // Bound a connection's work without rejecting the required health
-            // followed by business exchange. A new connection reauthenticates.
-            for _ in 0..128 {
-                // The start of the next frame, or the drain ending this
-                // connection (see `drain`), or the idle timeout.
-                #[cfg(unix)]
-                if reader.buffer().is_empty()
-                    && !matches!(
-                        reader
-                            .get_ref()
-                            .wait_readable(serving.closing(), CONNECTION_IDLE),
-                        Ok(arkdeck_platform::Readiness::Readable)
-                    )
-                {
-                    return;
-                }
-                let frame = match read_frame(&mut reader, MAX_REQUEST_BYTES) {
-                    Ok(frame) => frame,
-                    Err(error) if error.kind() == io::ErrorKind::InvalidData => {
-                        #[cfg(unix)]
-                        let _request = serving.request();
-                        let _ = reader.get_mut().write_all(&control.handle_frame(&[]));
-                        return;
-                    }
-                    Err(_) => return,
-                };
-                #[cfg(unix)]
-                let _request = serving.request();
-                #[cfg(target_os = "macos")]
-                let foreground_console = reader
-                    .get_ref()
-                    .origin()
-                    .is_ok_and(|peer| peer.foreground_console);
-                #[cfg(not(target_os = "macos"))]
-                let foreground_console = false;
-                let reply = control.handle_frame_with_console(&frame, foreground_console);
-                if reader.get_mut().write_all(&reply).is_err() || reader.get_mut().flush().is_err()
-                {
-                    return;
-                }
+            #[cfg(not(unix))]
+            {
+                listener.accept().map(Some)
             }
-        });
-    }
+        },
+        CONNECTION_IDLE,
+        DRAIN_DEADLINE,
+    )?;
     // Swift `drainAndStop`: the socket is closed and its name removed, the
     // frames being answered finish, then every connection is ended, within
     // one deadline. Jobs running in the background are neither awaited nor
     // cancelled; the App ingress is not drained.
     #[cfg(unix)]
     {
-        let _lock = listener.stop_listening();
-        serving.drain(std::time::Instant::now() + DRAIN_DEADLINE);
+        let _lock = socket_drain.listener_lock;
         // Swift stops its ArkForge daemon next (`main.swift` 1624-1627).
         #[cfg(target_os = "macos")]
         if let Some(arkforge) = &arkforge {
@@ -908,7 +824,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(if recompose { 70 } else { 0 });
     }
     #[cfg(not(unix))]
-    unreachable!("only a stop request ends accepting");
+    {
+        let _ = socket_drain;
+        unreachable!("only a stop request ends accepting");
+    }
 }
 
 fn main() {

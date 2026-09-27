@@ -1,6 +1,6 @@
 //! Bounded simulation over production Rust owners. No child, shell, live
 //! device transport, capability administration or unknown-outcome replay.
-//! This initial slice exercises owner lifecycle, not socket IPC.
+//! Each owner generation serves the existing control protocol on a private Unix socket.
 #![cfg(target_os = "macos")]
 
 use arkdeck_hoststore::{
@@ -17,7 +17,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
+mod socket_cycle;
 use std::time::Duration;
 
 pub mod artifact_bench;
@@ -250,11 +254,11 @@ fn terminal(state: &str) -> bool {
 }
 
 fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u64, u64)> {
-    let owners = Owners::open(root)?;
-    let fake = SimulatedHdc::default();
+    let owners = Arc::new(Owners::open(root)?);
+    let fake = Arc::new(SimulatedHdc::default());
     let hdc = HdcComposition {
         targets: &owners.targets,
-        dispatch: &fake,
+        dispatch: fake.as_ref(),
         receive_root: None,
         tool_sha256: DIGEST,
         now: runtime_now,
@@ -284,6 +288,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         hdc: Some(&hdc),
         workspace: None,
     };
+    let mut socket = socket_cycle::Cycle::start(root, Arc::clone(&owners), Arc::clone(&fake))?;
     let mut recovered = 0;
     for (id, state) in rows(&owners.jobs)? {
         if terminal(&state) {
@@ -314,7 +319,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         let observed_at = now()?;
         let clock = || observed_at.clone();
         let sources = Sources {
-            dispatch: &fake,
+            dispatch: fake.as_ref(),
             relations: &relations,
             targets: &owners.targets,
             now: &clock,
@@ -334,51 +339,33 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
                 },
             )
             .map_err(error)?;
-        let admitter = JobAdmitter {
-            planner: JobPlanner {
-                imports: None,
-                artifacts: Some(&owners.artifacts),
-                analyzer: None,
-                state_root: root,
-                hdc: Some(&hdc),
-                workspace: None,
-            },
-            jobs: &owners.jobs,
-            now: runtime_now,
-            authority: None,
-        };
-        let canceller = JobCanceller {
-            jobs: &owners.jobs,
-            now: runtime_now,
-            sessions: Some(&publisher),
-        };
         for offset in 0..count {
             let identity = format!("soak-{run_id}-{cycle}-{offset}");
             let request = json!({"documentType":"runtime-operation-request", "schemaVersion":"1.0.0",
                 "requestId":identity,"idempotencyKey":identity,
                 "target":{"targetId":adopted.target_id,"expectedBindingRevision":adopted.binding_revision},
                 "operation":{"id":"observe.device","version":1}});
-            let submitted = admitter
-                .submit(&serde_json::to_vec(&request).map_err(error)?)
-                .map_err(error)?;
+            let submitted = socket.request(
+                "job.submit",
+                Map::from_iter([(
+                    "requestJson".into(),
+                    Value::String(serde_json::to_string(&request).map_err(error)?),
+                )]),
+            )?;
             let params = job_params(field(&submitted, "jobId")?);
             if offset.is_multiple_of(11) {
-                canceller.handle(&params).map_err(error)?;
-                if owners
-                    .jobs
-                    .handle_resource("job.status", &params)
-                    .map_err(error)?["state"]
-                    != "cancelled"
-                {
+                socket.request("job.cancel", params.clone())?;
+                if socket.request("job.status", params.clone())?["state"] != "cancelled" {
                     return Err("never-started cancellation did not persist".into());
                 }
             } else if !offset.is_multiple_of(7)
-                && runner.handle(&params).map_err(error)?["state"] != "succeeded"
+                && socket.request("job.run", params.clone())?["state"] != "succeeded"
             {
                 return Err("observation did not succeed".into());
             }
         }
     }
+    socket.finish()?;
     Ok((recovered, fake.0.load(Ordering::Relaxed)))
 }
 
@@ -644,6 +631,7 @@ pub fn run(configuration: &Configuration) -> Result<Metrics> {
             .map_err(error)?;
     }
     let root = canonical_root(&configuration.state_directory)?;
+    socket_cycle::validate_root(&root)?;
     let directory = HostDirectory::open(&root).map_err(error)?;
     let _lock = directory
         .lock_document(".runtime-soak.lock")
@@ -830,10 +818,7 @@ mod recovery_refusal_tests {
             .collect();
         for (label, bytes) in [("intent", outstanding), ("unknown", fixture)] {
             let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-            let root = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
-                .join(format!("soak-refuse-{nonce:x}"));
+            let root = PathBuf::from("/private/tmp").join(format!("soak-refuse-{nonce:x}"));
             fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
             let directory = HostDirectory::open(&root).unwrap();
             directory

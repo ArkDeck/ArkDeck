@@ -15,10 +15,7 @@ impl Root {
             .iter()
             .map(|b| format!("{b:02x}"))
             .collect();
-        let root = std::env::temp_dir()
-            .canonicalize()
-            .unwrap()
-            .join(format!("adksoak-{suffix}"));
+        let root = PathBuf::from("/private/tmp").join(format!("adksoak-{suffix}"));
         fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
         Self(root)
     }
@@ -293,4 +290,56 @@ fn artifact_seed_refuses_foreign_or_wrong_size_input_without_publication() {
     fs::write(small.0.join("fixture.tar.gz"), b"not declared size").unwrap();
     assert!(arkdeck_soak::artifact_bench::seed(&small.0, 1_048_576, &"a".repeat(64)).is_err());
     assert!(!small.0.join("artifacts").exists());
+}
+
+#[test]
+fn oversized_socket_root_is_rejected_before_publishing_runtime_state() {
+    let root = Root::new();
+    let long = root.0.join("long-private-state-".repeat(6));
+    fs::DirBuilder::new().mode(0o700).create(&long).unwrap();
+    let error = run(&Configuration {
+        state_directory: long.clone(),
+        duration_seconds: 1,
+        restart_interval_seconds: 1,
+        jobs_per_cycle: 10,
+    })
+    .unwrap_err();
+    assert!(error.contains("socket path"), "{error}");
+    assert!(error.contains("shorter --state-directory"), "{error}");
+    assert_eq!(fs::read_dir(&long).unwrap().count(), 0);
+}
+
+#[test]
+fn the_existing_benchmark_socket_path_boundary_remains_valid_for_seeding() {
+    let root = Root::new();
+    let root_limit = 103 - "/agentd.sock".len();
+    let name_len = root_limit - root.0.as_os_str().as_encoded_bytes().len() - 1;
+    let state = root.0.join("b".repeat(name_len));
+    fs::DirBuilder::new().mode(0o700).create(&state).unwrap();
+    assert_eq!(
+        state
+            .join("agentd.sock")
+            .as_os_str()
+            .as_encoded_bytes()
+            .len(),
+        103
+    );
+    assert!(
+        state
+            .join("d/ctl.sock")
+            .as_os_str()
+            .as_encoded_bytes()
+            .len()
+            <= 103
+    );
+    let result = run(&Configuration {
+        state_directory: state.clone(),
+        duration_seconds: 1,
+        restart_interval_seconds: 1,
+        jobs_per_cycle: 1,
+    })
+    .unwrap();
+    assert_eq!(result.phase, "completed");
+    assert_eq!(result.active_job_count, 0);
+    assert!(!state.join("d/ctl.sock").exists());
 }

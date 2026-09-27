@@ -1478,6 +1478,8 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture
 
+- 2026-09-27 socket lifecycle: the Rust fixture now shares the daemon serving/drain path and existing client codec; bounded checks and scope are recorded in `evidence/runs/TASK-XPA-025/socket-lifecycle-run.md`. Historical owner-only evidence and reference/long-run acceptance remain separate.
+
 - 2026-09-26 current-main capture: three release runs measured ten metrics, but cold-start and settled-RSS spread exceeded 30%; exit 2, no baseline adoption. See `evidence/runs/TASK-XPA-025/rust-capture-20260926-run.md` and its unmodified capture document.
 - Status:ready（2026-09-14, r11: the lanes measure the isolated Rust daemon as delivered; TASK-XPA-014's later milestones only widen what the soak exercises. SPK-11 precedes the port. Readiness pins instantiated at `main` `6cf99fb6`）
 - Platform:macos and windows
