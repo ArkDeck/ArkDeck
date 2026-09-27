@@ -23,10 +23,10 @@ arkdeck-provider-arkforge = { path = "crates/arkdeck-provider-arkforge" }
 # ArkForge's own crates, at the revision `Packages/ArkDeckKit/Package.swift`
 # pins for the Swift SDK: one ArkForge revision for both lanes, asserted by
 # `scripts/check-arkforge-pin.py`. They carry no third-party dependency.
-arkforge-authority-api = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eee578720c5bae76b2574a6aaf25b536bc491c86" }
-arkforge-client = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eee578720c5bae76b2574a6aaf25b536bc491c86" }
-arkforge-core = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eee578720c5bae76b2574a6aaf25b536bc491c86" }
-arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "eee578720c5bae76b2574a6aaf25b536bc491c86" }
+arkforge-authority-api = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
+arkforge-client = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
+arkforge-core = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
+arkforge-ipc = { git = "https://github.com/ArkDeck/ArkForge.git", rev = "c1dc0553b42627581583abfba3fec34d13343282" }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["float_roundtrip"] }
 sha2 = "0.10.9"

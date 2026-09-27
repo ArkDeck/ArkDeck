@@ -190,9 +190,17 @@ pub(crate) fn alias_covers(
 
 /// Swift `ProductRockchipRuntimeUSBProbe` over the Runtime's census: exactly
 /// one registered DAYU200 in the personality asked for.
-struct CensusProbe<'a>(&'a Census);
+pub struct RockchipUsbProbe(Arc<Census>);
 
-impl CensusProbe<'_> {
+impl RockchipUsbProbe {
+    pub fn new(
+        census: impl Fn() -> Result<Vec<UsbHostDevice>, RegistryUnavailable> + Send + Sync + 'static,
+    ) -> Self {
+        Self(Arc::new(census))
+    }
+}
+
+impl RockchipUsbProbe {
     fn single(&self, matches: impl Fn(&UsbHostDevice) -> bool) -> Result<UsbHostDevice, String> {
         let devices = (self.0)().map_err(|_| admission("USB registry unavailable"))?;
         let mut found: Vec<UsbHostDevice> = devices.into_iter().filter(|d| matches(d)).collect();
@@ -204,7 +212,7 @@ impl CensusProbe<'_> {
     }
 }
 
-impl UsbProbe for CensusProbe<'_> {
+impl UsbProbe for RockchipUsbProbe {
     fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         let device = self.single(|device| {
             is_dayu200_loader(device)
@@ -277,7 +285,7 @@ impl LoaderObserver for ArkForgeLoader {
         expected_usb_topology: Option<&str>,
         request_id: &str,
     ) -> Result<LoaderIdentity, String> {
-        let identity = CensusProbe(&*self.census)
+        let identity = RockchipUsbProbe(Arc::clone(&self.census))
             .single_loader(stable_identity_sha256)
             .map_err(|detail| format!("IOKit did not observe the exact bound Loader: {detail}"))?;
         self.confirm_loader(
@@ -714,7 +722,7 @@ impl FlashHostFacts {
         let Some(hdc) = hdc else {
             return ("unknown".into(), None, "unknown".into(), None);
         };
-        let usb = CensusProbe(&*self.census);
+        let usb = RockchipUsbProbe(Arc::clone(&self.census));
         let usb: &dyn UsbProbe = &usb;
         match LiveModeProbe::new(hdc, &*self.loader, Some(usb)).observe(connect_key, identity) {
             Ok(observation) => {

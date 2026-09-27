@@ -30,6 +30,14 @@ fn typed_observations(
 #[cfg(target_os = "macos")]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
 
+/// The lane and per-action host are shared by direct and background Jobs.
+#[cfg(target_os = "macos")]
+struct FlashRuntime {
+    lane: std::sync::Arc<dyn arkdeck_provider_arkforge::FlashLane>,
+    host: std::sync::Arc<dyn arkdeck_provider_arkforge::RockchipHost>,
+    profile_id: String,
+}
+
 /// One Job's run, which every concurrent caller for that Job joins and a
 /// cancellation reaches through the run's `cancellation`, or the cancellation
 /// of a Job no run holds, which a concurrent run waits out.
@@ -192,13 +200,15 @@ pub struct Host {
     /// binding and the alias of the Application Support root, the census,
     /// the native RockUSB identity and the live probe over this host's HDC.
     #[cfg(target_os = "macos")]
-    flash_facts: Option<arkdeck_hoststore::FlashHostFacts>,
+    flash_facts: Option<std::sync::Arc<arkdeck_hoststore::FlashHostFacts>>,
     /// What a Flash `job.plan` reads beyond the Artifact and Import owners
     /// and those facts: the ArkForge provider's availability, the Rockchip
     /// dispatcher's reason and the lane's toolchain, as Swift's daemon
     /// composes them.
     #[cfg(target_os = "macos")]
-    flash_planning: Option<arkdeck_hoststore::FlashPlanning>,
+    flash_planning: Option<std::sync::Arc<arkdeck_hoststore::FlashPlanning>>,
+    #[cfg(target_os = "macos")]
+    flash_runtime: Option<std::sync::Arc<FlashRuntime>>,
     /// Swift `ProductRockchipDeviceAccessObserver`: ArkForge's public socket
     /// in the lane's runtime directory, a fresh bounded session per read.
     #[cfg(target_os = "macos")]
@@ -533,6 +543,20 @@ impl Host {
             code_sign_helper: self.code_sign_helper.as_ref(),
         })
     }
+
+    /// Rockchip managed control uses the same descriptor-bound dispatch and
+    /// managed server generation as every other operation of this owner.
+    #[cfg(target_os = "macos")]
+    pub(crate) fn rockchip_hdc_resolver(&self) -> Option<Box<arkdeck_hoststore::HdcResolver>> {
+        let dispatch = self.hdc.clone()?;
+        Some(Box::new(move || {
+            if !dispatch.tool_identity_current() {
+                return Err("the descriptor-bound HDC executable changed".into());
+            }
+            Ok(dispatch.clone()
+                as std::sync::Arc<dyn arkdeck_provider_hdc::HdcDispatch + Send + Sync>)
+        }))
+    }
     /// The bundled code-sign helper a native deployment stages, verified by
     /// the composition that found it (`code_sign_helper.rs`). With one,
     /// `deploy.native-library.app-owned@1` is available and planned; without
@@ -621,6 +645,9 @@ impl Host {
         let holds = self.holds.clone();
         let workspace = self.workspace.clone();
         let state_root = self.planning.as_ref().map(|(root, _)| root.clone());
+        let flash_runtime = self.flash_runtime.clone();
+        let flash_planning = self.flash_planning.clone();
+        let flash_facts = self.flash_facts.clone();
         // Swift's `startJob` runs the owned Job with the engine that admitted
         // it: the analyzer the admission materialized the plan against is the
         // one the run dispatches, or an admitted analyzer Job could never run.
@@ -659,7 +686,7 @@ impl Host {
             let params =
                 serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                arkdeck_hoststore::JobRunner {
+                let runner = arkdeck_hoststore::JobRunner {
                     imports: imports.as_deref(),
                     mutation: capabilities
                         .as_deref()
@@ -688,13 +715,43 @@ impl Host {
                     after_commit: None,
                     hdc: hdc.as_ref(),
                     workspace: workspace.as_deref(),
-                }
-                .handle(&params)
-                .map_err(|refusal| WireError {
-                    code: refusal.code.into(),
-                    message: refusal.message,
-                    details: Some(refusal.details),
-                })
+                };
+                let facts_port = |target: &str| {
+                    flash_facts
+                        .as_ref()
+                        .ok_or("Flash facts owner is absent".to_owned())?
+                        .current_facts(
+                            targets
+                                .as_deref()
+                                .ok_or("Target owner is absent".to_owned())?,
+                            dispatch
+                                .as_deref()
+                                .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch),
+                            target,
+                        )
+                };
+                let flash = flash_runtime
+                    .as_ref()
+                    .zip(flash_planning.as_deref())
+                    .zip(flash_facts.as_ref())
+                    .zip(targets.as_deref())
+                    .map(
+                        |(((runtime, planning), _), targets)| arkdeck_hoststore::FlashExecution {
+                            planning,
+                            facts: &facts_port,
+                            lane: &*runtime.lane,
+                            profile_id: &runtime.profile_id,
+                            host: &*runtime.host,
+                            targets,
+                        },
+                    );
+                arkdeck_hoststore::FlashRunner { runner, flash }
+                    .handle(&params)
+                    .map_err(|refusal| WireError {
+                        code: refusal.code.into(),
+                        message: refusal.message,
+                        details: Some(refusal.details),
+                    })
             }))
             .unwrap_or_else(|_| {
                 Err(WireError {
@@ -849,7 +906,7 @@ impl Host {
     /// against this host's Target store and, for the live probe, its HDC.
     #[cfg(target_os = "macos")]
     pub fn with_flash_host_facts(mut self, facts: arkdeck_hoststore::FlashHostFacts) -> Self {
-        self.flash_facts = Some(facts);
+        self.flash_facts = Some(std::sync::Arc::new(facts));
         self
     }
 
@@ -858,8 +915,42 @@ impl Host {
     /// planner's, which does not materialize them.
     #[cfg(target_os = "macos")]
     pub fn with_flash_planning(mut self, planning: arkdeck_hoststore::FlashPlanning) -> Self {
-        self.flash_planning = Some(planning);
+        self.flash_planning = Some(std::sync::Arc::new(planning));
         self
+    }
+
+    /// Install the executable lane only when production composition has all
+    /// its ports. Admission still checks fresh facts, exact materialization,
+    /// capability, history and both existing runtime/mutation locks.
+    #[cfg(target_os = "macos")]
+    pub fn with_flash_execution(
+        mut self,
+        lane: std::sync::Arc<dyn arkdeck_provider_arkforge::FlashLane>,
+        host: std::sync::Arc<dyn arkdeck_provider_arkforge::RockchipHost>,
+        profile_id: String,
+    ) -> Self {
+        self.flash_runtime = Some(std::sync::Arc::new(FlashRuntime {
+            lane,
+            host,
+            profile_id,
+        }));
+        self
+    }
+
+    #[cfg(target_os = "macos")]
+    fn flash_execution<'a>(
+        &'a self,
+        facts: arkdeck_hoststore::RockchipFactsPort<'a>,
+    ) -> Option<arkdeck_hoststore::FlashExecution<'a>> {
+        let runtime = self.flash_runtime.as_ref()?;
+        Some(arkdeck_hoststore::FlashExecution {
+            planning: self.flash_planning.as_deref()?,
+            facts,
+            lane: &*runtime.lane,
+            profile_id: &runtime.profile_id,
+            host: &*runtime.host,
+            targets: self.targets.as_deref()?,
+        })
     }
 
     /// Runs `run` with this host's `job.plan` planner: the Job planner over
@@ -883,7 +974,7 @@ impl Host {
                 hdc: hdc.as_ref(),
                 workspace: self.workspace.as_deref(),
             },
-            flash: self.flash_planning.as_ref(),
+            flash: self.flash_planning.as_deref(),
             facts: facts
                 .as_ref()
                 .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
@@ -1071,6 +1162,8 @@ impl Host {
             flash_facts: None,
             #[cfg(target_os = "macos")]
             flash_planning: None,
+            #[cfg(target_os = "macos")]
+            flash_runtime: None,
             #[cfg(target_os = "macos")]
             device_access: None,
             #[cfg(target_os = "macos")]
@@ -1613,6 +1706,10 @@ impl HostServices for Host {
         };
         let hdc = self.hdc();
         let facts = self.flash_facts_port();
+        let campaign = self
+            .flash_runtime
+            .as_ref()
+            .and_then(|runtime| runtime.lane.hardware_acceptance_campaign());
         arkdeck_hoststore::FlashAdmitter {
             admitter: arkdeck_hoststore::JobAdmitter {
                 planner: arkdeck_hoststore::JobPlanner {
@@ -1627,13 +1724,14 @@ impl HostServices for Host {
                 now: arkdeck_hoststore::runtime_now,
                 authority: self.authority(),
             },
-            flash: self.flash_planning.as_ref(),
+            flash: self.flash_planning.as_deref(),
             facts: facts
                 .as_ref()
                 .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
-            // No production lane executes a Flash yet.
-            executes: false,
-            campaign: None,
+            executes: self.flash_runtime.is_some()
+                && self.flash_facts.is_some()
+                && self.targets.is_some(),
+            campaign: campaign.as_deref(),
         }
         .handle(params)
         // A refusal before the admission point proves zero dispatch; Swift
@@ -1697,8 +1795,10 @@ impl HostServices for Host {
                     probe: &probe,
                 });
         let hdc = self.hdc();
+        let facts = self.flash_facts_port();
+        let flash = facts.as_ref().and_then(|facts| self.flash_execution(facts));
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
-            arkdeck_hoststore::JobRunner {
+            let runner = arkdeck_hoststore::JobRunner {
                 imports: self.imports.as_deref(),
                 mutation: self.authority().zip(self.planning.as_ref()).map(
                     |(authority, (state_root, _))| arkdeck_hoststore::MutationExecution {
@@ -1718,13 +1818,14 @@ impl HostServices for Host {
                 after_commit: None,
                 hdc: hdc.as_ref(),
                 workspace: self.workspace.as_deref(),
-            }
-            .handle(params)
-            .map_err(|refusal| WireError {
-                code: refusal.code.into(),
-                message: refusal.message,
-                details: Some(refusal.details),
-            })
+            };
+            arkdeck_hoststore::FlashRunner { runner, flash }
+                .handle(params)
+                .map_err(|refusal| WireError {
+                    code: refusal.code.into(),
+                    message: refusal.message,
+                    details: Some(refusal.details),
+                })
         };
         let uncertain = || WireError {
             code: "internalError".into(),
@@ -2014,6 +2115,10 @@ impl HostServices for Host {
             capabilities: self.capabilities.as_deref(),
             runner: runner.as_ref(),
         };
+        let flash_reconciler = arkdeck_hoststore::FlashReconciler {
+            reconciler,
+            lane: self.flash_runtime.as_ref().map(|runtime| &*runtime.lane),
+        };
         // Swift attaches no details to any `job.reconcile` refusal.
         let uncertain = || WireError {
             code: "internalError".into(),
@@ -2021,7 +2126,7 @@ impl HostServices for Host {
             details: None,
         };
         let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
-            return reconciler.handle(params);
+            return flash_reconciler.handle(params);
         };
         let slot = {
             // `running`, then `reconciling`, as `claim_run` takes them: a run
@@ -2029,7 +2134,7 @@ impl HostServices for Host {
             let running = self.running.lock().map_err(|_| uncertain())?;
             if running.get(job).is_some_and(|slot| !slot.cancelling) {
                 drop(running);
-                return reconciler.status(params);
+                return flash_reconciler.reconciler.status(params);
             }
             let mut reconciling = self.reconciling.lock().map_err(|_| uncertain())?;
             if let Some(slot) = reconciling.get(job).cloned() {
@@ -2041,9 +2146,10 @@ impl HostServices for Host {
             reconciling.insert(job.to_owned(), slot.clone());
             slot
         };
-        let result =
-            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reconciler.handle(params)))
-                .unwrap_or_else(|_| Err(uncertain()));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            flash_reconciler.handle(params)
+        }))
+        .unwrap_or_else(|_| Err(uncertain()));
         if let Ok(mut reconciling) = self.reconciling.lock() {
             reconciling.remove(job);
         }

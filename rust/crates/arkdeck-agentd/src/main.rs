@@ -11,6 +11,8 @@ mod app_ingress;
 #[path = "app_ingress/tests.rs"]
 mod app_ingress_tests;
 #[cfg(target_os = "macos")]
+mod arkforge_execution;
+#[cfg(target_os = "macos")]
 mod arkforge_lane;
 #[cfg(target_os = "macos")]
 mod bootstrap_readers;
@@ -584,10 +586,17 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 &root,
                 development_usb::flash_census(source, file.clone()),
                 arkdeck_hoststore::ArkForgeLoader::new(
-                    development_usb::flash_census(source, file),
+                    development_usb::flash_census(source, file.clone()),
                     &composed.runtime_directory,
                 ),
             ));
+        let host = arkforge_execution::install(
+            host,
+            &composed,
+            &root.join("jobs-state"),
+            &root,
+            development_usb::flash_census(source, file.clone()),
+        );
         arkforge = Some(composed);
         // The helper an isolated development root names outright, verified
         // above, in place of the bundle's.
