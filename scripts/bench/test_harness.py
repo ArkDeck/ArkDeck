@@ -25,6 +25,7 @@ MODULES = (
     "compare.py",
     "harness.py",
     "metrics.py",
+    "observations.py",
     "recovery.py",
 )
 STDLIB_ONLY = {
@@ -40,6 +41,7 @@ STDLIB_ONLY = {
     "re",
     "shutil",
     "socket",
+    "stat",
     "subprocess",
     "sys",
     "tempfile",
@@ -483,6 +485,7 @@ class RuntimeCompositionTests(unittest.TestCase):
                 seed_seconds=1, seed_jobs_per_cycle=10, runtime_kind=kind)
             with mock.patch.object(harness, "seed_state_directory") as seed, \
                  mock.patch.object(harness, "IsolatedRuntime") as runtime_class, \
+                 mock.patch.object(metrics.observations, "seed_metrics"), \
                  mock.patch.object(clocks, "Deadline") as deadline:
                 seed.return_value.returncode = 0
                 runtime = runtime_class.return_value
@@ -511,6 +514,7 @@ class RuntimeCompositionTests(unittest.TestCase):
             ipc_samples=1, idle_seconds=1, calibration_samples=0,
             seed_seconds=1, seed_jobs_per_cycle=10, runtime_kind="rust")
         with mock.patch.object(harness, "seed_state_directory") as seed, \
+             mock.patch.object(metrics.observations, "seed_metrics"), \
              mock.patch.object(harness, "IsolatedRuntime") as runtime_class:
             seed.return_value.returncode = 0
             runtime = runtime_class.return_value
@@ -627,8 +631,9 @@ class CaptureTraceTests(unittest.TestCase):
         self.assertEqual(scale['residentSetRawSamples'], [
             {'elapsedSeconds': 1.25, 'bytes': 100.0}, {'elapsedSeconds': 3.5, 'bytes': 40.0}])
         self.assertEqual(samples['daemon.residentSetSteady'], [40.0])
-        self.assertEqual(recorder.call_count, 2)
-        self.assertEqual(recorder.call_args.args[0]['finishedAtSeconds'], 3.75)
+        idle = [call.args[0] for call in recorder.call_args_list if call.args[0]['kind'] == 'idleResources']
+        self.assertEqual(len(idle), 2)
+        self.assertEqual(idle[-1]['finishedAtSeconds'], 3.75)
 
     def test_guard_failure_after_start_keeps_sample_and_stops_daemon(self):
         recorder = mock.Mock()
@@ -646,8 +651,9 @@ class CaptureTraceTests(unittest.TestCase):
                 metrics.execute_run(context, pathlib.Path('/state'))
             self.assertGreaterEqual(runtime.stop.call_count, 1)
         observations = [call.args[0] for call in recorder.call_args_list]
-        self.assertEqual(observations[-1]['kind'], 'coldStart')
-        self.assertEqual(observations[-1]['milliseconds'], 100)
+        cold = [entry for entry in observations if entry['kind'] == 'coldStart']
+        self.assertEqual(len(cold), 1)
+        self.assertEqual(cold[0]['milliseconds'], 100)
 
 
 class StartupObservationTests(unittest.TestCase):
@@ -786,14 +792,15 @@ class StartupObservationTests(unittest.TestCase):
             runtime = factory.return_value
             runtime.start_diagnostics = diagnostics
             def fail():
-                recorder.assert_not_called()
+                self.assertFalse(any(call.args[0]['kind'] == 'coldStart' for call in recorder.call_args_list))
                 raise harness.DaemonStartFailed('budget')
             runtime.start.side_effect = fail
             with self.assertRaises(harness.DaemonStartFailed):
                 metrics.execute_run(context,pathlib.Path('/state'))
             runtime.stop.assert_called_once()
-        recorder.assert_called_once()
-        entry = recorder.call_args.args[0]
+        cold = [call.args[0] for call in recorder.call_args_list if call.args[0]['kind'] == 'coldStart']
+        self.assertEqual(len(cold), 1)
+        entry = cold[0]
         self.assertEqual(entry['status'],'FAILED')
         self.assertEqual(entry['sampleIndex'],0)
         self.assertEqual(entry['diagnostics'],diagnostics)

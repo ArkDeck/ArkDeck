@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import time
 
-from . import baseline, clocks, control, harness, recovery, journal, artifact
+from . import baseline, clocks, control, harness, recovery, journal, artifact, observations
 
 # A pure-CPU workload with no allocation growth and no syscall, sized to land in
 # the same millisecond range as the IPC round trips it normalises.
@@ -35,7 +35,7 @@ SEED_RESTART_INTERVAL_SECONDS = 1
 # side of it is flat to within a few kilobytes.  Percentiles taken across the
 # step describe neither level, so the series is split at the release and each
 # level is reported on its own.  A drop of at least this fraction of the
-# running median is what counts as the release.
+# immediately preceding sample is what counts as the release.
 RESIDENT_SET_RELEASE_FRACTION = 0.25
 
 
@@ -416,15 +416,28 @@ def execute_run(
     numbers instead of being reconstructed from the seed parameters.
     """
 
-    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS | artifact.DEFINITIONS)}
-    scale: dict[str, object] = {
+    samples, scale = {}, {}
+    try:
+        measured, facts = _execute_run(context, state_directory, samples, scale)
+        return measured, facts
+    except Exception:
+        if context.capture_recorder:
+            context.capture_recorder({"kind": "phaseCheckpoint", "phase": "run-failure",
+                                      "status": "PARTIAL", "baselineEligible": False,
+                                      "samples": samples, "scale": scale})
+        raise
+
+
+def _execute_run(context, state_directory, samples, scale):
+    samples.update({name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS | artifact.DEFINITIONS)})
+    scale.update({
         "seedSeconds": context.seed_seconds,
         "seedJobsPerCycle": context.seed_jobs_per_cycle,
         "seedRestartIntervalSeconds": SEED_RESTART_INTERVAL_SECONDS,
         "jobListPageSize": JOB_LIST_PAGE_SIZE,
         "jobStoreRowCount": None,
         "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
-    }
+    })
 
     def record(entry):
         if context.capture_recorder:
@@ -432,11 +445,21 @@ def execute_run(
 
     def guard(phase):
         if context.require_quiet:
-            record({"kind": "quietHost", "phase": phase, **recovery.assert_quiet_host()})
+            try:
+                facts = recovery.assert_quiet_host()
+            except harness.HostTooBusy as error:
+                error.phase = phase
+                record({"kind": "quietHost", "phase": phase, "status": "REFUSED",
+                        **error.facts})
+                raise
+            record({"kind": "quietHost", "phase": phase, **facts})
 
     guard("run-start")
     for _ in range(context.calibration_samples):
         samples["calibration.busyLoop"].append(calibration_sample())
+
+    record({"kind": "phaseCheckpoint", "phase": "calibration", "status": "COMPLETE",
+            "samples": {"calibration.busyLoop": samples["calibration.busyLoop"]}})
 
     if context.recovery_samples:
         scale["recoveryFixtureVersion"] = recovery.VERSION
@@ -499,12 +522,16 @@ def execute_run(
         context.seed_seconds,
         context.seed_jobs_per_cycle,
         SEED_RESTART_INTERVAL_SECONDS,
+        recorder=record,
     )
     if seeded.returncode != 0:
         raise RunFailed(
             "the soak fixture could not seed a Runtime state directory: "
             f"{seeded.stdout.strip()} {seeded.stderr.strip()}"
         )
+
+    if context.runtime_kind == "rust":
+        observations.seed_metrics(state_directory, record)
 
     runtime = harness.IsolatedRuntime(
         context.daemon_executable, state_directory, runtime_kind=context.runtime_kind
@@ -541,6 +568,8 @@ def execute_run(
                     "use matching Runtime and soak executables"
                 )
             scale["jobStoreRowCount"] = row_count
+            record({"kind": "jobListProbe", "returnedPageRowCount": row_count,
+                    "pageSize": JOB_LIST_PAGE_SIZE})
             for index in range(context.ipc_samples):
                 if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
                     client.close()
@@ -555,6 +584,9 @@ def execute_run(
                 if job_id is not None:
                     _, elapsed = client.timed_call("job.status", {"jobId": job_id})
                     samples["ipc.jobStatus"].append(elapsed * 1000.0)
+        record({"kind": "phaseCheckpoint", "phase": "ipc", "status": "COMPLETE",
+                "samples": {name: values for name, values in samples.items() if name.startswith("ipc.")},
+                "scale": scale})
         runtime.stop()
 
         guard("ipc-after")
@@ -613,6 +645,9 @@ def execute_run(
         guard("idle-after")
         scale["residentSetSampleCount"] = len(resident_series)
     finally:
-        runtime.stop()
+        try:
+            runtime.stop()
+        finally:
+            record({"kind": "runtimeCleanup", "processReferenceCleared": runtime.process is None})
 
     return {name: values for name, values in samples.items() if values}, scale

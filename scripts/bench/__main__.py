@@ -16,7 +16,7 @@ import pathlib
 import shutil
 import sys
 
-from . import baseline, clocks, harness, metrics
+from . import baseline, clocks, harness, metrics, observations
 
 
 def _existing_file(value: str) -> pathlib.Path:
@@ -116,7 +116,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
         raw = arguments.out_dir / f"{prefix}-{capture_id}.jsonl"
         def record(sample):
             # Every attempt is appended before subsequent guards can fail.
-            entry = {"atUtc": clocks.utc_now(), "toolchain": toolchain,
+            entry = {"captureObservationVersion": observations.VERSION, "captureId": capture_id,
+                     "atUtc": clocks.utc_now(), "toolchain": toolchain,
                      "runIndex": index, "runtimeKind": arguments.runtime_kind,
                      "buildConfiguration": arguments.build_configuration,
                      **sample}
@@ -171,6 +172,23 @@ def command_capture(arguments: argparse.Namespace) -> int:
             "was waived"
         )
 
+    def write_failure(error, phase):
+        document = {"captureObservationVersion": observations.VERSION, "captureId": capture_id,
+                    "status": "FAILED", "baselineEligible": False,
+                    "failedRunIndex": index, "phase": getattr(error, "phase", phase), "errorType": type(error).__name__,
+                    "toolchain": toolchain, "completedRuns": run_records,
+                    "observations": f"capture-samples-{capture_id}.jsonl",
+                    "quietHostFacts": getattr(error, "facts", {})}
+        serialized = json.dumps(document, indent=2)
+        baseline.assert_no_host_identity(serialized)
+        destination = arguments.out_dir / f"capture-failed-{capture_id}.json"
+        temporary = destination.with_suffix(".tmp")
+        try:
+            temporary.write_text(serialized + "\n", encoding="utf-8")
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+
     for index in range(arguments.runs):
         # An advisory capture does not wait: it records the load it started at.
         wait_budget = 0.0 if arguments.allow_loaded_host else arguments.quiet_wait_seconds
@@ -179,6 +197,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
             load_start, waited = harness.wait_for_quiet_host(wait_budget)
         except harness.HostTooBusy as error:
             if not arguments.allow_loaded_host:
+                capture_recorder({"kind": "quietHost", "phase": "run-admission", "status": "REFUSED", **error.facts})
+                write_failure(error, "run-admission")
                 print(f"bench: run {index}: {error}", file=sys.stderr)
                 return 1
             load_start = harness.load_average()[0]
@@ -191,15 +211,28 @@ def command_capture(arguments: argparse.Namespace) -> int:
         started_at = clocks.utc_now()
         try:
             samples, scale = metrics.execute_run(context, state_directory)
+            capture_recorder({"kind": "runCheckpoint", "status": "COMPLETE",
+                              "samples": samples, "scale": scale})
         except (metrics.RunFailed, harness.DaemonStartFailed) as error:
             capture_recorder({"kind": "run", "status": "FAILED", "errorType": type(error).__name__})
+            write_failure(error, "run")
             print(f"bench: run {index} failed: {error}", file=sys.stderr)
             return 1
         except Exception as error:
             capture_recorder({"kind": "run", "status": "FAILED", "errorType": type(error).__name__})
+            write_failure(error, "run")
             raise
         finally:
             shutil.rmtree(state_directory, ignore_errors=True)
+            cleanup = {"kind": "stateCleanup"}
+            try:
+                state_directory.lstat()
+                cleanup["rootAbsent"] = False
+            except FileNotFoundError:
+                cleanup["rootAbsent"] = True
+            except OSError as error:
+                cleanup.update(rootAbsent=None, errorType=type(error).__name__)
+            capture_recorder(cleanup)
 
         for name, values in samples.items():
             unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS | metrics.artifact.DEFINITIONS)[name]
@@ -294,6 +327,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
     )
     for name, partial in incomplete.items():
         document["metrics"][name]["partialMeasurement"] = partial
+    document["captureObservationVersion"] = observations.VERSION
     serialized = baseline.serialize(document)
 
     arguments.out_dir.mkdir(parents=True, exist_ok=True)

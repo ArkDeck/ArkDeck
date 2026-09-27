@@ -189,6 +189,40 @@ baseline. Only explicit debug/loaded-host advisory captures waive that exit.
 `residentSetPhaseMethod: observed-release-v2` and `idleWindowSeconds` belong to
 the RSS comparison identity; old fallback-to-plateau results are not comparable.
 
+Capture observation identity `phase-checkpoints-v1` appears in every new raw
+record and successful document. It is evidence metadata, not a new metric scale
+or an exemption from the existing comparison/stability rules. Earlier captures
+are not relabeled or backfilled.
+
+Seed stdout/stderr are file-backed and only the first 64 KiB of each is read and
+archived, with actual byte count, truncation and an explicit complete/prefix hash
+scope. Temporary output files are removed after success/failure/timeout; the
+child's output size on disk is not capped by this prefix limit. Rust seed metrics
+are read from the actual completed `runtime-soak-metrics.json` (regular file,
+no symlink, at most 1 MiB), preserving the exact UTF-8 text and SHA-256. Observed
+state counts must agree and no active Jobs may remain. `seedWorkload` records the
+actual total separately: `jobStoreRowCount` still means the first `job.list` page's
+returned row count, never an estimate of the full store or `seconds × jobs/cycle`.
+
+Calibration and IPC arrays are checkpointed after their measured phases; an
+exception checkpoints only values already obtained. Complete runs are appended
+before the next run starts. A failure also writes `capture-failed-<id>.json`, with
+`baselineEligible: false`, completed-run metadata and its raw-log reference; it
+is not a `perf-baseline` and cannot resume, merge or select samples from retries.
+Recording occurs outside timed calls/startup/calibration intervals. A later
+failure therefore cannot erase earlier completed phases. This is closed-file
+process-failure evidence, not a claim of power-loss durability.
+
+Quiet-host refusals preserve the phase and facts known at refusal. A load refusal
+before process scanning records `processCheckPerformed: false` and an unknown
+conflict count, not zero. Cleanup retains daemon stop and temporary-root removal;
+raw results separately report whether the process reference was cleared and
+whether a subsequent filesystem check proved the root absent. These observations
+do not claim cleanup when it could not be verified. RSS splitting still requires
+a 25% adjacent-sample decrease; no observed release means no post-release steady
+measurement. No sampling cadence, timing endpoint, quiet threshold or p95 spread
+rule changes in this observation version.
+
 Every capture writes append-only `capture-samples-<id>.jsonl` with binary hashes,
 run/sample identities, startup diagnostics, resource read start/end elapsed
 times and host guards. Resource trajectories also appear once per run in the
