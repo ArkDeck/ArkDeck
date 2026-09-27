@@ -1,0 +1,2 @@
+check_union_merge: ok
+check_sdd: 0 error(s), 0 warning(s), 121 acceptance IDs

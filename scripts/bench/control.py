@@ -14,6 +14,7 @@ nothing and calls only read-only methods.  It deliberately does not reimplement
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -43,6 +44,23 @@ class ControlClient:
         self._socket: socket.socket | None = None
         self._buffer = b""
         self._verified = False
+        self._deadline = None
+        self.failure_evidence = None
+        self._capture_failure = False
+
+    def configure_measurement(self, deadline, capture_failure=False):
+        """Opt-in total budget and bounded fixture-only transport evidence."""
+        self._deadline = deadline
+        self._capture_failure = capture_failure
+        self._exchange = (self._exchange_measurement if deadline is not None or capture_failure
+                          else type(self)._exchange.__get__(self))
+
+    def _bound_io(self):
+        if self._deadline is not None:
+            remaining = self._deadline.remaining_seconds()
+            if remaining <= 0:
+                raise ControlError("continuous exchange deadline expired")
+            self._socket.settimeout(min(self.timeout_seconds, remaining))
 
     def __enter__(self) -> "ControlClient":
         try:
@@ -66,6 +84,13 @@ class ControlClient:
             raise ControlError(f"connect {self.socket_path}: {error}") from error
         self._socket = connection
         self._verified = False
+
+    def set_timeout(self, seconds: float) -> None:
+        if not 0 < seconds <= 60:
+            raise ValueError("control timeout outside bounded range")
+        self.timeout_seconds = seconds
+        if self._socket is not None:
+            self._socket.settimeout(seconds)
 
     def close(self) -> None:
         if self._socket is not None:
@@ -94,6 +119,75 @@ class ControlClient:
             self._buffer += chunk
             if len(self._buffer) > MAXIMUM_RESPONSE_BYTES:
                 raise ControlError("response frame exceeds its transport limit")
+        line, _, self._buffer = self._buffer.partition(b"\n")
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ControlError("duplicate response key")
+                result[key] = value
+            return result
+        if self._buffer or b"\r" in line:
+            raise ControlError("unexpected extra response frame")
+        response = json.loads(line, object_pairs_hook=unique)
+        if not isinstance(response, dict) or response.get("id") != frame["id"]:
+            raise ControlError("response identity mismatch")
+        expected = {"id", "ok", "result"} if response.get("ok") is True else {"id", "ok", "error"}
+        if set(response) != expected or type(response.get("ok")) is not bool:
+            raise ControlError("response shape mismatch")
+        return response
+
+    def _exchange_measurement(self, frame: dict[str, object]) -> dict[str, object]:
+        self.failure_evidence = None
+        self._received_hash = hashlib.sha256()
+        self._received_count = 0
+        self._received_prefix = bytearray()
+        self._exchange_stage = 'send'
+        try:
+            return self._exchange_impl(frame)
+        except Exception as error:
+            if self._capture_failure:
+                self.failure_evidence = {
+                    'phase': self._exchange_stage, 'errorType': type(error).__name__,
+                    'receivedByteCount': self._received_count,
+                    'receivedSha256': self._received_hash.hexdigest(),
+                    'prefixBase64': base64.b64encode(self._received_prefix).decode(),
+                    'prefixLimitBytes': 65536,
+                    'truncated': self._received_count > len(self._received_prefix),
+                    'budgetSeconds': self._deadline.budget_seconds if self._deadline else None,
+                    'remainingSeconds': self._deadline.remaining_seconds() if self._deadline else None,
+                }
+            raise
+
+    def _exchange_impl(self, frame: dict[str, object]) -> dict[str, object]:
+        if self._socket is None:
+            raise ControlError("client is not connected")
+        payload = json.dumps(frame, separators=(",", ":")).encode("utf-8") + b"\n"
+        if len(payload) > MAXIMUM_FRAME_BYTES:
+            raise ControlError("request frame exceeds the 4 MiB transport limit")
+        try:
+            self._bound_io()
+            self._socket.sendall(payload)
+        except OSError as error:
+            raise ControlError(f"request transport failed: {error}") from error
+        self._exchange_stage = "receive"
+        while b"\n" not in self._buffer:
+            try:
+                self._bound_io()
+                chunk = self._socket.recv(65536)
+            except OSError as error:
+                raise ControlError(f"response transport failed: {error}") from error
+            if self._capture_failure:
+                self._received_hash.update(chunk)
+                self._received_count += len(chunk)
+                self._received_prefix.extend(chunk[:max(0, 65536 - len(self._received_prefix))])
+            self._bound_io()
+            if not chunk:
+                raise ControlError("daemon closed the connection")
+            self._buffer += chunk
+            if len(self._buffer) > MAXIMUM_RESPONSE_BYTES:
+                raise ControlError("response frame exceeds its transport limit")
+        self._exchange_stage = "decode"
         line, _, self._buffer = self._buffer.partition(b"\n")
         def unique(pairs):
             result = {}

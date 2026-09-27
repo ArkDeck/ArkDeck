@@ -306,3 +306,46 @@ multiple actual pages. `job.eventsPage` remains an explicit gap; drain duration
 is **not** compared with the 50 ms single-page budget. Fixture version, counts,
 page request and timing boundaries are comparison identity. No provider/device
 is involved. Each sample owns a fresh temporary root, removed on every exit.
+
+## InputArtifact paged reads (opt-in, disk/time bounded)
+
+Rust `--artifact-samples N --artifact-only` requests 128 MiB and 1 GiB workloads.
+`--artifact-sizes-mib 1` is an explicitly separate correctness scale, not evidence
+for either target size. Without the opt-in flag no large payload is generated.
+
+The existing standard synthetic complete flash archive is streamed with only its
+`userdata.img` grow member enlarged. Stored DEFLATE blocks and bounded gzip extra
+padding produce an exact byte count, not a sparse file or fabricated counter.
+The actual Import owner uploads chunks, runs the production format/board
+validator and publishes immutable bytes. Measurements name owner.kind=import and
+kind=flash-bundle: these are InputArtifacts, not ordinary Job publications.
+The fixture's binding is synthetic and local; no Target/trusted facts/capability
+record or device dispatch is produced. Ordinary Job publication caps are unchanged.
+
+Before generation, free space must cover three payload copies plus metadata and
+an untouched 4 GiB reserve. Generation is bounded to 120 s, publication to 600 s,
+and readback to 600 s. Only each sample's own temporary root is removed.
+Every seed failure records bounded stdout/stderr, hashes and timeout/exit facts.
+Each size has a distinct metric/scale; the 128 MiB metric is artifact.pagedRead.
+
+The timer starts before the first page admission/read on a contract-verified
+connection and ends after all payload bytes and the final client SHA-256 are
+verified. Connection renewal after 64 requests is included. Every page's actual
+production full-file hash remains in the measured cost. Publication/startup are
+outside the read interval; no warm-up read, first-sample removal, cache eviction
+or subtraction disguises that cost. OS cache state is not claimed as cold.
+Base64 is strictly decoded and checked for canonical encoding, closed frame
+shape, exact identities/digest/ranges/counts and EOF. Formal runs check quiet-host
+admission before every page (included in elapsed cost) and after completion.
+The same continuous deadline bounds each send and receive, including sustained
+fragment progress. On transport/decode failure, optional fixture-only evidence
+retains a 64 KiB prefix, hash/count of all received bytes, phase and budget.
+Report I/O occurs afterward.
+Effective decimal MB/s and MiB/s use verified payload bytes, never base64 bytes.
+
+Daemon and client RSS are sampled every 0.2 s with actual timestamps. Observed
+peak growth is a sampled lower bound, not proof of the instantaneous peak or
+copy count; this reader cannot establish the ≤3-copy target. Swift's 128 MiB
+publication RSS test is a different boundary and is not relabeled as readback
+compliance. Missing RSS is unmeasured rather than zero. Debug or small-scale
+functional checks do not qualify either target-size performance baseline.

@@ -280,3 +280,17 @@ fn measured_journal_emits_every_append_and_drains_production_pages() {
     assert!(!refused.status.success());
     assert!(refused.stdout.is_empty());
 }
+
+#[test]
+fn artifact_seed_refuses_foreign_or_wrong_size_input_without_publication() {
+    let root = Root::new();
+    assert!(arkdeck_soak::artifact_bench::seed(&root.0, 100, &"a".repeat(64)).is_err());
+    assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
+    fs::write(root.0.join("foreign"), b"preserve").unwrap();
+    assert!(arkdeck_soak::artifact_bench::seed(&root.0, 1_048_576, &"a".repeat(64)).is_err());
+    assert_eq!(fs::read(root.0.join("foreign")).unwrap(), b"preserve");
+    let small = Root::new();
+    fs::write(small.0.join("fixture.tar.gz"), b"not declared size").unwrap();
+    assert!(arkdeck_soak::artifact_bench::seed(&small.0, 1_048_576, &"a".repeat(64)).is_err());
+    assert!(!small.0.join("artifacts").exists());
+}
