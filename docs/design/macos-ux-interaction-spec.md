@@ -78,7 +78,7 @@ Primary Window
 └── Bottom Job Inspector（跨页面、可拖动高度、可折叠）
 ```
 
-- 参考窗口 1180×760；最小 900×600。宽度不足 980 时先把双栏内容改为单栏；不足 760 时 sidebar 可自动收起，但必须保留 toolbar toggle 和 View menu 命令。双栏在可用宽度足够时应使用 detail pane 的主体宽度，不能把内容永久锁在窄卡片中并留下大面积无意义空白。
+- 参考窗口 1180×760；最小 900×600（窗口外框；内容区最小高度扣除实际标题栏／工具栏高度）。宽度不足 980 时先把双栏内容改为单栏；不足 760 时 sidebar 可自动收起，但必须保留 toolbar toggle 和 View menu 命令。双栏在可用宽度足够时应使用 detail pane 的主体宽度，不能把内容永久锁在窄卡片中并留下大面积无意义空白。
 - Sidebar 只保留两级以内层级，不在底部放关键动作。设备与工作流分组；Settings 使用系统 `Settings` scene，不作为 sidebar 最后一项伪装成普通页面。每个固定导航 row 的可见名称、稳定 identifier、selected state 与整行非零 AX hit frame 必须属于同一 accessibility element；不得只把 identifier 挂在无法激活的虚拟文本子节点上。
 - 页面标题在 toolbar，内容区不重复同一主标题。需要解释的页面用紧凑 section title + subtitle；滚动后 toolbar 仍提供上下文。
 - 表格和日志可以 full-bleed 到 detail pane 的分组边缘；文字、筛选器和操作保持 content inset。
@@ -266,6 +266,7 @@ Marker、notDerived 和产物元数据；文本显式读取，已发布 Trace �
 - 支持全文搜索、status、executionMode、session、device/target 与 time 筛选；筛选可保存到 toolbar menu。「需要关注」与「最近失败」是筛选预设，不改变 Runtime state。
 - 原生与原型窄窗将次要筛选收入「筛选历史」popover，活动选择与搜索保持直接可用；列表/详情只能使用筛选栏下方的剩余高度，不得溢出窗口。原型用独立「已存筛选」入口保留保存/恢复/删除和预设，宽窗继续使用「完整筛选」展开入口。普通筛选保留原生列表载体；显式 Job 导航清除旧筛选后，以恢复的记录重建原生列表并定位整行，空匹配状态不能吞掉定位请求。
 - 双栏与三栏的记录区独立滚动，标题、搜索与活动选择不随记录滚走；原型的精确跳转同时检查目标整行位于记录视口内、搜索仍可见。popover 使用平台的非模态交互，不增加 Runtime 执行动作。键盘打开/Escape 与点击外部关闭的原型验收状态见本轮验证记录，不以按钮关闭代替。
+- 选中记录或 Runtime 事实更新后，可选中文本的无障碍值必须与屏幕内容同步；VoiceOver 不得继续读取上一条 Job、状态或目标。History、Flash 活动和全局 Inspector 共用事实行时遵守同一要求。
 - 搜索和筛选使用精确 Job / Session / operation / target / state / executionMode，不把 Job ID 当 Session，也不把显示设备名当 target。active 只匹配已知非终态；needsAttention 使用未解决的 unknown / waitingForHuman 或实际残留计数，有恢复关系的历史 unknown 不因旧 unknown 本身继续报警。时间区间为过去一小时、一天、一周，按 reported finished / started / created 判断；缺失时刻不从“今天”标签推算。支持恢复、删除已存筛选和清除筛选。
 - 原型搜索即时更新并保留焦点/光标范围；完整筛选的展开状态不因改条件、清除或恢复而丢失。工具栏短标签不拆行，Inspector 长状态在列表内换行显示；切换语言或页面时，外观控件继续显示实际 system / light / dark 状态。
 - interrupted、failed、cancelled 使用不同 symbol + 文案；unknown outcome 额外显示 needsAttention。plan-only / simulated badge 在记录、详情与导出中永久保留。

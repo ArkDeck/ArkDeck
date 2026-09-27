@@ -174,6 +174,7 @@ struct ArkDeckApp: App {
           .task { await RuntimeReadonlySmoke.run() }
       } else {
         AppShellView(models: models)
+          .preferredColorScheme(WindowFrameEstablisher.requestedColorScheme)
           .onOpenURL(perform: openTrace)
           .overlay(alignment: .bottomTrailing) {
             if ProcessInfo.processInfo.arguments.contains("--ui-test-window-geometry") {
@@ -258,6 +259,45 @@ enum ArkDeckWindow {
   static let traceShortcuts = "arkdeck.window.traceShortcuts"
 }
 
+/// Measure the actual titlebar/toolbar exclusion so the shell's minimum
+/// describes the outer window, not 600pt of content plus window chrome.
+private struct WindowChromeHeight: NSViewRepresentable {
+  let onChange: (CGFloat) -> Void
+
+  func makeNSView(context: Context) -> Probe { Probe(frame: .zero) }
+
+  func updateNSView(_ view: Probe, context: Context) {
+    view.onChange = onChange
+    view.publish()
+  }
+
+  final class Probe: NSView {
+    var onChange: (CGFloat) -> Void = { _ in }
+    private var lastHeight: CGFloat?
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      publish()
+    }
+
+    override func layout() {
+      super.layout()
+      publish()
+    }
+
+    func publish() {
+      Task { @MainActor [weak self] in
+        await Task.yield()
+        guard let self, let window = unsafe self.window else { return }
+        let height = max(0, window.frame.height - window.contentLayoutRect.height)
+        guard lastHeight != height else { return }
+        lastHeight = height
+        onChange(height)
+      }
+    }
+  }
+}
+
 /// Opt-in UI-test observation of the actual window, not a synthetic AppKit
 /// style mask. The actual frame, full-size content and unobscured layout are
 /// separate measurements; none is inferred from a generic title-bar size.
@@ -292,6 +332,11 @@ private struct WindowGeometryEvidence: NSViewRepresentable {
       publish()
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+      super.viewDidChangeEffectiveAppearance()
+      publish()
+    }
+
     func publish() {
       Task { @MainActor [weak self] in
         await Task.yield()
@@ -303,6 +348,8 @@ private struct WindowGeometryEvidence: NSViewRepresentable {
           "frameWidth": frame.width, "frameHeight": frame.height,
           "contentWidth": content.width, "contentHeight": content.height,
           "layoutWidth": layout.width, "layoutHeight": layout.height,
+          "isDark": window.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? 1.0 : 0.0,
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: facts) else { return }
         self.setAccessibilityValue(String(decoding: data, as: UTF8.self))
@@ -340,6 +387,17 @@ private struct WindowFrameEstablisher: NSViewRepresentable {
     else { return nil }
     return CGSize(width: width, height: height)
   }()
+
+  // SwiftUI owns the window appearance; setting NSWindow.appearance once
+  // is overwritten by a subsequent SwiftUI update. Limit this preference to
+  // explicitly configured test windows and leave ordinary windows unchanged.
+  static var requestedColorScheme: ColorScheme? {
+    guard requestedSize != nil else { return nil }
+    let arguments = ProcessInfo.processInfo.arguments
+    if arguments.contains("--ui-test-appearance=dark") { return .dark }
+    if arguments.contains("--ui-test-appearance=light") { return .light }
+    return nil
+  }
 
   let size: CGSize
 
@@ -666,6 +724,7 @@ private struct AppShellView: View {
   private static let resetsShellSelection = ProcessInfo.processInfo.arguments.contains(
     "--ui-test-reset-shell-selection")
   @State private var isJobInspectorExpanded = false
+  @State private var windowChromeHeight: CGFloat = 0
   @State private var renamingDeviceConnectKey: String?
   @State private var pendingDeviceName = ""
   private let models: ArkDeckAppModelStore
@@ -710,7 +769,12 @@ private struct AppShellView: View {
           idealHeight: isJobInspectorExpanded ? 260 : WorkspaceMetrics.jobInspectorBarHeight,
           maxHeight: isJobInspectorExpanded ? 320 : WorkspaceMetrics.jobInspectorBarHeight)
     }
-    .frame(minWidth: 900, minHeight: 600)
+    .frame(minWidth: 900, minHeight: max(0, 600 - windowChromeHeight))
+    .background {
+      WindowChromeHeight { windowChromeHeight = $0 }
+        .frame(width: 0, height: 0)
+        .accessibilityHidden(true)
+    }
     .onAppear {
       applyRequestedNavigation(models.consumeRequestedNavigation())
       AppStartupPerformance.firstWindowAppeared()

@@ -417,8 +417,19 @@ final class AppShellUITests: XCTestCase {
       let app = launch(arguments: [
         "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-devices",
         "--ui-test-window-frame=1180x783", "-AppleLanguages", language,
-        "-AppleInterfaceStyle", language == "(en)" ? "Light" : "Dark",
+        language == "(en)" ? "--ui-test-appearance=light" : "--ui-test-appearance=dark",
       ])
+      let geometry = app.staticTexts["uiTest.windowGeometry"]
+      let expectedDark = language == "(en)" ? 0.0 : 1.0
+      let appearanceMatches = NSPredicate { _, _ in
+        guard let value = geometry.value as? String, let data = value.data(using: .utf8),
+          let facts = try? JSONSerialization.jsonObject(with: data) as? [String: Double]
+        else { return false }
+        return facts["isDark"] == expectedDark
+      }
+      XCTAssertEqual(
+        XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: appearanceMatches, object: nil)],
+          timeout: 5), .completed, "the native window must use the requested test appearance")
       select("app.navigation.history", in: app)
       app.buttons["jobInspector.toggle"].click()
       let read = app.buttons["jobInspector.readLog.fixture-capture.log"]
@@ -455,6 +466,28 @@ final class AppShellUITests: XCTestCase {
         deviceShot.name = "Device scrollable inspector \(language) \(Int(size.width))"
         deviceShot.lifetime = .keepAlways
         add(deviceShot)
+      }
+      app.terminate()
+    }
+  }
+
+  /// Debug currently composes a production read provider even when the
+  /// History and device presentation fixtures are selected. Keep this path
+  /// separate so fixture-only runs never query the installed Runtime.
+  func testDebugAvailabilityAtMinimumWindowInBothLanguages() throws {
+    guard ProcessInfo.processInfo.environment["ARKDECK_REAL_RUNTIME_DEBUG_READONLY_ACCEPTANCE"] == "1"
+    else {
+      throw XCTSkip("Debug availability reads the installed Runtime; explicit read-only acceptance required")
+    }
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-devices",
+        "--ui-test-window-frame=1180x783", "-AppleLanguages", language,
+        language == "(en)" ? "--ui-test-appearance=light" : "--ui-test-appearance=dark",
+      ])
+      defer { app.terminate() }
+      for size in [CGSize(width: 1180, height: 600), CGSize(width: 900, height: 600)] {
+        Self.resizeRecoveryWindow(in: app, to: size)
         select("app.navigation.debug", in: app)
         let commands = app.buttons["debug.tab.commands"]
         XCTAssertTrue(commands.waitForExistenceFast(timeout: 10))
@@ -465,7 +498,6 @@ final class AppShellUITests: XCTestCase {
         debugShot.lifetime = .keepAlways
         add(debugShot)
       }
-      app.terminate()
     }
   }
 
@@ -3298,7 +3330,13 @@ final class AppShellUITests: XCTestCase {
       // changes no measured outcome. It is here because the selection rule is
       // wrong on its own terms, not because a test is red today.
       guard frame.width > 0, frame.height > 0 else { return false }
-      return frame.minX <= targetX && targetX <= frame.maxX
+      guard frame.minX <= targetX && targetX <= frame.maxX else { return false }
+      // Recovery banners, workspace content and the global inspector can
+      // share an x range. Scroll the target's ancestor, not a smaller,
+      // unrelated viewport above it.
+      guard !element.identifier.isEmpty else { return true }
+      return host.descendants(matching: .any)
+        .matching(identifier: element.identifier).firstMatch.exists
     }
     guard
       let host = hosts.min(by: { lhs, rhs in

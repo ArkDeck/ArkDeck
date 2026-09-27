@@ -557,6 +557,9 @@ struct WorkspaceFactRow: View {
     return usesTabularDigits ? WorkspaceFont.tabularValue : WorkspaceFont.body
   }
 
+  // Selectable Text can redraw while its native AX value still describes
+  // the previous record. Bind that value explicitly for every fact update;
+  // keep the native label and text selection intact.
   @ViewBuilder
   private var valueText: some View {
     if let elidedValue {
@@ -565,10 +568,11 @@ struct WorkspaceFactRow: View {
         .lineLimit(1)
         .truncationMode(.middle)
         .help(elidedValue)
-        // Keep Text's native full accessible value. Overriding its label
+        // Keep Text's native label. Overriding it
         // before bridging selectable text can recurse through AppKit's AX
         // label lookup when a hierarchy snapshot visits the elided row.
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .accessibilityValue(value)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier(identifier ?? "")
     } else {
@@ -576,6 +580,7 @@ struct WorkspaceFactRow: View {
         .font(valueFont)
         .fixedSize(horizontal: false, vertical: true)
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
+        .accessibilityValue(value)
         .accessibilityIdentifier(identifier ?? "")
     }
   }
