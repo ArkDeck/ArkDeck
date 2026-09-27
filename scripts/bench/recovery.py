@@ -237,7 +237,9 @@ def assert_quiet_host() -> dict:
     import re
     load = harness.assert_host_is_quiet()
     if load >= 4:
-        raise harness.HostTooBusy("performance measurement requires one-minute load < 4")
+        raise harness.HostTooBusy("performance measurement requires one-minute load < 4",
+                                  facts={"oneMinuteLoad": load, "loadThreshold": 4,
+                                         "processCheckPerformed": False, "conflictingBuildProcesses": None})
     processes = subprocess.run(["ps", "-axo", "comm=,args="], capture_output=True,
                                text=True, check=True, timeout=10)
     for line in processes.stdout.splitlines():
@@ -248,5 +250,9 @@ def assert_quiet_host() -> dict:
         arguments = fields[1] if len(fields) > 1 else ""
         if (command in {"cargo", "rustc", "xcodebuild"}
                 or (command.lower().startswith("python") and re.search(r"(?:^|[ /])plan\.py(?:\s|$)", arguments))):
-            raise harness.HostTooBusy(f"performance measurement refused while {command} is running")
-    return {"oneMinuteLoad": load, "conflictingBuildProcesses": 0}
+            raise harness.HostTooBusy(f"performance measurement refused while {command} is running",
+                                      facts={"oneMinuteLoad": load, "loadThreshold": min(4, harness.quiet_load_ceiling()),
+                                             "processCheckPerformed": True, "conflictingBuildProcesses": None,
+                                             "firstConflictingCommand": command})
+    return {"oneMinuteLoad": load, "conflictingBuildProcesses": 0,
+            "processCheckPerformed": True, "loadThreshold": min(4, harness.quiet_load_ceiling())}

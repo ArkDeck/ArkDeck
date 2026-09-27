@@ -30,7 +30,7 @@ import subprocess
 import tempfile
 import time
 
-from . import clocks, control
+from . import clocks, control, observations
 
 SOCKET_NAME = "agentd.sock"
 # Darwin's sun_path is 104 bytes including the terminator.
@@ -42,6 +42,12 @@ QUIET_LOAD_RATIO = 0.5
 
 class HostTooBusy(RuntimeError):
     """The one-minute load average is too high for a reproducible sample."""
+
+    def __init__(self, message, *, facts=None):
+        super().__init__(message)
+        self.facts = {"oneMinuteLoad": None, "loadThreshold": None,
+                      "processCheckPerformed": None, "conflictingBuildProcesses": None,
+                      **(facts or {})}
 
 
 class DaemonStartFailed(RuntimeError):
@@ -71,7 +77,9 @@ def assert_host_is_quiet() -> float:
             f"({cpu_count()} CPUs x {QUIET_LOAD_RATIO}); a sample taken now will "
             "not reproduce.  Wait for the host to go quiet, or pass "
             "--allow-loaded-host to record an advisory run that is not "
-            "baseline-eligible."
+            "baseline-eligible.",
+            facts={"oneMinuteLoad": one_minute, "loadThreshold": ceiling,
+                   "processCheckPerformed": False, "conflictingBuildProcesses": None},
         )
     return one_minute
 
@@ -357,6 +365,7 @@ def seed_state_directory(
     duration_seconds: int,
     jobs_per_cycle: int,
     restart_interval_seconds: int,
+    *, recorder=None,
 ) -> subprocess.CompletedProcess:
     """Populate a state directory with real terminal Jobs.
 
@@ -367,7 +376,7 @@ def seed_state_directory(
     against an empty store would flatter every projection metric.
     """
 
-    return _run(
+    return observations.seed_process(
         [
             str(soak_executable),
             "--state-directory",
@@ -380,6 +389,7 @@ def seed_state_directory(
             str(jobs_per_cycle),
         ],
         timeout=duration_seconds + 300.0,
+        record=recorder or (lambda entry: None),
     )
 
 
