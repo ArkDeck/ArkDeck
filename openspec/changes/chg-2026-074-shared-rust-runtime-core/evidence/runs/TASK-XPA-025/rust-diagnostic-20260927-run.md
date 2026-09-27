@@ -56,3 +56,15 @@ PR #2274, merge `82f0971ce`. Corrected implementation head `0e9f0ee20` passed
 harness `36291854558`, guard `36291854556`/`36291877285`, and swift aggregate
 `36291854682`. Those results do not turn this interrupted local diagnostic into
 performance qualification. Formal three-run cold/RSS measurement remains pending.
+
+## Reproduction inputs
+
+The exact single-run driver is archived as
+[rust-diagnostic-20260927.py](rust-diagnostic-20260927.py); its SHA-256 and the
+Git object IDs for Rust, bench and the protocol registry are in the build
+provenance. These input objects still match source `82f0971ce`; later evidence
+commits do not change the measured implementation. Invoke with `PYTHONPATH=scripts`
+and three arguments: release daemon, release soak, a new output directory.
+The fixed script refuses an existing output directory and always removes its
+private Runtime root. A repeat requires a separately authorized quiet window
+and a distinct attempt directory; attempt 1 remains archived.
