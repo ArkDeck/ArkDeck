@@ -1,0 +1,38 @@
+[
+  {
+    "file": "python-tests-final.log.gz",
+    "sourceBytes": 8436,
+    "sourceSha256": "edb91992a5634d94534dccfcc105962e467e505d08021c67c331057af77864c0",
+    "storedSha256": "dc73a0c81b273eea5a64945b1eb9aa8cbbae92144cdb89231fe6fba2615617f6"
+  },
+  {
+    "file": "python-tests.log.gz",
+    "sourceBytes": 8435,
+    "sourceSha256": "44fa42264a2d7375c479605ac6e158b79ca6dc000458ff8c500074bd685b7449",
+    "storedSha256": "ccb1986f7ba1bd2cd4447e49faac6df5b04cbdc251e044b9ead8496ce345da4f"
+  },
+  {
+    "file": "run.md",
+    "sourceBytes": 3927,
+    "sourceSha256": "9aec9fddfd249081eda7f8044bb015f763e4ae7210f89ea7e7afbdc6324221d3",
+    "storedSha256": "9aec9fddfd249081eda7f8044bb015f763e4ae7210f89ea7e7afbdc6324221d3"
+  },
+  {
+    "file": "sdd.log.gz",
+    "sourceBytes": 78,
+    "sourceSha256": "77c173762c4c60a0fcd6a3a4c9c36c4a7c095abedaa2b91ba823397a223eb6f0",
+    "storedSha256": "ecd8cba184d0e7f8b803b91f10bd43c327a6be4c5d9014868d7e5c061243106f"
+  },
+  {
+    "file": "targeted-corrected.log.gz",
+    "sourceBytes": 104,
+    "sourceSha256": "65378dcad145da2497120819bebfc3c46534dce9714ce064b3d809a56654aca2",
+    "storedSha256": "afc2806ffad251b2b4edc614ef7612fc3bd1a399d599a33d2cbd588fa7a9cdba"
+  },
+  {
+    "file": "targeted.log.gz",
+    "sourceBytes": 428,
+    "sourceSha256": "32c491cb1dd8c36383f50f2b04d31ea46dfada1a33a048e2098034a64d973acd",
+    "storedSha256": "44bc197e942187d9846c744e9e270aed5d6fb874f823e4d5a86b2b01cb8f03e7"
+  }
+]

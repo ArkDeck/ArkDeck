@@ -648,3 +648,194 @@ class CaptureTraceTests(unittest.TestCase):
         observations = [call.args[0] for call in recorder.call_args_list]
         self.assertEqual(observations[-1]['kind'], 'coldStart')
         self.assertEqual(observations[-1]['milliseconds'], 100)
+
+
+class StartupObservationTests(unittest.TestCase):
+    def setup_start(self, polls, sleeps, clients):
+        clock = {'awake': 100., 'continuous': 1000.}
+        def advance(seconds):
+            clock['awake'] += seconds
+            clock['continuous'] += seconds
+        process = mock.Mock()
+        process.poll.return_value = None
+        def spawn(*args, **kwargs):
+            advance(.002)
+            return process
+        polls, sleeps = iter(polls), iter(sleeps)
+        def exists():
+            present, duration = next(polls)
+            advance(duration)
+            return present
+        requested = []
+        def sleep(seconds):
+            requested.append(seconds)
+            duration, error = next(sleeps)
+            advance(duration)
+            if error:
+                raise error
+        for target, name, replacement in (
+            (clocks, 'awake_seconds', lambda: clock['awake']),
+            (clocks, 'elapsed_seconds', lambda: clock['continuous']),
+            (harness.subprocess, 'Popen', spawn),
+            (pathlib.Path, 'exists', exists),
+            (harness.time, 'sleep', sleep),
+        ):
+            patcher = mock.patch.object(target,name,side_effect=replacement)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        factory = mock.patch.object(control,'ControlClient',side_effect=clients)
+        factory.start()
+        self.addCleanup(factory.stop)
+        runtime = harness.IsolatedRuntime(pathlib.Path('/daemon'),pathlib.Path('/state'),runtime_kind='rust')
+        return runtime, clock, advance, requested, process
+
+    def test_overshoot_connect_and_both_health_calls_remain_in_total(self):
+        client = mock.Mock()
+        runtime, clock, advance, sleeps, _ = self.setup_start(
+            [(False,.003),(False,.004),(True,.001)],[(.007,None),(.011,None)],[client])
+        order = []
+        def step(name, duration):
+            def act(*args):
+                order.append(name)
+                advance(duration)
+            return act
+        client.connect.side_effect = step('connect',.002)
+        client.verify_contract.side_effect = step('contract-health',.013)
+        client.call.side_effect = step('explicit-health',.003)
+        client.close.side_effect = step('close',.005)
+        elapsed = runtime.start()
+        d = runtime.start_diagnostics
+        self.assertAlmostEqual(elapsed,.046)
+        self.assertAlmostEqual(clock['awake']-100.,.051)  # Close stays outside the endpoint.
+        self.assertEqual(d['observationVersion'],'startup-observation-v2')
+        self.assertEqual(d['socketPollCount'],3)
+        self.assertEqual(d['pollSleepCount'],2)
+        for key,value in [('pollSleepTotalSeconds',.018),('pollSleepMaxSeconds',.011),
+                          ('lastSocketNegativeSeconds',.016),('spawnReturnedSeconds',.002),
+                          ('socketObservedSeconds',.028),('connectReturnedSeconds',.030),
+                          ('contractVerifiedSeconds',.043),('healthySeconds',.046)]:
+            self.assertAlmostEqual(d[key],value)
+        self.assertEqual(sleeps,[.001,.001])
+        self.assertEqual(order,['connect','contract-health','explicit-health','close'])
+        client.call.assert_called_once_with('health')
+        client.close.assert_called_once()
+
+    def test_failed_contract_closes_and_retry_does_not_mix_phases(self):
+        first,second = mock.Mock(),mock.Mock()
+        runtime,_,advance,_,_ = self.setup_start(
+            [(True,0),(True,0)],[(.01,None),(.01,None)],[first,second])
+        first.connect.side_effect = lambda: advance(.002)
+        first.verify_contract.side_effect = control.ControlError('wrong contract')
+        second.connect.side_effect = OSError('refused')
+        with self.assertRaises(harness.DaemonStartFailed):
+            runtime.start(budget_seconds=.015)
+        d = runtime.start_diagnostics
+        self.assertEqual(d['connectionAttempts'],2)
+        self.assertEqual(d['connectionFailures'],2)
+        self.assertEqual(d['lastConnectionFailure']['attempt'],2)
+        self.assertEqual(d['lastConnectionFailure']['phase'],'connect')
+        self.assertEqual(d['lastConnectionFailure']['errorType'],'OSError')
+        for key in ('connectReturnedSeconds','contractVerifiedSeconds','healthySeconds'):
+            self.assertNotIn(key,d)
+        self.assertIsNone(d['lastSocketNegativeSeconds'])
+        for client in (first,second):
+            client.close.assert_called_once()
+            client.call.assert_not_called()
+
+    def test_missing_socket_timeout_keeps_observed_sleep_without_connection(self):
+        runtime,_,_,sleeps,_ = self.setup_start([(False,.003)],[(.02,None)],[])
+        with self.assertRaises(harness.DaemonStartFailed):
+            runtime.start(budget_seconds=.01)
+        d = runtime.start_diagnostics
+        self.assertEqual(d['socketPollCount'],1)
+        self.assertEqual(d['connectionAttempts'],0)
+        self.assertAlmostEqual(d['lastSocketNegativeSeconds'],.005)
+        self.assertAlmostEqual(d['pollSleepTotalSeconds'],.02)
+        self.assertNotIn('healthySeconds',d)
+        self.assertEqual(sleeps,[.001])
+
+    def test_interrupted_sleep_records_elapsed_and_preserves_failure(self):
+        runtime,_,_,_,_ = self.setup_start([(False,0)],[(.007,InterruptedError('stop'))],[])
+        with self.assertRaises(InterruptedError):
+            runtime.start()
+        self.assertEqual(runtime.start_diagnostics['pollSleepCount'],1)
+        self.assertAlmostEqual(runtime.start_diagnostics['pollSleepMaxSeconds'],.007)
+        self.assertNotIn('healthySeconds',runtime.start_diagnostics)
+
+    def test_daemon_exit_has_no_fabricated_poll_or_completion(self):
+        runtime,_,_,sleeps,process = self.setup_start([],[],[])
+        process.poll.return_value = process.returncode = 9
+        with self.assertRaisesRegex(harness.DaemonStartFailed,'status 9'):
+            runtime.start()
+        self.assertEqual(runtime.start_diagnostics['socketPollCount'],0)
+        self.assertEqual(runtime.start_diagnostics['pollSleepCount'],0)
+        self.assertEqual(sleeps,[])
+        self.assertNotIn('socketObservedSeconds',runtime.start_diagnostics)
+
+    def test_capture_failure_records_final_diagnostics_once_and_stops(self):
+        recorder = mock.Mock()
+        context = metrics.RunContext(
+            daemon_executable=pathlib.Path('/daemon'),soak_executable=pathlib.Path('/soak'),
+            cold_start_samples=1,ipc_samples=0,idle_seconds=1,calibration_samples=0,
+            seed_seconds=1,seed_jobs_per_cycle=1,capture_recorder=recorder)
+        diagnostics = {'observationVersion':'startup-observation-v2','socketPollCount':4,
+                       'pollSleepTotalSeconds':.123}
+        with mock.patch.object(harness,'seed_state_directory') as seed, \
+             mock.patch.object(harness,'IsolatedRuntime') as factory:
+            seed.return_value.returncode = 0
+            runtime = factory.return_value
+            runtime.start_diagnostics = diagnostics
+            def fail():
+                recorder.assert_not_called()
+                raise harness.DaemonStartFailed('budget')
+            runtime.start.side_effect = fail
+            with self.assertRaises(harness.DaemonStartFailed):
+                metrics.execute_run(context,pathlib.Path('/state'))
+            runtime.stop.assert_called_once()
+        recorder.assert_called_once()
+        entry = recorder.call_args.args[0]
+        self.assertEqual(entry['status'],'FAILED')
+        self.assertEqual(entry['sampleIndex'],0)
+        self.assertEqual(entry['diagnostics'],diagnostics)
+
+    def test_retry_success_preserves_prior_failure_without_skipping_health(self):
+        first,second = mock.Mock(),mock.Mock()
+        runtime,_,advance,sleeps,_ = self.setup_start(
+            [(True,0),(True,0)],[(.006,None)],[first,second])
+        first.connect.side_effect = OSError('not ready')
+        second.connect.side_effect = lambda: advance(.003)
+        second.verify_contract.side_effect = lambda: advance(.004)
+        second.call.side_effect = lambda *_: advance(.005)
+        elapsed = runtime.start()
+        d = runtime.start_diagnostics
+        self.assertAlmostEqual(elapsed,.020)
+        self.assertEqual(d['connectionAttempts'],2)
+        self.assertEqual(d['connectionFailures'],1)
+        self.assertEqual(d['lastConnectionFailure']['attempt'],1)
+        self.assertAlmostEqual(d['connectReturnedSeconds'],.011)
+        self.assertAlmostEqual(d['contractVerifiedSeconds'],.015)
+        self.assertEqual(sleeps,[.001])
+        second.call.assert_called_once_with('health')
+        for client in (first,second):
+            client.close.assert_called_once()
+
+    def test_unexpected_verification_error_closes_without_retry_or_success(self):
+        client = mock.Mock()
+        runtime,_,_,sleeps,_ = self.setup_start([(True,0)],[],[client])
+        client.verify_contract.side_effect = ValueError('bad decoder')
+        with self.assertRaises(ValueError):
+            runtime.start()
+        client.close.assert_called_once()
+        self.assertEqual(sleeps,[])
+        self.assertNotIn('healthySeconds',runtime.start_diagnostics)
+        client.call.assert_not_called()
+
+    def test_close_error_retains_close_phase_and_cannot_be_measured_success(self):
+        client = mock.Mock()
+        runtime,_,_,_,_ = self.setup_start([(True,0)],[(.02,None)],[client])
+        client.close.side_effect = OSError('close failed')
+        with self.assertRaises(harness.DaemonStartFailed):
+            runtime.start(budget_seconds=.01)
+        self.assertEqual(runtime.start_diagnostics['connectionFailures'],1)
+        self.assertEqual(runtime.start_diagnostics['lastConnectionFailure']['phase'],'close')
+        client.call.assert_called_once_with('health')
