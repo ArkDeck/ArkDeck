@@ -188,7 +188,7 @@ pub use host_store::{
     HostDiagnosticWriter, HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass,
     HostEntryKind, HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal,
     HostJournalAppender, HostReadLock, HostUpdateDownload, HostUploadFile, HostUploadReader,
-    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, PayloadVerification,
     PreparedSessionRemoval, PreparedTraceRemoval, UpdateDownloadError, UploadChunkCheckpoint,
     UploadWritePoint,
 };

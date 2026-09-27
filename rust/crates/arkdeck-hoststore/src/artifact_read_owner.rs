@@ -8,6 +8,9 @@ use std::{
     io,
     path::{Path, PathBuf},
 };
+#[path = "artifact_payload_cache.rs"]
+mod payload_cache;
+use payload_cache::PayloadCache;
 
 const MAX_INDEX: usize = 16 * 1024 * 1024;
 const IMPORT_NAMESPACE: &str = ".imports-v1";
@@ -29,6 +32,7 @@ pub struct ArtifactReadStore {
     pub(crate) path: PathBuf,
     pub(crate) export_lock: std::sync::Mutex<()>,
     trace_retention: std::sync::Mutex<()>,
+    payload_verifications: std::sync::Mutex<PayloadCache>,
     fault: Option<PublicationFault>,
 }
 
@@ -160,6 +164,7 @@ impl ArtifactReadStore {
             path: path.into(),
             export_lock: std::sync::Mutex::new(()),
             trace_retention: std::sync::Mutex::new(()),
+            payload_verifications: std::sync::Mutex::new(PayloadCache::default()),
             fault: None,
         })
     }
@@ -252,7 +257,9 @@ impl ArtifactReadStore {
         let (job, index, rows) = self.index(job_id)?;
         for row in &rows {
             if row["status"].get("published").is_some() {
-                job.verify_payload(
+                self.verify_cached_artifact(
+                    &job,
+                    job_id,
                     row["artifactID"].as_str().ok_or_else(corrupt)?,
                     row["byteCount"].as_u64().ok_or_else(corrupt)?,
                     row["sha256"].as_str().ok_or_else(corrupt)?,
@@ -550,7 +557,9 @@ impl ArtifactReadStore {
         // Match list/inspect fail-closed behavior for other indexed publications.
         for other in &rows {
             if other["artifactID"] != artifact_id && other["status"].get("published").is_some() {
-                job.verify_payload(
+                self.verify_cached_artifact(
+                    &job,
+                    job_id,
                     other["artifactID"].as_str().ok_or_else(corrupt)?,
                     other["byteCount"].as_u64().ok_or_else(corrupt)?,
                     other["sha256"].as_str().ok_or_else(corrupt)?,
@@ -558,7 +567,9 @@ impl ArtifactReadStore {
             }
         }
         let digest = row["sha256"].as_str().ok_or_else(corrupt)?;
-        let bytes = job.verify_payload_range(artifact_id, length, digest, offset, maximum_bytes)?;
+        let bytes = self.with_payload_verification(job_id, artifact_id, |cached| {
+            job.read_cached_payload(artifact_id, length, digest, (offset, maximum_bytes), cached)
+        })?;
         self.unchanged(job_id, &job, &index)?;
         let next_offset = offset + bytes.len() as u64;
         Ok((

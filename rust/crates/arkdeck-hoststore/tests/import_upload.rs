@@ -1160,6 +1160,8 @@ fn receipt_identity_digest_generation_and_validation_corruption_cannot_supply_by
     let done = commit(&store, &artifacts, id).unwrap();
     let path = fixture.record("receipt");
     let original = read(&path);
+    let request =
+        json!({"owner":{"kind":"import","id":id},"artifactId":done["receipt"]["artifactId"]});
     for (key, value) in [
         (
             "importId",
@@ -1173,6 +1175,14 @@ fn receipt_identity_digest_generation_and_validation_corruption_cannot_supply_by
         ("validation", json!({"kind":"hap","container":"other"})),
         ("bindingRevision", json!("8")),
     ] {
+        // Warm both the Import inventory and range paths before each attack.
+        // A cached payload hash must never substitute for this request's receipt.
+        fs::write(&path, serde_json::to_vec(&original).unwrap()).unwrap();
+        for _ in 0..2 {
+            store
+                .artifact_resource(&artifacts, "artifact.read", request.as_object().unwrap())
+                .unwrap();
+        }
         let mut changed = original.clone();
         changed["receipt"][key] = value;
         fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
@@ -1336,6 +1346,16 @@ fn release_is_durable_idempotent_and_preserves_historical_artifact_reads() {
     let id = begin["importId"].as_str().unwrap();
     append(&store, id, 0, bytes).unwrap();
     let committed = commit(&store, &artifacts, id).unwrap();
+    let request =
+        json!({"owner":{"kind":"import","id":id},"artifactId":committed["receipt"]["artifactId"]});
+    // Retention and lease state must change even after payload verification hits.
+    for _ in 0..2 {
+        let before = store
+            .artifact_resource(&artifacts, "artifact.inspect", request.as_object().unwrap())
+            .unwrap();
+        assert!(before["lease"].is_string());
+        assert_eq!(before["retention"]["pinned"], true);
+    }
     assert_eq!(
         lifecycle(
             &store,
@@ -1379,8 +1399,6 @@ fn release_is_durable_idempotent_and_preserves_historical_artifact_reads() {
         .code,
         "resourceConflict"
     );
-    let request =
-        json!({"owner":{"kind":"import","id":id},"artifactId":committed["receipt"]["artifactId"]});
     let inspected = store
         .artifact_resource(&artifacts, "artifact.inspect", request.as_object().unwrap())
         .unwrap();

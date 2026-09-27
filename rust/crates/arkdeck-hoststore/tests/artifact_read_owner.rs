@@ -210,6 +210,69 @@ fn digest_corruption_outside_requested_range_and_linked_payloads_are_refused() {
     assert!(f.store().read("JOB-1", &id, 0, 1, false).is_err());
     assert_eq!(fs::read(&original).unwrap(), b"abcdeX");
 }
+
+#[test]
+fn warm_payload_proofs_preserve_privacy_metadata_and_unselected_integrity_checks() {
+    let mut f = Fixture::new();
+    let id = f.add("a", b"abcdefgh");
+    let other = f.add("b", b"second");
+    let store = f.store();
+    // list and read share the same store-generation proofs.
+    store.list("JOB-1").unwrap();
+    assert_eq!(store.read("JOB-1", &id, 0, 1, false).unwrap().bytes, b"a");
+    f.rows[0]["privacy"] = json!("sensitive");
+    f.save();
+    assert_eq!(
+        store.read("JOB-1", &id, 0, 1, false).unwrap_err().kind(),
+        ErrorKind::PermissionDenied
+    );
+    assert_eq!(store.read("JOB-1", &id, 0, 1, true).unwrap().bytes, b"a");
+    let original = f.rows[0]["sha256"].clone();
+    f.rows[0]["sha256"] = json!("0".repeat(64));
+    f.save();
+    assert!(store.read("JOB-1", &id, 0, 1, true).is_err());
+    f.rows[0]["sha256"] = original;
+    f.save();
+    store.read("JOB-1", &id, 0, 1, true).unwrap();
+    let other_path = f.root.join("JOB-1").join(other);
+    fs::set_permissions(&other_path, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&other_path, b"tamper").unwrap();
+    fs::set_permissions(&other_path, fs::Permissions::from_mode(0o400)).unwrap();
+    assert!(store.read("JOB-1", &id, 0, 1, true).is_err());
+}
+
+#[test]
+fn warm_proofs_rehash_same_byte_replacements_and_refuse_hidden_writes_and_directory_swap() {
+    use std::{fs::OpenOptions, os::unix::fs::FileExt};
+    let mut f = Fixture::new();
+    let id = f.add("a", b"abcdefgh");
+    let path = f.root.join("JOB-1").join(&id);
+    let store = f.store();
+    store.read("JOB-1", &id, 0, 1, false).unwrap();
+    fs::rename(&path, f.root.join("retained-original")).unwrap();
+    fs::write(&path, b"abcdefgh").unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+    assert_eq!(store.read("JOB-1", &id, 2, 3, false).unwrap().bytes, b"cde");
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let writer = OpenOptions::new().write(true).open(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+    store.read("JOB-1", &id, 0, 1, false).unwrap();
+    let modified = writer.metadata().unwrap().modified().unwrap();
+    writer.write_all_at(b"X", 7).unwrap();
+    writer
+        .set_times(fs::FileTimes::new().set_modified(modified))
+        .unwrap();
+    assert!(store.read("JOB-1", &id, 0, 1, false).is_err());
+    writer.write_all_at(b"h", 7).unwrap();
+    store.read("JOB-1", &id, 0, 1, false).unwrap();
+    // A path with identical indexed bytes cannot replace this store's root.
+    let moved = f.root.with_extension("retained");
+    fs::rename(&f.root, &moved).unwrap();
+    fs::DirBuilder::new().mode(0o700).create(&f.root).unwrap();
+    assert!(store.read("JOB-1", &id, 0, 1, false).is_err());
+    fs::remove_dir(&f.root).unwrap();
+    fs::rename(moved, &f.root).unwrap();
+}
 #[test]
 fn unicode_equivalent_names_and_corrupt_unselected_rows_fail_closed() {
     let mut f = Fixture::new();

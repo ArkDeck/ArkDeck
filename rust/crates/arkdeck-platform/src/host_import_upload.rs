@@ -44,14 +44,6 @@ fn full_sync(file: &File) -> io::Result<()> {
     }
     Ok(())
 }
-fn file_stat(file: &File) -> io::Result<libc::stat> {
-    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
-    // SAFETY: one valid retained descriptor and a correctly-sized output.
-    if unsafe { libc::fstat(file.as_raw_fd(), stat.as_mut_ptr()) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(unsafe { stat.assume_init() })
-}
 fn same(a: &libc::stat, b: &libc::stat) -> bool {
     a.st_dev == b.st_dev
         && a.st_ino == b.st_ino

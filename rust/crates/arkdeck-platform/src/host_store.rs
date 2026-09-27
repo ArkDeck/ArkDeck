@@ -8,6 +8,9 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
 pub struct HostDirectory(File, Ownership);
+#[path = "host_payload_verification.rs"]
+mod payload_verification;
+pub use payload_verification::PayloadVerification;
 #[path = "host_import_upload.rs"]
 mod import_upload;
 pub use import_upload::{
@@ -61,6 +64,15 @@ pub struct HostFileIdentity {
     pub modified: (i64, i64),
     /// Seconds and nanoseconds since 1970.
     pub changed: (i64, i64),
+}
+
+fn file_stat(file: &File) -> io::Result<libc::stat> {
+    let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+    // SAFETY: one valid retained descriptor and a correctly-sized output.
+    if unsafe { libc::fstat(file.as_raw_fd(), stat.as_mut_ptr()) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(unsafe { stat.assume_init() })
 }
 
 impl HostFileIdentity {
