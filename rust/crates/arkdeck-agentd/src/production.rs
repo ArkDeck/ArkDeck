@@ -723,6 +723,13 @@ pub(crate) fn compose(
                 &arkforge.runtime_directory,
             ),
         ));
+    let host = crate::arkforge_execution::install(
+        host,
+        &arkforge,
+        &layout.state,
+        &layout.application_support,
+        arkdeck_platform::usb_host_devices,
+    );
     for (name, owner) in &inputs.unread {
         omitted.push(format!(
             "{owner}: {name} is set, but this Runtime has not ported that owner yet"

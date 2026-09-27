@@ -13,8 +13,8 @@
 //! signs the StepPermits that let the daemon write, `managed_control` builds
 //! the receipts this authority answers the daemon's control requests with,
 //! and `authority_support` the key that binds this authority build to an
-//! executable plan; the controller surface that plans and drives a Job
-//! follows in later slices.
+//! executable plan. `LaneHost` materializes and starts one correlated Job,
+//! then drives that same Job after the Runtime persists and authorizes it.
 
 #![forbid(unsafe_code)]
 
@@ -25,8 +25,13 @@ mod flash_lane;
 pub mod flash_session;
 #[cfg(target_os = "macos")]
 mod lane;
+mod lane_client;
+mod lane_host;
+mod lane_plan;
 mod loader;
 pub mod managed_control;
+
+pub use lane_client::NativeLaneConnections;
 
 pub use device_access::{
     DEVICE_ACCESS_TIMEOUT, DeviceAccessFailure, DeviceAccessObserver, DeviceMode,
@@ -42,6 +47,8 @@ pub use lane::{
     NATIVE_ROCKUSB_TOOLCHAIN, RETIRED_KEYS, daemon_arguments, device_profile_selector,
     verify_readiness,
 };
+pub use lane_host::{ExecutionClient, LaneConnections, LaneHost};
+pub use lane_plan::{AssessmentSource, PlanSource};
 pub use loader::{
     LOADER_OBSERVATION_TIMEOUT, SelectionFailure, confirm_loader, select, topology_digest,
     usable_loader,

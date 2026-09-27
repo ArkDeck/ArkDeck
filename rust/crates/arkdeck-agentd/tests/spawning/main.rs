@@ -53,6 +53,7 @@ mod managed_hdc;
 
 mod app_ingress_fake_hdc;
 mod debug_read_control;
+mod flash_execution_control;
 mod flash_host_facts_control;
 mod managed_hdc_server;
 mod target_observation_control;

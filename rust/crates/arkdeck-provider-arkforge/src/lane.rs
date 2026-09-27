@@ -14,6 +14,7 @@
 
 use arkdeck_contract::{arkforge_bundle, sha256_hex};
 use arkdeck_platform::{ManagedServer, ServerStop, VerifiedTool};
+use arkforge_authority_api::{ControllerPairingSecret, PairingEpoch};
 use arkforge_client::{ControllerClient, PublicClient, PublicRuntimeInfo};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -250,6 +251,8 @@ pub struct Lane {
     profile_reference: String,
     daemon_sha256: String,
     campaign: String,
+    secret: ControllerPairingSecret,
+    authority_support: crate::authority_support::Configuration,
 }
 
 impl Lane {
@@ -329,6 +332,12 @@ impl Lane {
             profile_reference: format!("{id}@{version}"),
             daemon_sha256: inputs.daemon_sha256.to_lowercase(),
             campaign: inputs.campaign.clone(),
+            secret: ControllerPairingSecret::new(PairingEpoch(pairing_epoch), secret.to_vec()),
+            authority_support: crate::authority_support::Configuration::new(
+                authority_implementation_sha256,
+                managed_control_tool_sha256,
+                &inputs.campaign,
+            ),
         };
         let refuse = |lane: Self, detail: String| {
             lane.stop();
@@ -406,6 +415,18 @@ impl Lane {
     /// The runtime directory whose sockets the daemon serves.
     pub fn runtime_directory(&self) -> &Path {
         &self.runtime_directory
+    }
+
+    /// The execution host for this owned generation. The pairing secret is
+    /// retained only in memory; it is never reconstructed from persisted Jobs
+    /// or from caller-supplied authority records.
+    pub fn execution_host(&self, connections: Box<dyn crate::LaneConnections>) -> crate::LaneHost {
+        crate::LaneHost::new(
+            connections,
+            self.daemon_sha256.clone(),
+            self.authority_support.clone(),
+            self.secret.clone(),
+        )
     }
 
     /// Stops the owned generation, once: its end of input, then TERM to its
