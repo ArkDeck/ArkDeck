@@ -1,0 +1,239 @@
+{
+  "purpose": "formal-scale single capture; retain all obtained evidence",
+  "baselineAdoption": false,
+  "originalExitCode": 0,
+  "toolVerdict": "PASS",
+  "baselineEligible": false,
+  "measuredMetricCount": 9,
+  "gapCount": 16,
+  "runs": [
+    {
+      "runIndex": 0,
+      "actualSeedTotal": 20,
+      "jobStates": {
+        "cancelled": 2,
+        "succeeded": 18
+      },
+      "activeJobCount": 0,
+      "returnedFirstPageCount": 20,
+      "sampleCounts": {
+        "calibration.busyLoop": 200,
+        "daemon.coldStart": 50,
+        "daemon.idleCpuPercent": 545,
+        "daemon.idleOpenFileDescriptorCount": 545,
+        "daemon.idleThreadCount": 545,
+        "daemon.residentSetPlateau": 545,
+        "ipc.health": 1000,
+        "ipc.jobList": 1000,
+        "ipc.jobStatus": 1000
+      },
+      "idleLastStartSeconds": 600.4161394168623,
+      "idleLastFinishSeconds": 600.4374615419656,
+      "rssMinBytes": 21397504,
+      "rssMaxBytes": 21397504,
+      "releaseObserved": false,
+      "processReferenceCleared": true,
+      "ownedRootAbsent": true
+    },
+    {
+      "runIndex": 1,
+      "actualSeedTotal": 20,
+      "jobStates": {
+        "cancelled": 2,
+        "succeeded": 18
+      },
+      "activeJobCount": 0,
+      "returnedFirstPageCount": 20,
+      "sampleCounts": {
+        "calibration.busyLoop": 200,
+        "daemon.coldStart": 50,
+        "daemon.idleCpuPercent": 545,
+        "daemon.idleOpenFileDescriptorCount": 545,
+        "daemon.idleThreadCount": 545,
+        "daemon.residentSetPlateau": 545,
+        "ipc.health": 1000,
+        "ipc.jobList": 1000,
+        "ipc.jobStatus": 1000
+      },
+      "idleLastStartSeconds": 600.3843349588569,
+      "idleLastFinishSeconds": 600.4052169169299,
+      "rssMinBytes": 21348352,
+      "rssMaxBytes": 21348352,
+      "releaseObserved": false,
+      "processReferenceCleared": true,
+      "ownedRootAbsent": true
+    },
+    {
+      "runIndex": 2,
+      "actualSeedTotal": 20,
+      "jobStates": {
+        "cancelled": 2,
+        "succeeded": 18
+      },
+      "activeJobCount": 0,
+      "returnedFirstPageCount": 20,
+      "sampleCounts": {
+        "calibration.busyLoop": 200,
+        "daemon.coldStart": 50,
+        "daemon.idleCpuPercent": 545,
+        "daemon.idleOpenFileDescriptorCount": 545,
+        "daemon.idleThreadCount": 545,
+        "daemon.residentSetPlateau": 545,
+        "ipc.health": 1000,
+        "ipc.jobList": 1000,
+        "ipc.jobStatus": 1000
+      },
+      "idleLastStartSeconds": 600.4114074171521,
+      "idleLastFinishSeconds": 600.4325366672128,
+      "rssMinBytes": 21331968,
+      "rssMaxBytes": 21331968,
+      "releaseObserved": false,
+      "processReferenceCleared": true,
+      "ownedRootAbsent": true
+    }
+  ],
+  "quietChecks": {
+    "count": 1947,
+    "minimumLoad": 1.21435546875,
+    "maximumLoad": 3.6357421875
+  },
+  "remainingOwnedProcesses": [],
+  "ownedStateDirectoryEmpty": true,
+  "fixedInputsVerified": true,
+  "metricSummary": {
+    "calibration.busyLoop": {
+      "perRunP95": [
+        1.860292162746191,
+        1.8637501634657383,
+        1.849000109359622
+      ],
+      "aggregate": {
+        "p50": 1.8469591159373522,
+        "p95": 1.860292162746191,
+        "p99": 1.86625006608665
+      },
+      "p95SpreadRatio": 0.007929,
+      "stable": true
+    },
+    "daemon.coldStart": {
+      "perRunP95": [
+        30.096415895968676,
+        33.79820799455047,
+        30.121166026219726
+      ],
+      "aggregate": {
+        "p50": 28.454832965508103,
+        "p95": 30.121166026219726,
+        "p99": 72.9598340112716
+      },
+      "p95SpreadRatio": 0.122897,
+      "stable": true
+    },
+    "daemon.idleCpuPercent": {
+      "perRunP95": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "aggregate": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "p95SpreadRatio": 0.0,
+      "stable": true
+    },
+    "daemon.idleOpenFileDescriptorCount": {
+      "perRunP95": [
+        44.0,
+        44.0,
+        44.0
+      ],
+      "aggregate": {
+        "p50": 44.0,
+        "p95": 44.0,
+        "p99": 44.0
+      },
+      "p95SpreadRatio": 0.0,
+      "stable": true
+    },
+    "daemon.idleThreadCount": {
+      "perRunP95": [
+        2.0,
+        2.0,
+        2.0
+      ],
+      "aggregate": {
+        "p50": 2.0,
+        "p95": 2.0,
+        "p99": 2.0
+      },
+      "p95SpreadRatio": 0.0,
+      "stable": true
+    },
+    "daemon.residentSetPlateau": {
+      "perRunP95": [
+        21397504.0,
+        21348352.0,
+        21331968.0
+      ],
+      "aggregate": {
+        "p50": 21348352.0,
+        "p95": 21348352.0,
+        "p99": 21348352.0
+      },
+      "p95SpreadRatio": 0.00307,
+      "stable": true
+    },
+    "ipc.health": {
+      "perRunP95": [
+        0.08420809172093868,
+        0.09116693399846554,
+        0.08220807649195194
+      ],
+      "aggregate": {
+        "p50": 0.06970809772610664,
+        "p95": 0.08420809172093868,
+        "p99": 0.09791692718863487
+      },
+      "p95SpreadRatio": 0.10639,
+      "stable": true
+    },
+    "ipc.jobList": {
+      "perRunP95": [
+        15.747583005577326,
+        16.566417180001736,
+        14.73079202696681
+      ],
+      "aggregate": {
+        "p50": 13.508000178262591,
+        "p95": 15.747583005577326,
+        "p99": 16.6120829526335
+      },
+      "p95SpreadRatio": 0.116566,
+      "stable": true
+    },
+    "ipc.jobStatus": {
+      "perRunP95": [
+        0.40258304215967655,
+        0.4448750987648964,
+        0.3955001011490822
+      ],
+      "aggregate": {
+        "p50": 0.3328330349177122,
+        "p95": 0.40258304215967655,
+        "p99": 0.4807498771697283
+      },
+      "p95SpreadRatio": 0.122645,
+      "stable": true
+    }
+  },
+  "steady": {
+    "blockedBy": "complete phase observations in every run",
+    "designRow": "I.2 row 8 (idle resource footprint)",
+    "partialMeasurement": null,
+    "reason": "not measured in runs [0, 1, 2]: no qualifying release observed in the fixed idle window; post-release RSS is not measured",
+    "status": "NOT_MEASURED"
+  },
+  "verifiedAtUtc": "2026-09-27T11:07:43.295096+00:00"
+}
