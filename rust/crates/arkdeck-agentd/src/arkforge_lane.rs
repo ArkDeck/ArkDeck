@@ -79,11 +79,13 @@ impl Composed {
 
     /// Swift's lane plan previewer, composed only with a lane: the profile
     /// the lane was composed for (`main.swift` 1410-1414).
-    pub(crate) fn lane_plan_preview(&self) -> Option<String> {
-        self.lane
-            .as_ref()
-            .ok()
-            .map(|lane| lane.profile_reference().to_owned())
+    pub(crate) fn lane_plan_preview(
+        &self,
+    ) -> Option<std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>> {
+        self.lane.as_ref().ok().map(|lane| {
+            std::sync::Arc::new(lane.preview_host())
+                as std::sync::Arc<dyn arkdeck_provider_arkforge::LanePlanPreview>
+        })
     }
 
     /// Stops the lane's daemon, once, after the owner's drain.

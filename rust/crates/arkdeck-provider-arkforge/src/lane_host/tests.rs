@@ -14,6 +14,7 @@ struct Script {
     calls: Vec<String>,
     fault: String,
     imported: bool,
+    preview: bool,
     start_failure: bool,
     poll_failure: bool,
     outcome: String,
@@ -70,9 +71,19 @@ impl PlanSource for Port {
             "materialize:{}:{}",
             self.public, input.authority_support_state
         ));
-        assert_eq!(input.stable_identity_sha256, &[0xaa; 32]);
-        assert_eq!(input.binding_id, "TGT-1");
-        assert_eq!(input.binding_revision, 4);
+        if script.preview {
+            assert_eq!(
+                hex(input.stable_identity_sha256),
+                arkdeck_contract::sha256_hex(b"17956864")
+            );
+            assert_eq!(input.binding_id, "PREVIEW-555555555555");
+            assert_eq!(input.binding_revision, 1);
+            assert_eq!(input.execution_purpose, "primaryFlash");
+        } else {
+            assert_eq!(input.stable_identity_sha256, &[0xaa; 32]);
+            assert_eq!(input.binding_id, "TGT-1");
+            assert_eq!(input.binding_revision, 4);
+        }
         let assessment = Assessment {
             mechanics_maturity_key_sha256: "bb".repeat(32),
             mechanics_maturity_state: "hardwareCampaign".into(),
@@ -88,7 +99,15 @@ impl PlanSource for Port {
             match script.fault.as_str() {
                 "pending-seal" => assessment.authority_support_key_sha256 = "cc".repeat(32),
                 "mechanics-key" => assessment.mechanics_maturity_key_sha256 = "cc".repeat(32),
-                "mechanics-gated" => assessment.mechanics_maturity_state = "hardwareGated".into(),
+                "mechanics-gated" => {
+                    assessment.mechanics_maturity_state = "hardwareGated".into();
+                    assessment.availability = "unavailable".into();
+                    assessment.unavailable_reason = "maturity is hardwareGated".into();
+                    assessment.unknowns = vec![KeyValue {
+                        key: "RK-M02".into(),
+                        value: "hardwareGated".into(),
+                    }];
+                }
                 _ => {}
             }
             return Ok(MaterializePlanResponse::Assessment(assessment));
@@ -127,7 +146,12 @@ impl AssessmentSource for Port {
     fn discover(&mut self) -> Result<Vec<DeviceObservationView>, String> {
         PlanSource::discover(self)
     }
-    fn assess(&mut self, _: &str, _: &str, _: &str) -> Result<MaterializePlanResponse, String> {
+    fn assess(
+        &mut self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<MaterializePlanResponse, crate::AssessmentFailure> {
         let mut script = self.script.lock().unwrap();
         script.calls.push("materialize:true:".into());
         if script.fault == "public-plan" {
@@ -214,7 +238,7 @@ impl ControlPerformer for NeverPerform {
 }
 
 struct Connections(Arc<Mutex<Script>>);
-impl LaneConnections for Connections {
+impl super::PlanConnections for Connections {
     fn controller(&self) -> Result<Box<dyn PlanSource>, String> {
         Ok(Box::new(Port {
             script: Arc::clone(&self.0),
@@ -227,6 +251,8 @@ impl LaneConnections for Connections {
             public: true,
         }))
     }
+}
+impl LaneConnections for Connections {
     fn execution(&self) -> Result<Box<dyn ExecutionClient>, String> {
         Ok(Box::new(Port {
             script: Arc::clone(&self.0),
@@ -481,4 +507,133 @@ fn persisted_correlation_is_checked_before_polling_and_terminal_observation_is_p
     ));
     assert_eq!(&script.lock().unwrap().calls[calls.len()..], ["poll"]);
     assert!(lane.completed_plan_receipt("JOB-1").is_none());
+}
+
+#[test]
+fn preview_materializes_read_only_and_preserves_structured_refusals() {
+    use crate::{LanePlanPreview, LanePreview, LanePreviewHost};
+    for (fault, campaign, state) in [
+        ("", "fixture-campaign", "available"),
+        ("", "", "planNotExecutable"),
+        ("public-plan", "fixture-campaign", "planNotExecutable"),
+        ("observation", "fixture-campaign", "planNotExecutable"),
+        ("pending-plan", "fixture-campaign", "planNotExecutable"),
+        ("pending-seal", "fixture-campaign", "planNotExecutable"),
+        ("mechanics-key", "fixture-campaign", "planNotExecutable"),
+        ("mechanics-gated", "fixture-campaign", "planNotExecutable"),
+        (
+            "final-mechanics-key",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+        (
+            "final-mechanics-state",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+        (
+            "final-mechanics-campaign",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+        (
+            "final-authority-key",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+        (
+            "final-authority-state",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+        (
+            "final-authority-campaign",
+            "fixture-campaign",
+            "planNotExecutable",
+        ),
+    ] {
+        let script = Arc::new(Mutex::new(Script {
+            imported: true,
+            preview: true,
+            fault: fault.into(),
+            ..Script::default()
+        }));
+        let preview = LanePreviewHost::new(
+            Box::new(Connections(script.clone())),
+            Configuration::new(&"22".repeat(32), &"33".repeat(32), campaign),
+            "org.openharmony.dayu200".into(),
+        );
+        let result = preview.preview(&"55".repeat(32), "17956864");
+        match result {
+            LanePreview::Available {
+                plan_id,
+                plan_sha256,
+                observation_mode,
+            } => {
+                assert_eq!(state, "available", "{fault}");
+                assert_eq!(plan_id, "PLAN-1");
+                assert_eq!(plan_sha256, "11".repeat(32));
+                assert_eq!(observation_mode, "rockusb-loader");
+                assert_eq!(
+                    script.lock().unwrap().calls,
+                    [
+                        "inspect:false",
+                        "inspect:true",
+                        "discover:true",
+                        "materialize:true:",
+                        "discover:false",
+                        "materialize:false:hardwareGated",
+                        "materialize:false:hardwareCampaign",
+                    ]
+                );
+            }
+            LanePreview::PlanNotExecutable {
+                availability,
+                reason,
+                unknowns,
+            } => {
+                assert_eq!(state, "planNotExecutable", "{fault}");
+                assert!(!reason.is_empty());
+                assert!(!availability.is_empty());
+                assert!(!unknowns.is_empty());
+                if fault == "mechanics-gated" {
+                    assert_eq!(availability, "unavailable");
+                    assert_eq!(reason, "maturity is hardwareGated");
+                    assert_eq!(
+                        unknowns.get("RK-M02").map(String::as_str),
+                        Some("hardwareGated")
+                    );
+                }
+                if fault.starts_with("final-") {
+                    assert_eq!(unknowns.len(), 6);
+                }
+                if campaign.is_empty() {
+                    assert!(unknowns.contains_key("RK-A01"));
+                }
+            }
+            other => panic!("unexpected preview {fault}: {other:?}"),
+        }
+        let calls = &script.lock().unwrap().calls;
+        assert!(
+            !calls
+                .iter()
+                .any(|call| matches!(call.as_str(), "import" | "start" | "poll" | "permit"))
+        );
+    }
+}
+
+#[test]
+fn preview_store_miss_never_imports_or_opens_an_assessment() {
+    use crate::{LanePlanPreview, LanePreview, LanePreviewHost};
+    let script = Arc::new(Mutex::new(Script::default()));
+    let preview = LanePreviewHost::new(
+        Box::new(Connections(script.clone())),
+        Configuration::new(&"22".repeat(32), &"33".repeat(32), ""),
+        "org.openharmony.dayu200".into(),
+    );
+    assert_eq!(
+        preview.preview(&"55".repeat(32), "17956864"),
+        LanePreview::BundleNotInLaneStore
+    );
+    assert_eq!(script.lock().unwrap().calls, ["inspect:false"]);
 }

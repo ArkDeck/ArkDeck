@@ -51,11 +51,16 @@ impl HostServices for Facts {
             "observations": [{"identifier": "loader-mode", "status": "unknown"}],
         }))
     }
-    fn flash_lane_plan_preview(&self, target_id: &str) -> Result<Value, WireError> {
+    fn flash_lane_plan_preview(
+        &self,
+        target_id: &str,
+        profile: &str,
+        archive_sha256: &str,
+    ) -> Result<Value, WireError> {
         self.calls
             .lock()
             .unwrap()
-            .push(format!("preview:{target_id}"));
+            .push(format!("preview:{target_id}/{profile}/{archive_sha256}"));
         Ok(json!({"targetId": target_id, "bindingRevision": 2, "state": "laneNotComposed"}))
     }
 }
@@ -211,7 +216,7 @@ fn the_app_names_only_a_target_and_a_profile_and_never_a_board_path_or_command()
 fn the_app_previews_one_archive_for_one_target_and_names_nothing_else() {
     let root = Root::new();
     let (ingress, control, calls) = facts(&root);
-    let digest = "e".repeat(64);
+    let digest = "E".repeat(64);
     let preview = frame(
         "flash.lanePlanPreview",
         json!({"targetId": "TGT-1", "profileReference": "dayu200", "archiveSha256": digest}),
@@ -265,6 +270,9 @@ fn the_app_previews_one_archive_for_one_target_and_names_nothing_else() {
     }
     assert_eq!(
         calls.lock().unwrap().as_slice(),
-        ["preview:TGT-1", "preview:TGT-1"]
+        [
+            format!("preview:TGT-1/dayu200/{}", "e".repeat(64)),
+            format!("preview:TGT-1/dayu200/{}", "e".repeat(64))
+        ]
     );
 }

@@ -28,10 +28,12 @@ mod lane;
 mod lane_client;
 mod lane_host;
 mod lane_plan;
+mod lane_preview;
+pub use lane_preview::{LanePlanPreview, LanePreview, LanePreviewHost};
 mod loader;
 pub mod managed_control;
 
-pub use lane_client::NativeLaneConnections;
+pub use lane_client::{NativeLaneConnections, NativePlanConnections};
 
 pub use device_access::{
     DEVICE_ACCESS_TIMEOUT, DeviceAccessFailure, DeviceAccessObserver, DeviceMode,
@@ -47,8 +49,8 @@ pub use lane::{
     NATIVE_ROCKUSB_TOOLCHAIN, RETIRED_KEYS, daemon_arguments, device_profile_selector,
     verify_readiness,
 };
-pub use lane_host::{ExecutionClient, LaneConnections, LaneHost};
-pub use lane_plan::{AssessmentSource, PlanSource};
+pub use lane_host::{ExecutionClient, LaneConnections, LaneHost, PlanConnections};
+pub use lane_plan::{AssessmentFailure, AssessmentSource, PlanSource};
 pub use loader::{
     LOADER_OBSERVATION_TIMEOUT, SelectionFailure, confirm_loader, select, topology_digest,
     usable_loader,
