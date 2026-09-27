@@ -648,7 +648,8 @@ RUST_POLICY_TOKENS = (
 RUST_WORKSPACE_TOKENS = (
     "    needs: policy\n",
     "      CARGO_BUILD_JOBS: 2\n",
-    "      ARKDECK_RUST_CACHE_ROOT: ${{ runner.temp }}/arkdeck-rust-build\n",
+    'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-build" >> "$GITHUB_ENV"',
+    'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"',
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}\n",
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",

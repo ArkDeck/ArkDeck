@@ -190,9 +190,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       CARGO_BUILD_JOBS: 2
-      ARKDECK_RUST_CACHE_ROOT: ${{ runner.temp }}/arkdeck-rust-build
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
-      ARKDECK_RUST_TEST_REPORT_DIR: ${{ runner.temp }}/rust-test-timings
     steps:
       - name: Checkout exact revision with runner Git
         working-directory: .
@@ -236,6 +234,11 @@ jobs:
       # both the stable source mirror and its products, then synchronize exact
       # checkout bytes without retimestamping unchanged files. Toolchain, image,
       # build flags and dependency manifests must match even for prefix hits.
+      - name: Configure task-owned Rust CI paths
+        run: |
+          echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-build" >> "$GITHUB_ENV"
+          echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"
+
       - name: Identify compatible Rust build products
         id: rust-cache-key
         working-directory: .
