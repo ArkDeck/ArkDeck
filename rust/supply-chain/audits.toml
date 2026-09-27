@@ -115,6 +115,13 @@ start = "2026-07-20"
 end = "2026-07-21"
 notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
 
+[[trusted.sha2-asm]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2024-05-07"
+end = "2024-05-08"
+notes = "Applied after the coordinating task's independent review for TASK-XPA-025 within the user's authorized macOS implementation and PR work. Covers only sha2-asm 0.6.4's UTC publication day, together with deny.toml's exact version and Cargo.lock checksum b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab. Publisher provenance is not a complete source audit or separate per-package user approval. No other-package trust, future publication window or automatic renewal. Final PR CI/review remains required."
+
 [[trusted.syn]]
 criteria = "safe-to-deploy"
 user-id = 3618 # David Tolnay (dtolnay)

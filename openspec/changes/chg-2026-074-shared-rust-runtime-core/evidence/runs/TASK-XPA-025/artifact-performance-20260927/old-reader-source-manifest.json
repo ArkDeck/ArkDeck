@@ -1,0 +1,27 @@
+{
+  "sourceCommit": "56c321bec2c6e0e82a1e4453fc50fc393e370ddf",
+  "files": {
+    "Packages/ArkDeckKit/Contracts/control-protocol.json": "d32c42ebf54e4798adadeb40ddeb12a5e04f741bbb6cf3c01b29d94187027c4f",
+    "rust/tests/fixtures/flash-archive/archives/complete.tar.gz": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "scripts/bench/README.md": "0541fb9e489b238b71efa859aa584fd0008c59f580e76d030d5d7d2b4cadfcb8",
+    "scripts/bench/__init__.py": "62f8de82d66d4c5700630dbdeb7f937424cb5751bb279b986abc12815e09b7f5",
+    "scripts/bench/__main__.py": "8ce865b5c4a3e0cb97d8b4c2096ac683cfd30ec95e2b07f748a5adb317448773",
+    "scripts/bench/artifact.py": "3267f99786010a5c2d075df9303b7f83f9a403684cadd1a52f65e6ffee3c1f74",
+    "scripts/bench/artifact_fixture.py": "e7fa94f300024e376d7d2443cbce32d90e5bfd18bd9ac014bf6bb99bcc8feec0",
+    "scripts/bench/baseline.py": "f60bd1eba430764f50bc05ca9ce016220a6fb81de91fde0e4f2bc7cd0c4627f6",
+    "scripts/bench/baselines/perf-baseline-2026-09-04.json": "607617350591b92842a010414e9b2e6cde3373ca29986e811a38ee9d22ad0a93",
+    "scripts/bench/clocks.py": "f0d741eb61f06e903d58866748fe15b45b60ad5a99b061c1d16eb3c37ad4aab9",
+    "scripts/bench/compare.py": "3c6efa78b2f401e61408099ae6941efd5a4faa6cd892feefbc5f46d2808f4c86",
+    "scripts/bench/control.py": "c8aa8d953d6e7ea8ad650c56a4f88001dac73526c439ec6cde41e341afd1b789",
+    "scripts/bench/harness.py": "416cab70092974ca0269741e9d2d05b46e1a4371a08a7381cc6fc3089df33f04",
+    "scripts/bench/journal.py": "a46697f0bae435b32f6554770884d7d3c2ce62ddcd7a3b3ed37745e83f5c005b",
+    "scripts/bench/metrics.py": "cafc995f751a0657be8f47671fc448e8af5bf8a7e23295291a534ff43192ee64",
+    "scripts/bench/recovery.py": "4700b8936fd688e196495429460e6ce1927472e3e8223a43c3f705156f527903",
+    "scripts/bench/test_artifact.py": "79e6bc880504d5541c097f02f72f37c89eeb5bc2d62f1322412c145aa6147fcd",
+    "scripts/bench/test_baseline.py": "fbba082be500231c8563539cb5b9c035c004f82b1668da7597781ea54dca7c05",
+    "scripts/bench/test_compare.py": "9b8849822d9fc65140cbab5008774053e8ed70e22c5e9ea991d2e750de3ff34c",
+    "scripts/bench/test_harness.py": "d7345eaa1d358c14f1b35a677a7eeeee74126be8295c27415ab3414c1a6a8706",
+    "scripts/bench/test_journal.py": "5fdd1fc14af3e132b616ab702daee3698eed0bc9b8ceaf2f4f922871bb968ba9",
+    "scripts/bench/test_recovery.py": "1b5a65ef1748ecbb4629abade2e349f21685cc291d9326f29cdee9a82dc7a4ac"
+  }
+}

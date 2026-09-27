@@ -1,0 +1,60 @@
+{
+  "kind": "matrixInputs",
+  "functionalOnly": true,
+  "baselineEligible": false,
+  "label": "release-B-1m",
+  "instrumentSource": "78c6ad7d8ff4f6e34f00d0cc76d8df48f4b97ea2",
+  "daemon": "/private/tmp/arkdeck-xpa025-artifact-matrix-20260927/release-B/arkdeck-agentd",
+  "daemonSha256": "51f2a78dad9dcb66d069b015265bf3bcc1d1d2fe4752ab9d3369d90f3cc35cf0",
+  "soak": "/private/tmp/arkdeck-xpa025-artifact-matrix-20260927/release-A/arkdeck-soak",
+  "soakSha256": "29eff21e18bb62cf4b6aeef8b3cb90f4bbf4d3f7259f0ae51715bad023c6b373",
+  "mib": 1,
+  "requireQuiet": false,
+  "cachePolicy": "fresh owner; no OS cache eviction; fixed ordered single samples",
+  "milliseconds": 14.451291994191706,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactReaderVersion": "bounded-incremental-json-v2",
+    "artifactArchiveSha256": "5a721548af8cd1e8d196c51c7a0900f0b738056bf761dc5865ed1566c8b6112d",
+    "artifactTemplateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 1048576,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 1048576,
+      "sha256": "5a721548af8cd1e8d196c51c7a0900f0b738056bf761dc5865ed1566c8b6112d",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 1028096,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 1048576,
+      "actualPageCount": 1,
+      "effectiveBytesPerSecond": 72559325.52061407,
+      "effectiveDecimalMBPerSecond": 72.55932552061407,
+      "effectiveMiBPerSecond": 69.1979651647702,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.028965790988877416,
+          "daemonBytes": 19742720,
+          "clientBytes": 44662784
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 19742720,
+          "sampledPeakBytes": 19742720,
+          "sampledGrowthBytes": 0
+        },
+        "clientBytes": {
+          "baselineBytes": 44662784,
+          "sampledPeakBytes": 44662784,
+          "sampledGrowthBytes": 0
+        }
+      }
+    }
+  }
+}

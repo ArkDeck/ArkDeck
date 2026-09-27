@@ -1,0 +1,70 @@
+{
+  "url": "https://crates.io/api/v1/crates/sha2-asm/0.6.4",
+  "queried_http_date": "Sun, 27 Sep 2026 06:37:32 GMT",
+  "version": {
+    "id": 1137185,
+    "crate": "sha2-asm",
+    "num": "0.6.4",
+    "dl_path": "/api/v1/crates/sha2-asm/0.6.4/download",
+    "readme_path": "/api/v1/crates/sha2-asm/0.6.4/readme",
+    "updated_at": "2024-05-07T16:24:37.057435Z",
+    "created_at": "2024-05-07T16:24:37.057435Z",
+    "downloads": 19344579,
+    "features": {},
+    "yanked": false,
+    "yank_message": null,
+    "lib_links": null,
+    "license": "MIT",
+    "links": {
+      "dependencies": "/api/v1/crates/sha2-asm/0.6.4/dependencies",
+      "version_downloads": "/api/v1/crates/sha2-asm/0.6.4/downloads",
+      "authors": "/api/v1/crates/sha2-asm/0.6.4/authors"
+    },
+    "crate_size": 12581,
+    "published_by": {
+      "id": 5059,
+      "login": "newpavlov",
+      "name": "Artyom Pavlov",
+      "avatar": "https://avatars.githubusercontent.com/u/329626?v=4",
+      "url": "https://github.com/newpavlov",
+      "github_username_matches": true,
+      "created_at": "2010-07-12T13:48:27Z"
+    },
+    "audit_actions": [
+      {
+        "action": "publish",
+        "user": {
+          "id": 5059,
+          "login": "newpavlov",
+          "name": "Artyom Pavlov",
+          "avatar": "https://avatars.githubusercontent.com/u/329626?v=4",
+          "url": "https://github.com/newpavlov",
+          "github_username_matches": true,
+          "created_at": "2010-07-12T13:48:27Z"
+        },
+        "time": "2024-05-07T16:24:37.057435Z"
+      }
+    ],
+    "checksum": "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab",
+    "rust_version": null,
+    "has_lib": true,
+    "bin_names": [],
+    "edition": "2018",
+    "description": "Assembly implementation of SHA-2 compression functions",
+    "homepage": null,
+    "documentation": "https://docs.rs/sha2-asm",
+    "repository": "https://github.com/RustCrypto/asm-hashes",
+    "trustpub_data": null,
+    "linecounts": {
+      "languages": {
+        "Rust": {
+          "code_lines": 53,
+          "comment_lines": 0,
+          "files": 2
+        }
+      },
+      "total_code_lines": 53,
+      "total_comment_lines": 0
+    }
+  }
+}

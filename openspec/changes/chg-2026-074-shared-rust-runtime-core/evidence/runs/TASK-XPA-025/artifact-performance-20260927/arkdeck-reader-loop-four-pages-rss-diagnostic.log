@@ -1,0 +1,15 @@
+loop 0 traced (72680, 26644628) RSS {'daemonBytes': {'baselineBytes': 45613056, 'sampledPeakBytes': 45613056, 'sampledGrowthBytes': 0}, 'clientBytes': {'baselineBytes': 45613056, 'sampledPeakBytes': 45613056, 'sampledGrowthBytes': 0}} gc (461, 9, 0)
+postReadNativeRssKiB 101552
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/control.py:186: size=64.0 KiB (+64.0 KiB), count=1 (+1), average=64.0 KiB
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/decoder.py:337: size=1201 B (+1201 B), count=23 (+23), average=52 B
+<frozen abc>:123: size=503 B (+503 B), count=5 (+5), average=101 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/json/__init__.py:365: size=480 B (+480 B), count=4 (+4), average=120 B
+/private/tmp/arkdeck-reader-loop-four-pages-rss-diagnostic.py:24: size=447 B (+447 B), count=5 (+5), average=89 B
+/private/tmp/arkdeck-reader-loop-four-pages-rss-diagnostic.py:26: size=431 B (+431 B), count=5 (+5), average=86 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:112: size=328 B (+328 B), count=1 (+1), average=328 B
+/private/tmp/arkdeck-reader-loop-four-pages-rss-diagnostic.py:18: size=328 B (+328 B), count=1 (+1), average=328 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/tracemalloc.py:560: size=328 B (+328 B), count=1 (+1), average=328 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/tracemalloc.py:423: size=328 B (+328 B), count=1 (+1), average=328 B
+/opt/homebrew/Cellar/python@3.14/3.14.7/Frameworks/Python.framework/Versions/3.14/lib/python3.14/subprocess.py:555: size=304 B (+304 B), count=3 (+3), average=101 B
+/private/tmp/arkdeck-xpa025-artifact-performance/scripts/bench/artifact.py:159: size=296 B (+296 B), count=3 (+3), average=99 B
+retainedFrames [] count 0

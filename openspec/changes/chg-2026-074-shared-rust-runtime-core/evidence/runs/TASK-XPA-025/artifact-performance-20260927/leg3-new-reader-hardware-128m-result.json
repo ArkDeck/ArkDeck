@@ -1,0 +1,170 @@
+{
+  "kind": "matrixInputs",
+  "functionalOnly": true,
+  "baselineEligible": false,
+  "label": "leg3-new-reader-hardware-128m",
+  "instrumentSource": "78c6ad7d8ff4f6e34f00d0cc76d8df48f4b97ea2",
+  "daemon": "/private/tmp/arkdeck-xpa025-artifact-matrix-20260927/release-B/arkdeck-agentd",
+  "daemonSha256": "51f2a78dad9dcb66d069b015265bf3bcc1d1d2fe4752ab9d3369d90f3cc35cf0",
+  "soak": "/private/tmp/arkdeck-xpa025-artifact-matrix-20260927/release-A/arkdeck-soak",
+  "soakSha256": "29eff21e18bb62cf4b6aeef8b3cb90f4bbf4d3f7259f0ae51715bad023c6b373",
+  "mib": 128,
+  "requireQuiet": false,
+  "cachePolicy": "fresh owner; no OS cache eviction; fixed ordered single samples",
+  "milliseconds": 4964.065291918814,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactReaderVersion": "bounded-incremental-json-v2",
+    "artifactArchiveSha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+    "artifactTemplateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 134217728,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 134217728,
+      "sha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 134187008,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 134217728,
+      "actualPageCount": 32,
+      "effectiveBytesPerSecond": 27037865.158320542,
+      "effectiveDecimalMBPerSecond": 27.037865158320542,
+      "effectiveMiBPerSecond": 25.785317571945708,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.015110292006283998,
+          "daemonBytes": 19906560,
+          "clientBytes": 44548096
+        },
+        {
+          "elapsedSeconds": 0.2404175839619711,
+          "daemonBytes": 41697280,
+          "clientBytes": 53133312
+        },
+        {
+          "elapsedSeconds": 0.4824167089536786,
+          "daemonBytes": 41697280,
+          "clientBytes": 60325888
+        },
+        {
+          "elapsedSeconds": 0.7077222919324413,
+          "daemonBytes": 41697280,
+          "clientBytes": 71827456
+        },
+        {
+          "elapsedSeconds": 0.931611374951899,
+          "daemonBytes": 41713664,
+          "clientBytes": 77447168
+        },
+        {
+          "elapsedSeconds": 1.1475119169335812,
+          "daemonBytes": 41713664,
+          "clientBytes": 88686592
+        },
+        {
+          "elapsedSeconds": 1.3725937500130385,
+          "daemonBytes": 41713664,
+          "clientBytes": 94306304
+        },
+        {
+          "elapsedSeconds": 1.5972458749311045,
+          "daemonBytes": 41730048,
+          "clientBytes": 105545728
+        },
+        {
+          "elapsedSeconds": 1.8226932919351384,
+          "daemonBytes": 41730048,
+          "clientBytes": 111165440
+        },
+        {
+          "elapsedSeconds": 2.048012875020504,
+          "daemonBytes": 41730048,
+          "clientBytes": 122404864
+        },
+        {
+          "elapsedSeconds": 2.2637299170019105,
+          "daemonBytes": 41730048,
+          "clientBytes": 128024576
+        },
+        {
+          "elapsedSeconds": 2.4999123339075595,
+          "daemonBytes": 41730048,
+          "clientBytes": 133644288
+        },
+        {
+          "elapsedSeconds": 2.725155874970369,
+          "daemonBytes": 41730048,
+          "clientBytes": 144883712
+        },
+        {
+          "elapsedSeconds": 2.9643982090055943,
+          "daemonBytes": 41730048,
+          "clientBytes": 150519808
+        },
+        {
+          "elapsedSeconds": 3.180452000000514,
+          "daemonBytes": 41730048,
+          "clientBytes": 161759232
+        },
+        {
+          "elapsedSeconds": 3.406045416952111,
+          "daemonBytes": 41730048,
+          "clientBytes": 167378944
+        },
+        {
+          "elapsedSeconds": 3.631157041992992,
+          "daemonBytes": 41730048,
+          "clientBytes": 178618368
+        },
+        {
+          "elapsedSeconds": 3.850516499951482,
+          "daemonBytes": 41730048,
+          "clientBytes": 184238080
+        },
+        {
+          "elapsedSeconds": 4.072301166947,
+          "daemonBytes": 41730048,
+          "clientBytes": 195477504
+        },
+        {
+          "elapsedSeconds": 4.297181874979287,
+          "daemonBytes": 41746432,
+          "clientBytes": 201097216
+        },
+        {
+          "elapsedSeconds": 4.526296749943867,
+          "daemonBytes": 41746432,
+          "clientBytes": 212336640
+        },
+        {
+          "elapsedSeconds": 4.751583083998412,
+          "daemonBytes": 41746432,
+          "clientBytes": 217956352
+        },
+        {
+          "elapsedSeconds": 4.986229583970271,
+          "daemonBytes": 41762816,
+          "clientBytes": 225968128
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 19906560,
+          "sampledPeakBytes": 41762816,
+          "sampledGrowthBytes": 21856256
+        },
+        "clientBytes": {
+          "baselineBytes": 44548096,
+          "sampledPeakBytes": 225968128,
+          "sampledGrowthBytes": 181420032
+        }
+      }
+    }
+  }
+}
