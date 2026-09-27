@@ -1,0 +1,70 @@
+{
+  "status": "complete",
+  "milliseconds": 1037.1595829492435,
+  "scale": {
+    "artifactFixtureVersion": "input-artifact-stored-gzip-v1",
+    "artifactReaderVersion": "fixed-buffer-chunked-canonical-json-v4",
+    "artifactArchiveSha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+    "artifactTemplateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+    "artifactOwnerKind": "import",
+    "artifactImportKind": "flash-bundle",
+    "artifactPayloadBytes": 134217728,
+    "artifactPageBytes": 4194304,
+    "artifactTimingBoundary": "first-read-through-complete-client-digest-v1",
+    "artifactRssIntervalSeconds": 0.2,
+    "artifactCachePolicy": "fresh-owner-first-read-no-OS-cache-eviction",
+    "artifactEvidence": {
+      "fixtureVersion": "input-artifact-stored-gzip-v1",
+      "byteCount": 134217728,
+      "sha256": "3a6db799b50f87ebe4cd21dc5c691a6f1433e684fdd992bb6388e761bc3b2e7e",
+      "templateSha256": "1e3ab5867689c4059b6c11a080f6496ad5217e1ca3b529ea7388cb3b1657911d",
+      "userdataBytes": 134187008,
+      "gzipEncoding": "stored-deflate-with-bounded-extra",
+      "payloadBytes": 134217728,
+      "actualPageCount": 32,
+      "effectiveBytesPerSecond": 129408945.55333665,
+      "effectiveDecimalMBPerSecond": 129.40894555333665,
+      "effectiveMiBPerSecond": 123.41398768743196,
+      "rssSamples": [
+        {
+          "elapsedSeconds": 0.01368479197844863,
+          "daemonBytes": 20070400,
+          "clientBytes": 47218688
+        },
+        {
+          "elapsedSeconds": 0.2549775829538703,
+          "daemonBytes": 41975808,
+          "clientBytes": 57147392
+        },
+        {
+          "elapsedSeconds": 0.49809712497517467,
+          "daemonBytes": 41992192,
+          "clientBytes": 57147392
+        },
+        {
+          "elapsedSeconds": 0.7374775420175865,
+          "daemonBytes": 41992192,
+          "clientBytes": 57147392
+        },
+        {
+          "elapsedSeconds": 0.9890112919965759,
+          "daemonBytes": 42008576,
+          "clientBytes": 57147392
+        }
+      ],
+      "rssSummary": {
+        "daemonBytes": {
+          "baselineBytes": 20070400,
+          "sampledPeakBytes": 42008576,
+          "sampledGrowthBytes": 21938176
+        },
+        "clientBytes": {
+          "baselineBytes": 47218688,
+          "sampledPeakBytes": 57147392,
+          "sampledGrowthBytes": 9928704
+        }
+      }
+    }
+  },
+  "baselineEligible": false
+}

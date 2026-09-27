@@ -352,8 +352,10 @@ identity, so same-size input byte changes refuse comparison.
 
 The timer starts at the first page read on a contract-verified
 connection and ends after all payload bytes and the final client SHA-256 are
-verified. Connection renewal after 64 requests is included. Every page's actual
-production full-file hash remains in the measured cost. Publication/startup are
+verified. Connection renewal after 64 requests is included. The first production
+full-file hash and subsequent per-page integrity checks remain in the measured
+cost. A missing or invalid sealed-payload cache proof falls back to a full-file
+hash; eligible later pages use the production cache checks. Publication/startup are
 outside the read interval; no warm-up read, first-sample removal, cache eviction
 or subtraction disguises that cost. OS cache state is not claimed as cold.
 Base64 is strictly decoded and checked for canonical encoding, closed frame
