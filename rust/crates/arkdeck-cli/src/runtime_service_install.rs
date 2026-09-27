@@ -13,10 +13,11 @@
 //! - The helper it replaces is kept one generation in
 //!   `Helpers/.rollback/ArkDeckAgent.app` (ruling 4); the exchange is one
 //!   `renamex_np(RENAME_SWAP)`, so the installed path always holds a bundle.
-//! - While an OpenHarmony signing preset is installed it is refused before
-//!   anything changes: Swift re-records the replacement daemon's identity in
-//!   that receipt before launchd starts it, and this CLI has no signing owner
-//!   yet (ruling 3, Q8).
+//! - An existing OpenHarmony signing preset is validated before installation
+//!   changes. After verifying the installed replacement helper, the signing
+//!   owner refreshes its daemon identity under lock before bootstrap. Invalid
+//!   public material refuses early; a refresh failure attempts to restore the
+//!   validated replacement service before reporting the maintenance error.
 //! - The new helper's daemon is asked for the cutover preflight
 //!   (`arkdeck-agentd --cutover-preflight`, read-only): Swift's daemon refuses
 //!   the argument as unknown, the Rust daemon answers. An update to the Rust

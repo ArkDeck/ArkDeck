@@ -3,7 +3,7 @@
 > 状态：草案（2026-09-26 起草，未在真实主机上执行过）。Task：TASK-XPA-017（CHG-2026-074 M5）。
 > 本文只写步骤，不代表任何一步已经执行、已被批准或已通过。源码位置以 `main` `5d42490da`（#2257，已含 #2255 = `8acfe6900`）
 > 为准；
-> 行号可能随后续合入移动，窗口前按附录 A 复核一遍。
+> 签名安装与身份刷新条目已按 `main` `8cdcb78c2`（#2272）复核；其余行号可能随后续合入移动，窗口前按附录 A 复核一遍。
 
 维护者在一个切换窗口里照本文逐步执行：把安装态的 Swift Runtime（Swift daemon + Rust façade 对）换成
 standalone Rust daemon，然后做正式验收。本文不另立验收规则，真机验收照
@@ -339,7 +339,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
 - GJ-2、GJ-3：runbook §3、§4。
 - GJ-4：runbook §5，**维护者 go 之后**才开始；P7 裁决未放行时不开始。若需要命名 campaign，runbook §5 的
   `runtime service update … --arkforge-campaign` 在 Rust daemon 上也会重跑预检（每次装 Rust daemon 都跑，含 Rust→Rust）
-  并重启 daemon，前提是没有在途 Job，且受 P6 签名预设拒绝的约束。这里的 `--daemon` 传已安装 helper 本身
+  并重启 daemon，前提是没有在途 Job，且须通过 P6 的预设公开材料校验与 helper 身份刷新。这里的 `--daemon` 传已安装 helper 本身
   `"$SUPPORT/Helpers/ArkDeckAgent.app"`（与 `$HELPER` 同一份已验证字节），`.rollback` 里的 Swift helper 才不会被 Rust helper
   顶掉（见第 2 步「façade 保留一个周期」）；结束 staging 时照 runbook §5 清回，同样这样传 `--daemon`。
   刷机后重读 `target show` 的 binding revision。
@@ -367,8 +367,10 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 - 执行者：【维护者】本人（两次安装态切换）。
 - 前提：第 5、6 步的记录已落盘；1a 手工预检（此时用 `$HELPER` 里的 Rust agentd）`clear: true`。Rust→Swift 的
   update 走 Swift 安装路径，**不会**自动跑预检（新 helper 的 daemon 以 `unknown argument` exit 64 回答即判为 Swift，
-  `runtime_service_install.rs:812`），所以这里的手工预检是唯一的门。签名预设的拒绝对这次 update 同样生效（P6）：
-  装有预设时 Rust CLI 回滚不了，改用 Swift CLI 的 `runtime service update` 回滚是否可行、是否可接受 **TBD（维护者定）**。
+  `runtime_service_install.rs:812`），所以这里的手工预检是唯一的门。P6 的签名校验与身份刷新对这次 update 同样生效：
+  有效预设不再阻止 Rust CLI 回滚；无效公开材料在安装改动前拒绝。替换后的 helper 验签通过后、bootstrap 前
+  持锁刷新身份，失败按 P6 的恢复启动与错误报告处理。真实 Keychain、所选 Swift 回滚包与安装态连续性仍须在
+  维护者批准的窗口验收；不再要求仅为绕过预设拒绝而改用 Swift CLI。
 - 回滚命令（源用 `$ROLLBACK`，不用 `$SUPPORT/Helpers/.rollback/…`：后者会在这次 update 里被当前 Rust helper 顶替）：
 
   ```sh
@@ -456,7 +458,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 | 安装态路径（plist、`Helpers/ArkDeckAgent.app`、`Helpers/.rollback/`、`LaunchAgent/cutover-snapshots`、`install-receipt.json`、`Signing/OpenHarmony/preset-v1.json`、`Agentd`、socket、日志） | `rust/crates/arkdeck-cli/src/runtime_service.rs:119-138` |
 | plist 渲染（`Label`、`ProgramArguments`、`MachServices`）与切换时加 `ARKDECK_RUNTIME_COMPOSITION=production` | `rust/crates/arkdeck-cli/src/runtime_service_install.rs:1071`、`:1128-1130`、`:1132-1147` |
 | `ProgramArguments` 选 daemon 还是 façade | `runtime_service.rs:673-685`；`runtime_service_install.rs:552-554` |
-| 签名预设在任何改动前拒绝（exit 69） | `runtime_service_install.rs:442-455` |
+| 签名预设公开材料在安装改动前校验；无效材料拒绝（exit 69）；替换后持锁刷新身份，失败尝试恢复启动后报告 | `runtime_service_install.rs` 的 `validate_signing_refresh` 与 `install` 中 `refresh_signing_access` 分支；`signing_leaves.rs` 的 `validate_refresh` / `refresh_installed_identity` |
 | 已退役的 `--arkforged`/`--arkforged-sha256`/`--arkforge-profile` | `runtime_service_install.rs:387-395` |
 | `runtime service update/restart/status/verify/uninstall` 的选项表（Swift 注册表副本） | `rust/crates/arkdeck-cli/src/command_registry.json:953`、`:1020`、`:1073`、`:1188`、`:1241` |
 | `flash bind-loader`（`--target`、`--expected-binding-revision` 均必填） | `command_registry.json:20059` |
@@ -495,7 +497,7 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 2. P3/Q11：发布包是否公证。`build-local-helpers.sh` 已提供 `ARKDECK_HELPER_RUNTIME=rust`，构建带本地开发标记的 provisioned Debug helper，保留经校验的 Swift 回滚包；它只用于当前 Mac，不替代正式发布所需的公证。见 `evidence/runs/TASK-XPA-017/local-rust-helper-build-run.md`。采用哪种产物开窗仍由维护者决定。
 3. P4：20b Rust 基线是否为开窗条件。
 4. P5：4h soak 是否要在窗口所用提交上重跑。
-5. P6/S-1：签名写路径（S-1/S-2）；有签名预设的主机在 Rust 签名 owner 落地前 update 会被拒。
+5. P6/S-1：Rust 签名写路径与 helper 身份刷新已在 #2272 合入，已有预设不再构成一律拒绝；真实 Keychain、安装态身份刷新与 GJ-5 验收仍需维护者安排。
 6. P7/F1/F2：ArkForge 摘要域修法、与 bundle 同步发布的方式；裁决前切换不换 ArkForge bundle、GJ-4 不开始。
 7. P8：是否先发带 #2204/#2221/#2227 的 Swift 过渡版本；`$ROLLBACK` 用哪个构建。
 8. P9：新 App 由谁安装、是否嵌入 helper / 发 DMG。
@@ -511,9 +513,8 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 13. 第 2 步：「façade 保留一个周期」的截止日。
 14. 第 4 步：SPK-8 正向的具体 UI 测试名与开关；负向用例与 harness；`FacadeRollbackUITests` 对 standalone Rust daemon 是否适用。
 15. 第 7 步：`AgentXPCTransportContractTests` 黑盒子集对安装态 daemon 的运行方式。
-16. 第 7 步与 P6：装有签名预设时 Rust CLI 的 update（含回滚、GJ-4 campaign staging）一律被拒；改用 Swift CLI 回滚是否可行、是否可接受。
-17. 第 5 步 GJ-5：Rust CLI 没有装签名预设的叶子（S-1 前），预设由谁、用哪个 CLI 建立；若沿用切换前由 Swift 建的预设，
-    又与 P6 的切换拒绝冲突。
+16. 第 7 步与 P6：#2272 已移除“存在预设即拒绝”的实现限制。Rust CLI 的 update（含回滚、GJ-4 campaign staging）按 P6 校验公开材料并刷新身份；待定的是实际窗口与回滚包验收，不是另选 CLI 绕过旧拒绝。
+17. 第 5 步 GJ-5：#2272 已提供 Rust `runtime signing install|migrate-deveco|install-sdk-release`（兼容旧 `signing` 拼法）。维护者仍须选择真实签名材料和凭据来源，确认在哪个安装窗口建立或沿用预设；沿用有效 Swift 预设不再与 P6 冲突。
 18. 第 2 步在快照之后失败的中间态：已只读核实（`evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 18 条）：快照写完之后确无自动恢复；本文给的处理（按 §4 第 3 行
     回到 `$ROLLBACK`）与源码一致。现有临时 home / 记录型 launchctl 测试覆盖了快照、helper、plist 与收据已写入但 bootstrap 失败后的显式回滚，验证 Swift bundle、plist、收据恢复且 Runtime 状态与快照不变（`evidence/runs/TASK-XPA-017/cutover-rollback-bootstrap-run.md`）；真实安装态、签名与设备连续性仍未验收。待定：维护者是否认可并执行真实回退路径。
 19. 1a 手工预检：已只读核实（同上，第 19 条）：无锁那遍不取锁、不建目录或锁文件、不写任何 owner 数据；**会在 Job 索引旁
