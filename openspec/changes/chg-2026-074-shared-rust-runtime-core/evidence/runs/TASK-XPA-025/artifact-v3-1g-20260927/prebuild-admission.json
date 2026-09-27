@@ -1,0 +1,15 @@
+{
+  "utc": "2026-09-27T07:04:19Z",
+  "kind": "prebuildDiskAdmission",
+  "sourceCommit": "8616a8220a82cdc4200804b31d5408eea7953ee3",
+  "payloadBytes": 1073741824,
+  "requiredFreeBytes": 7583301632,
+  "attempt": 1,
+  "releaseBuildStarted": false,
+  "captureStarted": false,
+  "quietAdmissionPerformed": false,
+  "baselineEligible": false,
+  "status": "REFUSED",
+  "errorType": "ValueError",
+  "error": "artifact fixture needs 7583301632 free bytes including 4 GiB reserve; found 5160960000"
+}

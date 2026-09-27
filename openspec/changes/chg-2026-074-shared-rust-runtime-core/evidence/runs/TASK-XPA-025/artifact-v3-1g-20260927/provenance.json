@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "8616a8220a82cdc4200804b31d5408eea7953ee3",
+  "fixedAtUtc": "2026-09-27T07:09:04.568887+00:00",
+  "profile": "release default features plus target macOS ARM64 sha2 asm",
+  "cargoBuildJobs": 2,
+  "cargoIncremental": 0,
+  "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+  "cargo": "cargo 1.98.1 (797e8a9bc 2026-08-05)",
+  "rustFlags": null,
+  "encodedRustFlags": null,
+  "lockSha256": "4e06dad7b626eaa4f1039cb1409e5d5c1c78628a5b30838cb994ad7e9915c59f",
+  "files": {
+    "arkdeck-agentd": {
+      "sha256": "2e38510f22e64eded53f26bb59c7df3be25854f8add8043d1fc419d25da0bcb6",
+      "bytes": 13228880
+    },
+    "arkdeck-soak": {
+      "sha256": "0ecb78783597f10e70bc192bdb13aacce135e91010c5418e880a4fd17cee592f",
+      "bytes": 5962992
+    }
+  }
+}
