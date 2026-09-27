@@ -47,13 +47,32 @@ checkout and requires no difference; `check-contracts.py` builds its own
 source views. A workspace that does not build, or whose tests fail, passes
 those two.
 
+Hosted CI waits for the inexpensive Rust policy job before allocating native
+hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
+job-owned source path, preserving mtimes only for identical bytes. The cache
+key includes the compiler, runner image, dependency manifests and build flags;
+only successful protected-main runs save it. Restored Git refs/config are
+discarded and rebuilt from the current checkout. Published and candidate views
+retain separate source directories and Cargo targets. Local checks keep their
+ordinary task-owned targets unless the CI cache root is explicitly supplied.
+
+On macOS, `scripts/run-workspace-tests.py` compiles the complete default test
+inventory, then asks Cargo to run two queues with the same workspace features.
+Only three audited integration targets with unique temporary roots may overlap
+the conservative queue; fixed-oracle, port and spawning tests remain together.
+New targets default to that queue. Custom harnesses and doctests still run;
+either queue or doctest failure fails the lane. The `rust-test-timings-macos-26`
+artifact records compilation, queue and doctest durations and complete logs for
+checkout/published/candidate. Run `python scripts/test_ci_execution.py` to verify
+the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
+
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
 `cargo deny` and `cargo vet`; see [dependency policy](supply-chain/README.md).
 The committed policy combines imported source audits with fifteen bounded publisher
 trust entries and no exemptions. Both dependency checks must pass.
 
-The shared runner checks two independent temporary source views: current Rust
+The shared runner checks two independent task-owned source views: current Rust
 against the published inputs read from Git at the merge-base with `origin/main`,
 and current Rust against this checkout's candidate inputs. Each runs clippy,
 the full test suite, native process checks, binary builds and the same

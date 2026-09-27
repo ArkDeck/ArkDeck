@@ -607,6 +607,7 @@ RUST_SHARED_JOB_TOKENS = (
 )
 # Answers that cannot depend on the host: each runs exactly once, in `policy`.
 RUST_POLICY_TOKENS = (
+    "run: python rust/scripts/test_ci_execution.py\n",
     "run: python rust/scripts/generate-contract.py --check",
     "run: cargo fmt --all --check",
     "        working-directory: .\n"
@@ -645,6 +646,12 @@ RUST_POLICY_TOKENS = (
 # Answers that can differ between hosts: each runs exactly once per host, in
 # the `workspace` matrix.
 RUST_WORKSPACE_TOKENS = (
+    "    needs: policy\n",
+    'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-build" >> "$GITHUB_ENV"',
+    'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"',
+    "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}\n",
+    "run: python rust/scripts/ci-workspace.py key\n",
+    "run: python rust/scripts/ci-workspace.py prepare\n",
     # Only these two steps compile and run the checkout. Every contract
     # step either reads Git objects at the pinned Swift commit or builds a
     # separate candidate view, so dropping either one lets a workspace
@@ -653,11 +660,11 @@ RUST_WORKSPACE_TOKENS = (
     # currency and the Rust code's correctness as separate questions;
     # calling `cargo test --workspace` directly here fails every branch
     # that legitimately changes a recorded frame.
-    "run: cargo clippy --workspace --all-targets -- -D warnings\n",
+    "run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n",
     "        working-directory: .\n"
-    "        run: python rust/scripts/workspace-tests.py\n",
+    "        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py\n",
     "        working-directory: .\n"
-    "        run: python rust/scripts/check-contracts.py\n",
+    '        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"\n',
     "      - name: Preserve actual read-only recordings\n"
     "        if: always()\n"
     "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)\n"
@@ -731,11 +738,29 @@ def validate_rust_ci_contract(text: str) -> None:
         "continue-on-error:", "secrets.", "secrets[", "secrets: inherit",
         "contents: write", "id-token: write", "cargo vet init",
         "cargo vet regenerate", "cargo vet add-exemption", "|| true",
-        "--depth=", "--depth ", "restore-keys:", "arkforge-package-auth.sh",
+        "--depth=", "--depth ", "arkforge-package-auth.sh",
         "run: cargo fetch",
     ):
         if token in text.replace(RUST_FETCH_SECRET, ""):
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
+    if "restore-keys:" in policy:
+        raise WorkflowContractError("Policy tool cache must not use prefix fallback")
+    cache_key = "          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}\n"
+    if workspace.count(cache_key) != 2:
+        raise WorkflowContractError("Rust build restore and save must use the same compatibility key and revision")
+    prefix = "          restore-keys: ${{ steps.rust-cache-key.outputs.key }}-\n"
+    if workspace.count("restore-keys:") != 1 or prefix not in workspace:
+        raise WorkflowContractError("Rust build cache fallback must retain every compatibility dimension")
+    save_block = (
+        "      - name: Save trusted Rust build products\n"
+        "        if: >-\n"
+        "          success() &&\n"
+        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.rust-build-cache.outputs.cache-hit != 'true'\n"
+        "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+    )
+    if save_block not in workspace:
+        raise WorkflowContractError("Only successful protected main may publish Rust build products")
     if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2 or policy.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
         raise WorkflowContractError(
             "Rust CI must restore and save the policy tools under one exact key "
@@ -767,9 +792,13 @@ def validate_rust_ci_contract(text: str) -> None:
     order = [
         workspace.index("rustup toolchain install"),
         workspace.index(RUST_FETCH_RUN),
-        workspace.index("run: cargo clippy --workspace"),
-        workspace.index("run: python rust/scripts/workspace-tests.py"),
-        workspace.index("run: python rust/scripts/check-contracts.py"),
+        workspace.index("run: python rust/scripts/ci-workspace.py key"),
+        workspace.index("      - name: Restore trusted Rust build products"),
+        workspace.index("run: python rust/scripts/ci-workspace.py prepare"),
+        workspace.index("run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace"),
+        workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py"),
+        workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py"),
+        workspace.index("      - name: Save trusted Rust build products"),
         workspace.index("      - name: Preserve actual read-only recordings"),
     ]
     if order != sorted(order):
@@ -992,7 +1021,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         agent = WORKFLOW_PATH.read_text(encoding="utf-8")
         sdd = SDD_WORKFLOW_PATH.read_text(encoding="utf-8")
         fetch = ARKFORGE_CARGO_FETCH_PATH.read_text(encoding="utf-8")
-        lint = "        run: cargo clippy --workspace --all-targets -- -D warnings\n"
+        lint = "        run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n"
         rust_mutations = (
             # A fetch without the key-bounding wrapper.
             rust.replace(RUST_FETCH_RUN, "run: cargo fetch --locked"),
@@ -1081,7 +1110,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         )
         lint_step = (
             "      - name: Lint the workspace, its tests and its examples\n"
-            "        run: cargo clippy --workspace --all-targets -- -D warnings\n\n"
+            "        working-directory: .\n"
+            "        run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n\n"
         )
         recordings = "      - name: Preserve actual read-only recordings\n"
         lock_check = "      - name: Verify checks left locked inputs unchanged\n"
@@ -1107,19 +1137,19 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             ),
             rust.replace("run: python rust/scripts/test_contract_checks.py", "run: true"),
             rust.replace(
-                "run: cargo clippy --workspace --all-targets -- -D warnings\n",
+                "run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n",
                 "run: cargo clippy --workspace\n",
             ),
             rust.replace(
-                "run: cargo clippy --workspace --all-targets -- -D warnings\n", "run: true\n"
+                "run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n", "run: true\n"
             ),
             rust.replace(
-                "run: python rust/scripts/workspace-tests.py\n",
+                "run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py\n",
                 "run: cargo test -p arkdeck-contract\n",
             ),
-            rust.replace("run: python rust/scripts/workspace-tests.py\n", "run: true\n"),
-            rust.replace("run: python rust/scripts/check-contracts.py", "run: cargo test --workspace --locked"),
-            rust.replace("run: python rust/scripts/check-contracts.py", "run: python rust/scripts/check-contracts.py --published-only"),
+            rust.replace("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py\n", "run: true\n"),
+            rust.replace("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py", "run: cargo test --workspace --locked"),
+            rust.replace("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py", "run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --published-only"),
             rust.replace(
                 "run: cargo deny --locked check", "run: cargo deny --locked check || true"
             ),
@@ -1135,7 +1165,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace(
                 "run: python rust/scripts/generate-contract.py --check", "run: true"
             ),
-            rust.replace("run: python rust/scripts/check-contracts.py", "run: true"),
+            rust.replace("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py", "run: true"),
         )
         for mutated in mutations:
             # A mutation that no longer matches the workflow proves nothing.
@@ -1175,6 +1205,41 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         for mutated in mutations:
             with self.assertRaises(WorkflowContractError):
                 validate_rust_ci_contract(mutated)
+
+    def test_rust_build_cache_keeps_compatibility_main_only_writes_and_policy_gate(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        workspace_start = rust.index("  workspace:\n")
+        policy, workspace = rust[:workspace_start], rust[workspace_start:]
+        for mutated in (
+            workspace.replace("    needs: policy\n", ""),
+            workspace.replace("github.ref == 'refs/heads/main'", "github.ref != ''"),
+            workspace.replace("          success() &&\n", ""),
+            workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.key }}-", "restore-keys: arkdeck-rust-build-"),
+            workspace.replace("run: python rust/scripts/ci-workspace.py prepare", "run: true"),
+            workspace.replace(" && '2' || '1'", " && '4' || '1'"),
+        ):
+            self.assertNotEqual(mutated, workspace)
+            with self.assertRaises(WorkflowContractError):
+                validate_rust_ci_contract(policy + mutated)
+
+    def test_background_macos_lanes_share_one_slot_without_dropping_pending_jobs(self) -> None:
+        expected = (
+            "    concurrency:\n"
+            "      group: arkdeck-macos-background\n"
+            "      cancel-in-progress: false\n"
+            "      queue: max\n"
+        )
+        for filename, jobs in (
+            ("swift-slow-lanes.yml", ("host-store-shadow", "slow-lanes", "ui-tests")),
+            ("rust-perf.yml", ("nightly", "soak")),
+        ):
+            workflow = (REPOSITORY_ROOT / ".github/workflows" / filename).read_text()
+            for job in jobs:
+                with self.subTest(workflow=filename, job=job):
+                    self.assertIn(expected, _job_block(workflow, job))
+            self.assertEqual(workflow.count("group: arkdeck-macos-background"), len(jobs))
+        for path in (SWIFT_WORKFLOW_PATH, RUST_WORKFLOW_PATH):
+            self.assertNotIn("group: arkdeck-macos-background", path.read_text())
 
     def test_rust_recordings_are_preserved_after_failures(self) -> None:
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
