@@ -4,7 +4,7 @@ use arkdeck_hoststore::job_journal_events::{self as events, Envelope};
 use arkdeck_hoststore::{AdmissionVerdict, JobRecord, JobStore, JournalWriter, inspect_journal};
 use arkdeck_platform::HostDirectory;
 use serde_json::{Value, json};
-use std::{fs, path::Path};
+use std::{fs, io::Write, path::Path, time::Instant};
 
 const NOW: &str = "2026-09-26T00:00:00Z";
 pub const VERSION: &str = "rust-recovery-fixture-v1";
@@ -13,6 +13,15 @@ pub const VERSION: &str = "rust-recovery-fixture-v1";
 /// History follows the existing direct-repository terminal-history benchmark:
 /// terminal snapshots, no provider execution and no journals to recover.
 pub fn seed(root: &Path, workload: &str, count: usize) -> Result<Value> {
+    seed_impl(root, workload, count, false)
+}
+
+/// Opt-in measurement of actual synchronous append completion, never a delay.
+pub fn measure_journal(root: &Path) -> Result<Value> {
+    seed_impl(root, "journal", 1000, true)
+}
+
+fn seed_impl(root: &Path, workload: &str, count: usize, measure: bool) -> Result<Value> {
     if !(2..=10_000).contains(&count) || !matches!(workload, "journal" | "history") {
         return Err("recovery workload must be journal/history with count 2..10000".into());
     }
@@ -58,7 +67,11 @@ pub fn seed(root: &Path, workload: &str, count: usize) -> Result<Value> {
                 let envelope = Envelope {
                     event_id: format!("event-{sequence:05}"),
                     sequence: sequence as i64,
-                    session_id: "session-recovery".into(),
+                    session_id: if measure {
+                        format!("session-{id}")
+                    } else {
+                        "session-recovery".into()
+                    },
                     job_id: id.clone(),
                     timestamp: NOW.into(),
                 };
@@ -72,7 +85,22 @@ pub fn seed(root: &Path, workload: &str, count: usize) -> Result<Value> {
                         "timestamp":NOW,"kind":"warning", "payload":{
                             "code":"fixture", "message":"bounded historical warning", "details":{}}}),
                 };
-                writer.append(&event).map_err(error)?;
+                if measure {
+                    let started = Instant::now();
+                    let result = writer.append(&event);
+                    let milliseconds = started.elapsed().as_secs_f64() * 1000.0;
+                    // Reporting is outside the interval. Flush each attempt so
+                    // later append failure cannot erase earlier observations.
+                    let sample = json!({"kind":"journalAppend", "sequence":sequence,
+                        "milliseconds":milliseconds, "status":if result.is_ok() {"MEASURED"} else {"FAILED"},
+                        "clock":"std::time::Instant", "timingBoundary":"JournalWriter.append-call-through-return-v1"});
+                    let mut output = std::io::stdout().lock();
+                    writeln!(output, "{sample}").map_err(error)?;
+                    output.flush().map_err(error)?;
+                    result.map_err(error)?;
+                } else {
+                    writer.append(&event).map_err(error)?;
+                }
             }
             drop(writer);
             let facts = inspect_journal(&job_root).map_err(error)?;
@@ -84,7 +112,7 @@ pub fn seed(root: &Path, workload: &str, count: usize) -> Result<Value> {
             }
         }
     }
-    let manifest = json!({"fixtureVersion":VERSION,"workload":workload,
+    let manifest = json!({"fixtureVersion":if measure {"rust-journal-measurement-v1"} else {VERSION},"workload":workload,
         "jobCount":job_count,"activeJobCount":if workload == "journal" {1} else {0},
         "journalEventCount":if workload == "journal" {count} else {0},
         "seedTimestamp":NOW,"providerDispatchCount":0});

@@ -68,3 +68,28 @@ and three arguments: release daemon, release soak, a new output directory.
 The fixed script refuses an existing output directory and always removes its
 private Runtime root. A repeat requires a separately authorized quiet window
 and a distinct attempt directory; attempt 1 remains archived.
+
+## Fixed diagnostic attempt 2
+
+After a separately authorized window, all 19 pinned driver/import/registry/binary
+files matched their saved SHA-256s. No new journal implementation was imported.
+The guard accepted load 3.5947 at 04:30:03 UTC with zero conflicting builds.
+The unchanged script completed 50 cold starts, entered and exited the IPC phase,
+and saved 6 idle resource observations, then refused load 4.07 at 04:30:49 UTC.
+Exit 1; the fixed 600-second window did not complete. No third attempt was made.
+Full raw observations and preflight are retained in the attempt-2 JSON/JSONL.
+
+Cold samples range from 25.422 to 423.405 ms; nearest-rank p95 is 45.772 ms.
+The maximum is the first sample: spawn returned at 1.549 ms, socket was observed
+at 357.047 ms, contract verified at 423.304 ms and final health at 423.405 ms.
+This localizes the interval, not the product/environment cause. All 50 samples
+remain, including that first sample. Six RSS readings at elapsed 1.09–6.64 s are
+21,037,056 bytes; that is insufficient to infer release or a stable RSS phase.
+The interrupted driver did not write its final metric summary, so IPC values
+held in memory are unavailable despite the completed-phase marker; they are
+not reconstructed or claimed as archived measurements.
+
+Read-only ps immediately afterward showed dasd about 91.8% CPU and launchd
+about 27.1%, with other system activity. Quiet sampling stopped. The coordinator
+authorized ordinary journal correctness checks next; these are explicitly
+advisory and do not substitute for the interrupted quiet capture.

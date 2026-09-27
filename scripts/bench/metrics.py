@@ -18,7 +18,7 @@ from __future__ import annotations
 import pathlib
 import time
 
-from . import baseline, clocks, control, harness, recovery
+from . import baseline, clocks, control, harness, recovery, journal
 
 # A pure-CPU workload with no allocation growth and no syscall, sized to land in
 # the same millisecond range as the IPC round trips it normalises.
@@ -206,11 +206,11 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
         "job.eventsPage": baseline.Gap(
             "job.eventsPage",
             "I.2 row 5 (job.events 1,000-row page)",
-            "job.events is published and read-only, but every seeded Job is an "
-            "observe.device Job carrying a handful of events, not the "
-            "1,000-event Job the budget is written for; a page of a seeded Job "
-            "would only budget its own scale",
-            "a fixture that produces a 1,000-event Job",
+            "job.events is published; the opt-in journal leg provides a 1000-event "
+            "fixture, but the production 1 MiB page bound includes a per-row "
+            "estimate and prevents a full 1000-row single page. job.eventsDrain "
+            "measures complete multi-page readback, not this single-page budget",
+            "a reviewed resolution of the single-page target versus production page bound",
         ),
         "artifact.pagedRead": baseline.Gap(
             "artifact.pagedRead",
@@ -303,6 +303,8 @@ class RunContext:
         recovery_recorder=None,
         capture_recorder=None,
         require_quiet: bool = False,
+        journal_samples: int = 0,
+        journal_only: bool = False,
     ) -> None:
         if runtime_kind not in {"swift", "rust"}:
             raise ValueError("runtime_kind must be swift or rust")
@@ -310,6 +312,12 @@ class RunContext:
             raise ValueError("recovery-only requires positive recovery samples")
         if (recovery_only or recovery_samples) and runtime_kind != "rust":
             raise ValueError("recovery capture requires Rust")
+        if journal_samples < 0 or (journal_only and not journal_samples):
+            raise ValueError("journal-only requires positive journal samples")
+        if (journal_samples and runtime_kind != "rust") or (journal_only and recovery_only):
+            raise ValueError("journal capture requires Rust and separate only modes")
+        self.journal_samples = journal_samples
+        self.journal_only = journal_only
         self.recovery_samples = recovery_samples
         self.recovery_only = recovery_only
         self.recovery_require_quiet = recovery_require_quiet
@@ -392,7 +400,7 @@ def execute_run(
     numbers instead of being reconstructed from the seed parameters.
     """
 
-    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS)}
+    samples: dict[str, list[float]] = {name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS)}
     scale: dict[str, object] = {
         "seedSeconds": context.seed_seconds,
         "seedJobsPerCycle": context.seed_jobs_per_cycle,
@@ -442,7 +450,18 @@ def execute_run(
                     scale["recoverySamples"].append(evidence)
                     if context.recovery_recorder:
                         context.recovery_recorder({"status": "MEASURED", **evidence})
-    if context.recovery_only:
+    if context.journal_samples:
+        scale["journalSamples"] = []
+        for sample_index in range(context.journal_samples):
+            def journal_record(entry):
+                record({"leg": "journal", "sampleIndex": sample_index, **entry})
+            measured, facts = journal.measure(context.daemon_executable, context.soak_executable,
+                                              journal_record, context.require_quiet)
+            for name, values in measured.items():
+                samples[name].extend(values)
+            scale["journalSamples"].append(facts.pop("journalEvidence"))
+            scale.update(facts)
+    if context.recovery_only or context.journal_only:
         return {name: values for name, values in samples.items() if values}, scale
 
     seeded = harness.seed_state_directory(

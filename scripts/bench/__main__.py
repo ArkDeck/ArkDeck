@@ -145,6 +145,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
         recovery_recorder=recorder,
         capture_recorder=capture_recorder,
         require_quiet=not arguments.allow_loaded_host,
+        journal_samples=getattr(arguments, "journal_samples", 0),
+        journal_only=getattr(arguments, "journal_only", False),
     )
 
     results: dict[str, baseline.MetricResult] = {}
@@ -197,7 +199,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
             shutil.rmtree(state_directory, ignore_errors=True)
 
         for name, values in samples.items():
-            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS)[name]
+            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS)[name]
             result = results.setdefault(
                 name, baseline.MetricResult(name, unit, design_row, description)
             )
@@ -206,10 +208,13 @@ def command_capture(arguments: argparse.Namespace) -> int:
                     k: v for k, v in scale.items()
                     if k.startswith("recovery") and k != "recoverySamples"
                 }
+            elif name in metrics.journal.DEFINITIONS:
+                metric_scale = {k: v for k, v in scale.items()
+                                if k.startswith("journal") and k != "journalSamples"}
             else:
                 metric_scale = {
                     k: v for k, v in scale.items()
-                    if not k.startswith("recovery") and k not in {
+                    if not k.startswith(("recovery", "journal")) and k not in {
                         "residentSetRawSamples", "unmeasured",
                         "residentSetPhaseMethod", "idleWindowSeconds",
                     }
@@ -409,6 +414,10 @@ def build_parser() -> argparse.ArgumentParser:
                          help="fresh 10k Journal and 10k History fixtures per sample (Rust only)")
     capture.add_argument("--recovery-only", action="store_true",
                          help="capture only recovery and calibration; requires --recovery-samples")
+    capture.add_argument("--journal-samples", type=_positive_int, default=0,
+                         help="fresh 1000-event durable append and full drain samples per run (Rust)")
+    capture.add_argument("--journal-only", action="store_true",
+                         help="only journal metrics and calibration; requires --journal-samples")
     capture.add_argument("--cold-start-samples", type=_positive_int, default=50)
     capture.add_argument("--ipc-samples", type=_positive_int, default=1000)
     capture.add_argument(

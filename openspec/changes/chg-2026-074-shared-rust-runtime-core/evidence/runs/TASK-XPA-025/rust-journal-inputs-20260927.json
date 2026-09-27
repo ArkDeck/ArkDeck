@@ -1,0 +1,29 @@
+{
+  "sourceBase": "82f0971ce5f122bde47d9cd850f6df4e0b277da1",
+  "purpose": "functional integration only",
+  "daemonBuild": "pinned release at sourceBase",
+  "soakBuild": "debug, default features, CARGO_BUILD_JOBS=2, private journal target",
+  "rawByteCount": 2254025,
+  "rawSha256": "871b97179a04ac4ca616fa8809a540b190d2fd117f5dfa40f9c2c75a386a4ce0",
+  "sourceFiles": {
+    "rust/crates/arkdeck-soak/src/lib.rs": "6898c4b52595c924fb61f87688e78d66ced5806634a2e0e3e26815d70e604e29",
+    "rust/crates/arkdeck-soak/src/main.rs": "4bb6e5c04200d8354900fd302363a3f0bdbb8ffdac5f1b463084b70248d828ad",
+    "rust/crates/arkdeck-soak/src/recovery.rs": "5c89ffb688fddde3872c553b46ab7025af9e18ced7eb25cad860621e383f269c",
+    "rust/crates/arkdeck-soak/tests/workload.rs": "6d8ec977bb5d6f8df67c2f0c8d01b548a455d1228c1af41b6c578b56fd129951",
+    "scripts/bench/__init__.py": "62f8de82d66d4c5700630dbdeb7f937424cb5751bb279b986abc12815e09b7f5",
+    "scripts/bench/__main__.py": "802986cf7a179edba3191d366b7537165fe5126ad34998d7dfeb172b071a9967",
+    "scripts/bench/baseline.py": "f60bd1eba430764f50bc05ca9ce016220a6fb81de91fde0e4f2bc7cd0c4627f6",
+    "scripts/bench/clocks.py": "f0d741eb61f06e903d58866748fe15b45b60ad5a99b061c1d16eb3c37ad4aab9",
+    "scripts/bench/compare.py": "a9c9fc97774f89e62c5a4465fc91e185c72128f1cbe3f7c2585c635f6037d993",
+    "scripts/bench/control.py": "fb8f8d02eff5fdcb45c6fbda2f1aeb5c23078f82c5a2057ca190ad1ba28e94c4",
+    "scripts/bench/harness.py": "416cab70092974ca0269741e9d2d05b46e1a4371a08a7381cc6fc3089df33f04",
+    "scripts/bench/journal.py": "3547c499ca0a8ef1531626d6e2233a44377f28996303594fa2856fcbc7e3977e",
+    "scripts/bench/metrics.py": "48130500537d35dc0923318ddc1fe7e9eea9839a485149518067287657882e25",
+    "scripts/bench/recovery.py": "4700b8936fd688e196495429460e6ce1927472e3e8223a43c3f705156f527903",
+    "scripts/bench/test_baseline.py": "fbba082be500231c8563539cb5b9c035c004f82b1668da7597781ea54dca7c05",
+    "scripts/bench/test_compare.py": "9b8849822d9fc65140cbab5008774053e8ed70e22c5e9ea991d2e750de3ff34c",
+    "scripts/bench/test_harness.py": "d7345eaa1d358c14f1b35a677a7eeeee74126be8295c27415ab3414c1a6a8706",
+    "scripts/bench/test_journal.py": "ab0a0deb0c14c11eeda1bdd9251e131b79e1a422302d5d0d8b862eb2f7995dba",
+    "scripts/bench/test_recovery.py": "1b5a65ef1748ecbb4629abade2e349f21685cc291d9326f29cdee9a82dc7a4ac"
+  }
+}
