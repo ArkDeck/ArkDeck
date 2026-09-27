@@ -62,3 +62,19 @@ Pending this implementation PR. The previous capture-fix PR #2274 was reviewed
 and merged separately; its CI is not claimed for this new Rust fixture. Formal
 quiet three-run cold/RSS and Journal baseline qualification remain incomplete.
 TASK-XPA-025/G5 is not declared complete.
+
+## Row-contract review correction
+
+The original functional integration preceded stricter row validation. The
+consumer now checks closed row/data shapes, all required fields, per-row cursor
+uniqueness, exact fixture Job/session/kind/timestamp and nullable fields, the
+state-transition values and agreement between final row and page cursor. IDs
+and positions alone cannot qualify malformed rows. Validation stays inside the
+documented drain interval; reporting remains outside it. No Runtime/schema or
+new dependency was introduced.
+
+`PYTHONPATH=scripts python3 -m unittest discover -s scripts/bench -t scripts`:
+exit 0, 186 tests, 2 optional recovery checks skipped;
+`/private/tmp/arkdeck-journal-python-row-contract.log`. Real-daemon revalidation
+of this stronger consumer awaits its coordinated window; the earlier actual
+integration is retained without relabeling it as validation of this correction.

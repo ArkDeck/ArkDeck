@@ -14,8 +14,20 @@ def attempts():
 
 
 def page(start, end, more, cursor=None):
-    return dict(items=[dict(eventId=f'event-{i:05}', streamPosition=str(i+1), runtimeRevision='1000')
-                       for i in range(start, end)], snapshotRevision='1000', hasMore=more, nextCursor=cursor or f'next-{end}',
+    items = []
+    for i in range(start, end):
+        data = dict(jobId='job-recovery-00000', sessionId='session-job-recovery-00000',
+                    journalKind='jobCreated' if i == 0 else 'stateTransition' if i == 1 else 'warning',
+                    timestamp='2026-09-26T00:00:00Z', attempt=None, bindingRevision=None, stepId=None)
+        if i == 1:
+            data.update(fromState='queued', toState='preflight')
+        items.append(dict(eventId=f'event-{i:05}', streamPosition=str(i+1), runtimeRevision='1000',
+                          cursor=f'cursor-{i+1}', data=data,
+                          type='stateChanged' if i == 1 else 'journalEvent'))
+    next_cursor = cursor or f'cursor-{end}'
+    if items:
+        items[-1]['cursor'] = next_cursor
+    return dict(items=items, snapshotRevision='1000', hasMore=more, nextCursor=next_cursor,
                 schemaVersion='arkdeck.cli.page/1', pageKind='eventStream', order='streamPositionAsc')
 
 
@@ -145,3 +157,31 @@ class JournalEvidenceTests(unittest.TestCase):
                 self.assertEqual(record.call_args.args[0]['kind'], 'eventsPage')
         # The real terminal-page contract uses a non-null resume cursor.
         JournalTests().drain([page(0, 1000, False, 'terminal-cursor')])
+
+
+class JournalRowContractTests(unittest.TestCase):
+    def test_correct_ids_do_not_hide_missing_or_wrong_row_fields(self):
+        mutations = [lambda row, key=key: row.pop(key) for key in ('data', 'cursor', 'type')]
+        mutations += [lambda row: row.update(cursor=3), lambda row: row.update(type='wrong'),
+                      lambda row: row['data'].update(jobId='other-job'),
+                      lambda row: row['data'].update(sessionId='other-session'),
+                      lambda row: row['data'].update(journalKind='warning'),
+                      lambda row: row['data'].pop('attempt'),
+                      lambda row: row['data'].update(bindingRevision=7),
+                      lambda row: row.update(unpublished=True)]
+        for mutate in mutations:
+            item = page(0, 1000, False)
+            mutate(item['items'][0])
+            with self.subTest(mutation=mutate), self.assertRaises(ValueError):
+                JournalTests().drain([item])
+
+    def test_state_transition_and_final_row_cursor_must_match_fixture(self):
+        for field in ('fromState', 'toState'):
+            item = page(0, 1000, False)
+            item['items'][1]['data'][field] = 'wrong'
+            with self.assertRaises(ValueError):
+                JournalTests().drain([item])
+        item = page(0, 1000, False)
+        item['nextCursor'] = 'unrelated-cursor'
+        with self.assertRaises(ValueError):
+            JournalTests().drain([item])

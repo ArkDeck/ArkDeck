@@ -295,7 +295,8 @@ The clock is Rust `std::time::Instant`; no fake delay or static throughput count
 handshakes, pagination and complete client validation. Report serialization,
 byte counting and JSONL writes occur after the timing endpoint; partial-page
 reports survive a failed drain.
-The fixture uses the production event session identity. Each ID and position,
+The fixture uses the production event session identity. Closed row/data shapes,
+row cursor/type, exact Job/session/kind/timestamp and transition data, each ID and position,
 high water, cursor progress and final count is verified. The final journal hash
 must match its input. Actual page counts and serialized projection bytes are
 recorded (the latter are not claimed as socket wire bytes).

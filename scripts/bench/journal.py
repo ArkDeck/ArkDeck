@@ -70,10 +70,33 @@ def validate_attempts(entries):
     return values
 
 
+def validate_row(row, index, row_cursors):
+    # Closed published job.events row/data shapes plus this fixture's exact
+    # origin. Matching IDs alone does not prove that the requested Job was read.
+    kind = 'jobCreated' if index == 0 else 'stateTransition' if index == 1 else 'warning'
+    expected_data = {'jobId': 'job-recovery-00000',
+                     'sessionId': 'session-job-recovery-00000',
+                     'journalKind': kind, 'timestamp': '2026-09-26T00:00:00Z',
+                     'attempt': None, 'bindingRevision': None, 'stepId': None}
+    if index == 1:
+        expected_data.update(fromState='queued', toState='preflight')
+    if (not isinstance(row, dict)
+            or set(row) != {'cursor', 'data', 'eventId', 'runtimeRevision', 'streamPosition', 'type'}
+            or row['eventId'] != f'event-{index:05}'
+            or row['streamPosition'] != str(index + 1) or row['runtimeRevision'] != str(COUNT)
+            or row['type'] != ('stateChanged' if index == 1 else 'journalEvent')
+            or row['data'] != expected_data
+            or not isinstance(row['cursor'], str) or not row['cursor']
+            or row['cursor'] in row_cursors):
+        raise ValueError('event row shape, fixture origin or cursor differs')
+    row_cursors.add(row['cursor'])
+
+
 def drain(runtime, record, budget_seconds=30):
     deadline = clocks.Deadline(budget_seconds)
     ids = set()
     cursors = set()
+    row_cursors = set()
     cursor = None
     observed = []
     started = clocks.awake_seconds()
@@ -87,7 +110,9 @@ def drain(runtime, record, budget_seconds=30):
             with control.ControlClient(str(runtime.socket_path), timeout_seconds=max(.001, min(1., deadline.remaining_seconds()))) as client:
                 page = client.call('job.events', params)
             observed.append(page)
-            if (not isinstance(page, dict) or page.get('schemaVersion') != 'arkdeck.cli.page/1'
+            if (not isinstance(page, dict)
+                    or set(page) != {'hasMore', 'items', 'nextCursor', 'order', 'pageKind', 'schemaVersion', 'snapshotRevision'}
+                    or page.get('schemaVersion') != 'arkdeck.cli.page/1'
                     or page.get('pageKind') != 'eventStream' or page.get('order') != 'streamPositionAsc'
                     or type(page.get('hasMore')) is not bool
                     or not isinstance(page.get('nextCursor'), str) or not page['nextCursor']
@@ -98,11 +123,10 @@ def drain(runtime, record, budget_seconds=30):
             cursors.add(page['nextCursor'])
             for row in page['items']:
                 index = len(ids)
-                if (not isinstance(row, dict) or row.get('eventId') != f'event-{index:05}'
-                        or row['eventId'] in ids or row.get('streamPosition') != str(index + 1)
-                        or row.get('runtimeRevision') != str(COUNT)):
-                    raise ValueError('event identity/position differs')
+                validate_row(row, index, row_cursors)
                 ids.add(row['eventId'])
+            if page['items'][-1]['cursor'] != page['nextCursor']:
+                raise ValueError('page cursor differs from final row cursor')
             if page['hasMore'] is False:
                 break  # A valid terminal page still carries its resume cursor.
             if len(ids) >= COUNT:
