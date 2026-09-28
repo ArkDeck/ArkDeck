@@ -253,13 +253,33 @@ fn the_broker_plans_with_this_hosts_planner_and_answers_as_swifts() {
         "rejected",
         "epochBudgetExhausted",
     );
-    refused(
-        &call(&control, "debug.evaluate", evaluate(&interrupted, execute)),
-        "rejected",
-        "executePinnedRequest is not available on the Rust Runtime yet: it runs the pinned \
-         Flash, which this Runtime does not execute; the invocation is unchanged",
-    );
     assert!(!state.join("runtime-debug-attempts").exists());
+    // An interrupted attempt resumes with its exact request: its permit is
+    // written again and the request driven through this Host's Job path. This
+    // Host composes no Job owner, so the attempt is refused before any
+    // dispatch, and its epoch is given back as Swift's `finish` gives it.
+    let resumed = call(&control, "debug.evaluate", evaluate(&interrupted, execute));
+    assert_eq!(resumed["ok"], true, "{resumed}");
+    let settled = resumed["result"]["evaluations"]
+        .as_array()
+        .unwrap()
+        .last()
+        .unwrap()
+        .clone();
+    assert_eq!(settled["disposition"], "refusedBeforeDispatch", "{resumed}");
+    assert_eq!(settled["outcome"], "refused", "{resumed}");
+    assert_eq!(
+        settled["detail"], "the Job owner is not composed",
+        "{resumed}"
+    );
+    assert!(settled.get("destructiveEpoch").is_none(), "{resumed}");
+    let key = settled["idempotencyKey"].as_str().unwrap();
+    assert!(
+        state
+            .join("runtime-debug-attempts")
+            .join(format!("{key}.json"))
+            .exists()
+    );
 
     // A stop ends the invocation whose sixteen epochs are spent: the answer
     // carries every attempt Swift recorded and the stop, which the contract

@@ -30,7 +30,7 @@ use std::sync::Mutex;
 
 #[path = "flash_invocation_broker.rs"]
 mod broker;
-pub use broker::InvocationBroker;
+pub use broker::{DriverResult, InvocationBroker};
 
 /// Swift `RuntimeDebugInvocationController.maximumDestructiveEpochs`.
 pub const MAXIMUM_DESTRUCTIVE_EPOCHS: i64 = 16;
@@ -354,6 +354,46 @@ impl FlashInvocations {
     }
 }
 
+/// Swift `RuntimeDebugAttemptPermitStore.loadExact`'s timed check of the
+/// invocation an attempt permit names, read from `<state>/runtime-debug-invocations/`:
+/// the current document of that invocation, active, within its epoch budget
+/// and lifetime at `now`, whose evaluations hold the executing destructive
+/// attempt of exactly this idempotency key and candidate action. `Err` is
+/// Swift's `persistenceFailure` detail.
+pub(crate) fn dispatch_permitted(
+    state: &Path,
+    invocation_id: &str,
+    idempotency_key: &str,
+    candidate_action_sha256: &str,
+    now: &str,
+) -> Result<(), &'static str> {
+    let path = state.join(DIRECTORY).join(format!("{invocation_id}.json"));
+    let (document, (schema, identity)) = std::fs::read(path)
+        .ok()
+        .and_then(|bytes| decode(&bytes))
+        .ok_or("Runtime debug attempt names an invocation that is not the current document")?;
+    let seconds = |text: &str| {
+        crate::format_time::plain_utc_seconds(text)
+            .or_else(|| crate::format_time::precise_utc_millis(text).map(|millis| millis / 1_000))
+    };
+    let permitted = schema == SCHEMA_VERSION
+        && identity == invocation_id
+        && document.state == "active"
+        && document.epochs <= MAXIMUM_DESTRUCTIVE_EPOCHS
+        && matches!((seconds(now), seconds(&document.expires)), (Some(now), Some(expiry)) if now <= expiry)
+        && document.evaluations.iter().any(|evaluation| {
+            evaluation["disposition"] == "executing"
+                && evaluation["idempotencyKey"] == idempotency_key
+                && evaluation["candidateActionSHA256"] == candidate_action_sha256
+                && evaluation.get("destructiveEpoch").is_some()
+        });
+    if permitted {
+        Ok(())
+    } else {
+        Err("Runtime debug attempt has no active, in-budget invocation dispatch permit")
+    }
+}
+
 /// Swift `validInvocationID(_:)`: at most 128 bytes, a lowercase ASCII
 /// letter, then ASCII letters, digits, dots and hyphens.
 fn valid_identity(identity: &str) -> bool {
@@ -546,4 +586,16 @@ fn optional_integer(
         }
         Some(_) => None,
     }
+}
+
+/// Swift `RuntimeJobEngine.runtimeDebugExecutionOutcome(jobID:)`, the
+/// classification the recovery broker's driver settles an attempt by:
+/// `succeeded`, `safeToReflash`, `outcomeUnknown` or `failedKnown`. `Err` is
+/// a record, journal or ledger that could not be read.
+pub fn debug_execution_outcome(
+    jobs: &crate::JobStore,
+    capabilities: Option<&crate::CapabilityStore>,
+    job_id: &str,
+) -> Result<&'static str, String> {
+    crate::job_lineage_repair::debug_execution_outcome(jobs, capabilities, job_id)
 }
