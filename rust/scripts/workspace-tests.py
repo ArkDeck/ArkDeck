@@ -11,7 +11,7 @@ before the tests run, and otherwise runs them unchanged.
 It compares the checkout with nothing else. A Swift change regenerates the
 manifest in its own PR, and `origin/main` never enters: a merge elsewhere cannot
 make this checkout red. The published-versus-candidate comparison is
-check-contracts.py's job, later in the same lane.
+check-contracts.py's job, in the same lane (its own job in hosted CI).
 
 The tests run with `--no-fail-fast`. A red run then takes longer, but it shows
 every failing test binary at once, where cargo would otherwise stop at the

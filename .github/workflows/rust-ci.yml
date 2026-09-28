@@ -19,7 +19,7 @@ permissions:
   contents: read
   actions: read
 
-# Two jobs, both required through this workflow's result. `policy` runs once
+# Three jobs, all required through this workflow's result. `policy` runs once
 # the checks whose answer cannot depend on the host: the generated-input and
 # format checks compare repository bytes (autocrlf is off everywhere), the
 # checker's regression tests mock every native stage, cargo-deny resolves the
@@ -28,9 +28,16 @@ permissions:
 # failed on one host alone (the generated inputs failed on all three hosts at
 # once in 2 runs, the audits in 2), while repeating them cost the Windows job
 # 1.4 and the macOS job 0.6 of their minutes, and the macOS job is the critical
-# path of Swift CI. `workspace` keeps on every host what can differ between
-# hosts: lint, the workspace tests and the published/candidate contract views,
-# both of which re-verify the generated inputs before they build.
+# path of Swift CI. `workspace` and `contracts` keep on every host what can
+# differ between hosts: `workspace` lints and tests the checkout, `contracts`
+# builds and checks the published/candidate contract views, both of which
+# re-verify the generated inputs before they build. The two used to be
+# consecutive steps of one job; the views never read the workspace job's
+# products (each builds an isolated source view in its own Cargo target), so
+# they run side by side and the macOS critical path is the longer of the two,
+# not their sum. On #2311 (run 36440456252), which changed the contract
+# inputs, the macOS job spent 12.2 minutes in the workspace tests and then
+# 27.6 in the parity step, 43.6 of its 50 minutes.
 jobs:
   policy:
     name: Rust host-independent checks
@@ -171,16 +178,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-26, windows-latest]
     runs-on: ${{ matrix.os }}
-    # A change to the contract inputs runs the workspace tests three times on
-    # each host: the Workspace tests step below, then the published and
-    # candidate views of check-contracts.py, each view with its own clippy
-    # and build. On macOS each of those test runs takes about 10 to 11
-    # minutes, against 1 to 1.6 on the other hosts. #2197's macOS job (run
-    # 36152711471) was cancelled at 30 minutes in its candidate view and
-    # would have needed about 37, while Linux finished in 4 and Windows in
-    # 7.5. So macOS gets 50 minutes, and the other hosts keep 30, which still
-    # stops a hung job early. The check is on the prefix, so a newer macOS
-    # runner label keeps the longer bound.
+    # On macOS the workspace tests take about 8 to 12 minutes, against 1 to
+    # 1.6 on the other hosts (#2311, run 36440456252: 12.2 on macOS). The
+    # 50-minute bound predates moving the contract views to their own job and
+    # stays until cold-cache runs of this job alone have been measured; the
+    # other hosts keep 30, which still stops a hung job early. The check is
+    # on the prefix, so a newer macOS runner label keeps the longer bound.
     timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}
     defaults:
       run:
@@ -231,9 +234,12 @@ jobs:
       # both the stable source mirror and its products, then synchronize exact
       # checkout bytes without retimestamping unchanged files. Toolchain, image,
       # build flags and dependency manifests must match even for prefix hits.
+      # The cache root is part of the key, so this job's products and the
+      # contract views' (under the `contracts` job's own root) are separate
+      # entries; neither job restores, carries or saves the other's.
       - name: Configure task-owned Rust CI paths
         run: |
-          echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-build" >> "$GITHUB_ENV"
+          echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-workspace" >> "$GITHUB_ENV"
           echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"
 
       - name: Identify compatible Rust build products
@@ -253,8 +259,8 @@ jobs:
         working-directory: .
         run: python rust/scripts/ci-workspace.py prepare
 
-      # The contract steps around these regenerate from the checkout or build
-      # their own source views under rust/target. These two steps are the only
+      # The policy job's contract checks regenerate from the checkout and the
+      # contracts job builds its own source views. These two steps are the only
       # ones that compile and run the checkout itself, so without them a red
       # workspace reaches main behind a green lane.
       - name: Lint the workspace, its tests and its examples
@@ -266,8 +272,8 @@ jobs:
       # input with the regenerate command before the tests run; it never
       # compares the checkout with origin/main, so a merge elsewhere cannot
       # turn this branch red. Published-versus-candidate parity is
-      # check-contracts.py below, whose published inputs come from the
-      # merge-base with main.
+      # check-contracts.py in the contracts job, whose published inputs come
+      # from the merge-base with main.
       - name: Workspace tests
         working-directory: .
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py
@@ -300,12 +306,131 @@ jobs:
         working-directory: .
         run: python3 scripts/release/test_build_macos_release.py
 
+      # Retain linked/debug products, but remove compiler scratch state before
+      # it consumes archive/transfer capacity.
+      - name: Compact Rust compiler scratch state and report cache sizes
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py compact
+
+      # PRs may read main's cache, but only a successful protected-main run
+      # publishes executable products.
+      - name: Save trusted Rust build products
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.rust-build-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
+          key: ${{ steps.rust-cache-key.outputs.key }}
+
+      - name: Preserve Rust test timing and queue logs
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: rust-test-timings-${{ matrix.os }}
+          path: ${{ env.ARKDECK_RUST_TEST_REPORT_DIR }}
+          if-no-files-found: warn
+          retention-days: 7
+
+  contracts:
+    name: Rust contract parity (${{ matrix.os }})
+    # Same policy gate and hosts as `workspace`, beside it rather than after
+    # it. check-contracts.py builds the published and candidate views from
+    # isolated copies of the sources in their own Cargo targets and reads
+    # none of the workspace job's products. When the inputs equal the
+    # published base it runs only the candidate view and skips the lint and
+    # workspace tests that the `workspace` job runs on the same revision in
+    # the same Rust CI run; this workflow's result, which the swift aggregate
+    # requires, needs both jobs. On macOS the candidate view also runs the
+    # Rust owner checks (darwin only in check-contracts.py), so every host
+    # keeps its own job.
+    needs: policy
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26, windows-latest]
+    runs-on: ${{ matrix.os }}
+    # A change to the contract inputs builds, lints and tests both views, each
+    # in its own target: 27.6 minutes on macOS from main's cache on #2311
+    # (run 36440456252), against 3.2 on Linux and 4.6 on Windows. So macOS
+    # gets 50 minutes and the other hosts 30, as the workspace job does.
+    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
+    steps:
+      - name: Checkout exact revision with runner Git
+        working-directory: .
+        env:
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          # Contract/corpus digests are over repository bytes on every host.
+          git config core.autocrlf false
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Set up Python for contract validation
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0 (Node 24)
+        with:
+          python-version: "3.14"
+
+      - name: Install pinned contract validation dependencies
+        run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0
+
+      - name: Activate workspace toolchain and required components
+        run: |
+          set -eu
+          rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+
+      - name: Fetch the locked dependency graph for all host platforms
+        env:
+          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
+        run: sh ../scripts/ci/arkforge-cargo-fetch.sh
+
+      # The views' Cargo targets live under this job's own cache root, keyed
+      # apart from the workspace job's (see there).
+      - name: Configure task-owned Rust CI paths
+        run: |
+          echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"
+          echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"
+
+      - name: Identify compatible Rust build products
+        id: rust-cache-key
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py key
+
+      - name: Restore trusted Rust build products
+        id: rust-build-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
+          key: ${{ steps.rust-cache-key.outputs.key }}
+          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
+
+      - name: Synchronize exact sources and fresh Git references
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py prepare
+
       - name: Published consumer and candidate contract parity
         working-directory: .
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"
 
-      # Retain linked/debug products and isolated contract targets, but remove
-      # compiler scratch state before it consumes archive/transfer capacity.
+      # Retain the isolated contract targets, but remove compiler scratch state
+      # before it consumes archive/transfer capacity.
       - name: Compact Rust compiler scratch state and report cache sizes
         working-directory: .
         run: python rust/scripts/ci-workspace.py compact
@@ -322,11 +447,11 @@ jobs:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
           key: ${{ steps.rust-cache-key.outputs.key }}
 
-      - name: Preserve Rust test timing and queue logs
+      - name: Preserve Rust contract test timing and queue logs
         if: always() && runner.os == 'macOS'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
         with:
-          name: rust-test-timings-${{ matrix.os }}
+          name: rust-contract-test-timings-${{ matrix.os }}
           path: ${{ env.ARKDECK_RUST_TEST_REPORT_DIR }}
           if-no-files-found: warn
           retention-days: 7

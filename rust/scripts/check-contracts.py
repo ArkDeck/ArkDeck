@@ -100,7 +100,9 @@ def commands(view: Path, output: Path, *, owners: bool = False,
              checkout_tested: bool = False) -> list[tuple[list[str], Path]]:
     rust = view / "rust"
     if checkout_tested:
-        # The lane lints and tests the checkout before this script runs, and a
+        # The lane lints and tests the checkout (locally before this script
+        # runs; in hosted CI in the workspace job beside this one, and the Rust
+        # CI result requires both), and a
         # view of the published inputs compiles the checkout's own sources. It
         # differs only in the two input documents its bindings embed:
         # SWIFT_BASELINE names the merge-base commit and CONTRACT_INPUTS is the

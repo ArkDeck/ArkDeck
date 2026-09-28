@@ -567,7 +567,7 @@ def validate_automatic_check_contract(
             )
 
 
-RUST_CI_JOBS = ("policy", "workspace")
+RUST_CI_JOBS = ("policy", "workspace", "contracts")
 # The Rust lane receives exactly one secret, the read-only ArkForge deploy key,
 # by name. Each job hands it to its locked fetch alone: the wrapper keeps the
 # key and the SSH rewrite of github.com out of GITHUB_ENV and removes the key
@@ -591,8 +591,8 @@ RUST_SECRET_DECLARATION = (
     "      ARKFORGE_DEPLOY_KEY:\n"
     "        required: true\n"
 )
-# Both jobs check out, set up and fetch the same way: every contract digest is
-# over repository bytes on every host.
+# Every job checks out, sets up and fetches the same way: every contract digest
+# is over repository bytes on every host.
 RUST_SHARED_JOB_TOKENS = (
     "        shell: bash\n        working-directory: rust\n",
     "git config core.autocrlf false",
@@ -645,16 +645,27 @@ RUST_POLICY_TOKENS = (
     "run: cargo vet --locked --no-registry-suggestions",
     "run: git diff --exit-code -- Cargo.lock supply-chain",
 )
-# Answers that can differ between hosts: each runs exactly once per host, in
-# the `workspace` matrix.
-RUST_WORKSPACE_TOKENS = (
+# The two host matrices, `workspace` and `contracts`, each carry these once:
+# the same policy gate (and only it, so neither waits for the other), hosts,
+# worker count and cache discipline.
+RUST_NATIVE_JOB_TOKENS = (
     "    needs: policy\n",
-    'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-build" >> "$GITHUB_ENV"',
-    'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"',
+    "      fail-fast: false\n",
+    "        os: [ubuntu-latest, macos-26, windows-latest]\n",
+    "    runs-on: ${{ matrix.os }}\n",
+    "    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}\n",
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}\n",
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
     "run: python rust/scripts/ci-workspace.py compact\n",
+)
+# Answers that can differ between hosts: each runs exactly once per host, in
+# the `workspace` matrix.
+RUST_WORKSPACE_TOKENS = (
+    # Each native job owns its cache root; the root is part of the cache key,
+    # so the two jobs never restore, carry or save each other's products.
+    'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-workspace" >> "$GITHUB_ENV"',
+    'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-test-timings" >> "$GITHUB_ENV"',
     # Only these two steps compile and run the checkout. Every contract
     # step either reads Git objects at the pinned Swift commit or builds a
     # separate candidate view, so dropping either one lets a workspace
@@ -666,6 +677,12 @@ RUST_WORKSPACE_TOKENS = (
     "run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace --all-targets -- -D warnings\n",
     "        working-directory: .\n"
     "        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py\n",
+)
+# The published and candidate contract views: once per host, in the
+# `contracts` matrix beside `workspace`, since they read none of its products.
+RUST_CONTRACTS_TOKENS = (
+    'echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"',
+    'echo "ARKDECK_RUST_TEST_REPORT_DIR=$RUNNER_TEMP/rust-contract-test-timings" >> "$GITHUB_ENV"',
     "        working-directory: .\n"
     '        run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"\n',
     "      - name: Preserve actual read-only recordings\n"
@@ -683,9 +700,10 @@ def validate_rust_ci_contract(text: str) -> None:
     """Require native host checks and fail-closed locked dependency audits.
 
     The checks whose answer cannot depend on the host run once, in `policy`.
-    Lint, the workspace tests and the contract views run on every host, in the
-    `workspace` matrix. The swift aggregate requires both through the calling
-    job's result.
+    Lint and the workspace tests run on every host, in the `workspace` matrix;
+    the contract views run on every host beside them, in the `contracts`
+    matrix. The swift aggregate requires all three through the calling job's
+    result.
     """
 
     if extract_event_names(text) != ("workflow_call",):
@@ -694,27 +712,29 @@ def validate_rust_ci_contract(text: str) -> None:
         raise WorkflowContractError("Rust CI must be limited to reading contents")
     if extract_job_names(text) != RUST_CI_JOBS:
         raise WorkflowContractError(
-            "Rust CI must run its host-independent checks in `policy` and its "
-            "host checks in the `workspace` matrix"
+            "Rust CI must run its host-independent checks in `policy`, its "
+            "workspace checks in the `workspace` matrix and its contract views "
+            "in the `contracts` matrix"
         )
     policy = _job_block(text, "policy")
     workspace = _job_block(text, "workspace")
+    contracts = _job_block(text, "contracts")
     if "    runs-on: ubuntu-latest\n" not in policy or "matrix" in policy:
         raise WorkflowContractError("Rust policy checks must run once, on one fixed host")
-    for token in (
-        "      fail-fast: false\n",
-        "        os: [ubuntu-latest, macos-26, windows-latest]\n",
-        "    runs-on: ${{ matrix.os }}\n",
-    ):
-        if token not in workspace:
-            raise WorkflowContractError(f"Rust workspace matrix missing contract token: {token}")
-    for name, block in (("policy", policy), ("workspace", workspace)):
+    for name, block in (("workspace", workspace), ("contracts", contracts)):
+        for token in RUST_NATIVE_JOB_TOKENS:
+            if block.count(token) != 1 or text.count(token) != 2:
+                raise WorkflowContractError(
+                    f"Rust {name} matrix must carry this exactly once: {token}"
+                )
+    for name, block in (("policy", policy), ("workspace", workspace), ("contracts", contracts)):
         for token in RUST_SHARED_JOB_TOKENS:
             if token not in block:
                 raise WorkflowContractError(f"Rust {name} job missing contract token: {token}")
     for name, block, tokens in (
         ("policy", policy, RUST_POLICY_TOKENS),
         ("workspace", workspace, RUST_WORKSPACE_TOKENS),
+        ("contracts", contracts, RUST_CONTRACTS_TOKENS),
     ):
         for token in tokens:
             if token not in block:
@@ -728,10 +748,11 @@ def validate_rust_ci_contract(text: str) -> None:
             "Rust CI must declare the ArkForge deploy key as its one required secret"
         )
     if (
-        text.count(RUST_FETCH_SECRET) != 2
-        or text.count(RUST_FETCH_STEP) != 2
+        text.count(RUST_FETCH_SECRET) != 3
+        or text.count(RUST_FETCH_STEP) != 3
         or policy.count(RUST_FETCH_STEP) != 1
         or workspace.count(RUST_FETCH_STEP) != 1
+        or contracts.count(RUST_FETCH_STEP) != 1
     ):
         raise WorkflowContractError(
             "Rust CI must hand the ArkForge deploy key to each job's locked fetch and "
@@ -749,11 +770,12 @@ def validate_rust_ci_contract(text: str) -> None:
     if "restore-keys:" in policy:
         raise WorkflowContractError("Policy tool cache must not use prefix fallback")
     cache_key = "          key: ${{ steps.rust-cache-key.outputs.key }}\n"
-    if workspace.count(cache_key) != 2:
-        raise WorkflowContractError("Rust build restore and save must use the same daily compatibility key")
     prefix = "          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}\n"
-    if workspace.count("restore-keys:") != 1 or prefix not in workspace:
-        raise WorkflowContractError("Rust build cache fallback must retain every compatibility dimension")
+    for block in (workspace, contracts):
+        if block.count(cache_key) != 2:
+            raise WorkflowContractError("Rust build restore and save must use the same daily compatibility key")
+        if block.count("restore-keys:") != 1 or prefix not in block:
+            raise WorkflowContractError("Rust build cache fallback must retain every compatibility dimension")
     save_block = (
         "      - name: Save trusted Rust build products\n"
         "        if: >-\n"
@@ -762,7 +784,7 @@ def validate_rust_ci_contract(text: str) -> None:
         "          steps.rust-build-cache.outputs.cache-hit != 'true'\n"
         "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
     )
-    if save_block not in workspace:
+    if workspace.count(save_block) != 1 or contracts.count(save_block) != 1:
         raise WorkflowContractError("Only successful protected main may publish Rust build products")
     if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2 or policy.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
         raise WorkflowContractError(
@@ -800,15 +822,28 @@ def validate_rust_ci_contract(text: str) -> None:
         workspace.index("run: python rust/scripts/ci-workspace.py prepare"),
         workspace.index("run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace"),
         workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py"),
-        workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py"),
         workspace.index("run: python rust/scripts/ci-workspace.py compact"),
         workspace.index("      - name: Save trusted Rust build products"),
-        workspace.index("      - name: Preserve actual read-only recordings"),
     ]
     if order != sorted(order):
         raise WorkflowContractError(
-            "Rust workspace job must fetch locked metadata before it lints, tests and "
-            "runs the contract views, and preserve recordings after their producer runs"
+            "Rust workspace job must fetch locked metadata before it lints and tests"
+        )
+    order = [
+        contracts.index("rustup toolchain install"),
+        contracts.index(RUST_FETCH_RUN),
+        contracts.index("run: python rust/scripts/ci-workspace.py key"),
+        contracts.index("      - name: Restore trusted Rust build products"),
+        contracts.index("run: python rust/scripts/ci-workspace.py prepare"),
+        contracts.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py"),
+        contracts.index("run: python rust/scripts/ci-workspace.py compact"),
+        contracts.index("      - name: Save trusted Rust build products"),
+        contracts.index("      - name: Preserve actual read-only recordings"),
+    ]
+    if order != sorted(order):
+        raise WorkflowContractError(
+            "Rust contracts job must fetch locked metadata before it runs the contract "
+            "views, and preserve recordings after their producer runs"
         )
 
 
@@ -1194,6 +1229,11 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "run: python rust/scripts/generate-contract.py --check", "run: true"
             ),
             rust.replace("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py", "run: true"),
+            # The contract views wait for no host job, and no job goes missing.
+            rust[:rust.index("  contracts:\n")] + rust[rust.index("  contracts:\n"):].replace(
+                "    needs: policy\n", "    needs: [policy, workspace]\n"
+            ),
+            rust[:rust.index("  contracts:\n")],
         )
         for mutated in mutations:
             # A mutation that no longer matches the workflow proves nothing.
