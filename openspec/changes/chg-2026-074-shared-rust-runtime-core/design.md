@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: fdd610224ca88ef9dc37878019792690aa904478
-  sha256: 94d97b579b1d7e73965fc83568bb82e48c1003c30cd22001016a701896b73fa8
+  blob: 2e9ad45ab4f10d57b859245090730f100a06cc35
+  sha256: a1fcfdea8c2f409acccb609bcbdf1e0871adb2823b95741f0a52f75d4bd1de6e
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the

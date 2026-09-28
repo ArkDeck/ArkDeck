@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-26 against protected main `4eb8c677` (#2230), revision 11. This list tracks
+Updated 2026-09-28 against protected main `2e687ca82` (#2298), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -8,7 +8,7 @@ goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product wor
 
 | Routed methods on the standalone Rust daemon | Operations executable in Rust | Golden Journeys on Rust | App facades on ClientKit | Registered CLI feature names on Rust | Swift targets deleted |
 | --- | --- | --- | --- | --- | --- |
-| 105 / 105 (installed facade serves 3 locally) | 17 / 30 (57%; by operation below) | 0 / 5 | 16 extracted; 0 matching source files remain | 131 / 256 (187 parser command names total) | 0 / 6 |
+| 105 / 105 (installed facade serves 3 locally) | 17 / 30 on the isolated root; 26 / 30 counting the production composition (maintainer ruling 2026-09-28, below) | 0 / 5 | 16 extracted; 0 matching source files remain | 140 / 256 (199 parser command names total) | 0 / 6 |
 
 Two of the six no longer move (every method is routed, no facade file is left in Workflows) and
 the CLI one joins names by spelling, so this refresh adds the numbers below. They sit beside the
@@ -17,11 +17,31 @@ six and replace none of them; the notes further down say how each one relates to
 | Supplement | At the pinned main |
 | --- | --- |
 | Routed methods that reach an owner the daemon composes | 104 / 105 (`trace.inspect` answers the owner-absent default, as Swift's daemon without a Trace inspector does) |
-| Operations run end to end on either standalone composition | 25 / 30: the 17, and eight `workspace.*` run only by the production composition under a temporary home |
+| Operations run end to end on either standalone composition | 26 / 30: the 17, and nine `workspace.*` run only by the production composition under a temporary home (`workspace.run-tests@1` joined with #2265). Missing: `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1` (in-process replays only) and `flash.full-restore@1` with its alias (in-process with a fake lane only, #2231, #2282) |
 | Operations the Rust planner materializes | 28 / 30 (not the two Flash operations) |
-| Registry leaves the Rust CLI answers | 197 / 209: 187 ported, 10 answered by name as `blockedByProductDefect` |
+| Registry leaves the Rust CLI answers | 209 / 209 by reading the parser at the pin (199 positional names, plus the six `runtime update` and four update-feed leaves that `parse()` dispatches first); `blocked_leaves.rs` was removed with #2272. Not yet re-measured with a built binary (`count_cli.py` needs its BLOCKED parse adapted); the release-candidate check measures it |
 | CLI ledger entries the parity audit classifies implemented | 244 / 256 (2 leaf missing with the daemon routed, 5 owner missing, 5 tombstones) |
 | App sources importing `ArkDeckWorkflows`; `project.pbxproj` lines naming it | 0; 0 (11; 8 at the previous pin, `b958ff44`) |
+
+## Maintainer rulings, 2026-09-28
+
+The cutover runbook's opening section records them: notarization is required (overriding Q11); the Rust
+performance baseline and a soak rerun are not window conditions; the ArkForge digest domains follow the
+pinned ArkForge (`usb-topology`, `admission-device-facts`), with the release shipping an `arkforged`
+built from that pin; no Swift transitional release and no separate Swift rollback build; a notarized DMG
+ships; and real-device acceptance (`REAL_DEVICE_PASS`, SPK-8) comes last, on the installed release
+candidate after all software work, including deleting the Swift runtime, CLI and facade (design r10
+route C). Because acceptance now runs on the production composition, its temporary-home runs count
+toward the operations measure. Defaults applied meanwhile, which the maintainer may change: the GJ-5
+development-root seams (P1/P2) are not built; the crash-path HDC degrade (Q12 option B) waits until
+after G5 because it changes AC-HDC-003-02; trace database preparation stays in the App's own process,
+with `trace.inspect` unavailable as ruled on 2026-09-25.
+
+Software gaps found on 2026-09-28 and scheduled before the window: `agent.run` refuses the Flash
+operations on Rust (GJ-4's scripted entry), and the recovery broker still refuses
+`executePinnedRequest`; the cutover preflight does not refuse two parked Loader transitions on one
+target, which stops the Rust daemon from starting; SPK-8's two negative cases; the App export and DMG
+producer.
 
 These are separate coverage measures, not a weighted completion percentage. A routed method or
 CLI entry is not proof of complete behavior, installed activation or hardware acceptance. At the
@@ -152,7 +172,7 @@ import json
 import re
 import subprocess
 
-ref = "4eb8c677886e92b4438ba3d03ff80897644c5019"
+ref = "2e687ca8214e835bd2672bca8eedb55144fc83b6"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 def names(path):
@@ -243,6 +263,17 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 maintainer's 2026-09-19 ruling to port the carriers it names unchanged.
 
 ## History
+
+2026-09-28 (`2e687ca82`): 71 merges since `4eb8c677`, #2231–#2300. Routes stay 105. The isolated-root
+operations measure stays 17; either composition 26 (+`workspace.run-tests@1`, #2265). CLI parser names
+187 → 199 and registered names 131 → 140; every registry leaf is answered (Flash run and binding #2235/#2245,
+support bundle #2233, signing writes #2270/#2272, update and update feed #2239/#2272). M4: Flash issuance,
+admission, run, parking and reconcile (#2231), DEC-016 recovery (#2243), the ArkForge lane ported
+(#2251–#2263) and native execution composed in both compositions at ArkForge `c1dc0553` (#2282), lane
+preview materialized (#2284). M5 preparation: the runbook (#2258, #2264, #2273), preflight refusals
+(#2255, #2298), local Rust helpers and rollback coverage (#2267, #2268). Performance: formal-scale
+capture archived with `baselineEligible: false` (#2296). GJ on Rust 0/5; Swift retirement 0/6. Counts
+taken with the PYCOUNT above at the new pin and `count_operations.py` from the 09-26 run record.
 
 2026-09-26 (`4eb8c677`): 145 merges since `b958ff44`, #2085–#2230 (#2087 among them is the
 previous refresh itself): 47 under XPA-018, 24 under XPA-015, 24 under XPA-014, 20 under XPA-019,
