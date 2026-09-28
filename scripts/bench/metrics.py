@@ -361,18 +361,28 @@ IPC_SAMPLES_PER_CONNECTION = 32
 
 
 def split_at_release(
-    samples: list[float], fraction: float = RESIDENT_SET_RELEASE_FRACTION
+    samples: list[float], fraction: float = RESIDENT_SET_RELEASE_FRACTION,
+    *, observation_indices: list[int] | None = None,
 ) -> tuple[list[float], list[float], int | None]:
     """Split a resident-set series at its largest qualifying downward step.
 
     Returns `(plateau, steady, index)`.  With no qualifying step the whole
     series remains the plateau, steady is empty, and the index is `None`.
     No observation of a release means no measurement of the post-release phase.
+    Optional original observation indices prevent a missing read from creating
+    an artificial adjacent pair in a filtered series.
     """
 
+    if observation_indices is not None:
+        if (len(observation_indices) != len(samples)
+                or any(type(i) is not int or i < 0 for i in observation_indices)
+                or any(b <= a for a, b in zip(observation_indices, observation_indices[1:]))):
+            raise ValueError("invalid RSS observation indices")
     best_index: int | None = None
     best_drop = 0.0
     for index in range(1, len(samples)):
+        if observation_indices is not None and observation_indices[index] != observation_indices[index - 1] + 1:
+            continue  # A missing read cannot prove an adjacent-sample release.
         previous = samples[index - 1]
         drop = previous - samples[index]
         if previous > 0 and drop / previous >= fraction and drop > best_drop:
@@ -599,12 +609,19 @@ def _execute_run(context, state_directory, samples, scale):
         runtime.start()
         if runtime.process is None:
             raise RunFailed("the daemon stopped before the idle window")
-        pid = runtime.process.pid
+        process = runtime.process
+        pid = process.pid
         resident_series: list[float] = []
         resident_times: list[float] = []
-        resource_started = clocks.awake_seconds()
-        scale["residentSetPhaseMethod"] = "observed-release-v2"
+        resident_indices: list[int] = []
+        observation_index = 0
+        scale["residentSetPhaseMethod"] = "observed-release-v3"
         scale["idleWindowSeconds"] = context.idle_seconds
+        record({"kind": "idleWindow", "processId": pid,
+                "phaseMethod": "observed-release-v3",
+                "timeOrigin": "after-idle-daemon-health",
+                "startupDiagnostics": runtime.start_diagnostics})
+        resource_started = clocks.awake_seconds()
         idle_deadline = clocks.Deadline(max(1, context.idle_seconds))
         while not idle_deadline.expired():
             # One sample per second: the resource readers shell out, and
@@ -612,14 +629,27 @@ def _execute_run(context, state_directory, samples, scale):
             # busiest thing on an otherwise idle host.
             time.sleep(1.0)
             guard("idle-sample-before")
+            if process.poll() is not None:
+                record({"kind": "idleResources", "processId": pid,
+                        "observationIndex": observation_index, "status": "INVALID",
+                        "reason": "owned daemon exited before resource sampling"})
+                raise RunFailed("owned idle daemon exited before resource sampling")
             sample_started = clocks.awake_seconds() - resource_started
             sample = harness.sample_process_resources(pid)
             elapsed = clocks.awake_seconds() - resource_started
-            record({"kind": "idleResources", "startedAtSeconds": sample_started,
+            alive = process.poll() is None
+            record({"kind": "idleResources", "processId": pid,
+                    "observationIndex": observation_index,
+                    "ownedProcessAliveAfterSample": alive,
+                    "status": "MEASURED" if alive else "INVALID",
+                    "startedAtSeconds": sample_started,
                     "finishedAtSeconds": elapsed, **sample.as_document()})
+            if not alive:
+                raise RunFailed("owned idle daemon exited during resource sampling")
             if sample.resident_set_bytes is not None:
                 resident_series.append(float(sample.resident_set_bytes))
                 resident_times.append(sample_started)
+                resident_indices.append(observation_index)
             if sample.cpu_percent is not None:
                 samples["daemon.idleCpuPercent"].append(sample.cpu_percent)
             if sample.thread_count is not None:
@@ -628,9 +658,13 @@ def _execute_run(context, state_directory, samples, scale):
                 samples["daemon.idleOpenFileDescriptorCount"].append(
                     float(sample.open_file_descriptor_count)
                 )
-        plateau, steady, release_index = split_at_release(resident_series)
+            observation_index += 1
+        plateau, steady, release_index = split_at_release(
+            resident_series, observation_indices=resident_indices)
         samples["daemon.residentSetPlateau"] = plateau
         samples["daemon.residentSetSteady"] = steady
+        scale["residentSetObservationIndices"] = resident_indices
+        scale["residentSetMissingSampleCount"] = observation_index - len(resident_series)
         scale["residentSetReleaseObserved"] = release_index is not None
         scale["residentSetReleaseAtSeconds"] = (
             resident_times[release_index] if release_index is not None else None
@@ -639,9 +673,12 @@ def _execute_run(context, state_directory, samples, scale):
             {"elapsedSeconds": elapsed, "bytes": value}
             for elapsed, value in zip(resident_times, resident_series)
         ]
+        if not resident_series:
+            scale["unmeasured"] = {"daemon.residentSetPlateau":
+                "no RSS reading obtained in the fixed idle window"}
         if not steady:
-            scale["unmeasured"] = {"daemon.residentSetSteady":
-                "no qualifying release observed in the fixed idle window; post-release RSS is not measured"}
+            scale.setdefault("unmeasured", {}).update({"daemon.residentSetSteady":
+                "no qualifying release observed in the fixed idle window; post-release RSS is not measured"})
         guard("idle-after")
         scale["residentSetSampleCount"] = len(resident_series)
     finally:

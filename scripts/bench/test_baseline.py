@@ -481,7 +481,9 @@ class MissingResidentPhaseTests(unittest.TestCase):
                 calls.append(index)
                 samples = {"daemon.residentSetPlateau": [20.0],
                            "daemon.coldStart": [10.0 * (index + 1) if unstable else 10.0]}
-                scale = {"residentSetPhaseMethod": "observed-release-v2",
+                scale = {"residentSetPhaseMethod": "observed-release-v3",
+                         "residentSetObservationIndices": [0],
+                         "residentSetMissingSampleCount": 1,
                          "idleWindowSeconds": 120,
                          "residentSetRawSamples": [{"elapsedSeconds": 1.2, "bytes": 20.0}]}
                 if index < measured_runs:
@@ -514,6 +516,12 @@ class MissingResidentPhaseTests(unittest.TestCase):
                 else:
                     self.assertIsNone(steady['partialMeasurement'])
                 self.assertNotIn('residentSetRawSamples', doc['metrics']['daemon.residentSetPlateau']['scale'])
+                rss_scale = doc['metrics']['daemon.residentSetPlateau']['scale']
+                self.assertEqual(rss_scale['residentSetPhaseMethod'], 'observed-release-v3')
+                self.assertNotIn('residentSetPhaseMethod', doc['metrics']['daemon.coldStart']['scale'])
+                for key in ('residentSetObservationIndices', 'residentSetMissingSampleCount'):
+                    self.assertNotIn(key, rss_scale)
+                    self.assertIn(key, doc['runs'][0]['scale'])
                 self.assertEqual(len(doc['runs']), 3)
                 self.assertIn('residentSetRawSamples', doc['runs'][0]['scale'])
 

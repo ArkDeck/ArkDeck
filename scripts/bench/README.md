@@ -191,8 +191,20 @@ Coverage gaps do not waive instability: a quiet release capture still exits 2
 if another measured metric is unstable. A stable but incomplete capture exits 0
 with explicit gaps and `baselineEligible: false`; exit 0 alone never adopts a
 baseline. Only explicit debug/loaded-host advisory captures waive that exit.
-`residentSetPhaseMethod: observed-release-v2` and `idleWindowSeconds` belong to
-the RSS comparison identity; old fallback-to-plateau results are not comparable.
+`residentSetPhaseMethod: observed-release-v3` and `idleWindowSeconds` belong to
+the RSS comparison identity; v2 and older results are not silently comparable.
+Version 3 preserves original observation indices when RSS reads are missing:
+a decrease across a missing read cannot prove a consecutive release. Raw records
+retain each attempted sample, while `residentSetObservationIndices` maps accepted
+RSS values to those attempts and `residentSetMissingSampleCount` counts gaps.
+No usable RSS readings means neither plateau nor steady is measured.
+
+The idle window belongs to a freshly started daemon after its health handshake,
+not the previous IPC process. Its raw `idleWindow` record includes the process
+ID, startup diagnostics and time origin. Each resource read checks that the
+owned child is alive before and after sampling. If it exits, capture fails and
+archives the invalid attempt without accepting its values. The 25% threshold,
+one-second sampling delay and fixed observation duration are unchanged.
 
 Capture observation identity `phase-checkpoints-v1` appears in every new raw
 record and successful document. It is evidence metadata, not a new metric scale
