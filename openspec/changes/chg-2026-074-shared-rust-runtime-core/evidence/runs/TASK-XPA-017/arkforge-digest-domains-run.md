@@ -115,4 +115,22 @@ Not run:
 
 ## CI
 
-Pending.
+PR #2303, first head `13e50929c`, Swift CI run `36416418998`.
+
+- **Passed:** `guard`, `plan`, all four Rust lanes, `app-build`,
+  `ds-interactions`, `ds-tokens`.
+- **Failed:** `swift-tests`, and with it the `swift` aggregate. The failure
+  is `CaptureDiagnosticsTraceOracleContractTests.testSwiftCapturesTheTraceLegsOfTheSharedFakeDevice`.
+  Its recorded `hdc-calls.log` differs in the order of two trace
+  `param get` calls. On CI the case took 92.5 s.
+
+Recorded as an invalid run, by all four criteria:
+
+1. The failure is outside this diff. The diff touches only the two ArkForge
+   domain constants, and nothing in trace capture.
+2. It is a known kind: an HDC call-order race under load.
+3. It passes when run alone: the class passed locally in 5.7 s
+   (`/private/tmp/arkdeck-lane1-logs/s1-trace-oracle.log`).
+4. It is unrelated to the change.
+
+This record-only commit re-runs CI.
