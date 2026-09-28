@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 # Two jobs, both required through this workflow's result. `policy` runs once
 # the checks whose answer cannot depend on the host: the generated-input and
@@ -45,7 +46,6 @@ jobs:
       - name: Checkout exact revision with runner Git
         working-directory: .
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
@@ -55,7 +55,7 @@ jobs:
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+refs/heads/main:refs/remotes/origin/main" \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
@@ -104,20 +104,9 @@ jobs:
         working-directory: .
         run: python rust/scripts/check-arkforge-pin.py --run-vectors
 
-      # cargo-deny and cargo-vet are the policy checkers, not the workspace,
-      # and compiling them from source on every run was the Swift CI critical
-      # path from the day this lane arrived (#1768): medians over the hosted
-      # runs of #1827..#1846 were 7.5 of the Windows job's 11.7 minutes, 4.8
-      # of macOS's 7.4 and 3.7 of Linux's 5.3. The cache below memoizes the
-      # output of the two `--locked` installs and nothing else: the key names
-      # both pinned versions and the committed toolchain file, there is no
-      # prefix fallback, only protected main writes entries (the Swift caches'
-      # trust rule), and the version read-back fails closed before either
-      # policy check can run against a binary that is not the pinned one. The
-      # toolchain file names the `stable` channel, so the key moves when that
-      # file changes, not when stable advances; the two tools are standalone
-      # binaries that do not depend on the rustc that built them, so an entry
-      # built by an earlier stable stays valid.
+      # The small exact-version cache is the fast path. A pinned upstream
+      # cargo-deny binary and a successful-main cargo-vet artifact avoid
+      # recompiling the tools when large workspace caches evict that entry.
       - name: Restore pinned dependency policy tools
         id: policy-tools
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
@@ -128,11 +117,12 @@ jobs:
           key: arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}
 
       - name: Install pinned dependency policy tools
-        if: steps.policy-tools.outputs.cache-hit != 'true'
-        run: |
-          set -eu
-          cargo install --locked --version 0.20.2 cargo-deny
-          cargo install --locked --version 0.10.2 cargo-vet
+        id: policy-install
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARKDECK_POLICY_ARTIFACT_DIR: ${{ runner.temp }}/rust-policy-tools
+        run: python rust/scripts/ci-policy-tools.py
 
       - name: Require the pinned dependency policy tool versions
         run: |
@@ -162,6 +152,15 @@ jobs:
 
       - name: Verify checks left locked inputs unchanged
         run: git diff --exit-code -- Cargo.lock supply-chain
+
+      - name: Preserve trusted cargo-vet binary independently of cache eviction
+        if: success() && github.ref == 'refs/heads/main' && steps.policy-install.outputs.publish-vet == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: cargo-vet-linux-x64-0.10.2-v1
+          path: ${{ runner.temp }}/rust-policy-tools/
+          if-no-files-found: error
+          retention-days: 30
 
   workspace:
     name: Rust workspace (${{ matrix.os }})
@@ -194,7 +193,6 @@ jobs:
       - name: Checkout exact revision with runner Git
         working-directory: .
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
@@ -204,7 +202,7 @@ jobs:
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+refs/heads/main:refs/remotes/origin/main" \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
@@ -248,8 +246,8 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
-          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}
-          restore-keys: ${{ steps.rust-cache-key.outputs.key }}-
+          key: ${{ steps.rust-cache-key.outputs.key }}
+          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
 
       - name: Synchronize exact sources and fresh Git references
         working-directory: .
@@ -296,6 +294,12 @@ jobs:
         working-directory: .
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"
 
+      # Retain linked/debug products and isolated contract targets, but remove
+      # compiler scratch state before it consumes archive/transfer capacity.
+      - name: Compact Rust compiler scratch state and report cache sizes
+        working-directory: .
+        run: python rust/scripts/ci-workspace.py compact
+
       # PRs may read main's cache, but only a successful protected-main run
       # publishes executable products. Each contract view retains its own target.
       - name: Save trusted Rust build products
@@ -306,7 +310,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
-          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}
+          key: ${{ steps.rust-cache-key.outputs.key }}
 
       - name: Preserve Rust test timing and queue logs
         if: always() && runner.os == 'macOS'

@@ -1,0 +1,43 @@
+name: CI cache retention
+
+on:
+  workflow_run:
+    workflows: [Swift CI]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cache-retention
+  cancel-in-progress: false
+
+jobs:
+  retain-rust:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      # workflow_run runs from protected main, never the triggering PR branch.
+      - name: Checkout trusted maintenance revision
+        env:
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags origin "$ARKDECK_CI_SHA"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Retain one main Rust cache per runner format
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/retain-rust-caches.py --apply

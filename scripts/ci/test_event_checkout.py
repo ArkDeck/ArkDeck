@@ -14,11 +14,13 @@ import tempfile
 import unittest
 
 WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/swift-ci.yml"
-JOBS = ("plan", "swift-tests", "app-build", "ds-interactions")
+JOBS = ("plan", "swift-tests", "app-build", "ds-interactions", "rust-policy", "rust-workspace")
 
 
 def checkout_script(job: str) -> str:
-    text = WORKFLOW.read_text()
+    workflow = WORKFLOW.with_name("rust-ci.yml") if job.startswith("rust-") else WORKFLOW
+    job = job.removeprefix("rust-")
+    text = workflow.read_text()
     match = re.search(rf"^  {re.escape(job)}:\n(.*?)(?=^  [a-z][a-z-]*:\n|\Z)", text, re.M | re.S)
     if match is None:
         raise AssertionError(f"missing job {job}")
@@ -86,7 +88,7 @@ class EventCheckoutTests(unittest.TestCase):
                     self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertEqual(self.git("rev-parse", "HEAD", cwd=work).stdout.strip(), self.event_sha)
                     self.assertEqual((work / "tracked.txt").read_text(), "event contents")
-                    if job == "plan":
+                    if job == "plan" or job.startswith("rust-"):
                         self.assertEqual(self.git("rev-parse", "origin/main", cwd=work).stdout.strip(), self.tip_sha)
 
     def test_missing_event_sha_fails_without_falling_back_to_new_ref(self):

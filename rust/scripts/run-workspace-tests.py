@@ -27,6 +27,10 @@ ISOLATED = frozenset({
     ("arkdeck-agentd", "workspace_tests_process"),
     ("arkdeck-agentd", "workspace_checkpoint_process"),
     ("arkdeck-cli", "maintainer_contracts"),
+    # Private random account roots and Unix sockets; their fake Runtime threads
+    # are joined and CLI children reaped. No shared HDC oracle or TCP allocator.
+    ("arkdeck-cli", "domain_leaves"),
+    ("arkdeck-cli", "runtime_service"),
 })
 
 
