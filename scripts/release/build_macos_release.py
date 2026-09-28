@@ -18,9 +18,8 @@ Two modes share one assembly and verification path:
 release   (maintainer only: Developer ID identity, provisioning profiles,
           notary credentials) builds every component from a clean checkout:
           1. the Rust helper pair through
-             Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh
-             (ARKDECK_HELPER_RUNTIME=rust), which signs, notarizes, staples and
-             assesses the pair itself;
+             Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh, which
+             signs, notarizes, staples and assesses the pair itself;
           2. ArkForge.bundle through the ArkForge checkout's
              packaging/macos/package-arkforge.sh, only when that checkout is
              clean and its HEAD equals the pin; the bundle is covered by the
@@ -379,7 +378,6 @@ def build_helpers(work: Path, environment: Mapping[str, str], identity: str) -> 
     output = work / "helpers"
     helper_environment = dict(environment)
     helper_environment.update({
-        "ARKDECK_HELPER_RUNTIME": "rust",
         "ARKDECK_HELPER_OUTPUT": str(output),
         "ARKDECK_CODESIGN_IDENTITY": identity,
     })

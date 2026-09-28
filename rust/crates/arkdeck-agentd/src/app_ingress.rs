@@ -25,7 +25,7 @@ pub(crate) mod jobs;
 mod storage;
 
 const SERVICE: &str = "com.arkdeck.agentd";
-// Same policy as AgentXPCContract and the production facade. No caller override.
+// Same policy as AgentXPCContract. No caller override.
 const APP_REQUIREMENT: &str = "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.desktop\"";
 
 pub(crate) struct Configuration {
@@ -36,9 +36,8 @@ impl Configuration {
         let Some(mode) = std::env::var_os("ARKDECK_APP_INGRESS") else {
             return Ok(None);
         };
-        // Pairing is incompatible even if the executable would infer its Swift
-        // sibling instead of receiving ARKDECK_SWIFT_DAEMON explicitly.
-        if mode != "history" || crate::facade::swift_executable().is_some() {
+        // `main.rs` has already refused the retired facade's name and pairing.
+        if mode != "history" {
             return Err(invalid(
                 "App ingress requires standalone history composition",
             ));

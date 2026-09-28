@@ -1,11 +1,11 @@
 #!/bin/bash
 # Lays out and signs the helper pair whose main programs are the Rust CLI and
-# daemon (CHG-2026-074 M5, G5 slice 20a), and, when its caller names one, keeps
-# the Swift helper it replaces beside it for one cycle. Its callers own
-# everything around it: build-helpers.sh with ARKDECK_HELPER_RUNTIME=rust is the
-# release (validated provisioning profiles, Developer ID with a secure
-# timestamp, notarization, stapling and Gatekeeper assessment; it retains no
-# Swift helper, see its header); build-local-helpers.sh uses the same
+# daemon (CHG-2026-074 M5, G5 slice 20a). It retains no Swift helper: the
+# rollback is the installed helper itself (maintainer ruling 2026-09-28, P8;
+# see build-helpers.sh). Its callers own everything around it:
+# build-helpers.sh is the release (validated provisioning profiles, Developer
+# ID with a secure timestamp, notarization, stapling and Gatekeeper
+# assessment); build-local-helpers.sh uses the same
 # provisioned identities with debug binaries and no timestamp, for this Mac
 # only; and build-unsigned-rust-helpers.sh is a
 # structure check signed ad hoc that is never distributed. This script builds
@@ -24,11 +24,10 @@
 #
 # Usage: package-rust-helpers.sh <binaries> <staging> <cli-profile>
 #          <daemon-profile> <identity> <--timestamp|--timestamp=none>
-#          <rollback-helper|none>
 set -euo pipefail
-if [[ "$#" != 7 ]]; then
+if [[ "$#" != 6 ]]; then
   echo "usage: package-rust-helpers.sh <binaries> <staging> <cli-profile> <daemon-profile>" \
-    "<identity> <--timestamp|--timestamp=none> <rollback-helper|none>" >&2
+    "<identity> <--timestamp|--timestamp=none>" >&2
   exit 64
 fi
 binaries="$1"
@@ -37,7 +36,6 @@ cli_profile="$3"
 daemon_profile="$4"
 identity="$5"
 timestamp="$6"
-rollback_helper="$7"
 case "$timestamp" in --timestamp | --timestamp=none) ;; *) exit 64 ;; esac
 if [[ -z "$identity" || ("$identity" == - && "$timestamp" != --timestamp=none) ]]; then
   echo "an ad hoc signature carries no secure timestamp; a signing identity must be named" >&2
@@ -74,35 +72,9 @@ for input in "$cli_profile" "$daemon_profile" "$code_sign_helper"; do
     exit 66
   fi
 done
-if [[ ! -d "$staging_root" || -L "$staging_root" || -e "$staging_root/ArkDeckCLI.app" \
-  || -e "$staging_root/rollback" ]]; then
+if [[ ! -d "$staging_root" || -L "$staging_root" || -e "$staging_root/ArkDeckCLI.app" ]]; then
   echo "the staging root must be an existing directory that holds no helper yet" >&2
   exit 73
-fi
-
-# The helper retained for rollback is the one the current release installs:
-# the Swift daemon behind its Rust facade. Nothing about it is rebuilt or
-# re-signed here; it is checked, then copied as it is.
-if [[ "$rollback_helper" != none ]]; then
-  if [[ "$rollback_helper" != /*.app || ! -d "$rollback_helper" || -L "$rollback_helper" ]]; then
-    echo "the rollback helper must be an ArkDeckAgent.app bundle at an absolute physical path" >&2
-    exit 66
-  fi
-  rollback_info="$rollback_helper/Contents/Info.plist"
-  if [[ "$(plutil -extract CFBundleIdentifier raw -o - "$rollback_info" 2>/dev/null)" != com.arkdeck.agentd \
-    || "$(plutil -extract CFBundleExecutable raw -o - "$rollback_info" 2>/dev/null)" != arkdeck-agentd ]]; then
-    echo "the rollback helper is not an ArkDeck daemon bundle" >&2
-    exit 65
-  fi
-  if [[ ! -x "$rollback_helper/Contents/MacOS/arkdeck-agentd" \
-    || ! -x "$rollback_helper/Contents/MacOS/arkdeck-facade" ]]; then
-    echo "the rollback helper must be the current Swift daemon behind its facade" >&2
-    exit 65
-  fi
-  codesign --verify --strict --deep -R "=${anchor}identifier \"com.arkdeck.agentd\"" \
-    "$rollback_helper"
-  codesign --verify --strict -R "=${anchor}identifier \"com.arkdeck.agentd.facade\"" \
-    "$rollback_helper/Contents/MacOS/arkdeck-facade"
 fi
 
 cli_bundle="$staging_root/ArkDeckCLI.app"
@@ -130,10 +102,3 @@ codesign --force --sign "$identity" --options runtime "$timestamp" \
 codesign --verify --strict --deep --verbose=2 "$cli_bundle"
 codesign --verify --strict -R "=${anchor}identifier \"com.arkdeck.agentd\"" "$daemon_bundle"
 codesign --verify --strict -R "=${anchor}identifier \"com.arkdeck.cli\"" "$cli_bundle"
-
-if [[ "$rollback_helper" != none ]]; then
-  mkdir "$staging_root/rollback"
-  ditto "$rollback_helper" "$staging_root/rollback/ArkDeckAgent.app"
-  codesign --verify --strict --deep -R "=${anchor}identifier \"com.arkdeck.agentd\"" \
-    "$staging_root/rollback/ArkDeckAgent.app"
-fi

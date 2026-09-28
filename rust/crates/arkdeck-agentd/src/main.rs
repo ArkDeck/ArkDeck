@@ -2,8 +2,8 @@
 // them starts a child process: a test that does runs in `tests/spawning`, one
 // at a time, because a child keeps descriptors of this process that another
 // test's listener or lock needs gone (see there). The modules that binary
-// compiles from these sources (`app_ingress`, `bootstrap_readers`, `facade`,
-// `facade_owners`, `host`, `managed_hdc`) keep no test module beside them;
+// compiles from these sources (`app_ingress`, `bootstrap_readers`, `host`,
+// `managed_hdc`) keep no test module beside them;
 // their unit tests are declared here.
 #[cfg(target_os = "macos")]
 mod app_ingress;
@@ -36,12 +36,6 @@ mod development_admission;
 mod development_mutation;
 #[cfg(target_os = "macos")]
 mod development_usb;
-#[cfg(target_os = "macos")]
-mod facade;
-#[cfg(target_os = "macos")]
-mod facade_owners;
-#[cfg(all(test, target_os = "macos"))]
-mod facade_owners_tests;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
 #[cfg(target_os = "macos")]
@@ -189,9 +183,17 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if production {
         production::refuse_other_compositions(
             &|name| std::env::var_os(name).is_some(),
-            facade::swift_executable().is_some(),
+            production::runs_as_retired_facade(),
         )?;
     }
+    // The transport facade that paired this daemon with Swift's is retired
+    // (TASK-XPA-017): no composition forwards to a Swift daemon, whatever
+    // the executable is named or the environment pairs.
+    #[cfg(target_os = "macos")]
+    production::refuse_retired_facade(
+        &|name| std::env::var_os(name).is_some(),
+        production::runs_as_retired_facade(),
+    )?;
     #[cfg(not(target_os = "macos"))]
     if std::env::var_os("ARKDECK_RUNTIME_COMPOSITION").is_some() {
         return Err("the production composition is composed only on macOS".into());
@@ -201,18 +203,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "macos")]
     let mut development_listener = None;
     if development.is_some()
-        && [
-            "ARKDECK_SWIFT_DAEMON",
-            "ARKDECK_HDC_PATH",
-            "ARKDECK_HDC_SHA256",
-        ]
-        .iter()
-        .any(|key| std::env::var_os(key).is_some())
+        && ["ARKDECK_HDC_PATH", "ARKDECK_HDC_SHA256"]
+            .iter()
+            .any(|key| std::env::var_os(key).is_some())
     {
-        return Err(
-            "the isolated Rust development owner cannot pair a Swift daemon or configure HDC"
-                .into(),
-        );
+        return Err("the isolated Rust development owner cannot configure HDC".into());
     }
     if development.is_none()
         && [
@@ -224,7 +219,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("a development HDC is configured only for an isolated development root".into());
     }
-    // The standalone daemon and the facade never read development relations,
+    // The standalone and production daemons never read development relations,
     // acknowledged or not.
     if development.is_none()
         && std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC").is_some()
@@ -240,7 +235,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("development USB relations are configured only with a development HDC".into());
     }
-    // The standalone daemon and the facade compose the helper their own
+    // The standalone and production daemons compose the helper their own
     // bundle holds, never one a caller names.
     #[cfg(target_os = "macos")]
     if development.is_none() && std::env::var_os(code_sign_helper::DEVELOPMENT_HELPER).is_some() {
@@ -248,7 +243,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "a development code-sign helper is named only for an isolated development root".into(),
         );
     }
-    // The standalone daemon and the facade prove a device mutation's state
+    // The standalone and production daemons prove a device mutation's state
     // continuity against the installed Runtime's own root, and never take a
     // development authority, acknowledged or not.
     #[cfg(target_os = "macos")]
@@ -271,12 +266,6 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         )),
         None => None,
     };
-    #[cfg(target_os = "macos")]
-    if development.is_none()
-        && let Some(swift) = facade::swift_executable()
-    {
-        return facade::serve(swift);
-    }
     if std::env::args_os().len() != 1 {
         return Err("arkdeck-agentd takes no device, command, path or authority arguments; configure the local host environment".into());
     }

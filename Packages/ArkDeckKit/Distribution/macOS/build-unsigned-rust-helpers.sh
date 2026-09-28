@@ -13,14 +13,11 @@ set -euo pipefail
 # ARKDECK_RUST_HELPER_BINARIES names a directory holding already built
 # `arkdeck` and `arkdeck-agentd` (CI passes the ones its tests built); without
 # it the release profile is built as the release builds it.
-# ARKDECK_ROLLBACK_HELPER optionally names a Swift helper to retain, as the
-# release requires; here it is checked by identifier only.
 distribution_root="$(cd "$(dirname "$0")" && pwd)"
 package_root="$(cd "$distribution_root/../.." && pwd)"
 rust_root="$(cd "$package_root/../../rust" && pwd)"
 output_root="${ARKDECK_UNSIGNED_HELPER_OUTPUT:-$package_root/.build/arkdeck-macos-unsigned-rust-helpers}"
 binaries="${ARKDECK_RUST_HELPER_BINARIES:-}"
-rollback_helper="${ARKDECK_ROLLBACK_HELPER:-none}"
 
 if [[ "$output_root" != /* ]]; then
   echo "ARKDECK_UNSIGNED_HELPER_OUTPUT must be an absolute path" >&2
@@ -59,7 +56,7 @@ staging_root="$work_root/output"
 mkdir "$staging_root"
 bash "$distribution_root/package-rust-helpers.sh" "$binaries" "$staging_root" \
   "$work_root/com.arkdeck.cli.provisionprofile" "$work_root/com.arkdeck.agentd.provisionprofile" \
-  - --timestamp=none "$rollback_helper"
+  - --timestamp=none
 printf '%s\n' \
   "UNSIGNED STRUCTURE CHECK ONLY: signed ad hoc with placeholder provisioning profiles, no timestamp and no notarization. Never distribute or install it." \
   > "$staging_root/UNSIGNED-STRUCTURE-CHECK-ONLY.txt"

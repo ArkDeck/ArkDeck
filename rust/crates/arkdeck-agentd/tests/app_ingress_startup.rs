@@ -20,7 +20,7 @@ fn app_ingress_invalid_activation_never_starts_a_listener() {
                 ("ARKDECK_APP_INGRESS", "history"),
                 ("ARKDECK_SWIFT_DAEMON", "/nonexistent-swift-authority"),
             ],
-            "standalone history composition",
+            "transport facade is retired",
         ),
         (
             vec![

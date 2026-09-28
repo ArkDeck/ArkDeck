@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Check the unsigned Rust helper pair that build-unsigned-rust-helpers.sh lays out.
 
-CHG-2026-074 M5, G5 slice 20a. The Rust release (build-helpers.sh with
-ARKDECK_HELPER_RUNTIME=rust) and the unsigned structure build share one
+CHG-2026-074 M5, G5 slice 20a. The Rust release (build-helpers.sh) and the
+unsigned structure build share one
 layout-and-signing step, package-rust-helpers.sh. Signed ad hoc, its output is
 checked here without any signing identity:
 
@@ -23,17 +23,17 @@ checked here without any signing identity:
   probe listing byte for byte;
 - the packaged Rust CLI's own `runtime service update`, taking the packaged
   daemon bundle through the production helper validator in an empty relocated
-  home: refused at the signature alone, before launchd is asked anything;
-- a retained rollback helper, when there is one: the Swift daemon behind its
-  facade, intact.
+  home: refused at the signature alone, before launchd is asked anything.
+
+No Swift rollback helper is retained beside the pair (maintainer ruling
+2026-09-28, P8): the output root holds nothing else.
 
 The kernel kills an executable signed ad hoc that carries these restricted
 entitlements, so the two executables run from copies re-signed ad hoc without
 entitlements; each copy holds the packaged executable's bytes once both
 signatures are removed, which is checked too.
 
-Usage: check-rust-helpers.py [--expect-rollback] <output-root>
-(--expect-rollback when ARKDECK_ROLLBACK_HELPER named a helper to retain.)
+Usage: check-rust-helpers.py <output-root>
 Exit status: 0 when every check holds, 1 naming each one that does not, 2 on
 a usage error.
 """
@@ -195,7 +195,7 @@ def satisfies(code: Path, requirement: str, *, deep: bool = False) -> bool:
 
 def check_layout(report: Report, root: Path) -> bool:
     entries = {entry.name for entry in root.iterdir()}
-    expected = {CLI, MARKER} | ({"rollback"} & entries)
+    expected = {CLI, MARKER}
     report.check(
         entries == expected,
         f"the output root holds {sorted(entries)}, not {sorted(expected)}",
@@ -500,43 +500,10 @@ def check_cli_update(report: Report, cli_program: Path, daemon_bundle: Path, wor
     report.check(not any(home.iterdir()), "`runtime service update` wrote into the home it refused")
 
 
-def check_rollback(report: Report, root: Path, expected: bool) -> None:
-    rollback_root = root / "rollback"
-    if not report.check(
-        rollback_root.exists() or not expected,
-        "no rollback helper was retained although one was asked for",
-    ) or not rollback_root.exists():
-        return
-    entries = sorted(entry.name for entry in rollback_root.iterdir())
-    report.check(entries == ["ArkDeckAgent.app"], f"rollback/ holds {entries}, not one ArkDeckAgent.app")
-    bundle = rollback_root / "ArkDeckAgent.app"
-    info_path = bundle / "Contents/Info.plist"
-    info = plistlib.loads(info_path.read_bytes()) if info_path.is_file() else {}
-    report.check(
-        (info.get("CFBundleIdentifier"), info.get("CFBundleExecutable"))
-        == ("com.arkdeck.agentd", "arkdeck-agentd"),
-        "the retained rollback helper is not an ArkDeck daemon bundle",
-    )
-    for name in ("arkdeck-agentd", "arkdeck-facade"):
-        program = bundle / "Contents/MacOS" / name
-        report.check(
-            program.is_file() and os.access(program, os.X_OK),
-            f"the retained rollback helper lacks {name}: it must be the Swift daemon behind its facade",
-        )
-    report.check(
-        run([CODESIGN, "--verify", "--strict", "--deep", str(bundle)]).returncode == 0
-        and satisfies(bundle, 'identifier "com.arkdeck.agentd"', deep=True)
-        and satisfies(bundle / "Contents/MacOS/arkdeck-facade", 'identifier "com.arkdeck.agentd.facade"'),
-        "the retained rollback helper is no longer intact as signed",
-    )
-
-
 def main(arguments: list[str]) -> int:
-    expect_rollback = "--expect-rollback" in arguments
-    arguments = [argument for argument in arguments if argument != "--expect-rollback"]
     if len(arguments) != 1 or not Path(arguments[0]).is_absolute():
         print(
-            "usage: check-rust-helpers.py [--expect-rollback] <absolute output root>",
+            "usage: check-rust-helpers.py <absolute output root>",
             file=sys.stderr,
         )
         return 2
@@ -560,7 +527,6 @@ def main(arguments: list[str]) -> int:
             program = runnable_copy(report, cli / "Contents/MacOS/arkdeck", work)
             if program is not None:
                 check_cli_update(report, program, cli / DAEMON, work)
-        check_rollback(report, root, expect_rollback)
     for failure in report.failures:
         print(f"FAIL: {failure}")
     print(
