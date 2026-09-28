@@ -291,7 +291,8 @@ package actor ArkForgeExecutionAuthority {
     issued[permitID]
   }
 
-  private static let deviceFactsDomain = Array("arkforge/v1/device-facts\0".utf8)
+  private static let admissionDeviceFactsDomain = Array(
+    "arkforge/v1/admission-device-facts\0".utf8)
 
   package static func deviceFactsDigest(_ snapshot: ArkForgeStepAdmissionSnapshot) -> [UInt8] {
     let serialDigest: CanonicalCBOR.Value =
@@ -313,7 +314,7 @@ package actor ArkForgeExecutionAuthority {
       ("malformedDescriptor", .bool(snapshot.malformedDescriptor)),
     ])
     var hasher = SHA256()
-    hasher.update(data: Data(deviceFactsDomain))
+    hasher.update(data: Data(admissionDeviceFactsDomain))
     hasher.update(data: CanonicalCBOR.encodedData(value))
     return Array(hasher.finalize())
   }

@@ -21,7 +21,7 @@ import Foundation
 /// (`arkforge-transport::UsbDeviceRecord::topology_digest`):
 ///
 /// ```text
-/// SHA-256( "arkforge/v1/device-facts\0" || locationID_be32 )
+/// SHA-256( "arkforge/v1/usb-topology\0" || locationID_be32 )
 /// ```
 ///
 /// ArkDeck already carries that `locationID` as its binding `usbTopology`, so
@@ -33,7 +33,7 @@ public enum ArkForgeObservationSelection {
 
   /// The domain prefix, including the trailing NUL that keeps one domain from
   /// being a prefix of another.
-  static let deviceFactsDomain = Array("arkforge/v1/device-facts\0".utf8)
+  static let topologyDomain = Array("arkforge/v1/usb-topology\0".utf8)
 
   public enum SelectionFailure: Error, Equatable, CustomStringConvertible {
     case unusableTopology(String)
@@ -71,7 +71,7 @@ public enum ArkForgeObservationSelection {
     let trimmed = usbTopology.trimmingCharacters(in: .whitespaces)
     guard let location = UInt32(trimmed) else { return nil }
     var hasher = SHA256()
-    hasher.update(data: Data(deviceFactsDomain))
+    hasher.update(data: Data(topologyDomain))
     hasher.update(
       data: Data([
         UInt8(truncatingIfNeeded: location >> 24), UInt8(truncatingIfNeeded: location >> 16),
