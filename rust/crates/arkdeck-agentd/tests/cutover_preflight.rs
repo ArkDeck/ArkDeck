@@ -1140,6 +1140,120 @@ fn a_parked_flash_swift_would_not_settle_is_carried_over_as_every_parked_job_is(
     );
 }
 
+/// A second Flash Job parked as `park_at_loader` parks the first: a copy of
+/// its record and journal under its own identity.
+const SECOND_LOADER: (&str, &str) = (LOADER.0, "job-22222222222222222222222222222222");
+
+fn park_again_at_loader(home: &Home) {
+    let source = home.job(LOADER);
+    let destination = home.job(SECOND_LOADER);
+    directory(&destination);
+    for name in ["job-record.json", "journal.jsonl"] {
+        let text = fs::read_to_string(source.join(name))
+            .unwrap()
+            .replace(LOADER.1, SECOND_LOADER.1);
+        fs::write(destination.join(name), text).unwrap();
+        fs::set_permissions(destination.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+}
+
+fn lane_held(home: &Home, job: (&str, &str)) {
+    let sidecar = home.job(job).join("arkforge-runtime-state.json");
+    fs::write(&sidecar, b"{}").unwrap();
+    fs::set_permissions(&sidecar, fs::Permissions::from_mode(0o600)).unwrap();
+}
+
+/// The block for two or more Loader transitions of one Target and revision.
+fn covering_block(jobs: &[&str]) -> Value {
+    json!({"kind": "loaderTransitionsCoverTarget", "targetId": "TGT-8b3d0a34cf32",
+        "expectedBindingRevision": 2, "jobIds": jobs})
+}
+
+#[test]
+fn two_parked_flashes_at_one_targets_loader_transition_refuse_the_cutover_the_start_would_refuse() {
+    let _turn = turn();
+    // Records alone decide, as the Rust daemon's start counts them: however
+    // their journals stand and whichever lane drove them, two records parked
+    // at the enter-Loader transition for one Target and binding revision stop
+    // that start, so the cutover is refused first, naming both.
+    type Change = fn(&Home);
+    let cases: [(&str, Change); 4] = [
+        ("both driven by an ArkForge lane", |home| {
+            lane_held(home, LOADER);
+            lane_held(home, SECOND_LOADER);
+        }),
+        ("one journal holds another outstanding intent", |home| {
+            lane_held(home, LOADER);
+            home.edit_journal(SECOND_LOADER, |events| {
+                another_intent(events, "probe-before-loader", "readOnly");
+            });
+        }),
+        ("one only Swift settles, the other lane-held", |home| {
+            lane_held(home, SECOND_LOADER)
+        }),
+        ("both only Swift settles", |_| {}),
+    ];
+    for (case, change) in cases {
+        let home = Home::new();
+        home.seed();
+        home.quiet();
+        home.park_at_loader(json!({"id": "flash.full-restore", "version": 1}));
+        park_again_at_loader(&home);
+        change(&home);
+        let mut expected = vec![covering_block(&[LOADER.1, SECOND_LOADER.1])];
+        for job in [LOADER, SECOND_LOADER] {
+            let held = home.job(job).join("arkforge-runtime-state.json").exists();
+            let journal = arkdeck_hoststore::inspect_journal(&home.job(job)).unwrap();
+            if !held && journal.outstanding_intents.len() == 1 {
+                let mut strict = loader_block();
+                strict["jobId"] = json!(job.1);
+                expected.push(strict);
+            }
+        }
+        let before = home.tree();
+        let free = preflight(&home, false);
+        let held = preflight(&home, true);
+        for document in [&free, &held] {
+            assert_eq!(document["clear"], false, "{case}: {document}");
+            let mut blocks = blocks(document);
+            let order = |block: &Value| block.to_string();
+            blocks.sort_by_key(order);
+            expected.sort_by_key(order);
+            assert_eq!(blocks, expected, "{case}: {document}");
+        }
+        assert_eq!(home.tree(), before, "{case}");
+    }
+
+    // One such Job is carried over, as the start serves beside it.
+    let home = Home::new();
+    home.seed();
+    home.quiet();
+    home.park_at_loader(json!({"id": "flash.full-restore", "version": 1}));
+    lane_held(&home, LOADER);
+    let document = preflight(&home, false);
+    assert_eq!(document["clear"], true, "{document}");
+    assert_eq!(
+        document["carriedOver"]["parkedJobIds"],
+        json!([LOADER.1, PARKED.1])
+    );
+    // Two for one Target at different binding revisions: the start counts
+    // only those at the revision its binding carries the Target from, so at
+    // most one, and both are carried over.
+    park_again_at_loader(&home);
+    lane_held(&home, SECOND_LOADER);
+    home.edit_record(SECOND_LOADER, |record| {
+        for request in ["request", "originalSubmissionRequest"] {
+            record[request]["target"]["expectedBindingRevision"] = json!(3);
+        }
+    });
+    let document = preflight(&home, false);
+    assert_eq!(document["clear"], true, "{document}");
+    assert_eq!(
+        document["carriedOver"]["parkedJobIds"],
+        json!([LOADER.1, SECOND_LOADER.1, PARKED.1])
+    );
+}
+
 /// The Swift-recorded Job whose Session publication failed, as its durable
 /// record keeps it: terminal, created 2026-07-29.
 const FAILED_PUBLICATION: &str = "job-a9fda911411280791d18df748a6d3d84";

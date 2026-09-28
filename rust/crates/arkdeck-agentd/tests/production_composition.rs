@@ -1288,3 +1288,103 @@ fn an_enter_loader_transition_awaiting_the_binding_is_named_and_two_refuse_the_s
         "{output:?}"
     );
 }
+
+/// The cutover preflight over `home`, as the CLI's lock-free pass runs it.
+fn cutover_preflight(home: &Home) -> Value {
+    let output = production(home)
+        .arg("--cutover-preflight")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(0), "{output:?}");
+    serde_json::from_slice(&output.stdout).unwrap()
+}
+
+/// The preflight's blocks about Loader transitions.
+fn loader_blocks(document: &Value) -> Vec<Value> {
+    document["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|block| {
+            block["kind"]
+                .as_str()
+                .is_some_and(|kind| kind.starts_with("loaderTransition"))
+        })
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn the_loader_transitions_that_refuse_the_start_refuse_the_cutover_preflight_first() {
+    let _turn = turn();
+    let home = Home::new();
+    rockchip_scenario(&home, "lineage.advanced");
+    let target = "TGT-8b3d0a34cf32";
+    let first = "job-00000000000000000000000000000a01";
+    let second = "job-00000000000000000000000000000a02";
+    // Driven by an ArkForge lane, which Swift's bind-current-loader does not
+    // settle, so no Job is refused as awaiting that binding alone; the start
+    // counts the records whatever lane drove them.
+    let lane_held = |id: &str| {
+        let sidecar = home
+            .state()
+            .join("jobs")
+            .join(id)
+            .join("arkforge-runtime-state.json");
+        fs::write(&sidecar, b"{}").unwrap();
+        fs::set_permissions(&sidecar, fs::Permissions::from_mode(0o600)).unwrap();
+    };
+    park_loader_transition(&home.state(), first, target);
+    lane_held(first);
+    // One: carried over by the preflight, and the start serves beside it.
+    let document = cutover_preflight(&home);
+    assert_eq!(loader_blocks(&document), Vec::<Value>::new(), "{document}");
+    assert!(
+        document["carriedOver"]["parkedJobIds"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(first)),
+        "{document}"
+    );
+    let mut daemon = Daemon::start(&mut production(&home));
+    assert_eq!(
+        daemon.line("Loader transition "),
+        format!(
+            "Loader transition {first} awaits settlement at Rockchip binding revision 2, which \
+             this Runtime does not settle yet; its outcome stays unknown"
+        )
+    );
+    assert!(daemon.serving(&home).stop().success());
+
+    // Two: the start refuses them as ambiguous, so the preflight refuses the
+    // cutover first, naming both, and changes nothing.
+    park_loader_transition(&home.state(), second, target);
+    lane_held(second);
+    let output = finished(&mut production(&home));
+    assert_eq!(output.status.code(), Some(69), "{output:?}");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(&format!(
+            "jobNotRunnable(\"multiple unresolved Loader transitions cover target {target}\")"
+        )),
+        "{output:?}"
+    );
+    // The Job index's shared-memory index aside, where a reader records its
+    // read mark (`arkdeck_hoststore::cutover_facts`).
+    let measured = || {
+        let mut tree = home.tree();
+        tree.retain(|entry| !entry.0.ends_with("runtime-jobs.sqlite3-shm"));
+        tree
+    };
+    let before = measured();
+    let document = cutover_preflight(&home);
+    assert_eq!(document["clear"], false, "{document}");
+    assert_eq!(
+        loader_blocks(&document),
+        [
+            json!({"kind": "loaderTransitionsCoverTarget", "targetId": target,
+            "expectedBindingRevision": 1, "jobIds": [first, second]})
+        ],
+        "{document}"
+    );
+    assert_eq!(measured(), before);
+}

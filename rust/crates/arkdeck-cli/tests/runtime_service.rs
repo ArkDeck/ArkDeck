@@ -2622,10 +2622,11 @@ fn a_cutover_the_first_pass_refuses_changes_nothing() {
     assert!(is_analyzer_probe(&runs[1]), "{runs:?}");
 }
 
-/// The two refusals of state the Rust Runtime would hold stuck: a parked
-/// Loader transition only Swift's Runtime settles, named with the binding
-/// that settles it there, and the retained Sessions' continuity proof,
-/// answered in its own words.
+/// The refusals of state the Rust Runtime would hold stuck or could not
+/// start beside: a parked Loader transition only Swift's Runtime settles,
+/// named with the binding that settles it there, two or more Loader
+/// transitions of one Target, named together, and the retained Sessions'
+/// continuity proof, answered in its own words.
 #[test]
 fn a_cutover_names_what_only_the_swift_runtime_can_settle() {
     let home = Home::new();
@@ -2638,6 +2639,8 @@ fn a_cutover_names_what_only_the_swift_runtime_can_settle() {
     let blocks = json!([
         {"kind": "loaderTransitionAwaitingBinding", "jobId": "job-flash",
             "targetId": "target-dayu200", "expectedBindingRevision": 3},
+        {"kind": "loaderTransitionsCoverTarget", "targetId": "target-dayu200",
+            "expectedBindingRevision": 2, "jobIds": ["job-a", "job-b"]},
         {"kind": "retainedSessions", "sessionsRoot": "/Users/a/Library/Application Support/ArkDeck/Sessions",
             "code": "recordUnreadable", "message": message},
     ]);
@@ -2664,7 +2667,13 @@ fn a_cutover_names_what_only_the_swift_runtime_can_settle() {
                  revision 3 to settle its enter-Loader transition, which the Rust Runtime does \
                  not settle: settle it first on the old Swift Runtime with `arkdeck flash \
                  bind-loader --target target-dayu200 --expected-binding-revision 3` \
-                 (flash.bind-current-loader), then run the preflight again; the retained \
+                 (flash.bind-current-loader), then run the preflight again; Jobs job-a, \
+                 job-b each await a Loader binding of target target-dayu200 at binding \
+                 revision 2 at their enter-Loader transitions, and the Rust Runtime refuses to \
+                 start while two or more cover one target (jobNotRunnable: multiple unresolved \
+                 Loader transitions); their outcomes stay unknown and are never replayed: \
+                 stop, keep them as they are and ask the maintainer, then run the preflight \
+                 again; the retained \
                  Sessions under /Users/a/Library/Application Support/ArkDeck/Sessions are \
                  refused as a device mutation's continuity proof refuses them: \
                  recordUnreadable: {message}); nothing was changed"

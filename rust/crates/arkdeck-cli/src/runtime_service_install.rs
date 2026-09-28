@@ -718,6 +718,22 @@ fn block_text(block: &Value) -> String {
             target = field("targetId"),
             revision = block["expectedBindingRevision"],
         ),
+        "loaderTransitionsCoverTarget" => format!(
+            "Jobs {jobs} each await a Loader binding of target {target} at binding revision \
+             {revision} at their enter-Loader transitions, and the Rust Runtime refuses to \
+             start while two or more cover one target (jobNotRunnable: multiple unresolved \
+             Loader transitions); their outcomes stay unknown and are never replayed: stop, \
+             keep them as they are and ask the maintainer, then run the preflight again",
+            jobs = block["jobIds"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join(", "),
+            target = field("targetId"),
+            revision = block["expectedBindingRevision"],
+        ),
         "activeAgentExecution" => format!(
             "agent execution {} is {}",
             field("executionId"),
