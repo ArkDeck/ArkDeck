@@ -10,14 +10,15 @@
 //! are, as `<invocation-N>` in order of its start. Every answer and every
 //! document left must be Swift's.
 //!
-//! `executePinnedRequest` is the declared difference (`execute.json`): Swift
-//! admits the pinned Flash and runs it; this Runtime refuses where Swift
-//! begins, and the invocation is unchanged.
+//! `executePinnedRequest` (`execute.json`) is replayed over a scripted driver
+//! answering as Swift's engine answered (the Job failed, classified
+//! `safeToReflash`): the attempt's derived request, its permit record and the
+//! settled evaluation must be Swift's.
 #![cfg(target_os = "macos")]
 
 use arkdeck_hoststore::{
-    ArtifactReadStore, FlashInvocations, FlashPlanner, FlashPlanning, ImportUploadStore,
-    InvocationBroker, JobPlanner, RockchipFacts,
+    ArtifactReadStore, DriverResult, FlashInvocations, FlashPlanner, FlashPlanning,
+    ImportUploadStore, InvocationBroker, JobPlanner, RockchipFacts,
 };
 use serde_json::{Map, Value, json};
 use std::cell::RefCell;
@@ -184,6 +185,8 @@ struct Replay {
     imports: ImportUploadStore,
     owner: FlashInvocations,
     minted: RefCell<usize>,
+    /// What the scripted driver answers, and every request it was handed.
+    driver: RefCell<(Option<DriverResult>, Vec<Vec<u8>>)>,
 }
 
 impl Replay {
@@ -202,6 +205,7 @@ impl Replay {
             root,
             cases,
             minted: RefCell::new(0),
+            driver: RefCell::new((None, Vec::new())),
         }
     }
 
@@ -232,6 +236,14 @@ impl Replay {
                 let mut minted = self.minted.borrow_mut();
                 *minted += 1;
                 Some(Labels::identity(*minted))
+            },
+            execute: &|request| {
+                let mut driver = self.driver.borrow_mut();
+                driver.1.push(request.to_vec());
+                driver
+                    .0
+                    .clone()
+                    .expect("no exchange of the oracle reaches the driver unscripted")
             },
         };
         let answer = match method {
@@ -296,34 +308,53 @@ fn every_flash_invocation_is_brokered_as_swift_brokers_it() {
         "the documents left"
     );
 
-    // The declared difference: Swift began and ran the attempt; this Runtime
-    // refuses where Swift begins, and writes nothing.
+    // `executePinnedRequest`: the driver answers as Swift's engine did.
     let execute: Value =
         serde_json::from_slice(&fs::read(fixtures().join("execute.json")).unwrap()).unwrap();
-    let swift = &execute["answer"]["result"];
-    let attempt = swift["evaluations"].as_array().unwrap().last().unwrap();
-    assert_eq!(swift["invocationID"], "<invocation-4>");
-    assert_eq!(swift["destructiveEpochsUsed"], 1);
-    assert_eq!(attempt["candidateAction"], "executePinnedRequest");
-    assert_eq!(attempt["jobID"], "<job>");
+    replay.driver.borrow_mut().0 = Some(DriverResult {
+        job_id: Some("<job>".into()),
+        outcome: "safeToReflash",
+        detail: "Runtime Job terminal state failed".into(),
+    });
     let answer = replay.answer(
         &execute["setup"],
         "debug.evaluate",
         &labels.resolve(execute["params"].as_object().unwrap()),
     );
+    assert_eq!(labels.labelled(&answer), execute["answer"]);
+    // The driver was handed the attempt's exact request once: the pinned
+    // seed under the derived request id and idempotency key.
+    let requests = replay.driver.borrow().1.clone();
+    assert_eq!(requests.len(), 1);
+    let request: Value = serde_json::from_slice(&requests[0]).unwrap();
+    let attempt = &execute["answer"]["result"]["evaluations"][0];
     assert_eq!(
-        answer,
-        json!({"ok": false, "error": {"code": "rejected", "details": null, "message":
-            "executePinnedRequest is not available on the Rust Runtime yet: it runs the pinned \
-             Flash, which this Runtime does not execute; the invocation is unchanged"}})
+        labels.labelled(&request["requestId"]),
+        attempt["requestID"],
+        "{request}"
     );
     assert_eq!(
-        Value::Array(replay.documents(&labels)),
-        replay.cases["left"],
-        "nothing was written"
+        labels.labelled(&request["idempotencyKey"]),
+        attempt["idempotencyKey"]
     );
-    assert!(
-        !replay.root.0.join("state/runtime-debug-attempts").exists(),
-        "no attempt permit was written"
+    assert!(request.get("authorization").is_none(), "{request}");
+    // Its permit record is durable beside the invocation documents.
+    let key = request["idempotencyKey"].as_str().unwrap();
+    let permit: Value = serde_json::from_slice(
+        &fs::read(
+            replay
+                .root
+                .0
+                .join("state/runtime-debug-attempts")
+                .join(format!("{key}.json")),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(labels.labelled(&permit["invocationID"]), "<invocation-4>");
+    assert_eq!(
+        permit["candidateActionSHA256"],
+        attempt["candidateActionSHA256"]
     );
+    assert_eq!(permit["idempotencyKey"], json!(key));
 }

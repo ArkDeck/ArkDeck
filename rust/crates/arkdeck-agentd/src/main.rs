@@ -465,12 +465,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
                 &root.join("jobs-state").join("capabilities"),
             )?)
-            // Swift's Flash invocation owner keeps its documents beside the
-            // Job state it runs through, and creates their directories at its
-            // start.
-            .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(
-                &root.join("jobs-state"),
-            )?)
+            // Swift's Flash invocation owner keeps its documents in the state
+            // directory its engine plans in, and creates their directories at
+            // its start: the recovery broker writes an attempt's permit there
+            // and the planner below reads it from there, as in production.
+            .with_flash_invocations(arkdeck_hoststore::FlashInvocations::open(&root)?)
             // As the Swift daemon: an analyzer is configured only by naming its
             // executable, and a named path that is not one fails startup.
             .with_planning(

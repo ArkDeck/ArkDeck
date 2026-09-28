@@ -1010,6 +1010,72 @@ impl Host {
         })
     }
 
+    /// Swift `RuntimeJobEngineDebugAttemptDriver.execute`: the recovery
+    /// broker's attempt admitted as `job.submit` admits it — through the Flash
+    /// admission, with its DEC-016 classification and the Runtime's own
+    /// destructive capability — then run as `job.run` runs it, and classified
+    /// by the Job and its capability use. Once a Job exists its attempt is
+    /// never reported refused: an outcome that cannot be read is unknown.
+    #[cfg(target_os = "macos")]
+    fn debug_attempt(&self, request: &[u8]) -> arkdeck_hoststore::DriverResult {
+        let refused = |detail: String| arkdeck_hoststore::DriverResult {
+            job_id: None,
+            outcome: "refused",
+            detail,
+        };
+        let (Some((state_root, analyzer)), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return refused("the Job owner is not composed".into());
+        };
+        let hdc = self.hdc();
+        let admitter = arkdeck_hoststore::JobAdmitter {
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
+                artifacts: self.artifacts.as_deref(),
+                analyzer: Some(analyzer),
+                state_root,
+                hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
+            },
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            authority: self.authority(),
+        };
+        let accepted = match self.with_flash_admitter(admitter, |admitter| admitter.submit(request))
+        {
+            Ok(accepted) => accepted,
+            Err(refusal) => return refused(format!("{}: {}", refusal.code, refusal.message)),
+        };
+        let Some(job) = accepted["jobId"].as_str().map(str::to_owned) else {
+            return refused("the admission named no Job".into());
+        };
+        let classify = || {
+            arkdeck_hoststore::debug_execution_outcome(jobs, self.capabilities.as_deref(), &job)
+                .unwrap_or("outcomeUnknown")
+        };
+        let params = serde_json::Map::from_iter([("jobId".into(), serde_json::json!(job))]);
+        match self.job_run(&params) {
+            Ok(_) => {
+                let state = jobs
+                    .read_snapshot(&job)
+                    .map(|record| record.state)
+                    .unwrap_or_default();
+                arkdeck_hoststore::DriverResult {
+                    outcome: classify(),
+                    detail: format!("Runtime Job terminal state {state}"),
+                    job_id: Some(job),
+                }
+            }
+            Err(error) => arkdeck_hoststore::DriverResult {
+                outcome: classify(),
+                detail: format!(
+                    "Runtime Job failed after admission: {}: {}",
+                    error.code, error.message
+                ),
+                job_id: Some(job),
+            },
+        }
+    }
+
     /// Swift's ArkForge facts port: the Target store's facts, measured over
     /// this host's HDC when it has one. None without the facts owner or the
     /// Target store.
@@ -2762,7 +2828,8 @@ impl HostServices for Host {
             return owner.handle(method, params);
         }
         // Swift's broker over its engine's `planOnly`: this host's planner,
-        // Flash composition and facts, the Runtime clock and a fresh identity.
+        // Flash composition and facts, the Runtime clock and a fresh identity;
+        // an attempt is admitted and run through this host's own Job path.
         self.with_flash_planner(|planner| {
             owner.broker(
                 method,
@@ -2771,11 +2838,13 @@ impl HostServices for Host {
                     plan: &|request| planner.plan(request),
                     now: &arkdeck_hoststore::runtime_now,
                     mint: &|| fresh_id().ok().map(|id| format!("debug-{id}")),
+                    execute: &|request| self.debug_attempt(request),
                 },
             )
         })
         .unwrap_or_else(|| Err(unconfigured()))
     }
+
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when
     /// the isolated owner started a managed server.

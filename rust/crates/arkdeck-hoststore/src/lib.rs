@@ -364,9 +364,14 @@ mod flash_alias_reconcile;
 #[cfg(target_os = "macos")]
 pub use flash_alias_reconcile::{FlashAliasReconciler, UsbCensus};
 #[cfg(target_os = "macos")]
+mod debug_attempt_permit;
+#[cfg(target_os = "macos")]
 mod flash_invocations;
 #[cfg(target_os = "macos")]
-pub use flash_invocations::{FlashInvocations, InvocationBroker, MAXIMUM_DESTRUCTIVE_EPOCHS};
+pub use flash_invocations::{
+    DriverResult, FlashInvocations, InvocationBroker, MAXIMUM_DESTRUCTIVE_EPOCHS,
+    debug_execution_outcome,
+};
 #[cfg(target_os = "macos")]
 mod rockchip_binding;
 #[cfg(target_os = "macos")]

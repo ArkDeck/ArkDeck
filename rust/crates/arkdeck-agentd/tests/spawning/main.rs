@@ -56,6 +56,7 @@ mod tool_selection_startup;
 
 mod app_ingress_fake_hdc;
 mod debug_read_control;
+mod flash_broker_control;
 mod flash_execution_control;
 mod flash_host_facts_control;
 mod flash_socket_control;

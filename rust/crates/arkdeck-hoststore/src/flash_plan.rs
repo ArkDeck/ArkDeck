@@ -293,14 +293,30 @@ impl<'a> FlashPlanner<'a> {
                     format!("flash bundle Artifact lease is not resolvable: {reason}"),
                 )
             })?;
-        self.planner.refuse_debug_permit(request)?;
-        let artifact_facts = primary_facts(&leased)?;
         let preflight = |error: String| {
             refusal(
                 "invalidInput",
                 format!("typed plan preflight failed before authorization: {error}"),
             )
         };
+        // Swift `RuntimeDebugAttemptPermitStore.loadExact` on the Runtime
+        // clock: a destructive attempt the recovery broker prepared pins its
+        // invocation and candidate action into the plan; a record that no
+        // longer matches, or whose invocation no longer permits the dispatch,
+        // refuses the plan.
+        let now = crate::runtime_now();
+        let permit = crate::debug_attempt_permit::load_exact(
+            self.planner.state_root,
+            request,
+            now.as_deref(),
+        )
+        .map_err(|detail| {
+            preflight(format!(
+                "persistenceFailure({})",
+                crate::strict_json::swift_quoted(detail)
+            ))
+        })?;
+        let artifact_facts = primary_facts(&leased)?;
         let mut steps = Vec::new();
         for step in descriptor
             .steps
@@ -349,7 +365,7 @@ impl<'a> FlashPlanner<'a> {
             ));
             steps.push(materialized);
         }
-        let document = json!({
+        let mut document = json!({
             "operationReference": CANONICAL,
             "catalogDigest": CATALOG_DIGEST,
             "inputs": inputs,
@@ -359,6 +375,12 @@ impl<'a> FlashPlanner<'a> {
             "providerID": "arkforge",
             "steps": steps,
         });
+        // Present only for a Runtime-owned debug attempt; an ordinary Job's
+        // digest bytes are unchanged (Swift `encodeIfPresent`).
+        if let Some(permit) = permit {
+            document["runtimeDebugInvocationID"] = json!(permit.invocation_id);
+            document["runtimeDebugCandidateActionSHA256"] = json!(permit.candidate_action_sha256);
+        }
         let digest = sha256_hex(&session_json::encode(&document).map_err(|_| internal_failure())?);
         Ok((
             Materialized {

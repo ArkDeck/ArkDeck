@@ -8,10 +8,12 @@
 //! - `evaluate` takes one effect-level candidate action: observe the pinned
 //!   request again (plan-only, dispatch-free), stop, or execute it.
 //!
-//! This Runtime does not execute a Flash yet. `executePinnedRequest` is
-//! therefore refused where Swift would begin its attempt: after every check
-//! Swift makes before it writes anything, and before any permit, epoch or
-//! evaluation is written. That is a declared difference, never a silent one.
+//! `executePinnedRequest` runs one destructive attempt as Swift does: the
+//! attempt's exact request is derived from the pinned seed, its permit record
+//! (`debug_attempt_permit`) and the `executing` evaluation are made durable
+//! first, then the driver admits and runs it through the ordinary Job path
+//! and the evaluation is settled by the Job's classified outcome. An
+//! interrupted attempt is resumed with its exact request, never a new one.
 //!
 //! Every broker failure is answered `rejected` with Swift's description of
 //! it; any other failure `internalError`, a planning refusal with Swift's
@@ -38,6 +40,20 @@ pub struct InvocationBroker<'a> {
     pub now: &'a dyn Fn() -> Option<String>,
     /// A new invocation's identity, `debug-<lowercase UUID>`.
     pub mint: &'a dyn Fn() -> Option<String>,
+    /// Swift's driver `execute`: the attempt's exact request admitted and
+    /// run through the ordinary Job path, and the Job's outcome classified
+    /// (`RuntimeJobEngineDebugAttemptDriver`).
+    pub execute: &'a dyn Fn(&[u8]) -> DriverResult,
+}
+
+/// Swift `RuntimeDebugDriverResult`: the Job an attempt was admitted as, if
+/// any, its classified outcome (`succeeded`, `safeToReflash`,
+/// `outcomeUnknown`, `failedKnown` or `refused`) and a detail.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DriverResult {
+    pub job_id: Option<String>,
+    pub outcome: &'static str,
+    pub detail: String,
 }
 
 /// Swift `RuntimeDebugInvocationError`, every case of which the broker's two
@@ -94,18 +110,6 @@ impl From<ReadError> for Refusal {
             ReadError::NotFound(identity) => Self::NotFound(identity),
             ReadError::Persistence(detail) => Self::Persistence(detail.into()),
         }
-    }
-}
-
-/// Where Swift would begin its attempt, this Runtime refuses: it does not
-/// run the pinned Flash, and nothing about the invocation has changed.
-fn execution_unavailable() -> WireError {
-    WireError {
-        code: "rejected".into(),
-        message: "executePinnedRequest is not available on the Rust Runtime yet: it runs the \
-                  pinned Flash, which this Runtime does not execute; the invocation is unchanged"
-            .into(),
-        details: None,
     }
 }
 
@@ -178,6 +182,37 @@ fn decode_action(bytes: &[u8]) -> Result<Action, &'static str> {
         }
         _ => Err("unsupportedAction"),
     }
+}
+
+/// The attempt's exact request, Swift's `RuntimeOperationRequest(requestID:
+/// idempotencyKey:target:operation:inputs:requestedOutputs:)` over the pinned
+/// seed: its target, operation, inputs and outputs, and no capability or
+/// caller provenance.
+fn attempt_request(
+    seed: &OperationRequest,
+    request_id: &str,
+    idempotency_key: &str,
+) -> OperationRequest {
+    let mut request = seed.clone();
+    request.request_id = request_id.to_owned();
+    request.idempotency_key = idempotency_key.to_owned();
+    request.capability_id = None;
+    request.client_context = None;
+    request.reviewed_plan_digest = None;
+    request
+}
+
+/// Swift `candidateRevisionSHA256(actionData:provenance:)`: SHA-256 of the
+/// canonical `{actionSha256, buildSha256, sourceSha256}`.
+fn candidate_revision_sha256(action_sha256: &str, source: &str, build: &str) -> String {
+    let object = json!({
+        "actionSha256": action_sha256,
+        "buildSha256": build,
+        "sourceSha256": source,
+    });
+    sha256_hex(
+        &crate::session_json::encode(&object).expect("a revision document holds only strings"),
+    )
 }
 
 /// Swift `RuntimeOperationRequestRejection` as Swift prints the value.
@@ -379,8 +414,22 @@ impl FlashInvocations {
                 )
                 .wire());
             }
-            // Swift resumes the interrupted attempt here.
-            return Err(execution_unavailable());
+            // Swift resumes the interrupted attempt with its exact request:
+            // the permit written again, the same request driven, and the same
+            // evaluation settled. No new attempt, epoch or request is made.
+            let (Some(request_id), Some(idempotency_key)) = (
+                interrupted["requestID"].as_str(),
+                interrupted["idempotencyKey"].as_str(),
+            ) else {
+                return Err(Refusal::PredecessorBlocks(
+                    "an interrupted attempt must resume its exact candidate and provenance".into(),
+                )
+                .wire());
+            };
+            let resumed = attempt_request(&document.seed, request_id, idempotency_key);
+            self.persist_permit(identity, &resumed, &action_sha256)?;
+            let index = document.evaluations.len() - 1;
+            return self.drive(identity, &resumed, index, document, broker);
         }
         let ordinal = document.evaluations.len() + 1;
         let mut evaluation = Map::from_iter([
@@ -458,13 +507,103 @@ impl FlashInvocations {
                 if document.epochs >= MAXIMUM_DESTRUCTIVE_EPOCHS {
                     return Err(Refusal::EpochBudgetExhausted.wire());
                 }
-                // Swift persists the attempt's permit and begins it here.
-                return Err(execution_unavailable());
+                let epoch = document.epochs + 1;
+                let suffix = &identity[identity.len().saturating_sub(12)..];
+                let revision = candidate_revision_sha256(&action_sha256, source, build);
+                let request_id = format!("debug-{suffix}-e{epoch}");
+                let idempotency_key =
+                    format!("runtime-debug-{suffix}-e{epoch}-{}", &revision[..12]);
+                let generated = attempt_request(&document.seed, &request_id, &idempotency_key);
+                // The permit, then the executing evaluation, are durable
+                // before the driver may dispatch anything.
+                self.persist_permit(identity, &generated, &action_sha256)?;
+                let (prepared, _) = clock(broker).map_err(Refusal::wire)?;
+                document.epochs = epoch;
+                evaluation.insert("destructiveEpoch".into(), json!(epoch));
+                evaluation.insert("requestID".into(), json!(request_id));
+                evaluation.insert("idempotencyKey".into(), json!(idempotency_key));
+                evaluation.insert("disposition".into(), json!("executing"));
+                evaluation.insert("detail".into(), json!("Runtime attempt durably prepared"));
+                evaluation.insert("evaluatedAtUTC".into(), json!(prepared));
+                document.evaluations.push(Value::Object(evaluation));
+                {
+                    let _serial = self.lock()?;
+                    self.persist(identity, &document).map_err(Refusal::wire)?;
+                }
+                let index = document.evaluations.len() - 1;
+                return self.drive(identity, &generated, index, document, broker);
             }
         }
         let (evaluated, _) = clock(broker).map_err(Refusal::wire)?;
         evaluation.insert("evaluatedAtUTC".into(), json!(evaluated));
         document.evaluations.push(Value::Object(evaluation));
+        let _serial = self.lock()?;
+        self.persist(identity, &document).map_err(Refusal::wire)?;
+        Ok(status(identity, &document))
+    }
+
+    /// Swift `RuntimeDebugAttemptPermitStore.persist`, beside the invocation
+    /// documents in the Runtime state directory the planner reads it from.
+    fn persist_permit(
+        &self,
+        identity: &str,
+        request: &OperationRequest,
+        action_sha256: &str,
+    ) -> Result<(), WireError> {
+        let state = self
+            .directory
+            .parent()
+            .ok_or_else(|| internal("Flash invocation store has no state directory"))?;
+        crate::debug_attempt_permit::persist(state, identity, request, action_sha256)
+            .map_err(|error| internal(&error))
+    }
+
+    /// Swift's `driver.execute` of one attempt, then `finish(_:at:document:)`:
+    /// the evaluation at `index` settled by the driver's classified outcome,
+    /// and the document written.
+    fn drive(
+        &self,
+        identity: &str,
+        request: &OperationRequest,
+        index: usize,
+        mut document: Document,
+        broker: &InvocationBroker<'_>,
+    ) -> Result<Value, WireError> {
+        let result = (broker.execute)(&request.canonical_bytes());
+        let disposition = match result.outcome {
+            "succeeded" => {
+                document.state = "succeeded".into();
+                "succeeded"
+            }
+            "safeToReflash" => "nextCandidateAllowed",
+            "outcomeUnknown" => "awaitingRuntimeRecoveryProof",
+            "failedKnown" => {
+                document.state = "blocked".into();
+                "blockedKnownFailure"
+            }
+            _ => {
+                document.epochs -= 1;
+                "refusedBeforeDispatch"
+            }
+        };
+        let (evaluated, _) = clock(broker).map_err(Refusal::wire)?;
+        let prepared = document
+            .evaluations
+            .get_mut(index)
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| Refusal::Persistence("prepared evaluation disappeared".into()).wire())?;
+        if result.job_id.is_none() {
+            prepared.remove("destructiveEpoch");
+        }
+        match &result.job_id {
+            Some(job) => prepared.insert("jobID".into(), json!(job)),
+            None => prepared.remove("jobID"),
+        };
+        prepared.insert("outcome".into(), json!(result.outcome));
+        prepared.insert("disposition".into(), json!(disposition));
+        prepared.insert("detail".into(), json!(result.detail));
+        prepared.insert("evaluatedAtUTC".into(), json!(evaluated));
+        prepared.remove("observation");
         let _serial = self.lock()?;
         self.persist(identity, &document).map_err(Refusal::wire)?;
         Ok(status(identity, &document))

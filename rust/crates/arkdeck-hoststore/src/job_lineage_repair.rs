@@ -294,6 +294,66 @@ pub(crate) fn repair_outcome_gaps(
     Ok(())
 }
 
+/// Swift `RuntimeJobEngine.runtimeDebugExecutionOutcome(jobID:)`: one
+/// recovery-broker attempt classified from its Job and the exact durable
+/// capability use it ran under. A failed Job is not assumed retryable: only a
+/// journal whose every step intent is typed and neither a device mutation nor
+/// destructive, or the use's own `safeToReflash`, opens the next attempt.
+/// `Err` is a record, journal or ledger that could not be read, which the
+/// broker's driver answers as an unknown outcome.
+pub(crate) fn debug_execution_outcome(
+    jobs: &JobStore,
+    capabilities: Option<&CapabilityStore>,
+    job_id: &str,
+) -> Result<&'static str, String> {
+    let record = jobs.read_snapshot(job_id).map_err(|error| error.message)?;
+    if matches!(record.state.as_str(), "succeeded" | "recovered") {
+        return Ok("succeeded");
+    }
+    if record.outcome_unknown() || record.state == "waitingForRecovery" {
+        return Ok("outcomeUnknown");
+    }
+    if record.state == "failed" {
+        let events = journal_events(jobs, job_id).map_err(|error| match error {
+            RepairError::Engine(detail) | RepairError::Other(detail) => detail,
+        })?;
+        let typed_only = events
+            .iter()
+            .filter(|event| event["kind"] == "stepIntent")
+            .all(|event| {
+                matches!(
+                    event["payload"]["step"]["effect"].as_str(),
+                    Some("hostOnly" | "readOnly")
+                )
+            });
+        if typed_only {
+            return Ok("safeToReflash");
+        }
+    }
+    let Some(reference) = record
+        .admission_evidence()
+        .and_then(|evidence| evidence["reference"].as_str())
+    else {
+        return Ok("failedKnown");
+    };
+    let Some(store) = capabilities else {
+        return Ok("failedKnown");
+    };
+    let lineage = store.lineage().map_err(|error| error.swift())?;
+    Ok(
+        match lineage
+            .iter()
+            .rev()
+            .find(|use_| use_.capability == reference && use_.job == job_id)
+            .map(|use_| use_.outcome)
+        {
+            Some(UseOutcome::SafeToReflash) => "safeToReflash",
+            Some(UseOutcome::OutcomeUnknown | UseOutcome::Pending) => "outcomeUnknown",
+            Some(UseOutcome::Confirmed) | None => "failedKnown",
+        },
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
