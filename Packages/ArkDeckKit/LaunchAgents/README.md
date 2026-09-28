@@ -55,8 +55,10 @@ M5 切换窗口用的 Rust helper 也由 `build-helpers.sh` 发布：`ARKDECK_HE
 Info.plist、provisioning profile、entitlements 与可执行名同 Swift helper（只少了只有 Swift 读的
 SwiftPM 资源，daemon 仍带 OpenHarmony code-sign helper），并经过同样的 profile 校验、Developer ID、
 hardened runtime、secure timestamp、公证、staple 与 Gatekeeper assessment。Rust daemon 包不含
-façade；`ARKDECK_ROLLBACK_HELPER` 必须指向当前发布的 Swift helper（Swift daemon 加
-Rust façade 的 `ArkDeckAgent.app`），它原样复制到输出的 `rollback/ArkDeckAgent.app` 保留一个周期。
+façade。按维护者 2026-09-28 裁决（P8）它不再保留 Swift 回滚 helper：回滚目标是切换前安装态的 helper，
+由 `runtime service update` 留在 `Helpers/.rollback`，维护者另用 `ditto` 留一份。发布 DMG（App、这对
+helper 与 ArkForge.bundle）由 `scripts/release/build_macos_release.py` 调用本模式产出，见
+`docs/release/macos-install.md`。
 `Distribution/macOS/build-unsigned-rust-helpers.sh` 用同一布局步骤产出 ad hoc 签名、占位 profile 的
 一对 helper，输出根写有 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`，只供
 `Distribution/macOS/check-rust-helpers.py` 检查结构；生产 helper 校验会拒绝它，不可分发或安装。

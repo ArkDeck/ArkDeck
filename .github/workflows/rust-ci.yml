@@ -290,6 +290,16 @@ jobs:
             bash Packages/ArkDeckKit/Distribution/macOS/build-unsigned-rust-helpers.sh
           python Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py "$output"
 
+      # The release DMG entry (scripts/release/build_macos_release.py, TASK-XPA-017
+      # S5) driven end to end with recording signing, notary and build tools
+      # through the real build-helpers.sh Rust mode, plus one unsigned DMG built
+      # and mounted with the real hdiutil. No identity, nothing sent to Apple;
+      # it compiles nothing and takes about half a minute. macOS only.
+      - name: Release DMG pipeline (fixtures, unsigned)
+        if: runner.os == 'macOS'
+        working-directory: .
+        run: python3 scripts/release/test_build_macos_release.py
+
       - name: Published consumer and candidate contract parity
         working-directory: .
         run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py --output-dir "$GITHUB_WORKSPACE/rust/target/readonly-check"

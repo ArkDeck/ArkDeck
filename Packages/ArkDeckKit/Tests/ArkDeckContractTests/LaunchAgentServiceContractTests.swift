@@ -279,16 +279,21 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     // CHG-2026-074 M5 (G5 slice 20a): the Rust helper release, behind
     // ARKDECK_HELPER_RUNTIME=rust in the same script, notarizes, staples and
-    // assesses the pair and its retained Swift helper as the Swift release
-    // does, through the layout step it shares with the unsigned structure
-    // check. Neither that step nor the check reaches a release step.
+    // assesses the pair as the Swift release does, through the layout step it
+    // shares with the unsigned structure check. Neither that step nor the check
+    // reaches a release step. The Swift release does it for its pair and its
+    // facade rollback helper; the Rust release retains no Swift helper
+    // (maintainer ruling 2026-09-28, P8), so three in all.
     for releaseStep in [
       "xcrun notarytool submit", "xcrun stapler staple", "spctl --assess --type execute",
     ] {
       XCTAssertEqual(
-        releaseScript.components(separatedBy: releaseStep).count - 1, 4,
-        "both helper releases must retain \(releaseStep) for the pair and its rollback helper")
+        releaseScript.components(separatedBy: releaseStep).count - 1, 3,
+        "both helper releases must retain \(releaseStep) for each bundle they ship")
     }
+    XCTAssertFalse(
+      releaseScript.contains("ARKDECK_ROLLBACK_HELPER"),
+      "the Rust helper release must not require a Swift rollback helper")
     let rustLayoutStep = "bash \"$distribution_root/package-rust-helpers.sh\""
     XCTAssertTrue(
       releaseScript.contains(rustLayoutStep),

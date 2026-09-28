@@ -56,19 +56,18 @@ Agent 与协调会话在窗口内**不执行**任何 `runtime service update|ins
 下文命令用这些变量，窗口开始时由【维护者】在自己的 shell 里设好：
 
 ```sh
-RUST_OUT=<20a 产出的发布目录（绝对路径）>        # build-helpers.sh 的 ARKDECK_HELPER_OUTPUT
+RUST_OUT=<从 RC DMG 装好的 ArkDeckCLI.app 所在目录（绝对路径）>  # 例如 /Applications；RC 由 scripts/release/build_macos_release.py 产出
 ARKDECK="$RUST_OUT/ArkDeckCLI.app/Contents/MacOS/arkdeck"            # Rust CLI
 HELPER="$RUST_OUT/ArkDeckCLI.app/Contents/Helpers/ArkDeckAgent.app"  # Rust daemon bundle
-ROLLBACK="$RUST_OUT/rollback/ArkDeckAgent.app"                        # 保留一个周期的 Swift helper（Swift daemon + façade）
+ROLLBACK=<首次切换前维护者 ditto 留存的安装态 helper>                 # Swift daemon + façade；见文首裁决节 P8
 OLD_ARKDECK=<当前安装态配套的 Swift CLI>          # 例如 Toolchains/arkdeck-helpers-main-<sha>/ArkDeckCLI.app/Contents/MacOS/arkdeck
 HDC=<当前已验证 HDC 的绝对路径>                    # 从切换前的 runtime hdc status 的 executablePath 读
 OUT=/private/tmp/arkdeck-cutover-<YYYYMMDD>        # 原始输出目录，不入仓
 SUPPORT="$HOME/Library/Application Support/ArkDeck"
 ```
 
-发布目录布局（`$RUST_OUT/ArkDeckCLI.app/Contents/MacOS/arkdeck`、`…/Contents/Helpers/ArkDeckAgent.app`、
-`$RUST_OUT/rollback/ArkDeckAgent.app`）见 `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh:88-121` 与
-`package-rust-helpers.sh:118-136`。
+DMG 布局与安装步骤见 `docs/release/macos-install.md`；helper 对由 `build-helpers.sh` 的 Rust 模式经
+`package-rust-helpers.sh` 布局，2026-09-28 起不再带 `rollback/ArkDeckAgent.app`（P8 裁决）。
 
 ### 0.3 输出与停止
 
@@ -111,7 +110,7 @@ SUPPORT="$HOME/Library/Application Support/ArkDeck"
 |---|---|---|---|
 | P1 | 切换所需 PR 已合入 protected `main`：production 组合 #2136/#2137、`runtime service status/verify --job/restart` #2141、§G.4 预检 #2142、`update/install/uninstall` 与无 `--job` 的 `verify` #2143、Rust `--analyze-crash-ledger` #2144、Bootstrap 注册表 #2216/#2217、Rust helper 打包 #2218、entitlements 口径 #2219、App 脱离 `ArkDeckWorkflows` #2139；GJ-4 用到的 M4 Flash 链（含 `flash install-binding` #2245、执行授权 #2252 等） | 【协调会话】`git fetch origin main && git log --oneline origin/main \| grep -E '\(#(2136\|2137\|2139\|2141\|2142\|2143\|2144\|2216\|2217\|2218\|2219\|2245\|2252\|2255)\)'`，逐条命中；M4 其余 PR 以 `evidence/macos-remaining.md` 仪表盘 M4 行为准 | 起草时列出的 14 个 PR 均已在 `main`（#2136 `51f8009df`、#2137 `86ea4d839`、#2139 `1267e465d`、#2141 `5b1df34ee`、#2142 `d41cc1fb1`、#2143 `527459240`、#2144 `ae404cc5c`、#2216 `c3c120513`、#2217 `3315a9cba`、#2218 `1dbe5acd0`、#2219 `167783bb1`、#2245 `61d95b10d`、#2252 `f9d6cac06`、#2255 `8acfe6900`）；窗口前按此重核，并补上之后合入的 M4/CLI 车道 PR |
 | P2 | #2255（S36：预检的 `loaderTransitionAwaitingBinding` 与 `retainedSessions` 两条拒绝）已合入 | 同上 grep `(#2255)` | 起草期间已合入（`8acfe6900`）。仍要知道的残余：该拒绝只拦 Swift 的 `bind-current-loader` 能结算的那一类（判据见其 run 记录 :79-86，协调会话已接受这一收窄）；判据之外、停在 Loader 过渡上的 parked Flash Job 照旧原样带进 Rust。Rust daemon 启动时对这类过渡只打印一行「Loader transition … awaits settlement … its outcome stays unknown」并继续，但**同一 target 上有两个及以上时启动失败**（`rust/crates/arkdeck-agentd/src/main.rs:716-724`，`rust/crates/arkdeck-hoststore/src/rockchip_startup.rs:87-94`），launchd `KeepAlive` 会让它崩溃循环。窗口前由【协调会话】从第 1 步 1a 的 `carriedOver.parkedJobIds` 逐个 `job show` 只读核对有没有这种情况，有则交维护者裁决 |
-| P3 | 20a 产物：用 `ARKDECK_HELPER_RUNTIME=rust` 从**窗口所用 `main` 提交**构建、Developer ID 签名（公证按 Q11）的 `$RUST_OUT`，含 `rollback/ArkDeckAgent.app`（当前发布的 Swift helper，Swift daemon + façade） | 【维护者】构建命令与只读验收命令照 `evidence/runs/TASK-XPA-017/rust-helper-packaging-run.md` §5：`codesign --verify --strict --deep`、`codesign -dv`（Identifier `com.arkdeck.agentd`、Team `8AQTYW5FKR`、hardened runtime、有 Timestamp）、`-R` 要求、`codesign -d --entitlements`（恰为 `ArkDeckAgent.entitlements` 三键，#2219）、`stapler validate` 与 `spctl`（仅在要求公证时）、以及临时 home + 记录型 launchctl 下的 `runtime service update` 自检。注意 `check-rust-helpers.py` **只检查无签名的结构产物**（要求 ad hoc 签名与 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`），对签名发布包必然失败，不能当发布验收 | 维护者执行；Q11（要不要公证）**窗口前必须由维护者裁决** |
+| P3 | RC：维护者用 `scripts/release/build_macos_release.py release` 从**窗口所用 `main` 提交**构建、Developer ID 签名、公证并 staple 的 DMG（App、Rust helper 对、ArkForge.bundle；`docs/release/macos-install.md`），附 `release-receipt.json` | 【维护者】构建命令与只读验收命令照 `evidence/runs/TASK-XPA-017/rust-helper-packaging-run.md` §5：`codesign --verify --strict --deep`、`codesign -dv`（Identifier `com.arkdeck.agentd`、Team `8AQTYW5FKR`、hardened runtime、有 Timestamp）、`-R` 要求、`codesign -d --entitlements`（恰为 `ArkDeckAgent.entitlements` 三键，#2219）、`stapler validate` 与 `spctl`（必做；脚本在挂载的 DMG 上已跑一遍，receipt 记公证 submission id）、以及临时 home + 记录型 launchctl 下的 `runtime service update` 自检。注意 `check-rust-helpers.py` **只检查无签名的结构产物**（要求 ad hoc 签名与 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`），对签名发布包必然失败，不能当发布验收 | 维护者执行；Q11 已由 2026-09-28 裁决取代：必须公证（文首裁决节） |
 | P4 | 20b：Rust 性能基线 `perf-baseline-<date>-rust.json` 已在安静主机上采集并提交，两级 RSS 分开记，预算不提 | 【协调会话】`ls scripts/bench/baselines/` 有该文件且已在 `main` | 起草时只有 `perf-baseline-2026-09-04.json`（Swift）。是否以「基线已提交」为开窗条件，**窗口前必须由维护者裁决** |
 | P5 | 4h soak 绿 | 托管 4 小时 Rust soak run `36130214960`（#2185 之后），记录 `evidence/runs/TASK-XPA-025/snapshot-pager-bounded-run.md`；仪表盘 `evidence/macos-remaining.md` 的 Performance 行 | 已绿，但跑在较早的 `main` 上；是否要求在窗口所用提交上重跑，**窗口前必须由维护者裁决** |
 | P6 | 签名 S-1/S-2 裁决与安装态签名预设 | 【维护者】只读检查 `test -e "$SUPPORT/Signing/OpenHarmony/preset-v1.json" && echo present`；`"$ARKDECK" runtime signing status --output json`。Rust CLI 已有凭据 owner；`install/update` 在任何安装改动前验证预设公开材料，在已安装 helper 验签后、bootstrap 前持锁刷新 daemon 指纹。缺失 envelope 或不能证明 helper 身份时刷新失败；不可读 envelope 不阻止仅写公开指纹，实际签名仍须读到 secret | 不再因存在预设而一律拒绝；无效材料仍 exit 69 且安装态不变，刷新失败则按 Swift 行为尝试启动已验证的新 helper 后 exit 1；恢复启动也失败时服务停着并报告两项错误，按下文失败阶段处理。`status|remove|install|migrate-deveco|install-sdk-release` 与身份刷新已有隔离测试；签名替换发布结果未知时保留 `replacingSecrets`/`removingSecrets` 与 pending account 跟踪，Rust/旧 Swift 均拒绝自动恢复；须通过 Rust 显式安装或移除恢复，不能删除 ledger 强制采用。SDK release 材料发布失败也保留有界目录跟踪并显式收尾；S-1/S-2 与真实 Keychain/GJ-5 验收仍待完成。见 `evidence/runs/TASK-XPA-017/signing-identity-refresh-run.md`；本项不构成安装窗口或设备操作批准 |

@@ -212,6 +212,15 @@ class PathClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
 
+    def test_release_pipeline_changes_select_the_rust_lane_that_tests_them(self):
+        for path in (
+            "scripts/release/build_macos_release.py",
+            "scripts/release/test_build_macos_release.py",
+            "scripts/release/release-version.json",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+
     def test_every_declared_generator_input_selects_rust(self):
         root = SCRIPT.resolve().parents[2]
         spec = importlib.util.spec_from_file_location(
