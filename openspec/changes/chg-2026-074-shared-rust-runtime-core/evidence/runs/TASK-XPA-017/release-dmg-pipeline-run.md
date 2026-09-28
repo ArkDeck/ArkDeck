@@ -123,6 +123,7 @@ Branch `agent/xpa-017-release-dmg-20260928` on `origin/main` `f968192e6` (#2301)
 | `python3 Packages/ArkDeckKit/Distribution/macOS/test-local-rust-helpers.py` | 0 | OK |
 | `python3 scripts/ci/test_plan.py` | 0 | 40 tests OK |
 | `python3 scripts/test_agent_pr_workflow.py` | 0 | 15 tests OK |
+| `python3 scripts/test_agent_pr_identity.py` | 0 | 14 tests OK, after adding `release/` to `scripts/README.md` (the guard's boundary-map test failed on the first push) |
 | `plutil -lint scripts/release/ExportOptions.plist`; `bash -n build-helpers.sh` | 0 | OK |
 | `sh scripts/check-sdd.sh` | 0 | 0 errors, 0 warnings; `/private/tmp/arkdeck-lane3-work/logs/check-sdd.log` |
 
