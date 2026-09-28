@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-28 against protected main `2e687ca82` (#2298), revision 11. This list tracks
+Updated 2026-09-28 against protected main `6edb4e479` (#2307), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -8,7 +8,7 @@ goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product wor
 
 | Routed methods on the standalone Rust daemon | Operations executable in Rust | Golden Journeys on Rust | App facades on ClientKit | Registered CLI feature names on Rust | Swift targets deleted |
 | --- | --- | --- | --- | --- | --- |
-| 105 / 105 (installed facade serves 3 locally) | 17 / 30 on the isolated root; 26 / 30 counting the production composition (maintainer ruling 2026-09-28, below) | 0 / 5 | 16 extracted; 0 matching source files remain | 140 / 256 (199 parser command names total) | 0 / 6 |
+| 105 / 105 (installed facade serves 3 locally) | 17 / 30 on the isolated root; 26 / 30 counting the production composition (maintainer ruling 2026-09-28, below); 28 / 30 adding the two Flash operations, run over the production control transport against a test-composed Host with a fake ArkForge lane (#2305; not a daemon composition, see Operations) | 0 / 5 | 16 extracted; 0 matching source files remain | 140 / 256 (199 parser command names total) | 0 / 6 |
 
 Two of the six no longer move (every method is routed, no facade file is left in Workflows) and
 the CLI one joins names by spelling, so this refresh adds the numbers below. They sit beside the
@@ -17,8 +17,9 @@ six and replace none of them; the notes further down say how each one relates to
 | Supplement | At the pinned main |
 | --- | --- |
 | Routed methods that reach an owner the daemon composes | 104 / 105 (`trace.inspect` answers the owner-absent default, as Swift's daemon without a Trace inspector does) |
-| Operations run end to end on either standalone composition | 26 / 30: the 17, and nine `workspace.*` run only by the production composition under a temporary home (`workspace.run-tests@1` joined with #2265). Missing: `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1` (in-process replays only) and `flash.full-restore@1` with its alias (in-process with a fake lane only, #2231, #2282) |
-| Operations the Rust planner materializes | 28 / 30 (not the two Flash operations) |
+| Operations run end to end on either standalone composition | 26 / 30: the 17, and nine `workspace.*` run only by the production composition under a temporary home (`workspace.run-tests@1` joined with #2265). Missing: `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1` (in-process replays only) and `flash.full-restore@1` with its alias (below) |
+| Operations run end to end through a control socket by the real CLI, on any composition | 28 / 30: the 26, and `flash.full-restore@1` with its alias `flash.dayu200` through both GJ-4 entries (`agent run`, `flash run`) to a completed and to an unknown outcome, over `arkdeck_agentd::serve_control` against the Host `flash_execution_control` composes, whose only fakes are the Swift Flash oracle's ArkForge lane and Rockchip host (`tests/spawning/flash_socket_control.rs`, #2305). Missing: the build and sign legs |
+| Operations the Rust planner materializes | 28 / 30 in `job_plan.rs` (the two Flash operations are planned by the Flash planner and admitted by the Flash admitter instead, #2162, #2305) |
 | Registry leaves the Rust CLI answers | 209 / 209 by reading the parser at the pin (199 positional names, plus the six `runtime update` and four update-feed leaves that `parse()` dispatches first); `blocked_leaves.rs` was removed with #2272. Not yet re-measured with a built binary (`count_cli.py` needs its BLOCKED parse adapted); the release-candidate check measures it |
 | CLI ledger entries the parity audit classifies implemented | 244 / 256 (2 leaf missing with the daemon routed, 5 owner missing, 5 tombstones) |
 | App sources importing `ArkDeckWorkflows`; `project.pbxproj` lines naming it | 0; 0 (11; 8 at the previous pin, `b958ff44`) |
@@ -37,11 +38,15 @@ development-root seams (P1/P2) are not built; the crash-path HDC degrade (Q12 op
 after G5 because it changes AC-HDC-003-02; trace database preparation stays in the App's own process,
 with `trace.inspect` unavailable as ruled on 2026-09-25.
 
-Software gaps found on 2026-09-28 and scheduled before the window: `agent.run` refuses the Flash
-operations on Rust (GJ-4's scripted entry), and the recovery broker still refuses
-`executePinnedRequest`; the cutover preflight does not refuse two parked Loader transitions on one
-target, which stops the Rust daemon from starting; SPK-8's two negative cases; the App export and DMG
-producer.
+Software gaps found on 2026-09-28 and scheduled before the window. Closed on `main`: `agent.run`
+admits the Flash operations through the Flash admitter, and both GJ-4 entries run end to end over the
+control socket (#2305); the recovery broker executes its pinned Flash request (#2307); the cutover
+preflight refuses two or more parked Loader transitions on one target (`loaderTransitionsCoverTarget`,
+#2302); the ArkForge digest domains follow the pin (F1/F2, #2303); and one release entry builds the
+App export, the Rust helper pair, ArkForge.bundle and the notarized DMG (#2304), with a nested-code
+signature check before the App's upload (TASK-XPA-017 RC readiness). Still open: SPK-8's two negative
+cases (#2308, in review), the Swift targets' deletion (S6), and the maintainer's first signed
+`release` run.
 
 These are separate coverage measures, not a weighted completion percentage. A routed method or
 CLI entry is not proof of complete behavior, installed activation or hardware acceptance. At the
@@ -52,25 +57,23 @@ pinned main:
   composition over the account's own state is composed and tested under temporary homes but not
   activated (#2136), with the host's trusted USB relations beside its managed HDC (#2137). The
   §G.4 cutover preflight is a one-shot daemon mode (#2142); the Rust `runtime service` leaves
-  install, verify, restart, update and uninstall the service (#2141, #2143, #2217); and the release
-  script builds the Rust helper pair only behind `ARKDECK_HELPER_RUNTIME=rust`, the Swift pair
-  staying the default (#2218).
+  install, verify, restart, update and uninstall the service (#2141, #2143, #2217); `build-helpers.sh`
+  builds the Rust helper pair behind `ARKDECK_HELPER_RUNTIME=rust` (#2218), which the release entry
+  `scripts/release/build_macos_release.py` uses (#2304). No signed, notarized release candidate has
+  been built yet.
 - **Golden Journeys.** Each Journey has a rehearsal or a development-root run, and none has a
   `REAL_DEVICE_PASS` on a pure Rust daemon. GJ-1 ran against the real DAYU200 on the isolated root
   (#2024), which is development evidence. GJ-2 (#2081), GJ-3 (#2090) and GJ-5 (recorded with #2153)
   were rehearsed against a fake HDC; GJ-5's build and sign legs cannot run on an isolated root.
-  GJ-4's Flash is planned, and then refused before the Runtime capability it needs would be issued
-  (#2162, #2223).
+  GJ-4's Flash runs on the Rust Runtime through both entries over the control socket against a
+  fake ArkForge lane (#2305), which is not device evidence.
 - **App.** No App source imports `ArkDeckWorkflows`, and the App project links none of the six
   retirement targets (#2139); all sixteen facade files are in ClientKit. The harness for the signed
   App against the standalone Rust Mach service exists (#2114, #2117), but SPK-8's signed acceptance
   has not run.
-- **CLI.** 197 of the registry's 209 leaves are answered: 187 are ported, and 10
-  (`runtime update *`, `maintainer update-feed *` and its deprecated spelling) are answered by
-  name as `blockedByProductDefect` until their subsystems are ported (#2211). The twelve not answered are
-  `runtime signing install|install-sdk-release|migrate-deveco|remove` with their deprecated
-  `signing` spellings, `runtime support-bundle preview|export`, `flash run` and the legacy
-  `flash install-binding`.
+- **CLI.** Every one of the registry's 209 leaves is answered by reading the parser (199
+  positional names and the ten `runtime update` and update-feed leaves `parse()` dispatches first;
+  supplement above). The release-candidate check measures it with the RC's own binary.
 
 How each number is measured at the pinned main (both passes of every count, and the scripts the
 static one below does not cover, are in `runs/TASK-XPA-017/dashboard-refresh-20260926-run.md`):
@@ -96,12 +99,22 @@ static one below does not cover, are in `runs/TASK-XPA-017/dashboard-refresh-202
   definition as the previous refresh did: a host-only operation reaches no HDC, so the fake-HDC clause binds
   device operations only, and a recorded rehearsal or host acceptance run counts as a committed
   test does. Since #2136 the production composition also runs under a temporary
-  `CFFIXED_USER_HOME` in committed process tests, and eight `workspace.*` operations have run end
-  to end only there. The definition names the isolated root, so those eight are not counted.
-  Whether a production-composition run under a temporary home satisfies this measure is the
-  maintainer's call, as #2081's rehearsal was; meanwhile the supplement counts either composition
-  (25). `MATERIALIZED` in `rust/crates/arkdeck-hoststore/src/job_plan.rs` bounds both (28), so
-  17 ⊆ 25 ⊆ 28. By operation:
+  `CFFIXED_USER_HOME` in committed process tests, and nine `workspace.*` operations have run end
+  to end only there. The definition names the isolated root, so those nine are not counted in it.
+  The maintainer's 2026-09-28 ruling counts a production-composition run under a temporary home
+  toward acceptance, so the headline also gives either composition (26). `MATERIALIZED` in
+  `rust/crates/arkdeck-hoststore/src/job_plan.rs` bounds both (28), so 17 ⊆ 26 ⊆ 28. The two Flash
+  operations sit outside all three: the Flash planner and admitter carry them, and their end-to-end
+  evidence (#2305) is a third kind. A test binary serves the production control transport
+  (`arkdeck_agentd::serve_control`, the daemon's own serving and drain loop) on a private socket,
+  and the real `arkdeck` CLI drives it; but the Host behind it is composed by the test (the real
+  Target, Artifact, Import, Job, capability and Agent execution owners, the Flash planning, facts
+  and admission) with the Swift Flash oracle's fake ArkForge lane and Rockchip host as its only
+  external ports. It is neither daemon binary: neither composition can be given a fake lane, so the
+  lane's own IPC and the production startup of the lane are covered elsewhere (the provider's session
+  and lane tests, SPK-9's real-daemon subset, `arkforged_owner_stop`, `production_composition`) and
+  meet this path only in phase A's GJ-4 on a device. Counted as its own class, it makes 28 / 30 in the
+  headline and fills the two Flash operations the stage S exit asks for. By operation:
 
   | Operation | Effect | Counted | Evidence at the pinned main |
   | --- | --- | --- | --- |
@@ -123,9 +136,9 @@ static one below does not cover, are in `runs/TASK-XPA-017/dashboard-refresh-202
   | `workspace.inspect-source@1`, `workspace.read-source-range@1`, `workspace.inspect-git-status@1`, `workspace.inspect-diff@1` | hostOnly | no | production composition only: `workspace_read_process::the_production_daemon_serves_the_workspace_reads_with_the_host_tools` (#2190) |
   | `workspace.create-checkpoint@1`, `workspace.sweep-isolated-copies@1` | deviceMutation, hostOnly | no | production composition only: `workspace_checkpoint_process::the_production_daemon_checkpoints_and_sweeps_with_the_host_tools` (#2192) |
   | `workspace.symbolize-crash@1` | hostOnly | no | production composition only: `workspace_symbolize_process::the_production_daemon_symbolizes_a_devices_crash_with_its_own_one_shot_mode` (#2195) |
-  | `workspace.run-tests@1` | deviceMutation | no | materialized, and replayed in-process only (`workspace_test_symbolize_oracle`, #2195); no daemon has run it |
   | `workspace.build-openharmony@1`, `workspace.sign-openharmony-hap@1` | deviceMutation, hostOnly | no | replayed in-process only (#2153). An isolated root can register no DevEco and composes no signing credential owner; the development seams that would let it (P1 and P2 in `runs/TASK-XPA-015/gj5-fake-rehearsal-2026-09-25.md`) await the maintainer |
-  | `flash.full-restore@1`, `flash.dayu200` (its alias) | destructive | no | planned by the Flash planner (#2162). `job.submit` answers as Swift's up to capability issuance and then refuses, because the Rust Runtime does not issue the Runtime capability (#2223). There is no run path on `main`, and DEC-016's two recovery stories await their contract |
+  | `workspace.run-tests@1` | deviceMutation | no | production composition only: `workspace_tests_process::the_production_daemon_runs_tests_only_in_its_copy_and_keeps_the_result` (#2265) |
+  | `flash.full-restore@1`, `flash.dayu200` (its alias) | destructive | no (socket-test Host) | `tests/spawning/flash_socket_control.rs` (#2305): `agent_run_flashes_to_completion_over_the_control_socket`, `agent_run_of_the_alias_flashes_to_completion_over_the_control_socket`, `agent_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket`, `flash_run_flashes_to_completion_over_the_control_socket`, `flash_run_leaves_an_unknown_flash_outcome_unknown_over_the_control_socket` — the real CLI over the production control transport, the test-composed Host with a fake ArkForge lane (above). Issuance, admission, run, parking and reconcile (#2231), DEC-016 recovery (#2243) and the broker's pinned execution (#2307) are on the Rust Runtime; a real `arkforged` and device come only in phase A's GJ-4 |
 
 - **Golden Journeys:** `REAL_DEVICE_PASS` records on the pure Rust daemon. Fake-HDC/oracle
   replay and the earlier paired-facade acceptance do not increase this count, nor does the
@@ -172,7 +185,7 @@ import json
 import re
 import subprocess
 
-ref = "2e687ca8214e835bd2672bca8eedb55144fc83b6"
+ref = "6edb4e4792b560e1253685fd7f0cad3b4e22e362"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 def names(path):
@@ -225,7 +238,9 @@ PYCOUNT
 
 The operations evidence (`count_operations.py`, which checks every citation in the table above at
 a ref) and the CLI's answered leaves (`count_cli.py`, after a debug build of the CLI) are in the
-run record, with the two commands behind the Golden Journeys count.
+run record, with the two commands behind the Golden Journeys count. The rows added since, for
+`workspace.run-tests@1` and the Flash socket tests (a third composition kind, `socket-test`, whose
+marker is `arkdeck_agentd::serve_control(`), are in `runs/TASK-XPA-017/rc-readiness-run.md`.
 
 ## Milestones (design §G.1 r11)
 
@@ -234,8 +249,8 @@ run record, with the two commands behind the Golden Journeys count.
 | M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress. Delivered by the previous pin (listed in its row): observe/capture, agent run/status/list/abandon and resume, HAR and human-action reads, the Target owner, adoption and availability, live operation availability, HDC status, the managed HDC server with Swift's stop, `doctor` from the owners, the control actions and the restart impact approval, development USB relations, `job.reconcile`. Since: the console-approved HDC restart end to end — its frames (#2101), the Job interlock (#2102), durable approval and boundary recovery (#2104), the confirmed restart transferring the owned server identity (#2105), the foreground crash boundary (#2107), the replacement ended on stop (#2131), a proved server exit (#2174) and the CLI's foreground approval (#2106); trusted USB relations read from the host I/O Registry as Swift's daemon reads them (#2135), composed beside the production composition's managed HDC (#2137); every `capture.diagnostics@1` leg (#2134); `trace.probe` (#2133); Debug read controls (#2108) and `debug.template@1` as Jobs (#2122); restart carry-over of parked device Jobs by fresh facts and dedicated readbacks, with resume (#2086, #2138, #2140), the runner killed at each crash window (#2092) and unreadable recovery named in `doctor` (#2096); development inputs judged before the managed server launches (#2214). Remaining: GJ-1 `REAL_DEVICE_PASS` on the installed pure Rust daemon, which needs the M5 activation; the isolated-root run against the real DAYU200 (#2024) stays development evidence by the option-A ruling |
 | M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | in progress. Delivered by the previous pin (listed in its row): the HAP, native-library, pointer and port-rule providers, the capability store, pointer planning and admission, the durable runner, Artifact publication and the Import lease lifecycle, `debug.hap@1` and the native library planned, admitted and run, the screen-sequence run, capability-ledger unknown outcomes, `cleanupDebt.list`, and #2078's development mutation authority with GJ-2's fake rehearsal (#2081). Since: `cleanupDebt.continue` (#2085); the bundled arm64 code-sign helper composed and verified (#2088); fake-HDC rehearsals on the isolated daemon of GJ-3's deployment and rollback (#2090), the port rules and the screen sequence (#2093); the gestures through the real CLI (#2220); App uploads through the Rust ingress (#2132); one device mutation Job per Target at a time in its mutation lane (#2149), Target transactions waiting for each other's locks (#2147), admission waiting while a Session is published (#2207) and a Session published aside and renamed whole under the storage lock, so no mutation is refused over an unfinished one (#2230). Remaining: GJ-2/3 `REAL_DEVICE_PASS` on the installed pure Rust daemon (M5); a real-device leg on a development root still needs the installed daemon booted out of the USB interface for its window |
 | M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | in progress. Delivered by the previous pin: `workspace.project.*` and `workspace.preset.*` on the Rust owner with the DevEco pins, and SPK-10's HAP signing (#2031). Since: all 13 `workspace.*` operations materialize and run on the Rust daemon — the Swift oracle of an isolated copy (#2094), copies adopted after restart (#2145), patches applied and reverted (#2146), build and sign (#2153), the four reads (#2190), checkpoint and sweep (#2192), tests and crash symbolization (#2195) — with the operation, project and preset projections Swift's daemon publishes (#2197, #2199, #2215), the tombstone fix (#2204), the dispatcher check at admission (#2206) and the pinned-tool-shim fix in Swift and Rust (#2221); the HiLog summary (#2160), trace summary (#2164, #2165, #2167) and trace analysis (#2169) analyzers, the crash-ledger mode (#2144, #2157) and the answer to a completed host-only agent execution (#2161); `trace.inspect` answered as Swift's daemon without an inspector (#2163, #2176). GJ-5's fake rehearsal on the isolated daemon (recorded with #2153) ran the repro, isolate, patch and verify legs. Remaining: the build and sign legs on a development root (P1 and P2 await the maintainer), the `runtime signing` CLI leaves other than `status`, and GJ-5 `REAL_DEVICE_PASS` (M5) |
-| M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | in progress. Delivered by the previous pin: the Rockchip live-mode probe, post-flash observation, Loader transition and alias store (#1934–#1941). Since: ArkForge's crates at the Swift pin, with `flash.device-access` through its public socket (#2151); `arkforged` owned and paired by the daemon, which reads the Loader through it (#2152); `flash.reconcile-alias`, `debug.status` and the Flash invocation list (#2148), `flash.bootloader-status` and `flash.prerequisites` (#2150), the current Loader bound (#2154), the Rockchip state reconciled at start (#2155); DAYU200 flash bundles validated at Import commit (#2158) and uploaded by the App (#2159); both Flash operations planned (#2162); the recovery invocations started and evaluated (#2166); `flash.lanePlanPreview` (#2170, CLI #2168); Swift's Flash admission, run, reconcile and recovery recorded as an oracle, with `job.submit` answered up to capability issuance (#2223). Remaining: the Runtime capability for a Flash, its run and reconcile on the Rust Runtime, DEC-016's complete-overwrite recovery (its two recovery stories await a contract) and GJ-4 on a device with the maintainer's go |
-| M5 | cutover | G.4 preflight, LaunchAgent to the standalone Rust binary, deletions, DMG, lock and traceability flip (TASK-XPA-017) | all | not activated. Delivered: the production composition over the account's own state (#2136, #2137), the §G.4 cutover preflight (#2142), the `runtime service` leaves (#2141, #2143) with the typed install's Bootstrap pins (#2216, #2217), the analyzer gate opened by the Rust crash-ledger mode (#2144), the Rust helper pair packaged behind `ARKDECK_HELPER_RUNTIME=rust` (#2218) and the App off `ArkDeckWorkflows` (#2139). Remaining: the LaunchAgent switch with its Developer ID signing (and notarization if G5 requires it), SPK-8, the Swift targets' deletion (0/6) once the Swift CLI and daemon no longer link them, the Rust performance baseline, and the lock and traceability flip |
+| M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | in progress. Delivered by the previous pin: the Rockchip live-mode probe, post-flash observation, Loader transition and alias store (#1934–#1941). Since: ArkForge's crates at the Swift pin, with `flash.device-access` through its public socket (#2151); `arkforged` owned and paired by the daemon, which reads the Loader through it (#2152); `flash.reconcile-alias`, `debug.status` and the Flash invocation list (#2148), `flash.bootloader-status` and `flash.prerequisites` (#2150), the current Loader bound (#2154), the Rockchip state reconciled at start (#2155); DAYU200 flash bundles validated at Import commit (#2158) and uploaded by the App (#2159); both Flash operations planned (#2162); the recovery invocations started and evaluated (#2166); `flash.lanePlanPreview` (#2170, CLI #2168); Swift's Flash admission, run, reconcile and recovery recorded as an oracle, with `job.submit` answered up to capability issuance (#2223); Flash issuance, admission, run, parking and reconcile (#2231), DEC-016 recovery (#2243), the ArkForge lane ported (#2251–#2263) and native execution composed in both compositions at ArkForge `c1dc0553` (#2282), lane preview materialized (#2284); since `2e687ca82`: `agent run` admits Flash through the Flash admitter and both GJ-4 entries run end to end over the control socket against a fake lane (#2305), the recovery broker executes its pinned Flash (#2307), and the digest domains follow the pin (F1/F2, #2303). Remaining: GJ-4 on a device, through the release candidate's ArkForge.bundle, with the maintainer's go (phase A) |
+| M5 | cutover | G.4 preflight, LaunchAgent to the standalone Rust binary, deletions, DMG, lock and traceability flip (TASK-XPA-017) | all | not activated. Delivered: the production composition over the account's own state (#2136, #2137), the §G.4 cutover preflight (#2142) with its legacy and Loader-transition refusals (#2255, #2298, #2302), the `runtime service` leaves (#2141, #2143) with the typed install's Bootstrap pins (#2216, #2217), the analyzer gate opened by the Rust crash-ledger mode (#2144), the Rust helper pair packaged behind `ARKDECK_HELPER_RUNTIME=rust` (#2218), the App off `ArkDeckWorkflows` (#2139), the cutover runbook with the maintainer's 2026-09-28 rulings (#2258, #2264, #2273, #2301), and the release entry for the notarized DMG with one version source (#2304). Remaining: the maintainer's first signed and notarized `release` run and the agent's read-only RC verification (S7), SPK-8 (#2308 in review), the Swift targets' deletion (0/6, S6), the LaunchAgent switch, and the lock and traceability flip. The performance baseline and a soak rerun are no longer window conditions (2026-09-28 ruling) |
 
 ## Tasks
 
@@ -255,7 +270,7 @@ it, not to this dashboard.
 | XPA-018 | in-progress | 187 parser command names, 131 matching registered features; 197 of 209 registry leaves answered, 187 ported and 10 answered by name as `blockedByProductDefect`. Since `b958ff44`: `runtime health`, `operation validate`, `device wait`, `job watch` and `job wait` (#2091, #2098, #2100, #2171); the foreground impact approval (#2106); `debug probe`, `debug template list` and `trace probe|inspect|export` (#2120, #2125, #2172, #2180, #2182); `runtime service` and the cutover preflight (#2141, #2142, #2143, #2216, #2217); parse refusals, read parity, the legacy `--json` and client failure mapping as Swift's (#2173, #2179, #2181, #2187); workspace continuation over the shared Catalog model (#2177, #2178); the domain executor and every domain leaf (#2183, #2184, #2208, #2212, #2228, #2229); the machine-contract bundle export (#2186, #2188, #2189, #2191, #2194, #2196); the aliases, recovery cleanup, diagnostics and ui-dump leaves (#2205, #2209, #2210, #2224, #2225); `runtime signing status` (#2226); the update leaves answered by name (#2211), with the update-feed writes fixed in Swift (#2227); CI and test upkeep (#2193, #2198, #2200, #2202, #2203, #2213) | the twelve leaves not answered (above) and the subsystems behind the ten answered by name; Swift CLI retirement with M5 |
 | XPA-019 | ready | ClientKit transport and models; the History filter, History readers and JobControl, Device list, Trace cache, Overview, Settings, remote build and updater facades (#1976, #1982, #1991, #1997, #2007, #2036, #2044, #2054); the isolated App ingress serving the History reads (#1980, #1985). Since `b958ff44`: the Trace (#2089), Debug (#2095), UI dump (#2109), HDC client diagnostics (#2112), Flash and Rockchip device access (#2124) and support bundle (#2139) facades; the App off `ArkDeckWorkflows` (#2139); the Rust App ingress admitting discovery reads, UI dump Jobs, continuations, storage settings, uploads, quota, the Trace cache, the Debug probe and `trace.probe` (#2110, #2113, #2118, #2126, #2132, #2133); offline Flash review from Rust planning, with its facts kept accessible (#2121, #2123); the signed App ↔ standalone Rust Mach harness (#2114, #2117); App-side upkeep (#2103, #2111, #2115, #2127, #2130) | SPK-8's signed acceptance; the UI suites against the installed Rust daemon; hard prerequisite of M5 |
 | XPA-025 | ready | Rust benchmark launcher/probe (#1972), Rust performance lane (#1979), the isolated Rust owner soak (#1977), the Swift performance baseline, merge-lane micro-benchmarks retired (#1902), SPK-11 on the isolated daemon (#2070, #2075). Since `b958ff44`: the soak's resident set printed every cycle (#2099); Job payloads released during inventory projection (#2116); calendar autoreleases drained (#2129); stored snapshot pages read in bounded memory (#2185), after which the hosted 4-hour Rust soak passed (run 36130214960, `runs/TASK-XPA-025/snapshot-pager-bounded-run.md`) | SPK-11's repeated measurements and a committed Rust performance baseline, both on a quiet host |
-| XPA-017 | blocked | Filed under it since `b958ff44`, its status line unchanged: the production composition (#2136, #2137), the ArkForge lane and Flash work of M4 (#2148, #2150, #2151, #2152, #2154, #2155, #2158, #2159, #2162, #2166, #2168, #2170, #2223) and the Rust helper packaging (#2218) | M5 |
+| XPA-017 | blocked | Filed under it since `b958ff44`, its status line unchanged: the production composition (#2136, #2137), the ArkForge lane and Flash work of M4 (#2148, #2150, #2151, #2152, #2154, #2155, #2158, #2159, #2162, #2166, #2168, #2170, #2223) and the Rust helper packaging (#2218); since `2e687ca82`: the Loader-transition preflight block (#2302), the Flash entries end to end (#2305), the digest domains (#2303), the release entry (#2304) and the broker's pinned Flash (#2307) | M5 |
 
 Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land under
 `runs/<task>/spk-N-run.md`. The decision package for design §L.1 item 13 is
@@ -263,6 +278,16 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 maintainer's 2026-09-19 ruling to port the carriers it names unchanged.
 
 ## History
+
+2026-09-28 (`6edb4e479`): seven merges since `2e687ca82`, #2301–#2307 (#2301 is the previous refresh).
+Routes stay 105; CLI parser names 199 and registered names 140; `MATERIALIZED` 28. Operations: 17 on
+the isolated root and 26 on either daemon composition, unchanged; the two Flash operations now run
+end to end over the production control transport against a test-composed Host with a fake ArkForge
+lane (#2305), a third kind counted separately, 28 / 30. Also merged: the recovery broker's pinned
+Flash (#2307), the Loader-transition preflight block (#2302), the pinned digest domains (#2303), the
+release DMG entry (#2304) and bounded Rust CI caches (#2306). GJ on Rust 0/5; Swift retirement 0/6.
+Counted with the PYCOUNT above at the new pin and `count_operations.py` with the rows in
+`runs/TASK-XPA-017/rc-readiness-run.md`, each twice with identical output.
 
 2026-09-28 (`2e687ca82`): 71 merges since `4eb8c677`, #2231–#2300. Routes stay 105. The isolated-root
 operations measure stays 17; either composition 26 (+`workspace.run-tests@1`, #2265). CLI parser names

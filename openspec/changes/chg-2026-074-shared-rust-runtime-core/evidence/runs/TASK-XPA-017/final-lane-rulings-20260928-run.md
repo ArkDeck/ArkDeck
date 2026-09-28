@@ -47,4 +47,7 @@ removed `blocked_leaves.rs` needs adapting; the release-candidate check measures
 
 ## CI
 
-Pending.
+PR #2301, head `c1951dc0f`, Swift CI run `36413866804`: `guard`, `plan`, `ds-tokens`,
+`ds-interactions` and the `swift` aggregate green; `swift-tests`, `app-build` and `rust-checks` were
+not selected for this docs-only diff. Merged as `f968192e6`. (Recorded by the RC-readiness slice,
+`rc-readiness-run.md`.)

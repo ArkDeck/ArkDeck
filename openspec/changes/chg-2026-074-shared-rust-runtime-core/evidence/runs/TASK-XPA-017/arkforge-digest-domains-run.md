@@ -158,3 +158,7 @@ Also recorded as an invalid run under the four criteria:
 4. It is unrelated to the diff.
 
 A second record-only commit re-runs CI.
+
+**Final head `cab7606bc`, run `36423512334`.** Every lane green: `guard`, `plan`, `swift-tests`,
+`app-build`, the four Rust lanes, `ds-tokens`, `ds-interactions` and the `swift` aggregate. Merged as
+`e2f96a29b`. (Recorded by the RC-readiness slice, `rc-readiness-run.md`.)

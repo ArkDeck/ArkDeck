@@ -93,4 +93,7 @@ change), the full unified gate (CI's job).
 
 ## CI
 
-Pending; recorded by the next slice or a docs-only follow-up.
+PR #2302, head `e6fca6595`, Swift CI run `36416346545`: `guard`, `plan`, the four Rust lanes
+(host-independent, ubuntu-latest, macos-26, windows-latest), `ds-tokens`, `ds-interactions` and the
+`swift` aggregate green; `swift-tests` and `app-build` were not selected. Merged as `092b45eb8`.
+(Recorded by the RC-readiness slice, `rc-readiness-run.md`.)

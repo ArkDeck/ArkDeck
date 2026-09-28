@@ -35,6 +35,16 @@ SOURCE_HEAD = "f" * 40
 PIN = re.search(r'ArkForge\.git", rev = "([0-9a-f]{40})"', (REPO / "rust/Cargo.toml").read_text()).group(1)
 VERSIONS = release_version.load()
 DARWIN = sys.platform == "darwin"
+# A 64-bit little-endian Mach-O magic: the release's nested-code check finds
+# code by its magic, so fixture executables start with one.
+MACH_O = bytes.fromhex("cffaedfe0c000001")
+NESTED_FAILURES = {
+    "nested-adhoc": "is not signed with a Developer ID identity",
+    "nested-no-runtime": "lacks the hardened runtime",
+    "nested-no-timestamp": "lacks a secure timestamp",
+    "nested-get-task-allow": "carries com.apple.security.get-task-allow",
+    "nested-unsigned": "is not signed",
+}
 
 
 def log_call(name: str, arguments: list[str]) -> None:
@@ -54,9 +64,10 @@ def write_app(app: Path, version: str, build: str) -> None:
         "CFBundleShortVersionString": version,
         "CFBundleVersion": build,
     }))
-    executable = app / "Contents/MacOS/ArkDeck"
-    executable.write_text("fixture App executable\n")
-    executable.chmod(0o755)
+    for name in ("ArkDeck", "trace_streamer"):
+        executable = app / "Contents/MacOS" / name
+        executable.write_bytes(MACH_O + f"fixture App {name}\n".encode())
+        executable.chmod(0o755)
 
 
 def make_arkforge_bundle(bundle: Path, extra: bool = False) -> None:
@@ -68,7 +79,8 @@ def make_arkforge_bundle(bundle: Path, extra: bool = False) -> None:
     ):
         target = bundle / path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(f"fixture {path}\n")
+        prefix = MACH_O if role in ("cli", "daemon") else b""
+        target.write_bytes(prefix + f"fixture {path}\n".encode())
         target.chmod(mode)
         member = {"bytes": target.stat().st_size, "path": path, "role": role,
                   "sha256": hashlib.sha256(target.read_bytes()).hexdigest()}
@@ -80,6 +92,40 @@ def make_arkforge_bundle(bundle: Path, extra: bool = False) -> None:
     }))
     if extra:
         (bundle / "Contents/Resources/.DS_Store").write_text("finder\n")
+
+
+def display_signature(path: Path, failure: str, entitlements: bool) -> int:
+    """`codesign --display` as the real one answers for a Developer ID
+    signature; the App's nested trace_streamer is the one a failure spoils."""
+    spoiled = failure if path.name == "trace_streamer" and failure in NESTED_FAILURES else ""
+    if spoiled == "nested-unsigned":
+        print(f"{path}: code object is not signed at all", file=sys.stderr)
+        return 1
+    if entitlements:
+        granted = {"com.apple.security.app-sandbox": True}
+        if spoiled == "nested-get-task-allow":
+            granted["com.apple.security.get-task-allow"] = True
+        print(f"Executable={path}", file=sys.stderr)
+        sys.stdout.buffer.write(plistlib.dumps(granted, fmt=plistlib.FMT_XML))
+        return 0
+    adhoc = spoiled == "nested-adhoc"
+    flags = "0x2(adhoc)" if adhoc else ("0x0(none)" if spoiled == "nested-no-runtime" else "0x10000(runtime)")
+    lines = [
+        f"Executable={path}",
+        f"Identifier=fixture.{path.name}",
+        "Format=Mach-O thin (arm64)",
+        f"CodeDirectory v=20500 size=512 flags={flags} hashes=8+7 location=embedded",
+    ]
+    if adhoc:
+        lines += ["Signature=adhoc", "TeamIdentifier=not set"]
+    else:
+        lines += [f"Authority={IDENTITY}", "Authority=Developer ID Certification Authority",
+                  "Authority=Apple Root CA"]
+        lines.append("Signed Time=Sep 28, 2026 at 12:00:00" if spoiled == "nested-no-timestamp"
+                     else "Timestamp=Sep 28, 2026 at 12:00:00")
+        lines.append(f"TeamIdentifier={TEAM}")
+    print("\n".join(lines), file=sys.stderr)
+    return 0
 
 
 def tool(name: str, arguments: list[str]) -> int:
@@ -113,6 +159,8 @@ def tool(name: str, arguments: list[str]) -> int:
         print("arm64")
         return 0
     elif name == "codesign":
+        if "--display" in arguments:
+            return display_signature(Path(arguments[-1]), failure, "--entitlements" in arguments)
         if failure == "dmg-sign" and "--force" in arguments and arguments[-1].endswith(".dmg"):
             return 1
         return 0
@@ -188,7 +236,7 @@ class Fixture(unittest.TestCase):
         binaries = self.target / "aarch64-apple-darwin/release"
         binaries.mkdir(parents=True)
         for program in ("arkdeck", "arkdeck-agentd"):
-            (binaries / program).write_text(f"fixture Rust {program}\n")
+            (binaries / program).write_bytes(MACH_O + f"fixture Rust {program}\n".encode())
             (binaries / program).chmod(0o700)
         self.forge = self.root / "ArkForge checkout"
         packaging = self.forge / "packaging/macos"
@@ -313,9 +361,38 @@ class Release(Fixture):
         self.assertEqual(len([call for call in self.called("spctl", "--assess", "--type", "execute")
                               if "/mount/" in call[-1]]), 2)
         self.assertNotIn(dmg_path, [call[-1] for call in self.called("hdiutil", "attach")])
+        # Every Mach-O of every component is checked for what notarization
+        # requires, the App's nested trace_streamer before the App is uploaded.
+        displayed = [call[-1] for call in self.called("codesign", "--display", "--verbose=4")]
+        exported = [path for path in displayed if "/export/ArkDeck.app/" in path]
+        self.assertEqual(sorted(Path(path).name for path in exported), ["ArkDeck", "trace_streamer"])
+        app_upload = self.calls.index(next(call for call in self.called("xcrun", "notarytool", "submit")
+                                           if call[3].endswith("ArkDeck-notarization.zip")))
+        for path in exported:
+            self.assertLess(self.calls.index(["codesign", "--display", "--verbose=4", path]), app_upload)
+        mounted = sorted(path.split("/mount/", 1)[1] for path in displayed if "/mount/" in path)
+        self.assertEqual(mounted, sorted([
+            "ArkDeck.app/Contents/MacOS/ArkDeck", "ArkDeck.app/Contents/MacOS/trace_streamer",
+            "ArkDeckCLI.app/Contents/MacOS/arkdeck",
+            "ArkDeckCLI.app/Contents/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd",
+            "ArkForge.bundle/Contents/MacOS/arkforge", "ArkForge.bundle/Contents/MacOS/arkforged",
+        ]))
         # ArkForge was packaged by its own script, with the release identity.
         forged = self.root / "arkforge-package.json"
         self.assertEqual(json.loads(forged.read_text())["identity"], IDENTITY)
+
+    def test_nested_code_notarization_would_reject_stops_before_the_app_upload(self):
+        for failure, message in NESTED_FAILURES.items():
+            with self.subTest(failure):
+                self.log.unlink(missing_ok=True)
+                self.env["FIXTURE_FAIL"] = failure
+                result = self.run_script(self.arguments, 1)
+                self.assertIn("nested code notarization would reject: ArkDeck.app/Contents/MacOS/trace_streamer "
+                              + message, result.stderr)
+                self.assertNotIn("ArkDeck.app/Contents/MacOS/ArkDeck ", result.stderr)
+                submitted = [Path(call[3]).name for call in self.called("xcrun", "notarytool", "submit")]
+                self.assertEqual(submitted, ["ArkDeckCLI-notarization.zip"])
+                self.assertEqual(self.called("hdiutil", "create"), [])
 
     def test_arkforge_head_other_than_the_pin_stops_before_any_build(self):
         self.env["FIXTURE_ARKFORGE_HEAD"] = "0" * 40

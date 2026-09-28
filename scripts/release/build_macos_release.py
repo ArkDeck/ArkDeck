@@ -35,6 +35,11 @@ release   (maintainer only: Developer ID identity, provisioning profiles,
           exact requirement the App holds the daemon to (identity, Team,
           CFBundleShortVersionString and CFBundleVersion), spctl on the
           mounted App and CLI, and the ArkForge executables' Team anchor.
+          Every Mach-O in the App, the CLI and ArkForge.bundle (the App's
+          nested trace_streamer included) must carry a Developer ID signature
+          of this Team with hardened runtime and a secure timestamp and no
+          get-task-allow; this is checked right after each component is built,
+          before the App is uploaded, and again on the mounted DMG.
 
 unsigned  (anyone, CI included; no identity, no credentials, nothing sent to
           Apple) takes already built components (--app, --helpers,
@@ -135,6 +140,7 @@ def run(
     cwd: Path | None = None,
     capture: bool = True,
     timeout: float | None = None,
+    merge_stderr: bool = False,
 ) -> str:
     argv = [str(argument) for argument in arguments]
     try:
@@ -145,7 +151,7 @@ def run(
             # A build step's own output goes to stderr: stdout carries only
             # the DMG path this script prints at the end.
             stdout=subprocess.PIPE if capture else sys.stderr,
-            stderr=subprocess.PIPE if capture else None,
+            stderr=(subprocess.STDOUT if merge_stderr else subprocess.PIPE) if capture else None,
             text=True,
             timeout=timeout,
             check=False,
@@ -153,7 +159,8 @@ def run(
     except FileNotFoundError as error:
         raise ReleaseError(f"{argv[0]} is not available: {error}") from error
     if result.returncode != 0:
-        detail = (result.stderr or "").strip().splitlines()[-5:] if capture else []
+        diagnostics = result.stdout if merge_stderr else result.stderr
+        detail = (diagnostics or "").strip().splitlines()[-5:] if capture else []
         raise ReleaseError(
             f"{' '.join(argv[:3])} exited {result.returncode}"
             + (": " + " | ".join(detail) if detail else "")
@@ -329,6 +336,78 @@ def inspect_arkforge(bundle: Path) -> dict[str, Any]:
     }
 
 
+# -- nested code ---------------------------------------------------------------
+
+# Thin and fat Mach-O, both byte orders. ELF payloads (the device-side
+# arkdeck-code-sign-enable the daemon carries as a resource) are not Mach-O and
+# are left to the resource seal: notarization inspects Mach-O only.
+MACH_O_MAGICS = frozenset(bytes.fromhex(magic) for magic in (
+    "feedface", "cefaedfe", "feedfacf", "cffaedfe", "cafebabe", "bebafeca", "cafebabf", "bfbafeca",
+))
+GET_TASK_ALLOW = "com.apple.security.get-task-allow"
+
+
+def mach_o_files(root: Path) -> list[Path]:
+    found = []
+    for directory, _, names in os.walk(root):
+        for name in names:
+            path = Path(directory, name)
+            if path.is_symlink() or not path.is_file():
+                continue
+            with path.open("rb") as handle:
+                if handle.read(4) in MACH_O_MAGICS:
+                    found.append(path)
+    return sorted(found)
+
+
+def signature_problems(display: str, entitlements: str) -> list[str]:
+    """What notarization would reject in one signature, from
+    `codesign --display --verbose=4` and `--entitlements - --xml` output."""
+    lines = display.splitlines()
+    field = {line.split("=", 1)[0]: line.split("=", 1)[1] for line in lines if "=" in line}
+    problems = []
+    if "Signature=adhoc" in lines or "CodeDirectory v" not in field:
+        problems.append("is not signed with a Developer ID identity (ad hoc or unsigned)")
+    if field.get("TeamIdentifier") != TEAM:
+        problems.append(f"is signed by Team {field.get('TeamIdentifier', 'none')}, not {TEAM}")
+    flags = re.search(r"\bflags=0x[0-9a-f]+\(([^)]*)\)", field.get("CodeDirectory v", ""))
+    if flags is None or "runtime" not in flags.group(1).split(","):
+        problems.append("lacks the hardened runtime")
+    if "Timestamp" not in field:
+        problems.append("lacks a secure timestamp")
+    if entitlements.strip():
+        try:
+            granted = plistlib.loads(entitlements.strip().encode())
+        except (plistlib.InvalidFileException, ValueError):
+            granted = None
+        if not isinstance(granted, dict):
+            problems.append("carries unreadable entitlements")
+        elif granted.get(GET_TASK_ALLOW) is True:
+            problems.append(f"carries {GET_TASK_ALLOW}")
+    return problems
+
+
+def verify_nested_code(root: Path, environment: Mapping[str, str]) -> None:
+    """Every Mach-O under `root` — the main executables and anything nested,
+    such as the App's trace_streamer — as notarization requires it: Developer
+    ID of this Team, hardened runtime, secure timestamp, no get-task-allow.
+    `codesign --verify --deep` accepts an ad hoc or untimestamped nested
+    signature; this fails fast before an upload Apple would reject."""
+    files = mach_o_files(root)
+    require(bool(files), f"{root.name} carries no Mach-O code")
+    rejected = []
+    for path in files:
+        relative = f"{root.name}/{path.relative_to(root).as_posix()}"
+        try:
+            display = run(["codesign", "--display", "--verbose=4", path], env=environment, merge_stderr=True)
+        except ReleaseError:
+            rejected.append(f"{relative} is not signed")
+            continue
+        entitlements = run(["codesign", "--display", "--entitlements", "-", "--xml", path], env=environment)
+        rejected += [f"{relative} {problem}" for problem in signature_problems(display, entitlements)]
+    require(not rejected, "nested code notarization would reject: " + "; ".join(rejected))
+
+
 # -- release-only build steps --------------------------------------------------
 
 
@@ -488,6 +567,8 @@ def verify_mounted(mount: Path, staged: Mapping[str, str], unsigned: bool, versi
     for executable in ARKFORGE_EXECUTABLES:
         run(["codesign", "--verify", "--strict", "-R", f"={ANCHOR}", mount / ARKFORGE / executable],
             env=environment)
+    for name in (APP, CLI, ARKFORGE):
+        verify_nested_code(mount / name, environment)
 
 
 def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, str]) -> Path:
@@ -523,8 +604,13 @@ def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, st
                 require(path.is_absolute(), f"{flag} must be an absolute path")
         else:
             cli = build_helpers(work, environment, identity)
+            verify_nested_code(cli, environment)
             arkforge = build_arkforge(work, arguments.arkforge_checkout, environment, identity)
+            verify_nested_code(arkforge, environment)
             app = build_app(work, environment)
+            # Before the upload: an exported App whose nested helper lost its
+            # hardened runtime or timestamp fails here, not at Apple.
+            verify_nested_code(app, environment)
             notarization = {"app": notarize_app(work, app, environment, publish)}
 
         components = {
