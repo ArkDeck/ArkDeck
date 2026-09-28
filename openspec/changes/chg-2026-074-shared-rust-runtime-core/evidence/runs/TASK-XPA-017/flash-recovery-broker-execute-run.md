@@ -6,7 +6,7 @@ recovery broker's `executePinnedRequest`
 (`flash_invocation_broker.rs`), which until now refused where Swift began
 its attempt.
 
-Stacked on S2a (#2305, `flash-entry-points-run.md`). The driver admits through
+Built on S2a (#2305, `flash-entry-points-run.md`, merged as `53b832780`); rebased onto `main` `fa8d9d81b`. The driver admits through
 the `with_flash_admitter` helper S2a added. No contract input, Catalog,
 OpenSpec delta or `tasks.md` change. No device, and nothing here is device
 evidence.
@@ -141,6 +141,8 @@ Worktree `agent-adc7ba94d908e1c5c`, `CARGO_TARGET_DIR=/private/tmp/arkdeck-lane1
 | `cargo clippy --all-targets -- -D warnings` for `arkdeck-hoststore`, `-agentd`, `-cli`, `-client`, `-soak` (`s2b-clippy.log`) | exit 0 |
 | `cargo test --no-fail-fast` for the same five crates (`s2b-test.log`) | exit 0: 191 test binaries, 1458 passed, 0 failed, 21 ignored |
 | `sh scripts/check-sdd.sh` (`s2b-sdd.log`) | exit 0 |
+
+After the rebase onto `fa8d9d81b`: fmt exit 0; the same clippy exit 0 (`s2b-rebase-clippy.log`); `cargo test --no-fail-fast -p arkdeck-hoststore -p arkdeck-agentd` exit 0, 115 binaries, 959 passed, 0 failed (`s2b-rebase-test.log`).
 
 Not run:
 
