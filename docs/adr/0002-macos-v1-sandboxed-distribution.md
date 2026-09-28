@@ -8,6 +8,11 @@
 - Decision owner: maintainer(`@lvye`)
 - Core baseline: `CORE-2.1.0`
 - Supersedes: ADR-0001(non-Sandbox zero-entitlement DMG 架构)
+- Note(2026-09-28,TASK-XPA-017 S5,正文不改写):正文的支持格 `macOS 14 / arm64` 与现行构建不一致——
+  App 与两个 helper 的最低系统是 macOS 26.0(`ArkDeck.xcodeproj` 的 `MACOSX_DEPLOYMENT_TARGET = 26.0`,
+  helper Info.plist 的 `LSMinimumSystemVersion` 26.0),发布 DMG 只能装在 macOS 26 及以后。
+  发布入口是 `scripts/release/build_macos_release.py`,DMG 另含 Rust CLI/daemon 与 ArkForge.bundle
+  (`docs/release/macos-install.md`)。要不要把支持格改回 14 或改写本 ADR,由维护者决定。
 
 ## Decision
 

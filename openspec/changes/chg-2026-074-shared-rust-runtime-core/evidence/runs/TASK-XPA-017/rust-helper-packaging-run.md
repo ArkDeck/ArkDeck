@@ -323,7 +323,10 @@ rollback drill.
    G5 check 6; or keep "empty" and move the signing envelope out of the Data Protection
    Keychain and drop the entitlement checks from both helper validators — a change to the
    signing and helper-trust semantics. Recommendation: the first.
-2. **Q11.** This branch notarizes, as the Swift release does. If G5 is to install a
+2. **Q11.** *(Superseded 2026-09-28: the maintainer ruled that the release is notarized —
+   App, helper pair, ArkForge.bundle and DMG — and that the Rust release keeps no Swift
+   rollback helper; see `release-dmg-pipeline-run.md`. The recommendation below is history.)*
+   This branch notarizes, as the Swift release does. If G5 is to install a
    Developer-ID-signed helper without notarization (Q11's recommendation),
    `build-local-helpers.sh` needs the same switch: its layout through
    `package-rust-helpers.sh` with `--timestamp=none` and no notarization (a small next

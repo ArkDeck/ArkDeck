@@ -84,6 +84,13 @@ jobs:
       - name: CI workflow contract tests
         run: python3 scripts/test_agent_pr_workflow.py
 
+      # The App holds the daemon to its exact version and build
+      # (AgentXPCContract.serverCodeRequirement), so the pbxproj pair and the
+      # helper Info.plists must equal scripts/release/release-version.json.
+      # Runs on every PR because the copies live in several lanes' paths.
+      - name: Release version lockstep
+        run: python3 scripts/release/release_version.py check
+
       # A main run plans from the newest main commit this workflow passed on,
       # not from the push's `before` (see plan.py). If that cannot be read the
       # output stays empty, and an empty answer selects every lane.

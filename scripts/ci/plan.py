@@ -56,6 +56,9 @@ RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
 RUST_PACKAGING_PREFIXES = (
     "Packages/ArkDeckKit/Distribution/macOS/",
     "Packages/ArkDeckKit/Resources/OpenHarmonyNativeCodeSign/",
+    # The release DMG entry and its fixture tests (TASK-XPA-017 S5) run in the
+    # same job, driving build-helpers.sh from this directory.
+    "scripts/release/",
 )
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
