@@ -147,16 +147,26 @@ fn thread_identity(value: &str) -> bool {
 /// The binding the published Catalog declares for an exact `id@version`,
 /// or `None` for a reference the Catalog does not publish exactly.
 fn published_binding(reference: &str) -> Option<String> {
-    let (id, version) = reference.rsplit_once('@')?;
-    let version = version
-        .parse::<i64>()
-        .ok()
-        .filter(|number| number.to_string() == version)?;
+    // Swift `RuntimeOperationCatalog.descriptor(reference:)`: `id@version`,
+    // or an unversioned id naming only an unversioned entry, such as the
+    // `flash.dayu200` alias.
+    let (id, version) = match reference.split_once('@') {
+        Some((id, version)) => (
+            id,
+            Some(
+                version
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|number| number.to_string() == version && *number > 0)?,
+            ),
+        ),
+        None => (reference, None),
+    };
     let catalog: Value = serde_json::from_str(CATALOG_CANONICAL_JSON).ok()?;
     catalog
         .as_array()?
         .iter()
-        .find(|operation| operation["id"] == id && operation["version"].as_i64() == Some(version))?
+        .find(|operation| operation["id"] == id && operation["version"].as_i64() == version)?
         ["binding"]
         .as_str()
         .map(str::to_owned)

@@ -267,7 +267,7 @@ impl<'a> FlashSession<'a> {
                 }
             }
             for control in &controls {
-                self.answer_control(control, daemon_job_id)?;
+                self.answer_control(control, daemon_job_id, cursor)?;
             }
             if terminal.is_some() {
                 break;
@@ -355,12 +355,13 @@ impl<'a> FlashSession<'a> {
     /// Swift `answer(_ request:)`: performs the control action and relays
     /// what was observed. A failure to perform is not "nothing happened" —
     /// the action may have taken effect — so it travels as an unaccepted
-    /// observation with its reason. A rejected receipt is answered with
-    /// Swift's cancel, and the drive stops.
+    /// observation with its reason. A rejected receipt is answered with a
+    /// cancel at the job's last journal sequence, and the drive stops.
     fn answer_control(
         &mut self,
         request: &ManagedControlRequest,
         job_id: &str,
+        cursor: u64,
     ) -> Result<(), SessionError> {
         let observation = self
             .performer
@@ -377,13 +378,18 @@ impl<'a> FlashSession<'a> {
             .submit_control_receipt(&receipt)
             .map_err(SessionError::Daemon)?;
         if !answer.accepted {
-            // Swift's `cancelJob(jobID:)`, which names no journal sequence.
-            // ArkForge's cancel requires one, so the daemon refuses it
-            // (`EXPECTED_SEQUENCE_REQUIRED`) and, as Swift's `try?` does, the
-            // refusal is ignored: the job waits for its request's deadline, as
-            // it did on the GJ-4 bench. Whether a cancel should take effect
-            // here is the maintainer's to rule (F3, 2026-09-26).
-            let _ = self.daemon.cancel(job_id, 0);
+            // Swift's `cancelJob(jobID:)` names no journal sequence, which
+            // ArkForge's cancel requires (`EXPECTED_SEQUENCE_REQUIRED`), so
+            // under Swift the job waited for its request's deadline (F3). The
+            // cancel here names the job's last sequence, read once more after
+            // the rejection so that whatever the rejection published is
+            // counted. A job already classified is not cancelled. As Swift's
+            // `try?` does, a refused cancel is ignored: a job it leaves running
+            // still ends at its request's deadline, and the drive stops either
+            // way.
+            if let Some(sequence) = self.cancellable_sequence(job_id, cursor) {
+                let _ = self.daemon.cancel(job_id, sequence);
+            }
             return Err(SessionError::ControlReceiptRejected {
                 request_id: request.request_id.clone(),
                 code: answer.rejection_code,
@@ -395,6 +401,27 @@ impl<'a> FlashSession<'a> {
                 .record_managed_control_facts(&observation.facts);
         }
         Ok(())
+    }
+
+    /// The journal sequence a cancel of `job_id` must name: the last event
+    /// sequence after one more poll from `cursor`, or `cursor` when that poll
+    /// fails. `None` when the job has already been classified, so that
+    /// nothing remains to cancel.
+    fn cancellable_sequence(&mut self, job_id: &str, cursor: u64) -> Option<u64> {
+        let Ok(events) = self.daemon.job_events(job_id, cursor) else {
+            return Some(cursor);
+        };
+        let mut sequence = cursor;
+        for event in events
+            .iter()
+            .filter(|event| event.job_id == job_id && event.sequence > cursor)
+        {
+            if event.kind == JobEventKind::OutcomeClassified {
+                return None;
+            }
+            sequence = sequence.max(event.sequence);
+        }
+        Some(sequence)
     }
 }
 
