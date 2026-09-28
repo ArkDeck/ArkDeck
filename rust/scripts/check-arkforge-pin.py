@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""One ArkForge revision for both lanes.
+"""One ArkForge revision for the whole Rust workspace.
 
-The Swift lane links ArkForge's Swift SDK through
-`Packages/ArkDeckKit/Package.swift`, the Rust lane its Rust crates through
-`rust/Cargo.toml`, and both talk to the same `arkforged`. Its protocol
-negotiation checks only the major version, so two pins that drifted apart
-field by field would pass unseen. This check refuses, read-only:
+ArkDeck consumes ArkForge only through its Rust crates, pinned in
+`rust/Cargo.toml`. The Swift lane linked ArkForge's Swift SDK through
+`Packages/ArkDeckKit/Package.swift` until the Swift Runtime was deleted
+(CHG-2026-074, TASK-XPA-017); that pin is gone, and this check now holds the
+Rust pin alone. It refuses, read-only:
 
-- an ArkForge dependency in `rust/Cargo.toml` that is not the ArkForge
-  repository at exactly the revision Package.swift pins (no branch, no tag);
+- ArkForge crates in `rust/Cargo.toml` that are not the ArkForge repository
+  at one exact revision (no branch, no tag), or at more than one;
 - a crate that names an ArkForge crate other than through the workspace;
-- a locked ArkForge package from any other source or revision.
+- a locked ArkForge package from any other source or revision;
+- an ArkForge package reference returning to `Packages/ArkDeckKit/Package.swift`.
 
 With `--run-vectors` it also reruns, at that revision and from the checkout
-cargo fetched for the lockfile, ArkForge's own `swift_sdk_vectors` (the wire
-bytes the Swift SDK is held to) and `permit_vectors` (the StepPermit bytes both
-authorities mint), so a revision bump cannot land without them.
+cargo fetched for the lockfile, ArkForge's own `swift_sdk_vectors` (its wire
+bytes) and `permit_vectors` (the StepPermit bytes both authorities mint), so a
+revision bump cannot land without them.
 """
 
 import argparse
@@ -35,19 +36,18 @@ def fail(message: str) -> None:
     raise SystemExit(f"check-arkforge-pin: {message}")
 
 
-def swift_pin(package_swift: str) -> str:
-    pins = re.findall(
-        r'\.package\(\s*url:\s*"https://github\.com/ArkDeck/ArkForge(?:\.git)?",\s*'
-        r'revision:\s*"([0-9a-f]{40})"\s*\)',
-        package_swift,
-    )
-    if len(pins) != 1:
-        fail(f"Package.swift must pin ArkForge exactly once by revision, found {len(pins)}")
-    return pins[0]
+def workspace_pin(declared: dict) -> str:
+    revisions = {spec.get("rev") for spec in declared.values() if isinstance(spec, dict)}
+    if len(revisions) != 1 or not re.fullmatch(r"[0-9a-f]{40}", str(next(iter(revisions)))):
+        fail("rust/Cargo.toml must pin every ArkForge crate at one full revision, "
+             f"found {sorted(map(str, revisions))}")
+    return revisions.pop()
 
 
 def check(root: Path) -> tuple[str, list[str]]:
-    pin = swift_pin((root / "Packages/ArkDeckKit/Package.swift").read_text(encoding="utf-8"))
+    package_swift = (root / "Packages/ArkDeckKit/Package.swift").read_text(encoding="utf-8")
+    if "ArkDeck/ArkForge" in package_swift:
+        fail("Package.swift references ArkForge; the Swift SDK was deleted with the Swift Runtime")
     workspace = tomllib.loads((root / "rust/Cargo.toml").read_text(encoding="utf-8"))
     declared = {
         name: spec
@@ -56,13 +56,14 @@ def check(root: Path) -> tuple[str, list[str]]:
     }
     if not declared:
         fail("rust/Cargo.toml declares no ArkForge crate")
+    pin = workspace_pin(declared)
     for name, spec in sorted(declared.items()):
         if not isinstance(spec, dict) or set(spec) != {"git", "rev"}:
             fail(f"{name} must be declared as exactly {{ git, rev }}, not {spec!r}")
         if spec["git"] != REPOSITORY:
             fail(f"{name} comes from {spec['git']}, not {REPOSITORY}")
         if spec["rev"] != pin:
-            fail(f"{name} is pinned at {spec['rev']}, but Package.swift pins {pin}")
+            fail(f"{name} is pinned at {spec['rev']}, not {pin}")
     for manifest in sorted((root / "rust/crates").glob("*/Cargo.toml")):
         crate = tomllib.loads(manifest.read_text(encoding="utf-8"))
         scopes = [crate, *crate.get("target", {}).values()]
@@ -125,7 +126,7 @@ def main() -> None:
     parser.add_argument("--run-vectors", action="store_true")
     arguments = parser.parse_args()
     pin, locked = check(ROOT)
-    print(f"ArkForge {pin}: Package.swift, rust/Cargo.toml and rust/Cargo.lock agree "
+    print(f"ArkForge {pin}: rust/Cargo.toml and rust/Cargo.lock agree "
           f"({', '.join(locked)})")
     if arguments.run_vectors:
         run_vectors(ROOT)

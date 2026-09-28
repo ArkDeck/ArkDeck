@@ -40,7 +40,7 @@ APP_REQUIREMENT = (f'anchor apple generic and certificate leaf[subject.OU] = "{T
 # The App's `serverIdentityRequirement` (AgentXPCContract.swift), before it
 # appends the release pin.
 SERVER_IDENTITY = (f'anchor apple generic and certificate leaf[subject.OU] = "{TEAM}" '
-                   'and (identifier "com.arkdeck.agentd" or identifier "com.arkdeck.agentd.facade")')
+                   'and identifier "com.arkdeck.agentd"')
 MISMATCH_WORDS = "Runtime release does not match this App"
 REMEDY = "run runtime service update"
 REPORT_BUDGET_SECONDS = 20

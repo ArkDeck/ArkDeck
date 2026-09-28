@@ -235,8 +235,11 @@ package final class ArkDeckRawXPCObject: @unchecked Sendable {
 extension ArkDeckAgentXPC {
   package static let appCodeRequirement =
     "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.desktop\""
+  /// The standalone Rust daemon's identity. The transitional façade's
+  /// `com.arkdeck.agentd.facade` is no longer admitted: the façade and the
+  /// Swift daemon behind it are retired (CHG-2026-074).
   private static let serverIdentityRequirement =
-    "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and (identifier \"com.arkdeck.agentd\" or identifier \"com.arkdeck.agentd.facade\")"
+    "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.agentd\""
 }
 
 extension ArkDeckAgentXPC {

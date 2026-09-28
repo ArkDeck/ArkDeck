@@ -58,11 +58,7 @@ class PathClassificationTests(unittest.TestCase):
         for target in (
             "ArkDeckClientKit",
             "ArkDeckCore",
-            "ArkDeckProcess",
             "ArkDeckRuntime",
-            "ArkDeckOpenHarmony",
-            "ArkDeckWorkflows",
-            "ArkDeckStorage",
             "ArkDeckTraceAdapter",
         ):
             with self.subTest(target=target):
@@ -76,10 +72,9 @@ class PathClassificationTests(unittest.TestCase):
     def test_non_app_package_targets_skip_redundant_xcode_lane(self):
         for path in (
             "Packages/ArkDeckKit/Sources/ArkDeckAgentClient/Client.swift",
-            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/Daemon.swift",
-            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift",
-            "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/Composition.swift",
-            "Packages/ArkDeckKit/LaunchAgents/LaunchAgent.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/Registry.swift",
+            "Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift",
+            "Packages/ArkDeckKit/LaunchAgents/README.md",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True)
@@ -175,9 +170,6 @@ class PathClassificationTests(unittest.TestCase):
             "ArkDeckCore/ControlProtocolGenerated.swift",
             "ArkDeckCore/ControlProtocolContract.swift",
             "ArkDeckCore/ControlFrameJSON.swift",
-            "ArkDeckStorage/JournalEvent.swift",
-            "ArkDeckStorage/JournalEventValidation.swift",
-            "ArkDeckStorage/JournalReplay.swift",
         ):
             path = f"Packages/ArkDeckKit/Sources/{name}"
             with self.subTest(path=path):
@@ -187,7 +179,6 @@ class PathClassificationTests(unittest.TestCase):
         for path in (
             "Packages/ArkDeckKit/Contracts/control-protocol.json",
             "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
-            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",

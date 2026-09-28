@@ -61,11 +61,9 @@ RUST_PACKAGING_PREFIXES = (
 RUST_CONTRACT_SOURCE_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
-    "Packages/ArkDeckKit/Sources/ArkDeckStorage/Journal",
 )
 RUST_CONTRACT_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
     "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
     "openspec/contracts/runtime-control-plane.schema.json",
     "openspec/contracts/cli-canonical-json-vectors.json",
@@ -78,15 +76,8 @@ RUST_CONTRACT_INPUT_FILES = frozenset({
 APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckClientKit/",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
-    "Packages/ArkDeckKit/Sources/ArkDeckProcess/",
     "Packages/ArkDeckKit/Sources/ArkDeckRuntime/",
-    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/",
-    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/",
-    "Packages/ArkDeckKit/Sources/ArkDeckStorage/",
     "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
-)
-WORKFLOWS_COMPOSITION_PREFIX = (
-    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/"
 )
 # The @arkdeck/ds interaction tests execute the docs/design prototype draft and
 # cross-check it against the audit inventory and the App/Package Swift sources
@@ -183,12 +174,12 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             ds = True
 
         # The desktop app links a precise subset of ArkDeckKit production
-        # targets. Package tests, CLIs, agent processes, launch-agent inputs,
-        # fixtures, and AgentComposition do not affect that graph. Keeping
-        # those changes on the Swift lane avoids a redundant app rebuild.
+        # targets. Package tests, the agent client, bootstrap registries and
+        # fixtures do not affect that graph. Keeping those changes on the
+        # Swift lane avoids a redundant app rebuild.
         package_source_affects_app = any(
             path.startswith(prefix) for prefix in APP_PACKAGE_TARGET_PREFIXES
-        ) and not path.startswith(WORKFLOWS_COMPOSITION_PREFIX)
+        )
         if (
             path.startswith("ArkDeckApp/")
             or path.startswith("ArkDeckAppUITests/")

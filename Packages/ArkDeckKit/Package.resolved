@@ -2,14 +2,6 @@
   "originHash" : "5db3e84e1c012e68cad4dd4722ac5519a2cc3bde5f5e045957fc020b63aa7178",
   "pins" : [
     {
-      "identity" : "arkforge",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/ArkDeck/ArkForge.git",
-      "state" : {
-        "revision" : "c1dc0553b42627581583abfba3fec34d13343282"
-      }
-    },
-    {
       "identity" : "arktrace",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ArkDeck/ArkTrace.git",

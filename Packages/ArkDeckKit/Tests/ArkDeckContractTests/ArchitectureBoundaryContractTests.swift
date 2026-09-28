@@ -13,8 +13,8 @@
 // Concretely:
 //   - The Runtime is Rust. Swift carries no Runtime semantics: the Swift CLI
 //     (TASK-XPA-018) and the Swift daemon, engine, storage, process, provider
-//     and composition targets (TASK-XPA-017) are deleted, and no target may
-//     reintroduce them under their names.
+//     and composition targets (TASK-XPA-017) are deleted, the manifest holds
+//     exactly the targets listed below, and none may return under its name.
 //   - What stays in ArkDeckKit is the App's side: ClientKit (the App's typed
 //     client of the Rust daemon), Core (shared value contracts), and the
 //     small libraries those tests and the App still link.
@@ -56,20 +56,26 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ],
   ]
 
-  /// The Swift Runtime targets TASK-XPA-017 deletes. The Swift CLI and every
-  /// test are already off them; nothing that remains may link them, so their
-  /// deletion touches no client. Emptied, and turned into a permanent
-  /// absence, by the deletion itself.
-  private static let retiringTargets: Set<String> = [
-    "ArkDeckAgentDaemon", "ArkDeckAgentDaemonMain", "ArkDeckWorkflows",
-    "ArkDeckAgentComposition", "ArkDeckStorage", "ArkDeckProcess", "ArkDeckOpenHarmony",
-    "ArkDeckLaunchAgent", "ArkDeckJournalCrashFixture", "ArkDeckEngineCrashFixture",
-    "ArkDeckRuntimeSoakFixture", "ArkDeckRuntimePortFixture", "ArkDeckFakeHapSignerFixture",
-  ]
-
-  /// Deleted targets whose names and source directories must never return.
+  /// Deleted targets whose names and source directories must never return:
+  /// the Swift CLI (TASK-XPA-018), the Swift daemon, engine, storage,
+  /// process, provider, composition and launchd targets with their crash and
+  /// soak fixtures (TASK-XPA-017), and the in-process decision plane
+  /// (CHG-2026-064). Their recorded oracles live on as Rust replays.
   private static let deletedTargets: [(target: String, path: String)] = [
     ("ArkDeckCLI", "Sources/ArkDeckCLI"),
+    ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon"),
+    ("ArkDeckAgentDaemonMain", "Sources/ArkDeckAgentDaemonMain"),
+    ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows"),
+    ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition"),
+    ("ArkDeckStorage", "Sources/ArkDeckStorage"),
+    ("ArkDeckProcess", "Sources/ArkDeckProcess"),
+    ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony"),
+    ("ArkDeckLaunchAgent", "LaunchAgents/LaunchAgentService.swift"),
+    ("ArkDeckJournalCrashFixture", "Tests/ArkDeckJournalCrashFixture"),
+    ("ArkDeckEngineCrashFixture", "Tests/ArkDeckEngineCrashFixture"),
+    ("ArkDeckRuntimeSoakFixture", "Tests/ArkDeckRuntimeSoakFixture"),
+    ("ArkDeckRuntimePortFixture", "Tests/ArkDeckRuntimePortFixture"),
+    ("ArkDeckFakeHapSignerFixture", "Tests/ArkDeckFakeHapSignerFixture"),
     ("ArkDeckHarness", "Sources/ArkDeckHarness"),
   ]
 
@@ -85,17 +91,16 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
   // MARK: - 1. The package holds no Swift Runtime
 
-  /// Every target the manifest declares is a remaining library, a fixture, a
-  /// test target, or one of the Swift Runtime targets being deleted.
+  /// The manifest declares exactly the remaining libraries, the one fixture
+  /// and the test targets.
   func testThePackageDeclaresOnlyTheRemainingTargets() throws {
     let targets = try Self.parseTargets(manifest: manifestText())
     XCTAssertFalse(targets.isEmpty, "no targets parsed from Package.swift")
     let known = Set(Self.allowedImports.keys).union(Self.fixtureTargets)
-      .union(Self.testTargets.keys).union(Self.retiringTargets)
+      .union(Self.testTargets.keys)
     XCTAssertEqual(
-      Set(targets.keys).subtracting(known), [],
-      "Package.swift declares targets outside the architecture; Swift carries no Runtime "
-        + "semantics (CHG-2026-074)")
+      Set(targets.keys), known,
+      "Package.swift's targets drifted; Swift carries no Runtime semantics (CHG-2026-074)")
     for (name, path) in Self.deletedTargets {
       XCTAssertNil(targets[name], "\(name) returned to Package.swift")
       XCTAssertFalse(
@@ -106,10 +111,15 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertFalse(
       manifest.contains(#".executable(name: "arkdeck","#),
       "the Rust arkdeck is the only CLI (TASK-XPA-018)")
+    XCTAssertFalse(
+      manifest.contains(#".executable(name: "arkdeck-agentd","#),
+      "the Rust arkdeck-agentd is the only daemon (TASK-XPA-017)")
+    XCTAssertFalse(
+      manifest.contains("ArkDeck/ArkForge"),
+      "ArkDeck consumes ArkForge through its Rust crates only (rust/Cargo.toml)")
   }
 
-  /// Nothing that remains links a retiring target, so deleting them breaks
-  /// no client, and the remaining libraries keep their layer edges.
+  /// The remaining libraries and tests keep their layer edges.
   func testRemainingTargetsLinkOnlyTheLayerMatrix() throws {
     let targets = try Self.parseTargets(manifest: manifestText())
     for (name, allowed) in Self.allowedImports {
@@ -209,6 +219,15 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       }
     }
     XCTAssertGreaterThan(scanned, 100, "the scan covered almost nothing")
+  }
+
+  /// The App admits only the standalone Rust daemon's identity; the retired
+  /// façade's identifier may not return to its code requirement.
+  func testTheAppAdmitsOnlyTheStandaloneDaemonIdentity() throws {
+    let code = try codeWithoutComments(
+      of: packageRoot().appending(path: "Sources/ArkDeckCore/AgentXPCContract.swift"))
+    XCTAssertTrue(code.contains(#"identifier \"com.arkdeck.agentd\"""#))
+    XCTAssertFalse(code.contains("com.arkdeck.agentd.facade"))
   }
 
   // MARK: - 3. The App stands on ClientKit

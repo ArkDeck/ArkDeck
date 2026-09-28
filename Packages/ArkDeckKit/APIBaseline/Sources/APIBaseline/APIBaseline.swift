@@ -9,16 +9,10 @@
 // this package stops compiling — that is the gate.
 
 import ArkDeckAgentClient
-import ArkDeckAgentDaemon
 import ArkDeckClientKit
 import ArkDeckCore
-import ArkDeckLaunchAgent
-import ArkDeckOpenHarmony
-import ArkDeckProcess
 import ArkDeckRuntime
-import ArkDeckStorage
 import ArkDeckTraceAdapter
-import ArkDeckWorkflows
 import Foundation
 
 private enum TraceAdapterSurface {
@@ -26,20 +20,6 @@ private enum TraceAdapterSurface {
   static let recentDocumentsKey = ArkDeckTraceConfiguration.recentDocumentsKey
   static let supportedTraceExtensions = ArkDeckTraceConfiguration.supportedTraceExtensions
   static let make = ArkDeckTraceConfiguration.make(bundleURL:cachesDirectory:)
-}
-
-// MARK: - ArkDeckProcess: execution results carry their semantics
-
-private enum ProcessSurface {
-  static let termination = \ProcessExecutionResult.termination
-  static let groupTermination = \ProcessExecutionResult.processGroupTermination
-  static let byteCount = \ProcessStreamCapture.totalByteCount
-  static let truncated = \ProcessStreamCapture.wasTruncated
-  static let executor: FoundationProcessExecutor.Type = FoundationProcessExecutor.self
-  static let execute = FoundationProcessExecutor.execute(_:captureLimit:onOutput:)
-  static let executeIdentityBound =
-    FoundationProcessExecutor.executeIdentityBound(_:captureLimit:onOutput:)
-  static let error: ProcessExecutionError.Type = ProcessExecutionError.self
 }
 
 // MARK: - ArkDeckAgentClient: runtime client entry point and error contract
@@ -53,27 +33,6 @@ private enum AgentClientSurface {
       try body()
       return nil
     } catch let error as AgentClientError {
-      return "\(error)"
-    } catch {
-      return nil
-    }
-  }
-}
-
-// MARK: - ArkDeckAgentDaemon: daemon entry point, instance identity, error
-
-private enum DaemonSurface {
-  static let server: AgentDaemonServer.Type = AgentDaemonServer.self
-  static let makeServer = AgentDaemonServer.init(stateDirectory:handler:nowUTC:)
-  static let start = AgentDaemonServer.start
-  static let socketPath = \AgentDaemonInstance.socketPath
-  static let protocolVersion = \AgentDaemonInstance.protocolVersion
-
-  static func branches(_ body: () throws -> Void) -> String? {
-    do {
-      try body()
-      return nil
-    } catch let error as AgentDaemonError {
       return "\(error)"
     } catch {
       return nil
@@ -102,60 +61,8 @@ private enum CoreSurface {
   static let issuerKind: RuntimeCapabilityIssuer.Kind.Type = RuntimeCapabilityIssuer.Kind.self
 }
 
-// MARK: - ArkDeckOpenHarmony: probe classification vocabulary
-
-private enum OpenHarmonySurface {
-  static let probe: HDCServerProbeClassification.Type = HDCServerProbeClassification.self
-  static let authorization: HDCAuthorizationState.Type = HDCAuthorizationState.self
-  static let subserver: HDCSubserverCapability.Type = HDCSubserverCapability.self
-}
-
 // MARK: - ArkDeckClientKit: discovery vocabulary
-//
-// The App-facing RockUSB access advice moved here from ArkDeckWorkflows
-// (CHG-2026-074). Workflows' public RockchipDeviceAccessObserving still
-// returns this type, so an external importer names it through ClientKit.
 
 private enum ClientKitSurface {
   static let rockUSBMode = RockchipDeviceMode.loader
-}
-
-// MARK: - ArkDeckStorage: strict-JSON public error contract (#1267)
-
-private enum StorageSurface {
-  static func branches(_ body: () throws -> Void) -> String? {
-    do {
-      try body()
-      return nil
-    } catch let error as ArkDeckStorage.StrictJSONError {
-      return "\(error)"
-    } catch {
-      return nil
-    }
-  }
-}
-
-// MARK: - ArkDeckLaunchAgent: service lifecycle entry, error contract, status
-
-private enum LaunchAgentSurface {
-  static let module: ArkDeckLaunchAgent.Type = ArkDeckLaunchAgent.self
-  static let service: LaunchAgentService.Type = LaunchAgentService.self
-  static let makeService = LaunchAgentService.init(
-    paths:runner:fileManager:uid:nowUTC:)
-  static let install = LaunchAgentService.install(
-    daemonBundleSource:hdcExecutable:workspace:beforeBootstrap:)
-  static let status = LaunchAgentService.status
-  static let installed = \LaunchAgentStatus.installed
-  static let loaded = \LaunchAgentStatus.loaded
-
-  static func branches(_ body: () throws -> Void) -> String? {
-    do {
-      try body()
-      return nil
-    } catch let error as LaunchAgentServiceError {
-      return "\(error)"
-    } catch {
-      return nil
-    }
-  }
 }
