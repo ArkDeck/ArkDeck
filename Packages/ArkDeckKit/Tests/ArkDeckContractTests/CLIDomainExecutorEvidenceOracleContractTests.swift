@@ -199,7 +199,7 @@ final class CLIDomainExecutorEvidenceOracleContractTests: XCTestCase {
           ]),
           "answers": .string("Fixtures/ControlFrames/job.evidence.jsonl"),
         ])) + Data("\n".utf8)
-    try HDCOracleHarness.recordOrCompare(
+    try OracleFiles.recordOrCompare(
       files, variable: Self.recordVariable, oracle: Self.oracle)
   }
 }

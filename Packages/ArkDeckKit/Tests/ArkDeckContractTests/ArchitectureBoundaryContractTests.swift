@@ -1,281 +1,146 @@
-@testable import ArkDeckClientKit
 // Architecture boundary contract (docs/ArchitectureRules.md).
 //
-// These tests are structural fitness functions: they read Package.swift and
-// the source tree and fail when a dependency edge, an import, a filename or
-// a token crosses a layer boundary that the compiler alone cannot see (for
-// example a carved-out target directory silently merging back into its
-// parent target, or a shell-shaped public API appearing anywhere).
+// These tests are structural fitness functions: they read Package.swift, the
+// Xcode project and the source tree and fail when a dependency edge, an
+// import, a target or a token crosses a boundary that the compiler alone
+// cannot see.
 //
-// The intended shape they defend (CHG-2026-064):
+// The shape they defend (CHG-2026-064, CHG-2026-074):
 //
-//   External agent decides -> Runtime admits and executes -> Provider
+//   External agent decides -> Rust Runtime admits and executes -> Provider
 //   operates -> Artifact proves
 //
 // Concretely:
-//   - There is no in-process decision plane. No target named ArkDeckHarness
-//     exists, nothing imports one, and the only way any caller — human, App
-//     or external agent — reaches execution is a published operation
-//     reference with typed inputs through admission.
-//   - The chat composition may hold a model gateway for its conversational
-//     front-end, but every side effect it produces still enters through the
-//     same admission gate as everyone else's.
-//   - Storage and the artifact store know nothing about task identity.
+//   - The Runtime is Rust. Swift carries no Runtime semantics: the Swift CLI
+//     (TASK-XPA-018) and the Swift daemon, engine, storage, process, provider
+//     and composition targets (TASK-XPA-017) are deleted, and no target may
+//     reintroduce them under their names.
+//   - What stays in ArkDeckKit is the App's side: ClientKit (the App's typed
+//     client of the Rust daemon), Core (shared value contracts), and the
+//     small libraries those tests and the App still link.
+//   - There is no in-process decision plane and no model surface.
 //
-// When one of these tests fails, the fix is almost never to edit the test:
-// move the code to the layer that owns the concern, or descend the shared
-// contract into ArkDeckCore/ArkDeckRuntime. Widening a matrix entry is an
-// architecture decision and belongs in the same review as the code that
-// needs it (see docs/ArchitectureRules.md).
+// When one of these tests fails, the fix is almost never to edit the test.
+// Widening a matrix entry is an architecture decision and belongs in the same
+// review as the code that needs it.
 
 import Foundation
 import XCTest
-
-@testable import ArkDeckWorkflows
 
 final class ArchitectureBoundaryContractTests: XCTestCase {
 
   // MARK: - Layer matrix (single source of truth for these tests)
 
-  /// Allowed `import` edges between ArkDeck modules, keyed by target name.
-  /// A target may import strictly fewer modules than listed, never more.
-  /// Executable composition roots are deliberately wide; library layers are
-  /// deliberately narrow.
+  /// The ArkDeckKit library targets that remain, and the ArkDeck modules each
+  /// may import. A target may import strictly fewer modules than listed.
   private static let allowedImports: [String: Set<String>] = [
     "ArkDeckCore": [],
     "ArkDeckClientKit": ["ArkDeckCore"],
-    "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
-    "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
-    "ArkDeckStorage": ["ArkDeckCore"],
     "ArkDeckTraceAdapter": [],
-    // ArkForgeProtocol and ArkForgeClient are external SDK products owned by
-    // ArkForge. This matrix lists only ArkDeck-to-ArkDeck edges.
-    // CHG-2026-074: unmigrated facades reuse the extracted client transport.
-    "ArkDeckWorkflows": [
-      "ArkDeckClientKit",
-      "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony", "ArkDeckStorage",
-    ],
-    "ArkDeckAgentComposition": [
-      "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
-      "ArkDeckWorkflows", "ArkDeckAgentClient",
-    ],
     "ArkDeckAgentClient": ["ArkDeckCore"],
     "ArkDeckBootstrap": ["ArkDeckCore"],
-    "ArkDeckLaunchAgent": ["ArkDeckCore"],
-    "ArkDeckAgentDaemon": [
-      "ArkDeckClientKit", "ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows",
-    ],
-    "ArkDeckCLI": [
-      "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-      "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
-      // CHG-2026-074 transitional edge (docs/ArchitectureRules.md §2): the
-      // facades the App and the CLI share move to ClientKit. It disappears
-      // when the Swift CLI is deleted at M5.
-      "ArkDeckClientKit",
-    ],
-    "ArkDeckAgentDaemonMain": [
-      "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckClientKit", "ArkDeckCore",
-      "ArkDeckBootstrap", "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage",
-      "ArkDeckTraceAdapter",
-      "ArkDeckWorkflows",
+  ]
+
+  /// Test-only executables the remaining tests and the App UI tests run.
+  private static let fixtureTargets: Set<String> = ["ArkDeckFakeHDCFixture"]
+
+  /// The package's test targets and the ArkDeckKit modules each may link.
+  private static let testTargets: [String: Set<String>] = [
+    "ArkDeckClientKitTests": ["ArkDeckClientKit", "ArkDeckCore"],
+    "ArkDeckCoreTests": ["ArkDeckCore"],
+    "ArkDeckTraceAdapterTests": ["ArkDeckTraceAdapter"],
+    "ArkDeckContractTests": [
+      "ArkDeckClientKit", "ArkDeckCore", "ArkDeckRuntime", "ArkDeckAgentClient",
+      "ArkDeckBootstrap", "ArkDeckFakeHDCFixture",
     ],
   ]
 
-  /// Where each target's sources live, relative to the package root, plus
-  /// subdirectories that belong to a different (carved-out) target and must
-  /// be scanned under that target's name instead.
-  private static let targetRoots: [(target: String, path: String, carveOuts: [String])] = [
-    ("ArkDeckCore", "Sources/ArkDeckCore", []),
-    ("ArkDeckClientKit", "Sources/ArkDeckClientKit", []),
-    ("ArkDeckProcess", "Sources/ArkDeckProcess", []),
-    ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
-    ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
-    ("ArkDeckStorage", "Sources/ArkDeckStorage", []),
-    ("ArkDeckTraceAdapter", "Sources/ArkDeckTraceAdapter", []),
-    ("ArkDeckWorkflows", "Sources/ArkDeckWorkflows", ["AgentComposition"]),
-    ("ArkDeckAgentComposition", "Sources/ArkDeckWorkflows/AgentComposition", []),
-    ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient", []),
-    ("ArkDeckBootstrap", "Sources/ArkDeckBootstrap", []),
-    ("ArkDeckLaunchAgent", "LaunchAgents", ["ArkDeckCore"]),
-    ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon", []),
-    ("ArkDeckCLI", "Sources/ArkDeckCLI", []),
-    ("ArkDeckAgentDaemonMain", "Sources/ArkDeckAgentDaemonMain", []),
+  /// The Swift Runtime targets TASK-XPA-017 deletes. The Swift CLI and every
+  /// test are already off them; nothing that remains may link them, so their
+  /// deletion touches no client. Emptied, and turned into a permanent
+  /// absence, by the deletion itself.
+  private static let retiringTargets: Set<String> = [
+    "ArkDeckAgentDaemon", "ArkDeckAgentDaemonMain", "ArkDeckWorkflows",
+    "ArkDeckAgentComposition", "ArkDeckStorage", "ArkDeckProcess", "ArkDeckOpenHarmony",
+    "ArkDeckLaunchAgent", "ArkDeckJournalCrashFixture", "ArkDeckEngineCrashFixture",
+    "ArkDeckRuntimeSoakFixture", "ArkDeckRuntimePortFixture", "ArkDeckFakeHapSignerFixture",
   ]
 
-  // MARK: - 1. Package manifest edges
+  /// Deleted targets whose names and source directories must never return.
+  private static let deletedTargets: [(target: String, path: String)] = [
+    ("ArkDeckCLI", "Sources/ArkDeckCLI"),
+    ("ArkDeckHarness", "Sources/ArkDeckHarness"),
+  ]
 
-  /// Package.swift may only declare dependency edges the matrix allows. This
-  /// is the compiler-facing half of the rule: removing an edge here is what
-  /// makes a forbidden import a build error, so this test guards against the
-  /// edge quietly returning in a later manifest edit.
-  func testPackageManifestDependencyMatrix() throws {
-    let manifest = try String(
-      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
-    let targets = Self.parseTargets(manifest: manifest)
+  /// Where each remaining library target's sources live.
+  private static let targetRoots: [(target: String, path: String)] = [
+    ("ArkDeckCore", "Sources/ArkDeckCore"),
+    ("ArkDeckClientKit", "Sources/ArkDeckClientKit"),
+    ("ArkDeckRuntime", "Sources/ArkDeckRuntime"),
+    ("ArkDeckTraceAdapter", "Sources/ArkDeckTraceAdapter"),
+    ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient"),
+    ("ArkDeckBootstrap", "Sources/ArkDeckBootstrap"),
+  ]
+
+  // MARK: - 1. The package holds no Swift Runtime
+
+  /// Every target the manifest declares is a remaining library, a fixture, a
+  /// test target, or one of the Swift Runtime targets being deleted.
+  func testThePackageDeclaresOnlyTheRemainingTargets() throws {
+    let targets = try Self.parseTargets(manifest: manifestText())
     XCTAssertFalse(targets.isEmpty, "no targets parsed from Package.swift")
-    for (name, dependencies) in targets {
-      guard let allowed = Self.allowedImports[name] else { continue }
-      let arkdeckDependencies = dependencies.filter { $0.hasPrefix("ArkDeck") }
-      let violations = arkdeckDependencies.subtracting(allowed)
-      XCTAssertTrue(
-        violations.isEmpty,
-        "Package.swift target \(name) declares forbidden dependencies \(violations.sorted()); "
-          + "allowed: \(allowed.sorted()) (docs/ArchitectureRules.md)")
-    }
-    // The load-bearing absence, asserted directly so a failure names the
-    // rule rather than a set difference: the in-process decision plane was
-    // removed by CHG-2026-064 and no manifest edit may bring it back.
-    XCTAssertNil(
-      targets["ArkDeckHarness"],
-      "no target named ArkDeckHarness may exist; the decision plane is external agents")
-    for (name, dependencies) in targets {
-      XCTAssertFalse(
-        dependencies.contains("ArkDeckHarness"),
-        "\(name) depends on ArkDeckHarness; the in-process decision plane does not exist")
-    }
-  }
-
-  func testArkForgeCodecIsOwnedByThePinnedSDK() throws {
-    let manifest = try String(
-      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
-    XCTAssertTrue(manifest.contains("ArkForgeProtocol"))
-    XCTAssertTrue(manifest.contains("ArkForgeClient"))
-    XCTAssertTrue(manifest.contains("c1dc0553b42627581583abfba3fec34d13343282"))
-    XCTAssertFalse(
-      FileManager.default.fileExists(
-        atPath: packageRoot().appending(path: "Sources/ArkForgeIPC").path),
-      "ArkDeck must not keep a second copy of ArkForge's wire codec")
-  }
-
-  func testArkTraceEngineIsPinnedAndNeverCopiedIntoArkDeckKit() throws {
-    let revision = "9172c9525f954ec397e0555d7d03cd4367f3efcf"
-    let manifest = try String(
-      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
-    XCTAssertTrue(manifest.contains("https://github.com/ArkDeck/ArkTrace.git"))
-    XCTAssertTrue(manifest.contains("revision: \"\(revision)\""))
-
-    let forbiddenCopies = [
-      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
-      "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
-      "ArkDeckTraceAppSupport", "ArkDeckTraceCLI", "ArkDeckTraceCLIExecutable",
-      "ArkDeckTraceCLIResourceFixtures", "ArkDeckTraceSignalShim",
-    ]
-    for directory in forbiddenCopies {
-      let copyRoot = packageRoot().appending(path: "Sources/\(directory)")
-      let firstEntry = FileManager.default.enumerator(
-        at: copyRoot,
-        includingPropertiesForKeys: nil
-      )?.nextObject()
-      XCTAssertNil(
-        firstEntry,
-        "\(directory) is a forbidden ArkTrace source copy; use the pinned package")
-    }
-
-    let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
-    let project = try String(
-      contentsOf: repoRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
-      encoding: .utf8)
-    XCTAssertTrue(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
-    XCTAssertTrue(project.contains("revision = \(revision);"))
-
-    let resolved = try String(
-      contentsOf: packageRoot().appending(path: "Package.resolved"), encoding: .utf8)
-    XCTAssertTrue(resolved.contains("\"identity\" : \"arktrace\""))
-    XCTAssertTrue(resolved.contains("\"revision\" : \"\(revision)\""))
-
-    let xcodeResolved = try String(
-      contentsOf: repoRoot.appending(
-        path: "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"),
-      encoding: .utf8)
-    XCTAssertTrue(xcodeResolved.contains("\"identity\" : \"arktrace\""))
-    XCTAssertTrue(xcodeResolved.contains("\"revision\" : \"\(revision)\""))
-
-    let recipe = "a2e47752e1353d627b442e607eed513564aa66a94c54f2660042383a0f6f3b20"
-    let parserManifest = try String(
-      contentsOf: packageRoot().appending(
-        path: "ThirdParty/TraceStreamer/macx/manifest.json"),
-      encoding: .utf8)
-    XCTAssertTrue(parserManifest.contains("\"buildRecipeVersion\": \"\(recipe)\""))
-    for removedPath in [
-      "Scripts/build_trace_streamer.sh",
-      "Scripts/verify_trace_streamer_lock.sh",
-      "ThirdParty/TraceStreamer/source-lock.json",
-      "ThirdParty/TraceStreamer/patches",
-    ] {
-      XCTAssertFalse(
-        FileManager.default.fileExists(
-          atPath: packageRoot().appending(path: removedPath).path),
-        "ArkTrace build source belongs only in the pinned dependency: \(removedPath)")
-    }
-  }
-
-  /// The exact set of targets that claim strict memory safety.
-  ///
-  /// This setting is a claim that a target's unsafe surface has been read and
-  /// annotated, and it is invisible when it goes missing: dropping it produces
-  /// no diagnostic — that is the whole point of the diagnostic it was emitting.
-  /// The compiler cannot tell anyone the setting used to be there, so the
-  /// manifest is the only place the intent can be pinned.
-  ///
-  /// `ArkDeckProcess` owns every `posix_spawn`, raw file descriptor and PTY
-  /// site in the package, which is why it is on the list. `ArkDeckCore` is
-  /// value types and state machines with no unsafe constructs at all, so its
-  /// entry costs nothing and guards nothing — it stays only because removing a
-  /// safety setting is not this change's call to make.
-  ///
-  /// Adding a target here is not a formality: it will not compile until every
-  /// unsafe expression in that target carries `unsafe`.
-  func testStrictMemorySafetyCoversExactlyTheAuditedTargets() throws {
-    let manifest = try String(
-      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
-    var declaring: Set<String> = []
-    // Each `.target(` block runs to the start of the next one.
-    let blocks = manifest.components(separatedBy: ".target(").dropFirst()
-    for block in blocks {
-      guard let nameRange = block.range(of: #"name: ""#),
-        let closing = block[nameRange.upperBound...].firstIndex(of: "\"")
-      else { continue }
-      let name = String(block[nameRange.upperBound..<closing])
-      if block.contains(".strictMemorySafety()") || block.contains("traceSwiftSettings") {
-        declaring.insert(name)
-      }
-    }
+    let known = Set(Self.allowedImports.keys).union(Self.fixtureTargets)
+      .union(Self.testTargets.keys).union(Self.retiringTargets)
     XCTAssertEqual(
-      declaring,
-      [
-        "ArkDeckCore", "ArkDeckProcess",
-      ],
-      "the set of targets declaring .strictMemorySafety() changed; a target that "
-        + "drops it stops being checked with no diagnostic of any kind")
+      Set(targets.keys).subtracting(known), [],
+      "Package.swift declares targets outside the architecture; Swift carries no Runtime "
+        + "semantics (CHG-2026-074)")
+    for (name, path) in Self.deletedTargets {
+      XCTAssertNil(targets[name], "\(name) returned to Package.swift")
+      XCTAssertFalse(
+        FileManager.default.fileExists(atPath: packageRoot().appending(path: path).path),
+        "\(path) returned; it was deleted")
+    }
+    let manifest = try manifestText()
+    XCTAssertFalse(
+      manifest.contains(#".executable(name: "arkdeck","#),
+      "the Rust arkdeck is the only CLI (TASK-XPA-018)")
   }
 
-  /// The carved-out target directories must stay excluded from their parent
-  /// targets. If an `exclude:` entry disappears, SwiftPM folds the directory
-  /// back into the parent target and the parent silently regains the very
-  /// imports the split removed.
-  func testCompositionCarveOutsStayExcluded() throws {
-    let manifest = try String(
-      contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
-    XCTAssertTrue(
-      manifest.contains("exclude: [\"AgentComposition\"]"),
-      "ArkDeckWorkflows must exclude AgentComposition/ (it is the ArkDeckAgentComposition target)")
+  /// Nothing that remains links a retiring target, so deleting them breaks
+  /// no client, and the remaining libraries keep their layer edges.
+  func testRemainingTargetsLinkOnlyTheLayerMatrix() throws {
+    let targets = try Self.parseTargets(manifest: manifestText())
+    for (name, allowed) in Self.allowedImports {
+      let dependencies = try XCTUnwrap(targets[name], "\(name) is missing from Package.swift")
+      let arkdeck = dependencies.filter { $0.hasPrefix("ArkDeck") }
+      XCTAssertEqual(
+        arkdeck.subtracting(allowed), [],
+        "\(name) declares forbidden dependencies; allowed: \(allowed.sorted())")
+    }
+    for (name, allowed) in Self.testTargets {
+      let dependencies = try XCTUnwrap(targets[name], "\(name) is missing from Package.swift")
+      let arkdeck = dependencies.filter { $0.hasPrefix("ArkDeck") }
+      XCTAssertEqual(
+        arkdeck.subtracting(allowed), [],
+        "test target \(name) links \(arkdeck.subtracting(allowed).sorted()); tests of the "
+          + "deleted Swift Runtime live on as Rust replays of their recorded fixtures")
+    }
+    for name in Self.fixtureTargets {
+      let dependencies = try XCTUnwrap(targets[name], "\(name) is missing from Package.swift")
+      XCTAssertEqual(dependencies.filter { $0.hasPrefix("ArkDeck") }, [])
+    }
   }
 
-  // MARK: - 2. Source-level import matrix
-
-  /// Every source file's ArkDeck imports must respect the layer matrix.
-  /// Redundant with the manifest for straightforward cases, but this is the
-  /// half that understands carved-out directories, and it names the exact
-  /// file when it fails.
+  /// Every remaining source file's ArkDeck imports respect the matrix.
   func testSourceImportsRespectLayerMatrix() throws {
     var checkedFiles = 0
-    for (target, path, carveOuts) in Self.targetRoots {
+    for (target, path) in Self.targetRoots {
       let allowed = Self.allowedImports[target] ?? []
-      for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
+      for file in try swiftFiles(under: path) {
         checkedFiles += 1
-        let imports = try arkdeckImports(of: file)
-        let violations = imports.subtracting(allowed).subtracting([target])
+        let violations = try arkdeckImports(of: file).subtracting(allowed).subtracting([target])
         XCTAssertTrue(
           violations.isEmpty,
           "\(relative(file)) imports \(violations.sorted()) but target \(target) may only "
@@ -285,191 +150,122 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     XCTAssertGreaterThan(checkedFiles, 100, "layout drifted: too few files scanned")
   }
 
-  // MARK: - 3. The in-process decision plane stays removed
-
-  /// CHG-2026-064 removed the harness plane. Its directory must not exist,
-  /// and no production source may import a module by its name — a returning
-  /// plane should fail here by name, not as a matrix set difference.
-  func testTheInProcessDecisionPlaneStaysRemoved() throws {
-    var isDirectory: ObjCBool = false
-    XCTAssertFalse(
-      FileManager.default.fileExists(
-        atPath: packageRoot().appending(path: "Sources/ArkDeckHarness").path,
-        isDirectory: &isDirectory),
-      "Sources/ArkDeckHarness returned; the decision plane is external agents (CHG-2026-064)")
-    for (_, path, _) in Self.targetRoots {
-      for file in try swiftFiles(under: path, skippingSubdirectories: []) {
-        let code = try codeWithoutComments(of: file)
-        XCTAssertFalse(
-          code.contains("import ArkDeckHarness"),
-          "\(relative(file)): imports the removed in-process decision plane")
-      }
+  func testArkTraceEngineIsPinnedAndNeverCopiedIntoArkDeckKit() throws {
+    let revision = "9172c9525f954ec397e0555d7d03cd4367f3efcf"
+    let manifest = try manifestText()
+    XCTAssertTrue(manifest.contains("https://github.com/ArkDeck/ArkTrace.git"))
+    XCTAssertTrue(manifest.contains("revision: \"\(revision)\""))
+    for directory in [
+      "ArkDeckTraceCore", "ArkDeckTraceParser", "ArkDeckTraceStore",
+      "ArkDeckTraceRuntime", "ArkDeckTraceAnalysis", "ArkDeckTraceRendering",
+      "ArkDeckTraceAppSupport", "ArkDeckTraceCLI", "ArkDeckTraceCLIExecutable",
+      "ArkDeckTraceCLIResourceFixtures", "ArkDeckTraceSignalShim", "ArkForgeIPC",
+    ] {
+      XCTAssertFalse(
+        FileManager.default.fileExists(
+          atPath: packageRoot().appending(path: "Sources/\(directory)").path),
+        "\(directory) is a forbidden copy of a pinned dependency")
+    }
+    let project = try String(
+      contentsOf: repositoryRoot().appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+    XCTAssertTrue(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
+    XCTAssertTrue(project.contains("revision = \(revision);"))
+    for resolvedPath in [
+      "Packages/ArkDeckKit/Package.resolved",
+      "ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved",
+    ] {
+      let resolved = try String(
+        contentsOf: repositoryRoot().appending(path: resolvedPath), encoding: .utf8)
+      XCTAssertTrue(resolved.contains("\"identity\" : \"arktrace\""), resolvedPath)
+      XCTAssertTrue(resolved.contains("\"revision\" : \"\(revision)\""), resolvedPath)
     }
   }
 
-  // MARK: - 4. No raw-command public API anywhere
+  // MARK: - 2. No decision plane, no model, no raw command
 
-  /// The typed-operation rule at the API level: no public function or
-  /// initializer in any module takes a raw command string. Argv arrays exist
-  /// only as typed provider/process inputs, never as `command: String`.
-  func testNoPublicRawCommandStringParameters() throws {
-    let pattern =
-      "public\\s+(func|init)[^{]*\\b(command|shellCommand|shellScript|commandLine|rawCommand)"
-      + "\\s*:\\s*String"
-    for (_, path, carveOuts) in Self.targetRoots {
-      for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
-        let code = try codeWithoutComments(of: file)
-        XCTAssertNil(
-          code.range(of: pattern, options: .regularExpression),
-          "\(relative(file)): public API accepts a raw command string")
-      }
-    }
-  }
-
-  // MARK: - 5. No model surface anywhere
-
-  /// ArkDeck holds no model. Not a confined one — none.
-  ///
-  /// This used to permit a model gateway inside the chat composition and the
-  /// CLI, and assert only that it stayed there. `arkdeck agent chat` was the
-  /// thing behind that carve-out, and deleting it lets the rule say what the
-  /// architecture actually claims: decisions come from external agents, so no
-  /// target names a model surface, reads a model credential, or addresses a
-  /// vendor endpoint.
-  ///
-  /// The empty allowlist is the load-bearing part. While it had entries, "no
-  /// in-process model" was a convention two directories were exempt from; with
-  /// none, it is a property of the tree.
-  func testNoModelSurfaceExistsAnywhere() throws {
+  func testNoModelSurfaceOrRawCommandAPIExists() throws {
     let modelTokens = [
       "HarnessAgentModelGateway", "HarnessAgentOpenAIGateway", "HarnessAgentLoop",
-      "ARKDECK_HARNESS_MODEL_",
-      // A gateway that returned under another name would still need these.
-      "api.openai.com", "Authorization: Bearer", "chat/completions",
+      "ARKDECK_HARNESS_MODEL_", "api.openai.com", "Authorization: Bearer", "chat/completions",
+      "import ArkDeckHarness",
     ]
-    let allowedPrefixes: [String] = []
-    XCTAssertTrue(
-      allowedPrefixes.isEmpty,
-      "a carve-out here turns the absence of an in-process model back into a convention")
+    let rawCommand =
+      "public\\s+(func|init)[^{]*\\b(command|shellCommand|shellScript|commandLine|rawCommand)"
+      + "\\s*:\\s*String"
     var scanned = 0
-    for (_, path, carveOuts) in Self.targetRoots {
-      for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
-        let rel = relative(file)
-        guard !allowedPrefixes.contains(where: { rel.hasPrefix($0) }) else { continue }
+    for (_, path) in Self.targetRoots {
+      for file in try swiftFiles(under: path) {
         scanned += 1
         let code = try codeWithoutComments(of: file)
         for token in modelTokens {
           XCTAssertFalse(
             code.contains(token),
-            "\(rel): names a model surface (\(token)); decisions come from external agents")
+            "\(relative(file)): names \(token); decisions come from external agents")
         }
+        XCTAssertNil(
+          code.range(of: rawCommand, options: .regularExpression),
+          "\(relative(file)): public API accepts a raw command string")
       }
     }
     XCTAssertGreaterThan(scanned, 100, "the scan covered almost nothing")
   }
 
-  /// The chat composition is gone by name, so a file cannot quietly return
-  /// under it.
-  func testTheChatCompositionStaysDeleted() throws {
-    for name in [
-      "AgentChatApplication.swift", "AgentChatCLI.swift", "HarnessAgentLoop.swift",
-      "HarnessAgentOpenAIGateway.swift", "NativeAgentChatRuntimeTools.swift",
-    ] {
-      for directory in ["Sources/ArkDeckWorkflows/AgentComposition", "Sources/ArkDeckCLI"] {
-        XCTAssertFalse(
-          FileManager.default.fileExists(
-            atPath: packageRoot().appending(path: "\(directory)/\(name)").path),
-          "\(directory)/\(name) returned; ArkDeck runs no conversation of its own")
-      }
-    }
-  }
+  // MARK: - 3. The App stands on ClientKit
 
-  // MARK: - 6. Git execution stays read-only and confined
+  /// The ArkDeckKit products each target of `ArkDeck.xcodeproj` may link, and
+  /// so import. The App reaches the Rust Runtime through ClientKit alone
+  /// (CHG-2026-074, TASK-XPA-019).
+  private static let xcodeTargetProducts: [String: Set<String>] = [
+    "ArkDeck": ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckTraceAdapter"],
+    "ArkDeckHDCUITests": ["ArkDeckClientKit", "ArkDeckCore"],
+  ]
 
-  /// One file may reference the git executable, and it may not spell a
-  /// history-mutating subcommand as a string literal. Evolution promotion
-  /// produces a PR candidate document; nothing in the package can push, merge,
-  /// commit or move a ref.
-  ///
-  /// The allowlist is checked as an exact set, not as an upper bound. Written
-  /// as a one-way "nothing outside this list" rule it silently widened when
-  /// `EvolutionCandidatePipeline.swift` was deleted with the retired campaign
-  /// stack: the entry stayed, so any future file recreated at that exact path
-  /// would have inherited a reviewed git grant without review. A grant nothing
-  /// uses has to fail here so it gets revoked rather than lying in wait.
-  func testGitExecutionConfinedAndReadOnly() throws {
-    let allowedGitFiles: Set<String> = [
-      "Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceOperationsProvider.swift"
-    ]
-    let writeVerbs = [
-      "push", "merge", "commit", "checkout", "clone", "rebase", "reset", "fetch", "pull",
-      "cherry-pick", "switch", "restore", "worktree", "update-ref", "symbolic-ref",
-      "filter-branch", "gc",
-    ]
-    // A declared path outside every scanned root would never be observed
-    // below, so the set comparison alone could not tell "revoked" from
-    // "unscanned".
-    for declared in allowedGitFiles.sorted() {
-      XCTAssertTrue(
-        FileManager.default.fileExists(atPath: packageRoot().appending(path: declared).path),
-        "\(declared): declared as a git execution site but no such file exists; "
-          + "remove the entry (docs/ArchitectureRules.md §4)")
-    }
+  private static let xcodeTargetSources: [String: String] = [
+    "ArkDeck": "ArkDeckApp",
+    "ArkDeckHDCUITests": "ArkDeckAppUITests",
+  ]
 
-    var observedGitFiles: Set<String> = []
-    for (_, path, carveOuts) in Self.targetRoots {
-      for file in try swiftFiles(under: path, skippingSubdirectories: carveOuts) {
-        let rel = relative(file)
-        let code = try codeWithoutComments(of: file)
-        guard code.contains("/usr/bin/git") else { continue }
-        observedGitFiles.insert(rel)
-        for verb in writeVerbs {
-          XCTAssertNil(
-            code.range(of: "\"\(verb)\"", options: .literal),
-            "\(rel): git write verb \"\(verb)\" as a string literal; the git surface is "
-              + "read-only (status/diff/stash create + read-only plumbing)")
-        }
-      }
-    }
+  func testTheAppLinksAndImportsOnlyClientKitCoreAndTheTraceAdapter() throws {
+    let project = try String(
+      contentsOf: repositoryRoot().appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
+      encoding: .utf8)
+    let linked = try Self.arkDeckKitProductsByXcodeTarget(project: project)
     XCTAssertEqual(
-      observedGitFiles, allowedGitFiles,
-      "the git execution sites and the declared allowlist must match exactly: "
-        + "unlisted \(observedGitFiles.subtracting(allowedGitFiles).sorted()) reference the "
-        + "git executable without a reviewed grant, and listed "
-        + "\(allowedGitFiles.subtracting(observedGitFiles).sorted()) no longer use it and must "
-        + "be removed rather than left standing")
-  }
-
-  // MARK: - 7. Storage and the artifact store are task-ignorant
-
-  /// A single source of truth per fact: runtime storage and the artifact
-  /// store never see harness task identity. The harness references jobs and
-  /// artifacts by ID through its ports; nothing below stores an HTASK.
-  func testStorageAndArtifactStoreAreTaskIgnorant() throws {
-    var files = try swiftFiles(under: "Sources/ArkDeckStorage", skippingSubdirectories: [])
-    files.append(
-      packageRoot().appending(path: "Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift")
-    )
-    for file in files {
-      let code = try codeWithoutComments(of: file)
-      for token in ["import ArkDeckHarness", "HarnessTask", "HTASK-"] {
-        XCTAssertFalse(
-          code.contains(token),
-          "\(relative(file)): \(token) below the harness boundary — job and artifact stores "
-            + "must stay task-ignorant")
+      Set(linked.keys), Set(Self.xcodeTargetProducts.keys),
+      "ArkDeck.xcodeproj's targets drifted from xcodeTargetProducts")
+    for (target, products) in linked.sorted(by: { $0.key < $1.key }) {
+      let allowed = Self.xcodeTargetProducts[target] ?? []
+      XCTAssertTrue(
+        products.isSubset(of: allowed),
+        "Xcode target \(target) links \(products.subtracting(allowed).sorted()) but may link "
+          + "only \(allowed.sorted()) from ArkDeckKit")
+    }
+    var checkedFiles = 0
+    for (target, directory) in Self.xcodeTargetSources.sorted(by: { $0.key < $1.key }) {
+      let allowed = Self.xcodeTargetProducts[target] ?? []
+      for file in try repositorySwiftFiles(under: directory) {
+        checkedFiles += 1
+        let imports = try arkdeckImports(of: file)
+        XCTAssertTrue(
+          imports.isSubset(of: allowed),
+          "\(file.lastPathComponent) imports \(imports.subtracting(allowed).sorted()), which "
+            + "Xcode target \(target) does not link")
       }
     }
+    XCTAssertGreaterThan(checkedFiles, 30, "App layout drifted: too few files scanned")
   }
 
   // MARK: - Helpers
 
-  /// Extracts `(name, declared dependency names)` for every target in the
-  /// manifest. A balanced-parenthesis scan over `.target(`/`.executableTarget(`
-  /// blocks, then quoted strings out of the `dependencies: [...]` array. The
-  /// manifest is first-party and formatted by swift-format, so a text scan is
-  /// dependable here; if parsing breaks, the emptiness assertion above fails
-  /// loudly rather than passing vacuously.
-  private static func parseTargets(manifest: String) -> [String: Set<String>] {
+  private func manifestText() throws -> String {
+    try String(contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
+  }
+
+  /// `(name, declared dependency names)` for every target in the manifest: a
+  /// balanced-parenthesis scan over the target blocks, then the quoted strings
+  /// of their `dependencies: [...]` arrays.
+  private static func parseTargets(manifest: String) throws -> [String: Set<String>] {
     var result: [String: Set<String>] = [:]
     for opener in [".target(", ".executableTarget(", ".testTarget("] {
       var search = manifest.startIndex
@@ -486,22 +282,19 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
         }
         let block = String(manifest[start.upperBound..<index])
         search = index
-        guard let name = Self.quotedStrings(after: "name:", in: block, single: true).first else {
+        guard let name = quotedStrings(after: "name:", in: block, single: true).first else {
           continue
         }
-        if let dependenciesRange = block.range(of: "dependencies:") {
-          let tail = String(block[dependenciesRange.upperBound...])
+        var dependencies: Set<String> = []
+        if let range = block.range(of: "dependencies:") {
+          let tail = String(block[range.upperBound...])
           if let open = tail.firstIndex(of: "["), let close = tail.firstIndex(of: "]"),
             open < close
           {
-            let list = String(tail[open...close])
-            result[name] = Set(Self.quotedStrings(after: nil, in: list, single: false))
-          } else {
-            result[name] = []
+            dependencies = Set(quotedStrings(after: nil, in: String(tail[open...close]), single: false))
           }
-        } else {
-          result[name] = []
         }
+        result[name] = dependencies
       }
     }
     return result
@@ -510,431 +303,20 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static func quotedStrings(after label: String?, in text: String, single: Bool)
     -> [String]
   {
-    var scope = text
+    var scope = Substring(text)
     if let label {
       guard let range = scope.range(of: label) else { return [] }
-      scope = String(scope[range.upperBound...])
+      scope = scope[range.upperBound...]
     }
     var results: [String] = []
-    var remainder = Substring(scope)
-    while let open = remainder.firstIndex(of: "\"") {
-      let afterOpen = remainder.index(after: open)
-      guard let close = remainder[afterOpen...].firstIndex(of: "\"") else { break }
-      results.append(String(remainder[afterOpen..<close]))
+    while let open = scope.firstIndex(of: "\"") {
+      let afterOpen = scope.index(after: open)
+      guard let close = scope[afterOpen...].firstIndex(of: "\"") else { break }
+      results.append(String(scope[afterOpen..<close]))
       if single { return results }
-      remainder = remainder[remainder.index(after: close)...]
+      scope = scope[scope.index(after: close)...]
     }
     return results
-  }
-
-  private func packageRoot() -> URL {
-    // …/Tests/ArkDeckContractTests/ArchitectureBoundaryContractTests.swift -> package root
-    URL(filePath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-  }
-
-  func testArkForgeFullRestoreConsumersUseTheCanonicalIdentityPolicy() throws {
-    let sourceRoot = packageRoot().appending(path: "Sources")
-    let allowedAliasFiles: Set<String> = [
-      "ArkDeckCore/ArkForgeFlashOperation.swift",
-      "ArkDeckCore/RuntimeOperationCatalogGenerated.swift",
-      "ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift",
-    ]
-    guard
-      let enumerator = FileManager.default.enumerator(
-        at: sourceRoot, includingPropertiesForKeys: nil)
-    else { return XCTFail("cannot enumerate ArkDeckKit sources") }
-    var aliasFiles: Set<String> = []
-    var obsoleteAdapterFiles: [String] = []
-    for case let url as URL in enumerator where url.pathExtension == "swift" {
-      let source = try String(contentsOf: url, encoding: .utf8)
-      let relative = String(url.path.dropFirst(sourceRoot.path.count + 1))
-      if source.contains("flash.dayu200") { aliasFiles.insert(relative) }
-      if source.contains("RockchipFlashProviderAdapter") {
-        obsoleteAdapterFiles.append(relative)
-      }
-    }
-    XCTAssertEqual(aliasFiles, allowedAliasFiles)
-    XCTAssertEqual(obsoleteAdapterFiles, [])
-
-    let flashFacade = try String(
-      contentsOf: sourceRoot.appending(
-        path: "ArkDeckClientKit/FlashApplicationFacade.swift"),
-      encoding: .utf8)
-    XCTAssertTrue(flashFacade.contains("ArkForgeFlashOperation.canonicalReference"))
-    XCTAssertFalse(flashFacade.contains("flash.dayu200"))
-    let progressStart = try XCTUnwrap(
-      flashFacade.range(of: "public enum FlashLiveProgressProjector"))
-    let progressTail = flashFacade[progressStart.lowerBound...]
-    let progressEnd = try XCTUnwrap(
-      progressTail.range(of: "enum FlashJobStatusResponseDecoding"))
-    let progressSource = String(progressTail[..<progressEnd.lowerBound])
-    for legacyStepID in [
-      "flash-partitions", "verify-flash-readback", "rebind-and-verify-build",
-    ] {
-      XCTAssertFalse(
-        progressSource.contains(legacyStepID),
-        "typed Flash progress must derive phases from catalog step kinds")
-    }
-
-    let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
-    let historyFacade = try String(
-      contentsOf: sourceRoot.appending(
-        path: "ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift"),
-      encoding: .utf8)
-    let flashActivityStart = try XCTUnwrap(historyFacade.range(of: "public var flashActivityJobs:"))
-    let flashActivityTail = historyFacade[flashActivityStart.lowerBound...]
-    let flashActivityEnd = try XCTUnwrap(
-      flashActivityTail.range(of: "public var focusedFlashActivity:"))
-    let flashActivitySource = String(flashActivityTail[..<flashActivityEnd.lowerBound])
-    XCTAssertTrue(
-      flashActivitySource.contains("ArkForgeFlashOperation.containsDurableRecordReference"))
-    XCTAssertFalse(flashActivitySource.contains("flash.dayu200"))
-    for name in ["FlashWorkspaceView.swift", "FlashRuntimeActivityView.swift"] {
-      let source = try String(
-        contentsOf: repoRoot.appending(path: "ArkDeckApp/Features/Flash/\(name)"),
-        encoding: .utf8)
-      XCTAssertTrue(
-        source.contains(".focusedFlashActivity"),
-        "\(name) must use the shared canonical/legacy projection and attention priority")
-      XCTAssertFalse(source.contains("flash.dayu200"), "\(name) must not select only the old alias")
-    }
-    let manualDriver = try String(
-      contentsOf: repoRoot.appending(path: "scripts/manual_ui_flash/manual_ui_flash.swift"),
-      encoding: .utf8)
-    XCTAssertTrue(manualDriver.contains("flash.full-restore"))
-    XCTAssertFalse(manualDriver.contains("flash.dayu200"))
-    XCTAssertTrue(manualDriver.contains("\"job.plan\", \"job.show\", \"job.timeline\""))
-    XCTAssertFalse(manualDriver.contains("\"job.list-page\""))
-    XCTAssertFalse(manualDriver.contains("\"job.status\""))
-    XCTAssertTrue(manualDriver.contains("params.count == 1"))
-    XCTAssertFalse(manualDriver.contains("waitForPresence(\"open-panel\""))
-    XCTAssertFalse(manualDriver.contains("waitForAbsence(\"open-panel\""))
-    XCTAssertTrue(manualDriver.contains("try openGoToFolder(timeout: timeout)"))
-    XCTAssertTrue(
-      manualDriver.contains("com.apple.appkit.xpc.openAndSavePanelService"))
-    XCTAssertTrue(
-      manualDriver.contains("try keyForExactApplicationOwnedFilePanel("))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "try pressExactApplicationOwnedFilePanel(\"OKButton\", timeout: timeout)"))
-    XCTAssertTrue(manualDriver.contains("guard !runningApplication.isTerminated"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "let panel = elementAttribute(okButton, kAXWindowAttribute as CFString)"))
-    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, requiredWindow)"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "let raised = AXUIElementPerformAction(panel, kAXRaiseAction as CFString)"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "runningApplication.activate(options: [.activateAllWindows])"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "elementAttribute(application, kAXFocusedWindowAttribute as CFString)"))
-    XCTAssertTrue(manualDriver.contains("isSameExactApplicationWindow(panel, focusedWindow)"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "lhsPID == runningApplication.processIdentifier"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "an unrelated application remained frontmost; no file-panel input was dispatched"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "url.lastPathComponent, identifier: \"flash.image.value\", timeout: max(timeout, 30)"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "element(displayingNavigationFallback: fallbackStrings)"))
-    XCTAssertTrue(manualDriver.contains("kAXRowRole as String"))
-    XCTAssertTrue(
-      manualDriver.contains(
-        "expected.contains(where: { value == $0 || value.contains($0) })"))
-  }
-
-  private func relative(_ url: URL) -> String {
-    let root = packageRoot().standardizedFileURL.path + "/"
-    let path = url.standardizedFileURL.path
-    return path.hasPrefix(root) ? String(path.dropFirst(root.count)) : path
-  }
-
-  private func swiftFiles(
-    under relativePath: String, skippingSubdirectories: [String]
-  ) throws -> [URL] {
-    let root = packageRoot().appending(path: relativePath)
-    let skipped = Set(
-      skippingSubdirectories.map { root.appending(path: $0).standardizedFileURL.path })
-    guard
-      let enumerator = FileManager.default.enumerator(
-        at: root, includingPropertiesForKeys: nil)
-    else {
-      XCTFail("cannot enumerate \(relativePath)")
-      return []
-    }
-    var files: [URL] = []
-    for case let url as URL in enumerator {
-      let standardized = url.standardizedFileURL
-      if skipped.contains(where: {
-        standardized.path.hasPrefix($0 + "/") || standardized.path == $0
-      }) {
-        continue
-      }
-      if standardized.pathExtension == "swift" {
-        files.append(standardized)
-      }
-    }
-    XCTAssertFalse(files.isEmpty, "no Swift sources under \(relativePath) — layout drifted")
-    return files.sorted { $0.path < $1.path }
-  }
-
-  /// Every execution context the engine builds around a resolved input
-  /// artifact must also carry the build version derived from it.
-  ///
-  /// This is a source-shape test on purpose. The fact was threaded into one of
-  /// nine `ProviderExecutionContext` constructions by hand, and the eight that
-  /// were missed did not surface in 1325 contract tests — they surfaced when a
-  /// real flash plan was materialized through the engine and post-flash
-  /// verification had nothing to compare against. Threading a fact into N call
-  /// sites by hand fails at N > 1; what catches it is asking the source
-  /// whether any site was left behind.
-  func testEveryArtifactResolvingExecutionContextCarriesTheDerivedBuildVersion() throws {
-    let engine = packageRoot()
-      .appending(path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
-    let code = try String(contentsOf: engine, encoding: .utf8)
-    // Each construction runs to its closing paren before the next statement;
-    // splitting on the constructor name is enough to isolate them.
-    let constructions = code.components(separatedBy: "ProviderExecutionContext(").dropFirst()
-    var checked = 0
-    for construction in constructions {
-      guard let end = construction.range(of: ")\n") else { continue }
-      let body = String(construction[construction.startIndex..<end.upperBound])
-      guard body.contains("resolvedInputArtifact:"),
-        !body.contains("resolvedInputArtifact: nil")
-      else { continue }
-      checked += 1
-      XCTAssertTrue(
-        body.contains("expectedRuntimeBuildVersion:"),
-        "an execution context resolves an input artifact but does not carry the build "
-          + "version derived from it:\n\(body)")
-    }
-    XCTAssertGreaterThan(checked, 1, "no artifact-resolving contexts found — layout drifted")
-  }
-
-  private func arkdeckImports(of file: URL) throws -> Set<String> {
-    let code = try String(contentsOf: file, encoding: .utf8)
-    var result: Set<String> = []
-    let pattern = "^\\s*(?:@testable\\s+|@_exported\\s+)?import\\s+([A-Za-z_][A-Za-z0-9_]*)"
-    let regex = try NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines])
-    let range = NSRange(code.startIndex..., in: code)
-    regex.enumerateMatches(in: code, range: range) { match, _, _ in
-      guard let match, let moduleRange = Range(match.range(at: 1), in: code) else { return }
-      let module = String(code[moduleRange])
-      if module.hasPrefix("ArkDeck") {
-        result.insert(module)
-      }
-    }
-    return result
-  }
-
-  /// Strips line comments (and, coarsely, block comments) so that the token
-  /// scans above judge code, not prose. String literals are left in place on
-  /// purpose: a forbidden fragment inside a literal is exactly what several
-  /// tests exist to catch.
-  private func codeWithoutComments(of file: URL) throws -> String {
-    let raw = try String(contentsOf: file, encoding: .utf8)
-    var lines: [String] = []
-    var inBlockComment = false
-    for line in raw.split(separator: "\n", omittingEmptySubsequences: false) {
-      var text = String(line)
-      if inBlockComment {
-        if let end = text.range(of: "*/") {
-          text = String(text[end.upperBound...])
-          inBlockComment = false
-        } else {
-          continue
-        }
-      }
-      while let start = text.range(of: "/*") {
-        if let end = text.range(of: "*/", range: start.upperBound..<text.endIndex) {
-          text.removeSubrange(start.lowerBound..<end.upperBound)
-        } else {
-          text = String(text[..<start.lowerBound])
-          inBlockComment = true
-          break
-        }
-      }
-      if let comment = text.range(of: "//") {
-        text = String(text[..<comment.lowerBound])
-      }
-      lines.append(text)
-    }
-    return lines.joined(separator: "\n")
-  }
-  // MARK: - 8. The runtime engine gains no new per-operation knowledge
-
-  /// The engine names fourteen specific published operations, and each naming
-  /// is catalog or provider knowledge that migrated into the generic kernel:
-  /// mutation/readback pairings, evidence eligibility, per-operation
-  /// compensation, per-operation input handling. That is why publishing a new
-  /// operation currently costs an edit to the execution kernel.
-  ///
-  /// Refactoring it out is frozen — PRODUCT-LOOP §12 and §20 bar large module
-  /// restructuring and this meets none of §12's exceptions — so this stops the
-  /// bleeding rather than draining it. The set may shrink as each fact moves
-  /// to the Catalog or a provider; it may not grow.
-  ///
-  /// Compared as an exact set in both directions. An upper-bound-only rule is
-  /// precisely how the git execution allowlist quietly widened: one of its two
-  /// declared files was deleted, the entry stayed, and nothing failed.
-  ///
-  /// Scope is this one file on purpose. A provider naming the operations it
-  /// implements is doing its job; the kernel doing it is the layering problem,
-  /// and the kernel is here.
-  private static let engineDeclaredOperations: Set<String> = [
-    "analyzer.analyze-trace@1",
-    "analyzer.extract-crash-signature@1",
-    "analyzer.summarize-hilog@1",
-    "analyzer.summarize-trace@1",
-    "capture.diagnostics@1",
-    "debug.hap@1",
-    "deploy.native-library.app-owned@1",
-    "observe.device@1",
-    "port-forward.create@1",
-    "port-forward.remove@1",
-    "workspace.apply-patch@1",
-    "workspace.create-checkpoint@1",
-    "workspace.symbolize-crash@1",
-  ]
-
-  func testTheRuntimeEngineNamesNoNewPublishedOperation() throws {
-    let engine = packageRoot().appending(
-      path: "Sources/ArkDeckWorkflows/RuntimeJobEngine.swift")
-    let code = try codeWithoutComments(of: engine)
-    let pattern =
-      #""(?:analyzer|workspace|debug|capture|observe|flash|deploy|port-forward)"#
-      + #"\.[a-z0-9.\-]+(?:@[0-9]+)?""#
-    let expression = try NSRegularExpression(pattern: pattern)
-    var observed: Set<String> = []
-    for match in expression.matches(
-      in: code, range: NSRange(code.startIndex..., in: code))
-    {
-      guard let range = Range(match.range, in: code) else { continue }
-      observed.insert(String(code[range].dropFirst().dropLast()))
-    }
-    XCTAssertFalse(
-      observed.isEmpty, "the scan found no operation references; it tests nothing now")
-
-    let added = observed.subtracting(Self.engineDeclaredOperations).sorted()
-    XCTAssertEqual(
-      added, [],
-      """
-      the execution kernel gained per-operation knowledge for \(added.joined(separator: ", ")); \
-      that belongs to the Catalog descriptor or the provider that implements it, and adding it \
-      here makes publishing an operation an edit to the engine
-      """)
-    let stale = Self.engineDeclaredOperations.subtracting(observed).sorted()
-    XCTAssertEqual(
-      stale, [],
-      """
-      \(stale.joined(separator: ", ")) is declared here but the engine no longer names it — \
-      the point of this list is that it shrinks, so record the win by removing the entry
-      """)
-  }
-
-  // MARK: - 9. The v2 request contract is declared in Core
-
-  /// `RuntimeOperationRequest`, its parts and the `RuntimeOperationFailure`
-  /// projection are declared in ArkDeckCore, not ArkDeckRuntime. The App's
-  /// client library depends on Core alone and has to build these requests too,
-  /// and it still will once the Swift Runtime is deleted at M5
-  /// (docs/ArchitectureRules.md §1, §6 example 1). A declaration drifting back
-  /// into Runtime would cut ClientKit off from the requests it sends.
-  func testTheV2RequestContractIsDeclaredInCore() throws {
-    let contract: Set<String> = [
-      "RuntimeOperationRequest", "RuntimeOperationReference", "DurableTargetReference",
-      "RuntimeClientContext", "RuntimeRequestedOutput", "RuntimeCapabilityReference",
-      "RuntimeOperationErrorCode", "RuntimeOperationRequestRejection", "RuntimeOperationFailure",
-    ]
-    func declared(under path: String) throws -> Set<String> {
-      var found: Set<String> = []
-      for file in try swiftFiles(under: path, skippingSubdirectories: []) {
-        let code = try codeWithoutComments(of: file)
-        for name in contract
-        where code.range(
-          of: "(struct|enum|class|actor|typealias) \(name)\\b", options: .regularExpression)
-          != nil
-        {
-          found.insert(name)
-        }
-      }
-      return found
-    }
-    XCTAssertEqual(try declared(under: "Sources/ArkDeckCore"), contract)
-    XCTAssertEqual(
-      try declared(under: "Sources/ArkDeckRuntime"), [],
-      "the v2 request contract moved back into ArkDeckRuntime, which ClientKit may not import")
-  }
-
-  // MARK: - 10. The App stands on ClientKit, not on Workflows
-
-  /// The ArkDeckKit products each target of `ArkDeck.xcodeproj` may link, and
-  /// so import. The App reaches the Runtime through ClientKit alone
-  /// (CHG-2026-074, TASK-XPA-019): no Swift Runtime layer — Workflows,
-  /// AgentComposition, Runtime, Storage, OpenHarmony, Process — is linked into
-  /// it or into its UI-test bundle, so an App build cannot reach an engine,
-  /// provider or store, and deleting the Swift Runtime at M5 does not touch the
-  /// App. External packages (ArkTrace) are not ArkDeck edges and are not listed.
-  private static let xcodeTargetProducts: [String: Set<String>] = [
-    "ArkDeck": ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckTraceAdapter"],
-    "ArkDeckHDCUITests": ["ArkDeckClientKit", "ArkDeckCore"],
-  ]
-
-  /// Each Xcode target's own sources, relative to the repository root.
-  private static let xcodeTargetSources: [String: String] = [
-    "ArkDeck": "ArkDeckApp",
-    "ArkDeckHDCUITests": "ArkDeckAppUITests",
-  ]
-
-  func testTheAppNeitherLinksNorImportsArkDeckWorkflows() throws {
-    let project = try String(
-      contentsOf: repositoryRoot().appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
-      encoding: .utf8)
-    // The load-bearing absence, asserted by name: no target of the project can
-    // link a Workflows product the project does not declare.
-    XCTAssertFalse(
-      project.contains("productName = ArkDeckWorkflows;"),
-      "ArkDeck.xcodeproj declares the ArkDeckWorkflows product; the App reaches the Runtime "
-        + "through ArkDeckClientKit only (docs/ArchitectureRules.md)")
-    let linked = try Self.arkDeckKitProductsByXcodeTarget(project: project)
-    XCTAssertEqual(
-      Set(linked.keys), Set(Self.xcodeTargetProducts.keys),
-      "ArkDeck.xcodeproj's targets drifted from xcodeTargetProducts")
-    for (target, products) in linked.sorted(by: { $0.key < $1.key }) {
-      let allowed = Self.xcodeTargetProducts[target] ?? []
-      XCTAssertTrue(
-        products.isSubset(of: allowed),
-        "Xcode target \(target) links \(products.subtracting(allowed).sorted()) but may link "
-          + "only \(allowed.sorted()) from ArkDeckKit (docs/ArchitectureRules.md)")
-    }
-
-    var checkedFiles = 0
-    for (target, directory) in Self.xcodeTargetSources.sorted(by: { $0.key < $1.key }) {
-      let allowed = Self.xcodeTargetProducts[target] ?? []
-      for file in try repositorySwiftFiles(under: directory) {
-        checkedFiles += 1
-        let imports = try arkdeckImports(of: file)
-        XCTAssertFalse(
-          imports.contains("ArkDeckWorkflows"),
-          "\(file.lastPathComponent) imports ArkDeckWorkflows; the App reaches the Runtime "
-            + "through ArkDeckClientKit only")
-        XCTAssertTrue(
-          imports.isSubset(of: allowed),
-          "\(file.lastPathComponent) imports \(imports.subtracting(allowed).sorted()), which "
-            + "Xcode target \(target) does not link")
-      }
-    }
-    XCTAssertGreaterThan(checkedFiles, 30, "App layout drifted: too few files scanned")
   }
 
   /// Each native target's ArkDeckKit package products, read from its
@@ -953,7 +335,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       return [:]
     }
     let packageID = String(project[packageRange])
-
     var productsByID: [String: String] = [:]
     let productDeclaration = try NSRegularExpression(
       pattern: "(\(identifier)) /\\*[^*]*\\*/ = \\{\\s*isa = XCSwiftPackageProductDependency;"
@@ -966,7 +347,6 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       else { continue }
       productsByID[String(project[id])] = String(project[name])
     }
-
     var result: [String: Set<String>] = [:]
     let nativeTarget = try NSRegularExpression(
       pattern: "= \\{\\s*isa = PBXNativeTarget;(.*?)\\n\\t\\t\\};",
@@ -1005,97 +385,89 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     return result
   }
 
+  private func packageRoot() -> URL {
+    // …/Tests/ArkDeckContractTests/ArchitectureBoundaryContractTests.swift -> package root
+    URL(filePath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+  }
+
   private func repositoryRoot() -> URL {
-    packageRoot()
-      .deletingLastPathComponent()  // Packages
-      .deletingLastPathComponent()  // repository root
+    packageRoot().deletingLastPathComponent().deletingLastPathComponent()
+  }
+
+  private func relative(_ url: URL) -> String {
+    let root = packageRoot().standardizedFileURL.path + "/"
+    let path = url.standardizedFileURL.path
+    return path.hasPrefix(root) ? String(path.dropFirst(root.count)) : path
+  }
+
+  private func swiftFiles(under relativePath: String) throws -> [URL] {
+    try swiftFiles(in: packageRoot().appending(path: relativePath), named: relativePath)
   }
 
   private func repositorySwiftFiles(under directory: String) throws -> [URL] {
-    let root = repositoryRoot().appending(path: directory, directoryHint: .isDirectory)
-    guard
-      let enumerator = FileManager.default.enumerator(
-        at: root, includingPropertiesForKeys: nil)
+    try swiftFiles(
+      in: repositoryRoot().appending(path: directory, directoryHint: .isDirectory),
+      named: directory)
+  }
+
+  private func swiftFiles(in root: URL, named name: String) throws -> [URL] {
+    guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)
     else {
-      XCTFail("cannot enumerate \(directory)")
+      XCTFail("cannot enumerate \(name)")
       return []
     }
     let files = enumerator.compactMap { entry -> URL? in
       guard let url = entry as? URL, url.pathExtension == "swift" else { return nil }
       return url.standardizedFileURL
     }
-    XCTAssertFalse(files.isEmpty, "no Swift sources under \(directory) — layout drifted")
+    XCTAssertFalse(files.isEmpty, "no Swift sources under \(name) — layout drifted")
     return files.sorted { $0.path < $1.path }
   }
-}
 
-/// `AFA-AC-1`: the Rockchip lowering is gone from product code.
-///
-/// A grep test, deliberately. The dependency and type checks above cannot see
-/// this one: a string literal `"wlx"` handed to a process is not a type
-/// boundary, and the whole point of CHG-2026-059 is that ArkDeck stops knowing
-/// how to phrase a Rockchip write.
-final class RockchipLoweringRemovalContractTests: XCTestCase {
-
-  private func productSwiftFiles() throws -> [(path: String, source: String)] {
-    let root = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appending(path: "Sources", directoryHint: .isDirectory)
-    var out: [(String, String)] = []
-    let walker = FileManager.default.enumerator(
-      at: root, includingPropertiesForKeys: nil)
-    while let url = walker?.nextObject() as? URL {
-      guard url.pathExtension == "swift" else { continue }
-      out.append((url.path, try String(contentsOf: url, encoding: .utf8)))
+  private func arkdeckImports(of file: URL) throws -> Set<String> {
+    let code = try String(contentsOf: file, encoding: .utf8)
+    let regex = try NSRegularExpression(
+      pattern: "^\\s*(?:@testable\\s+|@_exported\\s+)?import\\s+([A-Za-z_][A-Za-z0-9_]*)",
+      options: [.anchorsMatchLines])
+    var result: Set<String> = []
+    regex.enumerateMatches(in: code, range: NSRange(code.startIndex..., in: code)) { match, _, _ in
+      guard let match, let range = Range(match.range(at: 1), in: code) else { return }
+      let module = String(code[range])
+      if module.hasPrefix("ArkDeck") { result.insert(module) }
     }
-    return out
+    return result
   }
 
-  /// Strips comments, so *discussing* the removal is not confused with doing it.
-  private func codeOnly(_ source: String) -> String {
-    source.split(separator: "\n", omittingEmptySubsequences: false)
-      .map { line -> Substring in
-        let trimmed = line.drop(while: { $0 == " " })
-        if trimmed.hasPrefix("//") { return "" }
-        if let comment = line.range(of: "//") { return line[line.startIndex..<comment.lowerBound] }
-        return line
+  /// Strips line and block comments so the token scans judge code, not prose.
+  /// String literals stay: a forbidden fragment inside one is what they catch.
+  private func codeWithoutComments(of file: URL) throws -> String {
+    let raw = try String(contentsOf: file, encoding: .utf8)
+    var lines: [String] = []
+    var inBlockComment = false
+    for line in raw.split(separator: "\n", omittingEmptySubsequences: false) {
+      var text = String(line)
+      if inBlockComment {
+        guard let end = text.range(of: "*/") else { continue }
+        text = String(text[end.upperBound...])
+        inBlockComment = false
       }
-      .joined(separator: "\n")
-  }
-
-  func testProductCodeNeverPhrasesARockchipWriteOrSectorRead() throws {
-    // ArkForge owns the complete RockUSB vocabulary. Product Swift may model
-    // typed actions, but it cannot reconstruct vendor argv.
-    let delegated = [
-      "\"ld\"", "\"rd\"", "\"wlx\"", "\"wl\"", "\"rl\"", "\"ppt\"",
-      "\"db\"", "\"gpt\"", "\"ul\"", "\"ef\"",
-    ]
-    for (path, source) in try productSwiftFiles() {
-      let code = codeOnly(source)
-      for verb in delegated {
-        XCTAssertFalse(
-          code.contains(verb),
-          "\(path) phrases \(verb) as an argv element; that lowering is arkforged's "
-            + "(CHG-2026-059)")
+      while let start = text.range(of: "/*") {
+        if let end = text.range(of: "*/", range: start.upperBound..<text.endIndex) {
+          text.removeSubrange(start.lowerBound..<end.upperBound)
+        } else {
+          text = String(text[..<start.lowerBound])
+          inBlockComment = true
+          break
+        }
       }
+      if let comment = text.range(of: "//") {
+        text = String(text[..<comment.lowerBound])
+      }
+      lines.append(text)
     }
-  }
-
-  func testTheReadDomainLessonSurvivedItsCode() throws {
-    // `characterizeMediumReadDomain` carried a lesson that cost a full
-    // campaign: past the read window every sector reads as uniform 0xCC, so a
-    // readback there cannot tell "not written" from "cannot be read". Deleting
-    // the code must not delete that.
-    let repoRoot = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent().deletingLastPathComponent()
-      .deletingLastPathComponent().deletingLastPathComponent()
-      .deletingLastPathComponent()
-    let index = repoRoot.appending(path: "docs/design/rockchip-read-domain.md")
-    let text = try String(contentsOf: index, encoding: .utf8)
-    XCTAssertTrue(text.contains("AD-006"), "the read-domain index must cite AD-006")
-    XCTAssertTrue(text.contains("AD-019"), "and its independent reproduction, AD-019")
-    XCTAssertTrue(text.contains("0xCC"), "and name what the window returns")
-    XCTAssertTrue(text.contains("65536"), "and where the window ends")
+    return lines.joined(separator: "\n")
   }
 }

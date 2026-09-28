@@ -91,7 +91,7 @@ final class UpdateFeedSignedRustOracleTests: XCTestCase {
       "now": .string(issued), "cases": .array(rows),
     ])) + Data("\n".utf8)
     if recording {
-      try HDCOracleHarness.recordOrCompare(
+      try OracleFiles.recordOrCompare(
         ["signed.json": output], variable: "ARKDECK_RUST_SIGNED_FEED_RECORD",
         oracle: repository.appending(path: "rust/tests/fixtures/update-feed"))
     } else {

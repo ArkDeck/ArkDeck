@@ -821,7 +821,6 @@ final class AutoUpdateContractTests: XCTestCase {
     let privateMarker = ["-----BEGIN", "PRIVATE KEY-----"].joined(separator: " ")
     for relativePath in [
       "ArkDeckApp/App/ArkDeckApp.swift",
-      "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift",
       "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate",
     ] {
       XCTAssertFalse(
@@ -844,11 +843,6 @@ final class AutoUpdateContractTests: XCTestCase {
     XCTAssertTrue(appSource.contains("if case .failed(.network) = await service.state"))
     XCTAssertTrue(appSource.contains("Integrity, replay and local-state failures"))
     XCTAssertFalse(appSource.contains("artifact.downloaded.url.lastPathComponent"))
-    let cliSource = try String(
-      contentsOf: repository.appending(
-        path: "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift"),
-      encoding: .utf8)
-    XCTAssertTrue(cliSource.contains("validateUnsignedPayloadForSigning(payload)"))
     let feedSource = try String(
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate/UpdateFeed.swift"),

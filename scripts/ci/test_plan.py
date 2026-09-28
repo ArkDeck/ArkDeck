@@ -75,7 +75,6 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_non_app_package_targets_skip_redundant_xcode_lane(self):
         for path in (
-            "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLI.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentClient/Client.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/Daemon.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift",
@@ -188,7 +187,6 @@ class PathClassificationTests(unittest.TestCase):
         for path in (
             "Packages/ArkDeckKit/Contracts/control-protocol.json",
             "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
-            "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICanonicalJSON.swift",
             "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",

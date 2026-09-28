@@ -100,7 +100,7 @@ final class UIDumpOfflineInspectorContractTests: XCTestCase {
     }
   }
 
-  func testAppAndCLIUseTheTypedOwnerInsteadOfCallingTheParserDirectly() throws {
+  func testTheAppUsesTheTypedOwnerInsteadOfCallingTheParserDirectly() throws {
     let root = URL(filePath: #filePath)
       .deletingLastPathComponent().deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -108,14 +108,8 @@ final class UIDumpOfflineInspectorContractTests: XCTestCase {
       contentsOf: root.appending(
         path: "Sources/ArkDeckClientKit/UIDumpApplicationFacade.swift"),
       encoding: .utf8)
-    let cli = try String(
-      contentsOf: root.appending(
-        path: "Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift"),
-      encoding: .utf8)
     XCTAssertTrue(app.contains("UIDumpOfflineInspector().inspect"))
-    XCTAssertTrue(cli.contains("UIDumpOfflineInspector()"))
     XCTAssertFalse(app.contains("try ViewerCaptureParser.parse("))
-    XCTAssertFalse(cli.contains("ViewerCaptureParser.parse("))
   }
 
   func testPublishedJSONSchemaPinsTheOwnerVersionsAndClosedSourceRoles() throws {

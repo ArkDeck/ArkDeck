@@ -14,7 +14,6 @@ let package = Package(
     .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
     .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .library(name: "ArkDeckTraceAdapter", targets: ["ArkDeckTraceAdapter"]),
-    .executable(name: "arkdeck", targets: ["ArkDeckCLI"]),
     .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
     .library(name: "ArkDeckBootstrap", targets: ["ArkDeckBootstrap"]),
@@ -118,17 +117,6 @@ let package = Package(
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ]),
-    .executableTarget(
-      name: "ArkDeckCLI",
-      dependencies: [
-        "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
-        "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
-        // CHG-2026-074 transitional edge: the facades the App and this CLI
-        // share move to ClientKit. It disappears when the Swift CLI is
-        // deleted at M5.
-        "ArkDeckClientKit",
-      ]
-    ),
     .target(
       name: "ArkDeckAgentDaemon",
       dependencies: ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
@@ -213,25 +201,10 @@ let package = Package(
       dependencies: [
         "ArkDeckClientKit",
         "ArkDeckCore",
-        "ArkDeckProcess",
-        .product(name: "ArkForgeProtocol", package: "ArkForge"),
-        .product(name: "ArkForgeClient", package: "ArkForge"),
         "ArkDeckRuntime",
-        "ArkDeckOpenHarmony",
-        "ArkDeckWorkflows",
-        "ArkDeckAgentComposition",
-        "ArkDeckStorage",
-        "ArkDeckAgentDaemon",
         "ArkDeckAgentClient",
         "ArkDeckBootstrap",
-        "ArkDeckLaunchAgent",
-        // The engine-lane campaign dispatcher lives in the CLI composition
-        // root (it needs the campaign protocol and the daemon transport, and
-        // ArkDeckWorkflows must not gain a client edge). Its mapping is
-        // product behaviour, so it is contract-tested here.
-        "ArkDeckCLI",
         "ArkDeckFakeHDCFixture",
-        "ArkDeckFakeHapSignerFixture",
       ],
       resources: [
         // Golden resource declaration is owned by TASK-I5-001 (CHG-2026-005). `.copy` preserves
