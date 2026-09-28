@@ -133,4 +133,28 @@ Recorded as an invalid run, by all four criteria:
    (`/private/tmp/arkdeck-lane1-logs/s1-trace-oracle.log`).
 4. It is unrelated to the change.
 
-This record-only commit re-runs CI.
+A record-only commit re-ran CI.
+
+**Second head `d5379e1fb`, run `36419963381`.**
+
+- **Passed:** every Rust lane and the other lanes.
+- **Failed:** `swift-tests`, on a different case,
+  `FlashRunOracleContractTests.testSwiftSubmitsAndRunsEveryFlashStoryAsTheRustRuntimeReplays`.
+  - The canonical story's `job-record.json` and `index.json` differ in the
+    journal's recorded byte count, last sequence and hashes. This is a
+    journal-length difference, not a digest-domain one.
+  - The case took 32.9 s on CI.
+  - The same case passed in the first run (`36416418998`), on identical Swift
+    sources.
+  - On this branch it passes locally: 2 tests in 4.1 s
+    (`/private/tmp/arkdeck-lane1-logs/s1-flashrun-oracle.log`).
+
+Also recorded as an invalid run under the four criteria:
+
+1. The two changed Swift constants feed digests that neither the recorded
+   job record nor the index carries.
+2. It is a load-sensitive timing difference.
+3. It passes when run alone, and it passed in the prior run.
+4. It is unrelated to the diff.
+
+A second record-only commit re-runs CI.
