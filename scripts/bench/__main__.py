@@ -253,7 +253,8 @@ def command_capture(arguments: argparse.Namespace) -> int:
                 metric_scale = {
                     k: v for k, v in scale.items()
                     if not k.startswith(("recovery", "journal", "artifact")) and k not in {
-                        "residentSetRawSamples", "unmeasured",
+                        "residentSetRawSamples", "residentSetObservationIndices",
+                        "residentSetMissingSampleCount", "unmeasured",
                         "residentSetPhaseMethod", "idleWindowSeconds",
                     }
                 }

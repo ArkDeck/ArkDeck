@@ -623,6 +623,9 @@ class CaptureTraceTests(unittest.TestCase):
              mock.patch.object(clocks, 'Deadline') as deadline, \
              mock.patch.object(metrics.time, 'sleep'):
             seed.return_value.returncode = 0
+            runtime_class.return_value.process.pid = 123
+            runtime_class.return_value.process.poll.return_value = None
+            runtime_class.return_value.start_diagnostics = {}
             runtime_class.return_value.client.return_value.__enter__.return_value.call.return_value = {
                 'items': [{'jobId': 'job-one'}]}
             deadline.return_value.expired.side_effect = [False, False, True]

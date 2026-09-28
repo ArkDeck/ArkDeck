@@ -184,8 +184,9 @@ class WorkloadScaleTests(unittest.TestCase):
         self.assertFalse(result["passed"])
 
     def test_rss_phase_method_and_window_are_comparison_identity(self) -> None:
-        current = dict(WORKLOAD, residentSetPhaseMethod="observed-release-v2", idleWindowSeconds=120)
-        for other in (dict(WORKLOAD), dict(current, idleWindowSeconds=600)):
+        current = dict(WORKLOAD, residentSetPhaseMethod="observed-release-v3", idleWindowSeconds=120)
+        for other in (dict(WORKLOAD), dict(current, idleWindowSeconds=600),
+                      dict(current, residentSetPhaseMethod="observed-release-v2")):
             result = compare.compare(scaled(document(rss=10), current),
                                      scaled(document(rss=10), other))
             self.assertFalse(result["passed"])
