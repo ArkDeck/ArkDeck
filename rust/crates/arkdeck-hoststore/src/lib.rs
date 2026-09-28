@@ -150,7 +150,9 @@ pub use job_admission::{
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
-pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart, Observing};
+pub use agent_execution::{
+    AgentAdmission, AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart, Observing,
+};
 #[cfg(target_os = "macos")]
 mod human_action;
 #[cfg(target_os = "macos")]

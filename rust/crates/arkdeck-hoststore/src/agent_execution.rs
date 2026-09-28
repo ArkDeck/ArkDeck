@@ -1032,13 +1032,28 @@ impl Record {
     }
 }
 
+/// Swift `engine.submitForAgent`: how an execution's exact request is
+/// admitted. It is the engine's one submission path, so an execution is
+/// admitted exactly as `job.submit` admits the same request: the
+/// [`JobAdmitter`] alone, or the [`FlashAdmitter`](crate::FlashAdmitter) over
+/// it, which admits the ArkForge Flash operations.
+pub trait AgentAdmission {
+    fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal>;
+}
+
+impl AgentAdmission for JobAdmitter<'_> {
+    fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
+        JobAdmitter::submit_for_agent(self, request_json)
+    }
+}
+
 /// What an execution reaches: the Target owner, the Job owner and the
 /// admitter the daemon admits with, the Runtime's precise clock and, for an
 /// execution that names no target, the Runtime's own device observation.
 pub struct AgentEngine<'a> {
     pub targets: &'a TargetStore,
     pub jobs: &'a JobStore,
-    pub admitter: &'a JobAdmitter<'a>,
+    pub admitter: &'a dyn AgentAdmission,
     pub now: fn() -> Option<String>,
     pub observations: Option<Observing<'a>>,
 }

@@ -128,3 +128,52 @@ SPK-9 and SPK-10 pass, the executor sidecar is never built") rests on SPK-6 (pas
   `reason` prose is T2.
 - Unverified: whether `arkforged` accepts a second concurrent controller session while the Swift one
   is open, and its socket permission and peer checks (`arkforged/src/main.rs` past line 205 not read).
+
+## Status on 2026-09-28 (final lane, S2)
+
+This section completes the record. The sections above are left as they were
+read on 2026-09-14.
+
+### The §4 preconditions, resolved
+
+1. **ArkForge crate API.** Resolved by the pin move to `c1dc0553`. The typed
+   controller client now has `artifact_show`, `device_list`,
+   `import_artifact`, `materialize_plan`, `start_execution`, `job_events`,
+   `submit_permit`, `submit_control_receipt` and `cancel`. The Rust preview owner
+   and the lane use them (#2284).
+2. **Git dependency and supply chain.** ArkForge's crates are taken at the pin
+   (#2151). `rust/scripts/check-arkforge-pin.py --run-vectors` keeps the
+   Swift and Rust pins equal and replays the vectors on every bump.
+3. **Licence.** Handled with the dependency in #2151.
+4. **One revision, two pins.** Enforced by `check-arkforge-pin.py`, as above.
+5. **The evidence shape.** Settled by the 2026-09-28 final-lane rulings (§1,
+   ruling 6). Anything that needs a device is left to phase A, on the
+   installed pure-Rust Runtime.
+
+### What SPK-9's device-free scope now holds
+
+| SPK-9 claim | Evidence |
+|---|---|
+| The Rust daemon owns and pairs `arkforged` and holds its stdin for the daemon's life | #2152 (`arkforge-lane-daemon-run.md`); `arkforged_owner_stop.rs` |
+| StepPermit CBOR vectors are byte-equal | `arkdeck-provider-arkforge/tests/permit_vectors.rs` mints the published vectors through ArkForge's own authority API. `arkdeck-contract`'s `canonical_parity.rs` reproduces them. |
+| `flash.prerequisites` | Makes no ArkForge call (§2). The Rust answers are replayed against the Swift host-facts oracle. |
+| `flash.lanePlanPreview` is T1-equal to Swift's `ArkForgeLaneHost` | All 74 Swift host-facts exchanges replay byte-equal through the typed SDK, including the eight lane-boundary states that were declared differences before (#2284, `lane-plan-preview-owner-run.md`). |
+| The same answers against a real `arkforged` | The missing-archive refusal subset: the Rust and Swift owners both get `bundleNotInLaneStore` from one real, unpaired, pinned daemon (#2287, `spk9-missing-cas-owner-run.md`). |
+| The admission digests the lane recomputes match ArkForge's producers | `tests/digest_domain_vectors.rs` (S1, #2303, `arkforge-digest-domains-run.md`). |
+| Execution through the lane reaches a terminal state over the Runtime's control socket | `agent run` and `flash run`, completed and unknown, over the production control transport with a fake lane (S2, `flash-entry-points-run.md`). |
+
+### Verdict
+
+**SPK-9 passes for its device-free scope.** The Rust daemon drives
+`arkforged` through `arkforge-client`, and the StepPermit vectors are reused
+byte for byte. The previews are T1-equal to Swift in every state that can be
+reached without a device.
+
+Two things stay outside that scope and move to phase A:
+
+- the `available` preview state, which needs a real DAYU200 in Loader mode;
+- device execution through a real `arkforged`.
+
+Both are exercised by GJ-4 on the installed pure-Rust Runtime (final-lane
+§5). Nothing in this spike argues for the executor sidecar. SPK-6 passed, and
+SPK-10 is recorded under TASK-XPA-015.

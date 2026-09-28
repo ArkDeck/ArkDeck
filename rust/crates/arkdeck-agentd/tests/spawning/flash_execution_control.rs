@@ -15,12 +15,12 @@ fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/flash-plan")
 }
 
-struct Root(PathBuf);
+pub(crate) struct Root(pub(crate) PathBuf);
 
 impl Root {
     /// The oracle's Artifact root and Target store, laid down as Swift left
     /// them, beside an empty Job state.
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
             "flash-plan-control-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
@@ -81,7 +81,7 @@ fn cases() -> Value {
 }
 
 /// The request the oracle recorded for `exchange`.
-fn request(exchange: &str) -> String {
+pub(crate) fn request(exchange: &str) -> String {
     cases()["exchanges"]
         .as_array()
         .unwrap()
@@ -115,7 +115,7 @@ fn control(host: crate::host::Host) -> Control<crate::host::Host> {
 // durable Runtime owners are real; the fixture shell never reaches a device.
 #[path = "../../../arkdeck-hoststore/tests/support/flash_lane.rs"]
 #[allow(dead_code)]
-mod execution_fakes;
+pub(crate) mod execution_fakes;
 
 #[test]
 fn flash_execution_reaches_the_runtime_owner_in_a_separate_process() {
@@ -151,41 +151,9 @@ fn flash_execution_fixture(outcome: &str) {
 #[ignore = "subprocess fixture: invoked by flash_execution_reaches_the_runtime_owner_in_a_separate_process"]
 fn flash_execution_process_fixture() {
     let _turn = crate::turn();
-    use execution_fakes::{FakeHost, FakeLane, Fakes};
-    use std::sync::Arc;
+    use execution_fakes::Fakes;
     let unknown = std::env::var("ARKDECK_TEST_FLASH_OWNER_OUTCOME").as_deref() == Ok("unknown");
     let root = Root::new();
-    let hdc_bytes = br#"#!/bin/sh
-case "$*" in
-  *"list targets"*) printf '150100424a544e4600\t\tUSB\tConnected\tlocalhost\n' ;;
-  *"param get const.ohos.fullname"*) printf 'OpenHarmony-7.0.0.35-20260728_180253\n' ;;
-  *"param get const.product.model"*) printf 'DAYU200\n' ;;
-  "-v") printf 'Ver: 3.2.0f\n' ;;
-  *) exit 1 ;;
-esac
-"#;
-    let hdc = root.0.join("fixture-hdc");
-    fs::write(&hdc, hdc_bytes).unwrap();
-    fs::set_permissions(&hdc, fs::Permissions::from_mode(0o700)).unwrap();
-    let digest = arkdeck_contract::sha256_hex(hdc_bytes);
-    let tool = arkdeck_platform::VerifiedTool::open(&hdc, &digest).unwrap();
-    let rockusb =
-        NativeRockUsbIdentity::configured(Some(hdc.to_string_lossy().into_owned()), Some(digest));
-    fs::write(
-        root.0.join("rockchip-binding.json"),
-        serde_json::to_vec(&json!({
-            "revision": 1, "serial": "150100424a544e4600", "usbTopology": "42",
-            "evidence": [format!("identity:serial-sha256={}",
-                arkdeck_contract::sha256_hex(b"150100424a544e4600"))]
-        }))
-        .unwrap(),
-    )
-    .unwrap();
-    fs::set_permissions(
-        root.0.join("rockchip-binding.json"),
-        fs::Permissions::from_mode(0o600),
-    )
-    .unwrap();
     let fakes = Fakes::default();
     if unknown {
         fakes.begin(execution_fakes::Script {
@@ -194,36 +162,7 @@ esac
             ..Default::default()
         });
     }
-    let host = root
-        .host()
-        .with_capabilities(
-            arkdeck_hoststore::CapabilityStore::open(&root.0.join("jobs/capabilities")).unwrap(),
-        )
-        .with_development_mutation_root(root.0.join("jobs"))
-        .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(tool, None)))
-        .with_flash_host_facts(
-            FlashHostFacts::new(&root.0, || {
-                Ok(vec![arkdeck_platform::UsbHostDevice {
-                    serial: "150100424a544e4600".into(),
-                    vendor_id: 0x2207,
-                    product_id: 0x5000,
-                    topology: "42".into(),
-                    product_name: Some("HDC Device".into()),
-                    registry_entry_id: Some(1),
-                }])
-            })
-            .with_rockusb(rockusb),
-        )
-        .with_flash_planning(FlashPlanning::new(
-            None,
-            || None,
-            Some(execution_fakes::TOOLCHAIN.into()),
-        ))
-        .with_flash_execution(
-            Arc::new(FakeLane::new(&fakes)),
-            Arc::new(FakeHost(fakes.clone())),
-            "org.openharmony.dayu200@1.0.0".into(),
-        );
+    let host = flash_host(&root, &fakes);
     let control = control(host);
     let mut request: Value = serde_json::from_str(&request("canonical.full")).unwrap();
     let plan = call(&control, "job.plan", &request.to_string());
@@ -297,4 +236,81 @@ esac
         calls,
         "terminal reconciliation never redispatches"
     );
+}
+
+/// The Host a Flash fixture serves: the oracle's owners and a fixture HDC
+/// beside the Target's Rockchip binding, the Flash facts, planning and
+/// execution over the fake lane and Rockchip host, and the Agent execution
+/// owner, whose executions admit and run as `job.submit` and `job.run` do.
+pub(crate) fn flash_host(root: &Root, fakes: &execution_fakes::Fakes) -> crate::host::Host {
+    use execution_fakes::{FakeHost, FakeLane};
+    use std::sync::Arc;
+    let hdc_bytes = br#"#!/bin/sh
+case "$*" in
+  *"list targets"*) printf '150100424a544e4600\t\tUSB\tConnected\tlocalhost\n' ;;
+  *"param get const.ohos.fullname"*) printf 'OpenHarmony-7.0.0.35-20260728_180253\n' ;;
+  *"param get const.product.model"*) printf 'DAYU200\n' ;;
+  "-v") printf 'Ver: 3.2.0f\n' ;;
+  *) exit 1 ;;
+esac
+"#;
+    let hdc = root.0.join("fixture-hdc");
+    fs::write(&hdc, hdc_bytes).unwrap();
+    fs::set_permissions(&hdc, fs::Permissions::from_mode(0o700)).unwrap();
+    let digest = arkdeck_contract::sha256_hex(hdc_bytes);
+    let tool = arkdeck_platform::VerifiedTool::open(&hdc, &digest).unwrap();
+    let rockusb =
+        NativeRockUsbIdentity::configured(Some(hdc.to_string_lossy().into_owned()), Some(digest));
+    fs::write(
+        root.0.join("rockchip-binding.json"),
+        serde_json::to_vec(&json!({
+            "revision": 1, "serial": "150100424a544e4600", "usbTopology": "42",
+            "evidence": [format!("identity:serial-sha256={}",
+                arkdeck_contract::sha256_hex(b"150100424a544e4600"))]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    fs::set_permissions(
+        root.0.join("rockchip-binding.json"),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    directory(&root.0.join("agents"));
+    // The one DAYU200 the host's USB census names, in HDC-normal mode at the
+    // binding's topology: the Flash facts and the Target observation owner
+    // both read it.
+    let census = || {
+        Ok(vec![arkdeck_platform::UsbHostDevice {
+            serial: "150100424a544e4600".into(),
+            vendor_id: 0x2207,
+            product_id: 0x5000,
+            topology: "42".into(),
+            product_name: Some("HDC Device".into()),
+            registry_entry_id: Some(1),
+        }])
+    };
+    root.host()
+        .with_usb_relations(Arc::new(arkdeck_provider_hdc::UsbRegistryRelations::new(
+            census,
+        )))
+        .with_agent_executions(
+            arkdeck_hoststore::AgentExecutionStore::open(&root.0.join("agents")).unwrap(),
+        )
+        .with_capabilities(
+            arkdeck_hoststore::CapabilityStore::open(&root.0.join("jobs/capabilities")).unwrap(),
+        )
+        .with_development_mutation_root(root.0.join("jobs"))
+        .with_development_hdc(Some(arkdeck_provider_hdc::ProcessDispatch::new(tool, None)))
+        .with_flash_host_facts(FlashHostFacts::new(&root.0, census).with_rockusb(rockusb))
+        .with_flash_planning(FlashPlanning::new(
+            None,
+            || None,
+            Some(execution_fakes::TOOLCHAIN.into()),
+        ))
+        .with_flash_execution(
+            Arc::new(FakeLane::new(fakes)),
+            Arc::new(FakeHost(fakes.clone())),
+            "org.openharmony.dayu200@1.0.0".into(),
+        )
 }

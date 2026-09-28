@@ -50,6 +50,21 @@ pub struct FlashAdmitter<'a> {
     pub campaign: Option<&'a str>,
 }
 
+/// Swift `submitForAgent` is `submitOwned`, the path `job.submit` takes: an
+/// execution of a Flash operation is admitted over the Flash composition
+/// exactly as `job.submit` admits it, and every other request as the
+/// admitter admits an execution's request.
+impl crate::AgentAdmission for FlashAdmitter<'_> {
+    fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
+        let request = OperationRequest::decode(request_json)
+            .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
+        if self.flash.is_some() && is_flash(&request.reference()) {
+            return self.submit(request_json);
+        }
+        self.admitter.submit_for_agent(request_json)
+    }
+}
+
 impl FlashAdmitter<'_> {
     /// The `job.submit` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, AdmissionRefusal> {

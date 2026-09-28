@@ -561,9 +561,9 @@ fn a_snapshot_expired_rejection_is_recorded_but_not_fatal() {
     assert!(declined[0].contains("SNAPSHOT_EXPIRED"), "{}", declined[0]);
 }
 
-/// A rejected receipt stops the drive, after Swift's cancel: one that names
-/// no journal sequence, which the daemon refuses, so the job waits for its
-/// request's deadline as it did under Swift.
+/// A rejected receipt stops the drive after a cancel at the job's last
+/// journal sequence, read once more after the rejection, as ArkForge's cancel
+/// requires (F3). Swift's cancel names none and is refused.
 #[test]
 fn a_rejected_control_receipt_cancels_the_job_and_stops() {
     let mut daemon = ScriptedDaemon::with(vec![control_event(1)]);
@@ -571,6 +571,14 @@ fn a_rejected_control_receipt_cancels_the_job_and_stops() {
         "CONTROL_EVIDENCE_MISMATCH".into(),
         "evidence is not the facts digest".into(),
     ));
+    // What the daemon published once the receipt reached it.
+    daemon.after_control = vec![JobEvent {
+        job_id: "JOB-1".into(),
+        sequence: 2,
+        kind: JobEventKind::StateChanged,
+        job_state: "running".into(),
+        ..JobEvent::default()
+    }];
     let (outcome, _) = drive(&mut daemon, &mut Performer(Ok(loader_observation())));
     let error = outcome.unwrap_err();
     assert_eq!(
@@ -587,7 +595,69 @@ fn a_rejected_control_receipt_cancels_the_job_and_stops() {
          is not the facts digest. The job was cancelled rather than left waiting for a receipt \
          it refuses"
     );
-    assert_eq!(daemon.cancels, [("JOB-1".to_owned(), 0)]);
+    assert_eq!(daemon.cancels, [("JOB-1".to_owned(), 2)]);
+    assert_eq!(daemon.polls, [0, 1], "one catch-up poll from the cursor");
+}
+
+/// A job the daemon already classified by the time its receipt was rejected
+/// is not cancelled: nothing remains to cancel.
+#[test]
+fn a_rejected_control_receipt_of_a_classified_job_cancels_nothing() {
+    let mut daemon = ScriptedDaemon::with(vec![control_event(1)]);
+    daemon.control_rejection = Some((
+        "CONTROL_EVIDENCE_MISMATCH".into(),
+        "evidence is not the facts digest".into(),
+    ));
+    daemon.after_control = vec![classified(2, &[("outcome", "confirmedFailed")])];
+    let (outcome, _) = drive(&mut daemon, &mut Performer(Ok(loader_observation())));
+    assert!(matches!(
+        outcome,
+        Err(SessionError::ControlReceiptRejected { .. })
+    ));
+    assert!(daemon.cancels.is_empty(), "{:?}", daemon.cancels);
+}
+
+/// When the catch-up poll fails, the cancel names the last sequence the
+/// drive answered.
+#[test]
+fn a_rejected_control_receipt_cancels_at_the_cursor_when_the_poll_fails() {
+    struct Failing(ScriptedDaemon);
+    impl SessionDaemon for Failing {
+        fn job_events(&mut self, job: &str, after: u64) -> Result<Vec<JobEvent>, String> {
+            if self.0.controls.is_empty() {
+                self.0.job_events(job, after)
+            } else {
+                Err("controller session ended".into())
+            }
+        }
+        fn submit_permit(
+            &mut self,
+            submission: &SubmitStepPermitRequest,
+        ) -> Result<SubmissionOutcome, String> {
+            self.0.submit_permit(submission)
+        }
+        fn submit_control_receipt(
+            &mut self,
+            receipt: &SubmitManagedControlReceiptRequest,
+        ) -> Result<SubmissionOutcome, String> {
+            self.0.submit_control_receipt(receipt)
+        }
+        fn cancel(&mut self, job: &str, sequence: u64) -> Result<(), String> {
+            self.0.cancel(job, sequence)
+        }
+    }
+    let mut scripted = ScriptedDaemon::with(vec![control_event(1)]);
+    scripted.control_rejection = Some((
+        "CONTROL_EVIDENCE_MISMATCH".into(),
+        "evidence is not the facts digest".into(),
+    ));
+    let mut daemon = Failing(scripted);
+    let (outcome, _) = drive(&mut daemon, &mut Performer(Ok(loader_observation())));
+    assert!(matches!(
+        outcome,
+        Err(SessionError::ControlReceiptRejected { .. })
+    ));
+    assert_eq!(daemon.0.cancels, [("JOB-1".to_owned(), 1)]);
 }
 
 /// A receipt the port refuses to build is never sent: the drive stops with

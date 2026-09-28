@@ -981,6 +981,35 @@ impl Host {
         }))
     }
 
+    /// Runs `run` with `admitter` under this host's Flash composition: the
+    /// ArkForge Flash operations are admitted over the Flash planning, facts
+    /// and campaign, and executed only where this host also runs them. Both
+    /// `job.submit` and an Agent execution admit through it, as Swift's
+    /// `submitOwned` serves both.
+    #[cfg(target_os = "macos")]
+    fn with_flash_admitter<T>(
+        &self,
+        admitter: arkdeck_hoststore::JobAdmitter<'_>,
+        run: impl FnOnce(&arkdeck_hoststore::FlashAdmitter<'_>) -> T,
+    ) -> T {
+        let facts = self.flash_facts_port();
+        let campaign = self
+            .flash_runtime
+            .as_ref()
+            .and_then(|runtime| runtime.lane.hardware_acceptance_campaign());
+        run(&arkdeck_hoststore::FlashAdmitter {
+            admitter,
+            flash: self.flash_planning.as_deref(),
+            facts: facts
+                .as_ref()
+                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
+            executes: self.flash_runtime.is_some()
+                && self.flash_facts.is_some()
+                && self.targets.is_some(),
+            campaign: campaign.as_deref(),
+        })
+    }
+
     /// Swift's ArkForge facts port: the Target store's facts, measured over
     /// this host's HDC when it has one. None without the facts owner or the
     /// Target store.
@@ -1485,15 +1514,19 @@ impl HostServices for Host {
             now: arkdeck_hoststore::runtime_now,
             authority: self.authority(),
         };
-        let engine = arkdeck_hoststore::AgentEngine {
-            targets,
-            jobs,
-            admitter: &admitter,
-            now: arkdeck_hoststore::runtime_precise_now,
-            observations: self.observing(),
-        };
-        let answer = agents
-            .advance(method, params, &engine)
+        // An execution's request is admitted as `job.submit` admits it: a
+        // Flash operation over the Flash composition (Swift `submitOwned`).
+        let answer = self
+            .with_flash_admitter(admitter, |admitter| {
+                let engine = arkdeck_hoststore::AgentEngine {
+                    targets,
+                    jobs,
+                    admitter,
+                    now: arkdeck_hoststore::runtime_precise_now,
+                    observations: self.observing(),
+                };
+                agents.advance(method, params, &engine)
+            })
             .map_err(|mut error| {
                 // The combined Swift HAR handler attaches its pre-admission proof
                 // to physical owner refusals; internal/storage uncertainty keeps
@@ -1713,49 +1746,34 @@ impl HostServices for Host {
             });
         };
         let hdc = self.hdc();
-        let facts = self.flash_facts_port();
-        let campaign = self
-            .flash_runtime
-            .as_ref()
-            .and_then(|runtime| runtime.lane.hardware_acceptance_campaign());
-        arkdeck_hoststore::FlashAdmitter {
-            admitter: arkdeck_hoststore::JobAdmitter {
-                planner: arkdeck_hoststore::JobPlanner {
-                    imports: self.imports.as_deref(),
-                    artifacts: self.artifacts.as_deref(),
-                    analyzer: Some(analyzer),
-                    state_root,
-                    hdc: hdc.as_ref(),
-                    workspace: self.workspace.as_deref(),
-                },
-                jobs,
-                now: arkdeck_hoststore::runtime_now,
-                authority: self.authority(),
+        let admitter = arkdeck_hoststore::JobAdmitter {
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
+                artifacts: self.artifacts.as_deref(),
+                analyzer: Some(analyzer),
+                state_root,
+                hdc: hdc.as_ref(),
+                workspace: self.workspace.as_deref(),
             },
-            flash: self.flash_planning.as_deref(),
-            facts: facts
-                .as_ref()
-                .map(|port| port as arkdeck_hoststore::RockchipFactsPort<'_>),
-            executes: self.flash_runtime.is_some()
-                && self.flash_facts.is_some()
-                && self.targets.is_some(),
-            campaign: campaign.as_deref(),
-        }
-        .handle(params)
-        // A refusal before the admission point proves zero dispatch; Swift
-        // attaches empty details to any later failure.
-        .map_err(|refusal| WireError {
-            code: refusal.code.into(),
-            message: refusal.message,
-            details: Some(if refusal.proven {
-                serde_json::Map::from_iter([
-                    ("phase".into(), serde_json::json!("preAdmission")),
-                    ("newDispatchCount".into(), serde_json::json!(0)),
-                ])
-            } else {
-                serde_json::Map::new()
-            }),
-        })
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            authority: self.authority(),
+        };
+        self.with_flash_admitter(admitter, |admitter| admitter.handle(params))
+            // A refusal before the admission point proves zero dispatch; Swift
+            // attaches empty details to any later failure.
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(if refusal.proven {
+                    serde_json::Map::from_iter([
+                        ("phase".into(), serde_json::json!("preAdmission")),
+                        ("newDispatchCount".into(), serde_json::json!(0)),
+                    ])
+                } else {
+                    serde_json::Map::new()
+                }),
+            })
     }
     /// `job.result` and `job.evidence` read from the Job and Artifact owners
     /// the isolated composition opened.
