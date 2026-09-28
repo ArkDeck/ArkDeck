@@ -23,7 +23,9 @@
 //!   agent executions and the capability ledger. Beside the table's rules it
 //!   refuses one cutover-only case, which the table does not class: a parked
 //!   Flash Job whose enter-Loader transition only Swift's
-//!   `flash.bind-current-loader` settles (F7, not ported).
+//!   `flash.bind-current-loader` settles (F7, not ported), and two or more
+//!   Jobs whose records park a Flash at its enter-Loader transition for one
+//!   Target and binding revision, which stop this Runtime's start.
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
@@ -201,13 +203,19 @@ pub fn classify_restart(current: &[Value]) -> Result<RestartPreflight, Malformed
 /// its journal holds an outstanding intent, an unknown outcome or a torn tail.
 /// `loader_transition` is set when its record and journal hold exactly the
 /// enter-Loader transition Swift's `flash.bind-current-loader` settles and no
-/// ArkForge lane held it.
+/// ArkForge lane held it. `loader_transition_candidates` are the Target and
+/// binding revision each of its records (the index row's and
+/// `job-record.json`) parks it at, by the record alone: the Job the Rust
+/// daemon's start counts against the Loader binding it carries a Target to
+/// (`JobStore::loader_transitions_awaiting_binding`), whatever its journal
+/// holds and whichever lane drove it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CutoverJob {
     pub job_id: String,
     pub states: Vec<String>,
     pub journal_unresolved: bool,
     pub loader_transition: Option<LoaderTransition>,
+    pub loader_transition_candidates: Vec<LoaderTransition>,
 }
 
 /// A DAYU200 Flash Job's enter-Loader transition left awaiting a Loader
@@ -256,6 +264,17 @@ pub enum CutoverBlock {
         target_id: String,
         expected_binding_revision: i64,
     },
+    /// Two or more Jobs whose records each park a DAYU200 Flash at its
+    /// enter-Loader transition for this Target and binding revision: once a
+    /// Loader binding carries the Target past that revision, the Rust
+    /// daemon's start refuses them as ambiguous
+    /// (`jobNotRunnable("multiple unresolved Loader transitions cover target
+    /// …")`, as Swift's engine does) and never serves. The Jobs, by identity.
+    LoaderTransitionsCoverTarget {
+        target_id: String,
+        expected_binding_revision: i64,
+        job_ids: Vec<String>,
+    },
     /// An agent execution that is active and not merely owned by a parked or
     /// terminal Job.
     ActiveExecution { execution_id: String, state: String },
@@ -278,7 +297,8 @@ pub fn cutover_job_class(job: &CutoverJob) -> JobStateClass {
 
 /// Design §G.4's cutover preflight: every reason to refuse, sorted; empty
 /// means every Job, execution and use may be carried over as it is. The
-/// table's rules, and a parked Job's Loader transition only Swift settles.
+/// table's rules, a parked Job's Loader transition only Swift settles, and
+/// the Loader transitions that together stop the Rust daemon's start.
 pub fn cutover_preflight(
     jobs: &[CutoverJob],
     executions: &[CutoverExecution],
@@ -289,7 +309,18 @@ pub fn cutover_preflight(
         .map(|job| (job.job_id.as_str(), cutover_job_class(job)))
         .collect();
     let mut blocks = Vec::new();
+    let mut covering: BTreeMap<&LoaderTransition, Vec<String>> = BTreeMap::new();
     for job in jobs {
+        let mut candidates: Vec<&LoaderTransition> =
+            job.loader_transition_candidates.iter().collect();
+        candidates.sort();
+        candidates.dedup();
+        for transition in candidates {
+            covering
+                .entry(transition)
+                .or_default()
+                .push(job.job_id.clone());
+        }
         let class = classes[job.job_id.as_str()];
         if class == JobStateClass::Blocking {
             let state = job
@@ -317,6 +348,18 @@ pub fn cutover_preflight(
                 job_id: job.job_id.clone(),
                 target_id: transition.target_id.clone(),
                 expected_binding_revision: transition.expected_binding_revision,
+            });
+        }
+    }
+    // The start counts every Job whose record awaits the binding it carried
+    // the Target to; two or more for one Target and revision stop it.
+    for (transition, mut job_ids) in covering {
+        if job_ids.len() > 1 {
+            job_ids.sort();
+            blocks.push(CutoverBlock::LoaderTransitionsCoverTarget {
+                target_id: transition.target_id.clone(),
+                expected_binding_revision: transition.expected_binding_revision,
+                job_ids,
             });
         }
     }
@@ -432,6 +475,7 @@ mod tests {
             states: states.iter().map(|state| (*state).into()).collect(),
             journal_unresolved,
             loader_transition: None,
+            loader_transition_candidates: Vec::new(),
         }
     }
 
@@ -593,5 +637,48 @@ mod tests {
                 job_id: "job-failed".into(),
             }]
         );
+    }
+
+    #[test]
+    fn two_loader_transitions_for_one_target_and_revision_refuse_the_cutover_by_name() {
+        let at = |target: &str, revision: i64| LoaderTransition {
+            target_id: target.into(),
+            expected_binding_revision: revision,
+        };
+        let candidate = |id: &str, transitions: &[LoaderTransition]| CutoverJob {
+            loader_transition_candidates: transitions.to_vec(),
+            ..job(id, &["waitingForRecovery"], true)
+        };
+        // One per Target and revision is carried over, as the start carries
+        // it (a Job whose sources agree names its transition twice).
+        let single = [
+            candidate("job-a", &[at("target-a", 2), at("target-a", 2)]),
+            candidate("job-b", &[at("target-a", 3)]),
+            candidate("job-c", &[at("target-b", 2)]),
+        ];
+        assert!(cutover_preflight(&single, &[], &[]).is_empty());
+        // Two for one Target and revision stop the start: refused together,
+        // named by identity, whichever class their other sources give.
+        let covering = [
+            candidate("job-d", &[at("target-a", 2)]),
+            CutoverJob {
+                loader_transition_candidates: vec![at("target-a", 2)],
+                ..job("job-a", &["running", "waitingForRecovery"], false)
+            },
+            candidate("job-b", &[at("target-a", 3)]),
+        ];
+        let mut expected = vec![
+            CutoverBlock::JobState {
+                job_id: "job-a".into(),
+                state: "running".into(),
+            },
+            CutoverBlock::LoaderTransitionsCoverTarget {
+                target_id: "target-a".into(),
+                expected_binding_revision: 2,
+                job_ids: vec!["job-a".into(), "job-d".into()],
+            },
+        ];
+        expected.sort();
+        assert_eq!(cutover_preflight(&covering, &[], &[]), expected);
     }
 }

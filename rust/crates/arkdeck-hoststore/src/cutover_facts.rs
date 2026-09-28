@@ -3,7 +3,8 @@
 //! without any owner of the state: every Job the index, `jobs/` or both name,
 //! with the states its index row, record and journal give, whether that
 //! journal is resolved and whether it awaits a Loader binding only Swift's
-//! Runtime settles; every agent execution; every capability use; the HDC
+//! Runtime settles, and the Loader binding each of its records awaits by the
+//! record alone, which the Rust daemon's start counts; every agent execution; every capability use; the HDC
 //! tool selection pending in the bootstrap store, if one is (the production
 //! composition refuses to start beside one); and the first refusal of the
 //! continuity proof of the retained Sessions, which every device mutation of
@@ -156,6 +157,7 @@ fn job<'a>(jobs: &'a mut BTreeMap<String, CutoverJob>, id: &str) -> &'a mut Cuto
         states: Vec::new(),
         journal_unresolved: false,
         loader_transition: None,
+        loader_transition_candidates: Vec::new(),
     })
 }
 
@@ -183,7 +185,17 @@ fn jobs(root: &Path, facts: &mut CutoverFacts) -> JobRoot {
         match index.states() {
             Ok(rows) => {
                 for (id, state) in rows {
-                    job(&mut jobs, &id).states.push(state);
+                    // The record an active row holds, as the Rust daemon's
+                    // start reads it; one that does not decode is no
+                    // candidate there either.
+                    let candidate = (!crate::job_record::terminal(&state))
+                        .then(|| index.row(&id).ok().flatten())
+                        .flatten()
+                        .and_then(|row| JobRecord::from_row(&row).ok())
+                        .and_then(|record| record_candidate(&record));
+                    let entry = job(&mut jobs, &id);
+                    entry.states.push(state);
+                    entry.loader_transition_candidates.extend(candidate);
                 }
             }
             Err(error) => facts.unreadable("jobIndex", error.to_string()),
@@ -226,6 +238,9 @@ fn jobs(root: &Path, facts: &mut CutoverFacts) -> JobRoot {
                         Ok(bytes) => match JobRecord::decode(&bytes) {
                             Ok(decoded) => {
                                 entry.states.push(decoded.state.clone());
+                                entry
+                                    .loader_transition_candidates
+                                    .extend(record_candidate(&decoded));
                                 record = Some(decoded);
                             }
                             Err(_) => entry.states.push(UNREADABLE_RECORD.into()),
@@ -278,6 +293,22 @@ fn jobs(root: &Path, facts: &mut CutoverFacts) -> JobRoot {
         directory: Some(directory),
         index,
     }
+}
+
+/// The Target and binding revision one record parks a DAYU200 Flash at, at
+/// its enter-Loader transition, by the record alone: exactly the Job the Rust
+/// daemon's start counts against the binding it carried that Target to
+/// (`RockchipStartup::awaiting_transition`, over
+/// `JobStore::loader_transitions_awaiting_binding`), which refuses to start
+/// beside two or more. No journal or ArkForge lane is consulted, since the
+/// start consults none.
+fn record_candidate(record: &JobRecord) -> Option<LoaderTransition> {
+    let (target_id, expected_binding_revision) =
+        crate::job_owner::loader_transition_candidate(record)?;
+    Some(LoaderTransition {
+        target_id: target_id.to_owned(),
+        expected_binding_revision,
+    })
 }
 
 /// Swift `RuntimeJobEngine.loaderTransitionAwaitingBinding` and

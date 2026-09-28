@@ -36,6 +36,18 @@
 //!   `JobStore::require_retained_sessions` makes, run over this state's Job
 //!   store without opening it as an owner, which would write into it.
 //!
+//! A third keeps this Runtime from a start it would refuse (runbook appendix
+//! B item 1, 2026-09-28):
+//! - `loaderTransitionsCoverTarget`: two or more Jobs whose records (the
+//!   index row's or `job-record.json`) park a DAYU200 Flash at its
+//!   enter-Loader transition for one Target and binding revision, whatever
+//!   their journals hold and whichever lane drove them. This Runtime's start
+//!   counts exactly those records against the Loader binding it carries the
+//!   Target to (`RockchipStartup::awaiting_transition`) and refuses two or
+//!   more as ambiguous, so launchd would restart it in a loop. Which binding
+//!   the next start finds is not a fact the state holds (one can be published
+//!   after the cutover), so the records alone decide; the Jobs are named.
+//!
 //! Without `--hold-instance-lock` the read takes no lock, so it may run beside
 //! the Runtime it would replace: the CLI's first pass, whose refusal changes
 //! nothing. With it, the process first takes that Runtime's instance lock
@@ -220,6 +232,15 @@ fn fact_blocks(facts: &CutoverFacts) -> Vec<Value> {
             "loaderTransitionAwaitingBinding",
             json!({"jobId": job_id, "targetId": target_id,
                 "expectedBindingRevision": expected_binding_revision}),
+        ),
+        CutoverBlock::LoaderTransitionsCoverTarget {
+            target_id,
+            expected_binding_revision,
+            job_ids,
+        } => block(
+            "loaderTransitionsCoverTarget",
+            json!({"targetId": target_id,
+                "expectedBindingRevision": expected_binding_revision, "jobIds": job_ids}),
         ),
         CutoverBlock::ActiveExecution {
             execution_id,
