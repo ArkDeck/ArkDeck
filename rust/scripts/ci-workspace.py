@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -182,12 +183,77 @@ def key(source: Path, root: str) -> str:
     for name in ("rust/Cargo.lock", "rust/rust-toolchain.toml"):
         identity["inputs"][name] = hashlib.sha256((source / name).read_bytes()).hexdigest()
     digest = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
-    return "arkdeck-rust-build-v1-" + digest
+    host = f"{os.environ.get('RUNNER_OS', sys.platform)}-{os.environ.get('RUNNER_ARCH', 'local')}"
+    return f"arkdeck-rust-build-v2-{host}-{digest}"
+
+
+def cache_outputs(source: Path, root: str, day: str | None = None) -> dict[str, str]:
+    # Immutable entries: refresh once per UTC day and compatibility identity,
+    # not once per source commit. prepare() still materializes this exact HEAD.
+    day = day or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    prefix = key(source, root) + "-"
+    return {"key": prefix + day, "prefix": prefix}
+
+
+def directory_sizes(root: Path) -> dict[Path, int]:
+    """One scandir/stat pass; incremental trees can contain many small files."""
+    sizes = {}
+
+    def visit(path: Path) -> int:
+        total = 0
+        with os.scandir(path) as entries:
+            for entry in entries:
+                if entry.is_symlink():
+                    continue
+                if entry.is_dir(follow_symlinks=False):
+                    total += visit(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    total += entry.stat(follow_symlinks=False).st_size
+        sizes[path] = total
+        return total
+
+    visit(root)
+    return sizes
+
+
+def compact(root: Path) -> dict:
+    """Discard only compiler scratch state, retaining linked products and views.
+
+    No profile/flags change: cached executables, dependencies, fingerprints,
+    source identities and debug information remain usable by native Cargo.
+    """
+    mirror = root / "workspace"
+    targets = [mirror / "rust/target"]
+    targets += [targets[0] / "contract-check" / view / "rust/target"
+                for view in ("published", "candidate")]
+    for target in targets:
+        # Reject an intermediate symlink before traversing or removing anything.
+        if any(p.is_symlink() for p in (target, *target.parents) if p != root and root in p.parents):
+            raise ValueError(f"cache target contains a symlink: {target}")
+        if (target / "debug").is_symlink():
+            raise ValueError(f"cache profile contains a symlink: {target}")
+        incremental = target / "debug/incremental"
+        if incremental.exists() and not incremental.is_dir() and not incremental.is_symlink():
+            raise ValueError(f"compiler scratch state must be a directory: {incremental}")
+    sizes = directory_sizes(root)
+    report = {"beforeBytes": sizes[root], "targets": []}
+    removed = [target / "debug/incremental" for target in targets]
+    for target, incremental in zip(targets, removed):
+        entry = {"path": str(target.relative_to(root)), "beforeBytes": sizes.get(target, 0),
+                 "incrementalBytes": sizes.get(incremental, 0),
+                 "depsBytes": sizes.get(target / "debug/deps", 0),
+                 "buildBytes": sizes.get(target / "debug/build", 0)}
+        remove(incremental)
+        entry["afterBytes"] = entry["beforeBytes"] - sum(sizes.get(p, 0) for p in removed if target in p.parents)
+        report["targets"].append(entry)
+    report["afterBytes"] = sizes[root] - sum(sizes.get(p, 0) for p in removed)
+    print(json.dumps(report, indent=2), flush=True)
+    return report
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("key", "prepare", "exec"))
+    parser.add_argument("action", choices=("key", "prepare", "compact", "exec"))
     parser.add_argument("--cwd", choices=(".", "rust"), default=".")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     # Options precede the action; everything after `--` belongs to the child.
@@ -196,11 +262,11 @@ def main() -> int:
     if not value:
         raise ValueError("ARKDECK_RUST_CACHE_ROOT is required; no shared local cache is implicit")
     if arguments.action == "key":
-        result = key(ROOT, value)
-        print(result)
+        result = cache_outputs(ROOT, value)
+        print(json.dumps(result))
         if os.environ.get("GITHUB_OUTPUT"):
             with open(os.environ["GITHUB_OUTPUT"], "a") as output:
-                output.write(f"key={result}\n")
+                output.writelines(f"{name}={value}\n" for name, value in result.items())
         return 0
     root = cache_root(value)
     with locked(root):
@@ -210,6 +276,14 @@ def main() -> int:
         mirror = root / "workspace"
         if git(mirror, "rev-parse", "HEAD") != git(ROOT, "rev-parse", "HEAD"):
             raise ValueError("prepare the stable Rust workspace for this exact revision first")
+        if arguments.action == "compact":
+            report = compact(root)
+            output = os.environ.get("ARKDECK_RUST_TEST_REPORT_DIR")
+            if output:
+                path = Path(output) / "cache-size.json"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(json.dumps(report, indent=2) + "\n")
+            return 0
         command = arguments.command
         if command[:1] == ["--"]:
             command = command[1:]

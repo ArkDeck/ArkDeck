@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from datetime import datetime, timezone
 import importlib.util
 import io
 import json
@@ -12,7 +13,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tarfile
 import unittest
+import zipfile
 from unittest.mock import patch
 
 
@@ -25,6 +28,10 @@ def load(name):
 
 cache = load("ci-workspace")
 tests = load("run-workspace-tests")
+policy = load("ci-policy-tools")
+retention_spec = importlib.util.spec_from_file_location("retention", Path(__file__).resolve().parents[2] / "scripts/ci/retain-rust-caches.py")
+retention = importlib.util.module_from_spec(retention_spec)
+retention_spec.loader.exec_module(retention)
 
 
 class WorkspaceCacheTests(unittest.TestCase):
@@ -160,6 +167,172 @@ class WorkspaceCacheTests(unittest.TestCase):
             self.write("rust/Cargo.lock", "# different dependency\n")
             self.assertNotEqual(cache.key(self.source, str(self.root)), original)
 
+    def test_daily_entries_preserve_compatibility_without_one_archive_per_commit(self):
+        with patch.object(cache.subprocess, "check_output", return_value="compiler-v1"):
+            first = cache.cache_outputs(self.source, str(self.root), "2026-09-28")
+            self.write("rust/src/lib.rs", "// source edit\n")
+            with patch.dict(os.environ, {"GITHUB_SHA": "different-commit"}):
+                self.assertEqual(cache.cache_outputs(self.source, str(self.root), "2026-09-28"), first)
+            next_day = cache.cache_outputs(self.source, str(self.root), "2026-09-29")
+            self.assertEqual(first["prefix"], next_day["prefix"])
+            self.assertNotEqual(first["key"], next_day["key"])
+            self.write("rust/Cargo.lock", "new dependencies")
+            self.assertNotEqual(cache.cache_outputs(self.source, str(self.root), "2026-09-28")["prefix"], first["prefix"])
+
+    def test_compaction_preserves_each_views_linked_products_and_debug_info(self):
+        mirror = cache.prepare(self.source, self.root)
+        targets = [mirror / "rust/target"]
+        targets += [targets[0] / "contract-check" / view / "rust/target" for view in ("published", "candidate")]
+        for target in targets:
+            for name in ("debug/incremental/chunk", "debug/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
+                path = target / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(name)
+        with contextlib.redirect_stdout(io.StringIO()):
+            result = cache.compact(self.root)
+        self.assertLess(result["afterBytes"], result["beforeBytes"])
+        for target in targets:
+            self.assertFalse((target / "debug/incremental").exists())
+            for name in ("debug/deps/library.rlib", "debug/agent.dSYM/symbols", "debug/.fingerprint/input", "readonly-check/report.json"):
+                self.assertEqual((target / name).read_text(), name)
+        self.assertEqual(result["afterBytes"], cache.directory_sizes(self.root)[self.root])
+
+    @unittest.skipIf(sys.platform == "win32", "creating symlinks requires a Windows privilege")
+    def test_compaction_rejects_symlinked_target_parents(self):
+        mirror = cache.prepare(self.source, self.root)
+        outside = self.directory / "outside"
+        (outside / "incremental").mkdir(parents=True)
+        (outside / "incremental/keep").write_text("untouched")
+        (mirror / "rust/target").mkdir()
+        (mirror / "rust/target/debug").symlink_to(outside, target_is_directory=True)
+        with self.assertRaises(ValueError):
+            cache.compact(self.root)
+        self.assertEqual((outside / "incremental/keep").read_text(), "untouched")
+
+
+class PolicyDistributionTests(unittest.TestCase):
+    def test_unseeded_vet_keeps_locked_pinned_source_fallback_and_pr_cannot_publish(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            binaries = home / ".cargo/bin"
+            binaries.mkdir(parents=True)
+            (binaries / "cargo-deny").write_text("restored trusted tool")
+            def install(argv, **kwargs):
+                self.assertEqual(argv, ["cargo", "install", "--locked", "--version", "0.10.2", "cargo-vet"])
+                self.assertTrue(kwargs["check"])
+                (binaries / "cargo-vet").write_text("compiled pinned tool")
+            def version(argv, **kwargs):
+                return "cargo-deny 0.20.2\n" if Path(argv[0]).name == "cargo-deny" else "cargo-vet 0.10.2\n"
+            env = {"GH_TOKEN": "", "GITHUB_REF": "refs/heads/agent/pr", "GITHUB_EVENT_NAME": "push",
+                   "GITHUB_OUTPUT": str(home / "output")}
+            with patch.dict(os.environ, env), patch.object(policy.Path, "home", return_value=home), \
+                    patch.object(policy.platform, "system", return_value="Linux"), \
+                    patch.object(policy.platform, "machine", return_value="x86_64"), \
+                    patch.object(policy.subprocess, "run", side_effect=install) as source_install, \
+                    patch.object(policy.subprocess, "check_output", side_effect=version):
+                policy.main()
+                self.assertEqual(source_install.call_count, 1)
+                policy.main()
+                self.assertEqual(source_install.call_count, 1)
+            self.assertEqual((home / "output").read_text(), "publish-vet=false\npublish-vet=false\n")
+            with patch.object(policy.subprocess, "check_output", return_value="cargo-vet 0.10.0\n"):
+                with self.assertRaises(ValueError):
+                    policy.require_version(binaries / "cargo-vet", policy.VET_VERSION)
+
+    def test_upstream_archive_requires_pinned_digest_and_regular_exact_member(self):
+        with tempfile.TemporaryDirectory() as directory:
+            destination = Path(directory) / "cargo-deny"
+            for symlink in (False, True):
+                buffer = io.BytesIO()
+                with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+                    member = tarfile.TarInfo(f"{policy.DENY_ASSET}/cargo-deny")
+                    member.size = 4 if not symlink else 0
+                    if symlink:
+                        member.type = tarfile.SYMTYPE
+                        member.linkname = "/outside"
+                    archive.addfile(member, None if symlink else io.BytesIO(b"tool"))
+                data = buffer.getvalue()
+                with self.assertRaisesRegex(ValueError, "checksum"):
+                    policy.install_deny(data, destination)
+                with patch.object(policy, "DENY_SHA256", policy.sha(data)):
+                    if symlink:
+                        with self.assertRaises(ValueError):
+                            policy.install_deny(data, destination)
+                    else:
+                        policy.install_deny(data, destination)
+                        self.assertEqual(destination.read_bytes(), b"tool")
+
+    def test_vet_bundle_checks_zip_digest_manifest_version_and_binary_digest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "cargo-vet"
+            binary.write_bytes(b"compiled pinned tool")
+            bundle = Path(directory) / "bundle"
+            policy.prepare_vet_artifact(binary, bundle)
+            manifest = json.loads((bundle / "manifest.json").read_text())
+            for mutation in (None, "version", "sha256", "path"):
+                doc = manifest.copy()
+                if mutation in ("version", "sha256"):
+                    doc[mutation] = "wrong"
+                buffer = io.BytesIO()
+                with zipfile.ZipFile(buffer, "w") as archive:
+                    archive.writestr("cargo-vet" if mutation != "path" else "../cargo-vet", binary.read_bytes())
+                    archive.writestr("manifest.json", json.dumps(doc))
+                data = buffer.getvalue()
+                artifact = {"digest": "sha256:" + policy.sha(data)}
+                output = Path(directory) / "restored"
+                if mutation:
+                    with self.assertRaises(ValueError):
+                        policy.restore_vet(data, artifact, output)
+                else:
+                    policy.restore_vet(data, artifact, output)
+                    self.assertEqual(output.read_bytes(), binary.read_bytes())
+                    with self.assertRaisesRegex(ValueError, "checksum"):
+                        policy.restore_vet(data + b"tampered", artifact, output)
+
+    def test_only_recent_successful_main_push_producers_supply_vet(self):
+        now = datetime(2026, 9, 28, tzinfo=timezone.utc)
+        artifact = {"name": policy.VET_ARTIFACT, "expired": False, "size_in_bytes": 100,
+                    "created_at": "2026-09-27T00:00:00Z", "workflow_run": {
+                        "id": 5, "repository_id": 7, "head_repository_id": 7, "head_branch": "main", "head_sha": "a"}}
+        producer = {"event": "push", "head_branch": "main", "path": ".github/workflows/swift-ci.yml",
+                    "conclusion": "success", "head_sha": "a", "repository": {"id": 7}, "head_repository": {"id": 7}}
+        for field, value in ((None, None), ("event", "pull_request"), ("head_branch", "agent/untrusted"),
+                             ("conclusion", "failure"), ("head_sha", "other"), ("path", ".github/workflows/other.yml"),
+                             ("head_repository", {"id": 8})):
+            run = producer | ({field: value} if field else {})
+            with patch.object(policy, "api", side_effect=[{"artifacts": [artifact]}, run]):
+                found = policy.trusted_vet_artifact("owner/repo", 7, now)
+                self.assertEqual(found, None if field else artifact)
+        for changed in (artifact | {"expired": True}, artifact | {"created_at": "2026-01-01T00:00:00Z"},
+                        artifact | {"workflow_run": artifact["workflow_run"] | {"head_repository_id": 8}}):
+            with patch.object(policy, "api", return_value={"artifacts": [changed]}) as api:
+                self.assertIsNone(policy.trusted_vet_artifact("owner/repo", 7, now))
+                self.assertEqual(api.call_count, 1)
+
+
+class CacheRetentionTests(unittest.TestCase):
+    def test_keeps_latest_per_format_and_never_deletes_other_families_or_branches(self):
+        def entry(n, version="mac", key=None, ref="refs/heads/main"):
+            return {"id": n, "created_at": f"2026-09-{n:02d}", "version": version, "ref": ref,
+                    "key": key or f"arkdeck-rust-build-v2-macOS-ARM64-{'a' * 64}-2026-09-{n:02d}"}
+        rows = [entry(1, key=f"arkdeck-rust-build-v1-{'a' * 64}-{'b' * 40}"), entry(2), entry(3),
+                entry(4, "linux"), entry(5, key="arkdeck-cargo-policy-tools-v1"),
+                entry(6, key="arkdeck-swiftpm-v2"), entry(7, key="arkdeck-xcode-v2"),
+                entry(8, ref="refs/heads/agent/pr"), entry(9, key="arkdeck-rust-build-unrecognized")]
+        self.assertEqual([e["id"] for e in retention.removals(rows)], [2, 1])
+        same_path_other_host = entry(10)
+        same_path_other_host["key"] = same_path_other_host["key"].replace("macOS-ARM64", "Linux-X64")
+        self.assertEqual(retention.removals([entry(3), same_path_other_host]), [])
+
+    def test_write_authority_requires_successful_same_repository_main_ci(self):
+        event = {"repository": {"full_name": "o/r"}, "workflow_run": {
+            "head_repository": {"full_name": "o/r"}, "head_branch": "main", "event": "push",
+            "path": ".github/workflows/swift-ci.yml", "conclusion": "success"}}
+        self.assertTrue(retention.trusted_event(event, "o/r"))
+        for field, value in (("head_repository", {"full_name": "fork/r"}), ("head_branch", "agent/pr"),
+                             ("event", "pull_request"), ("conclusion", "failure"), ("path", "other.yml")):
+            self.assertFalse(retention.trusted_event(event | {"workflow_run": event["workflow_run"] | {field: value}}, "o/r"))
+
 
 class CargoSchedulingTests(unittest.TestCase):
     def setUp(self):
@@ -201,6 +374,21 @@ class CargoSchedulingTests(unittest.TestCase):
             self.artifact("workspace_tests_process", package="other")), self.metadata))
         self.assertNotIn("isolated", planned)
         self.assertIn("workspace_tests_process", planned["shared-resources"])
+
+    def test_audited_cli_targets_overlap_but_other_package_names_stay_conservative(self):
+        cli = dict(self.metadata["packages"][0], id="cli", name="arkdeck-cli")
+        self.metadata["workspace_members"].append("cli")
+        self.metadata["packages"].append(cli)
+        planned = dict(tests.queues(self.messages(
+            self.artifact("domain_leaves", package="cli"), self.artifact("runtime_service", package="cli"),
+            self.artifact("spawning"), self.artifact("control_action_host_process"),
+        ), self.metadata))
+        self.assertIn("domain_leaves", planned["isolated"])
+        self.assertIn("runtime_service", planned["isolated"])
+        self.assertNotIn("spawning", planned["isolated"])
+        self.assertNotIn("control_action_host_process", planned["isolated"])
+        planned = dict(tests.queues(self.messages(self.artifact("runtime_service")), self.metadata))
+        self.assertNotIn("isolated", planned)
 
     def test_ambiguous_shapes_fall_back_to_all_tests_and_incomplete_inventory_fails(self):
         with self.assertRaisesRegex(ValueError, "complete test build"):
@@ -249,6 +437,13 @@ pub fn documented() {}
             if code:
                 self.fail("native fixture failed: " + "\n".join(p.read_text() for p in directory.glob("*.log")))
             self.assertEqual({p.name for p in (self.root / "receipts").iterdir()}, {"unit", "doc", "shared", "isolated", "custom"})
+            # Compaction does not invalidate linked outputs/fingerprints. Cargo
+            # can reuse them even though compiler incremental scratch is gone.
+            shutil.rmtree(self.root / "target/debug/incremental", ignore_errors=True)
+            warm = subprocess.run(tests.BASE + ["--no-run", "--message-format=json"],
+                                  cwd=self.root, check=True, capture_output=True, text=True)
+            artifacts = [json.loads(line) for line in warm.stdout.splitlines() if line.startswith('{')]
+            self.assertTrue(all(m["fresh"] for m in artifacts if m.get("reason") == "compiler-artifact"))
             # A failing queue must not suppress the other queue or doctests.
             (self.root / "tests/shared.rs").write_text(helper + '#[test] fn shared() { mark("shared"); panic!("fixture failure"); }\n')
             with patch.dict(os.environ, {"ARKDECK_CI_FIXTURE_FAIL_DOC": "1"}):

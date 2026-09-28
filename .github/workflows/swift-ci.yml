@@ -332,6 +332,9 @@ jobs:
   rust-checks:
     needs: plan
     if: needs.plan.outputs.rust == 'true'
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/rust-ci.yml
     # Only the read-only ArkForge deploy key, for the locked fetch of
     # ArkForge's pinned crates; never `inherit`.

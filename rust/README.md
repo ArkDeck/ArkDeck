@@ -51,20 +51,39 @@ Hosted CI waits for the inexpensive Rust policy job before allocating native
 hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
 job-owned source path, preserving mtimes only for identical bytes. The cache
 key includes the compiler, runner image, dependency manifests and build flags;
-only successful protected-main runs save it. Restored Git refs/config are
-discarded and rebuilt from the current checkout. Published and candidate views
+only successful protected-main runs save it, at most once per UTC day for the
+same compatibility key. Before saving, CI removes compiler incremental scratch
+state (not linked products, debug symbols or fingerprints) and records per-view
+sizes in `cache-size.json`. A separate successful-main workflow retains the
+newest Rust archive per runner/cache format without deleting SwiftPM, Xcode or
+policy-tool entries. Restored Git refs/config are discarded and rebuilt from
+the current checkout. Published and candidate views
 retain separate source directories and Cargo targets. Local checks keep their
 ordinary task-owned targets unless the CI cache root is explicitly supplied.
 
 On macOS, `scripts/run-workspace-tests.py` compiles the complete default test
 inventory, then asks Cargo to run two queues with the same workspace features.
-Only three audited integration targets with unique temporary roots may overlap
+Only five audited integration targets with unique temporary roots may overlap
 the conservative queue; fixed-oracle, port and spawning tests remain together.
 New targets default to that queue. Custom harnesses and doctests still run;
 either queue or doctest failure fails the lane. The `rust-test-timings-macos-26`
 artifact records compilation, queue and doctest durations and complete logs for
 checkout/published/candidate. Run `python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
+
+The two added CLI targets (`domain_leaves` and `runtime_service`) use random
+private account roots, Unix sockets and joined fake Runtime threads. They add
+about 20 seconds of work to the shorter queue in the #2295 sample; shared HDC,
+TCP allocation, spawning and deadline-sensitive targets stay conservative.
+No test assertion, deadline or worker limit changes.
+
+Policy installation keeps cargo-deny 0.20.2 and cargo-vet 0.10.2 pinned. On a
+cache miss, cargo-deny comes from its SHA-256-pinned official Linux release.
+Because cargo-vet 0.10.2 has no upstream binary release, a checksum-verified
+artifact from a successful same-repository main push of Swift CI supplies it;
+otherwise CI retains `cargo install --locked --version 0.10.2 cargo-vet`.
+Only main publishes that 30-day artifact, renewing after 21 days. Both tools'
+versions are checked before the unchanged dependency policy checks run.
 
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,

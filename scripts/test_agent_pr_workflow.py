@@ -597,6 +597,7 @@ RUST_SHARED_JOB_TOKENS = (
     "        shell: bash\n        working-directory: rust\n",
     "git config core.autocrlf false",
     '"+refs/heads/main:refs/remotes/origin/main"',
+    '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
     'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
     "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
     '          python-version: "3.14"\n',
@@ -626,9 +627,10 @@ RUST_POLICY_TOKENS = (
     "        id: policy-tools\n"
     "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
     "      - name: Install pinned dependency policy tools\n"
-    "        if: steps.policy-tools.outputs.cache-hit != 'true'\n",
-    "cargo install --locked --version 0.20.2 cargo-deny",
-    "cargo install --locked --version 0.10.2 cargo-vet",
+    "        id: policy-install\n",
+    "run: python rust/scripts/ci-policy-tools.py\n",
+    "        if: success() && github.ref == 'refs/heads/main' && steps.policy-install.outputs.publish-vet == 'true'\n",
+    "          name: cargo-vet-linux-x64-0.10.2-v1\n",
     "      - name: Require the pinned dependency policy tool versions\n"
     "        run: |\n",
     "test \"$(cargo deny --version | tr -d '\\r')\" = \"cargo-deny 0.20.2\"",
@@ -652,6 +654,7 @@ RUST_WORKSPACE_TOKENS = (
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}\n",
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
+    "run: python rust/scripts/ci-workspace.py compact\n",
     # Only these two steps compile and run the checkout. Every contract
     # step either reads Git objects at the pinned Swift commit or builds a
     # separate candidate view, so dropping either one lets a workspace
@@ -745,10 +748,10 @@ def validate_rust_ci_contract(text: str) -> None:
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
     if "restore-keys:" in policy:
         raise WorkflowContractError("Policy tool cache must not use prefix fallback")
-    cache_key = "          key: ${{ steps.rust-cache-key.outputs.key }}-${{ github.sha }}\n"
+    cache_key = "          key: ${{ steps.rust-cache-key.outputs.key }}\n"
     if workspace.count(cache_key) != 2:
-        raise WorkflowContractError("Rust build restore and save must use the same compatibility key and revision")
-    prefix = "          restore-keys: ${{ steps.rust-cache-key.outputs.key }}-\n"
+        raise WorkflowContractError("Rust build restore and save must use the same daily compatibility key")
+    prefix = "          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}\n"
     if workspace.count("restore-keys:") != 1 or prefix not in workspace:
         raise WorkflowContractError("Rust build cache fallback must retain every compatibility dimension")
     save_block = (
@@ -798,6 +801,7 @@ def validate_rust_ci_contract(text: str) -> None:
         workspace.index("run: python rust/scripts/ci-workspace.py --cwd rust exec -- cargo clippy --workspace"),
         workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/workspace-tests.py"),
         workspace.index("run: python rust/scripts/ci-workspace.py exec -- python rust/scripts/check-contracts.py"),
+        workspace.index("run: python rust/scripts/ci-workspace.py compact"),
         workspace.index("      - name: Save trusted Rust build products"),
         workspace.index("      - name: Preserve actual read-only recordings"),
     ]
@@ -806,6 +810,30 @@ def validate_rust_ci_contract(text: str) -> None:
             "Rust workspace job must fetch locked metadata before it lints, tests and "
             "runs the contract views, and preserve recordings after their producer runs"
         )
+
+
+def validate_cache_retention_contract(text: str) -> None:
+    if extract_event_names(text) != ("workflow_run",):
+        raise WorkflowContractError("Cache deletion must be triggered only after a completed workflow")
+    if extract_job_names(text) != ("retain-rust",):
+        raise WorkflowContractError("Cache retention must have one trusted maintenance job")
+    for token in (
+        "    workflows: [Swift CI]\n", "    types: [completed]\n",
+        "permissions:\n  contents: read\n",
+        "      github.event.workflow_run.conclusion == 'success' &&\n",
+        "      github.event.workflow_run.event == 'push' &&\n",
+        "      github.event.workflow_run.head_branch == 'main' &&\n",
+        "      github.event.workflow_run.head_repository.full_name == github.repository\n",
+        "    permissions:\n      contents: read\n      actions: write\n",
+        "          ARKDECK_CI_SHA: ${{ github.sha }}\n",
+        '          git fetch --no-tags origin "$ARKDECK_CI_SHA"\n',
+        '          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"\n',
+        "        run: python3 scripts/ci/retain-rust-caches.py --apply\n",
+    ):
+        if token not in text:
+            raise WorkflowContractError(f"Cache retention missing trust boundary: {token}")
+    if text.count("actions: write") != 1 or "contents: write" in text:
+        raise WorkflowContractError("Only the trusted maintenance job may delete caches")
 
 
 def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
@@ -1155,7 +1183,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             ),
             rust.replace("run: cargo vet --locked --no-registry-suggestions", "run: cargo vet"),
             rust.replace(
-                "cargo install --locked --version 0.10.2 cargo-vet", "cargo install cargo-vet"
+                "run: python rust/scripts/ci-policy-tools.py", "run: cargo install cargo-vet"
             ),
             rust + "\n        continue-on-error: true\n",
             rust + "\n        run: cargo vet init\n",
@@ -1197,8 +1225,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "          restore-keys: arkdeck-cargo-policy-tools-v1-\n          key: arkdeck-cargo-policy-tools-v1",
                 1,
             ),
-            # The install must stay the miss path of that memo, not disappear.
-            rust.replace("        if: steps.policy-tools.outputs.cache-hit != 'true'\n        run: |\n", "        run: |\n"),
+            # The version-pinned distribution/fallback must not disappear.
+            rust.replace("run: python rust/scripts/ci-policy-tools.py", "run: true"),
             rust.replace("actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", "actions/cache/restore@v6"),
             rust.replace("actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", "actions/cache/save@v6"),
         )
@@ -1214,7 +1242,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             workspace.replace("    needs: policy\n", ""),
             workspace.replace("github.ref == 'refs/heads/main'", "github.ref != ''"),
             workspace.replace("          success() &&\n", ""),
-            workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.key }}-", "restore-keys: arkdeck-rust-build-"),
+            workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}", "restore-keys: arkdeck-rust-build-"),
             workspace.replace("run: python rust/scripts/ci-workspace.py prepare", "run: true"),
             workspace.replace(" && '2' || '1'", " && '4' || '1'"),
         ):
@@ -1240,6 +1268,22 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             self.assertEqual(workflow.count("group: arkdeck-macos-background"), len(jobs))
         for path in (SWIFT_WORKFLOW_PATH, RUST_WORKFLOW_PATH):
             self.assertNotIn("group: arkdeck-macos-background", path.read_text())
+
+    def test_cache_deletion_never_runs_pr_code_or_receives_broader_write_authority(self) -> None:
+        text = (REPOSITORY_ROOT / ".github/workflows/ci-cache-retention.yml").read_text()
+        validate_cache_retention_contract(text)
+        for before, after in (
+            ("  workflow_run:", "  pull_request:"),
+            ("github.event.workflow_run.head_branch == 'main'", "github.event.workflow_run.head_branch != ''"),
+            ("github.event.workflow_run.head_repository.full_name == github.repository", "true"),
+            ("github.event.workflow_run.conclusion == 'success'", "true"),
+            ("ARKDECK_CI_SHA: ${{ github.sha }}", "ARKDECK_CI_SHA: ${{ github.event.workflow_run.head_sha }}"),
+            ("contents: read", "contents: write"),
+        ):
+            changed = text.replace(before, after)
+            self.assertNotEqual(changed, text)
+            with self.assertRaises(WorkflowContractError):
+                validate_cache_retention_contract(changed)
 
     def test_rust_recordings_are_preserved_after_failures(self) -> None:
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
