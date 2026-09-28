@@ -452,9 +452,6 @@ final class ViewerUITests: XCTestCase {
 
   // MARK: - Launches that stay separate, and why
 
-  /// This one cannot join the session: it asserts the *first* capture action
-  /// label against the recapture label, which only an instance that has never
-  /// captured can show, and it pins the second locale's strings.
   func testAdvancedDumpFindCommandFollowsInspectorTab() {
     let app = launchViewer()
     defer { app.terminate() }
@@ -474,6 +471,9 @@ final class ViewerUITests: XCTestCase {
       .waitForExistenceFast(timeout: 5))
   }
 
+  /// This one cannot join the session: it asserts the *first* capture action
+  /// label against the recapture label, which only an instance that has never
+  /// captured can show, and it pins the second locale's strings.
   func testCaptureActionDistinguishesFirstCaptureFromRecapture() {
     let app = launchViewer(extra: ["-AppleLanguages", "(zh-Hans)"])
     let capture = app.buttons["viewer.recapture"]
