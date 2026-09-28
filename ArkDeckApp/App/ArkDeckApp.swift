@@ -1880,7 +1880,12 @@ private enum RuntimeReadonlySmoke {
       let historyReady = snapshot.availability == .available && snapshot.olderJobsLoadFailure == nil
       let filterReady: Bool
       if case .loaded = filter { filterReady = true } else { filterReady = false }
-      let report: [String: Any] = [
+      // The words History shows when the Runtime is unusable (for SPK-8 (b),
+      // a release mismatch and its remedy). Bounded; carries no Job data.
+      var reason = ""
+      if case .unavailable(let text) = snapshot.availability { reason = text }
+      if reason.isEmpty, case .failed(let text) = filter { reason = text }
+      var report: [String: Any] = [
         "schemaVersion": "arkdeck.app-readonly-smoke/1",
         "connected": historyReady && filterReady,
         "historyAvailable": historyReady,
@@ -1888,6 +1893,7 @@ private enum RuntimeReadonlySmoke {
         "jobCount": snapshot.jobs.count,
         "hardwareAcceptance": false,
       ]
+      if !reason.isEmpty { report["unavailableReason"] = String(reason.prefix(512)) }
       guard let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]),
         let text = String(data: data, encoding: .utf8)
       else { exit(70) }
