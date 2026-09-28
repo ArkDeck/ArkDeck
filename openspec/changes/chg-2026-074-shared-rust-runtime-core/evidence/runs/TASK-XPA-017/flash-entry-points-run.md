@@ -161,4 +161,7 @@ Not run:
 
 ## CI
 
-Pending.
+PR #2305, head `b714dae88`, Swift CI run `36419884967`: `guard`, `plan`, the four Rust lanes,
+`ds-tokens` and the `swift` aggregate green; `swift-tests`, `app-build` and `ds-interactions` were
+not selected (no Swift or App change). Merged as `53b832780`. (Recorded by the RC-readiness slice,
+`rc-readiness-run.md`.)

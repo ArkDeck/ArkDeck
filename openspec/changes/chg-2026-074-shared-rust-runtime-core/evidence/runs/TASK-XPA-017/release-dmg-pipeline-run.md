@@ -94,7 +94,10 @@ install. The guide uses `update` for both and says so.
   is not at the pin, and its packaging script needs a Developer ID identity).
 - Whether `-exportArchive` re-signs the ad hoc `trace_streamer` the App's build phase signs is not
   verified without an identity; the export's strict deep verification, the App notarization and the
-  mounted `spctl` would each stop the release if it does not.
+  mounted `spctl` would each stop the release if it does not. (Followed up in `rc-readiness-run.md`:
+  the copy phase already re-signs it with the release identity, hardened runtime and a secure
+  timestamp; `codesign --verify --strict --deep` alone would not have stopped an ad hoc nested
+  signature, so the entry now checks every nested Mach-O before the App's upload.)
 - `tasks.md` XPA-017 "empty entitlements" wording: left to the 017 closing PR as planned.
 - Update feed and GitHub Release: after G5, by the maintainer.
 
@@ -139,3 +142,8 @@ kernel") during workspace tests, before the new release step ran. Invalid run by
 failure is outside this diff (no Rust source changed), it is a process-launch timing test, it passes
 alone locally (`cargo test -p arkdeck-provider-arkforge --test lane`: 8 passed), and the diff cannot
 affect it. Re-pushed with this record to rerun; the final result is recorded by a later slice.
+
+Final head `39d958a05`, Swift CI run `36420132577`: every lane green (`guard`, `plan`, `swift-tests`,
+`app-build`, the four Rust lanes including the new release-entry step, `ds-tokens`, `ds-interactions`,
+and the `swift` aggregate). Merged as `0aef701e5`. (Recorded by the RC-readiness slice,
+`rc-readiness-run.md`.)
