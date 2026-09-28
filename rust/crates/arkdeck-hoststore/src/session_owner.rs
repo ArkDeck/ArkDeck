@@ -579,10 +579,22 @@ fn configured_root_in(root: &HostDirectory, default_sessions: &Path) -> Result<P
     };
     let decoded = decode_session_configuration(&loaded).map_err(unreadable)?;
     let document: Value = serde_json::from_slice(&decoded.document).map_err(unreadable)?;
-    document["rootPath"]
+    let path = document["rootPath"]
         .as_str()
         .map(PathBuf::from)
-        .ok_or_else(|| unreadable(()))
+        .ok_or_else(|| unreadable(()))?;
+    // Match the storage status read before a cutover or publication relies on
+    // this selection. A missing default root is initialized by the owner;
+    // a missing custom root or a noncanonical selection is never substituted.
+    let canonical = match path.canonicalize() {
+        Ok(canonical) => canonical == path,
+        Err(error) if error.kind() == io::ErrorKind::NotFound && path == default_sessions => true,
+        Err(_) => false,
+    };
+    if !canonical || (document["rootKind"] == "default" && path != default_sessions) {
+        return Err(unreadable(()));
+    }
+    Ok(path)
 }
 
 /// [`StorageHold::configured_root`] at a state directory no owner of this
