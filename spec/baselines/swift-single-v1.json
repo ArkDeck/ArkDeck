@@ -538,7 +538,7 @@
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "7566c7319c49b4e28e2e00ca2c02c72ed1f079e97baa2a71003d8e9927a063ec",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
     "spec/control/methods": "b38aea77594ba3f88b154b9a89a58bec7133c9b750fcdca4cba1f27f43e435b5"
   },
   "files": {
@@ -1162,10 +1162,6 @@
       "blob": "9f6d70621a4d43b71731c2764ed8d3a084154a79",
       "sha256": "906d35a917937ecbb33d8dc3bbb6b3e1783bd2996a6201ab7227fb406d474ed9"
     },
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/HDCFixtures.swift": {
-      "blob": "66f598144ec016ea5454c5ea3ccf8fa475f82ba7",
-      "sha256": "22be193bc03f84fa1484be87128c40b8031a7b9fdbb5478b65c429a046680c7b"
-    },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0/.gitattributes": {
       "blob": "260280c01db804c21b8f3f47453e5abac2023094",
       "sha256": "341812c59f415702c2351d9357b43a43a67be8bc4f7a1389f512470583722421"
@@ -1731,7 +1727,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "b0f5f9b992a72d209803edbf3c2c9a149941ecec088225ddd02873825b1a27c4",
+  "inputDigest": "ae96f7fe223e6fb742a86f9dc18da1bed29f08d6c7d6a9709beeef85660d26cb",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

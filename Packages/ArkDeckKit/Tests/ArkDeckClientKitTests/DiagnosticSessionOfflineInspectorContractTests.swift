@@ -162,7 +162,7 @@ final class DiagnosticSessionOfflineInspectorContractTests:
     }
   }
 
-  func testAppAndCLICallTheSharedOwner() throws {
+  func testTheAppCallsTheSharedOwner() throws {
     let root = URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -172,16 +172,8 @@ final class DiagnosticSessionOfflineInspectorContractTests:
         path:
           "Sources/ArkDeckClientKit/DiagnosticSessionApplicationReader.swift"),
       encoding: .utf8)
-    let cli = try String(
-      contentsOf: root.appending(
-        path: "Sources/ArkDeckCLI/CLIDiagnosticsResources.swift"),
-      encoding: .utf8)
     XCTAssertTrue(
       app.contains("DiagnosticSessionOfflineInspector().inspect"))
-    XCTAssertTrue(
-      cli.contains("DiagnosticSessionOfflineInspector().inspect"))
-    XCTAssertFalse(
-      cli.contains("DiagnosticSessionApplicationReader"))
   }
 
   func testPublishedSchemaPinsOutputAndParserVersions() throws {

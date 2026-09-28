@@ -41,13 +41,11 @@ RUST_CONTRACT_INPUT_PREFIXES = (
 # The machine-contract bundle the Rust export renders. Its test holds every
 # product to `rust/tests/fixtures/contracts-bundle/owned.json` or to the
 # committed file, and check-contracts.py holds that table to the committed
-# bundle. A PR can regenerate products without touching rust/: Swift's export
-# rewrites them when a registry or the App's capability table changes. Such a
-# PR still runs the Rust lane, so the table and the Rust copies cannot drift
-# into main and fail the next unrelated Rust PR. The Swift contract tests read
-# the bundle too (its zero-drift check, the registry copy's check and the
-# schema tests), so such a change runs the Swift lane as well: a bundle-only
-# edit kept consistent with the Rust copies must not skip Swift's drift check.
+# bundle. A PR can edit products without touching rust/ (the Rust export is the
+# only producer since the Swift CLI's deletion, TASK-XPA-018). Such a PR still
+# runs the Rust lane, so the table and the Rust copies cannot drift into main
+# and fail the next unrelated Rust PR. Swift tests still read some of the
+# bundle's schemas, so such a change runs the Swift lane as well.
 RUST_BUNDLE_PREFIXES = ("openspec/contracts/",)
 # The Rust helper pair's release layout and the structure check that holds it
 # (G5 slice 20a, #2218) run in the Rust lane's macOS workspace job, over the
@@ -67,7 +65,6 @@ RUST_CONTRACT_SOURCE_PREFIXES = (
 )
 RUST_CONTRACT_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
-    "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICanonicalJSON.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
     "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
     "openspec/contracts/runtime-control-plane.schema.json",

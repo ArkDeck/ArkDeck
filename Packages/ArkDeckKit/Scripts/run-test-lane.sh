@@ -1,8 +1,8 @@
 #!/bin/sh
-# macOS Runtime test lanes.  The full suite remains the merge gate; this
-# runner gives local development and the nightly slow-lane workflow
-# (.github/workflows/swift-slow-lanes.yml) explicit fast/medium/slow
-# feedback without hiding a slow durability check behind a larger timeout.
+# ArkDeckKit test lanes.  The full suite remains the merge gate; this runner
+# gives local development explicit fast/medium feedback. The Swift Runtime and
+# its slow durability lanes were deleted with it (CHG-2026-074); the Rust
+# Runtime's own lanes run in rust-ci.yml and rust-perf.yml.
 
 set -eu
 
@@ -65,36 +65,10 @@ case "$lane" in
       --filter "$lane_filter"
     ;;
   medium)
-    # Now a superset of `fast`, which it was not: it named two contract
-    # classes and ran eighty-four tests where `fast` ran ninety-four, so
-    # moving up a tier narrowed coverage and the name said the opposite.
-    lane_filter='ArkDeckCoreTests|RuntimeJobEngineContractTests|AgentDaemonContractTests'
+    # A superset of `fast`: the shared Core values plus the App's client.
+    lane_filter='ArkDeckCoreTests|ArkDeckClientKitTests'
     run_lane medium "$swiftpm" test --parallel --num-workers "$workers" \
       --filter "$lane_filter"
-    ;;
-  provider)
-    lane_filter='WorkspaceProvider|DeviceProvider|AnalyzerProvider|Diagnostics'
-    run_lane provider "$swiftpm" test --parallel --num-workers "$workers" \
-      --filter "$lane_filter"
-    ;;
-  storage)
-    lane_filter='Storage|Artifact|Journal|Retention|Capability'
-    run_lane storage "$swiftpm" test --parallel --num-workers "$workers" \
-      --filter "$lane_filter"
-    ;;
-  slow)
-    ARKDECK_RUN_SLOW_ARTIFACT_TESTS=1 \
-      run_lane slow-artifact "$swiftpm" test \
-      --filter RuntimeArtifactContractTests/testLargeTextFilePublicationStreamsRedactionAcrossReadBoundaries
-    ARKDECK_RUN_LONG_RUNTIME_TESTS=1 \
-      run_lane slow-runtime "$swiftpm" test \
-      --filter RuntimeJobEngineContractTests/testLongRunSimulationKeepsTerminalHistoryOutOfRecoveryMemory
-    ARKDECK_RUN_TEN_THOUSAND_HISTORY_TESTS=1 \
-      run_lane slow-history "$swiftpm" test \
-      --filter RuntimeJobEngineContractTests/testTenThousandTerminalHistoryDoesNotExpandRestartRecovery
-    ARKDECK_RUN_LONG_JOURNAL_TESTS=1 \
-      run_lane slow-journal "$swiftpm" test \
-      --filter JournalRecoveryContractTests/testIncrementalJournalCursorScalesPastTenThousandDurableEvents
     ;;
   focus)
     [ "$#" -eq 2 ] || {
@@ -110,15 +84,12 @@ case "$lane" in
     # complete, but run its microbenchmarks serially after the parallel suite.
     lane_filter='<whole suite except serialized timing tests>'
     run_lane full-parallel "$swiftpm" test --parallel --num-workers "$workers" \
-      --skip ViewerScalePerformanceTests \
-      --skip ProcessExecutorContractTests/testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume
-    lane_filter='ProcessExecutorContractTests/testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume'
-    run_lane full-process-identity-race "$swiftpm" test --filter "$lane_filter"
+      --skip ViewerScalePerformanceTests
     lane_filter='ViewerScalePerformanceTests'
     run_lane full-viewer-scale "$swiftpm" test --filter "$lane_filter"
     ;;
   *)
-    echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh {fast|medium|provider|storage|slow|full|focus <test-filter>}" >&2
+    echo "usage: sh Packages/ArkDeckKit/Scripts/run-test-lane.sh {fast|medium|full|focus <test-filter>}" >&2
     exit 64
     ;;
 esac

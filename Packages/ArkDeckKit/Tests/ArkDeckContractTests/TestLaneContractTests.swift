@@ -128,19 +128,6 @@ final class TestLaneContractTests: XCTestCase {
       full.contains("--skip ViewerScalePerformanceTests"),
       "the parallel batch must exclude wall-clock microbenchmarks")
     XCTAssertTrue(
-      full.contains(
-        "--skip ProcessExecutorContractTests/"
-          + "testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume"),
-      "the scheduler-sensitive pre-SIGCONT race must not compete with the parallel batch")
-    XCTAssertTrue(
-      full.contains(
-        "lane_filter='ProcessExecutorContractTests/"
-          + "testVerifiedCanonicalNamespaceRejectsPinnedResourceReplacementBeforeResume'"),
-      "the same full gate must add the skipped process identity race back")
-    XCTAssertTrue(
-      full.contains("run_lane full-process-identity-race \"$swiftpm\" test --filter \"$lane_filter\""),
-      "the process identity race must run through the measured lane runner")
-    XCTAssertTrue(
       full.contains("lane_filter='ViewerScalePerformanceTests'"),
       "the same full gate must add every skipped Viewer scale test back")
     XCTAssertTrue(

@@ -49,7 +49,7 @@ final class RuntimeUpdateReplayRustOracleTests: XCTestCase {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     if ProcessInfo.processInfo.environment["ARKDECK_RUST_UPDATE_REPLAY_RECORD"] != nil {
-      try HDCOracleHarness.recordOrCompare(
+      try OracleFiles.recordOrCompare(
         ["replay.json": output], variable: "ARKDECK_RUST_UPDATE_REPLAY_RECORD",
         oracle: repository.appending(path: "rust/tests/fixtures/runtime-update"))
     } else {

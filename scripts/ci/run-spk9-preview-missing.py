@@ -4,6 +4,8 @@
 Builds sequentially before starting the isolated daemon. No installed path,
 profile override, replay transport, import, discovery, job or permit is used.
 This is only SPK-9's missing-archive refusal subset, never G5/hardware evidence.
+The Swift half of the pair was deleted with the Swift Runtime (CHG-2026-074);
+the Rust daemon's result is held to the outcome both halves recorded.
 """
 from __future__ import annotations
 
@@ -21,7 +23,6 @@ import time
 import tomllib
 
 ROOT = Path(__file__).resolve().parents[2]
-SWIFT_CLASS = "ArkForgeMissingArchiveLiveTests"
 RUST_CASE = "real_daemon_missing_archive_preview"
 
 
@@ -115,7 +116,7 @@ def main() -> None:
         raise KeyboardInterrupt("SPK-9 carrier interrupted")
     signal.signal(signal.SIGTERM, interrupted)
     if sys.platform != "darwin":
-        parser.error("the paired Swift/Rust carrier requires macOS")
+        parser.error("the carrier requires macOS")
     source = args.arkforge_source.resolve()
     target = args.cargo_target.resolve()
     output = args.output.resolve()
@@ -133,8 +134,7 @@ def main() -> None:
                     ["git", "diff", "HEAD"], cwd=ROOT, timeout=10)).hexdigest(),
                 "commands": [], "result": "incomplete"}
     sources = [Path(__file__).resolve(),
-               ROOT / "rust/crates/arkdeck-provider-arkforge/tests/live_preview_missing.rs",
-               ROOT / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArkForgeMissingArchiveLiveTests.swift"]
+               ROOT / "rust/crates/arkdeck-provider-arkforge/tests/live_preview_missing.rs"]
     identity["carrierSources"] = {str(p.relative_to(ROOT)): digest(p) for p in sources}
     write(output / "result.json", identity)
 
@@ -147,7 +147,6 @@ def main() -> None:
 
     try:
         checked(["rustc", "--version", "--verbose"], "rust-toolchain", 10)
-        checked(["swift", "--version"], "swift-toolchain", 10)
         env["CARGO_TARGET_DIR"] = str(args.daemon_target.resolve())
         checked(["cargo", "build", "--locked", "--manifest-path", str(source / "Cargo.toml"),
                  "-p", "arkforged", "--bin", "arkforged", "--message-format=json"], "daemon-build")
@@ -159,9 +158,6 @@ def main() -> None:
                  "--no-run", "--message-format=json"], "rust-build")
         rust_test = artifact(output / "rust-build.log", "live_preview_missing", "test")
         identity.update(rustTestPath=str(rust_test), rustTestSHA256=digest(rust_test))
-        swift = ["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "test", "--filter", SWIFT_CLASS]
-        # With no opt-in environment this builds the one class and records XCTSkip.
-        checked(swift, "swift-build")
         if git(source, "rev-parse", "HEAD") != pin or source_dirty(source):
             raise RuntimeError("ArkForge source changed during the build")
         if any(digest(p) != identity["carrierSources"][str(p.relative_to(ROOT))] for p in sources):
@@ -188,24 +184,19 @@ def main() -> None:
                     write(output / "state-before.json", before)
                     env.update(ARKDECK_SPK9_RUNTIME=str(runtime),
                                ARKDECK_SPK9_DAEMON_SHA256=identity["daemonSHA256"],
-                               ARKDECK_SPK9_RUST_REPORT=str(output / "rust.json"),
-                               ARKDECK_SPK9_SWIFT_REPORT=str(output / "swift.json"))
+                               ARKDECK_SPK9_RUST_REPORT=str(output / "rust.json"))
                     checked([str(rust_test), RUST_CASE, "--exact", "--ignored", "--nocapture"],
                             "rust-preview", 30)
-                    checked(swift + ["--skip-build"], "swift-preview", 60)
                     after = snapshot(runtime)
                     write(output / "state-after.json", after)
                     if before != after:
                         raise RuntimeError("private daemon state changed during CAS-miss previews")
-                    reports = [json.loads((output / f"{owner}.json").read_text()) for owner in ("rust", "swift")]
+                    report = json.loads((output / "rust.json").read_text())
                     expected = {"outcome": "bundleNotInLaneStore", "archiveSHA256": "0" * 64,
                                 "profileReference": "org.openharmony.dayu200@1.0.0",
                                 "calls": ["controller.inspectArtifact"], "refusalCode": "ARTIFACT_NOT_FOUND"}
-                    for owner, report in zip(("rust", "swift"), reports):
-                        if report.get("owner") != owner or any(report.get(k) != v for k, v in expected.items()):
-                            raise RuntimeError(f"unexpected {owner} result: {report}")
-                    if reports[1].get("executionReady") is not False or reports[1].get("daemonSHA256") != identity["daemonSHA256"]:
-                        raise RuntimeError("daemon identity or unpaired readiness mismatch")
+                    if report.get("owner") != "rust" or any(report.get(k) != v for k, v in expected.items()):
+                        raise RuntimeError(f"unexpected rust result: {report}")
                     if process.poll() is not None or digest(daemon) != identity["daemonSHA256"]:
                         raise RuntimeError("daemon exited or executable changed during the check")
                     identity.update(result="pass", stateUnchanged=True, hardwareEvidence=False)

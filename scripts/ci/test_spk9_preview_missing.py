@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Carrier failure-path checks; no arkforged, Swift build, or device access."""
+"""Carrier failure-path checks; no arkforged or device access."""
 import importlib.util
 import json
 import os

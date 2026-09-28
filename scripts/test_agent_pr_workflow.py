@@ -1258,7 +1258,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             "      queue: max\n"
         )
         for filename, jobs in (
-            ("swift-slow-lanes.yml", ("host-store-shadow", "slow-lanes", "ui-tests")),
+            ("swift-slow-lanes.yml", ("ui-tests",)),
             ("rust-perf.yml", ("nightly", "soak")),
         ):
             workflow = (REPOSITORY_ROOT / ".github/workflows" / filename).read_text()
