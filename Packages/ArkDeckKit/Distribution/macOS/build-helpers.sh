@@ -10,21 +10,14 @@ daemon_profile="${ARKDECK_DAEMON_PROVISIONING_PROFILE:-}"
 notary_profile="${ARKDECK_NOTARY_KEYCHAIN_PROFILE:-}"
 team_identifier="8AQTYW5FKR"
 keychain_group="$team_identifier.com.arkdeck.shared"
-# CHG-2026-074 M5 (G5 slice 20a): ARKDECK_HELPER_RUNTIME=rust releases the same
-# helper pair with the Rust CLI and daemon as its main programs. It retains no
-# Swift helper: by the maintainer's 2026-09-28 ruling (P8) there is no Swift
-# rollback build, and the rollback is the installed helper itself, which
-# `runtime service update` keeps in Helpers/.rollback and the maintainer copies
-# aside before the first cutover. scripts/release/build_macos_release.py calls
-# this mode for the release DMG. Swift stays the default until S6 deletes it.
-helper_runtime="${ARKDECK_HELPER_RUNTIME:-swift}"
-case "$helper_runtime" in
-  swift | rust) ;;
-  *)
-    echo "ARKDECK_HELPER_RUNTIME must be swift or rust" >&2
-    exit 64
-    ;;
-esac
+# CHG-2026-074 M5: the helper pair's main programs are the Rust CLI and
+# daemon, laid out by package-rust-helpers.sh. It retains no Swift helper: by
+# the maintainer's 2026-09-28 ruling (P8) there is no Swift rollback build, and
+# the rollback is the installed helper itself, which `runtime service update`
+# keeps in Helpers/.rollback and the maintainer copies aside before the first
+# cutover. The Swift helper build and its Rust transport facade are retired
+# (TASK-XPA-017). scripts/release/build_macos_release.py calls this script for
+# the release DMG.
 
 if [[ -z "$cli_profile" || -z "$daemon_profile" || -z "$notary_profile" ]]; then
   echo "CLI/daemon provisioning profiles and ARKDECK_NOTARY_KEYCHAIN_PROFILE are required" >&2
@@ -81,83 +74,25 @@ validate_profile() {
 validate_profile "cli" "$cli_profile" "$team_identifier.com.arkdeck.cli"
 validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd"
 
-if [[ "$helper_runtime" == rust ]]; then
-  # The same gates as the Swift release below: Developer ID with hardened
-  # runtime and a secure timestamp, strict verification, then notarization,
-  # stapling and Gatekeeper assessment of the pair.
-  rust_root="$(cd "$package_root/../../rust" && pwd)"
-  (cd "$rust_root" && cargo build --locked --release --target aarch64-apple-darwin \
-    -p arkdeck-cli -p arkdeck-agentd --bins)
-  target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
-    | plutil -extract target_directory raw -o - -)"
-  staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-helper-build.XXXXXX")"
-  bash "$distribution_root/package-rust-helpers.sh" \
-    "$target_directory/aarch64-apple-darwin/release" "$staging_root" \
-    "$cli_profile" "$daemon_profile" "$identity" --timestamp none
-  cli_bundle="$staging_root/ArkDeckCLI.app"
-  archive="$staging_root/ArkDeckCLI-notarization.zip"
-  ditto -c -k --keepParent "$cli_bundle" "$archive"
-  xcrun notarytool submit "$archive" --keychain-profile "$notary_profile" --wait
-  xcrun stapler staple "$cli_bundle"
-  spctl --assess --type execute --verbose=2 "$cli_bundle"
-  rm "$archive"
-  mkdir -p "$(dirname "$output_root")"
-  mv "$staging_root" "$output_root"
-  staging_root=""
-  rm -rf "$profile_root"
-  trap - EXIT
-  echo "$output_root/ArkDeckCLI.app"
-  exit 0
-fi
-
-# Host helpers ship for Apple silicon only, including when Swift runs under Rosetta.
-swift build --package-path "$package_root" --arch arm64 -c release --product arkdeck
-swift build --package-path "$package_root" --arch arm64 -c release --product arkdeck-agentd
-bin_root="$(swift build --package-path "$package_root" --arch arm64 -c release --show-bin-path)"
-workflows_resource_bundle="$bin_root/ArkDeckKit_ArkDeckWorkflows.bundle"
-launch_agent_resource_bundle="$bin_root/ArkDeckKit_ArkDeckLaunchAgent.bundle"
-if [[ ! -d "$workflows_resource_bundle" || ! -d "$launch_agent_resource_bundle" ]]; then
-  echo "required SwiftPM resource bundles are missing from the release products" >&2
-  exit 66
-fi
+# Developer ID with hardened runtime and a secure timestamp, strict
+# verification, then notarization, stapling and Gatekeeper assessment of the
+# pair.
+rust_root="$(cd "$package_root/../../rust" && pwd)"
+(cd "$rust_root" && cargo build --locked --release --target aarch64-apple-darwin \
+  -p arkdeck-cli -p arkdeck-agentd --bins)
+target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
+  | plutil -extract target_directory raw -o - -)"
 staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-helper-build.XXXXXX")"
+bash "$distribution_root/package-rust-helpers.sh" \
+  "$target_directory/aarch64-apple-darwin/release" "$staging_root" \
+  "$cli_profile" "$daemon_profile" "$identity" --timestamp
 cli_bundle="$staging_root/ArkDeckCLI.app"
-daemon_bundle="$cli_bundle/Contents/Helpers/ArkDeckAgent.app"
-mkdir -p \
-  "$cli_bundle/Contents/MacOS" "$cli_bundle/Contents/Resources" \
-  "$daemon_bundle/Contents/MacOS" "$daemon_bundle/Contents/Resources"
-cp "$distribution_root/ArkDeckCLI-Info.plist" "$cli_bundle/Contents/Info.plist"
-cp "$distribution_root/ArkDeckAgent-Info.plist" "$daemon_bundle/Contents/Info.plist"
-cp "$cli_profile" "$cli_bundle/Contents/embedded.provisionprofile"
-cp "$daemon_profile" "$daemon_bundle/Contents/embedded.provisionprofile"
-cp "$bin_root/arkdeck" "$cli_bundle/Contents/MacOS/arkdeck"
-cp "$bin_root/arkdeck-agentd" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
-cp -R "$workflows_resource_bundle" "$cli_bundle/Contents/Resources/"
-cp -R "$workflows_resource_bundle" "$daemon_bundle/Contents/Resources/"
-cp -R "$launch_agent_resource_bundle" "$cli_bundle/Contents/Resources/"
-chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
-
-bash "$package_root/../../rust/scripts/package-macos-facade.sh" release \
-  "$daemon_bundle" "$staging_root/rollback/ArkDeckAgent.app" "$identity" \
-  "$distribution_root/ArkDeckAgent.entitlements"
-
-codesign --force --sign "$identity" --options runtime --timestamp \
-  --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
-codesign --force --sign "$identity" --options runtime --timestamp \
-  --entitlements "$distribution_root/ArkDeckCLI.entitlements" "$cli_bundle"
-codesign --verify --strict --deep --verbose=2 "$cli_bundle"
 archive="$staging_root/ArkDeckCLI-notarization.zip"
 ditto -c -k --keepParent "$cli_bundle" "$archive"
 xcrun notarytool submit "$archive" --keychain-profile "$notary_profile" --wait
 xcrun stapler staple "$cli_bundle"
 spctl --assess --type execute --verbose=2 "$cli_bundle"
 rm "$archive"
-rollback_archive="$staging_root/ArkDeckAgent-rollback-notarization.zip"
-ditto -c -k --keepParent "$staging_root/rollback/ArkDeckAgent.app" "$rollback_archive"
-xcrun notarytool submit "$rollback_archive" --keychain-profile "$notary_profile" --wait
-xcrun stapler staple "$staging_root/rollback/ArkDeckAgent.app"
-spctl --assess --type execute --verbose=2 "$staging_root/rollback/ArkDeckAgent.app"
-rm "$rollback_archive"
 mkdir -p "$(dirname "$output_root")"
 mv "$staging_root" "$output_root"
 staging_root=""

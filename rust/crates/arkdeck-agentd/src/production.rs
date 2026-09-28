@@ -79,8 +79,9 @@ const APP_BUNDLE: &str = "com.arkdeck.desktop";
 const REFUSED: [&str; 7] = [
     "ARKDECK_DEVELOPMENT_STATE_ROOT",
     "ARKDECK_ENDPOINT",
-    // A facade pairing: its Swift authority, that authority's pin and the
-    // private socket a paired Swift daemon is handed.
+    // The retired facade pairing (`RETIRED_FACADE_PAIRING`): its Swift
+    // authority, that authority's pin and the private socket a paired Swift
+    // daemon was handed.
     "ARKDECK_SWIFT_DAEMON",
     "ARKDECK_SWIFT_SHA256",
     "ARKDECK_PRIVATE_SOCKET",
@@ -99,8 +100,53 @@ pub(crate) fn requested(value: Option<&OsStr>) -> Result<bool, String> {
     }
 }
 
+/// The executable name of the transport facade the installed Swift release
+/// ships beside its daemon (`arkdeck-facade`). Its mode is retired
+/// (TASK-XPA-017): this daemon no longer forwards to a Swift authority, and a
+/// copy of it under that name refuses to start. The Rust CLI still installs
+/// and reads a helper bundle that carries a signed facade — the retained Swift
+/// rollback pair — but never builds one.
+const RETIRED_FACADE_EXECUTABLE: &str = "arkdeck-facade";
+
+/// The retired facade's pairing inputs: the Swift daemon it forwarded to and
+/// the LaunchAgent's pin of that daemon.
+const RETIRED_FACADE_PAIRING: [&str; 2] = ["ARKDECK_SWIFT_DAEMON", "ARKDECK_SWIFT_SHA256"];
+
+/// Whether this process runs under the retired facade's executable name.
+pub(crate) fn runs_as_retired_facade() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|executable| {
+            executable
+                .file_name()
+                .map(|name| name == RETIRED_FACADE_EXECUTABLE)
+        })
+        .unwrap_or(false)
+}
+
+/// Refuses any start the retired facade mode would have served: under its
+/// executable name, or with a Swift daemon or its pin to pair.
+pub(crate) fn refuse_retired_facade(
+    set: &dyn Fn(&str) -> bool,
+    facade_executable: bool,
+) -> Result<(), String> {
+    if facade_executable {
+        return Err(format!(
+            "the transport facade is retired: {RETIRED_FACADE_EXECUTABLE} no longer pairs with \
+             a Swift daemon; run arkdeck-agentd itself"
+        ));
+    }
+    if let Some(name) = RETIRED_FACADE_PAIRING.iter().find(|name| set(name)) {
+        return Err(format!(
+            "the transport facade is retired: arkdeck-agentd pairs with no Swift daemon and \
+             takes no {name}"
+        ));
+    }
+    Ok(())
+}
+
 /// Refuses a production start that another composition's input also names,
-/// or that the facade executable would run.
+/// or that the retired facade's executable name would run.
 pub(crate) fn refuse_other_compositions(
     set: &dyn Fn(&str) -> bool,
     facade_executable: bool,

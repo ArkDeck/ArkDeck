@@ -15,7 +15,7 @@
 //! ([`ACKNOWLEDGMENT`]) and the owner runs its development HDC as the managed
 //! server. What the owner then proves about a real device is development-root
 //! evidence, never `REAL_DEVICE_PASS`, and the dashboard's Golden Journey
-//! count does not move. The standalone daemon and the facade never read the
+//! count does not move. The standalone and production daemons never read the
 //! acknowledgment: their authority stays the installed Runtime's, and the
 //! acknowledgment is refused there before anything is served.
 //!

@@ -15,7 +15,7 @@
 //! does: its `Resources` beside `MacOS`, the bundle directory beside the
 //! executable, and the directory above it. An isolated development root may
 //! name the helper outright with [`DEVELOPMENT_HELPER`]; the standalone
-//! daemon and the facade do not read it, as they read no other development
+//! and production daemons do not read it, as they read no other development
 //! variable. Whatever the source, the bytes are verified here and the facts
 //! the device actions carry (ABI, build id, SHA-256, byte count) are this
 //! file's, so naming a path pins exactly what it holds.

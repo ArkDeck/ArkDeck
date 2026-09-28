@@ -16,7 +16,8 @@ HDC 执行路径。
    `ARKDECK_DAEMON_PROVISIONING_PROFILE`；先用 `xcrun notarytool store-credentials`
    保存公证凭据，再把 profile 名称传入 `ARKDECK_NOTARY_KEYCHAIN_PROFILE`，运行
    `Distribution/macOS/build-helpers.sh`。脚本会核对两份 profile 的 Team、application
-   identifier 和共享 Keychain group，生成带 hardened runtime 的 `ArkDeckCLI.app`，在
+   identifier 和共享 Keychain group，用 Cargo 构建 arm64 Release 的 Rust `arkdeck`/`arkdeck-agentd`，
+   经共享布局步骤 `package-rust-helpers.sh` 生成带 hardened runtime 的 `ArkDeckCLI.app`，在
    `Contents/Helpers` 内嵌、逐层签名 `ArkDeckAgent.app`，最后完成 notarization、staple 和
    Gatekeeper assessment。未提供 Apple 授权的 profile 或公证凭据时不会产出发布 helper。
 3. 从已签名 CLI helper 运行：
@@ -37,28 +38,22 @@ ARKDECK_LOCAL_HELPER_OUTPUT=/absolute/output-directory \
 Distribution/macOS/build-local-helpers.sh
 ```
 
-该脚本固定构建 Debug `arkdeck`/`arkdeck-agentd`，复用发布路径相同的 Info.plist、资源、
-entitlements、Developer ID 和 hardened runtime，逐层执行严格 codesign 校验。它明确使用
-`timestamp=none`，不执行 notarization、staple 或 Gatekeeper distribution assessment，并在输出根
-写入 `LOCAL-DEVELOPMENT-BUILD.txt`；产物只可用于当前 Mac 的 `agentd install/update`、签名预设和
-CLI 真机验证，绝不是发布物。正式发布仍只能运行 `build-helpers.sh`，其公证要求没有本地绕过开关。
+该脚本用 Cargo 构建 arm64 Debug 的 Rust `arkdeck`/`arkdeck-agentd`，经发布路径同一布局步骤复用
+Info.plist、code-sign helper 资源、entitlements、Developer ID 和 hardened runtime，逐层执行严格
+codesign 校验。它明确使用 `timestamp=none`，不执行 notarization、staple 或 Gatekeeper distribution
+assessment，并在输出根写入 `LOCAL-DEVELOPMENT-BUILD.txt`；产物只可用于当前 Mac 的 `runtime service
+update` 与 CLI 验证，绝不是发布物。正式发布仍只能运行 `build-helpers.sh`，其公证要求没有本地绕过开关。
+构建本身不安装或切换 Runtime。Cargo 的 `CARGO_TARGET_DIR` 配置会被遵守。
 
-本地验证纯 Rust helper 时，在同一命令中增加 `ARKDECK_HELPER_RUNTIME=rust` 和
-`ARKDECK_ROLLBACK_HELPER=/absolute/ArkDeckAgent.app`。后者必须是当前 Swift daemon 加 Rust
-façade 的已签名 helper；脚本校验后原样保留到 `rollback/ArkDeckAgent.app`。Rust 模式用 Cargo
-构建 arm64 Debug CLI/daemon，通过共享打包步骤保留相同的 profile、Developer ID、hardened
-runtime 和严格签名校验，仍写入本地开发标记且不带时间戳。缺省模式仍是 Swift；构建本身不安装
-或切换 Runtime。Cargo 的 `CARGO_TARGET_DIR` 配置会被遵守。
-
-M5 切换窗口用的 Rust helper 也由 `build-helpers.sh` 发布：`ARKDECK_HELPER_RUNTIME=rust`（缺省
-`swift`，即上面的 Swift helper）以 Rust `arkdeck`/`arkdeck-agentd` 为两个包的主程序：包结构、
-Info.plist、provisioning profile、entitlements 与可执行名同 Swift helper（只少了只有 Swift 读的
-SwiftPM 资源，daemon 仍带 OpenHarmony code-sign helper），并经过同样的 profile 校验、Developer ID、
-hardened runtime、secure timestamp、公证、staple 与 Gatekeeper assessment。Rust daemon 包不含
-façade。按维护者 2026-09-28 裁决（P8）它不再保留 Swift 回滚 helper：回滚目标是切换前安装态的 helper，
-由 `runtime service update` 留在 `Helpers/.rollback`，维护者另用 `ditto` 留一份。发布 DMG（App、这对
-helper 与 ArkForge.bundle）由 `scripts/release/build_macos_release.py` 调用本模式产出，见
-`docs/release/macos-install.md`。
+两个脚本只构建 Rust helper 对（TASK-XPA-017 退役了 Swift helper 构建与 Rust daemon 的 façade 模式，
+`ARKDECK_HELPER_RUNTIME` 与 `ARKDECK_ROLLBACK_HELPER` 不再读取）。包结构、Info.plist、provisioning
+profile、entitlements 与可执行名同原 Swift helper（只少了只有 Swift 读的 SwiftPM 资源，daemon 仍带
+OpenHarmony code-sign helper）；Rust daemon 包不含 façade。按维护者 2026-09-28 裁决（P8）不保留也不另建
+Swift 回滚 helper：回滚目标是切换前安装态的 helper（Swift daemon + 已签名 `arkdeck-facade`），由
+`runtime service update` 留在 `Helpers/.rollback`，维护者另用 `ditto` 留一份；Rust CLI 的
+`runtime service update --daemon <该 bundle>` 仍按原样安装它（plist 指向 `arkdeck-facade` 并以
+`ARKDECK_SWIFT_SHA256` 钉住同包的 Swift daemon）。发布 DMG（App、这对 helper 与 ArkForge.bundle）由
+`scripts/release/build_macos_release.py` 调用 `build-helpers.sh` 产出，见 `docs/release/macos-install.md`。
 `Distribution/macOS/build-unsigned-rust-helpers.sh` 用同一布局步骤产出 ad hoc 签名、占位 profile 的
 一对 helper，输出根写有 `UNSIGNED-STRUCTURE-CHECK-ONLY.txt`，只供
 `Distribution/macOS/check-rust-helpers.py` 检查结构；生产 helper 校验会拒绝它，不可分发或安装。

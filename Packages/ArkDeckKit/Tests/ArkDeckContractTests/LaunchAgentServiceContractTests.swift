@@ -228,18 +228,15 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     }
     let releaseScript = try String(
       contentsOf: distribution.appending(path: "build-helpers.sh"), encoding: .utf8)
+    // TASK-XPA-017 retired the Swift helper build and its Rust facade: both
+    // scripts build only the Rust pair, through the shared layout step.
     for requiredStep in [
       "security cms -D",
-      "swift build --package-path \"$package_root\" --arch arm64 -c release --product arkdeck",
-      "swift build --package-path \"$package_root\" --arch arm64 -c release --product arkdeck-agentd",
-      "swift build --package-path \"$package_root\" --arch arm64 -c release --show-bin-path",
-      "codesign --verify --strict --deep",
+      "cargo build --locked --release --target aarch64-apple-darwin",
+      "-p arkdeck-cli -p arkdeck-agentd --bins",
       "xcrun notarytool submit",
       "xcrun stapler staple",
       "spctl --assess --type execute",
-      "cp -R \"$workflows_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
-      "cp -R \"$workflows_resource_bundle\" \"$daemon_bundle/Contents/Resources/\"",
-      "cp -R \"$launch_agent_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
     ] {
       XCTAssertTrue(
         releaseScript.contains(requiredStep),
@@ -251,16 +248,10 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     for requiredStep in [
       "security cms -D",
       "security find-identity -v -p codesigning",
-      "swift build --package-path \"$package_root\" --arch arm64 -c debug --product arkdeck",
-      "swift build --package-path \"$package_root\" --arch arm64 -c debug --product arkdeck-agentd",
-      "swift build --package-path \"$package_root\" --arch arm64 -c debug --show-bin-path",
-      "codesign --verify --strict --deep",
-      "--options runtime --timestamp=none",
+      "cargo build --locked --target aarch64-apple-darwin",
+      "--timestamp=none",
       "LOCAL-DEVELOPMENT-BUILD.txt",
       "-e \"$output_root\" || -L \"$output_root\"",
-      "cp -R \"$workflows_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
-      "cp -R \"$workflows_resource_bundle\" \"$daemon_bundle/Contents/Resources/\"",
-      "cp -R \"$launch_agent_resource_bundle\" \"$cli_bundle/Contents/Resources/\"",
     ] {
       XCTAssertTrue(
         localScript.contains(requiredStep),
@@ -277,23 +268,25 @@ final class LaunchAgentServiceContractTests: XCTestCase {
         "release helper pipeline must retain \(releaseOnlyStep)")
     }
 
-    // CHG-2026-074 M5 (G5 slice 20a): the Rust helper release, behind
-    // ARKDECK_HELPER_RUNTIME=rust in the same script, notarizes, staples and
-    // assesses the pair as the Swift release does, through the layout step it
-    // shares with the unsigned structure check. Neither that step nor the check
-    // reaches a release step. The Swift release does it for its pair and its
-    // facade rollback helper; the Rust release retains no Swift helper
-    // (maintainer ruling 2026-09-28, P8), so three in all.
+    // CHG-2026-074 M5 (G5 slice 20a): the Rust helper release notarizes,
+    // staples and assesses the pair once, through the layout step it shares
+    // with the unsigned structure check. Neither that step nor the check
+    // reaches a release step. It retains no Swift helper (maintainer ruling
+    // 2026-09-28, P8), and no script builds a Swift helper or a facade.
     for releaseStep in [
       "xcrun notarytool submit", "xcrun stapler staple", "spctl --assess --type execute",
     ] {
       XCTAssertEqual(
-        releaseScript.components(separatedBy: releaseStep).count - 1, 3,
-        "both helper releases must retain \(releaseStep) for each bundle they ship")
+        releaseScript.components(separatedBy: releaseStep).count - 1, 1,
+        "the helper release must retain \(releaseStep) for the one bundle it ships")
     }
-    XCTAssertFalse(
-      releaseScript.contains("ARKDECK_ROLLBACK_HELPER"),
-      "the Rust helper release must not require a Swift rollback helper")
+    for script in [releaseScript, localScript] {
+      for retired in [
+        "ARKDECK_ROLLBACK_HELPER", "ARKDECK_HELPER_RUNTIME", "swift build", "package-macos-facade.sh",
+      ] {
+        XCTAssertFalse(script.contains(retired), "the helper builds must not reach \(retired)")
+      }
+    }
     let rustLayoutStep = "bash \"$distribution_root/package-rust-helpers.sh\""
     XCTAssertTrue(
       releaseScript.contains(rustLayoutStep),

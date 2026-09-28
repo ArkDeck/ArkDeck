@@ -39,12 +39,6 @@ mod app_ingress;
 #[path = "../../src/bootstrap_readers.rs"]
 mod bootstrap_readers;
 #[allow(dead_code)]
-#[path = "../../src/facade.rs"]
-mod facade;
-#[allow(dead_code)]
-#[path = "../../src/facade_owners.rs"]
-mod facade_owners;
-#[allow(dead_code)]
 #[path = "../../src/host.rs"]
 mod host;
 #[allow(dead_code)]
@@ -84,8 +78,6 @@ fn the_daemon_modules_compiled_here_keep_no_tests_beside_them() {
             "bootstrap_readers",
             include_str!("../../src/bootstrap_readers.rs"),
         ),
-        ("facade", include_str!("../../src/facade.rs")),
-        ("facade_owners", include_str!("../../src/facade_owners.rs")),
         ("host", include_str!("../../src/host.rs")),
         ("managed_hdc", include_str!("../../src/managed_hdc.rs")),
         (

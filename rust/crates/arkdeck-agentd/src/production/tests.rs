@@ -100,6 +100,25 @@ fn only_production_is_requested_and_other_compositions_refuse_it() {
 }
 
 #[test]
+fn the_retired_facade_is_refused_by_name_and_by_its_pairing() {
+    assert_eq!(refuse_retired_facade(&|_| false, false), Ok(()));
+    assert!(
+        refuse_retired_facade(&|_| false, true)
+            .unwrap_err()
+            .contains("arkdeck-facade no longer pairs")
+    );
+    for name in RETIRED_FACADE_PAIRING {
+        let refused = refuse_retired_facade(&|set| set == name, false).unwrap_err();
+        assert!(refused.contains("facade is retired"), "{refused}");
+        assert!(refused.contains(name), "{refused}");
+        // A production start names the pairing as another composition's input.
+        assert!(REFUSED.contains(&name));
+    }
+    // The test binary is not the facade.
+    assert!(!runs_as_retired_facade());
+}
+
+#[test]
 fn the_claim_holds_swifts_lock_and_the_transport_and_names_this_process() {
     let home = Home::new();
     let layout = home.layout();

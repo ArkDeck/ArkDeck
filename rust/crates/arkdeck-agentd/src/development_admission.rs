@@ -12,7 +12,7 @@
 //! above all — and the managed server is stopped when one does
 //! (`managed_hdc::Launched`).
 //!
-//! Standalone and facade starts never get here: `main.rs` refuses every
+//! Standalone and production starts never get here: `main.rs` refuses every
 //! development input of theirs before anything else.
 use crate::{code_sign_helper, development_mutation, development_usb};
 use arkdeck_provider_hdc::{EndpointSelection, SERVER_PORT_VARIABLE};

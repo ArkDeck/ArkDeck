@@ -490,9 +490,9 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
 | `job cancel`、`job reconcile`、`job wait`、`agent status`、`agent resume`、`human-action show`、`session cleanup preview/apply`、`runtime storage status`、`runtime tool select`、`runtime signing status` | `command_registry.json:7350`、`:7645`、`:6701`、`:10944`、`:11375`、`:11649`、`:8118`、`:8222`、`:3259`、`:2600`、`:1633` |
 | `arkdeck-agentd --cutover-preflight [--hold-instance-lock]`：环境、退出码、输出字段、拒绝种类、快照 | `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-018/runtime-service-cutover-preflight-run.md:12-19`、`:35-77` |
 | `loaderTransitionAwaitingBinding`、`retainedSessions`（#2255） | `rust/crates/arkdeck-agentd/src/cutover_preflight.rs:215-223`、`:247-253`；`rust/crates/arkdeck-cli/src/runtime_service_install.rs:673-695`、`:702-711`、`:727-733`；记录 `evidence/runs/TASK-XPA-017/cutover-preflight-legacy-refusals-run.md:18-35`、`:254-257` |
-| Rust helper 发布构建与签名 | `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh:17-30`、`:88-121`；`package-rust-helpers.sh:83-136` |
+| Rust helper 发布构建与签名 | `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh:13-20`、`:77-101`；`package-rust-helpers.sh:80-104` |
 | 发布包只读验收与维护者窗口命令 | `evidence/runs/TASK-XPA-017/rust-helper-packaging-run.md` §5、§6 |
-| 结构检查（只适用于无签名产物） | `Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py:35`、`:69-73`、`:305-345` |
+| 结构检查（只适用于无签名产物） | `Packages/ArkDeckKit/Distribution/macOS/check-rust-helpers.py:36`、`:68-72`、`:305-345` |
 | ArkForge 源码 pin | `rust/Cargo.toml:23-29`；`Packages/ArkDeckKit/Package.swift:46-48`；`rust/scripts/check-arkforge-pin.py` |
 | ArkForge bundle manifest 校验 | `rust/crates/arkdeck-contract/src/arkforge_bundle.rs:295-296`、`:337` |
 | GJ 跑法、固定事实、§6b、记录模板 | `docs/design/cli-golden-journey-headless-runbook.md` §0、§1–§6、§6b、§7 |

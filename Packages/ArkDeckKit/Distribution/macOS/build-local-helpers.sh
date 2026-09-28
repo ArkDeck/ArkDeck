@@ -1,9 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-# Builds a provisioned helper pair for this Mac only. Release distribution
+# Builds a provisioned Rust helper pair for this Mac only. Release distribution
 # remains exclusively owned by build-helpers.sh, which requires timestamping,
-# notarization, stapling and Gatekeeper assessment.
+# notarization, stapling and Gatekeeper assessment. The Swift helper build and
+# its Rust transport facade are retired (TASK-XPA-017).
 distribution_root="$(cd "$(dirname "$0")" && pwd)"
 package_root="$(cd "$distribution_root/../.." && pwd)"
 output_root="${ARKDECK_LOCAL_HELPER_OUTPUT:-$package_root/.build/arkdeck-macos-local-helpers}"
@@ -12,22 +13,6 @@ cli_profile="${ARKDECK_CLI_PROVISIONING_PROFILE:-}"
 daemon_profile="${ARKDECK_DAEMON_PROVISIONING_PROFILE:-}"
 team_identifier="8AQTYW5FKR"
 keychain_group="$team_identifier.com.arkdeck.shared"
-helper_runtime="${ARKDECK_HELPER_RUNTIME:-swift}"
-rollback_helper="${ARKDECK_ROLLBACK_HELPER:-}"
-case "$helper_runtime" in
-  swift) ;;
-  rust)
-    if [[ "$rollback_helper" != /*.app || ! -d "$rollback_helper" || -L "$rollback_helper" ]]; then
-      echo "ARKDECK_ROLLBACK_HELPER must name the current Swift ArkDeckAgent.app to keep for one cycle" >&2
-      exit 64
-    fi
-    ;;
-  *)
-    echo "ARKDECK_HELPER_RUNTIME must be swift or rust" >&2
-    exit 64
-    ;;
-esac
-
 if [[ -z "$cli_profile" || -z "$daemon_profile" ]]; then
   echo "ARKDECK_CLI_PROVISIONING_PROFILE and ARKDECK_DAEMON_PROVISIONING_PROFILE are required" >&2
   exit 64
@@ -97,69 +82,17 @@ validate_profile() {
 validate_profile "cli" "$cli_profile" "$team_identifier.com.arkdeck.cli"
 validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd"
 
-if [[ "$helper_runtime" == rust ]]; then
-  # The provisioned local pair uses the release layout with debug binaries
-  # and no timestamp. Its signed rollback helper is retained without change.
-  rust_root="$(cd "$package_root/../../rust" && pwd)"
-  (cd "$rust_root" && cargo build --locked --target aarch64-apple-darwin \
-    -p arkdeck-cli -p arkdeck-agentd --bins)
-  target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
-    | plutil -extract target_directory raw -o - -)"
-  staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-local-helper-build.XXXXXX")"
-  bash "$distribution_root/package-rust-helpers.sh" \
-    "$target_directory/aarch64-apple-darwin/debug" "$staging_root" \
-    "$cli_profile" "$daemon_profile" "$identity" --timestamp=none "$rollback_helper"
-  printf '%s\n' \
-    "LOCAL DEVELOPMENT BUILD — not notarized, not stapled, and not for distribution." \
-    > "$staging_root/LOCAL-DEVELOPMENT-BUILD.txt"
-  mkdir -p "$(dirname "$output_root")"
-  mv "$staging_root" "$output_root"
-  staging_root=""
-  rm -rf "$profile_root"
-  trap - EXIT
-  echo "local development helper; do not distribute" >&2
-  echo "$output_root/ArkDeckCLI.app"
-  exit 0
-fi
-
-# Host helpers ship for Apple silicon only, including when Swift runs under Rosetta.
-swift build --package-path "$package_root" --arch arm64 -c debug --product arkdeck
-swift build --package-path "$package_root" --arch arm64 -c debug --product arkdeck-agentd
-bin_root="$(swift build --package-path "$package_root" --arch arm64 -c debug --show-bin-path)"
-workflows_resource_bundle="$bin_root/ArkDeckKit_ArkDeckWorkflows.bundle"
-launch_agent_resource_bundle="$bin_root/ArkDeckKit_ArkDeckLaunchAgent.bundle"
-if [[ ! -d "$workflows_resource_bundle" || ! -d "$launch_agent_resource_bundle" ]]; then
-  echo "required SwiftPM resource bundles are missing from the debug products" >&2
-  exit 66
-fi
-
+# The provisioned local pair uses the release layout with debug binaries
+# and no timestamp. It retains no Swift helper, as the release does not.
+rust_root="$(cd "$package_root/../../rust" && pwd)"
+(cd "$rust_root" && cargo build --locked --target aarch64-apple-darwin \
+  -p arkdeck-cli -p arkdeck-agentd --bins)
+target_directory="$(cd "$rust_root" && cargo metadata --locked --format-version 1 --no-deps \
+  | plutil -extract target_directory raw -o - -)"
 staging_root="$(mktemp -d "${TMPDIR:-/tmp}/arkdeck-local-helper-build.XXXXXX")"
-cli_bundle="$staging_root/ArkDeckCLI.app"
-daemon_bundle="$cli_bundle/Contents/Helpers/ArkDeckAgent.app"
-mkdir -p \
-  "$cli_bundle/Contents/MacOS" "$cli_bundle/Contents/Resources" \
-  "$daemon_bundle/Contents/MacOS" "$daemon_bundle/Contents/Resources"
-cp "$distribution_root/ArkDeckCLI-Info.plist" "$cli_bundle/Contents/Info.plist"
-cp "$distribution_root/ArkDeckAgent-Info.plist" "$daemon_bundle/Contents/Info.plist"
-cp "$cli_profile" "$cli_bundle/Contents/embedded.provisionprofile"
-cp "$daemon_profile" "$daemon_bundle/Contents/embedded.provisionprofile"
-cp "$bin_root/arkdeck" "$cli_bundle/Contents/MacOS/arkdeck"
-cp "$bin_root/arkdeck-agentd" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
-cp -R "$workflows_resource_bundle" "$cli_bundle/Contents/Resources/"
-cp -R "$workflows_resource_bundle" "$daemon_bundle/Contents/Resources/"
-cp -R "$launch_agent_resource_bundle" "$cli_bundle/Contents/Resources/"
-chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
-
-bash "$package_root/../../rust/scripts/package-macos-facade.sh" debug \
-  "$daemon_bundle" "$staging_root/rollback/ArkDeckAgent.app" "$identity" \
-  "$distribution_root/ArkDeckAgent.entitlements"
-
-codesign --force --sign "$identity" --options runtime --timestamp=none \
-  --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
-codesign --force --sign "$identity" --options runtime --timestamp=none \
-  --entitlements "$distribution_root/ArkDeckCLI.entitlements" "$cli_bundle"
-codesign --verify --strict --deep --verbose=2 "$cli_bundle"
-
+bash "$distribution_root/package-rust-helpers.sh" \
+  "$target_directory/aarch64-apple-darwin/debug" "$staging_root" \
+  "$cli_profile" "$daemon_profile" "$identity" --timestamp=none
 printf '%s\n' \
   "LOCAL DEVELOPMENT BUILD — not notarized, not stapled, and not for distribution." \
   > "$staging_root/LOCAL-DEVELOPMENT-BUILD.txt"
@@ -168,6 +101,5 @@ mv "$staging_root" "$output_root"
 staging_root=""
 rm -rf "$profile_root"
 trap - EXIT
-
 echo "local development helper; do not distribute" >&2
 echo "$output_root/ArkDeckCLI.app"

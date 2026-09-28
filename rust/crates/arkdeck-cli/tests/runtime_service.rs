@@ -2585,6 +2585,152 @@ fn a_failed_rust_bootstrap_can_explicitly_roll_back_without_rewriting_runtime_st
     );
 }
 
+/// The rollback pair the maintainer keeps from before the first cutover
+/// (runbook §0.2 `$ROLLBACK`): the installed Swift release's daemon bundle,
+/// its Swift daemon behind the signed `arkdeck-facade`. The daemon no longer
+/// builds or runs a facade (TASK-XPA-017), but `update --daemon` still
+/// installs this prebuilt pair as Swift's installer did: the plist names the
+/// facade and pins the Swift daemon beside it, and the service reads back
+/// consistent. A cutover from it keeps it in `.rollback`, and rolling back to
+/// the retained copy restores it byte for byte.
+#[test]
+fn update_installs_the_retained_facade_pair_and_rolls_back_to_it() {
+    let home = Home::new();
+    home.install();
+    let pair = Helper::new(&home, "retained", &Daemon::Swift);
+    let pair_facade = pair.bundle.join("Contents/MacOS/arkdeck-facade");
+    write_executable(&pair_facade, b"#!/bin/sh\n# facade\nexit 0\n");
+    let launchd = Launchd::loaded();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&pair, &home));
+    assert_eq!(answer.failure, None);
+    let domain = domain();
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootout {domain}/com.arkdeck.agentd"),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    // The pair is installed as it is: both executables, owner-only.
+    let installed_facade = home
+        .paths
+        .installed_daemon_bundle
+        .join("Contents/MacOS/arkdeck-facade");
+    assert_eq!(
+        fs::read(&installed_facade).unwrap(),
+        fs::read(&pair_facade).unwrap()
+    );
+    assert_eq!(
+        fs::read(&home.paths.installed_daemon).unwrap(),
+        fs::read(pair.bundle.join("Contents/MacOS/arkdeck-agentd")).unwrap()
+    );
+    // The plist launches the facade and pins the Swift daemon it pairs with;
+    // the analyzer stays the bundle's daemon. No production composition.
+    let mut environment = swift_environment(&home);
+    environment.insert(
+        "ARKDECK_SWIFT_SHA256".to_owned(),
+        digest(&home.paths.installed_daemon),
+    );
+    let facade_plist = plist(
+        &text(&installed_facade),
+        &environment,
+        &text(&home.paths.standard_output),
+        &text(&home.paths.standard_error),
+    );
+    assert_eq!(fs::read_to_string(&home.paths.plist).unwrap(), facade_plist);
+    assert_eq!(mode(&home.paths.plist), 0o600);
+    // The receipt names the facade and its digest.
+    let receipt: Value = serde_json::from_slice(&fs::read(&home.paths.receipt).unwrap()).unwrap();
+    assert_eq!(receipt["daemonPath"], json!(text(&installed_facade)));
+    assert_eq!(receipt["daemonSHA256"], json!(digest(&pair_facade)));
+    assert_eq!(answer.document.unwrap(), receipt);
+    // What was written reads back as a consistent installation.
+    let status = host(&home, &launchd).status().unwrap();
+    assert_eq!(
+        status.daemon_sha256.as_deref(),
+        Some(digest(&pair_facade).as_str())
+    );
+    assert!(
+        status
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.contains("drift") && !diagnostic.contains("plist")),
+        "{:?}",
+        status.diagnostics
+    );
+    let pair_plist = fs::read(&home.paths.plist).unwrap();
+    let pair_receipt = fs::read(&home.paths.receipt).unwrap();
+
+    // The cutover to the Rust daemon keeps the pair one generation.
+    let rust = Helper::new(
+        &home,
+        "rust",
+        &Daemon::Rust {
+            first: preflight_document(&home, json!([]), false),
+            held: preflight_document(&home, json!([]), true),
+            busy: None,
+            analyzer: Analyzer::Answers,
+        },
+    );
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&rust, &home));
+    assert_eq!(answer.failure, None);
+    assert!(!installed_facade.exists());
+    let mut production = swift_environment(&home);
+    production.insert(
+        "ARKDECK_RUNTIME_COMPOSITION".to_owned(),
+        "production".to_owned(),
+    );
+    assert_eq!(
+        fs::read_to_string(&home.paths.plist).unwrap(),
+        plist(
+            &text(&home.paths.installed_daemon),
+            &production,
+            &text(&home.paths.standard_output),
+            &text(&home.paths.standard_error),
+        )
+    );
+    assert_eq!(
+        fs::read(
+            home.paths
+                .rollback_bundle
+                .join("Contents/MacOS/arkdeck-facade")
+        )
+        .unwrap(),
+        fs::read(&pair_facade).unwrap()
+    );
+
+    // Rolling back to the maintainer's retained copy (runbook §4) restores
+    // the pair, its plist and its receipt as they were.
+    launchd.calls.lock().unwrap().clear();
+    let answer = update_leaf(&host(&home, &launchd), &update_options(&pair, &home));
+    assert_eq!(answer.failure, None);
+    assert_eq!(
+        launchd.calls(),
+        [
+            print_call(),
+            print_call(),
+            format!("bootout {domain}/com.arkdeck.agentd"),
+            format!("bootstrap {domain} {}", text(&home.paths.plist)),
+        ]
+    );
+    assert_eq!(
+        fs::read(&installed_facade).unwrap(),
+        fs::read(&pair_facade).unwrap()
+    );
+    assert_eq!(fs::read(&home.paths.plist).unwrap(), pair_plist);
+    assert_eq!(fs::read(&home.paths.receipt).unwrap(), pair_receipt);
+    // The Rust helper it replaced is now the one kept.
+    assert!(
+        !home
+            .paths
+            .rollback_bundle
+            .join("Contents/MacOS/arkdeck-facade")
+            .exists()
+    );
+}
+
 #[test]
 fn a_cutover_the_first_pass_refuses_changes_nothing() {
     let home = Home::new();

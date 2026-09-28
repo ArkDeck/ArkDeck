@@ -64,7 +64,7 @@
 //!
 //! The answer is one `arkdeck.cutover-preflight/1` document on stdout with
 //! exit 0, clear or not; exit 64 is a malformed invocation and 69 a process
-//! that may not run the preflight here (the facade's executable, another
+//! that may not run the preflight here (the retired facade's executable, another
 //! composition's inputs, no account home), each with only a stderr line.
 use crate::production::{self, Layout};
 use arkdeck_contract::{CutoverBlock, JobStateClass, canonical_json, sha256_hex};
@@ -107,7 +107,7 @@ pub(crate) fn run(arguments: &[OsString]) -> i32 {
     }
     if let Err(error) = production::refuse_other_compositions(
         &|name| std::env::var_os(name).is_some(),
-        crate::facade::swift_executable().is_some(),
+        production::runs_as_retired_facade(),
     ) {
         eprintln!("arkdeck-agentd: {error}");
         return 69;

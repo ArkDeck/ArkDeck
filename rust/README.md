@@ -815,7 +815,7 @@ mutable input signature, and a static executable (`ET_EXEC`, a loadable segment,
 no interpreter). An isolated development root may name one with
 `ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER`, an absolute path whose bytes are
 verified the same way, so the facts a deployment carries are that file's; the
-standalone daemon and the facade refuse that variable at startup, as they refuse
+standalone and production daemons refuse that variable at startup, as they refuse
 every other development one, and a named helper that does not verify fails
 startup. With no helper anywhere the operation stays unavailable with
 `provider_tool_unavailable`, as before. Once the Target's facts hold, the library's lease (a Job Artifact or an
@@ -1880,7 +1880,7 @@ M2's real-device acceptance can run there (the maintainer's decision of
 2026-09-20, handled as that option A: development-root evidence again, and the
 dashboard's Golden Journey count does not move). Startup refuses the
 acknowledgment without the managed server, outside an isolated root, and in the
-standalone daemon and the facade. Nothing else about the proof changes: recorded
+standalone and production daemons. Nothing else about the proof changes: recorded
 authorization usage beside the root, a Job history that is not read-only, and an
 unsafe or foreign Session root still refuse it, and a mutation still needs its
 capability and its device hold.
@@ -2565,47 +2565,33 @@ envelopes (`reviewed/`, answered for `zlib.htrace` and
 `trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
 reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
 
-## macOS facade host owners (TASK-XPA-012)
+## Retired facade mode (TASK-XPA-017)
 
-The installed facade pair now serves `history.filter.list/save/delete` itself.
-`arkdeck-facade` opens the History filter document in the paired authority's
-state directory (the public socket's directory: `--state-dir` in development,
-`~/Library/Application Support/ArkDeck/Agentd` when installed) and never
-forwards those frames; the Swift daemon composed behind a facade
-(`AgentFacadeHostOwnership`) no longer opens that store, so one process owns
-its lock. A standalone Swift daemon keeps its own owner over the same file and
-format. Requests inside the facade queue on one in-process guard, as the Swift
-owner's blocking lock did; another process holding the lock is refused with
-`resourceConflict`. Every Rust owner lock is unlocked before its descriptor
-closes, so a child that another thread is spawning never keeps a released lock.
-Every other method is still forwarded unchanged.
+`arkdeck-agentd` no longer runs as the transport facade that forwarded the
+installed socket to a paired Swift daemon (formerly selected by the
+`arkdeck-facade` executable name or `ARKDECK_SWIFT_DAEMON`, with the facade
+serving `history.filter.*` itself). Under that name, or handed
+`ARKDECK_SWIFT_DAEMON` or `ARKDECK_SWIFT_SHA256`, it refuses to start before it
+binds or opens anything (`production::refuse_retired_facade`,
+`tests/retired_facade.rs`); the one-shot modes (analyzers, symbolizer, cutover
+preflight) still answer first. Nothing in this repository builds a facade any
+more: `rust/scripts/package-macos-facade.sh`, the facade transport tests and
+benchmarks, and the Swift branches of the helper build scripts are gone.
 
-`ARKDECK_DAEMON_UNDER_TEST=target/debug/arkdeck-agentd python3
-scripts/test-macos-facade.py` checks the transport against a fixture authority,
-including that History filter frames never reach it.
-`python3 rust/scripts/check-facade-host-owners.py` (from the repository root,
-after building both Rust binaries and the SwiftPM `arkdeck-agentd` and `arkdeck`
-debug products) runs the real pair: both CLIs, restart, a foreign lock holder,
-concurrent reads, the Swift daemon's own control-frame log, and a standalone
-Swift daemon over the same directory in between as the positive control.
-Swift children get a disposable `CFFIXED_USER_HOME`, so nothing installed is
-opened. Installed activation follows the normal helper update.
-
-The facade pairs with its authority over a socket in a directory it creates
-for that one process, `/private/tmp/arkdeck-facade-<nonce>`. It removes exactly
-that directory, with the authority's socket in it, on every exit it can
-observe: a startup failure, its authority's exit, and a stop by SIGTERM or
-SIGINT, which its accept loop takes as the isolated Rust daemon and the Swift
-daemon do (`arkdeck_platform::StopSignal`) and answers by returning, so the
-process ends with status 0. After SIGKILL the paired Swift daemon unlinks its
-socket and removes the directory when the pairing pipe closes. The harness's
-fixture authority does the same, so the facade tests leave nothing under
-`/private/tmp`.
+The installed Swift release still ships a signed `arkdeck-facade` beside its
+Swift daemon, and that pair is the cutover's rollback target (runbook §0.2
+`$ROLLBACK`). The Rust CLI keeps installing and reading it as it is: `runtime
+service update --daemon <that bundle>` renders the plist for the facade with
+`ARKDECK_SWIFT_SHA256` pinning the Swift daemon beside it, and `status` checks
+the facade's signature (`arkdeck-cli/tests/runtime_service.rs`,
+`update_installs_the_retained_facade_pair_and_rolls_back_to_it`). The
+production composition still takes the installed facade's transport lock, so
+neither runs beside the other.
 
 ## macOS production composition (TASK-XPA-017, not activated)
 
-The third mode of `arkdeck-agentd` — neither an isolated development root nor
-a facade — is the one M5's cutover points the LaunchAgent at. Without
+The mode of `arkdeck-agentd` that is not an isolated development root is the
+one M5's cutover points the LaunchAgent at. Without
 `ARKDECK_RUNTIME_COMPOSITION` it stays the read-only foundation described
 above; with `ARKDECK_RUNTIME_COMPOSITION=production` (its one value) the daemon
 composes every owner over the account's own state, as Swift's daemon lays it

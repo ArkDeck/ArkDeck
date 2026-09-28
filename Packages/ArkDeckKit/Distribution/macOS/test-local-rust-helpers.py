@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import plistlib
 import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -41,18 +40,10 @@ def tool(name, arguments):
     elif name == "codesign":
         if failure == "sign" and "--force" in arguments:
             return 18
-        if failure == "rollback" and arguments[-1] == os.environ["ARKDECK_ROLLBACK_HELPER"]:
-            return 19
         return 0
     elif name == "lipo":
         print("x86_64" if failure == "architecture" else "arm64")
         return 0
-    elif name == "ditto":
-        shutil.copytree(arguments[0], arguments[1])
-        return 0
-    elif name == "swift":
-        # A default invocation must still reach the Swift build, not Cargo.
-        return 91
     raise RuntimeError(f"unexpected tool call: {name} {arguments}")
 
 
@@ -74,21 +65,12 @@ class LocalRustHelpers(unittest.TestCase):
             path = binaries / name
             path.write_text(f"fixture Rust {name}\n")
             path.chmod(0o700)
-        self.rollback = self.root / "current Swift.app"
-        (self.rollback / "Contents/MacOS").mkdir(parents=True)
-        shutil.copyfile(DISTRIBUTION / "ArkDeckAgent-Info.plist", self.rollback / "Contents/Info.plist")
-        for name in ["arkdeck-agentd", "arkdeck-facade"]:
-            path = self.rollback / "Contents/MacOS" / name
-            path.write_text(f"fixture rollback {name}\n")
-            path.chmod(0o700)
         self.env = {
             "PATH": f"{self.bin}:/usr/bin:/bin",
             "TMPDIR": str(self.tmp),
             "CARGO_TARGET_DIR": str(self.target),
             "FIXTURE_LOG": str(self.log),
             "ARKDECK_CODESIGN_IDENTITY": IDENTITY,
-            "ARKDECK_HELPER_RUNTIME": "rust",
-            "ARKDECK_ROLLBACK_HELPER": str(self.rollback),
             "ARKDECK_LOCAL_HELPER_OUTPUT": str(self.output),
         }
         for kind in ["cli", "daemon"]:
@@ -117,10 +99,12 @@ class LocalRustHelpers(unittest.TestCase):
         if expected:
             self.assertFalse(self.output.exists(), "failed build published a helper")
         self.calls = [json.loads(line) for line in self.log.read_text().splitlines()] if self.log.exists() else []
-        self.assertFalse(any(call[0] in ["xcrun", "spctl", "launchctl"] for call in self.calls))
+        # No release step, and no Swift build: the Swift helper is retired.
+        self.assertFalse(any(call[0] in ["xcrun", "spctl", "launchctl", "swift", "ditto"]
+                             for call in self.calls))
         return result
 
-    def test_rust_debug_pair_uses_shared_layout_and_keeps_rollback(self):
+    def test_rust_debug_pair_uses_shared_layout_and_retains_no_swift_helper(self):
         result = self.run_build(0)
         cli = self.output / "ArkDeckCLI.app"
         daemon = cli / "Contents/Helpers/ArkDeckAgent.app"
@@ -130,9 +114,8 @@ class LocalRustHelpers(unittest.TestCase):
             self.assertEqual((bundle / f"Contents/MacOS/{program}").read_bytes(),
                              (self.target / f"aarch64-apple-darwin/debug/{program}").read_bytes())
         self.assertFalse((daemon / "Contents/MacOS/arkdeck-facade").exists())
-        for path in self.rollback.rglob("*"):
-            if path.is_file():
-                self.assertEqual(path.read_bytes(), (self.output / "rollback/ArkDeckAgent.app" / path.relative_to(self.rollback)).read_bytes())
+        self.assertEqual(sorted(entry.name for entry in self.output.iterdir()),
+                         ["ArkDeckCLI.app", "LOCAL-DEVELOPMENT-BUILD.txt"])
         builds = [call for call in self.calls if call[:2] == ["cargo", "build"]]
         self.assertEqual(builds, [["cargo", "build", "--locked", "--target", "aarch64-apple-darwin",
                                   "-p", "arkdeck-cli", "-p", "arkdeck-agentd", "--bins"]])
@@ -142,29 +125,9 @@ class LocalRustHelpers(unittest.TestCase):
             self.assertIn("--timestamp=none", call)
             self.assertIn(IDENTITY, call)
             self.assertIn("--entitlements", call)
-        self.assertFalse(any(call[0] == "swift" for call in self.calls))
 
-    def test_default_still_builds_swift(self):
-        del self.env["ARKDECK_HELPER_RUNTIME"]
-        del self.env["ARKDECK_ROLLBACK_HELPER"]
-        self.run_build(91)
-        self.assertTrue(any(call[0] == "swift" for call in self.calls))
-        self.assertFalse(any(call[0] == "cargo" for call in self.calls))
-
-    def test_invalid_mode_stops_before_tools(self):
-        self.env["ARKDECK_HELPER_RUNTIME"] = "unknown"
-        self.run_build(64)
-        self.assertEqual(self.calls, [])
-
-    def test_missing_rollback_stops_before_tools(self):
-        del self.env["ARKDECK_ROLLBACK_HELPER"]
-        self.run_build(64)
-        self.assertEqual(self.calls, [])
-
-    def test_symlink_rollback_stops_before_tools(self):
-        link = self.root / "alias.app"
-        link.symlink_to(self.rollback, target_is_directory=True)
-        self.env["ARKDECK_ROLLBACK_HELPER"] = str(link)
+    def test_missing_profile_stops_before_tools(self):
+        del self.env["ARKDECK_DAEMON_PROVISIONING_PROFILE"]
         self.run_build(64)
         self.assertEqual(self.calls, [])
 
@@ -188,10 +151,6 @@ class LocalRustHelpers(unittest.TestCase):
     def test_signing_failure_publishes_nothing(self):
         self.env["FIXTURE_FAIL"] = "sign"
         self.run_build(18)
-
-    def test_rollback_signature_failure_publishes_nothing(self):
-        self.env["FIXTURE_FAIL"] = "rollback"
-        self.run_build(19)
 
     def test_wrong_architecture_publishes_nothing(self):
         self.env["FIXTURE_FAIL"] = "architecture"
