@@ -1305,3 +1305,59 @@ fn the_session_root_the_settings_select_is_proved_too() {
         "{document}"
     );
 }
+
+/// A clear cutover must not select settings that the storage owner's status
+/// immediately refuses. Both preflight passes preserve every existing byte.
+#[test]
+fn cutover_refuses_storage_root_selections_that_status_cannot_use() {
+    let _turn = turn();
+    for case in [
+        "default-mismatch",
+        "missing-custom",
+        "symlink-custom",
+        "missing-default",
+        "valid-custom",
+    ] {
+        let home = Home::new();
+        home.minimal();
+        let custom = home.0.join("custom-sessions");
+        directory(&custom);
+        let alias = home.0.join("alias-sessions");
+        std::os::unix::fs::symlink(&custom, &alias).unwrap();
+        let (kind, path, clear) = match case {
+            "default-mismatch" => ("default", custom.clone(), false),
+            "missing-custom" => ("custom", home.0.join("absent-sessions"), false),
+            "symlink-custom" => ("custom", alias, false),
+            "missing-default" => ("default", home.sessions(), true),
+            "valid-custom" => ("custom", custom, true),
+            _ => unreachable!(),
+        };
+        let settings = home.state().join("session-storage.json");
+        let mut bytes = serde_json::to_vec(&json!({
+            "schemaVersion": "arkdeck.session-storage-store/1", "generation": 2,
+            "rootKind": kind, "rootPath": path,
+            "policy": {"totalQuotaBytes": 21474836480_u64, "safetyMarginBytes": 2147483648_u64,
+                "retentionDays": 90}
+        }))
+        .unwrap();
+        bytes.push(b'\n');
+        arkdeck_hoststore::decode_session_configuration(&bytes).unwrap();
+        fs::write(&settings, &bytes).unwrap();
+        fs::set_permissions(&settings, fs::Permissions::from_mode(0o600)).unwrap();
+        let before = home.tree();
+        for hold in [false, true] {
+            let document = preflight(&home, hold);
+            assert_eq!(document["clear"], clear, "{case}: {document}");
+            let expected = if clear {
+                vec![]
+            } else {
+                vec![json!({
+                    "kind": "unreadable", "source": "sessionStorage",
+                    "reason": "Session storage is unavailable or unsafe"
+                })]
+            };
+            assert_eq!(blocks(&document), expected, "{case}");
+        }
+        assert_eq!(home.tree(), before, "{case}");
+    }
+}

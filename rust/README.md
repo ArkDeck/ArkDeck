@@ -2737,7 +2737,12 @@ select), in that proof's own code and words. The proof is
 `JobStore::require_retained_sessions`'s scan, run without opening the Job store
 as an owner (`arkdeck_hoststore::cutover_retained_sessions`): an owner would
 create and mark its lock document and create its snapshot directory in the
-state the preflight must leave as it is.
+state the preflight must leave as it is. The configured root must also satisfy
+storage status's existing selection rules: a canonical path, an existing custom
+root, and the account's default path when `rootKind` is `default`. A missing
+default root remains valid for first installation. Invalid settings are reported
+as `unreadable` / `sessionStorage` before service replacement; neither preflight
+pass creates or repairs the selected root.
 
 `runtime service update` asks the new helper's daemon for it: Swift's daemon
 refuses the argument as unknown (exit 64) and is installed as above; the Rust
