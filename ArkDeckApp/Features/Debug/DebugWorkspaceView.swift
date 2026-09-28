@@ -104,6 +104,10 @@ struct DebugWorkspaceView: View {
         .accessibilityIdentifier("debug.refresh")
       }
     }
+    .focusedSceneValue(\.workspaceRefresh, WorkspaceKeyboardAction(
+      title: DebugL10n.text("debug.action.refresh"),
+      isEnabled: !model.isRefreshing,
+      perform: { model.refresh(targetID: selectedTargetID) }))
     .onAppear(perform: reconcileTargetSelection)
     .onChange(of: historyContext?.id, initial: true) { _, _ in
       if historyContext == nil { reconcileTargetSelection() } else { applyHistoryContext() }
