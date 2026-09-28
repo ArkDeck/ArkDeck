@@ -22,6 +22,18 @@ final class XPCConnectionBox: @unchecked Sendable {
   private var active: Pending?
   private var healthPending: UUID?
   private var generation = UUID()
+  private let connect: @Sendable (DispatchQueue) -> xpc_connection_t
+
+  /// `connect` is the production Mach lookup. Tests substitute an anonymous
+  /// in-process listener's endpoint; the signature requirement, health gate
+  /// and failure mapping are unchanged either way.
+  init(
+    connect: @escaping @Sendable (DispatchQueue) -> xpc_connection_t = {
+      xpc_connection_create_mach_service(ArkDeckAgentXPC.machServiceName, $0, 0)
+    }
+  ) {
+    self.connect = connect
+  }
 
   func enqueue(
     token: UUID, live: OSAllocatedUnfairLock<Bool>, frame: Data, health: Data, requestID: String,
@@ -74,8 +86,7 @@ final class XPCConnectionBox: @unchecked Sendable {
     }
     active = request
     if connection == nil {
-      let peer = ArkDeckRawXPCObject(
-        xpc_connection_create_mach_service(ArkDeckAgentXPC.machServiceName, queue, 0))
+      let peer = ArkDeckRawXPCObject(connect(queue))
       guard
         xpc_connection_set_peer_code_signing_requirement(
           peer.value, ArkDeckAgentXPC.serverCodeRequirement) == 0
@@ -94,7 +105,10 @@ final class XPCConnectionBox: @unchecked Sendable {
           guard self.generation == current else { return }
           if let active = self.active {
             self.finish(
-              .failure(.unavailable("Runtime connection interrupted; run runtime service update")),
+              .failure(
+                Self.failure(
+                  for: event,
+                  otherwise: "Runtime connection interrupted; run runtime service update")),
               token: active.token, invalid: true)
           } else {
             self.invalidate()
@@ -163,7 +177,9 @@ final class XPCConnectionBox: @unchecked Sendable {
       else {
         reply(
           .failure(
-            .unavailable("Runtime transport mismatch or interruption; run runtime service update")))
+            Self.failure(
+              for: response,
+              otherwise: "Runtime transport mismatch or interruption; run runtime service update")))
         return
       }
       var length = 0
@@ -175,6 +191,33 @@ final class XPCConnectionBox: @unchecked Sendable {
       }
       reply(.success(Data(bytes: bytes, count: length)))
     }
+  }
+}
+
+extension XPCConnectionBox {
+  /// libxpc reports a Runtime that fails `serverCodeRequirement` (another
+  /// release/build, or not the ArkDeck daemon at all) as its own error, before
+  /// any reply is read. Name that mismatch and its remedy instead of calling it
+  /// an interruption; every other error keeps its existing wording.
+  static func failure(
+    for error: xpc_object_t, otherwise detail: String
+  ) -> RuntimeXPCRequestTransport.Failure {
+    guard xpc_get_type(error) == XPC_TYPE_ERROR,
+      xpc_equal(error, XPC_ERROR_PEER_CODE_SIGNING_REQUIREMENT)
+    else { return .unavailable(detail) }
+    return .unavailable(ArkDeckAgentXPC.runtimeReleaseMismatchDetail)
+  }
+}
+
+extension ArkDeckAgentXPC {
+  /// SPK-8 negative (b): the words the App shows when the Runtime is not the
+  /// release this App pins. Version and build are this App's own.
+  package static var runtimeReleaseMismatchDetail: String {
+    let info = Bundle.main.infoDictionary ?? [:]
+    let version = info["CFBundleShortVersionString"] as? String ?? "unknown"
+    let build = info["CFBundleVersion"] as? String ?? "unknown"
+    return "Runtime release does not match this App (requires ArkDeck Runtime \(version) build \(build)"
+      + " signed by the ArkDeck team); run runtime service update"
   }
 }
 

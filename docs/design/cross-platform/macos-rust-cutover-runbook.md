@@ -32,7 +32,7 @@ standalone Rust daemon，然后做正式验收。本文不另立验收规则，�
 - 第 1 条（P2）：同一 target 上两个及以上停在 Loader 过渡的 parked Flash Job 会让 Rust daemon 起不来；由切换预检提前拒绝（软件侧补齐），不在窗口里现场处理。
 - 第 10 条：第 7 步回滚演练**不执行**。依据 `verification.md:73` 的 XPA-AC-9「no same-release Swift rollback」与 `:43-46` 的 r11 解释；临时 home 下的显式回滚已由 #2268 覆盖。`$ROLLBACK` 只在切换失败时按 §4 使用。
 - 第 13 条：façade/Swift helper 保留到 G5 报告为止。
-- 第 14、15 条：SPK-8 正向用 `FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip`（开关见 `scripts/ci/installed-rust-ui.md:17-32`）；两个负向用例由 TASK-XPA-019 补齐；`AgentXPCTransportContractTests` 是进程内测试，随 Swift target 删除，黑盒职责由 Rust 控制面黑盒测试与这两个负例承担。
+- 第 14、15 条：SPK-8 正向用 `FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip`（开关见 `scripts/ci/installed-rust-ui.md:17-32`）；两个负向用例已由 TASK-XPA-019 补齐为 `scripts/ci/installed_spk8_negatives.py foreign-client|version-mismatch`（开关与判据见 `scripts/ci/installed-rust-ui.md`「SPK-8 negative cases」，命令见第 4 步）；`AgentXPCTransportContractTests` 是进程内测试，不能对安装态 daemon 黑盒运行，随 Swift target 删除，黑盒职责由 Rust 控制面黑盒测试与这两个负例承担。
 - 第 19 条：接受手工预检在 Job 索引旁创建或触碰 `-wal`/`-shm`（数据库字节不变），不另做零写入打开。
 - 删除 Swift target、Swift CLI 与 façade（原第 20d 刀）改在开窗**之前**完成；窗口里的 `$OLD_ARKDECK` 是当前安装态的 Swift CLI 二进制，不依赖源码。
 - 已知的开窗阻塞：保留的 Session `2026/08/rockchip-session-42f8e86d-8cbf-4aa0-a411-5e1624e9f291` 无 Manifest、含未决的历史 Loader 过渡（`evidence/runs/TASK-XPA-017/historical-hap-step-digest-run.md:130-136`），预检会以 `retainedSessions` 拒绝；它涉及未知副作用，只能按 `POL-RECOVERY-001` 推进或由维护者裁决，窗口前先读一次 1a 预检确认。
@@ -241,6 +241,7 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   `bootstrap`（`/bin/launchctl`，参数数组见 `rust/crates/arkdeck-platform/src/launchd.rs:23-56`），属于安装态操作。
 - 前提：第 1 步两遍 1a 都 `clear: true`；P6 已放行（无签名预设或 S-1 已落地）；按 2026-09-28 的 P7 决定，
   显式传 `--arkforge-bundle <发布包 ArkForge.bundle 的稳定路径>`，不再沿用 live plist 的旧 bundle。
+  RC App 已装好时，先跑第 4 步的 SPK-8 负向 (b)（`version-mismatch`）：update 之后就没有自然的版本不匹配了。
 - 命令（用 **Rust CLI**；Swift CLI 的 update 不做预检、不写快照、不留 `.rollback`，不得用于切换）：
 
   ```sh
@@ -327,24 +328,55 @@ Swift 安装包（Rust→Swift 回滚）不走这两遍：新 helper 的 daemon 
   service may still be starting …」，`runtime_service.rs:1159-1161`；看 `~/Library/Logs/ArkDeck/agentd.error.log`）。
 - 失败时：见 §4 第 3 行（切换后 daemon 起不来）与第 4 行（切换后功能缺陷）。
 
-### 第 4 步：签名 App ↔ Rust Mach service 的正向与负向验收（SPK-8，约 15 分钟）
+### 第 4 步：签名 App ↔ Rust Mach service 的正向与负向验收（SPK-8，约 20 分钟）
 
-- 执行者：【维护者】（App 与 UI 跑道是全机唯一的，窗口内不与其他 UI 跑道并行）。
-- 正向：已安装的签名 App（P9）连上 Rust daemon 的 `com.arkdeck.agentd` Mach service，Overview 显示当前 DAYU200、
-  History 列出切换前的 Job（与 `00-jobs-before.json` 同集合）。可复用的已登记 UI 冒烟是
-  `ArkDeckHDCUITests/FacadeRollbackUITests`（Overview/History 只读冒烟，tasks.md TASK-XPA-003 Allowed paths 条目）：
+- 执行者：【维护者】（App 与 UI 跑道是全机唯一的，窗口内不与其他 UI 跑道并行）。三条用例都只读或只写并恢复
+  测试自己的 History filter，不改安装态、不派发设备操作；开关与判据的全文在 `scripts/ci/installed-rust-ui.md`。
+- 变量：`$APP` 为从 RC 安装的签名 `ArkDeck.app`，`$CLI` 为 RC 的 `ArkDeckCLI.app/Contents/MacOS/arkdeck`，
+  三个 SHA-256 分别对 `$APP/Contents/MacOS/ArkDeck`、`$CLI` 与 `$HELPER/Contents/MacOS/arkdeck-agentd` 用
+  `shasum -a 256` 取得；证据目录都用 `$OUT` 下尚不存在的新目录。
+- 正向（UI）：`FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip`。UI 测试的变量要加 `TEST_RUNNER_` 前缀：
 
   ```sh
-  sh scripts/ci/run-ui-tests.sh -only-testing:ArkDeckHDCUITests/FacadeRollbackUITests
+  TEST_RUNNER_ARKDECK_INSTALLED_RUST_UI=1 \
+  TEST_RUNNER_ARKDECK_INSTALLED_RUST_APP="$APP" TEST_RUNNER_ARKDECK_INSTALLED_RUST_APP_SHA256=… \
+  TEST_RUNNER_ARKDECK_INSTALLED_RUST_CLI="$CLI" TEST_RUNNER_ARKDECK_INSTALLED_RUST_CLI_SHA256=… \
+  TEST_RUNNER_ARKDECK_INSTALLED_RUST_DAEMON_SHA256=… \
+  TEST_RUNNER_ARKDECK_INSTALLED_RUST_EVIDENCE="$OUT/04-spk8-positive" \
+    sh scripts/ci/run-ui-tests.sh \
+    -only-testing:ArkDeckHDCUITests/FacadeRollbackUITests/testInstalledPureRustHistoryFilterRoundTrip
   ```
 
-  该测试需要的开关与前提 **TBD（维护者定）**：本文未核实它对「standalone Rust daemon」形态是否适用；
-  SPK-8 的判据是「History filter UI 测试对 Rust standalone daemon 绿、六项 entitlements 不变」
-  （tasks.md SPK-8 行），对应的具体测试名也 **TBD（维护者定）**。
-- 负向：身份不符的对端被拒且不挂起——(a) daemon 拒绝非本团队签名的客户端；(b) App 遇到非同一 release 或身份不符的
-  daemon 时报告不匹配与补救办法、不挂起（XPA-AC-9 r5 的「另一 release 的 daemon」一条）。可执行的负向用例与
-  harness **TBD（维护者定）**：仓内没有现成的「安装态负向」脚本，Q3 的环境裁决决定在哪里做。
-- 停止判据：正向任一项失败；负向中出现挂起或放行。
+  预期：测试通过（不是 skip），`$OUT/04-spk8-positive/restoration.json` 存在。
+- 负向 (a)，非本 team 签名的客户端被拒且零派发（切换后）：
+
+  ```sh
+  ARKDECK_SPK8_FOREIGN_CLIENT=1 \
+  ARKDECK_INSTALLED_RUST_APP="$APP" ARKDECK_INSTALLED_RUST_APP_SHA256=… \
+  ARKDECK_INSTALLED_RUST_CLI="$CLI" ARKDECK_INSTALLED_RUST_CLI_SHA256=… \
+  ARKDECK_INSTALLED_RUST_DAEMON_SHA256=… \
+    python3 scripts/ci/installed_spk8_negatives.py foreign-client "$OUT/04-spk8-foreign-client"
+  ```
+
+  预期：exit 0，`status: PASS`。ad-hoc 签名、无 team 的探针只发一帧只读 `health`；daemon 必须在不回任何帧的
+  情况下切断连接（`connectionInterrupted`/`connectionInvalid`），前后 launchd PID 与已钉身份不变。
+- 负向 (b)，App 面对另一 release 的 daemon 时报告不匹配与补救、不挂起：在**第 1–2 步之间**做——RC App 已装好、
+  `runtime service update` 之前，此时安装态仍是旧 helper，版本号或 build 号与 RC 不同。先退出 ArkDeck：
+
+  ```sh
+  ARKDECK_SPK8_VERSION_MISMATCH=1 ARKDECK_SPK8_APP="$APP" ARKDECK_SPK8_APP_SHA256=… \
+    python3 scripts/ci/installed_spk8_negatives.py version-mismatch "$OUT/02-spk8-version-mismatch"
+  ```
+
+  预期：exit 0，`status: PASS`。App 的 `--runtime-readonly-smoke` 入口两次刷新都在 20 秒内答
+  「Runtime release does not match this App … run runtime service update」，然后正常退出，launchd owner 不变。
+  若得到 `BLOCKED`（安装态 daemon 与 App 同版本），说明窗口里已没有自然的不匹配；切换后重跑需要一个带该入口、
+  build 号不同的旧签名 App。
+- 三条命令没有设开关时一律 `SKIPPED`（exit 77），skip 不是验收。`installed_spk8_negatives.py self-test` 只在
+  进程内匿名 listener 上自检探针，可在窗口前跑，不计 SPK-8 证据。
+- `AgentXPCTransportContractTests` 不在窗口内运行：它是对 Swift listener 的进程内测试，随 Swift target 删除；
+  黑盒职责由 Rust 控制面黑盒测试与上面两个负例承担（附录 B 第 15 条）。
+- 停止判据：正向任一项失败或被 skip；负向出现 `FAIL`（放行、挂起、服务被换）或 (a) 出现 `BLOCKED`。
 - 失败时：记 `BLOCKED_BY_PRODUCT_DEFECT`，按原实现 Task（TASK-XPA-019）修；是否回滚见 §4。
 
 ### 第 5 步：GJ-1…GJ-5 `REAL_DEVICE_PASS`（约 70 分钟）
@@ -539,7 +571,9 @@ façade bundle 保留一个周期）」，并写明「no same-release Swift roll
     整根拒绝），也没有移动它的已发布命令，只能手工移出 Session 根。待定：是否手工移出、移到哪里。
 13. 第 2 步：「façade 保留一个周期」的截止日。
 14. 第 4 步：SPK-8 正向的具体 UI 测试名与开关；负向用例与 harness；`FacadeRollbackUITests` 对 standalone Rust daemon 是否适用。
+    （2026-09-28 已收口：正向为 `testInstalledPureRustHistoryFilterRoundTrip`，负向为 `installed_spk8_negatives.py`，见第 4 步。）
 15. 第 7 步：`AgentXPCTransportContractTests` 黑盒子集对安装态 daemon 的运行方式。
+    （2026-09-28 已收口：不运行，随 Swift target 删除；黑盒职责由 Rust 控制面黑盒测试与 SPK-8 两个负例承担。）
 16. 第 7 步与 P6：#2272 已移除“存在预设即拒绝”的实现限制。Rust CLI 的 update（含回滚、GJ-4 campaign staging）按 P6 校验公开材料并刷新身份；待定的是实际窗口与回滚包验收，不是另选 CLI 绕过旧拒绝。
 17. 第 5 步 GJ-5：#2272 已提供 Rust `runtime signing install|migrate-deveco|install-sdk-release`（兼容旧 `signing` 拼法）。维护者仍须选择真实签名材料和凭据来源，确认在哪个安装窗口建立或沿用预设；沿用有效 Swift 预设不再与 P6 冲突。
 18. 第 2 步在快照之后失败的中间态：已只读核实（`evidence/runs/TASK-XPA-017/cutover-runbook-appendix-b-run.md` 第 18 条）：快照写完之后确无自动恢复；本文给的处理（按 §4 第 3 行
