@@ -131,5 +131,11 @@ No Rust crate changed, so no cargo checks; no contract input changed.
 
 ## CI
 
-Recorded by a later slice or a docs-only follow-up (the PR number and run ids are not known when this
-record is committed).
+PR #2304. First head `a73a868d0`: `guard` red on the scripts boundary-map test (`scripts/README.md` did
+not name `release/`); fixed in `0e661ca3d`. Second head `0e661ca3d`, Swift CI run `36418183518`: every
+lane green except `Rust workspace (macos-26)`, red in `arkdeck-provider-arkforge --test lane`
+`a_dropped_lane_ends_a_daemon_at_its_end_of_input` ("server launch could not be recorded from the
+kernel") during workspace tests, before the new release step ran. Invalid run by the four criteria: the
+failure is outside this diff (no Rust source changed), it is a process-launch timing test, it passes
+alone locally (`cargo test -p arkdeck-provider-arkforge --test lane`: 8 passed), and the diff cannot
+affect it. Re-pushed with this record to rerun; the final result is recorded by a later slice.
