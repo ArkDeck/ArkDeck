@@ -10,17 +10,13 @@
 //! Read-only: one public session per confirmation, no execution surface.
 
 use crate::device_access::discover;
-use arkdeck_contract::sha256_hex;
 use arkforge_client::DeviceObservationView;
+use arkforge_core::digest::{Domain, digest_in_domain};
 use std::path::Path;
 use std::time::Duration;
 
 /// Swift's bound on the public session a confirmation opens.
 pub const LOADER_OBSERVATION_TIMEOUT: Duration = Duration::from_secs(15);
-
-/// The domain prefix of `arkforge-transport::UsbDeviceRecord::topology_digest`,
-/// its trailing NUL included.
-const DEVICE_FACTS_DOMAIN: &[u8] = b"arkforge/v1/device-facts\0";
 
 /// Foundation's `CharacterSet.whitespaces`: the space separators and the tab.
 fn swift_whitespace(character: char) -> bool {
@@ -33,13 +29,13 @@ fn swift_whitespace(character: char) -> bool {
 }
 
 /// Swift `ArkForgeObservationSelection.topologyDigest`: the digest the daemon
-/// derives for a USB location id, `SHA-256(domain || locationID_be32)`; `None`
-/// when the topology is not a number that fits one.
+/// derives for a USB location id — `arkforge-transport`'s
+/// `UsbDeviceRecord::topology_digest`, `SHA-256(usb-topology domain ||
+/// locationID_be32)`, computed with the pinned `arkforge-core`'s own domain so
+/// the two cannot drift; `None` when the topology is not a number that fits one.
 pub fn topology_digest(usb_topology: &str) -> Option<String> {
     let location: u32 = usb_topology.trim_matches(swift_whitespace).parse().ok()?;
-    let mut preimage = DEVICE_FACTS_DOMAIN.to_vec();
-    preimage.extend_from_slice(&location.to_be_bytes());
-    Some(sha256_hex(&preimage))
+    Some(digest_in_domain(Domain::UsbTopology, &location.to_be_bytes()).to_hex())
 }
 
 /// Swift `ArkForgeObservationSelection.SelectionFailure`.
@@ -195,14 +191,17 @@ mod tests {
         }
     }
 
-    /// The published rule, checked against its own statement: the domain
-    /// with its NUL, then the location id big-endian — and Swift's reading of
-    /// the topology text around it.
+    /// The published rule, checked against its own statement: the
+    /// `usb-topology` domain with its NUL, then the location id big-endian —
+    /// and Swift's reading of the topology text around it.
     #[test]
     fn the_topology_digest_is_the_daemons_rule() {
-        let mut preimage = b"arkforge/v1/device-facts\0".to_vec();
+        let mut preimage = b"arkforge/v1/usb-topology\0".to_vec();
         preimage.extend_from_slice(&[0x01, 0x20, 0x00, 0x00]);
-        assert_eq!(topology_digest("18874368"), Some(sha256_hex(&preimage)));
+        assert_eq!(
+            topology_digest("18874368"),
+            Some(arkdeck_contract::sha256_hex(&preimage))
+        );
         assert_eq!(topology_digest(" 18874368\t"), topology_digest("18874368"));
         for unusable in ["", "loader", "4294967296", "-1", "18874368\n", "0x01200000"] {
             assert_eq!(topology_digest(unusable), None, "{unusable:?}");

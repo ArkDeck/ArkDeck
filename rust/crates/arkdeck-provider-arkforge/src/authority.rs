@@ -11,9 +11,10 @@
 //! 8.6).
 
 use crate::loader::topology_digest;
-use arkdeck_contract::{CborValue, canonical_cbor, sha256_hex};
+use arkdeck_contract::{CborValue, canonical_cbor};
 use arkforge_authority_api::authority_side::mint_integrity_tag;
 use arkforge_authority_api::{ControllerPairingSecret, PermitIntegrityTag, StepPermit};
+use arkforge_core::digest::{Domain, digest_in_domain};
 use arkforge_core::{
     AttemptId, AuthorityBindingRef, AuthorityNamespace, ControllerSessionId, JobId, OpaqueId,
     PermitId, PlanId, Sha256Digest, StepId,
@@ -420,16 +421,14 @@ pub fn device_facts_digest(snapshot: &StepAdmissionSnapshot) -> Vec<u8> {
             CborValue::Bool(snapshot.malformed_descriptor),
         ),
     ]);
-    let mut preimage = DEVICE_FACTS_DOMAIN.to_vec();
-    // Every value above is in the encoder's vocabulary.
-    preimage.extend(canonical_cbor(&facts).unwrap_or_default());
-    hex_to_bytes(&sha256_hex(&preimage)).unwrap_or_default()
+    // Every value above is in the encoder's vocabulary. The domain is the
+    // pinned `arkforge-core`'s own, the one `DeviceObservation::
+    // admission_facts_digest` hashes under, so the two cannot drift.
+    let payload = canonical_cbor(&facts).unwrap_or_default();
+    digest_in_domain(Domain::AdmissionDeviceFacts, &payload)
+        .as_bytes()
+        .to_vec()
 }
-
-/// The domain Swift's authority hashes the admission facts under, its
-/// trailing NUL included. Kept as Swift spells it until the maintainer rules
-/// on ArkForge's current domain (F2, 2026-09-26).
-const DEVICE_FACTS_DOMAIN: &[u8] = b"arkforge/v1/device-facts\0";
 
 /// Swift `canonicalMode(_:)`: the measured mode lineage's one key, whatever
 /// spelling a receipt or an admission uses.

@@ -4,6 +4,7 @@
 //! what this authority signs, and the admission facts encode as ArkForge's
 //! canonical CBOR encodes them.
 use super::*;
+use arkdeck_contract::sha256_hex;
 use arkforge_authority_api::{DispatchIntent, PairingEpoch, verify_permit};
 use arkforge_ipc::messages::KeyValue;
 use std::sync::Arc;
@@ -459,8 +460,8 @@ fn arkforges_own_verification_accepts_the_permit_for_its_dispatch() {
 }
 
 /// The admission facts encode exactly as ArkForge's canonical CBOR encodes
-/// the daemon's own admission facts map; only the domain prefix is this
-/// authority's (F2).
+/// the daemon's own admission facts map, under ArkForge's
+/// `admission-device-facts` domain (F2).
 #[test]
 fn the_admission_facts_encode_as_arkforges_canonical_cbor() {
     use arkforge_core::CborValue as Theirs;
@@ -516,7 +517,7 @@ fn the_admission_facts_encode_as_arkforges_canonical_cbor() {
                 Theirs::Bool(raw.malformed_descriptor),
             ),
         ]);
-        let mut preimage = DEVICE_FACTS_DOMAIN.to_vec();
+        let mut preimage = b"arkforge/v1/admission-device-facts\0".to_vec();
         preimage.extend(theirs.to_canonical_bytes().unwrap());
         assert_eq!(
             device_facts_digest(&raw),
