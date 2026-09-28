@@ -41,6 +41,7 @@ Trace Viewer 用 `traceViewerState=loaded|loading|failed`。所有页面保持�
 4. **跟随系统个性化**：sidebar icon、主选择态和 focus ring 跟随 macOS accent color。品牌色不覆盖用户选择；状态色只承担成功、警告和危险语义。
 5. **高信息密度但不拥挤**：优先同时显示设备、阶段、证据和操作，减少弹窗与层层 drill-down；长表允许排序、筛选和列宽调整。
 6. **所有控制都有键盘路径**：toolbar 命令同时出现在 menu bar；支持 `⌘R` refresh、`⌘F` search/filter、`⌘⇧J` 展开 Job inspector、`Esc` 取消或关闭 sheet，并恢复焦点。
+   History 的 `⌘F` 聚焦记录搜索，History / Debug 的 `⌘R` 与页面刷新共用可用状态；菜单命令跟随当前窗口的可见页面，切换页面不保留旧命令。独立 Trace Viewer 和 Viewer 原始属性搜索继续使用各自的 `⌘F`。
 
 以上方向与 Apple 当前 macOS HIG 一致：Mac 工具应利用大屏减少嵌套、支持窗口缩放和键盘工作流；sidebar 使用熟悉 symbol 并尊重系统 accent；toolbar 位于窗口 frame 内且命令在 menu bar 有等价入口。
 

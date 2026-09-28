@@ -48,6 +48,7 @@ struct RuntimeHistoryView: View {
   @State private var revealRowIDs: [String]?
   @State private var historyListGeneration = UUID()
   @State private var searchText = ""
+  @FocusState private var isSearchFocused: Bool
   @State private var statusFilter = HistoryStatusFilter.all
   @State private var modeFilter = HistoryModeFilter.all
   @State private var sessionFilter = Self.allSessions
@@ -153,6 +154,14 @@ struct RuntimeHistoryView: View {
         }
       }
     }
+    .focusedSceneValue(\.workspaceSearch, WorkspaceKeyboardAction(
+      title: historyLocalized("history.action.search"),
+      isEnabled: presentation.availability == .available && !presentation.jobs.isEmpty,
+      perform: { isSearchFocused = true }))
+    .focusedSceneValue(\.workspaceRefresh, WorkspaceKeyboardAction(
+      title: historyLocalized("history.action.refresh"),
+      isEnabled: onRefresh != nil && !isRefreshInFlight,
+      perform: { onRefresh?() }))
     .onChange(of: filterProjectionInput, initial: true) { _, input in
       cachedFilteredJobs = makeFilteredJobs()
       cachedFilterProjectionInput = input
@@ -494,6 +503,7 @@ struct RuntimeHistoryView: View {
         TextField(historyLocalized("history.filter.search"), text: $searchText)
           .textFieldStyle(.roundedBorder)
           .accessibilityIdentifier("history.filter.search")
+          .focused($isSearchFocused)
       }
       .padding(WorkspaceMetrics.pageInsetHorizontal)
       ScrollViewReader { scroll in

@@ -955,6 +955,10 @@ private struct AdvancedDumpInspectorView: View {
           .frame(maxWidth: .infinity, alignment: .leading)
       }
     }
+    .focusedSceneValue(\.workspaceSearch, WorkspaceKeyboardAction(
+      title: ViewerInspectorCopy.advancedSearch,
+      isEnabled: !fields.isEmpty,
+      perform: { searchFocusRequestID &+= 1 }))
   }
 
   private func searchBar(matchCount: Int, hasQuery: Bool) -> some View {
@@ -965,7 +969,6 @@ private struct AdvancedDumpInspectorView: View {
           .contentShape(.rect)
       }
       .buttonStyle(.borderless)
-      .keyboardShortcut("f", modifiers: [.command])
       .disabled(fields.isEmpty)
       .help(ViewerInspectorCopy.advancedSearchShortcut)
       .accessibilityLabel(ViewerInspectorCopy.advancedSearch)

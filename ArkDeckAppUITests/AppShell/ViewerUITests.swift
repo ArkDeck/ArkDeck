@@ -455,6 +455,25 @@ final class ViewerUITests: XCTestCase {
   /// This one cannot join the session: it asserts the *first* capture action
   /// label against the recapture label, which only an instance that has never
   /// captured can show, and it pins the second locale's strings.
+  func testAdvancedDumpFindCommandFollowsInspectorTab() {
+    let app = launchViewer()
+    defer { app.terminate() }
+    freshCapture(in: app)
+    revealNode("40", in: app).click()
+    app.buttons["viewer.inspector.tab.advancedDump"].click()
+    let search = app.textFields["viewer.advancedDump.search"]
+    XCTAssertTrue(search.waitForExistenceFast(timeout: 5))
+    app.typeKey("f", modifierFlags: .command)
+    app.typeText("COMPONENTID")
+    XCTAssertEqual(search.value as? String, "COMPONENTID")
+    XCTAssertTrue(app.descendants(matching: .any)["viewer.advancedDump.field.componentId"].exists)
+    XCTAssertTrue(app.descendants(matching: .any)["viewer.advancedDump.field.hostWindowId"]
+      .waitForNonExistenceFast(timeout: 5))
+    app.typeKey(XCUIKeyboardKey.escape, modifierFlags: [])
+    XCTAssertTrue(app.descendants(matching: .any)["viewer.advancedDump.field.hostWindowId"]
+      .waitForExistenceFast(timeout: 5))
+  }
+
   func testCaptureActionDistinguishesFirstCaptureFromRecapture() {
     let app = launchViewer(extra: ["-AppleLanguages", "(zh-Hans)"])
     let capture = app.buttons["viewer.recapture"]

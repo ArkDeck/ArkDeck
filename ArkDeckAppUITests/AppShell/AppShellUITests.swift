@@ -410,6 +410,56 @@ final class AppShellUITests: XCTestCase {
     assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
   }
 
+  func testHistoryKeyboardCommandsFollowVisibleWorkspace() {
+    for language in ["(en)", "(zh-Hans)"] {
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-diagnostics-session", "--ui-test-devices",
+        "--ui-test-window-frame=1180x783", "-AppleLanguages", language,
+      ])
+      select("app.navigation.history", in: app)
+      let search = app.textFields["history.filter.search"]
+      XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+      app.typeKey("f", modifierFlags: .command)
+      app.typeText("job-fixture-0001")
+      XCTAssertEqual(search.value as? String, "job-fixture-0001")
+      assertDisplayed(app.staticTexts["history.detail.job"], equals: "job-fixture-0001")
+      app.typeKey("a", modifierFlags: .command)
+      app.typeKey(XCUIKeyboardKey.delete.rawValue, modifierFlags: [])
+
+      app.typeKey("j", modifierFlags: [.command, .shift])
+      let read = app.buttons["jobInspector.readLog.fixture-capture.log"]
+      XCTAssertTrue(read.waitForExistenceFast(timeout: 10))
+      scrollIntoView(read, in: app)
+      read.click()
+      let log = element("jobInspector.log.text", in: app)
+      XCTAssertTrue(log.waitForExistenceFast(timeout: 10))
+      app.typeKey("r", modifierFlags: .command)
+      XCTAssertTrue(log.waitForNonExistenceFast(timeout: 10),
+        "Cmd-R must refresh History even when focus is inside Job Inspector")
+      app.typeKey("j", modifierFlags: [.command, .shift])
+
+      let findTitle = language == "(en)" ? "Search History" : "搜索历史记录"
+      // Opening the menu moves focus out of the search field; the scene's
+      // command must remain available until the actual workspace changes.
+      app.menuBars.menuBarItems.matching(
+        NSPredicate(format: "title IN %@", ["Edit", "编辑"])).firstMatch.click()
+      XCTAssertTrue(app.menuItems[findTitle].waitForExistenceFast(timeout: 5))
+      app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+      select("app.navigation.device", in: app)
+      app.menuBars.menuBarItems.matching(
+        NSPredicate(format: "title IN %@", ["Edit", "编辑"])).firstMatch.click()
+      XCTAssertFalse(app.menuItems[findTitle].exists,
+        "a hidden History page must not retain the window's Find command")
+      app.typeKey(XCUIKeyboardKey.escape.rawValue, modifierFlags: [])
+      select("app.navigation.history", in: app)
+      XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+      app.typeKey("f", modifierFlags: .command)
+      app.typeText("job-fixture-0001")
+      XCTAssertEqual(search.value as? String, "job-fixture-0001")
+      app.terminate()
+    }
+  }
+
   /// A refresh outside the inspector must invalidate its independently loaded
   /// detail, even when job.list returns exactly the same summary.
   func testInspectorReloadsAfterHistoryRefreshInBothLanguages() {

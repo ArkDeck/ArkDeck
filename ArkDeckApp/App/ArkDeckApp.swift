@@ -162,6 +162,55 @@ private final class ArkDeckAppModelStore {
   }
 }
 
+/// Commands follow the focused window's visible workspace. In particular,
+/// a retained Trace document must not take Find away from History or Viewer.
+struct WorkspaceKeyboardAction {
+  let title: String
+  var isEnabled = true
+  let perform: @MainActor () -> Void
+}
+
+private struct WorkspaceSearchKey: FocusedValueKey {
+  typealias Value = WorkspaceKeyboardAction
+}
+
+private struct WorkspaceRefreshKey: FocusedValueKey {
+  typealias Value = WorkspaceKeyboardAction
+}
+
+extension FocusedValues {
+  var workspaceSearch: WorkspaceKeyboardAction? {
+    get { self[WorkspaceSearchKey.self] }
+    set { self[WorkspaceSearchKey.self] = newValue }
+  }
+
+  var workspaceRefresh: WorkspaceKeyboardAction? {
+    get { self[WorkspaceRefreshKey.self] }
+    set { self[WorkspaceRefreshKey.self] = newValue }
+  }
+}
+
+private struct WorkspaceKeyboardCommands: Commands {
+  @FocusedValue(\.workspaceSearch) private var search
+  @FocusedValue(\.workspaceRefresh) private var refresh
+
+  var body: some Commands {
+    CommandGroup(after: .pasteboard) {
+      if let search {
+        Divider()
+        Button(search.title, action: search.perform)
+          .keyboardShortcut("f")
+          .disabled(!search.isEnabled)
+      }
+      if let refresh {
+        Button(refresh.title, action: refresh.perform)
+          .keyboardShortcut("r")
+          .disabled(!refresh.isEnabled)
+      }
+    }
+  }
+}
+
 @main
 struct ArkDeckApp: App {
   @State private var models = ArkDeckAppModelStore()
@@ -192,6 +241,7 @@ struct ArkDeckApp: App {
     }
     .defaultSize(width: 1180, height: 760)
     .commands {
+      WorkspaceKeyboardCommands()
       CommandMenu("Trace") {
         Button(traceViewerText("Capture Trace…")) {
           models.requestTraceWorkspace()
@@ -205,7 +255,6 @@ struct ArkDeckApp: App {
           .disabled(models.traceDocument.sourceURL == nil)
         Divider()
         Button(traceViewerText("Filter Trace Processes")) { models.traceDocument.focusProcessFilter() }
-          .keyboardShortcut("f")
           .disabled(models.traceDocument.trackGroups.isEmpty)
         Button(traceViewerText("viewer.searchEvents.menu")) { models.traceDocument.focusTraceSearch() }
           .keyboardShortcut("f", modifiers: [.command, .shift])
@@ -449,6 +498,10 @@ private struct TraceViewerSceneView: View {
         models.requestTraceWorkspace()
         openWindow(id: ArkDeckWindow.main)
       })
+      .focusedSceneValue(\.workspaceSearch, WorkspaceKeyboardAction(
+        title: traceViewerText("Filter Trace Processes"),
+        isEnabled: !models.traceDocument.trackGroups.isEmpty,
+        perform: { models.traceDocument.focusProcessFilter() }))
   }
 }
 
