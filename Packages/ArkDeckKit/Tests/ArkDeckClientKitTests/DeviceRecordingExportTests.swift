@@ -1,11 +1,11 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
-final class DeviceRecordingExportTests: XCTestCase {
-  @MainActor
-  func testCopyPreservesSourceAndPublishesCompleteDestination() async throws {
+struct DeviceRecordingExportTests {
+  @Test @MainActor
+  func copyPreservesSourceAndPublishesCompleteDestination() async throws {
     try await withScratch { directory in
       let source = directory.appending(path: "recording.mov")
       let destination = directory.appending(path: "saved.mov")
@@ -14,14 +14,14 @@ final class DeviceRecordingExportTests: XCTestCase {
 
       try await DeviceRecordingExport.copy(from: source, to: destination)
 
-      XCTAssertEqual(try Data(contentsOf: source), bytes)
-      XCTAssertEqual(try Data(contentsOf: destination), bytes)
-      XCTAssertEqual(try contents(of: directory), ["recording.mov", "saved.mov"])
+      #expect(try Data(contentsOf: source) == bytes)
+      #expect(try Data(contentsOf: destination) == bytes)
+      #expect(try contents(of: directory) == ["recording.mov", "saved.mov"])
     }
   }
 
-  @MainActor
-  func testReplacingDestinationPreservesSourceAndRemovesStagingFile() async throws {
+  @Test @MainActor
+  func replacingDestinationPreservesSourceAndRemovesStagingFile() async throws {
     try await withScratch { directory in
       let source = directory.appending(path: "recording.mov")
       let destination = directory.appending(path: "saved.mov")
@@ -31,14 +31,14 @@ final class DeviceRecordingExportTests: XCTestCase {
 
       try await DeviceRecordingExport.copy(from: source, to: destination)
 
-      XCTAssertEqual(try Data(contentsOf: source), bytes)
-      XCTAssertEqual(try Data(contentsOf: destination), bytes)
-      XCTAssertEqual(try contents(of: directory), ["recording.mov", "saved.mov"])
+      #expect(try Data(contentsOf: source) == bytes)
+      #expect(try Data(contentsOf: destination) == bytes)
+      #expect(try contents(of: directory) == ["recording.mov", "saved.mov"])
     }
   }
 
-  @MainActor
-  func testFailedCopyDoesNotDeleteExistingDestination() async throws {
+  @Test @MainActor
+  func failedCopyDoesNotDeleteExistingDestination() async throws {
     try await withScratch { directory in
       let destination = directory.appending(path: "saved.mov")
       let original = Data("keep this file".utf8)
@@ -47,16 +47,16 @@ final class DeviceRecordingExportTests: XCTestCase {
       do {
         try await DeviceRecordingExport.copy(
           from: directory.appending(path: "missing.mov"), to: destination)
-        XCTFail("A missing source must fail")
+        Issue.record("A missing source must fail")
       } catch {
-        XCTAssertEqual(try Data(contentsOf: destination), original)
-        XCTAssertEqual(try contents(of: directory), ["saved.mov"])
+        #expect(try Data(contentsOf: destination) == original)
+        #expect(try contents(of: directory) == ["saved.mov"])
       }
     }
   }
 
-  @MainActor
-  func testCancelledExportDoesNotPublishOrReplaceDestination() async throws {
+  @Test @MainActor
+  func cancelledExportDoesNotPublishOrReplaceDestination() async throws {
     try await withScratch { directory in
       let source = directory.appending(path: "recording.mov")
       let destination = directory.appending(path: "saved.mov")
@@ -70,10 +70,10 @@ final class DeviceRecordingExportTests: XCTestCase {
       }
       do {
         try await export.value
-        XCTFail("A cancelled export must fail before publishing")
+        Issue.record("A cancelled export must fail before publishing")
       } catch is CancellationError {
-        XCTAssertEqual(try Data(contentsOf: destination), original)
-        XCTAssertEqual(try contents(of: directory), ["recording.mov", "saved.mov"])
+        #expect(try Data(contentsOf: destination) == original)
+        #expect(try contents(of: directory) == ["recording.mov", "saved.mov"])
       }
     }
   }

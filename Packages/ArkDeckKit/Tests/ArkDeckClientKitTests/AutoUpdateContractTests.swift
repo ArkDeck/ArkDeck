@@ -2,60 +2,62 @@ import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
-final class AutoUpdateContractTests: XCTestCase {
+struct AutoUpdateContractTests {
   private let now = ISO8601Timestamps.parseCanonicalPlain("2026-07-24T00:00:00Z")!
 
   /// The UI fixture exists so the Settings scene can be rendered by a test
   /// without the real updater deciding what it shows. The property that
   /// matters is the boundary: a launch that does not ask for it gets nothing,
   /// so no production run can render a declared update state.
-  func testTheUpdateUIFixtureIsUnreachableWithoutItsOwnArgument() {
-    XCTAssertFalse(AutoUpdateUIFixture.isSelected(arguments: []))
-    XCTAssertNil(AutoUpdateUIFixture.state(arguments: []))
-    XCTAssertFalse(
-      AutoUpdateUIFixture.isSelected(arguments: [
+  @Test func theUpdateUIFixtureIsUnreachableWithoutItsOwnArgument() {
+    #expect(!AutoUpdateUIFixture.isSelected(arguments: []))
+    #expect(AutoUpdateUIFixture.state(arguments: []) == nil)
+    #expect(
+      !AutoUpdateUIFixture.isSelected(arguments: [
         "/Applications/ArkDeck.app", "--ui-test-hdc-diagnostics", "--ui-test-runtime-history",
       ]),
       "another surface's fixture must not select this one")
-    XCTAssertNil(
-      AutoUpdateUIFixture.state(arguments: ["--arkdeck-hdc-user-configured-path", "/usr/bin/true"]))
+    #expect(
+      AutoUpdateUIFixture.state(arguments: ["--arkdeck-hdc-user-configured-path", "/usr/bin/true"])
+        == nil)
 
-    XCTAssertEqual(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-idle"]), .idle)
-    XCTAssertEqual(
-      AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-failed"]), .failed(.feed))
+    #expect(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-idle"]) == .idle)
+    #expect(
+      AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update-failed"]) == .failed(.feed))
     // An argument in the family but with no state of its own still selects the
     // fixture, so a launch can never fall back to the real updater by typo.
-    XCTAssertEqual(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update"]), .idle)
+    #expect(AutoUpdateUIFixture.state(arguments: ["--ui-test-auto-update"]) == .idle)
   }
 
-  func testTEST_AU_CONTRACT_001_productionTrustPinAndValidFeed() throws {
+  @Test func TEST_AU_CONTRACT_001_productionTrustPinAndValidFeed() throws {
     let trust = try UpdateFeedTrust.production
-    XCTAssertEqual(trust.keyID, "arkdeck-update-2026-07-b949b102")
-    XCTAssertEqual(
-      trust.rawPublicKey.base64EncodedString(),
-      "c5Ho0xkWFQ3Ovzjx98dQhF3n5sytJjffqD3a+ftgP8c=")
+    #expect(trust.keyID == "arkdeck-update-2026-07-b949b102")
+    #expect(
+      trust.rawPublicKey.base64EncodedString()
+        == "c5Ho0xkWFQ3Ovzjx98dQhF3n5sytJjffqD3a+ftgP8c=")
     let spkiPrefix = Data([
       0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00,
     ])
-    XCTAssertEqual(
-      UpdateFeedCodec.sha256(spkiPrefix + trust.rawPublicKey),
-      UpdateFeedTrust.productionSPKISHA256)
+    #expect(
+      UpdateFeedCodec.sha256(spkiPrefix + trust.rawPublicKey)
+        == UpdateFeedTrust.productionSPKISHA256)
 
     let fixture = try signedFixture()
     let result = try verifier(trust: fixture.trust).verify(
       fixture.envelope, context: verificationContext(), now: now)
     guard case .update(let verified) = result else {
-      return XCTFail("expected a verified update")
+      Issue.record("expected a verified update")
+      return
     }
-    XCTAssertEqual(verified.payload.version, "2.0.0")
-    XCTAssertEqual(verified.payloadSHA256, UpdateFeedCodec.sha256(fixture.payload))
+    #expect(verified.payload.version == "2.0.0")
+    #expect(verified.payloadSHA256 == UpdateFeedCodec.sha256(fixture.payload))
   }
 
-  func testTEST_AU_CONTRACT_001_feedSignatureAndCanonicalShapeFailClosed() throws {
+  @Test func TEST_AU_CONTRACT_001_feedSignatureAndCanonicalShapeFailClosed() throws {
     let signingKey = Curve25519.Signing.PrivateKey()
     let fixture = try signedFixture(privateKey: signingKey)
 
@@ -92,7 +94,7 @@ final class AutoUpdateContractTests: XCTestCase {
     nonCanonical.append(0x0a)
     assertFeedError(nonCanonical, trust: fixture.trust, expected: .nonCanonicalEnvelope)
 
-    var object = try XCTUnwrap(
+    var object = try #require(
       try JSONSerialization.jsonObject(with: fixture.envelope) as? [String: Any])
     object["unknown"] = true
     let unknownMember = try JSONSerialization.data(
@@ -105,7 +107,7 @@ final class AutoUpdateContractTests: XCTestCase {
         .utf8)
     assertFeedError(duplicateMember, trust: fixture.trust, expected: .nonCanonicalEnvelope)
 
-    var payloadObject = try XCTUnwrap(
+    var payloadObject = try #require(
       try JSONSerialization.jsonObject(with: fixture.payload) as? [String: Any])
     payloadObject["unknown"] = true
     let unknownPayload = try JSONSerialization.data(
@@ -133,7 +135,7 @@ final class AutoUpdateContractTests: XCTestCase {
       trust: fixture.trust, expected: .nonCanonicalPayload)
   }
 
-  func testTEST_AU_CONTRACT_001_replayDowngradeExpiryAndURLMatrix() throws {
+  @Test func TEST_AU_CONTRACT_001_replayDowngradeExpiryAndURLMatrix() throws {
     let key = Curve25519.Signing.PrivateKey()
     let trust = try UpdateFeedTrust(
       keyID: "test-update-key", rawPublicKey: key.publicKey.rawRepresentation)
@@ -144,7 +146,10 @@ final class AutoUpdateContractTests: XCTestCase {
     _ = try verifier.verify(first.envelope, context: verificationContext(), now: now)
     let idempotent = try verifier.verify(
       first.envelope, context: verificationContext(), now: now)
-    guard case .update = idempotent else { return XCTFail("expected idempotent update") }
+    guard case .update = idempotent else {
+      Issue.record("expected idempotent update")
+      return
+    }
 
     let replay = try signedFixture(privateKey: key, sequence: 1, version: "1.9.0")
     assertVerificationError(replay.envelope, verifier: verifier, expected: .replay)
@@ -199,7 +204,7 @@ final class AutoUpdateContractTests: XCTestCase {
     }
   }
 
-  func testTEST_AU_CONTRACT_001_replayTransactionKeepsHighestAcrossStoresAndReopen()
+  @Test func TEST_AU_CONTRACT_001_replayTransactionKeepsHighestAcrossStoresAndReopen()
     async throws
   {
     let root = FileManager.default.temporaryDirectory.appending(
@@ -213,7 +218,7 @@ final class AutoUpdateContractTests: XCTestCase {
       sequence: 2, payloadSHA256: String(repeating: "2", count: 64), version: "2.0.0")
     let sequenceThree = UpdateReplayRecord(
       sequence: 3, payloadSHA256: String(repeating: "3", count: 64), version: "3.0.0")
-    XCTAssertEqual(try firstStore.validateAndCommit(sequenceOne), .accepted)
+    #expect(try firstStore.validateAndCommit(sequenceOne) == .accepted)
 
     let start = ConcurrentStartGate(participants: 2)
     let lowerWriter = Task.detached {
@@ -226,24 +231,25 @@ final class AutoUpdateContractTests: XCTestCase {
     }
     let lowerDecision = try await lowerWriter.value
     let higherDecision = try await higherWriter.value
-    XCTAssertTrue([.accepted, .replay].contains(lowerDecision))
-    XCTAssertEqual(higherDecision, .accepted)
+    #expect([UpdateReplayDecision.accepted, .replay].contains(lowerDecision))
+    #expect(higherDecision == .accepted)
 
     let reopened = FileUpdateReplayStore(directory: root)
-    XCTAssertEqual(try reopened.loadCurrentRecord(), sequenceThree)
-    XCTAssertEqual(try reopened.validateAndCommit(sequenceTwo), .replay)
-    XCTAssertEqual(try reopened.validateAndCommit(sequenceThree), .accepted)
-    XCTAssertFalse(
-      try FileManager.default.contentsOfDirectory(atPath: root.path)
+    #expect(try reopened.loadCurrentRecord() == sequenceThree)
+    #expect(try reopened.validateAndCommit(sequenceTwo) == .replay)
+    #expect(try reopened.validateAndCommit(sequenceThree) == .accepted)
+    #expect(
+      try !FileManager.default.contentsOfDirectory(atPath: root.path)
         .contains(where: { $0.hasSuffix(".part") }))
   }
 
-  func testTEST_AU_CONTRACT_001_prepareRejectsInvalidUnsignedPayloadBeforeSigning() throws {
-    XCTAssertNoThrow(
+  @Test func TEST_AU_CONTRACT_001_prepareRejectsInvalidUnsignedPayloadBeforeSigning() throws {
+    #expect(throws: Never.self) {
       try UpdateFeedVerifier.validateUnsignedPayloadForSigning(
         payloadModel(
           issuedAt: "2026-07-01T00:00:00Z",
-          expiresAt: "2026-07-31T00:00:00Z")))
+          expiresAt: "2026-07-31T00:00:00Z"))
+    }
 
     assertUnsignedPayloadError(payloadModel(version: "2.0"), expected: .invalidVersion)
     assertUnsignedPayloadError(
@@ -258,25 +264,26 @@ final class AutoUpdateContractTests: XCTestCase {
       expected: .invalidArtifactURL)
   }
 
-  func testTEST_AU_PRIVACY_001_requestAndRedirectAllowlist() throws {
+  @Test func TEST_AU_PRIVACY_001_requestAndRedirectAllowlist() throws {
     let identity = UpdateProductIdentity(
       appVersion: "1.2.3", osVersion: "14.4.1", architecture: "arm64")
     let request = try UpdateRequestFactory.feedRequest(identity: identity)
-    XCTAssertEqual(request.httpMethod, "GET")
-    XCTAssertNil(request.httpBody)
-    XCTAssertFalse(request.httpShouldHandleCookies)
-    XCTAssertEqual(request.cachePolicy, .reloadIgnoringLocalAndRemoteCacheData)
-    XCTAssertEqual(
-      request.allHTTPHeaderFields,
-      [
-        "Accept": UpdateNetworkContract.acceptHeader,
-        "User-Agent": UpdateNetworkContract.userAgentHeader,
-      ])
-    let queryItems = try XCTUnwrap(
-      URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems)
-    XCTAssertEqual(
-      Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "") }),
-      ["appVersion": "1.2.3", "osVersion": "14.4.1", "arch": "arm64"])
+    #expect(request.httpMethod == "GET")
+    #expect(request.httpBody == nil)
+    #expect(!request.httpShouldHandleCookies)
+    #expect(request.cachePolicy == .reloadIgnoringLocalAndRemoteCacheData)
+    #expect(
+      request.allHTTPHeaderFields
+        == [
+          "Accept": UpdateNetworkContract.acceptHeader,
+          "User-Agent": UpdateNetworkContract.userAgentHeader,
+        ])
+    let requestURL = try #require(request.url)
+    let queryItems = try #require(
+      URLComponents(url: requestURL, resolvingAgainstBaseURL: false)?.queryItems)
+    #expect(
+      Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "") })
+        == ["appVersion": "1.2.3", "osVersion": "14.4.1", "arch": "arm64"])
 
     var proposed = URLRequest(
       url: URL(
@@ -287,12 +294,12 @@ final class AutoUpdateContractTests: XCTestCase {
     proposed.setValue("secret", forHTTPHeaderField: "Cookie")
     let redirected = try UpdateRedirectPolicy.redirectedRequest(
       proposed: proposed, redirectCount: 1)
-    XCTAssertNil(redirected.value(forHTTPHeaderField: "Authorization"))
-    XCTAssertNil(redirected.value(forHTTPHeaderField: "Cookie"))
+    #expect(redirected.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(redirected.value(forHTTPHeaderField: "Cookie") == nil)
     let redirectedItems =
       URLComponents(url: redirected.url!, resolvingAgainstBaseURL: false)?.queryItems ?? []
-    XCTAssertEqual(redirectedItems, [URLQueryItem(name: "token", value: "public")])
-    XCTAssertEqual(redirected.allHTTPHeaderFields, request.allHTTPHeaderFields)
+    #expect(redirectedItems == [URLQueryItem(name: "token", value: "public")])
+    #expect(redirected.allHTTPHeaderFields == request.allHTTPHeaderFields)
 
     for value in [
       "http://github.com/asset",
@@ -301,19 +308,18 @@ final class AutoUpdateContractTests: XCTestCase {
       "https://user@github.com/asset",
       "https://github.com/asset#fragment",
     ] {
-      XCTAssertThrowsError(
+      #expect(throws: (any Error).self) {
         try UpdateRedirectPolicy.redirectedRequest(
-          proposed: URLRequest(url: URL(string: value)!), redirectCount: 1))
+          proposed: URLRequest(url: URL(string: value)!), redirectCount: 1)
+      }
     }
-    XCTAssertThrowsError(
+    #expect(throws: UpdateNetworkError.redirectLimitExceeded) {
       try UpdateRedirectPolicy.redirectedRequest(
         proposed: proposed, redirectCount: UpdateNetworkContract.maximumRedirects + 1)
-    ) { error in
-      XCTAssertEqual(error as? UpdateNetworkError, .redirectLimitExceeded)
     }
   }
 
-  func testTEST_AU_PRIVACY_001_URLProtocolCapturesActualInitialRequest() async throws {
+  @Test func TEST_AU_PRIVACY_001_URLProtocolCapturesActualInitialRequest() async throws {
     CapturingUpdateURLProtocol.reset()
     let streamer = URLSessionUpdateHTTPStreamer(protocolClasses: [CapturingUpdateURLProtocol.self])
     let request = try UpdateRequestFactory.feedRequest(
@@ -323,26 +329,27 @@ final class AutoUpdateContractTests: XCTestCase {
     for try await chunk in streamer.stream(for: request, maximumBytes: 16) {
       body.append(chunk)
     }
-    XCTAssertEqual(body, Data("ok".utf8))
-    let captured = try XCTUnwrap(CapturingUpdateURLProtocol.capturedRequest())
-    let components = try XCTUnwrap(
-      URLComponents(url: try XCTUnwrap(captured.url), resolvingAgainstBaseURL: false))
-    XCTAssertEqual(
-      Set(components.queryItems?.map(\.name) ?? []),
-      [
-        "appVersion", "osVersion", "arch",
-      ])
-    XCTAssertEqual(captured.httpMethod, "GET")
-    XCTAssertNil(captured.httpBody)
-    XCTAssertNil(captured.value(forHTTPHeaderField: "Cookie"))
-    XCTAssertNil(captured.value(forHTTPHeaderField: "Authorization"))
-    XCTAssertEqual(
-      captured.value(forHTTPHeaderField: "Accept"), UpdateNetworkContract.acceptHeader)
-    XCTAssertEqual(
-      captured.value(forHTTPHeaderField: "User-Agent"), UpdateNetworkContract.userAgentHeader)
-    XCTAssertEqual(
-      Set(captured.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? []),
-      ["accept", "user-agent"])
+    #expect(body == Data("ok".utf8))
+    let captured = try #require(CapturingUpdateURLProtocol.capturedRequest())
+    let capturedURL = try #require(captured.url)
+    let components = try #require(
+      URLComponents(url: capturedURL, resolvingAgainstBaseURL: false))
+    #expect(
+      Set(components.queryItems?.map(\.name) ?? [])
+        == [
+          "appVersion", "osVersion", "arch",
+        ])
+    #expect(captured.httpMethod == "GET")
+    #expect(captured.httpBody == nil)
+    #expect(captured.value(forHTTPHeaderField: "Cookie") == nil)
+    #expect(captured.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(
+      captured.value(forHTTPHeaderField: "Accept") == UpdateNetworkContract.acceptHeader)
+    #expect(
+      captured.value(forHTTPHeaderField: "User-Agent") == UpdateNetworkContract.userAgentHeader)
+    #expect(
+      Set(captured.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? [])
+        == ["accept", "user-agent"])
 
     CapturingUpdateURLProtocol.reset()
     let signedArtifactURL =
@@ -354,14 +361,14 @@ final class AutoUpdateContractTests: XCTestCase {
     ) {
       artifactBody.append(chunk)
     }
-    XCTAssertEqual(artifactBody, Data("ok".utf8))
-    let capturedArtifact = try XCTUnwrap(CapturingUpdateURLProtocol.capturedRequest())
-    XCTAssertEqual(capturedArtifact.url?.absoluteString, signedArtifactURL)
-    XCTAssertNil(capturedArtifact.value(forHTTPHeaderField: "Cookie"))
-    XCTAssertNil(capturedArtifact.value(forHTTPHeaderField: "Authorization"))
+    #expect(artifactBody == Data("ok".utf8))
+    let capturedArtifact = try #require(CapturingUpdateURLProtocol.capturedRequest())
+    #expect(capturedArtifact.url?.absoluteString == signedArtifactURL)
+    #expect(capturedArtifact.value(forHTTPHeaderField: "Cookie") == nil)
+    #expect(capturedArtifact.value(forHTTPHeaderField: "Authorization") == nil)
   }
 
-  func testTEST_AU_PRIVACY_001_URLProtocolCapturesSanitizedRedirectRequest() async throws {
+  @Test func TEST_AU_PRIVACY_001_URLProtocolCapturesSanitizedRedirectRequest() async throws {
     RedirectingUpdateURLProtocol.reset()
     let streamer = URLSessionUpdateHTTPStreamer(
       protocolClasses: [RedirectingUpdateURLProtocol.self])
@@ -372,23 +379,23 @@ final class AutoUpdateContractTests: XCTestCase {
     for try await chunk in streamer.stream(for: request, maximumBytes: 16) {
       body.append(chunk)
     }
-    XCTAssertEqual(body, Data("ok".utf8))
+    #expect(body == Data("ok".utf8))
     let requests = RedirectingUpdateURLProtocol.capturedRequests()
-    XCTAssertEqual(requests.count, 2)
-    let redirected = try XCTUnwrap(requests.last)
-    XCTAssertEqual(redirected.url?.host, "release-assets.githubusercontent.com")
+    #expect(requests.count == 2)
+    let redirected = try #require(requests.last)
+    #expect(redirected.url?.host == "release-assets.githubusercontent.com")
     let names = Set(
       URLComponents(url: redirected.url!, resolvingAgainstBaseURL: false)?.queryItems?.map(\.name)
         ?? [])
-    XCTAssertEqual(names, ["token"])
-    XCTAssertNil(redirected.value(forHTTPHeaderField: "Cookie"))
-    XCTAssertNil(redirected.value(forHTTPHeaderField: "Authorization"))
-    XCTAssertEqual(
-      Set(redirected.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? []),
-      ["accept", "user-agent"])
+    #expect(names == ["token"])
+    #expect(redirected.value(forHTTPHeaderField: "Cookie") == nil)
+    #expect(redirected.value(forHTTPHeaderField: "Authorization") == nil)
+    #expect(
+      Set(redirected.allHTTPHeaderFields?.keys.map { $0.lowercased() } ?? [])
+        == ["accept", "user-agent"])
   }
 
-  func testTEST_AU_CONTRACT_001_downloadLengthDigestInterruptionAndCleanup() async throws {
+  @Test func TEST_AU_CONTRACT_001_downloadLengthDigestInterruptionAndCleanup() async throws {
     let fixture = try temporaryArtifactStore()
     defer { try? FileManager.default.removeItem(at: fixture.root) }
     let bytes = Data("verified-dmg-fixture".utf8)
@@ -397,23 +404,21 @@ final class AutoUpdateContractTests: XCTestCase {
       stream: stream([Data(bytes.prefix(5)), Data(bytes.dropFirst(5))]),
       expectedLength: UInt64(bytes.count),
       expectedSHA256: digest)
-    XCTAssertEqual(artifact.url.pathExtension, "dmg")
-    XCTAssertEqual(
-      try FileManager.default.attributesOfItem(atPath: artifact.url.path)[.posixPermissions]
-        as? NSNumber,
-      NSNumber(value: 0o400))
-    XCTAssertEqual(
-      try UpdateArtifactStore.verifyFile(
-        at: artifact.url, expectedLength: UInt64(bytes.count), expectedSHA256: digest),
-      artifact.identity)
-    XCTAssertEqual(artifact.identity.mode, 0o400)
-
-    XCTAssertEqual(Darwin.chmod(artifact.url.path, 0o600), 0)
-    XCTAssertThrowsError(
+    #expect(artifact.url.pathExtension == "dmg")
+    #expect(
+      (try FileManager.default.attributesOfItem(atPath: artifact.url.path)[.posixPermissions]
+        as? NSNumber)
+        == NSNumber(value: 0o400))
+    #expect(
       try UpdateArtifactStore.verifyFile(
         at: artifact.url, expectedLength: UInt64(bytes.count), expectedSHA256: digest)
-    ) { error in
-      XCTAssertEqual(error as? UpdateDownloadError, .unsafeArtifact)
+        == artifact.identity)
+    #expect(artifact.identity.mode == 0o400)
+
+    #expect(Darwin.chmod(artifact.url.path, 0o600) == 0)
+    #expect(throws: UpdateDownloadError.unsafeArtifact) {
+      try UpdateArtifactStore.verifyFile(
+        at: artifact.url, expectedLength: UInt64(bytes.count), expectedSHA256: digest)
     }
 
     for failure in DownloadFailureFixture.allCases {
@@ -443,14 +448,14 @@ final class AutoUpdateContractTests: XCTestCase {
             stream: failingStream(bytes: Data(), error: CancellationError()),
             expectedLength: UInt64(bytes.count), expectedSHA256: digest)
         }
-        XCTFail("expected \(failure) to fail")
+        Issue.record("expected \(failure) to fail")
       } catch {}
       let residue = try FileManager.default.contentsOfDirectory(atPath: next.store.directory.path)
-      XCTAssertTrue(residue.isEmpty, "\(failure) left untrusted cache: \(residue)")
+      #expect(residue.isEmpty, "\(failure) left untrusted cache: \(residue)")
     }
   }
 
-  func testTEST_AU_CONTRACT_001_cancelTerminatesDownloadAndLateCatchCannotClobberRestart()
+  @Test func TEST_AU_CONTRACT_001_cancelTerminatesDownloadAndLateCatchCannotClobberRestart()
     async throws
   {
     let signed = try signedFixture()
@@ -476,23 +481,25 @@ final class AutoUpdateContractTests: XCTestCase {
 
     let restarted = try await service.checkManually(identity: verificationIdentity(), now: now)
     guard case .available = restarted else {
-      return XCTFail("the replacement check must remain active")
+      Issue.record("the replacement check must remain active")
+      return
     }
     let result = await download.result
     switch result {
     case .success:
-      XCTFail("cancelled download unexpectedly succeeded")
+      Issue.record("cancelled download unexpectedly succeeded")
     case .failure(let error):
-      XCTAssertEqual(error as? UpdateDownloadError, .cancelled)
+      #expect(error as? UpdateDownloadError == .cancelled)
     }
     try await waitUntil { streamer.artifactTerminated }
     guard case .available = await service.state else {
-      return XCTFail("late completion from the cancelled download clobbered the replacement check")
+      Issue.record("late completion from the cancelled download clobbered the replacement check")
+      return
     }
-    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+    #expect(try cachedArtifacts(in: storage.store).isEmpty)
   }
 
-  func testTEST_AU_CONTRACT_001_developerIDRequirementAppliesToRunningAppAndArtifact()
+  @Test func TEST_AU_CONTRACT_001_developerIDRequirementAppliesToRunningAppAndArtifact()
     async throws
   {
     let storage = try temporaryArtifactStore()
@@ -504,19 +511,20 @@ final class AutoUpdateContractTests: XCTestCase {
     let codeSigning = RecordingCodeSigningChecker(
       runningTeam: "ABCDEFGHIJ", artifactTeam: "ABCDEFGHIJ")
     let validated = try SystemUpdateArtifactValidator(codeSigning: codeSigning).validate(artifact)
-    XCTAssertEqual(validated.teamIdentifier, "ABCDEFGHIJ")
+    #expect(validated.teamIdentifier == "ABCDEFGHIJ")
 
     let expected =
       "anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] exists"
       + " and certificate leaf[subject.OU] = \"ABCDEFGHIJ\""
-    XCTAssertEqual(codeSigning.runningRequirements, [expected])
-    XCTAssertEqual(codeSigning.artifactRequirements, [expected])
-    XCTAssertThrowsError(
+    #expect(codeSigning.runningRequirements == [expected])
+    #expect(codeSigning.artifactRequirements == [expected])
+    #expect(throws: (any Error).self) {
       try SystemUpdateArtifactValidator.developerIDApplicationRequirementSource(
-        teamIdentifier: "invalid team"))
+        teamIdentifier: "invalid team")
+    }
   }
 
-  func testTEST_AU_CONTRACT_001_ownerWritableArtifactFailsFinalReverification()
+  @Test func TEST_AU_CONTRACT_001_ownerWritableArtifactFailsFinalReverification()
     async throws
   {
     let signed = try signedFixture()
@@ -534,23 +542,24 @@ final class AutoUpdateContractTests: XCTestCase {
     _ = try await service.checkManually(identity: verificationIdentity(), now: now)
     let awaiting = try await service.downloadAvailableUpdate()
     guard case .awaitingConsent(_, let approved) = awaiting else {
-      return XCTFail("expected final-consent state")
+      Issue.record("expected final-consent state")
+      return
     }
-    XCTAssertEqual(Darwin.chmod(approved.downloaded.url.path, 0o600), 0)
+    #expect(Darwin.chmod(approved.downloaded.url.path, 0o600) == 0)
 
-    do {
+    await #expect(
+      throws: UpdateDownloadError.unsafeArtifact,
+      "owner-writable artifact must fail final verification"
+    ) {
       _ = try await service.handoff(explicitConsent: true, revealer: revealer)
-      XCTFail("owner-writable artifact must fail final verification")
-    } catch {
-      XCTAssertEqual(error as? UpdateDownloadError, .unsafeArtifact)
     }
-    XCTAssertEqual(revealer.count, 0)
+    #expect(revealer.count == 0)
     let failedState = await service.state
-    XCTAssertEqual(failedState, .failed(.handoff))
-    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+    #expect(failedState == .failed(.handoff))
+    #expect(try cachedArtifacts(in: storage.store).isEmpty)
   }
 
-  func testTEST_AU_CONTRACT_001_teamUnsignedReplacementAndConsentHaveZeroHandoff()
+  @Test func TEST_AU_CONTRACT_001_teamUnsignedReplacementAndConsentHaveZeroHandoff()
     async throws
   {
     for securityError in [
@@ -563,18 +572,15 @@ final class AutoUpdateContractTests: XCTestCase {
       let installedBytes = Data("do-not-touch-installed-app".utf8)
       try installedBytes.write(to: installed)
       _ = try await fixture.service.checkManually(identity: verificationIdentity(), now: now)
-      do {
+      await #expect(throws: securityError, "expected artifact security failure") {
         _ = try await fixture.service.downloadAvailableUpdate()
-        XCTFail("expected artifact security failure")
-      } catch {
-        XCTAssertEqual(error as? UpdateArtifactSecurityError, securityError)
       }
       let failedState = await fixture.service.state
       let handoffCount = fixture.revealer.count
-      XCTAssertEqual(failedState, .failed(.artifact))
-      XCTAssertEqual(handoffCount, 0)
-      XCTAssertTrue(try cachedArtifacts(in: fixture.store).isEmpty)
-      XCTAssertEqual(try Data(contentsOf: installed), installedBytes)
+      #expect(failedState == .failed(.artifact))
+      #expect(handoffCount == 0)
+      #expect(try cachedArtifacts(in: fixture.store).isEmpty)
+      #expect(try Data(contentsOf: installed) == installedBytes)
     }
 
     let validator = FakeArtifactValidator()
@@ -585,107 +591,112 @@ final class AutoUpdateContractTests: XCTestCase {
     try installedBytes.write(to: installed)
     _ = try await fixture.service.checkManually(identity: verificationIdentity(), now: now)
     _ = try await fixture.service.downloadAvailableUpdate()
-    do {
+    await #expect(
+      throws: AutoUpdateServiceError.explicitConsentRequired,
+      "handoff must require consent"
+    ) {
       _ = try await fixture.service.handoff(
         explicitConsent: false, revealer: fixture.revealer)
-      XCTFail("handoff must require consent")
-    } catch {
-      XCTAssertEqual(error as? AutoUpdateServiceError, .explicitConsentRequired)
     }
     let countBeforeReplacement = fixture.revealer.count
-    XCTAssertEqual(countBeforeReplacement, 0)
+    #expect(countBeforeReplacement == 0)
 
     validator.failAfterFirstValidation = true
-    do {
+    await #expect(
+      throws: UpdateArtifactSecurityError.artifactReplaced,
+      "replacement at final verification must fail"
+    ) {
       _ = try await fixture.service.handoff(
         explicitConsent: true, revealer: fixture.revealer)
-      XCTFail("replacement at final verification must fail")
-    } catch {
-      XCTAssertEqual(error as? UpdateArtifactSecurityError, .artifactReplaced)
     }
     let countAfterReplacement = fixture.revealer.count
     let replacementState = await fixture.service.state
-    XCTAssertEqual(countAfterReplacement, 0)
-    XCTAssertEqual(replacementState, .failed(.handoff))
-    XCTAssertEqual(try Data(contentsOf: installed), installedBytes)
+    #expect(countAfterReplacement == 0)
+    #expect(replacementState == .failed(.handoff))
+    #expect(try Data(contentsOf: installed) == installedBytes)
   }
 
-  func testTEST_AU_CONTRACT_001_positiveHandoffNeedsTwoUserActionsAndNoAutomaticDownload()
+  @Test func TEST_AU_CONTRACT_001_positiveHandoffNeedsTwoUserActionsAndNoAutomaticDownload()
     async throws
   {
     let fixture = try serviceFixture(validator: FakeArtifactValidator())
     defer { try? FileManager.default.removeItem(at: fixture.root) }
     let state = try await fixture.service.checkAutomaticallyIfDue(
       identity: verificationIdentity(), now: now)
-    guard case .available = state else { return XCTFail("expected available") }
-    XCTAssertEqual(fixture.streamer.artifactRequestCount, 0)
-    XCTAssertTrue(try cachedArtifacts(in: fixture.store).isEmpty)
+    guard case .available = state else {
+      Issue.record("expected available")
+      return
+    }
+    #expect(fixture.streamer.artifactRequestCount == 0)
+    #expect(try cachedArtifacts(in: fixture.store).isEmpty)
 
-    do {
+    await #expect(
+      throws: AutoUpdateServiceError.automaticCheckNotDue,
+      "automatic check must be rate limited"
+    ) {
       _ = try await fixture.service.checkAutomaticallyIfDue(
         identity: verificationIdentity(), now: now.addingTimeInterval(60))
-      XCTFail("automatic check must be rate limited")
-    } catch {
-      XCTAssertEqual(error as? AutoUpdateServiceError, .automaticCheckNotDue)
     }
-    XCTAssertEqual(fixture.streamer.feedRequestCount, 1)
+    #expect(fixture.streamer.feedRequestCount == 1)
 
     let awaitingConsent = try await fixture.service.downloadAvailableUpdate()
     guard case .awaitingConsent(let feed, _) = awaitingConsent else {
-      return XCTFail("expected final-consent state")
+      Issue.record("expected final-consent state")
+      return
     }
-    XCTAssertEqual(feed.payload.releaseNotesSummary, "Security and reliability improvements.")
-    XCTAssertEqual(fixture.streamer.artifactRequestCount, 1)
+    #expect(feed.payload.releaseNotesSummary == "Security and reliability improvements.")
+    #expect(fixture.streamer.artifactRequestCount == 1)
     let countBeforeHandoff = fixture.revealer.count
-    XCTAssertEqual(countBeforeHandoff, 0)
+    #expect(countBeforeHandoff == 0)
     _ = try await fixture.service.handoff(
       explicitConsent: true, revealer: fixture.revealer)
     let countAfterHandoff = fixture.revealer.count
     let handedOffState = await fixture.service.state
-    XCTAssertEqual(countAfterHandoff, 1)
+    #expect(countAfterHandoff == 1)
     guard case .handedOff = handedOffState else {
-      return XCTFail("expected handed off")
+      Issue.record("expected handed off")
+      return
     }
   }
 
-  func testTEST_AU_CONTRACT_001_automaticChecksPersistDefaultOnAndUserOptOut() throws {
+  @Test func TEST_AU_CONTRACT_001_automaticChecksPersistDefaultOnAndUserOptOut() throws {
     let suiteName = "ArkDeckAutoUpdateContractTests.\(UUID().uuidString)"
-    let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
     defer { defaults.removePersistentDomain(forName: suiteName) }
     defaults.removePersistentDomain(forName: suiteName)
 
     let preferences = UserDefaultsAutoUpdatePreferences(defaults: defaults)
-    XCTAssertTrue(preferences.automaticChecksEnabled())
+    #expect(preferences.automaticChecksEnabled())
     preferences.setAutomaticChecksEnabled(false)
-    XCTAssertFalse(preferences.automaticChecksEnabled())
-    let attempt = try XCTUnwrap(
+    #expect(!preferences.automaticChecksEnabled())
+    let attempt = try #require(
       ISO8601Timestamps.parseCanonicalPlain("2026-07-24T00:00:00Z"))
     preferences.recordCheckAttempt(attempt)
-    XCTAssertEqual(preferences.lastCheckAttempt(), attempt)
-    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4"), "1.4.0")
-    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4.2"), "1.4.2")
-    XCTAssertEqual(AutoUpdateApplicationFacade.normalizedApplicationVersion("01.4"), "01.4")
+    #expect(preferences.lastCheckAttempt() == attempt)
+    #expect(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4") == "1.4.0")
+    #expect(AutoUpdateApplicationFacade.normalizedApplicationVersion("1.4.2") == "1.4.2")
+    #expect(AutoUpdateApplicationFacade.normalizedApplicationVersion("01.4") == "01.4")
   }
 
-  func testTEST_AU_CONTRACT_001_entitlementsDependenciesSecretsAndDisclosure() throws {
+  @Test func TEST_AU_CONTRACT_001_entitlementsDependenciesSecretsAndDisclosure() throws {
     let repository = repoRoot
     let entitlementData = try Data(
       contentsOf: repository.appending(path: "ArkDeckApp/ArkDeckApp.entitlements"))
-    let entitlementPlist = try XCTUnwrap(
+    let entitlementPlist = try #require(
       try PropertyListSerialization.propertyList(from: entitlementData, format: nil)
         as? [String: Any])
     let entitlements = entitlementPlist.compactMapValues { $0 as? Bool }
-    XCTAssertEqual(
-      Set(entitlements.keys),
-      [
-        "com.apple.security.app-sandbox",
-        "com.apple.security.device.serial",
-        "com.apple.security.device.usb",
-        "com.apple.security.files.bookmarks.app-scope",
-        "com.apple.security.files.user-selected.read-write",
-        "com.apple.security.network.client",
-      ])
-    XCTAssertTrue(entitlements.values.allSatisfy { $0 })
+    #expect(
+      Set(entitlements.keys)
+        == [
+          "com.apple.security.app-sandbox",
+          "com.apple.security.device.serial",
+          "com.apple.security.device.usb",
+          "com.apple.security.files.bookmarks.app-scope",
+          "com.apple.security.files.user-selected.read-write",
+          "com.apple.security.network.client",
+        ])
+    #expect(entitlements.values.allSatisfy { $0 })
 
     // Every non-boolean entitlement is value-pinned. The App Sandbox classifies
     // AF_UNIX connect() as its own operation, so the daemon's Unix socket is
@@ -695,31 +706,31 @@ final class AutoUpdateContractTests: XCTestCase {
     // read-only: it cannot enumerate ~/.ssh or read config, known_hosts, agent
     // sockets, public keys, or other identity names.
     let machLookupKey = "com.apple.security.temporary-exception.mach-lookup.global-name"
-    XCTAssertEqual(
-      entitlementPlist[machLookupKey] as? [String], ["com.arkdeck.agentd"],
+    #expect(
+      entitlementPlist[machLookupKey] as? [String] == ["com.arkdeck.agentd"],
       "the mach-lookup exception must name exactly the daemon's read-only XPC door")
     let systemSSHIdentityKey =
       "com.apple.security.temporary-exception.files.home-relative-path.read-only"
-    XCTAssertEqual(
-      entitlementPlist[systemSSHIdentityKey] as? [String],
-      ["/.ssh/id_rsa", "/.ssh/id_ed25519"],
+    #expect(
+      entitlementPlist[systemSSHIdentityKey] as? [String]
+        == ["/.ssh/id_rsa", "/.ssh/id_ed25519"],
       "system-default SSH access must remain read-only and identity-file exact")
-    XCTAssertEqual(
-      Set(entitlementPlist.keys),
-      Set(entitlements.keys).union([machLookupKey, systemSSHIdentityKey]),
+    #expect(
+      Set(entitlementPlist.keys)
+        == Set(entitlements.keys).union([machLookupKey, systemSSHIdentityKey]),
       "the App's entitlement set is closed; adding one is a privilege decision")
 
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
     let arkTraceRevision = "9172c9525f954ec397e0555d7d03cd4367f3efcf"
-    XCTAssertEqual(
-      package.components(separatedBy: ".package(").count - 1, 6,
+    #expect(
+      package.components(separatedBy: ".package(").count - 1 == 6,
       "the package's direct remote-source dependency set is closed")
     // The ArkForge Swift SDK left with the Swift Runtime (CHG-2026-074).
-    XCTAssertFalse(package.contains("ArkDeck/ArkForge"))
-    XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkTrace.git"))
-    XCTAssertTrue(package.contains("revision: \"\(arkTraceRevision)\""))
+    #expect(!package.contains("ArkDeck/ArkForge"))
+    #expect(package.contains("https://github.com/ArkDeck/ArkTrace.git"))
+    #expect(package.contains("revision: \"\(arkTraceRevision)\""))
     for dependency in [
       ("https://github.com/orlandos-nl/Citadel.git", "0.12.1"),
       ("https://github.com/Wellz26/swift-nio-ssh.git", "0.3.4"),
@@ -727,15 +738,15 @@ final class AutoUpdateContractTests: XCTestCase {
       ("https://github.com/apple/swift-crypto.git", "3.15.1"),
       ("https://github.com/apple/swift-log.git", "1.15.0"),
     ] {
-      XCTAssertTrue(package.contains(dependency.0))
-      XCTAssertTrue(package.contains("exact: \"\(dependency.1)\""))
+      #expect(package.contains(dependency.0))
+      #expect(package.contains("exact: \"\(dependency.1)\""))
     }
     let packageResolution =
       try JSONSerialization.jsonObject(
         with: Data(
           contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.resolved")))
       as? [String: Any]
-    let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
+    let pins = try #require(packageResolution?["pins"] as? [[String: Any]])
     let expectedPins: [String: (location: String, revision: String, version: String?)] = [
       "arktrace": (
         "https://github.com/ArkDeck/ArkTrace.git",
@@ -773,38 +784,38 @@ final class AutoUpdateContractTests: XCTestCase {
     ]
     let pinsByIdentity = Dictionary(
       uniqueKeysWithValues: try pins.map { pin in
-        (try XCTUnwrap(pin["identity"] as? String), pin)
+        (try #require(pin["identity"] as? String), pin)
       })
-    XCTAssertEqual(Set(pinsByIdentity.keys), Set(expectedPins.keys))
+    #expect(Set(pinsByIdentity.keys) == Set(expectedPins.keys))
     for (identity, expected) in expectedPins {
-      let pin = try XCTUnwrap(pinsByIdentity[identity])
-      XCTAssertEqual(pin["location"] as? String, expected.location, identity)
-      let state = try XCTUnwrap(pin["state"] as? [String: Any])
-      XCTAssertEqual(state["revision"] as? String, expected.revision, identity)
-      XCTAssertEqual(state["version"] as? String, expected.version, identity)
+      let pin = try #require(pinsByIdentity[identity])
+      #expect(pin["location"] as? String == expected.location, "\(identity)")
+      let state = try #require(pin["state"] as? [String: Any])
+      #expect(state["revision"] as? String == expected.revision, "\(identity)")
+      #expect(state["version"] as? String == expected.version, "\(identity)")
     }
-    let arkTracePin = try XCTUnwrap(pinsByIdentity["arktrace"])
-    XCTAssertEqual(
-      arkTracePin["location"] as? String,
-      "https://github.com/ArkDeck/ArkTrace.git")
-    XCTAssertEqual(
-      (arkTracePin["state"] as? [String: Any])?["revision"] as? String,
-      arkTraceRevision)
+    let arkTracePin = try #require(pinsByIdentity["arktrace"])
+    #expect(
+      arkTracePin["location"] as? String
+        == "https://github.com/ArkDeck/ArkTrace.git")
+    #expect(
+      (arkTracePin["state"] as? [String: Any])?["revision"] as? String
+        == arkTraceRevision)
     let project = try String(
       contentsOf: repository.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
-    XCTAssertTrue(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
-    XCTAssertTrue(project.contains("revision = \(arkTraceRevision);"))
+    #expect(project.contains("XCRemoteSwiftPackageReference \"ArkTrace\""))
+    #expect(project.contains("revision = \(arkTraceRevision);"))
     let marketingVersions = project.split(separator: "\n").compactMap { line -> String? in
       guard line.contains("MARKETING_VERSION =") else { return nil }
       return line.split(separator: "=", maxSplits: 1)[1]
         .trimmingCharacters(in: .whitespacesAndNewlines)
         .trimmingCharacters(in: CharacterSet(charactersIn: ";"))
     }
-    XCTAssertFalse(marketingVersions.isEmpty)
-    XCTAssertTrue(marketingVersions.allSatisfy { UpdateSemanticVersion($0) != nil })
-    XCTAssertFalse(
-      FileManager.default.fileExists(
+    #expect(!marketingVersions.isEmpty)
+    #expect(marketingVersions.allSatisfy { UpdateSemanticVersion($0) != nil })
+    #expect(
+      !FileManager.default.fileExists(
         atPath: repository.appending(path: "Package.resolved").path))
 
     let privateMarker = ["-----BEGIN", "PRIVATE KEY-----"].joined(separator: " ")
@@ -812,40 +823,40 @@ final class AutoUpdateContractTests: XCTestCase {
       "ArkDeckApp/App/ArkDeckApp.swift",
       "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate",
     ] {
-      XCTAssertFalse(
-        try sourceTree(at: repository.appending(path: relativePath)).contains(privateMarker),
+      #expect(
+        try !sourceTree(at: repository.appending(path: relativePath)).contains(privateMarker),
         "private-key material marker found under \(relativePath)")
     }
     let localization = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Resources/Localizable.xcstrings"),
       encoding: .utf8)
-    XCTAssertTrue(localization.contains("\"update.privacyDisclosure\""))
-    XCTAssertTrue(localization.contains("ArkDeck version, macOS version, and CPU architecture"))
-    XCTAssertTrue(localization.contains("No device ID, user path, locale, telemetry"))
-    XCTAssertTrue(localization.contains("does not install, replace itself, update on quit"))
-    XCTAssertTrue(localization.contains("\"update.status.automaticCheckIncomplete\""))
-    XCTAssertTrue(localization.contains("automatic update check did not complete"))
+    #expect(localization.contains("\"update.privacyDisclosure\""))
+    #expect(localization.contains("ArkDeck version, macOS version, and CPU architecture"))
+    #expect(localization.contains("No device ID, user path, locale, telemetry"))
+    #expect(localization.contains("does not install, replace itself, update on quit"))
+    #expect(localization.contains("\"update.status.automaticCheckIncomplete\""))
+    #expect(localization.contains("automatic update check did not complete"))
     let appSource = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/App/ArkDeckApp.swift"),
       encoding: .utf8)
-    XCTAssertTrue(appSource.contains("update.status.automaticCheckIncomplete"))
-    XCTAssertTrue(appSource.contains("if case .failed(.network) = await service.state"))
-    XCTAssertTrue(appSource.contains("Integrity, replay and local-state failures"))
-    XCTAssertFalse(appSource.contains("artifact.downloaded.url.lastPathComponent"))
+    #expect(appSource.contains("update.status.automaticCheckIncomplete"))
+    #expect(appSource.contains("if case .failed(.network) = await service.state"))
+    #expect(appSource.contains("Integrity, replay and local-state failures"))
+    #expect(!appSource.contains("artifact.downloaded.url.lastPathComponent"))
     let feedSource = try String(
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate/UpdateFeed.swift"),
       encoding: .utf8)
-    XCTAssertTrue(feedSource.contains("UpdateNetworkContract.allowedHosts.contains(host)"))
-    XCTAssertFalse(feedSource.contains("allowedArtifactHosts"))
+    #expect(feedSource.contains("UpdateNetworkContract.allowedHosts.contains(host)"))
+    #expect(!feedSource.contains("allowedArtifactHosts"))
     let releaseProcedure = try String(
       contentsOf: repository.appending(path: "docs/release/macos-auto-update.md"),
       encoding: .utf8)
-    XCTAssertTrue(releaseProcedure.contains("openssl pkeyutl -sign -rawin"))
-    XCTAssertTrue(releaseProcedure.contains("最后才发布签名 feed"))
-    XCTAssertTrue(releaseProcedure.contains("不得成为 CLI 参数、环境变量"))
-    XCTAssertTrue(releaseProcedure.contains("30 天有效期是强制 freshness 边界"))
-    XCTAssertTrue(releaseProcedure.contains("不支持同版本续期"))
+    #expect(releaseProcedure.contains("openssl pkeyutl -sign -rawin"))
+    #expect(releaseProcedure.contains("最后才发布签名 feed"))
+    #expect(releaseProcedure.contains("不得成为 CLI 参数、环境变量"))
+    #expect(releaseProcedure.contains("30 天有效期是强制 freshness 边界"))
+    #expect(releaseProcedure.contains("不支持同版本续期"))
   }
 
   // MARK: - Fixtures
@@ -912,13 +923,10 @@ final class AutoUpdateContractTests: XCTestCase {
     _ data: Data,
     trust: UpdateFeedTrust,
     expected: UpdateFeedError,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    sourceLocation: SourceLocation = #_sourceLocation
   ) {
-    XCTAssertThrowsError(
-      try UpdateFeedCodec.decodeAndVerify(data, trust: trust), file: file, line: line
-    ) { error in
-      XCTAssertEqual(error as? UpdateFeedError, expected, file: file, line: line)
+    #expect(throws: expected, sourceLocation: sourceLocation) {
+      try UpdateFeedCodec.decodeAndVerify(data, trust: trust)
     }
   }
 
@@ -927,32 +935,24 @@ final class AutoUpdateContractTests: XCTestCase {
     verifier: UpdateFeedVerifier,
     context: UpdateVerificationContext? = nil,
     expected: UpdateFeedError,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    sourceLocation: SourceLocation = #_sourceLocation
   ) {
-    XCTAssertThrowsError(
-      try verifier.verify(data, context: context ?? verificationContext(), now: now),
-      file: file, line: line
-    ) { error in
-      XCTAssertEqual(error as? UpdateFeedError, expected, file: file, line: line)
+    #expect(throws: expected, sourceLocation: sourceLocation) {
+      try verifier.verify(data, context: context ?? verificationContext(), now: now)
     }
   }
 
   private func assertUnsignedPayloadError(
     _ payload: UpdateFeedPayload,
     expected: UpdateFeedError,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    sourceLocation: SourceLocation = #_sourceLocation
   ) {
-    XCTAssertThrowsError(
-      try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload),
-      file: file, line: line
-    ) { error in
-      XCTAssertEqual(error as? UpdateFeedError, expected, file: file, line: line)
+    #expect(throws: expected, sourceLocation: sourceLocation) {
+      try UpdateFeedVerifier.validateUnsignedPayloadForSigning(payload)
     }
   }
 
-  func testRuntimeUpdateFacadeContinuesOneLifecycleAcrossFreshOwners() async throws {
+  @Test func runtimeUpdateFacadeContinuesOneLifecycleAcrossFreshOwners() async throws {
     let signed = try signedFixture()
     let storage = try temporaryArtifactStore()
     defer { try? FileManager.default.removeItem(at: storage.root) }
@@ -977,29 +977,36 @@ final class AutoUpdateContractTests: XCTestCase {
     let first = try facade()
     guard case .available = try await first.checkManually(
       identity: verificationIdentity(), now: fixedNow)
-    else { return XCTFail("check must publish a durable available state") }
+    else {
+      Issue.record("check must publish a durable available state")
+      return
+    }
 
     let second = try facade()
     let availableStatus = try await second.status()
-    XCTAssertEqual(availableStatus.phase, "available")
+    #expect(availableStatus.phase == "available")
     guard case .awaitingConsent = try await second.downloadAvailableUpdate() else {
-      return XCTFail("a fresh owner must continue the durable download transition")
+      Issue.record("a fresh owner must continue the durable download transition")
+      return
     }
 
     let third = try facade()
     let awaiting = try await third.status()
-    XCTAssertEqual(awaiting.phase, "awaitingConsent")
-    XCTAssertEqual(awaiting.artifactSHA256, UpdateFeedCodec.sha256(signed.artifactBytes))
-    XCTAssertFalse(String(describing: awaiting).contains(storage.root.path))
+    #expect(awaiting.phase == "awaitingConsent")
+    #expect(awaiting.artifactSHA256 == UpdateFeedCodec.sha256(signed.artifactBytes))
+    #expect(!String(describing: awaiting).contains(storage.root.path))
     guard case .handedOff = try await third.handoff(
       explicitConsent: true, revealer: revealer)
-    else { return XCTFail("a third owner must continue the consent-bound handoff") }
-    XCTAssertEqual(revealer.count, 1)
+    else {
+      Issue.record("a third owner must continue the consent-bound handoff")
+      return
+    }
+    #expect(revealer.count == 1)
     let handedOffStatus = try await third.status()
-    XCTAssertEqual(handedOffStatus.phase, "handedOff")
+    #expect(handedOffStatus.phase == "handedOff")
   }
 
-  func testRuntimeUpdateFacadeObservesCrossProcessCancellationAndSettlesDurably()
+  @Test func runtimeUpdateFacadeObservesCrossProcessCancellationAndSettlesDurably()
     async throws
   {
     let signed = try signedFixture()
@@ -1025,23 +1032,23 @@ final class AutoUpdateContractTests: XCTestCase {
     try await waitUntil { streamer.artifactStarted }
     let cancellation = try RuntimeUpdateStateStore(directory: stateDirectory)
       .requestCancellation()
-    XCTAssertTrue(cancellation.cancellationRequested)
+    #expect(cancellation.cancellationRequested)
 
     switch await download.result {
     case .success:
-      XCTFail("a cross-process cancellation must not publish a verified artifact")
+      Issue.record("a cross-process cancellation must not publish a verified artifact")
     case .failure(let error):
-      XCTAssertEqual(error as? UpdateDownloadError, .cancelled)
+      #expect(error as? UpdateDownloadError == .cancelled)
     }
     try await waitUntil { streamer.artifactTerminated }
     let settled = try await facade.status()
-    XCTAssertEqual(settled.phase, "cancelled")
-    XCTAssertFalse(settled.isBusy)
-    XCTAssertFalse(settled.cancellationRequested)
-    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+    #expect(settled.phase == "cancelled")
+    #expect(!settled.isBusy)
+    #expect(!settled.cancellationRequested)
+    #expect(try cachedArtifacts(in: storage.store).isEmpty)
   }
 
-  func testRuntimeUpdateFacadeRecoversCrashedVerificationOwnerWithoutLivenessGuessing()
+  @Test func runtimeUpdateFacadeRecoversCrashedVerificationOwnerWithoutLivenessGuessing()
     async throws
   {
     let signed = try signedFixture()
@@ -1069,12 +1076,12 @@ final class AutoUpdateContractTests: XCTestCase {
     try await facade.recoverOrphanPartials()
 
     let recovered = try await facade.status()
-    XCTAssertEqual(recovered.phase, "cancelled")
-    XCTAssertFalse(recovered.isBusy)
-    XCTAssertTrue(try cachedArtifacts(in: storage.store).isEmpty)
+    #expect(recovered.phase == "cancelled")
+    #expect(!recovered.isBusy)
+    #expect(try cachedArtifacts(in: storage.store).isEmpty)
   }
 
-  func testRuntimeUpdateFacadeReportsHandoffWhenCancellationArrivesAfterFinderReveal()
+  @Test func runtimeUpdateFacadeReportsHandoffWhenCancellationArrivesAfterFinderReveal()
     async throws
   {
     let signed = try signedFixture()
@@ -1096,15 +1103,18 @@ final class AutoUpdateContractTests: XCTestCase {
     let revealer = CancellingArtifactRevealer(stateStore: stateStore)
     guard case .handedOff = try await facade.handoff(
       explicitConsent: true, revealer: revealer)
-    else { return XCTFail("a reveal that completed is a handed-off outcome") }
+    else {
+      Issue.record("a reveal that completed is a handed-off outcome")
+      return
+    }
     let settled = try await facade.status()
-    XCTAssertEqual(settled.phase, "handedOff")
-    XCTAssertFalse(settled.isBusy)
-    XCTAssertFalse(settled.cancellationRequested)
-    XCTAssertEqual(revealer.count, 1)
+    #expect(settled.phase == "handedOff")
+    #expect(!settled.isBusy)
+    #expect(!settled.cancellationRequested)
+    #expect(revealer.count == 1)
   }
 
-  func testRuntimeUpdateCleanupExplicitlyDiscardsAwaitingConsentArtifact() async throws {
+  @Test func runtimeUpdateCleanupExplicitlyDiscardsAwaitingConsentArtifact() async throws {
     let signed = try signedFixture()
     let storage = try temporaryArtifactStore()
     defer { try? FileManager.default.removeItem(at: storage.root) }
@@ -1121,13 +1131,13 @@ final class AutoUpdateContractTests: XCTestCase {
       stateStore: RuntimeUpdateStateStore(directory: stateDirectory))
     _ = try await facade.checkManually(identity: verificationIdentity(), now: now)
     _ = try await facade.downloadAvailableUpdate()
-    XCTAssertEqual(try cachedArtifacts(in: storage.store).filter { $0.hasSuffix(".dmg") }.count, 2)
+    #expect(try cachedArtifacts(in: storage.store).filter { $0.hasSuffix(".dmg") }.count == 2)
 
     let receipt = try await facade.cleanup()
 
-    XCTAssertEqual(receipt.status.phase, "idle")
-    XCTAssertEqual(receipt.removedVerifiedArtifacts, 1)
-    XCTAssertEqual(try cachedArtifacts(in: storage.store), ["keep-me.dmg"])
+    #expect(receipt.status.phase == "idle")
+    #expect(receipt.removedVerifiedArtifacts == 1)
+    #expect(try cachedArtifacts(in: storage.store) == ["keep-me.dmg"])
   }
 
   private func waitUntil(
@@ -1216,7 +1226,7 @@ final class AutoUpdateContractTests: XCTestCase {
   /// PR #1276 review: replay-state durability is split — regular files take
   /// the strict fsync+F_FULLFSYNC pair, directories take plain fsync — and
   /// both spellings fail loudly on a dead descriptor.
-  func testReplayStateSyncSpellingsFailLoudlyAndSucceedOnLiveDescriptors() throws {
+  @Test func replayStateSyncSpellingsFailLoudlyAndSucceedOnLiveDescriptors() throws {
     let directory = FileManager.default.temporaryDirectory
       .appending(path: "arkdeck-update-sync-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -1224,17 +1234,17 @@ final class AutoUpdateContractTests: XCTestCase {
 
     let fileURL = directory.appending(path: "watermark.json")
     let fileDescriptor = open(fileURL.path, O_RDWR | O_CREAT, 0o600)
-    XCTAssertGreaterThanOrEqual(fileDescriptor, 0)
-    XCTAssertNoThrow(try FileUpdateReplayStore.strictFileSync(fileDescriptor))
+    #expect(fileDescriptor >= 0)
+    #expect(throws: Never.self) { try FileUpdateReplayStore.strictFileSync(fileDescriptor) }
     close(fileDescriptor)
 
     let directoryDescriptor = open(directory.path, O_RDONLY | O_DIRECTORY)
-    XCTAssertGreaterThanOrEqual(directoryDescriptor, 0)
-    XCTAssertNoThrow(try FileUpdateReplayStore.syncDirectory(directoryDescriptor))
+    #expect(directoryDescriptor >= 0)
+    #expect(throws: Never.self) { try FileUpdateReplayStore.syncDirectory(directoryDescriptor) }
     close(directoryDescriptor)
 
-    XCTAssertThrowsError(try FileUpdateReplayStore.strictFileSync(-1))
-    XCTAssertThrowsError(try FileUpdateReplayStore.syncDirectory(-1))
+    #expect(throws: (any Error).self) { try FileUpdateReplayStore.strictFileSync(-1) }
+    #expect(throws: (any Error).self) { try FileUpdateReplayStore.syncDirectory(-1) }
   }
 }
 

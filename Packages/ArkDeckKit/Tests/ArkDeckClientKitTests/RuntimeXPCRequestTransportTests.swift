@@ -1,25 +1,25 @@
 import ArkDeckCore
 import Foundation
-import XCTest
+import Testing
 import XPC
 import os
 
 @testable import ArkDeckClientKit
 
-final class RuntimeXPCRequestTransportTests: XCTestCase {
-  func testSharedTransportBoundsASilentEndpointWithoutClaimingRejection() async {
+struct RuntimeXPCRequestTransportTests {
+  @Test func sharedTransportBoundsASilentEndpointWithoutClaimingRejection() async {
     let startedAt = ContinuousClock.now
     let result = await RuntimeXPCRequestTransport.awaitReply(timeoutSeconds: 0.01) { _ in
       // Reproduces a live endpoint that never invokes its reply closure.
     }
 
-    XCTAssertEqual(result, .failure(.timedOut))
-    XCTAssertLessThan(startedAt.duration(to: .now), .seconds(1))
-    XCTAssertFalse(RuntimeXPCRequestTransport.Failure.timedOut.message.contains("retry"))
-    XCTAssertTrue(RuntimeXPCRequestTransport.Failure.timedOut.message.contains("may already"))
+    #expect(result == .failure(.timedOut))
+    #expect(startedAt.duration(to: .now) < .seconds(1))
+    #expect(!RuntimeXPCRequestTransport.Failure.timedOut.message.contains("retry"))
+    #expect(RuntimeXPCRequestTransport.Failure.timedOut.message.contains("may already"))
   }
 
-  func testSharedTransportUsesTheFirstTerminalSignalAndCleansUpOnce() async {
+  @Test func sharedTransportUsesTheFirstTerminalSignalAndCleansUpOnce() async {
     let cleanupCount = OSAllocatedUnfairLock(initialState: 0)
     let expected = Data("first".utf8)
     let result = await RuntimeXPCRequestTransport.awaitReply(
@@ -30,9 +30,9 @@ final class RuntimeXPCRequestTransportTests: XCTestCase {
         finish(.failure(.emptyResponse))
       })
 
-    XCTAssertEqual(result, .success(expected))
+    #expect(result == .success(expected))
     try? await Task.sleep(for: .milliseconds(20))
-    XCTAssertEqual(cleanupCount.withLock { $0 }, 1)
+    #expect(cleanupCount.withLock { $0 } == 1)
   }
 
   /// SPK-8 negative (b), in process: a live Runtime that answers but fails
@@ -40,18 +40,19 @@ final class RuntimeXPCRequestTransportTests: XCTestCase {
   /// not the ArkDeck team's daemon, just as another release is not this one)
   /// is named as a release mismatch with its remedy, well inside the 5 s
   /// health bound, instead of hanging or being called an interruption.
-  func testReleaseMismatchedRuntimeIsReportedWithItsRemedyWithoutHanging() async throws {
+  @Test func releaseMismatchedRuntimeIsReportedWithItsRemedyWithoutHanging() async throws {
     let listener = AnonymousRuntimeListener(requirement: nil)
     let startedAt = ContinuousClock.now
     let result = await listener.request()
 
     guard case .failure(.unavailable(let detail?)) = result else {
-      return XCTFail("expected an unavailable Runtime, got \(result)")
+      Issue.record("expected an unavailable Runtime, got \(result)")
+      return
     }
-    XCTAssertEqual(detail, ArkDeckAgentXPC.runtimeReleaseMismatchDetail)
-    XCTAssertTrue(detail.contains("does not match this App"))
-    XCTAssertTrue(detail.hasSuffix("run runtime service update"))
-    XCTAssertLessThan(startedAt.duration(to: .now), .seconds(4))
+    #expect(detail == ArkDeckAgentXPC.runtimeReleaseMismatchDetail)
+    #expect(detail.contains("does not match this App"))
+    #expect(detail.hasSuffix("run runtime service update"))
+    #expect(startedAt.duration(to: .now) < .seconds(4))
   }
 
   /// SPK-8 negative (a), in process: the listener installs the App's code
@@ -59,7 +60,7 @@ final class RuntimeXPCRequestTransportTests: XCTestCase {
   /// daemon's `arkdeck_mach_listen` does. A client that is not the ArkDeck
   /// team's App is cut off with zero handler entries, and the App transport
   /// keeps calling that an interruption rather than a release mismatch.
-  func testRuntimeRefusingAForeignClientDispatchesNothing() async throws {
+  @Test func runtimeRefusingAForeignClientDispatchesNothing() async throws {
     let listener = AnonymousRuntimeListener(requirement: ArkDeckAgentXPC.appCodeRequirement)
     let result = await listener.request()
 
@@ -70,9 +71,10 @@ final class RuntimeXPCRequestTransportTests: XCTestCase {
       "Runtime connection interrupted; run runtime service update",
     ]
     guard case .failure(.unavailable(let detail?)) = result, interruption.contains(detail) else {
-      return XCTFail("expected an interrupted Runtime, got \(result)")
+      Issue.record("expected an interrupted Runtime, got \(result)")
+      return
     }
-    XCTAssertEqual(listener.dispatches, 0)
+    #expect(listener.dispatches == 0)
   }
 }
 
@@ -95,14 +97,18 @@ private final class AnonymousRuntimeListener: @unchecked Sendable {
         xpc_connection_cancel(peer)
         return
       }
+      // The handler answers on the connection each frame arrived on rather
+      // than capturing `peer`: an `xpc_object_t` is not `Sendable`, and this
+      // handler is a `@Sendable` closure.
       xpc_connection_set_event_handler(peer) { event in
         guard xpc_get_type(event) == XPC_TYPE_DICTIONARY,
           let reply = xpc_dictionary_create_reply(event)
         else { return }
         entries.withLock { $0 += 1 }
+        guard let connection = xpc_dictionary_get_remote_connection(event) else { return }
         let frame = Data("{}".utf8)
         frame.withUnsafeBytes { xpc_dictionary_set_data(reply, "frame", $0.baseAddress, $0.count) }
-        xpc_connection_send_message(peer, reply)
+        xpc_connection_send_message(connection, reply)
       }
       xpc_connection_activate(peer)
     }

@@ -1,10 +1,10 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 @testable import ArkDeckCore
 
-final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
+struct RuntimeHistoryFilterApplicationContractTests {
   private actor Scenario {
     private var answers: [(String, RuntimeHistoryFilterTransportResult)]
     private var calls: [(String, [String: JSONValue]?)] = []
@@ -49,7 +49,7 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
       sessionID: "S-1", targetID: "T-1", timeRange: "lastDay", activity: "flash")
   }
 
-  func testAppProviderReadsAndMutatesOnlyTheTypedHistoryResource() async throws {
+  @Test func appProviderReadsAndMutatesOnlyTheTypedHistoryResource() async throws {
     let queryValue = query.projection
     let scenario = Scenario([
       (
@@ -68,36 +68,36 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
     })
 
     let loaded = await provider.loadHistoryFilter()
-    XCTAssertEqual(
-      loaded,
-      .loaded(RuntimeHistoryFilterResource(generation: 1, query: nil, updatedAtUTC: nil)))
+    #expect(
+      loaded
+        == .loaded(RuntimeHistoryFilterResource(generation: 1, query: nil, updatedAtUTC: nil)))
     let saved = await provider.saveHistoryFilter(query, expectedGeneration: 1)
-    XCTAssertEqual(
-      saved,
-      .completed(
-        RuntimeHistoryFilterResource(
-          generation: 2, query: query, updatedAtUTC: "2026-09-01T08:30:00.000Z")))
+    #expect(
+      saved
+        == .completed(
+          RuntimeHistoryFilterResource(
+            generation: 2, query: query, updatedAtUTC: "2026-09-01T08:30:00.000Z")))
     let deleted = await provider.deleteHistoryFilter(expectedGeneration: 2)
-    XCTAssertEqual(
-      deleted,
-      .completed(
-        RuntimeHistoryFilterResource(
-          generation: 3, query: nil, updatedAtUTC: "2026-09-01T08:30:00.000Z")))
+    #expect(
+      deleted
+        == .completed(
+          RuntimeHistoryFilterResource(
+            generation: 3, query: nil, updatedAtUTC: "2026-09-01T08:30:00.000Z")))
 
     let calls = await scenario.recordedCalls()
-    XCTAssertEqual(
-      calls.map(\.0),
-      [
-        "history.filter.list", "history.filter.save", "history.filter.delete",
-      ])
-    XCTAssertNil(calls[0].1)
-    XCTAssertEqual(calls[1].1?["expectedGeneration"], .string("1"))
-    XCTAssertEqual(calls[1].1?["sessionId"], .string("S-1"))
-    XCTAssertEqual(calls[1].1?["targetId"], .string("T-1"))
-    XCTAssertEqual(calls[2].1, ["expectedGeneration": .string("2")])
+    #expect(
+      calls.map(\.0)
+        == [
+          "history.filter.list", "history.filter.save", "history.filter.delete",
+        ])
+    #expect(calls[0].1 == nil)
+    #expect(calls[1].1?["expectedGeneration"] == .string("1"))
+    #expect(calls[1].1?["sessionId"] == .string("S-1"))
+    #expect(calls[1].1?["targetId"] == .string("T-1"))
+    #expect(calls[2].1 == ["expectedGeneration": .string("2")])
   }
 
-  func testAppDecoderRefusesAListWhoseContainerAndRecordDrift() throws {
+  @Test func appDecoderRefusesAListWhoseContainerAndRecordDrift() throws {
     let drifted = try response(
       .object([
         "schemaVersion": .string("arkdeck.history-filter-list/1"),
@@ -107,10 +107,10 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
       ]))
     guard case .success(let data) = drifted,
       case .failure(let reason) = RuntimeHistoryFilterResponseDecoding.list(data)
-    else { return XCTFail("a drifting list was accepted") }
-    XCTAssertTrue(reason.contains("drifting"))
+    else { Issue.record("a drifting list was accepted"); return }
+    #expect(reason.contains("drifting"))
   }
-  func testSavePreservesExplicitNullIdentitiesAndSurfacesConflictWithoutReplay() async {
+  @Test func savePreservesExplicitNullIdentitiesAndSurfacesConflictWithoutReplay() async {
     let scenario = Scenario([
       (
         "history.filter.save",
@@ -126,16 +126,16 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
     guard
       case .failed(let reason) = await provider.saveHistoryFilter(
         RuntimeHistoryFilterQuery(), expectedGeneration: 7)
-    else { return XCTFail("conflict must not become a successful save") }
-    XCTAssertTrue(reason.contains("resourceConflict"))
+    else { Issue.record("conflict must not become a successful save"); return }
+    #expect(reason.contains("resourceConflict"))
     let calls = await scenario.recordedCalls()
-    XCTAssertEqual(calls.count, 1)
-    XCTAssertEqual(calls.first?.1?["sessionId"], .null)
-    XCTAssertEqual(calls.first?.1?["targetId"], .null)
-    XCTAssertEqual(calls.first?.1?["expectedGeneration"], .string("7"))
+    #expect(calls.count == 1)
+    #expect(calls.first?.1?["sessionId"] == .null)
+    #expect(calls.first?.1?["targetId"] == .null)
+    #expect(calls.first?.1?["expectedGeneration"] == .string("7"))
   }
 
-  func testGeneratedListStructurePreservesNonNullIdentitiesAndSemanticChecks() throws {
+  @Test func generatedListStructurePreservesNonNullIdentitiesAndSemanticChecks() throws {
     func list(generation: String, query: JSONValue) throws -> Data {
       guard case .success(let data) = try response(.object([
         "schemaVersion": .string("arkdeck.history-filter-list/1"),
@@ -147,17 +147,17 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
     }
     guard case .success(let decoded) = RuntimeHistoryFilterResponseDecoding.list(
       try list(generation: "2", query: query.projection))
-    else { return XCTFail("published non-null identities must survive generated decoding") }
-    XCTAssertEqual(decoded.query, query)
+    else { Issue.record("published non-null identities must survive generated decoding"); return }
+    #expect(decoded.query == query)
     for generation in ["02", "0", "9223372036854775808"] {
       guard case .failure = RuntimeHistoryFilterResponseDecoding.list(
         try list(generation: generation, query: query.projection))
-      else { return XCTFail("non-canonical generation accepted: \(generation)") }
+      else { Issue.record("non-canonical generation accepted: \(generation)"); return }
     }
     let invalid = RuntimeHistoryFilterQuery(status: "not-a-status")
     guard case .failure = RuntimeHistoryFilterResponseDecoding.list(
       try list(generation: "2", query: invalid.projection))
-    else { return XCTFail("generated structure erased enum validation") }
+    else { Issue.record("generated structure erased enum validation"); return }
   }
 
 }

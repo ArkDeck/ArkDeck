@@ -1,49 +1,49 @@
 import ArkDeckTraceAdapter
 import ArkTraceAppSupport
 import Foundation
-import XCTest
+import Testing
 
-final class ArkDeckTraceConfigurationTests: XCTestCase {
-  func testArkDeckOwnsOnlyItsProductProfile() {
+struct ArkDeckTraceConfigurationTests {
+  @Test func arkDeckOwnsOnlyItsProductProfile() {
     let configuration = ArkDeckTraceConfiguration.make(
       bundleURL: URL(filePath: "/Applications/ArkDeck.app"),
       cachesDirectory: URL(filePath: "/tmp/arkdeck-contract-cache")
     )
 
-    XCTAssertEqual(
-      configuration.cacheDirectory.path,
-      "/tmp/arkdeck-contract-cache/ArkDeck/Trace/traces")
-    XCTAssertEqual(
-      configuration.stagingDirectory.path,
-      "/tmp/arkdeck-contract-cache/ArkDeck/Trace/staging")
-    XCTAssertEqual(
-      configuration.recentDocumentsKey,
-      "ArkDeck.Trace.RecentTraceBookmarks.v1")
-    XCTAssertEqual(configuration.signpostSubsystem, "com.arkdeck.desktop.trace")
-    XCTAssertEqual(
-      ArkDeckTraceConfiguration.supportedTraceExtensions,
-      ["htrace", "ftrace", "systrace", "trace"])
-    XCTAssertEqual(ArkDeckTraceConfiguration.supportedTraceContentTypes.count, 4)
-    XCTAssertEqual(
-      configuration.bundledParser.executableRelativePath,
-      "Contents/MacOS/trace_streamer")
-    XCTAssertEqual(
-      configuration.bundledParser.manifestRelativePath,
-      "Contents/Resources/TraceStreamer/manifest.json")
-    XCTAssertEqual(
-      configuration.bundledParserExecutionPolicy,
-      .signedBundleInPlace)
+    #expect(
+      configuration.cacheDirectory.path
+        == "/tmp/arkdeck-contract-cache/ArkDeck/Trace/traces")
+    #expect(
+      configuration.stagingDirectory.path
+        == "/tmp/arkdeck-contract-cache/ArkDeck/Trace/staging")
+    #expect(
+      configuration.recentDocumentsKey
+        == "ArkDeck.Trace.RecentTraceBookmarks.v1")
+    #expect(configuration.signpostSubsystem == "com.arkdeck.desktop.trace")
+    #expect(
+      ArkDeckTraceConfiguration.supportedTraceExtensions
+        == ["htrace", "ftrace", "systrace", "trace"])
+    #expect(ArkDeckTraceConfiguration.supportedTraceContentTypes.count == 4)
+    #expect(
+      configuration.bundledParser.executableRelativePath
+        == "Contents/MacOS/trace_streamer")
+    #expect(
+      configuration.bundledParser.manifestRelativePath
+        == "Contents/Resources/TraceStreamer/manifest.json")
+    #expect(
+      configuration.bundledParserExecutionPolicy
+        == .signedBundleInPlace)
   }
 
-  func testDaemonDerivesTheSandboxCacheRootFromTheReviewedBundleIdentity() {
+  @Test func daemonDerivesTheSandboxCacheRootFromTheReviewedBundleIdentity() {
     let root = ArkDeckTraceConfiguration.appContainerCachesDirectory(
       homeDirectory: URL(filePath: "/Users/fixture", directoryHint: .isDirectory))
-    XCTAssertEqual(
-      root.path,
-      "/Users/fixture/Library/Containers/com.arkdeck.desktop/Data/Library/Caches")
+    #expect(
+      root.path
+        == "/Users/fixture/Library/Containers/com.arkdeck.desktop/Data/Library/Caches")
   }
 
-  func testMaintenanceOwnsOnlyEmptyDerivedCacheSiblings() async throws {
+  @Test func maintenanceOwnsOnlyEmptyDerivedCacheSiblings() async throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-trace-maintenance-\(UUID().uuidString)",
       directoryHint: .isDirectory)
@@ -54,14 +54,14 @@ final class ArkDeckTraceConfigurationTests: XCTestCase {
 
     let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
     let inventory = try await service.inventory()
-    XCTAssertEqual(
-      inventory,
-      ArkDeckTraceCacheInventory(entryCount: 0, totalByteCount: 0, activeEntryCount: 0))
+    #expect(
+      inventory
+        == ArkDeckTraceCacheInventory(entryCount: 0, totalByteCount: 0, activeEntryCount: 0))
 
     let report = try await service.purgeUnused()
-    XCTAssertEqual(report.before, inventory)
-    XCTAssertEqual(report.after, inventory)
-    XCTAssertEqual(report.removedEntryCount, 0)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: originalTrace.path))
+    #expect(report.before == inventory)
+    #expect(report.after == inventory)
+    #expect(report.removedEntryCount == 0)
+    #expect(FileManager.default.fileExists(atPath: originalTrace.path))
   }
 }

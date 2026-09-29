@@ -1,11 +1,11 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 @testable import ArkDeckCore
 
 /// Current wire fixtures exercise the real App provider, without device dispatch.
-final class DeviceProductionProviderContractTests: XCTestCase {
+struct DeviceProductionProviderContractTests {
   private let jobID = "job-device-current"
   private let target = DeviceTargetPresentation(id: "TGT-fixture", bindingRevision: 1, displayName: "Fixture")
   private let revision = "11111111-1111-4111-8111-111111111111"
@@ -28,13 +28,13 @@ final class DeviceProductionProviderContractTests: XCTestCase {
   }
 
   private func runReplies(unknown: Bool = false, pagedTimeline: Bool = false) throws -> [(String, Data)] {
-    var detail = try XCTUnwrap(JSONSerialization.jsonObject(with: currentJobDetailResponse([
+    var detail = try #require(JSONSerialization.jsonObject(with: currentJobDetailResponse([
       "jobId": jobID, "state": unknown ? "interrupted" : "succeeded",
       "outcomeUnknown": unknown, "waitingForHuman": false, "outstandingResidueCount": 0,
       "finishedAtUtc": "2026-09-05T00:00:00Z", "timeline": [],
     ])) as? [String: Any])
     if pagedTimeline {
-      var result = try XCTUnwrap(detail["result"] as? [String: Any])
+      var result = try #require(detail["result"] as? [String: Any])
       result["timeline"] = ["kind": "snapshotPages", "method": "job.timeline", "jobId": jobID]
       detail["result"] = result
     }
@@ -55,8 +55,8 @@ final class DeviceProductionProviderContractTests: XCTestCase {
   }
 
   private func page(_ rows: [[String: Any]], more: Bool = false) throws -> Data {
-    var response = try XCTUnwrap(JSONSerialization.jsonObject(with: currentArtifactPageResponse(rows)) as? [String: Any])
-    var result = try XCTUnwrap(response["result"] as? [String: Any])
+    var response = try #require(JSONSerialization.jsonObject(with: currentArtifactPageResponse(rows)) as? [String: Any])
+    var result = try #require(response["result"] as? [String: Any])
     result["hasMore"] = more
     result["nextCursor"] = more ? revision + ".next" : NSNull()
     response["result"] = result
@@ -73,7 +73,7 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     return try envelope(result)
   }
 
-  func testRecordingReadsAllArtifactPagesAndBothVerifiedProducts() async throws {
+  @Test func recordingReadsAllArtifactPagesAndBothVerifiedProducts() async throws {
     let frame = Data([1, 2, 3])
     let archive = TarFixture.archive(entries: [("0001.png", frame), ("0002.png", frame)])
     let timings = Data(#"{"frameDurationsSeconds":[0.4,0.7],"framesMissing":1}"#.utf8)
@@ -85,25 +85,29 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     ])
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .captured(let recording) = await provider.recordScreen(frameCount: 2, target: target) else {
-      return XCTFail("the current paged recording resources must be readable")
+      Issue.record("the current paged recording resources must be readable")
+      return
     }
-    XCTAssertEqual(recording.frames.map(\.bytes), [frame, frame])
-    XCTAssertEqual(recording.frameDurationsSeconds, [0.4, 0.7])
-    XCTAssertEqual(recording.framesMissing, 1)
+    #expect(recording.frames.map(\.bytes) == [frame, frame])
+    #expect(recording.frameDurationsSeconds == [0.4, 0.7])
+    #expect(recording.framesMissing == 1)
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show", "artifact.list", "artifact.list", "artifact.read", "artifact.read"])
-    XCTAssertEqual(calls[4].1["cursor"], .string(revision + ".next"))
+    #expect(calls.map(\.0) == ["job.submit", "job.run", "job.show", "artifact.list", "artifact.list", "artifact.read", "artifact.read"])
+    #expect(calls[4].1["cursor"] == .string(revision + ".next"))
     for call in calls.suffix(4) {
-      XCTAssertEqual(call.1["owner"], .object(["kind": .string("job"), "id": .string(jobID)]))
-      XCTAssertNil(call.1["jobId"])
+      #expect(call.1["owner"] == .object(["kind": .string("job"), "id": .string(jobID)]))
+      #expect(call.1["jobId"] == nil)
     }
-    guard case .string(let wire)? = calls[0].1["requestJson"] else { return XCTFail("missing typed request") }
+    guard case .string(let wire)? = calls[0].1["requestJson"] else {
+      Issue.record("missing typed request")
+      return
+    }
     let request = try JSONDecoder().decode(RuntimeOperationRequest.self, from: Data(wire.utf8))
-    XCTAssertEqual(request.target.targetID, target.id)
-    XCTAssertEqual(request.operation.id, "capture.screen-sequence")
+    #expect(request.target.targetID == target.id)
+    #expect(request.operation.id == "capture.screen-sequence")
   }
 
-  func testGestureReadsItsVerifiedSummaryFromCurrentTimelinePages() async throws {
+  @Test func gestureReadsItsVerifiedSummaryFromCurrentTimelinePages() async throws {
     let fragment: [String: Any] = ["entryIndex": "0", "partIndex": "0",
       "text": #"verified inject-pointer-input ["frame", "gesture"]"#, "lastPart": true]
     let replies = Replies(try runReplies(pagedTimeline: true) + [
@@ -115,23 +119,25 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .confirmed(let summary) = await provider.send(
       DeviceGestureRequest(gesture: .tap, x: 1, y: 2, frameWidth: 100, frameHeight: 200), to: target) else {
-      return XCTFail("the verified timeline must drive the gesture summary")
+      Issue.record("the verified timeline must drive the gesture summary")
+      return
     }
-    XCTAssertEqual(summary["verifiedFacts"], "frame, gesture")
+    #expect(summary["verifiedFacts"] == "frame, gesture")
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show", "job.timeline"])
-    XCTAssertEqual(calls.last?.1["jobId"], .string(jobID))
+    #expect(calls.map(\.0) == ["job.submit", "job.run", "job.show", "job.timeline"])
+    #expect(calls.last?.1["jobId"] == .string(jobID))
   }
 
-  func testUnknownGestureDoesNotResubmitOrRunAgain() async throws {
+  @Test func unknownGestureDoesNotResubmitOrRunAgain() async throws {
     let replies = Replies(try runReplies(unknown: true))
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .unknown = await provider.send(
       DeviceGestureRequest(gesture: .tap, x: 1, y: 2, frameWidth: 100, frameHeight: 200), to: target) else {
-      return XCTFail("an unknown gesture must remain unknown")
+      Issue.record("an unknown gesture must remain unknown")
+      return
     }
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show"])
+    #expect(calls.map(\.0) == ["job.submit", "job.run", "job.show"])
   }
 
   private func historicalStatus(_ changes: [String: Any] = [:]) -> [String: Any] {
@@ -144,7 +150,7 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     return status
   }
 
-  func testHistoricalScreenReadsCurrentDetailAndVerifiedArtifactWithoutDispatch() async throws {
+  @Test func historicalScreenReadsCurrentDetailAndVerifiedArtifactWithoutDispatch() async throws {
     let bytes = Data([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
       0, 0, 0, 64, 0, 0, 0, 32])
     let replies = Replies([
@@ -154,16 +160,17 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     ])
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .captured(let frame) = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
-      return XCTFail("a confirmed current Job and verified screenshot must reopen")
+      Issue.record("a confirmed current Job and verified screenshot must reopen")
+      return
     }
-    XCTAssertEqual(frame.imageData, bytes)
-    XCTAssertEqual(frame.width, 64)
-    XCTAssertEqual(frame.height, 32)
+    #expect(frame.imageData == bytes)
+    #expect(frame.width == 64)
+    #expect(frame.height == 32)
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.show", "artifact.list", "artifact.read"])
+    #expect(calls.map(\.0) == ["job.show", "artifact.list", "artifact.read"])
   }
 
-  func testHistoricalUnknownIdentityDriftAndUnreadableJobNeverReadArtifactsOrDispatch() async throws {
+  @Test func historicalUnknownIdentityDriftAndUnreadableJobNeverReadArtifactsOrDispatch() async throws {
     for changes: [String: Any] in [
       ["jobId": "foreign"], ["targetId": "foreign"], ["operation": "other@1"],
       ["state": "failed"], ["waitingForHuman": true], ["outcomeUnknown": true],
@@ -172,21 +179,23 @@ final class DeviceProductionProviderContractTests: XCTestCase {
       let replies = Replies([("job.show", try currentJobDetailResponse(historicalStatus(changes)))])
       let provider = DeviceProductionProvider { try await replies.send($0, $1) }
       guard case .failed = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
-        return XCTFail("unconfirmed history must not be rendered as a capture")
+        Issue.record("unconfirmed history must not be rendered as a capture")
+        return
       }
       let calls = await replies.calls
-      XCTAssertEqual(calls.map(\.0), ["job.show"])
+      #expect(calls.map(\.0) == ["job.show"])
     }
     let replies = Replies([])
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .failed = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
-      return XCTFail("unreadable Job must remain unavailable")
+      Issue.record("unreadable Job must remain unavailable")
+      return
     }
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.show"])
+    #expect(calls.map(\.0) == ["job.show"])
   }
 
-  func testScreenshotRejectsForeignOwnerChangedRangeIdentityAndCorruptBytes() async throws {
+  @Test func screenshotRejectsForeignOwnerChangedRangeIdentityAndCorruptBytes() async throws {
     let bytes = Data([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
       0, 0, 0, 64, 0, 0, 0, 32])
     for replacement: [String: Any] in [
@@ -200,19 +209,21 @@ final class DeviceProductionProviderContractTests: XCTestCase {
       ])
       let provider = DeviceProductionProvider { try await replies.send($0, $1) }
       guard case .failed = await provider.captureScreen(target: target) else {
-        return XCTFail("a malformed or corrupt range cannot supply an aiming frame")
+        Issue.record("a malformed or corrupt range cannot supply an aiming frame")
+        return
       }
       let calls = await replies.calls
-      XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show", "artifact.list", "artifact.read"])
+      #expect(calls.map(\.0) == ["job.submit", "job.run", "job.show", "artifact.list", "artifact.read"])
     }
     var foreign = artifactRow("ART-screen", "screenshot.png", bytes)
     foreign["jobId"] = "job-foreign"
     let replies = Replies(try runReplies() + [("artifact.list", page([foreign]))])
     let provider = DeviceProductionProvider { try await replies.send($0, $1) }
     guard case .failed = await provider.captureScreen(target: target) else {
-      return XCTFail("a foreign inventory must fail before reading bytes")
+      Issue.record("a foreign inventory must fail before reading bytes")
+      return
     }
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show", "artifact.list"])
+    #expect(calls.map(\.0) == ["job.submit", "job.run", "job.show", "artifact.list"])
   }
 }

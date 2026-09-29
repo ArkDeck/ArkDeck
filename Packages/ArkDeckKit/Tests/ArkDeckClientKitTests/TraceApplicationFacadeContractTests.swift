@@ -1,84 +1,84 @@
 @testable import ArkDeckClientKit
 import Foundation
-import XCTest
+import Testing
 
 
-final class TraceApplicationFacadeContractTests: XCTestCase {
-  func testPublishedOperationFactsAreProjectedWithoutInventingProbeOrArtifacts() {
+struct TraceApplicationFacadeContractTests {
+  @Test func publishedOperationFactsAreProjectedWithoutInventingProbeOrArtifacts() {
     let operation = TraceApplicationFacade.operationPresentation(availability: .available)
 
-    XCTAssertEqual(operation.reference, "capture.diagnostics@1")
-    XCTAssertEqual(operation.durationSecondsRange, 1...600)
-    XCTAssertEqual(operation.traceBufferKBRange, 1_024...65_536)
-    XCTAssertEqual(operation.maximumTraceTagCount, 24)
-    XCTAssertEqual(operation.traceStepCancellation, "atSafeBoundary")
-    XCTAssertTrue(operation.supportsTypedTraceCategories)
-    XCTAssertTrue(operation.supportsRawTraceArtifact)
-    XCTAssertFalse(operation.supportsFilteredTraceArtifact)
-    XCTAssertTrue(operation.supportsCaptureLogArtifact)
-    XCTAssertFalse(operation.exposesAdapterCapabilityFacts)
-    XCTAssertFalse(operation.exposesParameterSnapshotFacts)
+    #expect(operation.reference == "capture.diagnostics@1")
+    #expect(operation.durationSecondsRange == 1...600)
+    #expect(operation.traceBufferKBRange == 1_024...65_536)
+    #expect(operation.maximumTraceTagCount == 24)
+    #expect(operation.traceStepCancellation == "atSafeBoundary")
+    #expect(operation.supportsTypedTraceCategories)
+    #expect(operation.supportsRawTraceArtifact)
+    #expect(!operation.supportsFilteredTraceArtifact)
+    #expect(operation.supportsCaptureLogArtifact)
+    #expect(!operation.exposesAdapterCapabilityFacts)
+    #expect(!operation.exposesParameterSnapshotFacts)
   }
 
-  func testNumericValidatorAcceptsOnlyBoundedDecimalInput() {
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("1", range: 1...600),
-      .valid(1))
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("600", range: 1...600),
-      .valid(600))
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("", range: 1...600),
-      .invalid(.missing))
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("10.5", range: 1...600),
-      .invalid(.notDecimal))
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("10;id", range: 1...600),
-      .invalid(.notDecimal))
-    XCTAssertEqual(
-      TraceNumericInputValidator.validate("601", range: 1...600),
-      .invalid(.outsideRange(1...600)))
+  @Test func numericValidatorAcceptsOnlyBoundedDecimalInput() {
+    #expect(
+      TraceNumericInputValidator.validate("1", range: 1...600)
+        == .valid(1))
+    #expect(
+      TraceNumericInputValidator.validate("600", range: 1...600)
+        == .valid(600))
+    #expect(
+      TraceNumericInputValidator.validate("", range: 1...600)
+        == .invalid(.missing))
+    #expect(
+      TraceNumericInputValidator.validate("10.5", range: 1...600)
+        == .invalid(.notDecimal))
+    #expect(
+      TraceNumericInputValidator.validate("10;id", range: 1...600)
+        == .invalid(.notDecimal))
+    #expect(
+      TraceNumericInputValidator.validate("601", range: 1...600)
+        == .invalid(.outsideRange(1...600)))
   }
 
-  func testDurationUnitsKeepRuntimeRequestsInCanonicalSeconds() {
-    XCTAssertEqual(TraceDurationInputUnit.seconds.quickValues, [5, 10, 15, 30])
-    XCTAssertEqual(TraceDurationInputUnit.minutes.quickValues, [1, 2, 3])
-    XCTAssertEqual(
-      TraceDurationInputUnit.seconds.inputRange(forDurationSecondsRange: 1...600),
-      1...600)
-    XCTAssertEqual(
-      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...600),
-      1...10)
-    XCTAssertNil(
-      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...30))
-    XCTAssertEqual(
-      TraceDurationInputUnit.seconds.durationSeconds(for: 45, allowedRange: 1...600),
-      45)
-    XCTAssertEqual(
-      TraceDurationInputUnit.minutes.durationSeconds(for: 3, allowedRange: 1...600),
-      180)
-    XCTAssertNil(
-      TraceDurationInputUnit.minutes.durationSeconds(for: 11, allowedRange: 1...600))
-    XCTAssertEqual(
+  @Test func durationUnitsKeepRuntimeRequestsInCanonicalSeconds() {
+    #expect(TraceDurationInputUnit.seconds.quickValues == [5, 10, 15, 30])
+    #expect(TraceDurationInputUnit.minutes.quickValues == [1, 2, 3])
+    #expect(
+      TraceDurationInputUnit.seconds.inputRange(forDurationSecondsRange: 1...600)
+        == 1...600)
+    #expect(
+      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...600)
+        == 1...10)
+    #expect(
+      TraceDurationInputUnit.minutes.inputRange(forDurationSecondsRange: 1...30) == nil)
+    #expect(
+      TraceDurationInputUnit.seconds.durationSeconds(for: 45, allowedRange: 1...600)
+        == 45)
+    #expect(
+      TraceDurationInputUnit.minutes.durationSeconds(for: 3, allowedRange: 1...600)
+        == 180)
+    #expect(
+      TraceDurationInputUnit.minutes.durationSeconds(for: 11, allowedRange: 1...600) == nil)
+    #expect(
       TraceDurationInputUnit.minutes.inputValue(
         forDurationSeconds: 61,
-        allowedRange: 1...600),
-      2)
-    XCTAssertNil(
+        allowedRange: 1...600)
+        == 2)
+    #expect(
       TraceDurationInputUnit.minutes.inputValue(
         forDurationSeconds: 100,
-        allowedRange: 1...100),
+        allowedRange: 1...100) == nil,
       "unit changes must not round beyond the published maximum or shorten silently")
   }
 
-  func testViewerArtifactPolicyRequiresOneExactPublishedRawTrace() {
+  @Test func viewerArtifactPolicyRequiresOneExactPublishedRawTrace() {
     let valid = artifact()
-    XCTAssertEqual(
-      TracePublishedArtifactPolicy.selectRawTrace(from: [valid]),
-      valid)
-    XCTAssertNil(
-      TracePublishedArtifactPolicy.selectRawTrace(from: [valid, valid]),
+    #expect(
+      TracePublishedArtifactPolicy.selectRawTrace(from: [valid])
+        == valid)
+    #expect(
+      TracePublishedArtifactPolicy.selectRawTrace(from: [valid, valid]) == nil,
       "two plausible rows are ambiguous and must fail closed")
 
     let invalid: [RuntimeArtifactPresentation] = [
@@ -92,13 +92,13 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       artifact(sourceOperation: "capture.diagnostics@2"),
     ]
     for candidate in invalid {
-      XCTAssertNil(
-        TracePublishedArtifactPolicy.selectRawTrace(from: [candidate]),
+      #expect(
+        TracePublishedArtifactPolicy.selectRawTrace(from: [candidate]) == nil,
         "invalid field set must never enter the parser: \(candidate)")
     }
   }
 
-  func testWorkspaceDecoderPreservesBindingAndLabelsDiagnosticsJobsHonestly() throws {
+  @Test func workspaceDecoderPreservesBindingAndLabelsDiagnosticsJobsHonestly() throws {
     let presentation = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
@@ -139,22 +139,22 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           ],
         ])))
 
-    XCTAssertEqual(presentation.operation.availability, .available)
-    XCTAssertEqual(
-      presentation.targets,
-      [
-        TraceTargetPresentation(
-          id: "target-a",
-          bindingRevision: 9,
-          toolVersion: "3.2.0f",
-          adoptedAtUTC: "2026-08-06T08:00:00Z")
-      ])
-    XCTAssertEqual(presentation.relatedDiagnosticsJobs.count, 1)
-    XCTAssertEqual(presentation.relatedDiagnosticsJobs.first?.id, "diagnostics-job")
-    XCTAssertEqual(presentation.relatedDiagnosticsJobs.first?.traceLegSelectionKnown, false)
+    #expect(presentation.operation.availability == .available)
+    #expect(
+      presentation.targets
+        == [
+          TraceTargetPresentation(
+            id: "target-a",
+            bindingRevision: 9,
+            toolVersion: "3.2.0f",
+            adoptedAtUTC: "2026-08-06T08:00:00Z")
+        ])
+    #expect(presentation.relatedDiagnosticsJobs.count == 1)
+    #expect(presentation.relatedDiagnosticsJobs.first?.id == "diagnostics-job")
+    #expect(presentation.relatedDiagnosticsJobs.first?.traceLegSelectionKnown == false)
   }
 
-  func testTraceTargetsJoinSharedDeviceIdentityFacts() {
+  @Test func traceTargetsJoinSharedDeviceIdentityFacts() {
     let target = TraceTargetPresentation(
       id: "target-a",
       bindingRevision: 9,
@@ -182,19 +182,19 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
 
     let joined = TraceApplicationFacade.rejoin(targets: [target], with: observation)
 
-    XCTAssertEqual(joined.first?.deviceName, "OpenHarmony Reference Device")
-    XCTAssertEqual(joined.first?.systemVersion, "OpenHarmony-7.0.0.39")
-    XCTAssertEqual(joined.first?.connectKey, "5SM0125725000252")
-    XCTAssertEqual(joined.first?.transport, "USB")
-    XCTAssertEqual(
-      joined.first?.connectionSummary,
-      "OpenHarmony-7.0.0.39 · 5SM0…00252 · USB")
-    XCTAssertEqual(
-      joined.first?.accessibleConnectionSummary,
-      "OpenHarmony-7.0.0.39, 5SM0125725000252, USB")
+    #expect(joined.first?.deviceName == "OpenHarmony Reference Device")
+    #expect(joined.first?.systemVersion == "OpenHarmony-7.0.0.39")
+    #expect(joined.first?.connectKey == "5SM0125725000252")
+    #expect(joined.first?.transport == "USB")
+    #expect(
+      joined.first?.connectionSummary
+        == "OpenHarmony-7.0.0.39 · 5SM0…00252 · USB")
+    #expect(
+      joined.first?.accessibleConnectionSummary
+        == "OpenHarmony-7.0.0.39, 5SM0125725000252, USB")
   }
 
-  func testTraceDeviceJoinRequiresTheCurrentBindingAndOneRoute() {
+  @Test func traceDeviceJoinRequiresTheCurrentBindingAndOneRoute() {
     let target = TraceTargetPresentation(
       id: "target-a", bindingRevision: 9, toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-06T08:00:00Z")
@@ -210,15 +210,15 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
         adoptedTargetID: "target-a", bindingRevision: 9),
     ]
 
-    XCTAssertEqual(
+    #expect(
       TraceApplicationFacade.rejoin(
         targets: [target],
-        with: DeviceListPresentation(availability: .available, candidates: candidates)),
-      [target],
+        with: DeviceListPresentation(availability: .available, candidates: candidates))
+        == [target],
       "ambiguous current routes must not be presented as one physical device")
   }
 
-  func testMalformedMatchingFactsFailClosed() throws {
+  @Test func malformedMatchingFactsFailClosed() throws {
     let presentation = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: .success(
         try response([
@@ -233,94 +233,94 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           ["jobId": "incomplete", "operation": "capture.diagnostics@1"]
         ])))
 
-    XCTAssertEqual(
-      presentation.operation.availability,
-      .unavailable(reasons: ["capture.diagnostics@1 is missing complete availability facts"]))
-    XCTAssertTrue(presentation.targets.isEmpty)
-    XCTAssertTrue(presentation.relatedDiagnosticsJobs.isEmpty)
-    XCTAssertEqual(
-      presentation.targetLoadFailure,
-      "Runtime returned a target without complete binding facts")
-    XCTAssertEqual(
-      presentation.jobLoadFailure,
-      "Runtime returned an incomplete diagnostics job")
+    #expect(
+      presentation.operation.availability
+        == .unavailable(reasons: ["capture.diagnostics@1 is missing complete availability facts"]))
+    #expect(presentation.targets.isEmpty)
+    #expect(presentation.relatedDiagnosticsJobs.isEmpty)
+    #expect(
+      presentation.targetLoadFailure
+        == "Runtime returned a target without complete binding facts")
+    #expect(
+      presentation.jobLoadFailure
+        == "Runtime returned an incomplete diagnostics job")
   }
 
-  func testFacadeExposesClosedTypedTraceSubmitRunAndCancel() throws {
+  @Test func facadeExposesClosedTypedTraceSubmitRunAndCancel() throws {
     let facade = try source(
       "Packages/ArkDeckKit/Sources/ArkDeckClientKit/TraceApplicationFacade.swift")
-    let protocolBody = try XCTUnwrap(
+    let protocolBody = try #require(
       facade.split(separator: "public protocol TraceApplicationProviding", maxSplits: 1)
         .last?.split(separator: "public enum TraceApplicationFacade", maxSplits: 1).first)
 
-    XCTAssertTrue(protocolBody.contains("refreshWorkspace"))
-    XCTAssertTrue(protocolBody.contains("submitCapture"))
-    XCTAssertTrue(protocolBody.contains("run(jobID:"))
-    XCTAssertTrue(protocolBody.contains("cancel(jobID:"))
-    XCTAssertFalse(protocolBody.contains("write"))
-    XCTAssertTrue(facade.contains("method: \"operation.list\""))
-    XCTAssertTrue(facade.contains("method: \"target.list\""))
-    XCTAssertTrue(facade.contains("method: \"job.list\""))
-    XCTAssertTrue(facade.contains("method: \"job.submit\""))
-    XCTAssertTrue(facade.contains("method: \"job.run\""))
-    XCTAssertTrue(facade.contains("method: \"job.cancel\""))
-    XCTAssertTrue(facade.contains("ArkDeckAgentClientName.traceWorkspace"))
+    #expect(protocolBody.contains("refreshWorkspace"))
+    #expect(protocolBody.contains("submitCapture"))
+    #expect(protocolBody.contains("run(jobID:"))
+    #expect(protocolBody.contains("cancel(jobID:"))
+    #expect(!protocolBody.contains("write"))
+    #expect(facade.contains("method: \"operation.list\""))
+    #expect(facade.contains("method: \"target.list\""))
+    #expect(facade.contains("method: \"job.list\""))
+    #expect(facade.contains("method: \"job.submit\""))
+    #expect(facade.contains("method: \"job.run\""))
+    #expect(facade.contains("method: \"job.cancel\""))
+    #expect(facade.contains("ArkDeckAgentClientName.traceWorkspace"))
     for forbidden in ["method: \"artifact.import\"", "method: \"artifact.export\""] {
-      XCTAssertFalse(facade.contains(forbidden), forbidden)
+      #expect(!facade.contains(forbidden), "\(forbidden)")
     }
   }
 
-  func testAppRoutesTraceWorkspaceAndStartsOnlyThroughTheFacade() throws {
+  @Test func appRoutesTraceWorkspaceAndStartsOnlyThroughTheFacade() throws {
     let app = try source("ArkDeckApp/App/ArkDeckApp.swift")
     let workspace = try source("ArkDeckApp/Features/Trace/TraceWorkspaceView.swift")
     let configuration = try source(
       "ArkDeckApp/Features/Trace/TraceConfigurationView.swift")
 
-    XCTAssertTrue(app.contains("case .trace:\n      TraceWorkspaceView"))
-    XCTAssertTrue(
+    #expect(app.contains("case .trace:\n      TraceWorkspaceView"))
+    #expect(
       workspace.contains(
         "String.LocalizationValue(key), table: \"TraceLocalizable\""))
-    XCTAssertTrue(workspace.contains("model.submit()"))
-    XCTAssertTrue(workspace.contains("traceString(\"trace.action.start\")"))
-    XCTAssertTrue(workspace.contains("model.cancel()"))
-    XCTAssertTrue(workspace.contains(#"private(set) var durationText = "10""#))
-    XCTAssertTrue(
+    #expect(workspace.contains("model.submit()"))
+    #expect(workspace.contains("traceString(\"trace.action.start\")"))
+    #expect(workspace.contains("model.cancel()"))
+    #expect(workspace.contains(#"private(set) var durationText = "10""#))
+    #expect(
       workspace.contains(
         "min(durationRange.upperBound, max(durationRange.lowerBound, 10))"))
-    XCTAssertTrue(configuration.contains("model.capturePresets"))
-    XCTAssertTrue(configuration.contains("TextField(traceString(\"trace.bounds.duration\")"))
-    XCTAssertTrue(configuration.contains("selection: durationUnitBinding"))
-    XCTAssertTrue(configuration.contains("ForEach(model.durationUnit.quickValues"))
-    XCTAssertTrue(configuration.contains(".toggleStyle(.button)"))
-    XCTAssertFalse(configuration.contains("configurationMode"))
-    XCTAssertFalse(configuration.contains("customTags"))
-    XCTAssertFalse(configuration.contains("TraceDebugParameterCatalog.definitions"))
-    XCTAssertFalse(configuration.contains("trace.buffer"))
-    XCTAssertFalse(configuration.contains("trace.parameters"))
-    XCTAssertFalse(configuration.contains("trace.filter"))
-    XCTAssertTrue(app.contains("models.traceWorkspace.applyDeviceObservation("))
-    XCTAssertTrue(workspace.contains("TraceApplicationFacade.rejoin("))
-    XCTAssertTrue(configuration.contains("model.deviceTitle(target)"))
-    XCTAssertTrue(configuration.contains("target.connectionSummary"))
-    XCTAssertTrue(workspace.contains("trace.blocker.adapterUnsupported"))
-    XCTAssertTrue(workspace.contains(".disabled(model.isSubmitting)"))
-    XCTAssertTrue(workspace.contains("submissionFailure = captureBlockers.first"))
-    XCTAssertTrue(workspace.contains("selectionChangedDuringRefresh"))
-    XCTAssertTrue(workspace.contains("next.runtimeProbe?.targetID != resolvedTargetID"))
-    XCTAssertTrue(workspace.contains("preferredConnectedTargetID"))
-    XCTAssertTrue(workspace.contains("candidate.isAuthorized"))
-    XCTAssertFalse(workspace.contains("job.submit"))
-    XCTAssertFalse(configuration.contains("shell"))
-    XCTAssertTrue(
+    #expect(configuration.contains("model.capturePresets"))
+    #expect(configuration.contains("TextField(traceString(\"trace.bounds.duration\")"))
+    #expect(configuration.contains("selection: durationUnitBinding"))
+    #expect(configuration.contains("ForEach(model.durationUnit.quickValues"))
+    #expect(configuration.contains(".toggleStyle(.button)"))
+    #expect(!configuration.contains("configurationMode"))
+    #expect(!configuration.contains("customTags"))
+    #expect(!configuration.contains("TraceDebugParameterCatalog.definitions"))
+    #expect(!configuration.contains("trace.buffer"))
+    #expect(!configuration.contains("trace.parameters"))
+    #expect(!configuration.contains("trace.filter"))
+    #expect(app.contains("models.traceWorkspace.applyDeviceObservation("))
+    #expect(workspace.contains("TraceApplicationFacade.rejoin("))
+    #expect(configuration.contains("model.deviceTitle(target)"))
+    #expect(configuration.contains("target.connectionSummary"))
+    #expect(workspace.contains("trace.blocker.adapterUnsupported"))
+    #expect(workspace.contains(".disabled(model.isSubmitting)"))
+    #expect(workspace.contains("submissionFailure = captureBlockers.first"))
+    #expect(workspace.contains("selectionChangedDuringRefresh"))
+    #expect(workspace.contains("next.runtimeProbe?.targetID != resolvedTargetID"))
+    #expect(workspace.contains("preferredConnectedTargetID"))
+    #expect(workspace.contains("candidate.isAuthorized"))
+    #expect(!workspace.contains("job.submit"))
+    #expect(!configuration.contains("shell"))
+    #expect(
       workspace.contains(
         "if terminal.state == \"succeeded\", !terminal.outcomeUnknown"))
-    XCTAssertTrue(workspace.contains("TracePublishedArtifactPolicy.selectRawTrace("))
-    XCTAssertTrue(workspace.contains("allowSensitive: true"))
-    XCTAssertTrue(workspace.contains("case .completed(let url):"))
-    XCTAssertTrue(workspace.contains("documentController.open(url)"))
+    #expect(workspace.contains("TracePublishedArtifactPolicy.selectRawTrace("))
+    #expect(workspace.contains("allowSensitive: true"))
+    #expect(workspace.contains("case .completed(let url):"))
+    #expect(workspace.contains("documentController.open(url)"))
   }
 
-  func testRuntimeProbeDecoderPinsTargetBindingAdapterTagsAndAllParameters() throws {
+  @Test func runtimeProbeDecoderPinsTargetBindingAdapterTagsAndAllParameters() throws {
     let target = TraceTargetPresentation(
       id: "target-a", bindingRevision: 9, toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-06T08:00:00Z")
@@ -352,13 +352,14 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       withJSONObject: ["id": "probe", "ok": true, "result": result])
     let decoded = TraceRuntimeProbeResponseDecoding.snapshot(.success(data), target: target)
     guard case .success(let snapshot) = decoded else {
-      return XCTFail("complete target-bound probe should decode")
+      Issue.record("complete target-bound probe should decode")
+      return
     }
-    XCTAssertEqual(snapshot.targetID, target.id)
-    XCTAssertEqual(snapshot.bindingRevision, target.bindingRevision)
-    XCTAssertEqual(snapshot.supportedTags, ["ace"])
-    XCTAssertEqual(snapshot.tools.map(\.tool), ["hitrace", "bytrace"])
-    XCTAssertEqual(snapshot.parameters.count, TraceDebugParameterCatalog.definitions.count)
+    #expect(snapshot.targetID == target.id)
+    #expect(snapshot.bindingRevision == target.bindingRevision)
+    #expect(snapshot.supportedTags == ["ace"])
+    #expect(snapshot.tools.map(\.tool) == ["hitrace", "bytrace"])
+    #expect(snapshot.parameters.count == TraceDebugParameterCatalog.definitions.count)
 
     var drifted = result
     drifted["bindingRevision"] = 10
@@ -367,16 +368,16 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
     guard
       case .failure = TraceRuntimeProbeResponseDecoding.snapshot(
         .success(driftedData), target: target)
-    else { return XCTFail("binding drift must fail closed") }
+    else { Issue.record("binding drift must fail closed"); return }
   }
 
-  func testTraceLocalizationCoversRuntimeKeysAndContainsNoOrphans() throws {
+  @Test func traceLocalizationCoversRuntimeKeysAndContainsNoOrphans() throws {
     let data = try Data(
       contentsOf: repository.appending(
         path: "ArkDeckApp/Resources/TraceLocalizable.xcstrings"))
-    let object = try XCTUnwrap(
+    let object = try #require(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
-    let strings = try XCTUnwrap(object["strings"] as? [String: Any])
+    let strings = try #require(object["strings"] as? [String: Any])
     let requiredKeys = TracePresetCatalog.definitions.filter { $0.id != .custom }.map {
       "trace.preset.\($0.id.rawValue)"
     }
@@ -409,16 +410,16 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
       })
 
     let orphanedKeys = Set(strings.keys).subtracting(referencedKeys).sorted()
-    XCTAssertTrue(
+    #expect(
       orphanedKeys.isEmpty,
       "TraceLocalizable contains keys with no Trace source consumer: \(orphanedKeys)")
 
     for key in strings.keys.sorted() {
-      let entry = try XCTUnwrap(strings[key] as? [String: Any], key)
-      let localizations = try XCTUnwrap(
-        entry["localizations"] as? [String: Any], key)
-      XCTAssertNotNil(localizations["en"], key)
-      XCTAssertNotNil(localizations["zh-Hans"], key)
+      let entry = try #require(strings[key] as? [String: Any], "\(key)")
+      let localizations = try #require(
+        entry["localizations"] as? [String: Any], "\(key)")
+      #expect(localizations["en"] != nil, "\(key)")
+      #expect(localizations["zh-Hans"] != nil, "\(key)")
     }
   }
 

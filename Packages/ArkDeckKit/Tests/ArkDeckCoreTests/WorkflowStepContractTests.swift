@@ -1,11 +1,11 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class WorkflowStepContractTests: XCTestCase {
+struct WorkflowStepContractTests {
   // TEST-AC-WF-001-01 / workflowSchemaContract
-  func testTEST_AC_WF_001_01_UnregisteredHostCommandIsRejectedBeforeDispatch() throws {
+  @Test func TEST_AC_WF_001_01_UnregisteredHostCommandIsRejectedBeforeDispatch() throws {
     let data = Data(
       #"""
       {
@@ -19,15 +19,15 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(data)) { error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError,
-        .unsupportedKind(rawKind: "hostCommand", assumedEffect: .destructive)
-      )
+    #expect(
+      throws: WorkflowStepValidationError.unsupportedKind(
+        rawKind: "hostCommand", assumedEffect: .destructive)
+    ) {
+      try WorkflowStepDecoder.decodeProfileStep(data)
     }
   }
 
-  func testTEST_AC_WF_001_01_RegisteredStepCannotHideAShellSurfaceInOptions() {
+  @Test func TEST_AC_WF_001_01_RegisteredStepCannotHideAShellSurfaceInOptions() {
     let data = Data(
       #"""
       {
@@ -47,16 +47,15 @@ final class WorkflowStepContractTests: XCTestCase {
       """#.utf8
     )
 
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(data)) { error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError,
-        .unsafeArgumentKey(path: "arguments.parameters.command")
-      )
+    #expect(
+      throws: WorkflowStepValidationError.unsafeArgumentKey(path: "arguments.parameters.command")
+    ) {
+      try WorkflowStepDecoder.decodeProfileStep(data)
     }
   }
 
   // TEST-AC-WF-002-01 / effectLatticeProperty
-  func testTEST_AC_WF_002_01_EraseCannotBeDowngradedByProfileClassification() throws {
+  @Test func TEST_AC_WF_002_01_EraseCannotBeDowngradedByProfileClassification() throws {
     let data = Data(
       #"""
       {
@@ -78,22 +77,23 @@ final class WorkflowStepContractTests: XCTestCase {
 
     let step = try WorkflowStepDecoder.decodeProfileStep(data)
 
-    XCTAssertEqual(step.kind, .erasePartition)
-    XCTAssertEqual(step.effect, .destructive)
-    XCTAssertEqual(step.cancellation, .criticalNonInterruptible)
-    XCTAssertEqual(step.bindingRequirement, .confirmedDevice)
+    #expect(step.kind == .erasePartition)
+    #expect(step.effect == .destructive)
+    #expect(step.cancellation == .criticalNonInterruptible)
+    #expect(step.bindingRequirement == .confirmedDevice)
   }
 
-  func testTEST_AC_WF_002_01_EveryClosedRegistryEntryEnforcesItsCoreMinimums() throws {
-    XCTAssertEqual(
-      Set(WorkflowStepKind.allCases.map(\.rawValue)).count, WorkflowStepKind.allCases.count)
+  @Test func TEST_AC_WF_002_01_EveryClosedRegistryEntryEnforcesItsCoreMinimums() throws {
+    #expect(
+      Set(WorkflowStepKind.allCases.map(\.rawValue)).count == WorkflowStepKind.allCases.count)
 
     for kind in WorkflowStepKind.allCases {
       let resolution = WorkflowStepRegistry.resolve(rawKind: kind.rawValue)
       guard case .supported(let resolvedKind, let metadata) = resolution else {
-        return XCTFail("registered kind unexpectedly unsupported: \(kind.rawValue)")
+        Issue.record("registered kind unexpectedly unsupported: \(kind.rawValue)")
+        return
       }
-      XCTAssertEqual(resolvedKind, kind)
+      #expect(resolvedKind == kind)
 
       let step = try WorkflowStep(
         id: "step-\(kind.rawValue)",
@@ -104,24 +104,23 @@ final class WorkflowStepContractTests: XCTestCase {
         arguments: validArguments(for: kind)
       )
 
-      XCTAssertGreaterThanOrEqual(step.effect, metadata.minimumEffect, kind.rawValue)
-      XCTAssertGreaterThanOrEqual(step.cancellation, metadata.minimumCancellation, kind.rawValue)
-      XCTAssertGreaterThanOrEqual(
-        step.bindingRequirement,
-        metadata.minimumBindingRequirement,
-        kind.rawValue
+      #expect(step.effect >= metadata.minimumEffect, "\(kind.rawValue)")
+      #expect(step.cancellation >= metadata.minimumCancellation, "\(kind.rawValue)")
+      #expect(
+        step.bindingRequirement >= metadata.minimumBindingRequirement,
+        "\(kind.rawValue)"
       )
     }
   }
 
-  func testClosedRegistryKindsExactlyMatchTheLockedWorkflowStepContract() throws {
+  @Test func closedRegistryKindsExactlyMatchTheLockedWorkflowStepContract() throws {
     let contract = try loadContract(named: "workflow-step.schema.json")
-    let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
-    let kindDefinition = try XCTUnwrap(definitions["kind"] as? [String: Any])
-    let contractKinds = try XCTUnwrap(kindDefinition["enum"] as? [String])
+    let definitions = try #require(contract["$defs"] as? [String: Any])
+    let kindDefinition = try #require(definitions["kind"] as? [String: Any])
+    let contractKinds = try #require(kindDefinition["enum"] as? [String])
 
-    XCTAssertEqual(WorkflowStepKind.allCases.map(\.rawValue), contractKinds)
-    XCTAssertEqual(WorkflowStepRegistry.schemaIdentifier, contract["$id"] as? String)
+    #expect(WorkflowStepKind.allCases.map(\.rawValue) == contractKinds)
+    #expect(WorkflowStepRegistry.schemaIdentifier == contract["$id"] as? String)
   }
 
   /// The locked contract and the code that enforces it must agree on what
@@ -141,10 +140,10 @@ final class WorkflowStepContractTests: XCTestCase {
   /// reads `requiredArgumentKeys` and `allowedArgumentKeys` directly, so this
   /// asserts the document against the executor rather than against a third
   /// transcription of the same list.
-  func testEveryStepKindsArgumentContractMatchesTheRegistryItIsEnforcedBy() throws {
+  @Test func everyStepKindsArgumentContractMatchesTheRegistryItIsEnforcedBy() throws {
     let contract = try loadContract(named: "workflow-step.schema.json")
-    let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
-    let chain = try XCTUnwrap(
+    let definitions = try #require(contract["$defs"] as? [String: Any])
+    let chain = try #require(
       (definitions["typedArgumentsByKind"] as? [String: Any])?["allOf"] as? [[String: Any]])
 
     // The chain maps kinds to argument objects two ways — one kind by `const`,
@@ -183,47 +182,52 @@ final class WorkflowStepContractTests: XCTestCase {
 
     for kind in WorkflowStepKind.allCases {
       let raw = kind.rawValue
-      let name = try XCTUnwrap(referenced[raw], "\(raw): the contract maps it to no arguments object")
-      let object = try XCTUnwrap(definitions[name] as? [String: Any], name)
+      let name = try #require(referenced[raw], "\(raw): the contract maps it to no arguments object")
+      let object = try #require(definitions[name] as? [String: Any], "\(name)")
       let metadata = WorkflowStepRegistry.metadata(for: kind)
 
       let contractRequired =
         Set(object["required"] as? [String] ?? []).union(additionalRequired[raw] ?? [])
-      XCTAssertEqual(
-        contractRequired, metadata.requiredArgumentKeys,
+      #expect(
+        contractRequired == metadata.requiredArgumentKeys,
         "\(raw): the contract and the validator disagree on which arguments are required")
 
       let contractAllowed =
         Set((object["properties"] as? [String: Any])?.keys ?? [:].keys)
         .subtracting(forbidden[raw] ?? [])
-      XCTAssertEqual(
-        contractAllowed, metadata.allowedArgumentKeys,
+      #expect(
+        contractAllowed == metadata.allowedArgumentKeys,
         "\(raw): the contract and the validator disagree on which arguments are accepted")
 
-      XCTAssertEqual(
-        object["additionalProperties"] as? Bool, false,
+      #expect(
+        object["additionalProperties"] as? Bool == false,
         "\(raw): the arguments object must be closed, as the validator is")
     }
   }
 
-  func testRegistryMetadataExactlyMatchesTheLockedRegistry() throws {
+  @Test func registryMetadataExactlyMatchesTheLockedRegistry() throws {
     let records = try loadInlineYAMLRecords(named: "workflow-step-registry.yaml")
-    XCTAssertEqual(records.count, WorkflowStepKind.allCases.count)
+    #expect(records.count == WorkflowStepKind.allCases.count)
 
     for record in records {
-      let kind = try XCTUnwrap(WorkflowStepKind(rawValue: try XCTUnwrap(record["kind"])))
+      // Swift Testing rejects a #require nested in another #require.
+      let rawKind = try #require(record["kind"])
+      let kind = try #require(WorkflowStepKind(rawValue: rawKind))
       let metadata = WorkflowStepRegistry.metadata(for: kind)
-      XCTAssertEqual(metadata.minimumEffect.rawValue, record["minimum_effect"], kind.rawValue)
-      XCTAssertEqual(metadata.minimumCancellation.rawValue, record["cancellation"], kind.rawValue)
-      XCTAssertEqual(
-        metadata.minimumBindingRequirement.rawValue, record["binding"], kind.rawValue)
-      XCTAssertEqual(
-        metadata.profileExposable, record["profile_exposable"] == "true", kind.rawValue)
-      XCTAssertEqual(metadata.bindingIsExact, record["binding_exact"] == "true", kind.rawValue)
+      #expect(metadata.minimumEffect.rawValue == record["minimum_effect"], "\(kind.rawValue)")
+      #expect(
+        metadata.minimumCancellation.rawValue == record["cancellation"], "\(kind.rawValue)")
+      #expect(
+        metadata.minimumBindingRequirement.rawValue == record["binding"], "\(kind.rawValue)")
+      #expect(
+        metadata.profileExposable == (record["profile_exposable"] == "true"),
+        "\(kind.rawValue)")
+      #expect(
+        metadata.bindingIsExact == (record["binding_exact"] == "true"), "\(kind.rawValue)")
     }
   }
 
-  func testProfileExposureAndExactBindingRulesFailClosed() throws {
+  @Test func profileExposureAndExactBindingRulesFailClosed() throws {
     let internalStep = try WorkflowStep(
       id: "probe-host",
       kind: .probeHostTool,
@@ -233,12 +237,11 @@ final class WorkflowStepContractTests: XCTestCase {
       arguments: validArguments(for: .probeHostTool)
     )
     let internalData = try JSONEncoder().encode(internalStep)
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(internalData)) { error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError, .kindNotProfileExposable(.probeHostTool))
+    #expect(throws: WorkflowStepValidationError.kindNotProfileExposable(.probeHostTool)) {
+      try WorkflowStepDecoder.decodeProfileStep(internalData)
     }
     let trustedStep = try WorkflowStepDecoder.decodeCoreOrProviderStep(internalData)
-    XCTAssertEqual(trustedStep.kind, .probeHostTool)
+    #expect(trustedStep.kind == .probeHostTool)
 
     let exposedStep = try WorkflowStep(
       id: "capture",
@@ -248,10 +251,14 @@ final class WorkflowStepContractTests: XCTestCase {
       declaredBindingRequirement: .confirmedDevice,
       arguments: validArguments(for: .captureRemoteStdout)
     )
-    XCTAssertNoThrow(
-      try WorkflowStepDecoder.decodeProfileStep(try JSONEncoder().encode(exposedStep)))
+    #expect(throws: Never.self) {
+      _ = try WorkflowStepDecoder.decodeProfileStep(try JSONEncoder().encode(exposedStep))
+    }
 
-    XCTAssertThrowsError(
+    #expect(
+      throws: WorkflowStepValidationError.exactBindingMismatch(
+        kind: .mutateHDCServerLifecycle, declared: .confirmedDevice, required: .none)
+    ) {
       try WorkflowStep(
         id: "server-lifecycle",
         kind: .mutateHDCServerLifecycle,
@@ -260,16 +267,10 @@ final class WorkflowStepContractTests: XCTestCase {
         declaredBindingRequirement: .confirmedDevice,
         arguments: validArguments(for: .mutateHDCServerLifecycle)
       )
-    ) { error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError,
-        .exactBindingMismatch(
-          kind: .mutateHDCServerLifecycle, declared: .confirmedDevice, required: .none)
-      )
     }
   }
 
-  func testProfileExposureCoversEveryCompensationDescriptor() throws {
+  @Test func profileExposureCoversEveryCompensationDescriptor() throws {
     let internalCompensationKinds: [WorkflowStepKind] = [
       .stopRemoteCapture, .restoreParameter, .cleanupOwnedRemotePath,
     ]
@@ -281,31 +282,32 @@ final class WorkflowStepContractTests: XCTestCase {
 
       do {
         _ = try WorkflowStepDecoder.decodeProfileStep(data)
-        XCTFail("Profile decoded internal compensation kind \(kind.rawValue)")
+        Issue.record("Profile decoded internal compensation kind \(kind.rawValue)")
       } catch {
-        XCTAssertEqual(
-          error as? WorkflowStepValidationError,
-          .kindNotProfileExposable(kind)
+        #expect(
+          error as? WorkflowStepValidationError
+            == .kindNotProfileExposable(kind)
         )
       }
 
       let trusted = try WorkflowStepDecoder.decodeCoreOrProviderStep(data)
-      let trustedCompensation = try XCTUnwrap(trusted.compensationDescriptors.first)
+      let trustedCompensation = try #require(trusted.compensationDescriptors.first)
       let metadata = WorkflowStepRegistry.metadata(for: kind)
-      XCTAssertEqual(trustedCompensation.kind, kind)
-      XCTAssertGreaterThanOrEqual(trustedCompensation.effect, metadata.minimumEffect)
-      XCTAssertGreaterThanOrEqual(
-        trustedCompensation.cancellation, metadata.minimumCancellation)
-      XCTAssertGreaterThanOrEqual(
-        trustedCompensation.bindingRequirement, metadata.minimumBindingRequirement)
+      #expect(trustedCompensation.kind == kind)
+      #expect(trustedCompensation.effect >= metadata.minimumEffect)
+      #expect(
+        trustedCompensation.cancellation >= metadata.minimumCancellation)
+      #expect(
+        trustedCompensation.bindingRequirement >= metadata.minimumBindingRequirement)
     }
     let exposedCompensation = try makeCompensationDescriptor(kind: .stopApplication)
     let legalProfile = try makeProfileStep(compensationDescriptors: [exposedCompensation])
-    XCTAssertNoThrow(
-      try WorkflowStepDecoder.decodeProfileStep(try JSONEncoder().encode(legalProfile)))
+    #expect(throws: Never.self) {
+      _ = try WorkflowStepDecoder.decodeProfileStep(try JSONEncoder().encode(legalProfile))
+    }
   }
 
-  func testStrictDecoderRejectsDuplicateMemberNamesAtEveryObjectDepth() {
+  @Test func strictDecoderRejectsDuplicateMemberNamesAtEveryObjectDepth() {
     let fixtures: [(name: String, path: String, data: Data)] = [
       (
         "escaped duplicate kind",
@@ -488,18 +490,18 @@ final class WorkflowStepContractTests: XCTestCase {
     for fixture in fixtures {
       do {
         _ = try WorkflowStepDecoder.decodeCoreOrProviderStep(fixture.data)
-        XCTFail("decoded duplicate JSON member fixture: \(fixture.name)")
+        Issue.record("decoded duplicate JSON member fixture: \(fixture.name)")
       } catch {
-        XCTAssertEqual(
-          error as? WorkflowStepValidationError,
-          .duplicateJSONMemberName(path: fixture.path),
-          fixture.name
+        #expect(
+          error as? WorkflowStepValidationError
+            == .duplicateJSONMemberName(path: fixture.path),
+          "\(fixture.name)"
         )
       }
     }
   }
 
-  func testJSONMemberNamesRemainCaseSensitiveBeforeReservedKeyValidation() {
+  @Test func jsonMemberNamesRemainCaseSensitiveBeforeReservedKeyValidation() {
     let data = Data(
       #"""
       {
@@ -519,15 +521,19 @@ final class WorkflowStepContractTests: XCTestCase {
       """#.utf8
     )
 
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(data)) { error in
-      guard case .unsafeArgumentKey(let path) = error as? WorkflowStepValidationError else {
-        return XCTFail("unexpected error: \(error)")
-      }
-      XCTAssertEqual(path.lowercased(), "arguments.parameters.command")
+    let error = #expect(throws: WorkflowStepValidationError.self) {
+      try WorkflowStepDecoder.decodeProfileStep(data)
     }
+    // A missing or foreign error is already recorded by #expect(throws:).
+    guard let error else { return }
+    guard case .unsafeArgumentKey(let path) = error else {
+      Issue.record("unexpected error: \(error)")
+      return
+    }
+    #expect(path.lowercased() == "arguments.parameters.command")
   }
 
-  func testWorkflowStepDecodeRejectsUnknownTopLevelAndArgumentFields() {
+  @Test func workflowStepDecodeRejectsUnknownTopLevelAndArgumentFields() {
     let unknownTopLevel = Data(
       #"""
       {
@@ -542,9 +548,8 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownTopLevel)) {
-      error in
-      XCTAssertEqual(error as? WorkflowStepValidationError, .unexpectedFields(["executable"]))
+    #expect(throws: WorkflowStepValidationError.unexpectedFields(["executable"])) {
+      try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownTopLevel)
     }
 
     let unknownArgument = Data(
@@ -560,16 +565,15 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownArgument)) {
-      error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError,
-        .unexpectedArgumentFields(kind: .probeDevice, fields: ["script"])
-      )
+    #expect(
+      throws: WorkflowStepValidationError.unexpectedArgumentFields(
+        kind: .probeDevice, fields: ["script"])
+    ) {
+      try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownArgument)
     }
   }
 
-  func testTypedArgumentsRejectWrongTypesAndUnknownCatalogActionPairs() {
+  @Test func typedArgumentsRejectWrongTypesAndUnknownCatalogActionPairs() {
     let wrongType = Data(
       #"""
       {
@@ -583,12 +587,16 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeCoreOrProviderStep(wrongType)) { error in
-      guard
-        case .invalidArgument(kind: .probeDevice, path: "arguments.evidencePolicy", _) =
-          error as? WorkflowStepValidationError
-      else {
-        return XCTFail("unexpected error: \(error)")
+    let wrongTypeError = #expect(throws: WorkflowStepValidationError.self) {
+      try WorkflowStepDecoder.decodeCoreOrProviderStep(wrongType)
+    }
+    // A missing or foreign error is already recorded by #expect(throws:).
+    if let wrongTypeError {
+      switch wrongTypeError {
+      case .invalidArgument(kind: .probeDevice, path: "arguments.evidencePolicy", _):
+        break
+      default:
+        Issue.record("unexpected error: \(wrongTypeError)")
       }
     }
 
@@ -610,13 +618,15 @@ final class WorkflowStepContractTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeProfileStep(mismatchedCatalogPair)) {
-      error in
-      guard
-        case .invalidArgument(kind: .captureRemoteStdout, path: "arguments.catalogId", _) =
-          error as? WorkflowStepValidationError
-      else {
-        return XCTFail("unexpected error: \(error)")
+    let mismatchedPairError = #expect(throws: WorkflowStepValidationError.self) {
+      try WorkflowStepDecoder.decodeProfileStep(mismatchedCatalogPair)
+    }
+    if let mismatchedPairError {
+      switch mismatchedPairError {
+      case .invalidArgument(kind: .captureRemoteStdout, path: "arguments.catalogId", _):
+        break
+      default:
+        Issue.record("unexpected error: \(mismatchedPairError)")
       }
     }
   }
@@ -732,7 +742,7 @@ final class WorkflowStepContractTests: XCTestCase {
   private func loadContract(named name: String) throws -> [String: Any] {
     let repositoryRoot = repositoryRoot()
     let data = try Data(contentsOf: repositoryRoot.appending(path: "openspec/contracts/\(name)"))
-    return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 
   private func loadInlineYAMLRecords(named name: String) throws -> [[String: String]] {

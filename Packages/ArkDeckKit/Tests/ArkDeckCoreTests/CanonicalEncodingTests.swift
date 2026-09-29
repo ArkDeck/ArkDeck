@@ -1,86 +1,86 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class CanonicalJSONEncodersTests: XCTestCase {
+struct CanonicalJSONEncodersTests {
   private struct Sample: Encodable {
     let zulu: String
     let alpha: String
     let path: String
   }
 
-  func testCanonicalSortsKeysAndDoesNotEscapeSlashes() throws {
+  @Test func canonicalSortsKeysAndDoesNotEscapeSlashes() throws {
     let data = try CanonicalJSONEncoders.canonical().encode(
       Sample(zulu: "z", alpha: "a", path: "a/b/c"))
-    XCTAssertEqual(
-      String(decoding: data, as: UTF8.self),
-      #"{"alpha":"a","path":"a/b/c","zulu":"z"}"#)
+    #expect(
+      String(decoding: data, as: UTF8.self)
+        == #"{"alpha":"a","path":"a/b/c","zulu":"z"}"#)
   }
 
-  func testCanonicalPrettyKeepsOrderAndSlashSpellingAndPrettyPrints() throws {
+  @Test func canonicalPrettyKeepsOrderAndSlashSpellingAndPrettyPrints() throws {
     let text = String(
       decoding: try CanonicalJSONEncoders.canonicalPretty().encode(
         Sample(zulu: "z", alpha: "a", path: "a/b/c")),
       as: UTF8.self)
-    XCTAssertTrue(text.contains("\n"), "pretty output must be multi-line")
-    XCTAssertTrue(text.contains(#""path" : "a\/b\/c""#) == false, "slashes must stay unescaped")
-    XCTAssertTrue(text.contains(#"a/b/c"#))
-    let alpha = try XCTUnwrap(text.range(of: #""alpha""#))
-    let zulu = try XCTUnwrap(text.range(of: #""zulu""#))
-    XCTAssertLessThan(alpha.lowerBound, zulu.lowerBound, "keys must be sorted")
+    #expect(text.contains("\n"), "pretty output must be multi-line")
+    #expect(text.contains(#""path" : "a\/b\/c""#) == false, "slashes must stay unescaped")
+    #expect(text.contains(#"a/b/c"#))
+    let alpha = try #require(text.range(of: #""alpha""#))
+    let zulu = try #require(text.range(of: #""zulu""#))
+    #expect(alpha.lowerBound < zulu.lowerBound, "keys must be sorted")
   }
 
-  func testEachCallReturnsAFreshInstance() {
+  @Test func eachCallReturnsAFreshInstance() {
     let first = CanonicalJSONEncoders.canonical()
     let second = CanonicalJSONEncoders.canonical()
     first.outputFormatting.insert(.prettyPrinted)
-    XCTAssertFalse(second.outputFormatting.contains(.prettyPrinted))
+    #expect(!second.outputFormatting.contains(.prettyPrinted))
   }
 }
 
-final class ISO8601TimestampsTests: XCTestCase {
-  func testParsesPlainInternetDateTime() throws {
-    let date = try XCTUnwrap(ISO8601Timestamps.parse("2026-08-11T12:00:00Z"))
-    XCTAssertEqual(date.timeIntervalSince1970, 1_786_449_600, accuracy: 0.001)
+struct ISO8601TimestampsTests {
+  @Test func parsesPlainInternetDateTime() throws {
+    let date = try #require(ISO8601Timestamps.parse("2026-08-11T12:00:00Z"))
+    #expect(abs(date.timeIntervalSince1970 - 1_786_449_600) <= 0.001)
   }
 
-  func testParsesFractionalSeconds() throws {
-    let date = try XCTUnwrap(ISO8601Timestamps.parse("2026-08-11T12:00:00.250Z"))
-    XCTAssertEqual(date.timeIntervalSince1970, 1_786_449_600.25, accuracy: 0.001)
+  @Test func parsesFractionalSeconds() throws {
+    let date = try #require(ISO8601Timestamps.parse("2026-08-11T12:00:00.250Z"))
+    #expect(abs(date.timeIntervalSince1970 - 1_786_449_600.25) <= 0.001)
   }
 
-  func testFractionalAndPlainAgreeOnTheIntegralInstant() throws {
-    let plain = try XCTUnwrap(ISO8601Timestamps.parse("2026-08-11T12:00:00Z"))
-    let fractional = try XCTUnwrap(ISO8601Timestamps.parse("2026-08-11T12:00:00.000Z"))
-    XCTAssertEqual(plain, fractional)
+  @Test func fractionalAndPlainAgreeOnTheIntegralInstant() throws {
+    let plain = try #require(ISO8601Timestamps.parse("2026-08-11T12:00:00Z"))
+    let fractional = try #require(ISO8601Timestamps.parse("2026-08-11T12:00:00.000Z"))
+    #expect(plain == fractional)
   }
 
-  func testRejectsNonTimestamps() {
-    XCTAssertNil(ISO8601Timestamps.parse(""))
-    XCTAssertNil(ISO8601Timestamps.parse("not-a-date"))
-    XCTAssertNil(ISO8601Timestamps.parse("2026-08-11"))
-    XCTAssertNil(ISO8601Timestamps.parse("2026-08-11T12:00:00"))
-    XCTAssertNil(ISO8601Timestamps.parse("2026-13-40T99:99:99Z"))
+  @Test func rejectsNonTimestamps() {
+    #expect(ISO8601Timestamps.parse("") == nil)
+    #expect(ISO8601Timestamps.parse("not-a-date") == nil)
+    #expect(ISO8601Timestamps.parse("2026-08-11") == nil)
+    #expect(ISO8601Timestamps.parse("2026-08-11T12:00:00") == nil)
+    #expect(ISO8601Timestamps.parse("2026-13-40T99:99:99Z") == nil)
   }
 
-  func testFormatsCanonicalPlainAndFractionalSpellings() {
+  @Test func formatsCanonicalPlainAndFractionalSpellings() {
     let epoch = Date(timeIntervalSince1970: 0)
-    XCTAssertEqual(ISO8601Timestamps.string(from: epoch), "1970-01-01T00:00:00Z")
-    XCTAssertEqual(
-      ISO8601Timestamps.string(from: epoch, includingFractionalSeconds: true),
-      "1970-01-01T00:00:00.000Z")
+    #expect(ISO8601Timestamps.string(from: epoch) == "1970-01-01T00:00:00Z")
+    #expect(
+      ISO8601Timestamps.string(from: epoch, includingFractionalSeconds: true)
+        == "1970-01-01T00:00:00.000Z")
   }
 
-  func testCanonicalPlainParserRejectsAlternateEquivalentSpellings() {
-    XCTAssertNotNil(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00Z"))
-    XCTAssertNil(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00.000Z"))
-    XCTAssertNil(ISO8601Timestamps.parseCanonicalPlain("1969-12-31T16:00:00-08:00"))
+  @Test func canonicalPlainParserRejectsAlternateEquivalentSpellings() {
+    #expect(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00Z") != nil)
+    #expect(ISO8601Timestamps.parseCanonicalPlain("1970-01-01T00:00:00.000Z") == nil)
+    #expect(ISO8601Timestamps.parseCanonicalPlain("1969-12-31T16:00:00-08:00") == nil)
   }
 
   /// The shared format styles are immutable Sendable values, so hammer them
   /// from parallel callers and require every result to stay correct.
-  func testConcurrentParsingStaysCorrectAcrossTasks() async {
+  @Test func concurrentParsingStaysCorrectAcrossTasks() async {
     let expectations: [(String, TimeInterval?)] = [
       ("2026-08-11T12:00:00Z", 1_786_449_600),
       ("2026-08-11T12:00:00.250Z", 1_786_449_600.25),
@@ -110,6 +110,6 @@ final class ISO8601TimestampsTests: XCTestCase {
       }
       return await group.reduce(0, +)
     }
-    XCTAssertEqual(failures, 0)
+    #expect(failures == 0)
   }
 }

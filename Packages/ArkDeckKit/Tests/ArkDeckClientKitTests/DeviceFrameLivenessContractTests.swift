@@ -1,5 +1,5 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
@@ -15,48 +15,50 @@ import XCTest
 /// These pin both halves. A rule that refused too eagerly - anything
 /// time-based - would refuse every gesture anyone ever made, since nobody
 /// looks at a still and decides where to press inside a second.
-final class DeviceFrameLivenessContractTests: XCTestCase {
+struct DeviceFrameLivenessContractTests {
   /// Nothing has been shown yet, so there is nothing to aim at.
-  func testAWorkspaceWithNoPictureRefuses() {
-    XCTAssertTrue(DeviceFrameLiveness().refusesInput)
+  @Test func aWorkspaceWithNoPictureRefuses() {
+    #expect(DeviceFrameLiveness().refusesInput)
   }
 
-  func testAFreshPictureIsAimable() {
+  @Test func aFreshPictureIsAimable() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
-    XCTAssertFalse(liveness.refusesInput)
+    #expect(!liveness.refusesInput)
   }
 
   /// The case the gap was about: press, then press again without looking.
-  func testASecondPressOnTheSamePictureIsRefused() {
+  @Test func aSecondPressOnTheSamePictureIsRefused() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
-    XCTAssertTrue(
+    #expect(
       liveness.refusesInput,
-      "the gesture that just landed is the one change this workspace knows "
-        + "changed the screen, so the picture it was aimed at is spent")
+      """
+      the gesture that just landed is the one change this workspace knows \
+      changed the screen, so the picture it was aimed at is spent
+      """)
   }
 
   /// Unknown is not a licence to keep aiming. A gesture that may have landed
   /// leaves a picture that may already be wrong, and the two are the same
   /// thing from here.
-  func testAnUnknownOutcomeAlsoSpendsThePicture() {
+  @Test func anUnknownOutcomeAlsoSpendsThePicture() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.unknown(reason: "channel closed before the verdict"))
-    XCTAssertTrue(liveness.refusesInput)
+    #expect(liveness.refusesInput)
   }
 
   /// The other half of the rule. A clean failure reached no device, so the
   /// picture is still true and refusing here would cost a person their aim
   /// for nothing.
-  func testACleanFailureLeavesThePictureAimable() {
+  @Test func aCleanFailureLeavesThePictureAimable() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.failed(reason: "device not adopted"))
-    XCTAssertFalse(
-      liveness.refusesInput,
+    #expect(
+      !liveness.refusesInput,
       "nothing reached the device, so nothing changed the screen")
   }
 
@@ -64,31 +66,31 @@ final class DeviceFrameLivenessContractTests: XCTestCase {
   /// one-second freshness budget here would refuse every gesture ever made,
   /// which is why `DeviceScreenFrame.capturedAtUTC` is deliberately not a
   /// freshness claim.
-  func testAgeAloneNeverRefuses() {
+  @Test func ageAloneNeverRefuses() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     // No call carries a clock, and none can: there is nothing here to pass a
     // later instant to. That absence is the assertion.
-    XCTAssertFalse(liveness.refusesInput)
+    #expect(!liveness.refusesInput)
   }
 
   /// Recapturing is the way back, and the only way.
-  func testOnlyAFreshPictureRestoresAim() {
+  @Test func onlyAFreshPictureRestoresAim() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
-    XCTAssertTrue(liveness.refusesInput)
+    #expect(liveness.refusesInput)
     liveness.captured()
-    XCTAssertFalse(liveness.refusesInput)
+    #expect(!liveness.refusesInput)
   }
 
   /// Two gestures in a row without a recapture do not somehow come back.
-  func testStalenessDoesNotDecayBackToAimable() {
+  @Test func stalenessDoesNotDecayBackToAimable() {
     var liveness = DeviceFrameLiveness()
     liveness.captured()
     liveness.settled(.confirmed(summary: [:]))
     liveness.settled(.failed(reason: "refused before dispatch"))
-    XCTAssertTrue(
+    #expect(
       liveness.refusesInput,
       "a failure after the screen already changed does not un-change it")
   }

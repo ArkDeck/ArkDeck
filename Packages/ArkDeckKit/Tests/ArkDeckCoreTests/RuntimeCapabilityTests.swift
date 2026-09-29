@@ -1,8 +1,9 @@
-import XCTest
+import Foundation
+import Testing
 
 @testable import ArkDeckCore
 
-final class RuntimeCapabilityTests: XCTestCase {
+struct RuntimeCapabilityTests {
   private func makeE1(
     operationScope: [RuntimeCapabilityOperationScope] = [
       .init(operationID: "debug.hap", version: 1)
@@ -66,7 +67,7 @@ final class RuntimeCapabilityTests: XCTestCase {
 
   // MARK: - Model invariants
 
-  func testValidE1AndE2Construct() throws {
+  @Test func validE1AndE2Construct() throws {
     _ = try makeE1()
     _ = try makeE2()
     _ = try RuntimeCapability(
@@ -81,7 +82,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
   }
 
-  func testDAYU200SingletonCapabilityDoesNotAliasLegacyVersionedScope() throws {
+  @Test func dayu200SingletonCapabilityDoesNotAliasLegacyVersionedScope() throws {
     let current = try makeE2()
     let query = RuntimeCapabilityAuthorizationQuery(
       operationID: "flash.dayu200",
@@ -91,9 +92,10 @@ final class RuntimeCapabilityTests: XCTestCase {
       targetBindingRevision: 7,
       planDigest: String(repeating: "b", count: 64),
       inputs: [:])
-    XCTAssertNoThrow(
-      try current.authorizes(
-        query, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get())
+    #expect(throws: Never.self) {
+      _ = try current.authorizes(
+        query, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get()
+    }
 
     let legacy = try RuntimeCapability(
       capabilityID: "CAP-RT-DAYU200-FLASH-LEGACY-001",
@@ -111,7 +113,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       .operationScopeMismatch)
   }
 
-  func testRuntimePolicyBindsCompleteTypedInputMap() throws {
+  @Test func runtimePolicyBindsCompleteTypedInputMap() throws {
     let capability = try RuntimeCapability(
       capabilityID: "CAP-RT-POLICY-DEBUG-INPUTS-001",
       targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
@@ -123,13 +125,14 @@ final class RuntimeCapabilityTests: XCTestCase {
       maximumUses: 10_000,
       issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
 
-    XCTAssertNoThrow(
-      try capability.authorizes(
+    #expect(throws: Never.self) {
+      _ = try capability.authorizes(
         query(inputs: ["captureDiagnostics": .bool(true)]),
         nowUTC: "2026-07-02T00:00:00Z",
         remainingUses: 10
-      ).get())
-    XCTAssertThrowsError(
+      ).get()
+    }
+    let denial = #expect(throws: RuntimeCapabilityDenial.self) {
       try capability.authorizes(
         query(
           inputs: [
@@ -139,15 +142,15 @@ final class RuntimeCapabilityTests: XCTestCase {
         nowUTC: "2026-07-02T00:00:00Z",
         remainingUses: 10
       ).get()
-    ) { error in
-      XCTAssertEqual(
-        (error as? RuntimeCapabilityDenial)?.reason,
-        .inputConstraintViolated)
+    }
+    // A missing or foreign error is already recorded by #expect(throws:).
+    if let denial {
+      #expect(denial.reason == .inputConstraintViolated)
     }
   }
 
-  func testRuntimePolicyWithoutExactInputsIsRejected() {
-    XCTAssertThrowsError(
+  @Test func runtimePolicyWithoutExactInputsIsRejected() {
+    #expect(throws: RuntimeCapabilityValidationError.runtimePolicyRequiresExactInputs) {
       try RuntimeCapability(
         capabilityID: "CAP-RT-POLICY-DEBUG-UNBOUND-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
@@ -157,15 +160,11 @@ final class RuntimeCapabilityTests: XCTestCase {
         expiresAtUTC: "2026-08-01T00:00:00Z",
         maximumUses: 10_000,
         issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test:debug.hap@1"))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError,
-        .runtimePolicyRequiresExactInputs)
     }
   }
 
-  func testReadOnlyCeilingIsRejected() {
-    XCTAssertThrowsError(
+  @Test func readOnlyCeilingIsRejected() {
+    #expect(throws: RuntimeCapabilityValidationError.unsupportedEffectCeiling(.readOnly)) {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .anyTarget,
@@ -175,15 +174,12 @@ final class RuntimeCapabilityTests: XCTestCase {
         expiresAtUTC: "2026-08-01T00:00:00Z",
         maximumUses: 1,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#1"))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError, .unsupportedEffectCeiling(.readOnly))
     }
   }
 
-  func testDestructiveRequiresExactPlanDigestSingleUseAndStableTarget() throws {
-    XCTAssertNoThrow(
-      try RuntimeCapability(
+  @Test func destructiveRequiresExactPlanDigestSingleUseAndStableTarget() throws {
+    #expect(throws: Never.self) {
+      _ = try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
         operationScope: [.init(operationID: "flash.dayu200")],
@@ -195,8 +191,8 @@ final class RuntimeCapabilityTests: XCTestCase {
         maximumUses: 1,
         issuer: .init(kind: .runtimeDefaultPolicy, reference: "catalog:test"),
         exactPlanDigest: String(repeating: "b", count: 64))
-    )
-    XCTAssertThrowsError(
+    }
+    #expect(throws: RuntimeCapabilityValidationError.destructiveRequiresExactPlanDigest) {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
@@ -206,11 +202,8 @@ final class RuntimeCapabilityTests: XCTestCase {
         expiresAtUTC: "2026-08-01T00:00:00Z",
         maximumUses: 1,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#1"))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError, .destructiveRequiresExactPlanDigest)
     }
-    XCTAssertThrowsError(
+    #expect(throws: RuntimeCapabilityValidationError.destructiveRequiresSingleUse) {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .stablePhysicalIdentity(sha256: String(repeating: "a", count: 64)),
@@ -221,10 +214,8 @@ final class RuntimeCapabilityTests: XCTestCase {
         maximumUses: 2,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#1"),
         exactPlanDigest: String(repeating: "b", count: 64))
-    ) { error in
-      XCTAssertEqual(error as? RuntimeCapabilityValidationError, .destructiveRequiresSingleUse)
     }
-    XCTAssertThrowsError(
+    #expect(throws: RuntimeCapabilityValidationError.destructiveRequiresStableIdentityTarget) {
       try RuntimeCapability(
         capabilityID: "CAP-RT-X-001",
         targetScope: .anyTarget,
@@ -235,22 +226,20 @@ final class RuntimeCapabilityTests: XCTestCase {
         maximumUses: 1,
         issuer: .init(kind: .maintainerMergedPR, reference: "PR#1"),
         exactPlanDigest: String(repeating: "b", count: 64))
-    ) { error in
-      XCTAssertEqual(
-        error as? RuntimeCapabilityValidationError, .destructiveRequiresStableIdentityTarget)
     }
   }
 
-  func testDeviceMutationCanBindExactPlanAndBindingRevision() throws {
+  @Test func deviceMutationCanBindExactPlanAndBindingRevision() throws {
     let capability = try makeE1(
       maximumUses: 1,
       exactPlanDigest: String(repeating: "b", count: 64),
       exactBindingRevision: 7)
-    XCTAssertNoThrow(
-      try capability.authorizes(
+    #expect(throws: Never.self) {
+      _ = try capability.authorizes(
         query(planDigest: String(repeating: "b", count: 64)),
         nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1
-      ).get())
+      ).get()
+    }
     assertDenied(
       capability.authorizes(
         query(bindingRevision: 8, planDigest: String(repeating: "b", count: 64)),
@@ -263,53 +252,56 @@ final class RuntimeCapabilityTests: XCTestCase {
       .planDigestMismatch)
   }
 
-  func testMalformedTimestampAndExpiryOrderingAreRejected() {
-    XCTAssertThrowsError(try makeE1(issuedAtUTC: "2026-07-01 00:00:00"))
-    XCTAssertThrowsError(try makeE1(issuedAtUTC: "2026-07-01T00:00:00+08"))
-    XCTAssertThrowsError(
-      try makeE1(issuedAtUTC: "2026-08-01T00:00:00Z", expiresAtUTC: "2026-07-01T00:00:00Z"))
+  @Test func malformedTimestampAndExpiryOrderingAreRejected() {
+    #expect(throws: (any Error).self) { try makeE1(issuedAtUTC: "2026-07-01 00:00:00") }
+    #expect(throws: (any Error).self) { try makeE1(issuedAtUTC: "2026-07-01T00:00:00+08") }
+    #expect(throws: (any Error).self) {
+      try makeE1(issuedAtUTC: "2026-08-01T00:00:00Z", expiresAtUTC: "2026-07-01T00:00:00Z")
+    }
   }
 
-  func testCodableRoundTripPreservesEquality() throws {
+  @Test func codableRoundTripPreservesEquality() throws {
     let capability = try makeE2()
     let data = try JSONEncoder().encode(capability)
     let decoded = try JSONDecoder().decode(RuntimeCapability.self, from: data)
-    XCTAssertEqual(decoded, capability)
+    #expect(decoded == capability)
   }
 
-  func testDecodingAnInvariantViolatingDocumentFails() throws {
+  @Test func decodingAnInvariantViolatingDocumentFails() throws {
     let capability = try makeE2()
     let data = try JSONEncoder().encode(capability)
     var text = String(data: data, encoding: .utf8)!
     // Corrupt maximumUses to 2: E2 must be single use, so decode must fail.
     text = text.replacingOccurrences(of: "\"maximumUses\":1", with: "\"maximumUses\":2")
-    XCTAssertThrowsError(
-      try JSONDecoder().decode(RuntimeCapability.self, from: Data(text.utf8)))
+    #expect(throws: (any Error).self) {
+      try JSONDecoder().decode(RuntimeCapability.self, from: Data(text.utf8))
+    }
   }
 
   // MARK: - Authorization matrix
 
-  func testHappyPathAuthorizes() throws {
+  @Test func happyPathAuthorizes() throws {
     let capability = try makeE1()
-    XCTAssertNoThrow(
-      try capability.authorizes(query(), nowUTC: "2026-07-15T00:00:00Z", remainingUses: 3).get())
+    #expect(throws: Never.self) {
+      _ = try capability.authorizes(query(), nowUTC: "2026-07-15T00:00:00Z", remainingUses: 3)
+        .get()
+    }
   }
 
   private func assertDenied(
     _ result: Result<Void, RuntimeCapabilityDenial>,
     _ reason: RuntimeCapabilityDenialReason,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    sourceLocation: SourceLocation = #_sourceLocation
   ) {
     switch result {
     case .success:
-      XCTFail("expected denial \(reason)", file: file, line: line)
+      Issue.record("expected denial \(reason)", sourceLocation: sourceLocation)
     case .failure(let denial):
-      XCTAssertEqual(denial.reason, reason, file: file, line: line)
+      #expect(denial.reason == reason, sourceLocation: sourceLocation)
     }
   }
 
-  func testExpiryRevocationExhaustionFailClosed() throws {
+  @Test func expiryRevocationExhaustionFailClosed() throws {
     let capability = try makeE1()
     assertDenied(
       capability.authorizes(query(), nowUTC: "2027-01-01T00:00:00Z", remainingUses: 3), .expired)
@@ -335,7 +327,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       revoked.authorizes(query(), nowUTC: "2026-07-15T00:00:00Z", remainingUses: 3), .revoked)
   }
 
-  func testScopeAndCeilingFailClosed() throws {
+  @Test func scopeAndCeilingFailClosed() throws {
     let capability = try makeE1()
     assertDenied(
       capability.authorizes(
@@ -361,13 +353,14 @@ final class RuntimeCapabilityTests: XCTestCase {
       .targetIdentityRequired)
   }
 
-  func testE2PlanDigestBindingFailClosed() throws {
+  @Test func e2PlanDigestBindingFailClosed() throws {
     let capability = try makeE2()
     let good = query(
       operationID: "flash.dayu200", version: nil, effect: .destructive,
       planDigest: String(repeating: "b", count: 64))
-    XCTAssertNoThrow(
-      try capability.authorizes(good, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get())
+    #expect(throws: Never.self) {
+      _ = try capability.authorizes(good, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 1).get()
+    }
     assertDenied(
       capability.authorizes(
         query(
@@ -384,7 +377,7 @@ final class RuntimeCapabilityTests: XCTestCase {
       .planDigestMismatch)
   }
 
-  func testInputConstraintsFailClosed() throws {
+  @Test func inputConstraintsFailClosed() throws {
     let capability = try makeE1(inputConstraints: [
       "bundleName": .exactString("com.example.demo"),
       "durationSeconds": .integerRange(minimum: 1, maximum: 60),
@@ -393,8 +386,10 @@ final class RuntimeCapabilityTests: XCTestCase {
       "bundleName": .string("com.example.demo"),
       "durationSeconds": .integer(30),
     ])
-    XCTAssertNoThrow(
-      try capability.authorizes(allowed, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 3).get())
+    #expect(throws: Never.self) {
+      _ = try capability.authorizes(allowed, nowUTC: "2026-07-15T00:00:00Z", remainingUses: 3)
+        .get()
+    }
     assertDenied(
       capability.authorizes(
         query(inputs: [
@@ -421,24 +416,24 @@ final class RuntimeCapabilityTests: XCTestCase {
 
   // MARK: - Default read-only policy
 
-  func testDefaultReadOnlyPolicyBounds() {
+  @Test func defaultReadOnlyPolicyBounds() {
     let policy = RuntimeDefaultReadOnlyPolicy(
       maximumTimeoutSeconds: 60, maximumOutputByteBudget: 1024)
-    XCTAssertEqual(
-      policy.evaluate(effect: .readOnly, timeoutSeconds: 60, outputByteBudget: 1024), .allowed)
-    XCTAssertEqual(
-      policy.evaluate(effect: .hostOnly, timeoutSeconds: 1, outputByteBudget: 1), .allowed)
-    XCTAssertEqual(
-      policy.evaluate(effect: .deviceMutation, timeoutSeconds: 1, outputByteBudget: 1),
-      .deniedEffectRequiresCapability(.deviceMutation))
-    XCTAssertEqual(
-      policy.evaluate(effect: .destructive, timeoutSeconds: 1, outputByteBudget: 1),
-      .deniedEffectRequiresCapability(.destructive))
-    XCTAssertEqual(
-      policy.evaluate(effect: .readOnly, timeoutSeconds: 61, outputByteBudget: 1),
-      .deniedTimeoutAboveLimit(requested: 61, limit: 60))
-    XCTAssertEqual(
-      policy.evaluate(effect: .readOnly, timeoutSeconds: 1, outputByteBudget: 2048),
-      .deniedBudgetAboveLimit(requested: 2048, limit: 1024))
+    #expect(
+      policy.evaluate(effect: .readOnly, timeoutSeconds: 60, outputByteBudget: 1024) == .allowed)
+    #expect(
+      policy.evaluate(effect: .hostOnly, timeoutSeconds: 1, outputByteBudget: 1) == .allowed)
+    #expect(
+      policy.evaluate(effect: .deviceMutation, timeoutSeconds: 1, outputByteBudget: 1)
+        == .deniedEffectRequiresCapability(.deviceMutation))
+    #expect(
+      policy.evaluate(effect: .destructive, timeoutSeconds: 1, outputByteBudget: 1)
+        == .deniedEffectRequiresCapability(.destructive))
+    #expect(
+      policy.evaluate(effect: .readOnly, timeoutSeconds: 61, outputByteBudget: 1)
+        == .deniedTimeoutAboveLimit(requested: 61, limit: 60))
+    #expect(
+      policy.evaluate(effect: .readOnly, timeoutSeconds: 1, outputByteBudget: 2048)
+        == .deniedBudgetAboveLimit(requested: 2048, limit: 1024))
   }
 }

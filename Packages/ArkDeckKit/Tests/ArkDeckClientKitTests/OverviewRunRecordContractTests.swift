@@ -8,41 +8,44 @@
 
 import ArkDeckCore
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
-final class OverviewRunRecordContractTests: XCTestCase {
-  func testContinuationCopiesTypedInputsAndThreadButCreatesNewRequestIdentity() throws {
+struct OverviewRunRecordContractTests {
+  @Test func continuationCopiesTypedInputsAndThreadButCreatesNewRequestIdentity() throws {
     let job = DiagnosticSessionUIFixture.job
     let draft = try RuntimeWorkspaceContinuation.prepare(
       job: job, detail: DiagnosticSessionUIFixture.detail(),
       currentTargetID: job.targetID, currentBindingRevision: 3).get()
     let first = try draft.request(nonce: "first-request")
     let second = try draft.request(nonce: "second-request")
-    XCTAssertEqual(first.inputs, ["durationSeconds": .integer(10), "captureHilog": .bool(true), "uiDump": .bool(false)])
-    XCTAssertEqual(first.clientContext?.threadID, job.threadID)
-    XCTAssertEqual(first.clientContext?.provenance?["arkdeck.continuedFromJob"], job.id)
-    XCTAssertNotEqual(first.requestID, second.requestID)
-    XCTAssertNotEqual(first.idempotencyKey, second.idempotencyKey)
-    XCTAssertNil(first.authorization)
-    XCTAssertFalse(String(decoding: try JSONEncoder().encode(first), as: UTF8.self).contains("campaignReservation"))
-    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(first)) as? [String: Any])
-    XCTAssertNil(json["sessionId"], "a thread must not become a Runtime session identity")
+    #expect(first.inputs == ["durationSeconds": .integer(10), "captureHilog": .bool(true), "uiDump": .bool(false)])
+    #expect(first.clientContext?.threadID == job.threadID)
+    #expect(first.clientContext?.provenance?["arkdeck.continuedFromJob"] == job.id)
+    #expect(first.requestID != second.requestID)
+    #expect(first.idempotencyKey != second.idempotencyKey)
+    #expect(first.authorization == nil)
+    #expect(try !String(decoding: JSONEncoder().encode(first), as: UTF8.self).contains("campaignReservation"))
+    let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(first)) as? [String: Any])
+    #expect(json["sessionId"] == nil, "a thread must not become a Runtime session identity")
   }
 
-  func testContinuationRefusesBindingAndTargetDrift() throws {
+  @Test func continuationRefusesBindingAndTargetDrift() throws {
     let job = DiagnosticSessionUIFixture.job
     let detail = try DiagnosticSessionUIFixture.detail()
     for (target, binding) in [(job.targetID, Optional(4)), ("other-target", Optional(3)), (job.targetID, nil)] {
       let result = RuntimeWorkspaceContinuation.prepare(
         job: job, detail: detail, currentTargetID: target, currentBindingRevision: binding)
-      guard case .failure(let failure) = result else { return XCTFail("drift was accepted") }
-      XCTAssertEqual(failure.reason, "continuation_target_or_binding_changed")
+      guard case .failure(let failure) = result else {
+        Issue.record("drift was accepted")
+        return
+      }
+      #expect(failure.reason == "continuation_target_or_binding_changed")
     }
   }
 
-  func testContinuationRefusesMutationOldMarkerTimesAndMalformedTypedInputs() throws {
+  @Test func continuationRefusesMutationOldMarkerTimesAndMalformedTypedInputs() throws {
     let job = DiagnosticSessionUIFixture.job
     let cases: [[String: Any]] = [
       ["durationSeconds": 10, "uiScreenshot": true],
@@ -69,7 +72,10 @@ final class OverviewRunRecordContractTests: XCTestCase {
         ]), artifactResponse: .success(try currentArtifactPageResponse([])))
       let result = RuntimeWorkspaceContinuation.prepare(
         job: job, detail: detail, currentTargetID: job.targetID, currentBindingRevision: 3)
-      guard case .failure = result else { return XCTFail("accepted unsafe or invalid draft: \(inputs)") }
+      guard case .failure = result else {
+        Issue.record("accepted unsafe or invalid draft: \(inputs)")
+        return
+      }
     }
   }
 
@@ -91,7 +97,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
       currentTargetID: DiagnosticSessionUIFixture.job.targetID, currentBindingRevision: 3).get()
   }
 
-  func testContinuationFreshChecksPrecedeSubmissionAndRunIsOneShot() async throws {
+  @Test func continuationFreshChecksPrecedeSubmissionAndRunIsOneShot() async throws {
     let source = DiagnosticSessionUIFixture.job
     let transport = OverviewRPCScenario([
       ("target.list", try continuationResponse([["targetId": source.targetID, "bindingRevision": 3]])),
@@ -107,21 +113,27 @@ final class OverviewRunRecordContractTests: XCTestCase {
       reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
       request: { await transport.request($0, $1) })
     let submission = await provider.submit(try continuationDraft())
-    XCTAssertEqual(try submission.get(), "job-new")
+    #expect(try submission.get() == "job-new")
     let first = await provider.run(jobID: "job-new")
-    XCTAssertEqual(try first.get(), "succeeded")
-    guard case .failure = await provider.run(jobID: "job-new") else { return XCTFail("run was dispatched twice") }
+    #expect(try first.get() == "succeeded")
+    guard case .failure = await provider.run(jobID: "job-new") else {
+      Issue.record("run was dispatched twice")
+      return
+    }
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["target.list", "job.show", "job.submit", "job.run", "job.show"])
-    guard case .string(let requestJSON)? = calls[2].1["requestJson"] else { return XCTFail("missing typed request") }
-    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
-    XCTAssertNil(json["sessionId"])
-    XCTAssertNil(json["authorization"])
-    XCTAssertNil(json["campaignReservation"])
-    XCTAssertEqual(calls[3].1, ["jobId": .string("job-new")])
+    #expect(calls.map(\.0) == ["target.list", "job.show", "job.submit", "job.run", "job.show"])
+    guard case .string(let requestJSON)? = calls[2].1["requestJson"] else {
+      Issue.record("missing typed request")
+      return
+    }
+    let json = try #require(JSONSerialization.jsonObject(with: Data(requestJSON.utf8)) as? [String: Any])
+    #expect(json["sessionId"] == nil)
+    #expect(json["authorization"] == nil)
+    #expect(json["campaignReservation"] == nil)
+    #expect(calls[3].1 == ["jobId": .string("job-new")])
   }
 
-  func testContinuationFreshBindingDriftAndForeignRunReadNoNewJob() async throws {
+  @Test func continuationFreshBindingDriftAndForeignRunReadNoNewJob() async throws {
     let transport = OverviewRPCScenario([
       ("target.list", try continuationResponse([["targetId": DiagnosticSessionUIFixture.job.targetID, "bindingRevision": 4]])),
       ("job.show", .success(try currentJobDetailResponse(continuationSourceStatus()))),
@@ -130,16 +142,20 @@ final class OverviewRunRecordContractTests: XCTestCase {
       reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
       request: { await transport.request($0, $1) })
     guard case .failure = await provider.run(jobID: DiagnosticSessionUIFixture.job.id) else {
-      return XCTFail("historical Job reached run")
+      Issue.record("historical Job reached run")
+      return
     }
     let initial = await transport.recordedCalls()
-    XCTAssertTrue(initial.isEmpty)
-    guard case .failure = await provider.submit(try continuationDraft()) else { return XCTFail("binding drift reached submit") }
+    #expect(initial.isEmpty)
+    guard case .failure = await provider.submit(try continuationDraft()) else {
+      Issue.record("binding drift reached submit")
+      return
+    }
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["target.list", "job.show"])
+    #expect(calls.map(\.0) == ["target.list", "job.show"])
   }
 
-  func testContinuationRejectsDeduplicationAndDoesNotRetryUnknownRunOutcome() async throws {
+  @Test func continuationRejectsDeduplicationAndDoesNotRetryUnknownRunOutcome() async throws {
     let source = DiagnosticSessionUIFixture.job
     for deduplicated in [true, false] {
       var answers: [(String, RuntimeHistoryTransportResult)] = [
@@ -160,19 +176,25 @@ final class OverviewRunRecordContractTests: XCTestCase {
         request: { await transport.request($0, $1) })
       let result = await provider.submit(try continuationDraft())
       if deduplicated {
-        guard case .failure = result else { return XCTFail("deduplicated Job became a new continuation") }
+        guard case .failure = result else {
+          Issue.record("deduplicated Job became a new continuation")
+          return
+        }
       } else {
-        XCTAssertEqual(try result.get(), "job-new")
+        #expect(try result.get() == "job-new")
       }
       for _ in 0..<2 {
-        guard case .failure = await provider.run(jobID: "job-new") else { return XCTFail("unknown result was retried") }
+        guard case .failure = await provider.run(jobID: "job-new") else {
+          Issue.record("unknown result was retried")
+          return
+        }
       }
       let calls = await transport.recordedCalls()
-      XCTAssertEqual(calls.filter { $0.0 == "job.run" }.count, deduplicated ? 0 : 1)
+      #expect(calls.filter { $0.0 == "job.run" }.count == (deduplicated ? 0 : 1))
     }
   }
 
-  func testContinuationDisconnectAfterRunAcknowledgementCannotReplay() async throws {
+  @Test func continuationDisconnectAfterRunAcknowledgementCannotReplay() async throws {
     let source = DiagnosticSessionUIFixture.job
     let transport = OverviewRPCScenario([
       ("target.list", try continuationResponse([["targetId": source.targetID, "bindingRevision": 3]])),
@@ -185,14 +207,15 @@ final class OverviewRunRecordContractTests: XCTestCase {
       reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
       request: { await transport.request($0, $1) })
     let accepted = await provider.submit(try continuationDraft())
-    XCTAssertEqual(try accepted.get(), "job-new")
+    #expect(try accepted.get() == "job-new")
     for _ in 0..<2 {
       guard case .failure = await provider.run(jobID: "job-new") else {
-        return XCTFail("a run acknowledgement cannot prove terminal success after disconnect")
+        Issue.record("a run acknowledgement cannot prove terminal success after disconnect")
+        return
       }
     }
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["target.list", "job.show", "job.submit", "job.run", "job.show"])
+    #expect(calls.map(\.0) == ["target.list", "job.show", "job.submit", "job.run", "job.show"])
   }
 
   private func job(
@@ -233,7 +256,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
 
   /// The whole point of a line is that consecutive work reads as one thing and
   /// unrelated work does not.
-  func testRunsGroupByThreadAndUngroupedRunsStayOnTheirOwn() {
+  @Test func runsGroupByThreadAndUngroupedRunsStayOnTheirOwn() {
     let threads = OverviewRunRecordProjection.threads(
       from: [
         job("job-1", thread: "t-aaa", finishedAt: stamp(1)),
@@ -244,18 +267,18 @@ final class OverviewRunRecordContractTests: XCTestCase {
       ],
       limit: 10)
 
-    XCTAssertEqual(threads.map(\.threadID), [nil, nil, "t-aaa", "t-bbb"])
-    XCTAssertEqual(
-      threads.first(where: { $0.threadID == "t-aaa" })?.runs.map(\.id), ["job-1", "job-2"],
+    #expect(threads.map(\.threadID) == [nil, nil, "t-aaa", "t-bbb"])
+    #expect(
+      threads.first(where: { $0.threadID == "t-aaa" })?.runs.map(\.id) == ["job-1", "job-2"],
       "runs inside a line read oldest first, the way the work happened")
-    XCTAssertEqual(
-      threads.filter { $0.threadID == nil }.map { $0.runs.map(\.id) }, [["job-5"], ["job-4"]],
+    #expect(
+      threads.filter { $0.threadID == nil }.map { $0.runs.map(\.id) } == [["job-5"], ["job-4"]],
       "two runs that recorded no thread are two lines, not one shared line")
   }
 
   /// A line that still needs a person is the reason to open the page, so it is
   /// pinned above more recent but settled work.
-  func testALineNeedingAPersonIsPinnedAboveMoreRecentSettledWork() {
+  @Test func aLineNeedingAPersonIsPinnedAboveMoreRecentSettledWork() {
     for needing in [
       job("job-old", thread: "t-old", outcomeUnknown: true, finishedAt: stamp(1)),
       job("job-old", thread: "t-old", waitingForHuman: true, finishedAt: stamp(1)),
@@ -264,14 +287,14 @@ final class OverviewRunRecordContractTests: XCTestCase {
       let threads = OverviewRunRecordProjection.threads(
         from: [needing, job("job-new", thread: "t-new", finishedAt: stamp(9))],
         limit: 10)
-      XCTAssertEqual(threads.map(\.threadID), ["t-old", "t-new"])
-      XCTAssertEqual(threads.map(\.needsAttention), [true, false])
+      #expect(threads.map(\.threadID) == ["t-old", "t-new"])
+      #expect(threads.map(\.needsAttention) == [true, false])
     }
   }
 
   /// Runtime having established the current epoch settles a historical
   /// unknown: it stays in the record, but it stops paging the operator.
-  func testAResolvedHistoricalUnknownStopsPinningTheLine() {
+  @Test func aResolvedHistoricalUnknownStopsPinningTheLine() {
     let threads = OverviewRunRecordProjection.threads(
       from: [
         job(
@@ -280,13 +303,13 @@ final class OverviewRunRecordContractTests: XCTestCase {
         job("job-new", thread: "t-new", finishedAt: stamp(9)),
       ],
       limit: 10)
-    XCTAssertEqual(threads.map(\.threadID), ["t-new", "t-old"])
-    XCTAssertEqual(threads.map(\.needsAttention), [false, false])
+    #expect(threads.map(\.threadID) == ["t-new", "t-old"])
+    #expect(threads.map(\.needsAttention) == [false, false])
   }
 
   /// Truncation is by whole lines. A line shown with some of its runs missing
   /// would misstate what happened.
-  func testTruncationDropsWholeLinesAndKeepsThePinnedOne() {
+  @Test func truncationDropsWholeLinesAndKeepsThePinnedOne() {
     let jobs = (1...6).flatMap { index in
       [
         job("job-\(index)-a", thread: "t-\(index)", finishedAt: stamp(index * 2)),
@@ -295,14 +318,14 @@ final class OverviewRunRecordContractTests: XCTestCase {
     } + [job("job-attention", thread: "t-att", outcomeUnknown: true, finishedAt: stamp(0))]
 
     let threads = OverviewRunRecordProjection.threads(from: jobs, limit: 3)
-    XCTAssertEqual(threads.count, 3)
-    XCTAssertEqual(threads.first?.threadID, "t-att")
+    #expect(threads.count == 3)
+    #expect(threads.first?.threadID == "t-att")
     for thread in threads where thread.threadID != "t-att" {
-      XCTAssertEqual(thread.runs.count, 2, "a truncated line would misstate the work")
+      #expect(thread.runs.count == 2, "a truncated line would misstate the work")
     }
   }
 
-  func testALineReportsEveryOperationItRanInFirstSeenOrder() {
+  @Test func aLineReportsEveryOperationItRanInFirstSeenOrder() {
     let threads = OverviewRunRecordProjection.threads(
       from: [
         job("job-1", thread: "t-aaa", operation: "capture.diagnostics@1", finishedAt: stamp(1)),
@@ -310,27 +333,27 @@ final class OverviewRunRecordContractTests: XCTestCase {
         job("job-3", thread: "t-aaa", operation: "capture.diagnostics@1", finishedAt: stamp(3)),
       ],
       limit: 10)
-    XCTAssertEqual(
-      threads.first?.operationReferences, ["capture.diagnostics@1", "debug.hap@1"])
+    #expect(
+      threads.first?.operationReferences == ["capture.diagnostics@1", "debug.hap@1"])
   }
 
-  func testOverviewShowsOneFeaturedRunAndAtMostThreeMore() throws {
-    let thread = try XCTUnwrap(
+  @Test func overviewShowsOneFeaturedRunAndAtMostThreeMore() throws {
+    let thread = try #require(
       OverviewRunRecordProjection.threads(
         from: (1...7).map {
           job("job-\($0)", thread: "t-aaa", finishedAt: stamp($0))
         },
         limit: 1
       ).first)
-    let featured = try XCTUnwrap(OverviewRunRecordProjection.featuredRun(in: thread))
-    XCTAssertEqual(featured.id, "job-7")
-    XCTAssertEqual(
-      OverviewRunRecordProjection.additionalRuns(in: thread, excluding: featured).map(\.id),
-      ["job-6", "job-5", "job-4"])
+    let featured = try #require(OverviewRunRecordProjection.featuredRun(in: thread))
+    #expect(featured.id == "job-7")
+    #expect(
+      OverviewRunRecordProjection.additionalRuns(in: thread, excluding: featured).map(\.id)
+        == ["job-6", "job-5", "job-4"])
   }
 
-  func testAnUnresolvedRunRemainsFeaturedEvenWhenTheLineContinued() throws {
-    let thread = try XCTUnwrap(
+  @Test func anUnresolvedRunRemainsFeaturedEvenWhenTheLineContinued() throws {
+    let thread = try #require(
       OverviewRunRecordProjection.threads(
         from: [
           job(
@@ -340,57 +363,57 @@ final class OverviewRunRecordContractTests: XCTestCase {
         ],
         limit: 1
       ).first)
-    XCTAssertEqual(
-      OverviewRunRecordProjection.featuredRun(in: thread)?.id, "job-attention")
+    #expect(
+      OverviewRunRecordProjection.featuredRun(in: thread)?.id == "job-attention")
   }
 
   // MARK: - Resuming
 
   /// Every refusal has to name itself. A page that greys a button without
   /// saying why is the same page that invites a support question.
-  func testEveryRefusalToRepeatARunNamesItself() {
-    XCTAssertEqual(
+  @Test func everyRefusalToRepeatARunNamesItself() {
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1", state: "running"), parametersWereReported: true),
-      .notTerminal)
-    XCTAssertEqual(
+        for: job("job-1", state: "running"), parametersWereReported: true)
+        == .notTerminal)
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1", effect: nil), parametersWereReported: true),
-      .effectUnknown)
-    XCTAssertEqual(
+        for: job("job-1", effect: nil), parametersWereReported: true)
+        == .effectUnknown)
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1", effect: "deviceMutation"), parametersWereReported: true),
-      .requiresAuthorization(effect: "deviceMutation"))
-    XCTAssertEqual(
+        for: job("job-1", effect: "deviceMutation"), parametersWereReported: true)
+        == .requiresAuthorization(effect: "deviceMutation"))
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1", effect: "destructive"), parametersWereReported: true),
-      .requiresAuthorization(effect: "destructive"))
-    XCTAssertEqual(
+        for: job("job-1", effect: "destructive"), parametersWereReported: true)
+        == .requiresAuthorization(effect: "destructive"))
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1"), parametersWereReported: false),
-      .parametersNotReported)
-    XCTAssertEqual(
+        for: job("job-1"), parametersWereReported: false)
+        == .parametersNotReported)
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1"), parametersWereReported: nil),
-      .detailNotLoaded,
+        for: job("job-1"), parametersWereReported: nil)
+        == .detailNotLoaded,
       "an unread run must not be optimistically offered as repeatable")
-    XCTAssertEqual(
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1"), parametersWereReported: true),
-      .resumable)
+        for: job("job-1"), parametersWereReported: true)
+        == .resumable)
   }
 
   /// An unknown outcome is refused before the effect grade is even consulted:
   /// what the device received was never established, so no repeat and no claim
   /// about its grade would be truthful.
-  func testAnUnknownOutcomeIsNeverReplayedWhateverElseIsRecorded() {
+  @Test func anUnknownOutcomeIsNeverReplayedWhateverElseIsRecorded() {
     for effect in ["readOnly", "hostOnly", "deviceMutation", "destructive", nil] {
-      XCTAssertEqual(
+      #expect(
         OverviewRunRecordProjection.resumeDisposition(
           for: job(
             "job-1", state: "interrupted", effect: effect, outcomeUnknown: true),
-          parametersWereReported: true),
-        .neverReplayed,
+          parametersWereReported: true)
+          == .neverReplayed,
         "effect \(effect ?? "nil") must not buy a replay of an unknown outcome")
     }
   }
@@ -398,12 +421,12 @@ final class OverviewRunRecordContractTests: XCTestCase {
   /// Read-only is the only grade the page repeats on its own. Anything else
   /// goes back through the workspace's gate, so a new grade added upstream
   /// fails closed here instead of being silently repeatable.
-  func testOnlyNonMutatingGradesAreRepeatedWithoutTheWorkspaceGate() {
-    XCTAssertEqual(OverviewRunRecordProjection.repeatableEffects, ["readOnly", "hostOnly"])
-    XCTAssertEqual(
+  @Test func onlyNonMutatingGradesAreRepeatedWithoutTheWorkspaceGate() {
+    #expect(OverviewRunRecordProjection.repeatableEffects == ["readOnly", "hostOnly"])
+    #expect(
       OverviewRunRecordProjection.resumeDisposition(
-        for: job("job-1", effect: "somethingNewUpstream"), parametersWereReported: true),
-      .requiresAuthorization(effect: "somethingNewUpstream"))
+        for: job("job-1", effect: "somethingNewUpstream"), parametersWereReported: true)
+        == .requiresAuthorization(effect: "somethingNewUpstream"))
   }
 }
 
@@ -411,7 +434,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
 ///
 /// The failure this guards is the one the page exists to stop making: reading
 /// "the probe did not answer" as "the device cannot do this".
-final class OverviewActionProjectionContractTests: XCTestCase {
+struct OverviewActionProjectionContractTests {
   private func matrix(
     _ items: [(String, OverviewCapabilityState, String)],
     failure: String? = nil
@@ -425,7 +448,7 @@ final class OverviewActionProjectionContractTests: XCTestCase {
       failure: failure)
   }
 
-  func testAProbeThatDidNotAnswerIsNotProbedAndNeverUnavailable() {
+  @Test func aProbeThatDidNotAnswerIsNotProbedAndNeverUnavailable() {
     let actions = OverviewActionProjection.actions(
       from: matrix([
         ("hidumper", .unknown, "probeFailed"),
@@ -434,51 +457,52 @@ final class OverviewActionProjectionContractTests: XCTestCase {
       ]))
     let byKind = Dictionary(uniqueKeysWithValues: actions.map { ($0.kind, $0) })
 
-    XCTAssertEqual(byKind[.uiDump]?.availability, .notProbed(reason: "probeFailed"))
-    XCTAssertEqual(byKind[.trace]?.availability, .available)
-    XCTAssertEqual(
-      byKind[.flash]?.availability, .unavailable(reason: "Runtime reported unavailable"),
+    #expect(byKind[.uiDump]?.availability == .notProbed(reason: "probeFailed"))
+    #expect(byKind[.trace]?.availability == .available)
+    #expect(
+      byKind[.flash]?.availability == .unavailable(reason: "Runtime reported unavailable"),
       "a stated unavailability is the one thing that may read as unavailable")
-    XCTAssertEqual(byKind[.uiDump]?.availability.opensWorkspace, false)
-    XCTAssertEqual(byKind[.trace]?.availability.opensWorkspace, true)
+    #expect(byKind[.uiDump]?.availability.opensWorkspace == false)
+    #expect(byKind[.trace]?.availability.opensWorkspace == true)
   }
 
   /// Capabilities nothing probes yet must say exactly that, rather than
   /// borrowing another row's verdict or disappearing from the row.
-  func testCapabilitiesWithNoPublishedProbeSaySoInsteadOfVanishing() {
+  @Test func capabilitiesWithNoPublishedProbeSaySoInsteadOfVanishing() {
     let actions = OverviewActionProjection.actions(from: matrix([]))
-    XCTAssertEqual(actions.map(\.kind), OverviewActionProjection.order)
+    #expect(actions.map(\.kind) == OverviewActionProjection.order)
     for action in actions {
       guard case .notProbed = action.availability else {
-        return XCTFail("\(action.kind) must read as not probed with an empty matrix")
+        Issue.record("\(action.kind) must read as not probed with an empty matrix")
+        return
       }
     }
   }
 
   /// A matrix that failed wholesale hands its own reason to every entry rather
   /// than letting the page invent one.
-  func testAFailedMatrixHandsItsOwnReasonToEveryEntry() {
+  @Test func aFailedMatrixHandsItsOwnReasonToEveryEntry() {
     let actions = OverviewActionProjection.actions(
       from: matrix([], failure: "No adopted target is available"))
     for action in actions {
-      XCTAssertEqual(
-        action.availability, .notProbed(reason: "No adopted target is available"))
+      #expect(
+        action.availability == .notProbed(reason: "No adopted target is available"))
     }
   }
 
   /// The effect grade is a property of the operation, not of how the probe
   /// went, so it is stated whether or not the entry can be used.
-  func testTheEffectGradeIsStatedEvenWhenTheEntryCannotBeUsed() {
+  @Test func theEffectGradeIsStatedEvenWhenTheEntryCannotBeUsed() {
     let actions = OverviewActionProjection.actions(from: matrix([]))
     let grades = Dictionary(uniqueKeysWithValues: actions.map { ($0.kind, $0.effect) })
-    XCTAssertEqual(grades[.uiDump], "readOnly")
-    XCTAssertEqual(grades[.trace], "readOnly")
-    XCTAssertEqual(grades[.debugHAP], "deviceMutation")
-    XCTAssertEqual(grades[.flash], "destructive")
-    XCTAssertEqual(
-      Dictionary(uniqueKeysWithValues: actions.map { ($0.kind, $0.operationReference) })[.flash],
-      ArkForgeFlashOperation.canonicalReference)
-    XCTAssertEqual(grades[.device], "deviceMutation")
+    #expect(grades[.uiDump] == "readOnly")
+    #expect(grades[.trace] == "readOnly")
+    #expect(grades[.debugHAP] == "deviceMutation")
+    #expect(grades[.flash] == "destructive")
+    #expect(
+      Dictionary(uniqueKeysWithValues: actions.map { ($0.kind, $0.operationReference) })[.flash]
+        == ArkForgeFlashOperation.canonicalReference)
+    #expect(grades[.device] == "deviceMutation")
   }
 }
 
@@ -487,67 +511,67 @@ final class OverviewActionProjectionContractTests: XCTestCase {
 /// Viewer, Trace and the Device all submit `capture.diagnostics@1`. Opening
 /// the wrong one would prefill a different request than the one being
 /// repeated, so an unsettled case has to end in nil rather than a guess.
-final class OverviewWorkspaceKindContractTests: XCTestCase {
+struct OverviewWorkspaceKindContractTests {
   private func parameters(_ pairs: [(String, String)]) -> [RuntimeJobParameterPresentation] {
     pairs.map { RuntimeJobParameterPresentation(name: $0.0, value: $0.1) }
   }
 
-  func testAnOperationWithOneOwnerResolvesFromTheReferenceAlone() {
-    XCTAssertEqual(
-      OverviewActionProjection.workspaceKind(forOperation: "debug.hap@1", parameters: []),
-      .debugHAP)
+  @Test func anOperationWithOneOwnerResolvesFromTheReferenceAlone() {
+    #expect(
+      OverviewActionProjection.workspaceKind(forOperation: "debug.hap@1", parameters: [])
+        == .debugHAP)
     for reference in [
       ArkForgeFlashOperation.canonicalReference,
       // A durable record written before the rename still resolves.
       "flash.dayu200@1",
     ] {
-      XCTAssertEqual(
-        OverviewActionProjection.workspaceKind(forOperation: reference, parameters: []),
-        .flash, "flash identity must go through the canonical policy: \(reference)")
+      #expect(
+        OverviewActionProjection.workspaceKind(forOperation: reference, parameters: [])
+          == .flash, "flash identity must go through the canonical policy: \(reference)")
     }
     for gesture in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
-      XCTAssertEqual(
-        OverviewActionProjection.workspaceKind(forOperation: gesture, parameters: []), .device)
+      #expect(
+        OverviewActionProjection.workspaceKind(forOperation: gesture, parameters: []) == .device)
     }
   }
 
-  func testASharedOperationResolvesFromTheInputsItReported() {
-    XCTAssertEqual(
+  @Test func aSharedOperationResolvesFromTheInputsItReported() {
+    #expect(
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
-        parameters: parameters([("uiComponentTree", "true"), ("uiScreenshot", "true")])),
-      .uiDump)
-    XCTAssertEqual(
+        parameters: parameters([("uiComponentTree", "true"), ("uiScreenshot", "true")]))
+        == .uiDump)
+    #expect(
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
-        parameters: parameters([("advancedDump", "true")])),
-      .uiDump)
-    XCTAssertEqual(
+        parameters: parameters([("advancedDump", "true")]))
+        == .uiDump)
+    #expect(
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
-        parameters: parameters([("traceCategories", "ark · ui"), ("uiDump", "false")])),
-      .trace)
-    XCTAssertEqual(
+        parameters: parameters([("traceCategories", "ark · ui"), ("uiDump", "false")]))
+        == .trace)
+    #expect(
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
-        parameters: parameters([("uiScreenshot", "true"), ("durationSeconds", "1")])),
-      .device)
+        parameters: parameters([("uiScreenshot", "true"), ("durationSeconds", "1")]))
+        == .device)
   }
 
   /// The important half: silence, not a guess.
-  func testAnUnsettledOrUnknownOperationResolvesToNothing() {
-    XCTAssertNil(
+  @Test func anUnsettledOrUnknownOperationResolvesToNothing() {
+    #expect(
       OverviewActionProjection.workspaceKind(
-        forOperation: "capture.diagnostics@1", parameters: []),
+        forOperation: "capture.diagnostics@1", parameters: []) == nil,
       "reported nothing that identifies a workspace")
-    XCTAssertNil(
+    #expect(
       OverviewActionProjection.workspaceKind(
         forOperation: "capture.diagnostics@1",
-        parameters: parameters([("traceCategories", "[]")])),
+        parameters: parameters([("traceCategories", "[]")])) == nil,
       "an empty category list does not make it a Trace capture")
-    XCTAssertNil(
+    #expect(
       OverviewActionProjection.workspaceKind(
-        forOperation: "observe.device@1", parameters: []),
+        forOperation: "observe.device@1", parameters: []) == nil,
       "no workspace submits this one")
   }
 }

@@ -1,11 +1,11 @@
 import Darwin
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
-final class RuntimeUpdateStateStoreContractTests: XCTestCase {
-  func testAppAndCLIResolveTheSameSandboxContainerDirectories() throws {
+struct RuntimeUpdateStateStoreContractTests {
+  @Test func appAndCLIResolveTheSameSandboxContainerDirectories() throws {
     let physicalHome = URL(filePath: "/Users/example")
     let containerLibrary = physicalHome
       .appending(path: "Library/Containers", directoryHint: .isDirectory)
@@ -25,87 +25,85 @@ final class RuntimeUpdateStateStoreContractTests: XCTestCase {
         processBundleIdentifier: "com.arkdeck.cli",
         processDirectory: physicalHome.appending(path: "Library/\(kind)"),
         processHomeDirectory: physicalHome)
-      XCTAssertEqual(fromCLI, fromApp)
+      #expect(fromCLI == fromApp)
     }
 
     let project = try String(
       contentsOf: repositoryRoot.appending(path: "ArkDeck.xcodeproj/project.pbxproj"),
       encoding: .utf8)
-    XCTAssertTrue(
+    #expect(
       project.contains(
         "PRODUCT_BUNDLE_IDENTIFIER = \(AutoUpdateFilesystemLayout.appBundleIdentifier);"),
       "the shared-container pin must match the App's signed bundle identifier")
   }
 
-  func testDurableStateUsesGenerationCASAndSurvivesANewOwner() throws {
+  @Test func durableStateUsesGenerationCASAndSurvivesANewOwner() throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let fixed = Date(timeIntervalSince1970: 1_788_225_600)
     let first = RuntimeUpdateStateStore(directory: root, now: { fixed })
 
     let initial = try first.load()
-    XCTAssertEqual(initial.generation, 0)
+    #expect(initial.generation == 0)
     let laterOwner = RuntimeUpdateStateStore(
       directory: root, now: { fixed.addingTimeInterval(3_600) })
-    XCTAssertEqual(try laterOwner.load(), initial)
+    #expect(try laterOwner.load() == initial)
     let operationID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
     let checking = try first.replace(
       expectedGeneration: 0, state: .checking, activeOperationID: operationID)
-    XCTAssertEqual(checking.generation, 1)
-    XCTAssertEqual(checking.activeOperationID, operationID)
+    #expect(checking.generation == 1)
+    #expect(checking.activeOperationID == operationID)
 
     let second = RuntimeUpdateStateStore(directory: root, now: { fixed })
-    XCTAssertEqual(try second.load(), checking)
-    XCTAssertThrowsError(
+    #expect(try second.load() == checking)
+    #expect(throws: RuntimeUpdateStateStoreError.resourceConflict) {
       try second.replace(expectedGeneration: 0, state: .idle)
-    ) { error in
-      XCTAssertEqual(error as? RuntimeUpdateStateStoreError, .resourceConflict)
     }
 
     let cancelled = try second.requestCancellation()
-    XCTAssertEqual(cancelled.generation, 2)
-    XCTAssertTrue(cancelled.cancellationRequested)
-    XCTAssertEqual(cancelled.activeOperationID, operationID)
+    #expect(cancelled.generation == 2)
+    #expect(cancelled.cancellationRequested)
+    #expect(cancelled.activeOperationID == operationID)
 
     let statePath = root.appending(path: "state-v1.json").path
     var stateMetadata = stat()
-    XCTAssertEqual(lstat(statePath, &stateMetadata), 0)
-    XCTAssertEqual(stateMetadata.st_mode & mode_t(0o777), mode_t(0o400))
+    #expect(lstat(statePath, &stateMetadata) == 0)
+    #expect(stateMetadata.st_mode & mode_t(0o777) == mode_t(0o400))
     var directoryMetadata = stat()
-    XCTAssertEqual(lstat(root.path, &directoryMetadata), 0)
-    XCTAssertEqual(directoryMetadata.st_mode & mode_t(0o777), mode_t(0o700))
+    #expect(lstat(root.path, &directoryMetadata) == 0)
+    #expect(directoryMetadata.st_mode & mode_t(0o777) == mode_t(0o700))
   }
 
-  func testOperationLeaseProvesWhetherAnInProgressRecordCanBeRecovered() throws {
+  @Test func operationLeaseProvesWhetherAnInProgressRecordCanBeRecovered() throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let first = RuntimeUpdateStateStore(directory: root)
     let second = RuntimeUpdateStateStore(directory: root)
 
     var lease: RuntimeUpdateOperationLease? = try first.acquireOperationLease()
-    XCTAssertTrue(try second.operationIsActive())
-    XCTAssertThrowsError(try second.acquireOperationLease()) { error in
-      XCTAssertEqual(error as? RuntimeUpdateStateStoreError, .operationInProgress)
+    #expect(try second.operationIsActive())
+    #expect(throws: RuntimeUpdateStateStoreError.operationInProgress) {
+      try second.acquireOperationLease()
     }
     lease = nil
-    XCTAssertFalse(try second.operationIsActive())
-    XCTAssertNil(lease)
+    #expect(try !second.operationIsActive())
+    #expect(lease == nil)
   }
 
-  func testNonCanonicalOrWritableStateFailsClosed() throws {
+  @Test func nonCanonicalOrWritableStateFailsClosed() throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }
     let store = RuntimeUpdateStateStore(directory: root)
     _ = try store.replace(expectedGeneration: 0, state: .idle)
     let state = root.appending(path: "state-v1.json")
 
-    XCTAssertEqual(chmod(state.path, 0o600), 0)
-    XCTAssertThrowsError(try store.load()) { error in
-      XCTAssertEqual(error as? RuntimeUpdateStateStoreError, .recordUnreadable)
+    #expect(chmod(state.path, 0o600) == 0)
+    #expect(throws: RuntimeUpdateStateStoreError.recordUnreadable) {
+      try store.load()
     }
   }
 
-  func testStatusProjectionNeverPublishesThePrivateArtifactPath() throws {
+  @Test func statusProjectionNeverPublishesThePrivateArtifactPath() throws {
     let artifact = DownloadedUpdateArtifact(
       url: URL(filePath: "/Users/example/private/ArkDeck-Updates/update.dmg"),
       byteLength: 1_024,
@@ -118,10 +116,10 @@ final class RuntimeUpdateStateStoreContractTests: XCTestCase {
       snapshot: RuntimeUpdateSnapshot(
         generation: 7, state: .verifying(artifact), activeOperationID: UUID()))
 
-    XCTAssertEqual(projection.phase, "verifying")
-    XCTAssertEqual(projection.artifactSHA256, String(repeating: "a", count: 64))
-    XCTAssertEqual(projection.artifactByteLength, 1_024)
-    XCTAssertFalse(String(describing: projection).contains("/Users/example/private"))
+    #expect(projection.phase == "verifying")
+    #expect(projection.artifactSHA256 == String(repeating: "a", count: 64))
+    #expect(projection.artifactByteLength == 1_024)
+    #expect(!String(describing: projection).contains("/Users/example/private"))
   }
 
   private func temporaryRoot() -> URL {

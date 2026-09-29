@@ -37,11 +37,45 @@ run_lane() {
   set -e
   cat "$log"
   finished=$(date +%s)
-  test_count=$(sed -n -E \
-    -e 's/.*Executed ([0-9]+) tests?.*/\1/p' \
-    -e 's/.*Test run with ([0-9]+) tests?.*/\1/p' \
-    -e 's/^\[[0-9]+\/([0-9]+)\] Testing .*/\1/p' \
-    "$log" | awk '$1 > 0 { count = $1 } END { if (count != "") print count }')
+  # A run can mix XCTest and Swift Testing, and SwiftPM runs each test bundle
+  # as its own process per framework, so no single line carries the total:
+  # it is XCTest's count plus Swift Testing's.
+  #   - Swift Testing ends every bundle's run with "Test run with N tests";
+  #     those are summed.
+  #   - Parallel XCTest numbers each test "[i/N] Testing" against one N for
+  #     the whole run, so the last N is its total. It also replays the serial
+  #     output of a failing test, which must not be counted again.
+  #   - Serial XCTest ends every bundle's run with its top-level suite ('All
+  #     tests' or 'Selected tests') and "Executed N tests"; those are summed.
+  # A framework that printed no count adds nothing; if neither printed one,
+  # the count is unavailable rather than zero.
+  test_count=$(awk '
+    /Test run with [0-9]+ tests?/ {
+      value = $0
+      sub(/.*Test run with /, "", value)
+      sub(/[^0-9].*/, "", value)
+      swift_testing += value
+      counted = 1
+    }
+    /^\[[0-9]+\/[0-9]+\] Testing / {
+      value = $0
+      sub(/^\[[0-9]+\//, "", value)
+      sub(/\].*/, "", value)
+      xctest_parallel = value + 0
+      parallel = 1
+      counted = 1
+    }
+    top_level_suite_ended && /Executed [0-9]+ tests?/ {
+      value = $0
+      sub(/.*Executed /, "", value)
+      sub(/[^0-9].*/, "", value)
+      xctest_serial += value
+      counted = 1
+    }
+    { top_level_suite_ended = /^Test Suite .(All|Selected) tests. (passed|failed) at / }
+    END {
+      if (counted) print swift_testing + (parallel ? xctest_parallel : xctest_serial)
+    }' "$log")
   maximum_resident_set=$(sed -n -E \
     's/^[[:space:]]*([0-9]+)  maximum resident set size$/\1/p' "$log" | tail -n 1)
   peak_memory_footprint=$(sed -n -E \
