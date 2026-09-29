@@ -86,6 +86,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -176,6 +177,29 @@ def run(
 
 
 # -- digests and trees ---------------------------------------------------------
+
+# `hdiutil create` fails with "Resource busy" when another process (on hosted
+# runners, usually the malware scanner) still holds the freshly staged tree.
+# Only that failure is retried, after removing any partial image; every other
+# failure, and the last busy one, is reported as it is.
+HDIUTIL_BUSY = "Resource busy"
+HDIUTIL_ATTEMPTS = 5
+
+
+def create_dmg(arguments: Sequence[str | Path], dmg: Path, environment: Mapping[str, str]) -> None:
+    delay = float(environment.get("ARKDECK_HDIUTIL_RETRY_SECONDS", "15"))
+    for attempt in range(1, HDIUTIL_ATTEMPTS + 1):
+        try:
+            run(arguments, env=environment)
+            return
+        except ReleaseError as error:
+            if HDIUTIL_BUSY not in str(error) or attempt == HDIUTIL_ATTEMPTS:
+                raise
+            dmg.unlink(missing_ok=True)
+            print(f"build_macos_release: hdiutil create busy (attempt {attempt}/{HDIUTIL_ATTEMPTS}); "
+                  f"retrying in {delay * attempt:.0f} s", file=sys.stderr)
+            time.sleep(delay * attempt)
+
 
 
 def sha256_file(path: Path) -> str:
@@ -705,8 +729,8 @@ def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, st
 
         suffix = "-unsigned" if unsigned else ""
         dmg = publish / f"ArkDeck-{versions['version']}-{versions['build']}{suffix}.dmg"
-        run(["hdiutil", "create", "-volname", f"ArkDeck {versions['version']}", "-srcfolder", root,
-             "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9", dmg], env=environment)
+        create_dmg(["hdiutil", "create", "-volname", f"ArkDeck {versions['version']}", "-srcfolder", root,
+                    "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9", dmg], dmg, environment)
         if not unsigned:
             run(["codesign", "--force", "--sign", identity, "--timestamp", *keychain_arguments(environment), dmg],
                 env=environment)
