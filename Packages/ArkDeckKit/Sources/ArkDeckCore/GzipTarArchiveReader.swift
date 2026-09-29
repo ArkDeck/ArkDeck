@@ -137,8 +137,8 @@ package enum GzipTarArchiveReader {
         deflatePayload = headerPending.subdata(in: headerLength..<headerPending.count)
         headerPending = Data()
       }
-      try decompressor.feed(deflatePayload, finalize: false) { produced in
-        try tar.consume(produced)
+      try unsafe decompressor.feed(deflatePayload, finalize: false) { produced in
+        try unsafe tar.consume(produced)
       }
     }
 
@@ -147,8 +147,8 @@ package enum GzipTarArchiveReader {
         ? GzipTarArchiveReaderError.unreadableFile(url.path)
         : GzipTarArchiveReaderError.corruptGzipHeader
     }
-    try decompressor.feed(Data(), finalize: true) { produced in
-      try tar.consume(produced)
+    try unsafe decompressor.feed(Data(), finalize: true) { produced in
+      try unsafe tar.consume(produced)
     }
     let members = try tar.finish()
     let archiveSHA256 = SHA256Hex.hexString(archiveHasher.finalize())
@@ -194,6 +194,10 @@ package enum GzipTarArchiveReader {
 
 // MARK: - Raw DEFLATE decompression (gzip payload)
 
+/// Owns the Compression stream and its output buffer for its whole lifetime;
+/// neither pointer leaves this type, and `feed` lends each output chunk to
+/// `emit` only for the duration of the call.
+@safe
 private final class RawDeflateDecompressor {
   private let streamPointer: UnsafeMutablePointer<compression_stream>
   private let destinationCapacity = GzipTarArchiveReader.chunkSizeBytes
@@ -201,22 +205,22 @@ private final class RawDeflateDecompressor {
   private var ended = false
 
   init() throws {
-    streamPointer = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
-    destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationCapacity)
+    unsafe streamPointer = UnsafeMutablePointer<compression_stream>.allocate(capacity: 1)
+    unsafe destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: destinationCapacity)
     guard
-      compression_stream_init(streamPointer, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
+      unsafe compression_stream_init(streamPointer, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
         == COMPRESSION_STATUS_OK
     else {
-      streamPointer.deallocate()
-      destinationBuffer.deallocate()
+      unsafe streamPointer.deallocate()
+      unsafe destinationBuffer.deallocate()
       throw GzipTarArchiveReaderError.decompressionFailed
     }
   }
 
   deinit {
-    compression_stream_destroy(streamPointer)
-    streamPointer.deallocate()
-    destinationBuffer.deallocate()
+    unsafe compression_stream_destroy(streamPointer)
+    unsafe streamPointer.deallocate()
+    unsafe destinationBuffer.deallocate()
   }
 
   func feed(
@@ -227,23 +231,23 @@ private final class RawDeflateDecompressor {
     guard !ended else { return }
     var scratch: UInt8 = 0
     try withUnsafeMutablePointer(to: &scratch) { scratchPointer in
-      try data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
+      try unsafe data.withUnsafeBytes { (input: UnsafeRawBufferPointer) in
         if let base = input.baseAddress {
-          streamPointer.pointee.src_ptr = base.assumingMemoryBound(to: UInt8.self)
-          streamPointer.pointee.src_size = input.count
+          unsafe streamPointer.pointee.src_ptr = base.assumingMemoryBound(to: UInt8.self)
+          unsafe streamPointer.pointee.src_size = input.count
         } else {
-          streamPointer.pointee.src_ptr = UnsafePointer(scratchPointer)
-          streamPointer.pointee.src_size = 0
+          unsafe streamPointer.pointee.src_ptr = UnsafePointer(scratchPointer)
+          unsafe streamPointer.pointee.src_size = 0
         }
         var stalledIterations = 0
         while true {
-          streamPointer.pointee.dst_ptr = destinationBuffer
-          streamPointer.pointee.dst_size = destinationCapacity
-          let status = compression_stream_process(
+          unsafe streamPointer.pointee.dst_ptr = destinationBuffer
+          unsafe streamPointer.pointee.dst_size = destinationCapacity
+          let status = unsafe compression_stream_process(
             streamPointer, finalize ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0)
-          let produced = destinationCapacity - streamPointer.pointee.dst_size
+          let produced = unsafe destinationCapacity - streamPointer.pointee.dst_size
           if produced > 0 {
-            try emit(UnsafeRawBufferPointer(start: destinationBuffer, count: produced))
+            try unsafe emit(UnsafeRawBufferPointer(start: destinationBuffer, count: produced))
           }
           switch status {
           case COMPRESSION_STATUS_END:
@@ -252,7 +256,7 @@ private final class RawDeflateDecompressor {
             ended = true
             return
           case COMPRESSION_STATUS_OK:
-            if streamPointer.pointee.src_size == 0 {
+            if unsafe streamPointer.pointee.src_size == 0 {
               if !finalize && produced < destinationCapacity { return }
               stalledIterations = produced == 0 ? stalledIterations + 1 : 0
               if stalledIterations > 2 {
@@ -307,7 +311,7 @@ private struct TarStreamSummarizer {
         return
       case .header:
         let take = min(512 - headerBuffer.count, input.count - offset)
-        headerBuffer.append(
+        unsafe headerBuffer.append(
           contentsOf: UnsafeRawBufferPointer(rebasing: input[offset..<offset + take]))
         offset += take
         if headerBuffer.count == 512 {
@@ -316,17 +320,17 @@ private struct TarStreamSummarizer {
       case .memberContent, .skipContent:
         let take = Int(min(remainingBytes, Int64(input.count - offset)))
         if state == .memberContent && take > 0 {
-          let slice = UnsafeRawBufferPointer(rebasing: input[offset..<offset + take])
-          memberHasher.update(bufferPointer: slice)
+          let slice = unsafe UnsafeRawBufferPointer(rebasing: input[offset..<offset + take])
+          unsafe memberHasher.update(bufferPointer: slice)
           if capturing != nil {
             if capturing!.count + take <= (derivation?.captureByteLimit ?? 0) {
-              capturing!.append(contentsOf: slice)
+              unsafe capturing!.append(contentsOf: slice)
             } else {
               capturingOverflowed = true
             }
           }
           if scanner != nil, scannedValue == nil {
-            scannedValue = scanner!.consume(slice)
+            scannedValue = unsafe scanner!.consume(slice)
           }
         }
         offset += take

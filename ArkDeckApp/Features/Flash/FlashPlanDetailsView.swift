@@ -1,4 +1,5 @@
 import ArkDeckClientKit
+import ArkDeckCore
 import Foundation
 import SwiftUI
 

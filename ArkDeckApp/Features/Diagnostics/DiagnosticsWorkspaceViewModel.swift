@@ -3,7 +3,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-@MainActor
 @Observable
 final class DiagnosticsWorkspaceViewModel {
   private(set) var reading: DiagnosticSessionReading?

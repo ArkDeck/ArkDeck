@@ -52,6 +52,9 @@ public struct DiagnosticSessionApplicationReader: Sendable {
     self.provider = provider
   }
 
+  /// Inspects the session's artifacts here, so it runs on the concurrent pool
+  /// rather than on its caller's actor.
+  @concurrent
   public func load(
     _ context: RuntimeHistoryWorkspaceContext
   ) async -> DiagnosticSessionLoadResult {

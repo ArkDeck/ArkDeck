@@ -14,7 +14,6 @@ private final class FlashImageArchiveOpenPanelDelegate: NSObject, NSOpenSavePane
   }
 }
 
-@MainActor
 private enum FlashImageArchiveOpenPanel {
   static func choose() async -> URL? {
     let panel = NSOpenPanel()
@@ -1402,7 +1401,6 @@ struct FlashWorkspaceView: View {
   }
 }
 
-@MainActor
 @Observable
 final class FlashWorkspaceViewModel {
   private(set) var workspace = FlashWorkspacePresentation.loading

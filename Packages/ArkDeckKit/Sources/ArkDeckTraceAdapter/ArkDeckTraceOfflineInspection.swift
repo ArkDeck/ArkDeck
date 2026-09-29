@@ -1,4 +1,5 @@
 import ArkTraceAppSupport
+import ArkTraceCore
 import Foundation
 
 public struct ArkDeckTraceOfflineInspectionContract: Sendable, Equatable {

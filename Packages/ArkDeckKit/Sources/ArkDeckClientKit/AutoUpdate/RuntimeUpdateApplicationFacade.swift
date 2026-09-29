@@ -100,7 +100,7 @@ public actor RuntimeUpdateApplicationFacade {
   @discardableResult
   public func checkAutomaticallyIfDue(
     identity: UpdateProductIdentity,
-    now: Date = Date()
+    now: Date = Date.now
   ) async throws -> AutoUpdateState {
     guard preferences.automaticChecksEnabled() else {
       throw AutoUpdateServiceError.automaticChecksDisabled
@@ -116,7 +116,7 @@ public actor RuntimeUpdateApplicationFacade {
   @discardableResult
   public func checkManually(
     identity: UpdateProductIdentity,
-    now: Date = Date()
+    now: Date = Date.now
   ) async throws -> AutoUpdateState {
     try await check(identity: identity, now: now)
   }

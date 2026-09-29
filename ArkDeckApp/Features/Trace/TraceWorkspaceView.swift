@@ -151,7 +151,6 @@ struct TraceWorkspaceView: View {
   }
 }
 
-@MainActor
 @Observable
 final class TraceWorkspaceViewModel {
   private static let defaultBufferKB = 8_192

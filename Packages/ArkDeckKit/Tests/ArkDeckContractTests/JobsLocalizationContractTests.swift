@@ -20,7 +20,7 @@ final class JobsLocalizationContractTests: XCTestCase {
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
     XCTAssertTrue(source.contains("table: \"JobsLocalizable\""))
-    XCTAssertTrue(source.contains("Bundle.main.localizedString"))
+    XCTAssertTrue(source.contains("String(localized: String.LocalizationValue(key), table: \"JobsLocalizable\")"))
 
     let forbiddenPatterns = [
       #"(?<![A-Za-z0-9_])(?:Text|Label|Button|ContentUnavailableView)\(\s*\"job"#,

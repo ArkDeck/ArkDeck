@@ -11,7 +11,6 @@ import SwiftUI
 /// capturing is on the device, assembling writes the movie, and
 /// validating reads that file back — because "the writer said it finished" is
 /// exactly the claim a validating step is there to doubt.
-@MainActor
 @Observable
 final class DeviceRecordingViewModel {
   enum Stage: Equatable {

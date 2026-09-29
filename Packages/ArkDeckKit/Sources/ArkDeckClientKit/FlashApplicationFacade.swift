@@ -678,6 +678,19 @@ actor FlashProductionApplicationProvider: FlashApplicationProviding {
       bootloaderResponse: await bootloader)
   }
 
+  /// Decompresses and hashes the whole images archive, so it runs on the
+  /// concurrent pool rather than on this actor.
+  @concurrent
+  private static func prepareLocalPlan(
+    archiveURL: URL,
+    profileReference: String,
+    mode: RockchipFlashExecutionMode,
+    target: FlashTargetPresentation?
+  ) async -> FlashPlanPreparationResult {
+    FlashPlanPresentationBuilder.prepare(
+      archiveURL: archiveURL, profileReference: profileReference, mode: mode, target: target)
+  }
+
   func preparePlan(
     archiveURL: URL,
     profileReference: String,
@@ -688,13 +701,8 @@ actor FlashProductionApplicationProvider: FlashApplicationProviding {
     defer {
       if gainedScope { archiveURL.stopAccessingSecurityScopedResource() }
     }
-    let local = await Task.detached(priority: .userInitiated) {
-      FlashPlanPresentationBuilder.prepare(
-        archiveURL: archiveURL,
-        profileReference: profileReference,
-        mode: mode,
-        target: target)
-    }.value
+    let local = await Self.prepareLocalPlan(
+      archiveURL: archiveURL, profileReference: profileReference, mode: mode, target: target)
     guard mode == .execute, let target, case .ready(let plan) = local else {
       return local
     }

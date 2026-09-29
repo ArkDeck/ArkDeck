@@ -13,6 +13,7 @@ import XCTest
 ///
 /// The separate real-device case uses the installed Runtime, with no archive,
 /// quota or device fixture. Its evidence must not be conflated with replay.
+@MainActor
 final class DeviceRecordingUITests: XCTestCase {
   private static let archiveKey = "ARKDECK_UI_TEST_FRAME_ARCHIVE"
 

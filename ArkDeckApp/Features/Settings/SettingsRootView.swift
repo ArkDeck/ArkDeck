@@ -518,10 +518,12 @@ enum ApplicationIconChoice: String, CaseIterable, Hashable, Identifiable {
 
   var id: String { rawValue }
 
-  var imageAssetName: String {
+  /// The generated asset symbol, so a renamed image fails the build rather
+  /// than falling back at run time.
+  var imageResource: ImageResource {
     switch self {
-    case .keycap: "ArkDeckKeycapIcon"
-    case .waveform: "ArkDeckWaveformIcon"
+    case .keycap: .arkDeckKeycapIcon
+    case .waveform: .arkDeckWaveformIcon
     }
   }
 
@@ -532,17 +534,10 @@ enum ApplicationIconChoice: String, CaseIterable, Hashable, Identifiable {
     }
   }
 
-  var image: NSImage? {
-    NSImage(named: NSImage.Name(imageAssetName))
-  }
-
-  @MainActor
   func apply() {
-    guard let image else { return }
-    NSApplication.shared.applicationIconImage = image
+    NSApplication.shared.applicationIconImage = NSImage(resource: imageResource)
   }
 
-  @MainActor
   static func applyStoredSelection() {
     let rawValue = UserDefaults.standard.string(forKey: persistenceKey)
     (rawValue.flatMap(ApplicationIconChoice.init(rawValue:)) ?? defaultChoice).apply()
@@ -628,18 +623,9 @@ private struct ApplicationIconPreview: View {
   let choice: ApplicationIconChoice
 
   var body: some View {
-    Group {
-      if let image = choice.image {
-        Image(nsImage: image)
-          .resizable()
-          .interpolation(.high)
-      } else {
-        Image(systemName: "app.dashed")
-          .resizable()
-          .scaledToFit()
-          .padding(WorkspaceMetrics.tightGap)
-      }
-    }
+    Image(choice.imageResource)
+      .resizable()
+      .interpolation(.high)
     // Concentric: the preview sits inside the option tile (radius 9), so its
     // own corner is the next step down, not a larger 14.
     .frame(width: 40, height: 40)

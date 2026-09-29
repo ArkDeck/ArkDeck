@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 // App-facing Runtime history, over the daemon's read-only XPC door.
 //
 // Same shape as HDCApplicationDiagnosticsFacade: the App receives closed

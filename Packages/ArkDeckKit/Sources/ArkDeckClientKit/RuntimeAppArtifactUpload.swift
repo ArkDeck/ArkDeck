@@ -8,6 +8,9 @@ import Foundation
 package enum RuntimeAppArtifactUpload {
   package typealias Send = @Sendable (String, [String: JSONValue]) async throws -> Data
 
+  /// Reads, hashes and encodes the whole file chunk by chunk, so it runs on
+  /// the concurrent pool rather than on its caller's actor.
+  @concurrent
   package static func upload(
     fileURL: URL, kind: String, targetID: String, bindingRevision: Int,
     name: String, byteCount: Int, sha256: String, send: Send

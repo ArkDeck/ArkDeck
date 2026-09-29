@@ -1,5 +1,6 @@
 import AppKit
 import ArkDeckClientKit
+import ArkDeckCore
 import Foundation
 import Observation
 import SwiftUI
@@ -3034,7 +3035,6 @@ private func effectColor(_ effect: String) -> Color {
   }
 }
 
-@MainActor
 @Observable
 final class DebugWorkspaceViewModel {
   private struct TargetBindingScope: Equatable {

@@ -245,7 +245,7 @@ package enum RockchipImageArchiveIntrospection {
 
     /// Returns the value once the run ends, or nil while more input is needed.
     mutating func consume(_ bytes: UnsafeRawBufferPointer) -> String? {
-      for byte in bytes {
+      for unsafe byte in unsafe bytes {
         if collecting {
           if isValueByte(byte) {
             value.append(byte)

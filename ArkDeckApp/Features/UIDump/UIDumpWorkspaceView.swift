@@ -1275,7 +1275,6 @@ private enum ViewerInspectorCopy {
   static func show(_ title: String) -> String { "Show \(title)" }
 }
 
-@MainActor
 @Observable
 final class UIDumpWorkspaceViewModel {
   private(set) var workspace = UIDumpWorkspacePresentation.loading
