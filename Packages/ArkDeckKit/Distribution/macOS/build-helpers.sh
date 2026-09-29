@@ -8,6 +8,10 @@ identity="${ARKDECK_CODESIGN_IDENTITY:-Developer ID Application: Hanfeng Fu (8AQ
 cli_profile="${ARKDECK_CLI_PROVISIONING_PROFILE:-}"
 daemon_profile="${ARKDECK_DAEMON_PROVISIONING_PROFILE:-}"
 notary_profile="${ARKDECK_NOTARY_KEYCHAIN_PROFILE:-}"
+notary_keychain="${ARKDECK_NOTARY_KEYCHAIN:-}"
+notary_key="${ARKDECK_NOTARY_API_KEY_PATH:-}"
+notary_key_id="${ARKDECK_NOTARY_API_KEY_ID:-}"
+notary_issuer="${ARKDECK_NOTARY_API_ISSUER_ID:-}"
 team_identifier="8AQTYW5FKR"
 keychain_group="$team_identifier.com.arkdeck.shared"
 # CHG-2026-074 M5: the helper pair's main programs are the Rust CLI and
@@ -19,8 +23,34 @@ keychain_group="$team_identifier.com.arkdeck.shared"
 # (TASK-XPA-017). scripts/release/build_macos_release.py calls this script for
 # the release DMG.
 
-if [[ -z "$cli_profile" || -z "$daemon_profile" || -z "$notary_profile" ]]; then
-  echo "CLI/daemon provisioning profiles and ARKDECK_NOTARY_KEYCHAIN_PROFILE are required" >&2
+if [[ -z "$cli_profile" || -z "$daemon_profile" ]]; then
+  echo "CLI/daemon provisioning profiles are required" >&2
+  exit 64
+fi
+# Notary credentials: a stored Keychain profile, or an App Store Connect API
+# key (the release-rc workflow's), exactly one of the two. Only the key's path
+# is ever an argument; nothing here prints the key, its ID or the issuer.
+if [[ -n "$notary_profile" && -n "$notary_key$notary_key_id$notary_issuer" ]]; then
+  echo "notary credentials are ARKDECK_NOTARY_KEYCHAIN_PROFILE or the API key, not both" >&2
+  exit 64
+elif [[ -n "$notary_profile" ]]; then
+  notary_arguments=(--keychain-profile "$notary_profile")
+  if [[ -n "$notary_keychain" ]]; then
+    notary_arguments+=(--keychain "$notary_keychain")
+  fi
+elif [[ -n "$notary_key" && -n "$notary_key_id" && -n "$notary_issuer" ]]; then
+  if [[ -n "$notary_keychain" ]]; then
+    echo "ARKDECK_NOTARY_KEYCHAIN names where a Keychain profile is stored; an API key has none" >&2
+    exit 64
+  fi
+  if [[ "$notary_key" != /* || ! -f "$notary_key" || -L "$notary_key" ]]; then
+    echo "ARKDECK_NOTARY_API_KEY_PATH must be an absolute path to the .p8 key file" >&2
+    exit 66
+  fi
+  notary_arguments=(--key "$notary_key" --key-id "$notary_key_id" --issuer "$notary_issuer")
+else
+  echo "notary credentials are required: ARKDECK_NOTARY_KEYCHAIN_PROFILE, or" \
+    "ARKDECK_NOTARY_API_KEY_PATH, ARKDECK_NOTARY_API_KEY_ID and ARKDECK_NOTARY_API_ISSUER_ID" >&2
   exit 64
 fi
 if [[ ! -f "$cli_profile" || ! -f "$daemon_profile" ]]; then
@@ -76,7 +106,8 @@ validate_profile "daemon" "$daemon_profile" "$team_identifier.com.arkdeck.agentd
 
 # Developer ID with hardened runtime and a secure timestamp, strict
 # verification, then notarization, stapling and Gatekeeper assessment of the
-# pair.
+# pair. ARKDECK_CODESIGN_KEYCHAIN, when set, reaches package-rust-helpers.sh
+# through the environment and names the keychain that holds the identity.
 rust_root="$(cd "$package_root/../../rust" && pwd)"
 (cd "$rust_root" && cargo build --locked --release --target aarch64-apple-darwin \
   -p arkdeck-cli -p arkdeck-agentd --bins)
@@ -89,7 +120,7 @@ bash "$distribution_root/package-rust-helpers.sh" \
 cli_bundle="$staging_root/ArkDeckCLI.app"
 archive="$staging_root/ArkDeckCLI-notarization.zip"
 ditto -c -k --keepParent "$cli_bundle" "$archive"
-xcrun notarytool submit "$archive" --keychain-profile "$notary_profile" --wait
+xcrun notarytool submit "$archive" "${notary_arguments[@]}" --wait
 xcrun stapler staple "$cli_bundle"
 spctl --assess --type execute --verbose=2 "$cli_bundle"
 rm "$archive"

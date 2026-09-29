@@ -38,6 +38,11 @@ DARWIN = sys.platform == "darwin"
 # A 64-bit little-endian Mach-O magic: the release's nested-code check finds
 # code by its magic, so fixture executables start with one.
 MACH_O = bytes.fromhex("cffaedfe0c000001")
+# Stand-ins for an App Store Connect API key: the key bytes must never leave
+# the key file, and the ID and issuer never reach the script's output.
+KEY_MATERIAL = "-----BEGIN PRIVATE KEY-----\nFIXTURE-NOTARY-KEY-MATERIAL\n-----END PRIVATE KEY-----\n"
+KEY_ID = "FIXTUREKEY1"
+ISSUER = "00000000-fixture-issuer-0000-000000000000"
 NESTED_FAILURES = {
     "nested-adhoc": "is not signed with a Developer ID identity",
     "nested-no-runtime": "lacks the hardened runtime",
@@ -143,8 +148,13 @@ def tool(name: str, arguments: list[str]) -> int:
             print(" M changed.rs" if dirty else "", end="")
             return 0
     elif name == "security":
-        if arguments == ["find-identity", "-v", "-p", "codesigning"]:
+        if arguments[:4] == ["find-identity", "-v", "-p", "codesigning"] and len(arguments) <= 5:
             print(f'  1) ABCDEF "{IDENTITY}"')
+            return 0
+        if arguments == ["list-keychains", "-d", "user"]:
+            for keychain in os.environ.get("FIXTURE_SEARCH_LIST", "").split(":"):
+                if keychain:
+                    print(f'    "{keychain}"')
             return 0
         if arguments[:3] == ["cms", "-D", "-i"]:
             sys.stdout.buffer.write(Path(arguments[3]).read_bytes())
@@ -417,6 +427,114 @@ class Release(Fixture):
         result = self.run_script(self.arguments, 1)
         self.assertIn("ARKDECK_NOTARY_KEYCHAIN_PROFILE", result.stderr)
         self.assertFalse(any(call[0] in ("cargo", "xcodebuild", "xcrun", "security") for call in self.calls))
+
+    def use_api_key(self) -> Path:
+        """Notary credentials as the release-rc workflow gives them."""
+        self.env.pop("ARKDECK_NOTARY_KEYCHAIN_PROFILE", None)
+        key = self.root / "AuthKey_FIXTURE.p8"
+        key.write_text(KEY_MATERIAL)
+        key.chmod(0o600)
+        self.env.update({
+            "ARKDECK_NOTARY_API_KEY_PATH": str(key),
+            "ARKDECK_NOTARY_API_KEY_ID": KEY_ID,
+            "ARKDECK_NOTARY_API_ISSUER_ID": ISSUER,
+        })
+        return key
+
+    def test_api_key_notarizes_every_submission_without_a_keychain_profile(self):
+        key = self.use_api_key()
+        result = self.run_script(self.arguments, 0)
+        credentials = ["--key", str(key), "--key-id", KEY_ID, "--issuer", ISSUER]
+        self.assertEqual([call[2] for call in self.called("xcrun", "notarytool")],
+                         ["history", "submit", "submit", "log", "submit", "log"])
+        self.assertEqual(self.called("xcrun", "notarytool", "history")[0][3:],
+                         credentials + ["--output-format", "json"])
+        submits = self.called("xcrun", "notarytool", "submit")
+        # build-helpers.sh submits the helper pair; the script the App and the DMG.
+        self.assertEqual(submits[0][4:], credentials + ["--wait"])
+        for call in submits[1:]:
+            self.assertEqual(call[4:], credentials + ["--wait", "--output-format", "json"])
+        for call in self.called("xcrun", "notarytool", "log"):
+            self.assertEqual(call[5:], credentials)
+        self.assertFalse(any("--keychain-profile" in call for call in self.calls))
+        # The key's bytes stay in its file; its ID and issuer stay out of the output.
+        self.assertNotIn("FIXTURE-NOTARY-KEY-MATERIAL", self.log.read_text())
+        for secret in ("FIXTURE-NOTARY-KEY-MATERIAL", KEY_ID, ISSUER):
+            self.assertNotIn(secret, result.stdout + result.stderr)
+
+    def test_notary_credentials_must_be_exactly_one_kind(self):
+        cases = (
+            ("both", "not both", {"ARKDECK_NOTARY_KEYCHAIN_PROFILE": "fixture-notary"}, ()),
+            ("neither", "release needs notary credentials", {},
+             ("ARKDECK_NOTARY_API_KEY_PATH", "ARKDECK_NOTARY_API_KEY_ID", "ARKDECK_NOTARY_API_ISSUER_ID")),
+            ("partial", "the notary API key also needs ARKDECK_NOTARY_API_ISSUER_ID", {},
+             ("ARKDECK_NOTARY_API_ISSUER_ID",)),
+            ("relative key", "must be an absolute path to the .p8 key file",
+             {"ARKDECK_NOTARY_API_KEY_PATH": "AuthKey_FIXTURE.p8"}, ()),
+            ("key with a notary keychain", "an API key has none",
+             {"ARKDECK_NOTARY_KEYCHAIN": "/fixture/notary.keychain-db"}, ()),
+        )
+        for case, message, added, removed in cases:
+            with self.subTest(case):
+                self.log.unlink(missing_ok=True)
+                self.env.pop("ARKDECK_NOTARY_KEYCHAIN", None)
+                self.use_api_key()
+                self.env.update(added)
+                for name in removed:
+                    del self.env[name]
+                result = self.run_script(self.arguments, 1)
+                self.assertIn(message, result.stderr)
+                for secret in ("FIXTURE-NOTARY-KEY-MATERIAL", KEY_ID, ISSUER):
+                    self.assertNotIn(secret, result.stderr)
+                self.assertFalse(any(call[0] in ("cargo", "xcodebuild", "xcrun", "security")
+                                     for call in self.calls))
+
+    def test_build_helpers_refuses_both_or_neither_notary_credential(self):
+        output = self.root / "helpers"
+        self.use_api_key()
+        api_key = dict(self.env, ARKDECK_HELPER_OUTPUT=str(output))
+        both = dict(api_key, ARKDECK_NOTARY_KEYCHAIN_PROFILE="fixture-notary")
+        partial = {name: value for name, value in api_key.items() if name != "ARKDECK_NOTARY_API_ISSUER_ID"}
+        neither = {name: value for name, value in api_key.items() if not name.startswith("ARKDECK_NOTARY_")}
+        for case, environment, message in (
+            ("both", both, "not both"),
+            ("neither", neither, "notary credentials are required"),
+            ("partial", partial, "notary credentials are required"),
+        ):
+            with self.subTest(case):
+                result = subprocess.run(["/bin/bash", str(release_version.DISTRIBUTION / "build-helpers.sh")],
+                                        env=environment, capture_output=True, text=True, timeout=60)
+                self.assertEqual(result.returncode, 64, result.stderr)
+                self.assertIn(message, result.stderr)
+                self.assertFalse(self.log.exists(), "a refused helper build ran a tool")
+                self.assertFalse(output.exists())
+
+    def test_codesign_keychain_reaches_every_signature_this_repository_makes(self):
+        keychain = self.root / "arkdeck-release.keychain-db"
+        keychain.write_bytes(b"fixture keychain\n")
+        self.env["ARKDECK_CODESIGN_KEYCHAIN"] = str(keychain)
+        self.env["FIXTURE_SEARCH_LIST"] = f"{keychain}:/Users/fixture/Library/Keychains/login.keychain-db"
+        self.run_script(self.arguments, 0)
+        self.assertEqual(self.called("security", "find-identity"),
+                         [["security", "find-identity", "-v", "-p", "codesigning", str(keychain)]])
+        # The daemon and the CLI (package-rust-helpers.sh), then the DMG.
+        signatures = self.called("codesign", "--force", "--sign")
+        self.assertEqual(len(signatures), 3)
+        for call in signatures:
+            self.assertEqual(option(call, "--keychain"), str(keychain))
+        archive = self.called("xcodebuild", "-project")
+        self.assertEqual(len(archive), 1)
+        self.assertIn(f"OTHER_CODE_SIGN_FLAGS=--timestamp --keychain {keychain}", archive[0])
+        self.assertEqual(archive[0][-1], "archive")
+
+    def test_codesign_keychain_off_the_search_list_is_refused(self):
+        keychain = self.root / "arkdeck-release.keychain-db"
+        keychain.write_bytes(b"fixture keychain\n")
+        self.env["ARKDECK_CODESIGN_KEYCHAIN"] = str(keychain)
+        self.env["FIXTURE_SEARCH_LIST"] = "/Users/fixture/Library/Keychains/login.keychain-db"
+        result = self.run_script(self.arguments, 1)
+        self.assertIn("not on the user keychain search list", result.stderr)
+        self.assertFalse(any(call[0] in ("cargo", "xcodebuild") for call in self.calls))
 
     def test_rejected_dmg_notarization_publishes_nothing(self):
         self.env["FIXTURE_FAIL"] = "notary-dmg"

@@ -15,8 +15,10 @@ signing an enclosing bundle would add one (`_CodeSignature`).
 
 Two modes share one assembly and verification path:
 
-release   (maintainer only: Developer ID identity, provisioning profiles,
-          notary credentials) builds every component from a clean checkout:
+release   (Developer ID identity, provisioning profiles, notary credentials:
+          the maintainer's own Keychain, or the release-rc workflow's
+          temporary keychain and App Store Connect API key) builds every
+          component from a clean checkout:
           1. the Rust helper pair through
              Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh, which
              signs, notarizes, staples and assesses the pair itself;
@@ -59,9 +61,14 @@ installs anything, never runs `runtime service`, and never talks to a device.
 
 Usage:
   build_macos_release.py release --output DIR --arkforge-checkout DIR
-      env: ARKDECK_CLI_PROVISIONING_PROFILE, ARKDECK_DAEMON_PROVISIONING_PROFILE,
-           ARKDECK_NOTARY_KEYCHAIN_PROFILE (required);
-           ARKDECK_CODESIGN_IDENTITY, ARKDECK_NOTARY_KEYCHAIN (optional)
+      env: ARKDECK_CLI_PROVISIONING_PROFILE, ARKDECK_DAEMON_PROVISIONING_PROFILE
+           (required); notary credentials, exactly one of
+             ARKDECK_NOTARY_KEYCHAIN_PROFILE [ARKDECK_NOTARY_KEYCHAIN]
+             ARKDECK_NOTARY_API_KEY_PATH, ARKDECK_NOTARY_API_KEY_ID,
+               ARKDECK_NOTARY_API_ISSUER_ID (an App Store Connect API key);
+           ARKDECK_CODESIGN_IDENTITY, ARKDECK_CODESIGN_KEYCHAIN (optional; the
+           keychain that holds the identity, which must also be on the user
+           keychain search list)
   build_macos_release.py unsigned --output DIR --app APP --helpers DIR
       --arkforge-bundle DIR [--arkforge-checkout DIR]
 """
@@ -411,11 +418,69 @@ def verify_nested_code(root: Path, environment: Mapping[str, str]) -> None:
 # -- release-only build steps --------------------------------------------------
 
 
+NOTARY_PROFILE = "ARKDECK_NOTARY_KEYCHAIN_PROFILE"
+NOTARY_API_KEY = ("ARKDECK_NOTARY_API_KEY_PATH", "ARKDECK_NOTARY_API_KEY_ID", "ARKDECK_NOTARY_API_ISSUER_ID")
+
+
 def notary_arguments(environment: Mapping[str, str]) -> list[str]:
-    arguments = ["--keychain-profile", environment["ARKDECK_NOTARY_KEYCHAIN_PROFILE"]]
-    if environment.get("ARKDECK_NOTARY_KEYCHAIN"):
-        arguments += ["--keychain", environment["ARKDECK_NOTARY_KEYCHAIN"]]
-    return arguments
+    """notarytool's credential options: a stored Keychain profile, or an App
+    Store Connect API key (`--key --key-id --issuer`), exactly one of the two.
+    Only the key's path reaches an argument, never its bytes, and `run` names
+    no argument past the subcommand when a call fails."""
+    profile = environment.get(NOTARY_PROFILE, "")
+    api_key = {name: environment.get(name, "") for name in NOTARY_API_KEY}
+    given = [name for name, value in api_key.items() if value]
+    require(
+        not (profile and given),
+        f"notary credentials are {NOTARY_PROFILE} or the API key "
+        f"({', '.join(NOTARY_API_KEY)}), not both",
+    )
+    if profile:
+        arguments = ["--keychain-profile", profile]
+        if environment.get("ARKDECK_NOTARY_KEYCHAIN"):
+            arguments += ["--keychain", environment["ARKDECK_NOTARY_KEYCHAIN"]]
+        return arguments
+    require(
+        bool(given),
+        f"release needs notary credentials: {NOTARY_PROFILE}, or the API key "
+        f"({', '.join(NOTARY_API_KEY)})",
+    )
+    missing = [name for name, value in api_key.items() if not value]
+    require(not missing, "the notary API key also needs " + ", ".join(missing))
+    require(
+        not environment.get("ARKDECK_NOTARY_KEYCHAIN"),
+        "ARKDECK_NOTARY_KEYCHAIN names where a Keychain profile is stored; an API key has none",
+    )
+    key = Path(api_key["ARKDECK_NOTARY_API_KEY_PATH"])
+    require(
+        key.is_absolute() and key.is_file() and not key.is_symlink(),
+        "ARKDECK_NOTARY_API_KEY_PATH must be an absolute path to the .p8 key file",
+    )
+    return ["--key", str(key), "--key-id", api_key["ARKDECK_NOTARY_API_KEY_ID"],
+            "--issuer", api_key["ARKDECK_NOTARY_API_ISSUER_ID"]]
+
+
+def codesign_keychain(environment: Mapping[str, str]) -> str | None:
+    """ARKDECK_CODESIGN_KEYCHAIN: the keychain that holds the identity, such
+    as the release-rc workflow's temporary one. codesign calls this script
+    and its helper builder make are given `--keychain`, and the App archive
+    gets it through OTHER_CODE_SIGN_FLAGS; `xcodebuild -exportArchive` and
+    ArkForge's packager take no keychain option and find the identity on the
+    user search list, so the keychain must be on it."""
+    keychain = environment.get("ARKDECK_CODESIGN_KEYCHAIN", "")
+    if not keychain:
+        return None
+    path = Path(keychain)
+    require(
+        path.is_absolute() and path.is_file() and not re.search(r"\s", keychain),
+        "ARKDECK_CODESIGN_KEYCHAIN must be an absolute keychain file path without whitespace",
+    )
+    return keychain
+
+
+def keychain_arguments(environment: Mapping[str, str]) -> list[str]:
+    keychain = codesign_keychain(environment)
+    return ["--keychain", keychain] if keychain else []
 
 
 def notarize(path: Path, environment: Mapping[str, str], log_path: Path) -> dict[str, str]:
@@ -442,14 +507,24 @@ def preflight_release(environment: Mapping[str, str], identity: str) -> None:
     missing = [
         name for name in (
             "ARKDECK_CLI_PROVISIONING_PROFILE", "ARKDECK_DAEMON_PROVISIONING_PROFILE",
-            "ARKDECK_NOTARY_KEYCHAIN_PROFILE",
         ) if not environment.get(name)
     ]
     require(not missing, "release needs " + ", ".join(missing))
-    identities = run(["security", "find-identity", "-v", "-p", "codesigning"], env=environment)
+    notary = notary_arguments(environment)
+    keychain = codesign_keychain(environment)
+    if keychain is not None:
+        search_list = run(["security", "list-keychains", "-d", "user"], env=environment)
+        listed = {os.path.realpath(line.strip().strip('"')) for line in search_list.splitlines() if line.strip()}
+        require(
+            os.path.realpath(keychain) in listed,
+            "ARKDECK_CODESIGN_KEYCHAIN is not on the user keychain search list; "
+            "xcodebuild -exportArchive and ArkForge's packager find the identity only there",
+        )
+    identities = run(["security", "find-identity", "-v", "-p", "codesigning",
+                      *([keychain] if keychain else [])], env=environment)
     require(identity in identities, f"signing identity {identity!r} is not in the keychain")
     # Credentials are checked before anything is built, not after an hour of it.
-    run(["xcrun", "notarytool", "history", *notary_arguments(environment), "--output-format", "json"],
+    run(["xcrun", "notarytool", "history", *notary, "--output-format", "json"],
         env=environment)
 
 
@@ -481,9 +556,13 @@ def build_arkforge(work: Path, checkout: Path, environment: Mapping[str, str], i
 def build_app(work: Path, environment: Mapping[str, str]) -> Path:
     archive = work / "ArkDeck.xcarchive"
     export = work / "export"
+    keychain = codesign_keychain(environment)
+    # A command-line setting replaces the project's, so the Release
+    # configuration's own `--timestamp` is restated beside the keychain.
+    signing = [f"OTHER_CODE_SIGN_FLAGS=--timestamp --keychain {keychain}"] if keychain else []
     run(["xcodebuild", "-project", PROJECT, "-scheme", "ArkDeck", "-configuration", "Release",
          "-destination", "generic/platform=macOS", "-derivedDataPath", work / "DerivedData",
-         "-archivePath", archive, "archive"],
+         "-archivePath", archive, *signing, "archive"],
         env=environment, cwd=REPO, capture=False)
     run(["xcodebuild", "-exportArchive", "-archivePath", archive,
          "-exportOptionsPlist", EXPORT_OPTIONS, "-exportPath", export],
@@ -629,7 +708,8 @@ def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, st
         run(["hdiutil", "create", "-volname", f"ArkDeck {versions['version']}", "-srcfolder", root,
              "-fs", "HFS+", "-format", "UDZO", "-imagekey", "zlib-level=9", dmg], env=environment)
         if not unsigned:
-            run(["codesign", "--force", "--sign", identity, "--timestamp", dmg], env=environment)
+            run(["codesign", "--force", "--sign", identity, "--timestamp", *keychain_arguments(environment), dmg],
+                env=environment)
             run(["codesign", "--verify", "--strict", "--verbose=2", "-R", f"={ANCHOR}", dmg], env=environment)
             run(["hdiutil", "verify", dmg], env=environment)
             notarization["dmg"] = notarize(dmg, environment, publish / "notary-log-dmg.json")
