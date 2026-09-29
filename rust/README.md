@@ -2580,7 +2580,10 @@ binds or opens anything (`production::refuse_retired_facade`,
 `tests/retired_facade.rs`); the one-shot modes (analyzers, symbolizer, cutover
 preflight) still answer first. Nothing in this repository builds a facade any
 more: `rust/scripts/package-macos-facade.sh`, the facade transport tests and
-benchmarks, and the Swift branches of the helper build scripts are gone.
+benchmarks, and the Swift branches of the helper build scripts are gone, and
+`arkdeck-agentd` no longer embeds the facade's `com.arkdeck.agentd.facade`
+`__info_plist` (its `build.rs` only served signing the unbundled facade; the
+Rust helper is signed as `ArkDeckAgent.app` with that bundle's Info.plist).
 
 The installed Swift release still ships a signed `arkdeck-facade` beside its
 Swift daemon, and that pair is the cutover's rollback target (runbook §0.2
