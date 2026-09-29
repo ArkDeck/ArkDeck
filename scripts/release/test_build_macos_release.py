@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -133,6 +134,21 @@ def display_signature(path: Path, failure: str, entitlements: bool) -> int:
     return 0
 
 
+def rendezvous(state: Path, arrived: str, awaited: str) -> None:
+    """With FIXTURE_RENDEZVOUS, the helper build and the App archive each wait
+    for the other to have started: run one after the other, they never meet
+    and the first one fails after the deadline."""
+    if not os.environ.get("FIXTURE_RENDEZVOUS"):
+        return
+    (state / f"{arrived}.started").touch()
+    deadline = time.monotonic() + 30
+    while not (state / f"{awaited}.started").exists():
+        if time.monotonic() > deadline:
+            print(f"fixture rendezvous: {awaited} never started beside {arrived}", file=sys.stderr)
+            sys.exit(70)
+        time.sleep(0.05)
+
+
 def tool(name: str, arguments: list[str]) -> int:
     log_call(name, arguments)
     failure = os.environ.get("FIXTURE_FAIL", "")
@@ -164,9 +180,16 @@ def tool(name: str, arguments: list[str]) -> int:
             print(json.dumps({"target_directory": os.environ["CARGO_TARGET_DIR"]}))
             return 0
         if arguments[0] == "build":
+            rendezvous(state, "cargo-build", "xcodebuild-archive")
+            if failure == "cargo-build":
+                print("error: could not compile `arkdeck-cli` (bin \"arkdeck\")", file=sys.stderr)
+                return 101
+            if os.environ.get("FIXTURE_SLOW_CARGO"):
+                time.sleep(float(os.environ["FIXTURE_SLOW_CARGO"]))
             return 0
     elif name == "lipo":
-        print("arm64")
+        universal = failure == "app-universal" and "/ArkDeck.app/Contents/MacOS/" in arguments[-1]
+        print("x86_64 arm64" if universal else "arm64")
         return 0
     elif name == "codesign":
         if "--display" in arguments:
@@ -185,6 +208,10 @@ def tool(name: str, arguments: list[str]) -> int:
         return 0
     elif name == "xcodebuild":
         if arguments[-1] == "archive":
+            rendezvous(state, "xcodebuild-archive", "cargo-build")
+            if failure == "app-archive":
+                print("error: fixture compile failure\n** ARCHIVE FAILED **")
+                return 65
             app = Path(option(arguments, "-archivePath")) / "Products/Applications/ArkDeck.app"
             write_app(app, VERSIONS["version"], os.environ.get("FIXTURE_APP_BUILD", VERSIONS["build"]))
             return 0
@@ -355,16 +382,39 @@ class Release(Fixture):
         self.assertEqual(self.called("cargo", "build"), [[
             "cargo", "build", "--locked", "--release", "--target", "aarch64-apple-darwin",
             "-p", "arkdeck-cli", "-p", "arkdeck-agentd", "--bins"]])
-        # Three notarizations: the helper pair, the App, the DMG; each stapled.
+        # Three notarizations: the helper pair and the App (concurrently, in
+        # either order), then the DMG; each stapled.
         submitted = [Path(call[3]).name for call in self.called("xcrun", "notarytool", "submit")]
-        self.assertEqual(submitted, ["ArkDeckCLI-notarization.zip", "ArkDeck-notarization.zip", name])
-        self.assertEqual([Path(call[3]).name for call in self.called("xcrun", "stapler", "staple")],
-                         ["ArkDeckCLI.app", "ArkDeck.app", name])
-        for call in self.called("xcrun", "notarytool", "submit")[1:]:
-            self.assertEqual(call[4:], ["--keychain-profile", "fixture-notary", "--wait", "--output-format", "json"])
+        self.assertCountEqual(submitted[:2], ["ArkDeckCLI-notarization.zip", "ArkDeck-notarization.zip"])
+        self.assertEqual(submitted[2:], [name])
+        stapled = [Path(call[3]).name for call in self.called("xcrun", "stapler", "staple")]
+        self.assertCountEqual(stapled[:2], ["ArkDeckCLI.app", "ArkDeck.app"])
+        self.assertEqual(stapled[2:], [name])
+        for call in self.called("xcrun", "notarytool", "submit"):
+            if not call[3].endswith("ArkDeckCLI-notarization.zip"):
+                self.assertEqual(call[4:], ["--keychain-profile", "fixture-notary", "--wait",
+                                            "--output-format", "json"])
+        # The App archive is arm64 only for every target, SwiftPM packages at
+        # their Package.resolved revisions, in a fresh DerivedData.
+        archive = self.called("xcodebuild", "-project")
+        self.assertEqual(len(archive), 1)
+        for setting in ("ARCHS=arm64", "ONLY_ACTIVE_ARCH=NO", "-onlyUsePackageVersionsFromResolvedFile"):
+            self.assertIn(setting, archive[0])
+        self.assertNotIn("-clonedSourcePackagesDirPath", archive[0])
+        self.assertTrue(option(archive[0], "-derivedDataPath").startswith(str(self.tmp)))
         # The App is exported for Developer ID with the committed options.
         export = self.called("xcodebuild", "-exportArchive")
         self.assertEqual(option(export[0], "-exportOptionsPlist"), str(RELEASE / "ExportOptions.plist"))
+        # Every Mach-O is a thin arm64 slice: the exported App before its
+        # upload, and all three components on the mounted DMG.
+        architectures = [call[-1] for call in self.called("lipo", "-archs")]
+        exported_archs = [path for path in architectures if "/export/ArkDeck.app/" in path]
+        self.assertEqual(sorted(Path(path).name for path in exported_archs), ["ArkDeck", "trace_streamer"])
+        app_submit = self.calls.index(next(call for call in self.called("xcrun", "notarytool", "submit")
+                                           if call[3].endswith("ArkDeck-notarization.zip")))
+        for path in exported_archs:
+            self.assertLess(self.calls.index(["lipo", "-archs", path]), app_submit)
+        self.assertEqual(len([path for path in architectures if "/mount/" in path]), 6)
         # The DMG is signed with a secure timestamp, assessed, and its contents verified mounted.
         dmg_path = str(self.output / name)
         self.assertIn(["codesign", "--force", "--sign", IDENTITY, "--timestamp"],
@@ -405,12 +455,81 @@ class Release(Fixture):
                 self.log.unlink(missing_ok=True)
                 self.env["FIXTURE_FAIL"] = failure
                 result = self.run_script(self.arguments, 1)
-                self.assertIn("nested code notarization would reject: ArkDeck.app/Contents/MacOS/trace_streamer "
-                              + message, result.stderr)
+                self.assertIn("ArkDeck.app failed: nested code notarization would reject: "
+                              "ArkDeck.app/Contents/MacOS/trace_streamer " + message, result.stderr)
                 self.assertNotIn("ArkDeck.app/Contents/MacOS/ArkDeck ", result.stderr)
+                # The helper pair, built beside the App, may or may not have
+                # been submitted before the failure stopped it; the App never is.
                 submitted = [Path(call[3]).name for call in self.called("xcrun", "notarytool", "submit")]
-                self.assertEqual(submitted, ["ArkDeckCLI-notarization.zip"])
+                self.assertNotIn("ArkDeck-notarization.zip", submitted)
+                self.assertLessEqual(set(submitted), {"ArkDeckCLI-notarization.zip"})
                 self.assertEqual(self.called("hdiutil", "create"), [])
+
+    def test_components_build_concurrently(self):
+        # The helper build and the App archive each wait for the other to
+        # start; built one after the other, the first would time out.
+        self.env["FIXTURE_RENDEZVOUS"] = "1"
+        self.run_script(self.arguments, 0)
+        state = self.root / "state"
+        self.assertTrue((state / "cargo-build.started").exists())
+        self.assertTrue((state / "xcodebuild-archive.started").exists())
+
+    def assert_component_failure(self, result: subprocess.CompletedProcess, failed: str, detail: str) -> None:
+        self.assertIn(f"{failed} failed: ", result.stderr)
+        self.assertIn(detail, result.stderr)
+        for other in ("ArkDeckCLI.app", "ArkForge.bundle", "ArkDeck.app"):
+            if other != failed:
+                self.assertNotIn(f"{other} failed", result.stderr)
+        # Nothing is assembled, the DMG never goes to Apple, nothing is published.
+        self.assertEqual(self.called("hdiutil", "create"), [])
+        self.assertFalse(any(call[3].endswith(".dmg") for call in self.called("xcrun", "notarytool", "submit")))
+
+    def test_failing_rust_helper_build_publishes_nothing_and_names_the_helpers(self):
+        self.env["FIXTURE_FAIL"] = "cargo-build"
+        result = self.run_script(self.arguments, 1)
+        self.assert_component_failure(result, "ArkDeckCLI.app", "could not compile `arkdeck-cli`")
+        self.assertNotIn("ArkDeckCLI-notarization.zip",
+                         [Path(call[3]).name for call in self.called("xcrun", "notarytool", "submit")])
+
+    def test_failing_app_archive_publishes_nothing_and_names_the_app(self):
+        self.env["FIXTURE_FAIL"] = "app-archive"
+        result = self.run_script(self.arguments, 1)
+        self.assert_component_failure(result, "ArkDeck.app", "** ARCHIVE FAILED **")
+        self.assertEqual(self.called("xcodebuild", "-exportArchive"), [])
+
+    def test_first_failure_stops_the_other_components(self):
+        # The App archive fails while the helper build is still running: the
+        # helper build's process group is stopped rather than waited out, and
+        # only the App is reported.
+        self.env["FIXTURE_FAIL"] = "app-archive"
+        self.env["FIXTURE_SLOW_CARGO"] = "90"
+        started = time.monotonic()
+        result = self.run_script(self.arguments, 1)
+        self.assertLess(time.monotonic() - started, 60)
+        self.assert_component_failure(result, "ArkDeck.app", "** ARCHIVE FAILED **")
+        self.assertEqual(self.called("xcrun", "notarytool", "submit"), [])
+
+    def test_universal_app_is_refused_before_its_upload(self):
+        self.env["FIXTURE_FAIL"] = "app-universal"
+        result = self.run_script(self.arguments, 1)
+        self.assert_component_failure(result, "ArkDeck.app",
+                                      "the release is thin arm64 only: ArkDeck.app/Contents/MacOS/ArkDeck is x86_64 arm64")
+        self.assertNotIn("ArkDeck-notarization.zip",
+                         [Path(call[3]).name for call in self.called("xcrun", "notarytool", "submit")])
+
+    def test_source_packages_directory_reaches_the_archive(self):
+        packages = self.root / "SourcePackages"
+        self.env["ARKDECK_XCODE_SOURCE_PACKAGES"] = str(packages)
+        self.run_script(self.arguments, 0)
+        archive = self.called("xcodebuild", "-project")[0]
+        self.assertEqual(option(archive, "-clonedSourcePackagesDirPath"), str(packages))
+        self.assertIn("-onlyUsePackageVersionsFromResolvedFile", archive)
+
+    def test_relative_source_packages_directory_is_refused_before_any_build(self):
+        self.env["ARKDECK_XCODE_SOURCE_PACKAGES"] = "SourcePackages"
+        result = self.run_script(self.arguments, 1)
+        self.assertIn("ARKDECK_XCODE_SOURCE_PACKAGES must be an absolute path", result.stderr)
+        self.assertFalse(any(call[0] in ("cargo", "xcodebuild") for call in self.calls))
 
     def test_arkforge_head_other_than_the_pin_stops_before_any_build(self):
         self.env["FIXTURE_ARKFORGE_HEAD"] = "0" * 40
@@ -453,14 +572,17 @@ class Release(Fixture):
         key = self.use_api_key()
         result = self.run_script(self.arguments, 0)
         credentials = ["--key", str(key), "--key-id", KEY_ID, "--issuer", ISSUER]
-        self.assertEqual([call[2] for call in self.called("xcrun", "notarytool")],
-                         ["history", "submit", "submit", "log", "submit", "log"])
+        subcommands = [call[2] for call in self.called("xcrun", "notarytool")]
+        self.assertEqual(subcommands[0], "history")
+        self.assertCountEqual(subcommands[1:4], ["submit", "submit", "log"])
+        self.assertEqual(subcommands[4:], ["submit", "log"])
         self.assertEqual(self.called("xcrun", "notarytool", "history")[0][3:],
                          credentials + ["--output-format", "json"])
-        submits = self.called("xcrun", "notarytool", "submit")
+        submits = {Path(call[3]).name: call for call in self.called("xcrun", "notarytool", "submit")}
+        self.assertEqual(len(submits), 3)
         # build-helpers.sh submits the helper pair; the script the App and the DMG.
-        self.assertEqual(submits[0][4:], credentials + ["--wait"])
-        for call in submits[1:]:
+        self.assertEqual(submits.pop("ArkDeckCLI-notarization.zip")[4:], credentials + ["--wait"])
+        for call in submits.values():
             self.assertEqual(call[4:], credentials + ["--wait", "--output-format", "json"])
         for call in self.called("xcrun", "notarytool", "log"):
             self.assertEqual(call[5:], credentials)
