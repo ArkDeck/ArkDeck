@@ -58,7 +58,10 @@ sizes in `cache-size.json`. A separate successful-main workflow retains the
 newest Rust archive per runner/cache format without deleting SwiftPM, Xcode or
 policy-tool entries. Restored Git refs/config are discarded and rebuilt from
 the current checkout. Published and candidate views
-retain separate source directories and Cargo targets. Local checks keep their
+retain separate source directories and Cargo targets. In hosted CI the
+workspace tests and `check-contracts.py` run as two jobs side by side on each
+host, each with its own cache root and therefore its own cache key, so neither
+restores or saves the other's build products. Local checks keep their
 ordinary task-owned targets unless the CI cache root is explicitly supplied.
 
 On macOS, `scripts/run-workspace-tests.py` compiles the complete default test
@@ -68,7 +71,8 @@ the conservative queue; fixed-oracle, port and spawning tests remain together.
 New targets default to that queue. Custom harnesses and doctests still run;
 either queue or doctest failure fails the lane. The `rust-test-timings-macos-26`
 artifact records compilation, queue and doctest durations and complete logs for
-checkout/published/candidate. Run `python scripts/test_ci_execution.py` to verify
+the checkout, and `rust-contract-test-timings-macos-26` for the published and
+candidate views. Run `python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
 
 The two added CLI targets (`domain_leaves` and `runtime_service`) use random
