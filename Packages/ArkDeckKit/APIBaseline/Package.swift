@@ -25,8 +25,6 @@ let package = Package(
       dependencies: [
         .product(name: "ArkDeckClientKit", package: "ArkDeckKit"),
         .product(name: "ArkDeckCore", package: "ArkDeckKit"),
-        .product(name: "ArkDeckRuntime", package: "ArkDeckKit"),
-        .product(name: "ArkDeckAgentClient", package: "ArkDeckKit"),
         .product(name: "ArkDeckTraceAdapter", package: "ArkDeckKit"),
       ])
   ]

@@ -369,9 +369,9 @@ checks the Swift registration consumer against the Rust owner. Missing native
 content is reported as SKIP; this is separate from portable contract CI and is
 not device acceptance.
 
-`cargo build -p arkdeck-hoststore --example tool_registry_read` builds the local
-comparison adapter. Set `ARKDECK_TOOL_OWNER_BINARY` to it when running
-`BootstrapToolRustOwnerTests` to compare a real Swift registration with Rust.
+The Swift `ArkDeckBootstrap` target and its owner comparison test are deleted
+(TASK-XPA-017), and with them the `tool_registry_read` comparison example; the
+recorded registry oracles live on as the Rust replays above.
 
 The macOS `ArtifactReadStore` library lists, inspects and reads existing Job
 Artifact publications with full-payload digest verification and bounded range

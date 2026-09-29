@@ -11,10 +11,7 @@ let package = Package(
   products: [
     .library(name: "ArkDeckClientKit", targets: ["ArkDeckClientKit"]),
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),
-    .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
     .library(name: "ArkDeckTraceAdapter", targets: ["ArkDeckTraceAdapter"]),
-    .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
-    .library(name: "ArkDeckBootstrap", targets: ["ArkDeckBootstrap"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
   ],
   dependencies: [
@@ -53,7 +50,6 @@ let package = Package(
     .target(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
-    .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
     // ArkTrace owns every shared engine source. ArkDeck keeps only its fixed
     // product profile and app-bundle adapter in this target.
     .target(
@@ -62,17 +58,6 @@ let package = Package(
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ]),
-    .target(
-      name: "ArkDeckAgentClient",
-      dependencies: ["ArkDeckCore"]
-    ),
-    // Current-user, pre-daemon typed bundle/tool registry. It owns no launchd
-    // command surface and grants no Runtime execution authority.
-    .target(
-      name: "ArkDeckBootstrap",
-      dependencies: ["ArkDeckCore"],
-      linkerSettings: [.linkedFramework("Security")]
-    ),
     // The fake HDC the App UI tests point the App at.
     .executableTarget(
       name: "ArkDeckFakeHDCFixture",
@@ -92,9 +77,6 @@ let package = Package(
       dependencies: [
         "ArkDeckClientKit",
         "ArkDeckCore",
-        "ArkDeckRuntime",
-        "ArkDeckAgentClient",
-        "ArkDeckBootstrap",
         "ArkDeckFakeHDCFixture",
       ],
       resources: [

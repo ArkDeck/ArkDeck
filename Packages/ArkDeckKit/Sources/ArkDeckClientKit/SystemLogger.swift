@@ -3,10 +3,9 @@ import Darwin
 import Foundation
 import OSLog
 
-// `PORT-LOGGING-001`: the App's own bounded, redacted diagnostics. The App and
-// the Swift CLI are its only writers — the auto-updater logs through it — and
-// no daemon code uses it, so it lives in the App's client library rather than
-// in ArkDeckRuntime, which the App may not import (docs/ArchitectureRules.md).
+// `PORT-LOGGING-001`: the App's own bounded, redacted diagnostics. The App is
+// its only writer — the auto-updater logs through it — and no daemon code uses
+// it, so it lives in the App's client library (docs/ArchitectureRules.md).
 
 /// The wall clock a diagnostic record's timestamp comes from.
 public protocol DiagnosticAuditClock: Sendable {

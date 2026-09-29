@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckRuntime
 @testable import ArkDeckClientKit
 
 /// The Device workspace's submission surface (TASK-IDC-002 stage 3).

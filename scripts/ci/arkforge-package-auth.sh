@@ -1,8 +1,9 @@
 #!/bin/sh
-# Configure the two compiled CI lanes to fetch ArkForge's private, pinned
-# Swift package with a repository-scoped read-only deploy key.  The secret is
-# present only in this setup process; later steps inherit the key path and Git
-# transport configuration through GITHUB_ENV, never the secret value itself.
+# Configure the transport that fetches ArkForge's private, pinned crates with a
+# repository-scoped read-only deploy key.  Its one caller is
+# arkforge-cargo-fetch.sh, which hands it a private GITHUB_ENV and removes the
+# key after `cargo fetch --locked`; no Swift package depends on ArkForge.  The
+# secret is present only in this setup process, never in later steps.
 
 set -eu
 umask 077

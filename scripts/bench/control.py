@@ -2,7 +2,7 @@
 
 The daemon speaks newline-delimited JSON over a Unix domain socket: one request
 object per line, one response object per line
-(`Packages/ArkDeckKit/Sources/ArkDeckAgentClient/AgentClient.swift`).  A session
+(`rust/crates/arkdeck-client/src/lib.rs`).  A session
 verifies the current health contract on the same connection before any measured
 request. Every frame carries the one current version and contract identity.
 

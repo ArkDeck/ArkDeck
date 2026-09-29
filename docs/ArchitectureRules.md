@@ -24,7 +24,8 @@ Artifact proves
 
 Runtime 与 CLI 是 Rust(`rust/`,CHG-2026-074):`arkdeck-agentd`(daemon)与 `arkdeck`(CLI)
 是唯一的执行面与命令面。Swift 不承载 Runtime 语义:Swift daemon、engine、storage、process、
-provider、组合层、launchd 与 Swift CLI 的 target 已删除,结构测试断言它们不得以原名回归。
+provider、组合层、launchd、Swift CLI,以及只剩测试使用的 `ArkDeckRuntime`、`ArkDeckAgentClient`、
+`ArkDeckBootstrap` 的 target 已删除,结构测试断言它们不得以原名回归。
 Swift 侧只剩 App 这一边:
 
 ```mermaid
@@ -32,9 +33,6 @@ graph TD
     APP[ArkDeck.app<br/>Xcode App + UI 测试] --> CLIENTKIT
     APP --> TRACE[ArkDeckTraceAdapter<br/>ArkTrace 产品配置]
     CLIENTKIT[ArkDeckClientKit<br/>App IPC transport + 展示/读模型 + facade] --> CORE
-    RT[ArkDeckRuntime<br/>共享契约 + 宿主设施] --> CORE
-    CLIENT[ArkDeckAgentClient] --> CORE
-    BOOT[ArkDeckBootstrap<br/>bundle/tool 注册表] --> CORE
     CORE[ArkDeckCore<br/>catalog/JobState/Capability/Target<br/>v2 请求 DTO]
     CLIENTKIT -. XPC com.arkdeck.agentd .-> AGENTD[Rust arkdeck-agentd]
 ```
@@ -46,8 +44,7 @@ graph TD
   typed inputs 经 admission」。
 - App 只经 ClientKit 与 Rust daemon 说话,只认独立 Rust daemon 的身份
   (`com.arkdeck.agentd`,版本与 build 号精确匹配);过渡期的 façade 身份不再被接受。
-- `ArkDeckRuntime`、`ArkDeckAgentClient`、`ArkDeckBootstrap` 只依赖 Core;App 不链接它们,
-  由契约测试使用。v2 请求 DTO 在 ArkDeckCore(§6 判例 1)。
+- v2 请求 DTO 在 ArkDeckCore(§6 判例 1)。
 - 删除的 Swift Runtime 录下的 oracle 仍提交在 `rust/tests/fixtures/**` 与
   `Tests/ArkDeckContractTests/Fixtures/**`,由 Rust 测试回放。
 
@@ -58,9 +55,6 @@ graph TD
 
 ```text
 ClientKit    → Core
-Runtime      → Core
-AgentClient  → Core
-Bootstrap    → Core
 TraceAdapter → (nothing in ArkDeckKit; ArkTrace 外部包)
 Core         → (nothing)
 App(ArkDeck.xcodeproj)→ ClientKit, Core, TraceAdapter(UI 测试 target:ClientKit, Core)

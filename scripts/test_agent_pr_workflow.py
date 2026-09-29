@@ -327,10 +327,9 @@ def validate_automatic_check_contract(
         )
 
     allowed_swift_secret = "${{ secrets.ARKFORGE_DEPLOY_KEY }}"
-    if swift_text.count(allowed_swift_secret) != 3:
+    if swift_text.count(allowed_swift_secret) != 1:
         raise WorkflowContractError(
-            "Swift CI must expose the ArkForge deploy key only to both setup steps "
-            "and to the Rust lane's locked fetch"
+            "Swift CI must expose the ArkForge deploy key only to the Rust lane's locked fetch"
         )
     if _job_block(swift_text, "rust-checks").count(RUST_CHECKS_SECRET) != 1:
         raise WorkflowContractError(
@@ -924,39 +923,20 @@ def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
 
 
 def validate_arkforge_private_package_auth(swift_text: str, auth_text: str) -> None:
-    """Pin least-privilege private Swift-package access in both compiled lanes."""
+    """Pin the ArkForge transport the Rust lane's locked fetch uses.
 
-    setup = """      - name: Configure read-only ArkForge package access
-        env:
-          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh scripts/ci/arkforge-package-auth.sh setup
-"""
-    cleanup = """      - name: Remove ArkForge package credential
-        if: always()
-        run: sh scripts/ci/arkforge-package-auth.sh cleanup
-"""
-    if swift_text.count(setup) != 2:
-        raise WorkflowContractError(
-            "both compiled lanes must configure the ArkForge deploy key exactly once"
-        )
-    if swift_text.count(cleanup) != 2:
-        raise WorkflowContractError(
-            "both compiled lanes must always remove the ArkForge deploy key"
-        )
+    No Swift package depends on ArkForge any more (TASK-XPA-017), so neither
+    compiled Swift lane holds the deploy key: only `arkforge-cargo-fetch.sh`
+    runs the auth script, around `cargo fetch --locked`.
+    """
 
-    swift_tests_job = _job_block(swift_text, "swift-tests")
-    app_build_job = _job_block(swift_text, "app-build")
-    for job_name, job_block, build_token in (
-        ("Swift test", swift_tests_job, "ArkDeckKit full test suite (8 workers)"),
-        ("App build", app_build_job, "Build ArkDeck app and UI-test bundle"),
-    ):
-        setup_index = job_block.find(setup)
-        build_index = job_block.find(build_token)
-        cleanup_index = job_block.find(cleanup)
-        if not (0 <= setup_index < build_index < cleanup_index):
-            raise WorkflowContractError(
-                f"{job_name} ArkForge credential lifetime does not bracket the build"
-            )
+    for job_name in ("swift-tests", "app-build"):
+        job_block = _job_block(swift_text, job_name)
+        for token in ("arkforge-package-auth.sh", "ARKFORGE_DEPLOY_KEY"):
+            if token in job_block:
+                raise WorkflowContractError(
+                    f"{job_name} must not handle the ArkForge deploy key: {token}"
+                )
 
     required_auth = (
         "set -eu",
@@ -1344,8 +1324,17 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
     def test_arkforge_private_package_auth_rejects_credential_regressions(self) -> None:
         swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
         auth = ARKFORGE_AUTH_PATH.read_text(encoding="utf-8")
+        setup = (
+            "      - name: Configure read-only ArkForge package access\n"
+            "        env:\n"
+            "          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}\n"
+            "        run: sh scripts/ci/arkforge-package-auth.sh setup\n\n"
+        )
+        build = "      - name: Build ArkDeck app and UI-test bundle\n"
+        self.assertIn(build, swift)
         mutations = (
-            (swift.replace("        if: always()\n", "        if: success()\n", 1), auth),
+            # A compiled Swift lane handed the deploy key again.
+            (swift.replace(build, setup + build, 1), auth),
             (swift, auth.replace("StrictHostKeyChecking=yes", "StrictHostKeyChecking=no")),
             (swift, auth.replace("GIT_CONFIG_VALUE_0=https://github.com/", "")),
             (swift, auth + "\nssh-keyscan github.com\n"),
