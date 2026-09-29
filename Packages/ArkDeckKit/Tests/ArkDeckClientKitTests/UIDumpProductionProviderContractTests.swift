@@ -1,12 +1,12 @@
 import ArkDeckCore
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 
 /// Exercises the production Viewer provider with current wire replies. These
 /// are client contract checks, not signed IPC or real-device acceptance.
-final class UIDumpProductionProviderContractTests: XCTestCase {
+struct UIDumpProductionProviderContractTests {
   private let target = UIDumpTargetPresentation(
     id: "target-viewer", bindingRevision: 7, toolVersion: "fixture", adoptedAtUTC: "",
     connection: .connected)
@@ -38,7 +38,7 @@ final class UIDumpProductionProviderContractTests: XCTestCase {
     ])
   }
 
-  func testCaptureReadsCurrentJobDetailAfterCompactRunAndRefusesUnknown() async throws {
+  @Test func captureReadsCurrentJobDetailAfterCompactRunAndRefusesUnknown() async throws {
     let replies = Replies([
       ("job.submit", .success(try envelope(["jobId": "job-viewer"]))),
       ("job.run", .success(try envelope(["jobId": "job-viewer", "state": "succeeded"]))),
@@ -46,39 +46,41 @@ final class UIDumpProductionProviderContractTests: XCTestCase {
     ])
     let provider = UIDumpProductionApplicationProvider(send: { await replies.send($0, $1) })
     guard case .failed(let reason) = await provider.recapture(target: target) else {
-      return XCTFail("unknown capture must not publish artifacts")
+      Issue.record("unknown capture must not publish artifacts")
+      return
     }
-    XCTAssertTrue(reason.contains("safe terminal result"), reason)
+    #expect(reason.contains("safe terminal result"), "\(reason)")
     let calls = await replies.calls
-    XCTAssertEqual(calls, ["job.submit", "job.run", "job.show"])
+    #expect(calls == ["job.submit", "job.run", "job.show"])
   }
 
-  func testRunTimeoutDoesNotReplayOrReadArtifacts() async throws {
+  @Test func runTimeoutDoesNotReplayOrReadArtifacts() async throws {
     let replies = Replies([
       ("job.submit", .success(try envelope(["jobId": "job-viewer"]))),
       ("job.run", .failure(.timedOut)),
     ])
     let provider = UIDumpProductionApplicationProvider(send: { await replies.send($0, $1) })
     guard case .failed(let reason) = await provider.recapture(target: target) else {
-      return XCTFail("timeout must remain unconfirmed")
+      Issue.record("timeout must remain unconfirmed")
+      return
     }
-    XCTAssertTrue(reason.contains("may already have been accepted"), reason)
+    #expect(reason.contains("may already have been accepted"), "\(reason)")
     let calls = await replies.calls
-    XCTAssertEqual(calls, ["job.submit", "job.run"])
+    #expect(calls == ["job.submit", "job.run"])
   }
 
-  func testHistoricalCaptureUsesReadOnlyDetailAndRejectsWrongTarget() async throws {
+  @Test func historicalCaptureUsesReadOnlyDetailAndRejectsWrongTarget() async throws {
     let replies = Replies([("job.show", .success(try detail(targetID: "another-target")))])
     let provider = UIDumpProductionApplicationProvider(send: { await replies.send($0, $1) })
     guard case .failed(let reason) = await provider.loadHistoricalCapture(
       jobID: "job-viewer", targetID: target.id, bindingRevision: 7)
-    else { return XCTFail("cross-target history must be rejected") }
-    XCTAssertTrue(reason.contains("terminal Viewer Job facts"), reason)
+    else { Issue.record("cross-target history must be rejected"); return }
+    #expect(reason.contains("terminal Viewer Job facts"), "\(reason)")
     let calls = await replies.calls
-    XCTAssertEqual(calls, ["job.show"])
+    #expect(calls == ["job.show"])
   }
 
-  func testAdvancedDumpUsesDetailAndStopsOnDisconnectWithoutRetry() async throws {
+  @Test func advancedDumpUsesDetailAndStopsOnDisconnectWithoutRetry() async throws {
     let replies = Replies([
       ("job.submit", .success(try envelope(["jobId": "job-viewer"]))),
       ("job.run", .success(try envelope(["jobId": "job-viewer", "state": "succeeded"]))),
@@ -87,13 +89,13 @@ final class UIDumpProductionProviderContractTests: XCTestCase {
     let provider = UIDumpProductionApplicationProvider(send: { await replies.send($0, $1) })
     guard case .failed(let reason) = await provider.advancedDump(
       target: target, selection: ViewerAdvancedDumpSelection(windowID: "60", componentID: "841"))
-    else { return XCTFail("disconnected detail must not publish a capture") }
-    XCTAssertTrue(reason.contains("connection interrupted"), reason)
+    else { Issue.record("disconnected detail must not publish a capture"); return }
+    #expect(reason.contains("connection interrupted"), "\(reason)")
     let calls = await replies.calls
-    XCTAssertEqual(calls, ["job.submit", "job.run", "job.show"])
+    #expect(calls == ["job.submit", "job.run", "job.show"])
   }
 
-  func testAdvancedDumpReadsVerifiedArtifactAfterCurrentDetail() async throws {
+  @Test func advancedDumpReadsVerifiedArtifactAfterCurrentDetail() async throws {
     let bytes = Data("accessibilityId : 841\nscrollable : true".utf8)
     let digest = SHA256Hex.string(of: bytes)
     let artifact = try currentArtifactPageResponse([[
@@ -118,11 +120,12 @@ final class UIDumpProductionProviderContractTests: XCTestCase {
     let result = await provider.advancedDump(
       target: target, selection: ViewerAdvancedDumpSelection(windowID: "60", componentID: "841"))
     guard case .captured(let fields) = result else {
-      return XCTFail("current detail and verified artifact must render: \(result)")
+      Issue.record("current detail and verified artifact must render: \(result)")
+      return
     }
-    XCTAssertEqual(fields, [ViewerDumpField(key: "accessibilityId", value: "841"),
+    #expect(fields == [ViewerDumpField(key: "accessibilityId", value: "841"),
       ViewerDumpField(key: "scrollable", value: "true")])
     let calls = await replies.calls
-    XCTAssertEqual(calls, ["job.submit", "job.run", "job.show", "artifact.list", "artifact.read"])
+    #expect(calls == ["job.submit", "job.run", "job.show", "artifact.list", "artifact.read"])
   }
 }

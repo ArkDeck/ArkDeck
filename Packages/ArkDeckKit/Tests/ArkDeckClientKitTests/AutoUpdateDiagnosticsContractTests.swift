@@ -1,11 +1,11 @@
 import ArkDeckClientKit
 import Foundation
-import XCTest
+import Testing
 
 /// The updater logs through the SystemLogger adapter of its production
 /// assembly; both live in ClientKit beside the updater.
-final class AutoUpdateDiagnosticsContractTests: XCTestCase {
-  func testTEST_AU_CONTRACT_001_updateDiagnosticsUseClosedPublicEventsOnly() throws {
+struct AutoUpdateDiagnosticsContractTests {
+  @Test func TEST_AU_CONTRACT_001_updateDiagnosticsUseClosedPublicEventsOnly() throws {
     let root = FileManager.default.temporaryDirectory.appending(
       path: "arkdeck-update-logging-\(UUID().uuidString)", directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
@@ -18,11 +18,11 @@ final class AutoUpdateDiagnosticsContractTests: XCTestCase {
       logger.record(event)
     }
     let bytes = try store.snapshot().files.reduce(into: Data()) { $0.append($1.data) }
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.check\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.download\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.verification\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.handoff\"".utf8)))
-    XCTAssertFalse(bytes.contains(Data("/Users/".utf8)))
-    XCTAssertFalse(bytes.contains(Data("github.com".utf8)))
+    #expect(bytes.contains(Data("\"eventName\":\"update.check\"".utf8)))
+    #expect(bytes.contains(Data("\"eventName\":\"update.download\"".utf8)))
+    #expect(bytes.contains(Data("\"eventName\":\"update.verification\"".utf8)))
+    #expect(bytes.contains(Data("\"eventName\":\"update.handoff\"".utf8)))
+    #expect(!bytes.contains(Data("/Users/".utf8)))
+    #expect(!bytes.contains(Data("github.com".utf8)))
   }
 }

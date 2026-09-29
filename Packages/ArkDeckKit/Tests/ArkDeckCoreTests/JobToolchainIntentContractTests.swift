@@ -1,25 +1,25 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class JobToolchainIntentContractTests: XCTestCase {
-  func testJobToolchainIntentRoundTripsExplicitKnownUnknownAndUnverifiedEvidence() throws {
+struct JobToolchainIntentContractTests {
+  @Test func jobToolchainIntentRoundTripsExplicitKnownUnknownAndUnverifiedEvidence() throws {
     let intent = try makeIntent()
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let bytes = try encoder.encode(intent)
     let reopened = try JSONDecoder().decode(JobToolchainIntent.self, from: bytes)
 
-    XCTAssertEqual(reopened, intent)
-    XCTAssertEqual(reopened.schemaVersion, "1.0.0")
-    XCTAssertEqual(reopened.platformTrust, .unverified(value: "ad-hoc", reason: "not assessed"))
-    XCTAssertEqual(reopened.serverVersion, .unknown(reason: "server version probe unavailable"))
-    XCTAssertEqual(reopened.daemonVersion, .unknown(reason: "daemon version probe unavailable"))
-    XCTAssertEqual(reopened.serverGeneration, .known(7))
+    #expect(reopened == intent)
+    #expect(reopened.schemaVersion == "1.0.0")
+    #expect(reopened.platformTrust == .unverified(value: "ad-hoc", reason: "not assessed"))
+    #expect(reopened.serverVersion == .unknown(reason: "server version probe unavailable"))
+    #expect(reopened.daemonVersion == .unknown(reason: "daemon version probe unavailable"))
+    #expect(reopened.serverGeneration == .known(7))
   }
 
-  func testSettingsAndPATHChangesDoNotRewriteTheDurablyReopenedBinding() throws {
+  @Test func settingsAndPATHChangesDoNotRewriteTheDurablyReopenedBinding() throws {
     var selectedPath = "/opt/openharmony/hdc"
     var selectedHash = String(repeating: "a", count: 64)
     let intent = try makeIntent(executablePath: selectedPath, sha256: selectedHash)
@@ -38,22 +38,21 @@ final class JobToolchainIntentContractTests: XCTestCase {
     let reopened = try JSONDecoder().decode(
       JobToolchainIntentBinding.self, from: Data(contentsOf: durableBytes))
 
-    XCTAssertEqual(reopened, binding)
-    XCTAssertEqual(reopened.intent.executablePath, "/opt/openharmony/hdc")
-    XCTAssertEqual(reopened.intent.executableSHA256, String(repeating: "a", count: 64))
-    XCTAssertNotEqual(reopened.intent.executablePath, selectedPath)
-    XCTAssertNotEqual(reopened.intent.executableSHA256, selectedHash)
+    #expect(reopened == binding)
+    #expect(reopened.intent.executablePath == "/opt/openharmony/hdc")
+    #expect(reopened.intent.executableSHA256 == String(repeating: "a", count: 64))
+    #expect(reopened.intent.executablePath != selectedPath)
+    #expect(reopened.intent.executableSHA256 != selectedHash)
   }
 
-  func testBindingRejectsAnotherJobAndNonHDCStepKinds() throws {
+  @Test func bindingRejectsAnotherJobAndNonHDCStepKinds() throws {
     let intent = try makeIntent()
-    XCTAssertThrowsError(
+    #expect(
+      throws: JobToolchainIntentValidationError.jobMismatch(
+        expected: "job-hdc-1", actual: "another-job")
+    ) {
       try JobToolchainIntentBinding(
         jobID: "another-job", intent: intent, step: makeProbeStep(path: intent.executablePath))
-    ) { error in
-      XCTAssertEqual(
-        error as? JobToolchainIntentValidationError,
-        .jobMismatch(expected: "job-hdc-1", actual: "another-job"))
     }
 
     let unrelated = try WorkflowStep(
@@ -67,24 +66,22 @@ final class JobToolchainIntentContractTests: XCTestCase {
         "publicationPolicy": .string("atomicAfterValidation"),
       ]
     )
-    XCTAssertThrowsError(
+    #expect(throws: JobToolchainIntentValidationError.unsupportedStepKind(.finalizeSession)) {
       try JobToolchainIntentBinding(jobID: intent.jobID, intent: intent, step: unrelated)
-    ) { error in
-      XCTAssertEqual(
-        error as? JobToolchainIntentValidationError, .unsupportedStepKind(.finalizeSession))
     }
   }
 
-  func testInvalidPathHashAndEvidenceFailBeforeAnIntentCanBeCreated() throws {
-    XCTAssertThrowsError(try makeIntent(executablePath: "relative/hdc")) { error in
-      XCTAssertEqual(
-        error as? JobToolchainIntentValidationError, .executablePathMustBeAbsolute)
+  @Test func invalidPathHashAndEvidenceFailBeforeAnIntentCanBeCreated() throws {
+    #expect(throws: JobToolchainIntentValidationError.executablePathMustBeAbsolute) {
+      try makeIntent(executablePath: "relative/hdc")
     }
-    XCTAssertThrowsError(try makeIntent(sha256: "not-a-sha256")) { error in
-      XCTAssertEqual(error as? JobToolchainIntentValidationError, .invalidSHA256)
+    #expect(throws: JobToolchainIntentValidationError.invalidSHA256) {
+      try makeIntent(sha256: "not-a-sha256")
     }
 
-    XCTAssertThrowsError(
+    #expect(
+      throws: JobToolchainIntentValidationError.invalidDiagnosticEvidence(field: "platformTrust")
+    ) {
       try JobToolchainIntent(
         id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
         jobID: "job-hdc-1",
@@ -98,10 +95,6 @@ final class JobToolchainIntentContractTests: XCTestCase {
         endpoint: "127.0.0.1:8710",
         serverGeneration: .unknown(reason: "identity probe unavailable")
       )
-    ) { error in
-      XCTAssertEqual(
-        error as? JobToolchainIntentValidationError,
-        .invalidDiagnosticEvidence(field: "platformTrust"))
     }
   }
 

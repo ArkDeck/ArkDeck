@@ -1,11 +1,11 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class DeviceTargetingContractTests: XCTestCase {
+struct DeviceTargetingContractTests {
   // TEST-AC-DEV-001-01 / bindingStateContract
-  func testTEST_AC_DEV_001_01_OriginalTargetAndRevisionOneRoundTripWithoutSelectionMutation()
+  @Test func TEST_AC_DEV_001_01_OriginalTargetAndRevisionOneRoundTripWithoutSelectionMutation()
     throws
   {
     let original = try originalTarget(connectKey: "synthetic-usb-A")
@@ -18,29 +18,28 @@ final class DeviceTargetingContractTests: XCTestCase {
     let reopened = try JSONDecoder().decode(DeviceBindingHistory.self, from: encoded)
     let laterUISelection = try originalTarget(connectKey: "synthetic-usb-B")
 
-    XCTAssertEqual(reopened, history)
-    XCTAssertEqual(reopened.originalTarget.connectKey, "synthetic-usb-A")
-    XCTAssertEqual(reopened.current, revisionOne)
-    XCTAssertNotEqual(laterUISelection, reopened.originalTarget)
-    XCTAssertThrowsError(
+    #expect(reopened == history)
+    #expect(reopened.originalTarget.connectKey == "synthetic-usb-A")
+    #expect(reopened.current == revisionOne)
+    #expect(laterUISelection != reopened.originalTarget)
+    #expect(throws: (any Error).self) {
       try DeviceBindingHistory(
         targetID: "device-A",
         originalTarget: original,
         initialBinding: binding(
-          revision: 2, connectKey: "synthetic-usb-A", serial: "SERIAL-A")))
-    XCTAssertThrowsError(try DeviceIdentitySnapshot(attributes: [:])) { error in
-      XCTAssertEqual(error as? DeviceTargetingValidationError, .emptyIdentitySnapshot)
+          revision: 2, connectKey: "synthetic-usb-A", serial: "SERIAL-A"))
     }
-    XCTAssertThrowsError(
+    #expect(throws: DeviceTargetingValidationError.emptyIdentitySnapshot) {
+      try DeviceIdentitySnapshot(attributes: [:])
+    }
+    #expect(throws: DeviceTargetingValidationError.invalidTargetShape) {
       try OriginalTargetSnapshot(
         kind: .real,
         connectKey: nil,
         transport: .usb,
         identitySnapshot: identity(serial: "SERIAL-A"))
-    ) { error in
-      XCTAssertEqual(error as? DeviceTargetingValidationError, .invalidTargetShape)
     }
-    XCTAssertThrowsError(
+    #expect(throws: DeviceTargetingValidationError.invalidBindingShape) {
       try CurrentDeviceBinding(
         revision: 1,
         connectKey: "synthetic-usb-A",
@@ -49,24 +48,22 @@ final class DeviceTargetingContractTests: XCTestCase {
         evidence: [],
         confirmedBy: .user,
         channelProtection: .unverifiedAssumeUnprotected)
-    ) { error in
-      XCTAssertEqual(error as? DeviceTargetingValidationError, .invalidBindingShape)
     }
   }
 
   // TEST-AC-DEV-003-01 / rebindPolicyContract
-  func testTEST_AC_DEV_003_01_USBAutoRebindRequiresTheCompleteCoreThreshold() throws {
+  @Test func TEST_AC_DEV_003_01_USBAutoRebindRequiresTheCompleteCoreThreshold() throws {
     let complete = try candidate(
       id: "complete", key: "synthetic-usb-updater", serial: true, fingerprint: true,
       topology: true, mode: true)
-    XCTAssertEqual(
+    #expect(
       DeviceRebindPolicy.evaluate(
         transport: .usb,
         disconnected: true,
         endpointExplicitlyAdded: true,
         expectedModeTransition: true,
-        candidates: [complete]),
-      .autoRebindEligible(complete))
+        candidates: [complete])
+        == .autoRebindEligible(complete))
 
     let booleanValues = [false, true]
     var evaluated = 0
@@ -90,8 +87,8 @@ final class DeviceTargetingContractTests: XCTestCase {
         }
       }
     }
-    XCTAssertEqual(evaluated, 16)
-    XCTAssertEqual(eligible, 1)
+    #expect(evaluated == 16)
+    #expect(eligible == 1)
     assertAwaiting(
       DeviceRebindPolicy.evaluate(
         transport: .usb,
@@ -104,7 +101,7 @@ final class DeviceTargetingContractTests: XCTestCase {
   }
 
   // TEST-AC-DEV-003-02 / rebindPolicyContract
-  func testTEST_AC_DEV_003_02_ProfileCannotRelaxMissingOrAmbiguousUSBEvidence() throws {
+  @Test func TEST_AC_DEV_003_02_ProfileCannotRelaxMissingOrAmbiguousUSBEvidence() throws {
     let modelOnly = try candidate(
       id: "model-only", key: "synthetic-model-only", serial: false, fingerprint: false,
       topology: false, mode: true)
@@ -141,17 +138,17 @@ final class DeviceTargetingContractTests: XCTestCase {
         candidates: [second],
         profile: DeviceRebindProfilePolicy(requiresManualConfirmation: true)),
       reason: .profileRequiresConfirmation)
-    XCTAssertEqual(
+    #expect(
       DeviceEffectGate.evaluate(
         effect: .deviceMutation,
         intendedBinding: nil,
         durableBinding: nil,
-        identity: .unconfirmed),
-      .rejected(.identityUnconfirmed))
+        identity: .unconfirmed)
+        == .rejected(.identityUnconfirmed))
   }
 
   // TEST-AC-DEV-004-01 / transportRecoveryContract
-  func testTEST_AC_DEV_004_01_TCPReconnectAlwaysRequiresExplicitConfirmation() throws {
+  @Test func TEST_AC_DEV_004_01_TCPReconnectAlwaysRequiresExplicitConfirmation() throws {
     let replacement = try DeviceRebindCandidate(
       candidateID: "replacement-board",
       connectKey: "192.0.2.10:8710",
@@ -168,12 +165,14 @@ final class DeviceTargetingContractTests: XCTestCase {
     guard
       case .awaitingRebindConfirmation(let reconnectReason, let displayedCandidates) =
         reconnectDecision
-    else { return XCTFail("TCP replacement unexpectedly auto-rebound") }
-    XCTAssertEqual(reconnectReason, .tcpReconnectRequiresConfirmation)
-    XCTAssertEqual(displayedCandidates, [replacement])
-    XCTAssertNotEqual(
-      displayedCandidates[0].identitySnapshot,
-      try identity(serial: "SERIAL-A"),
+    else {
+      Issue.record("TCP replacement unexpectedly auto-rebound")
+      return
+    }
+    #expect(reconnectReason == .tcpReconnectRequiresConfirmation)
+    #expect(displayedCandidates == [replacement])
+    #expect(
+      try displayedCandidates[0].identitySnapshot != identity(serial: "SERIAL-A"),
       "the paused state must retain the replacement identity diff")
     assertAwaiting(
       DeviceRebindPolicy.evaluate(
@@ -186,7 +185,7 @@ final class DeviceTargetingContractTests: XCTestCase {
   }
 
   // TEST-AC-DEV-005-01 / transportRecoveryContract
-  func testTEST_AC_DEV_005_01_UARTNodeOrAdapterChangeNeverAutoResumes() throws {
+  @Test func TEST_AC_DEV_005_01_UARTNodeOrAdapterChangeNeverAutoResumes() throws {
     let rebuiltNode = try DeviceRebindCandidate(
       candidateID: "rebuilt-node",
       connectKey: "/dev/cu.usbserial-synthetic-2",
@@ -205,26 +204,22 @@ final class DeviceTargetingContractTests: XCTestCase {
   }
 
   // TEST-AC-DEV-008-01 / concurrencyProperty
-  func testTEST_AC_DEV_008_01_PerDeviceMutationLaneQueuesCancelsAndReleasesAllPaths()
+  @Test func TEST_AC_DEV_008_01_PerDeviceMutationLaneQueuesCancelsAndReleasesAllPaths()
     async throws
   {
     let normalIdentity = try identity(serial: "SERIAL-A", mode: "normal")
     let updaterIdentity = try identity(serial: "SERIAL-A", mode: "updater")
     let paddedIdentity = try identity(serial: "  SERIAL-A\n", mode: "updater")
-    XCTAssertNotEqual(try normalIdentity.sha256(), try updaterIdentity.sha256())
-    XCTAssertEqual(
-      try normalIdentity.stablePhysicalIdentitySha256(),
-      try updaterIdentity.stablePhysicalIdentitySha256())
-    XCTAssertEqual(
-      try normalIdentity.stablePhysicalIdentitySha256(),
-      try paddedIdentity.stablePhysicalIdentitySha256())
-    XCTAssertThrowsError(
+    #expect(try normalIdentity.sha256() != updaterIdentity.sha256())
+    #expect(
+      try normalIdentity.stablePhysicalIdentitySha256()
+        == updaterIdentity.stablePhysicalIdentitySha256())
+    #expect(
+      try normalIdentity.stablePhysicalIdentitySha256()
+        == paddedIdentity.stablePhysicalIdentitySha256())
+    #expect(throws: DeviceTargetingValidationError.stablePhysicalIdentityMissing) {
       try DeviceIdentitySnapshot(attributes: ["mode": .string("normal")])
         .stablePhysicalIdentitySha256()
-    ) { error in
-      XCTAssertEqual(
-        error as? DeviceTargetingValidationError,
-        .stablePhysicalIdentityMissing)
     }
 
     let coordinator = DeviceMutationLaneCoordinator()
@@ -239,7 +234,8 @@ final class DeviceTargetingContractTests: XCTestCase {
 
     let cancelled = Task {
       try await coordinator.withMutationLane(deviceID: "device-A", requestID: "cancelled") {
-        XCTFail("a queued cancelled request must never enter its operation")
+        Issue.record("a queued cancelled request must never enter its operation")
+        return
       }
     }
     try await waitForState(
@@ -247,14 +243,14 @@ final class DeviceTargetingContractTests: XCTestCase {
     cancelled.cancel()
     do {
       try await cancelled.value
-      XCTFail("cancelled queued request unexpectedly succeeded")
+      Issue.record("cancelled queued request unexpectedly succeeded")
     } catch {
-      XCTAssertEqual(error as? DeviceMutationLaneError, .cancelled)
+      #expect(error as? DeviceMutationLaneError == .cancelled)
     }
 
     await firstGate.open()
     let firstResult = try await first.value
-    XCTAssertEqual(firstResult, "first-finished")
+    #expect(firstResult == "first-finished")
 
     struct SyntheticFailure: Error {}
     do {
@@ -264,7 +260,7 @@ final class DeviceTargetingContractTests: XCTestCase {
         ) {
           throw SyntheticFailure()
         } as String
-      XCTFail("throwing operation unexpectedly succeeded")
+      Issue.record("throwing operation unexpectedly succeeded")
     } catch is SyntheticFailure {
       // Expected. The following request proves the throwing path released the lane.
     }
@@ -273,7 +269,7 @@ final class DeviceTargetingContractTests: XCTestCase {
     ) {
       "released"
     }
-    XCTAssertEqual(afterThrow, "released")
+    #expect(afterThrow == "released")
 
     let handoffCoordinator = DeviceMutationLaneCoordinator()
     let handoffIdentity = DeviceMutationLaneRequestIdentity.job(
@@ -289,11 +285,11 @@ final class DeviceTargetingContractTests: XCTestCase {
         deviceID: "handoff-device",
         requestIdentity: handoffIdentity,
         ownerID: "reopened-adapter")
-      XCTFail("reopen took ownership while the original adapter was dispatching")
+      Issue.record("reopen took ownership while the original adapter was dispatching")
     } catch {
-      XCTAssertEqual(
-        error as? DeviceMutationLaneError,
-        .leaseInUse(handoffIdentity.diagnosticID))
+      #expect(
+        error as? DeviceMutationLaneError
+          == .leaseInUse(handoffIdentity.diagnosticID))
     }
     try await handoffCoordinator.endDispatch(originalLease)
     do {
@@ -301,29 +297,29 @@ final class DeviceTargetingContractTests: XCTestCase {
         deviceID: "different-device",
         requestIdentity: handoffIdentity,
         ownerID: "independent-adapter")
-      XCTFail("one durable Job identity acquired two physical-device lanes")
+      Issue.record("one durable Job identity acquired two physical-device lanes")
     } catch {
-      XCTAssertEqual(
-        error as? DeviceMutationLaneError,
-        .duplicateRequest(handoffIdentity.diagnosticID))
+      #expect(
+        error as? DeviceMutationLaneError
+          == .duplicateRequest(handoffIdentity.diagnosticID))
     }
     let adoptedLease = try await handoffCoordinator.adoptActiveLease(
       requestIdentity: handoffIdentity,
       ownerID: "reopened-adapter")
-    let reopenedLease = try XCTUnwrap(adoptedLease)
+    let reopenedLease = try #require(adoptedLease)
     do {
       try await handoffCoordinator.beginDispatch(originalLease)
-      XCTFail("the superseded adapter retained dispatch authority")
+      Issue.record("the superseded adapter retained dispatch authority")
     } catch {
-      XCTAssertEqual(
-        error as? DeviceMutationLaneError,
-        .staleLease(handoffIdentity.diagnosticID))
+      #expect(
+        error as? DeviceMutationLaneError
+          == .staleLease(handoffIdentity.diagnosticID))
     }
     try await handoffCoordinator.beginDispatch(reopenedLease)
     try await handoffCoordinator.endDispatch(reopenedLease)
     try await handoffCoordinator.releaseLease(reopenedLease)
     let handoffSnapshot = await handoffCoordinator.snapshot()
-    XCTAssertTrue(handoffSnapshot.activeRequestIDs.isEmpty)
+    #expect(handoffSnapshot.activeRequestIDs.isEmpty)
 
     let probe = LaneConcurrencyProbe()
     await withTaskGroup(of: Void.self) { group in
@@ -342,13 +338,13 @@ final class DeviceTargetingContractTests: XCTestCase {
     }
     let maxima = await probe.maximumByDevice()
     let overallMaximum = await probe.maximumOverall()
-    XCTAssertEqual(maxima, ["device-0": 1, "device-1": 1, "device-2": 1, "device-3": 1])
-    XCTAssertGreaterThan(overallMaximum, 1)
+    #expect(maxima == ["device-0": 1, "device-1": 1, "device-2": 1, "device-3": 1])
+    #expect(overallMaximum > 1)
 
     let snapshot = await coordinator.snapshot()
-    XCTAssertTrue(snapshot.activeRequestIDs.isEmpty)
-    XCTAssertTrue(snapshot.queuedRequestIDs.isEmpty)
-    XCTAssertTrue(snapshot.maximumConcurrentByDevice.values.allSatisfy { $0 <= 1 })
+    #expect(snapshot.activeRequestIDs.isEmpty)
+    #expect(snapshot.queuedRequestIDs.isEmpty)
+    #expect(snapshot.maximumConcurrentByDevice.values.allSatisfy { $0 <= 1 })
     print(
       "TASK-M1-007 lane_property_operations=96 same_device_max=1 overall_max=\(overallMaximum) queued_cancelled=1 active_final=\(snapshot.activeRequestIDs.count) queued_final=\(snapshot.queuedRequestIDs.count)"
     )
@@ -409,13 +405,13 @@ final class DeviceTargetingContractTests: XCTestCase {
   private func assertAwaiting(
     _ decision: DeviceRebindDecision,
     reason: DeviceRebindAwaitingReason,
-    file: StaticString = #filePath,
-    line: UInt = #line
+    sourceLocation: SourceLocation = #_sourceLocation
   ) {
     guard case .awaitingRebindConfirmation(let actual, _) = decision else {
-      return XCTFail("expected awaitingRebindConfirmation", file: file, line: line)
+      Issue.record("expected awaitingRebindConfirmation", sourceLocation: sourceLocation)
+      return
     }
-    XCTAssertEqual(actual, reason, file: file, line: line)
+    #expect(actual == reason, sourceLocation: sourceLocation)
   }
 
   private func waitForState(
@@ -427,7 +423,7 @@ final class DeviceTargetingContractTests: XCTestCase {
       if await coordinator.state(deviceID: "device-A", requestID: requestID) == expected { return }
       await Task.yield()
     }
-    XCTFail("request \(requestID) did not reach \(expected)")
+    Issue.record("request \(requestID) did not reach \(expected)")
   }
 }
 

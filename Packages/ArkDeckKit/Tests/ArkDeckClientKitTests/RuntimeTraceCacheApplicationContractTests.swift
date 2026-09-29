@@ -1,10 +1,10 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckClientKit
 @testable import ArkDeckCore
 
-final class RuntimeTraceCacheApplicationContractTests: XCTestCase {
+struct RuntimeTraceCacheApplicationContractTests {
   private actor Scenario {
     private var answers: [(String, RuntimeTraceCacheTransportResult)]
     private var calls: [(String, [String: JSONValue]?)] = []
@@ -41,10 +41,10 @@ final class RuntimeTraceCacheApplicationContractTests: XCTestCase {
     ])
   }
 
-  func testAppProviderUsesOnlyTheTypedTraceCacheResource() async throws {
+  @Test func appProviderUsesOnlyTheTypedTraceCacheResource() async throws {
     var status: [String: JSONValue]
     guard case .object(let inventoryFields) = inventory(entries: 3, bytes: "4096", active: 1)
-    else { return XCTFail("inventory fixture must be an object") }
+    else { Issue.record("inventory fixture must be an object"); return }
     status = inventoryFields
     status["schemaVersion"] = .string("arkdeck.trace-cache-status/1")
     status["purgeScope"] = .string("inactiveDerivedDatabases")
@@ -68,30 +68,30 @@ final class RuntimeTraceCacheApplicationContractTests: XCTestCase {
     })
 
     let loaded = await provider.loadTraceCache()
-    XCTAssertEqual(
-      loaded,
-      .loaded(RuntimeTraceCacheInventory(entryCount: 3, totalByteCount: 4096, activeEntryCount: 1)))
+    #expect(
+      loaded
+        == .loaded(RuntimeTraceCacheInventory(entryCount: 3, totalByteCount: 4096, activeEntryCount: 1)))
     let purged = await provider.purgeUnusedTraceCache()
-    XCTAssertEqual(
-      purged,
-      .completed(
-        RuntimeTraceCachePurgeReport(
-          before: RuntimeTraceCacheInventory(
-            entryCount: 3, totalByteCount: 4096, activeEntryCount: 1),
-          after: RuntimeTraceCacheInventory(
-            entryCount: 1, totalByteCount: 1024, activeEntryCount: 1),
-          recoveredPrivateDirectoryCount: 0,
-          removedOrphanOwnerMarkerCount: 1,
-          removedEntryCount: 2,
-          skippedActiveEntryCount: 1)))
+    #expect(
+      purged
+        == .completed(
+          RuntimeTraceCachePurgeReport(
+            before: RuntimeTraceCacheInventory(
+              entryCount: 3, totalByteCount: 4096, activeEntryCount: 1),
+            after: RuntimeTraceCacheInventory(
+              entryCount: 1, totalByteCount: 1024, activeEntryCount: 1),
+            recoveredPrivateDirectoryCount: 0,
+            removedOrphanOwnerMarkerCount: 1,
+            removedEntryCount: 2,
+            skippedActiveEntryCount: 1)))
 
     let calls = await scenario.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["trace.cache.status", "trace.cache.purge"])
-    XCTAssertNil(calls[0].1)
-    XCTAssertNil(calls[1].1)
+    #expect(calls.map(\.0) == ["trace.cache.status", "trace.cache.purge"])
+    #expect(calls[0].1 == nil)
+    #expect(calls[1].1 == nil)
   }
 
-  func testDecoderRejectsPathsAndImpossibleInventoryCounts() throws {
+  @Test func decoderRejectsPathsAndImpossibleInventoryCounts() throws {
     let invalid: JSONValue = .object([
       "schemaVersion": .string("arkdeck.trace-cache-status/1"),
       "entryCount": .integer(1),
@@ -103,7 +103,7 @@ final class RuntimeTraceCacheApplicationContractTests: XCTestCase {
     ])
     guard case .success(let data) = try response(invalid),
       case .failure(let reason) = RuntimeTraceCacheResponseDecoding.status(data)
-    else { return XCTFail("an impossible, path-bearing inventory was accepted") }
-    XCTAssertTrue(reason.contains("invalid"))
+    else { Issue.record("an impossible, path-bearing inventory was accepted"); return }
+    #expect(reason.contains("invalid"))
   }
 }

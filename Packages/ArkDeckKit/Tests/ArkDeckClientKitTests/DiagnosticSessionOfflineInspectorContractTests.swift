@@ -1,57 +1,56 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 @testable import ArkDeckClientKit
 
-final class DiagnosticSessionOfflineInspectorContractTests:
-  XCTestCase
-{
-  func testInspectionBindsDocumentsAndReportsCompleteness() throws {
+struct DiagnosticSessionOfflineInspectorContractTests {
+  @Test func inspectionBindsDocumentsAndReportsCompleteness() throws {
     let input = try fixture()
     let inspection =
       try DiagnosticSessionOfflineInspector().inspect(input)
 
-    XCTAssertEqual(
-      inspection.schemaVersion,
-      "arkdeck.diagnostics-inspection/1")
-    XCTAssertEqual(inspection.jobID, "job-diagnostics")
-    XCTAssertEqual(
-      inspection.operationReference,
-      "capture.diagnostics@1")
-    XCTAssertEqual(
-      inspection.provenance.kind,
-      "offlineDerived")
-    XCTAssertEqual(
-      inspection.provenance.parser,
-      DiagnosticSessionOfflineInspector.parserID)
-    XCTAssertEqual(
-      inspection.provenance.sources.map(\.name),
-      [
-        "artifact-index.json",
-        "capture-summary.json",
-        "markers.json",
-      ])
-    XCTAssertFalse(inspection.reading.isPartial)
-    XCTAssertEqual(
-      inspection.reading.marks.first?.label,
-      "stutter")
-    XCTAssertEqual(
-      inspection.reading.notDerived,
-      ["frameDeadline"])
-    XCTAssertEqual(inspection.ringHeldAnchor, true)
+    #expect(
+      inspection.schemaVersion
+        == "arkdeck.diagnostics-inspection/1")
+    #expect(inspection.jobID == "job-diagnostics")
+    #expect(
+      inspection.operationReference
+        == "capture.diagnostics@1")
+    #expect(
+      inspection.provenance.kind
+        == "offlineDerived")
+    #expect(
+      inspection.provenance.parser
+        == DiagnosticSessionOfflineInspector.parserID)
+    #expect(
+      inspection.provenance.sources.map(\.name)
+        == [
+          "artifact-index.json",
+          "capture-summary.json",
+          "markers.json",
+        ])
+    #expect(!inspection.reading.isPartial)
+    #expect(
+      inspection.reading.marks.first?.label
+        == "stutter")
+    #expect(
+      inspection.reading.notDerived
+        == ["frameDeadline"])
+    #expect(inspection.ringHeldAnchor == true)
     guard
       case .cannotAlign(let reason) =
         inspection.reading.alignment
     else {
-      return XCTFail("inspection must not invent clock alignment")
+      Issue.record("inspection must not invent clock alignment")
+      return
     }
-    XCTAssertFalse(reason.isEmpty)
+    #expect(!reason.isEmpty)
   }
 
-  func testMetadataBytesAndIndexMustBindExactly() throws {
+  @Test func metadataBytesAndIndexMustBindExactly() throws {
     let input = try fixture()
-    let marker = try XCTUnwrap(input.documents["markers.json"])
+    let marker = try #require(input.documents["markers.json"])
     let wrongDigest = try DiagnosticOfflineArtifactMetadata(
       artifactID: marker.metadata.artifactID,
       name: marker.metadata.name,
@@ -61,14 +60,13 @@ final class DiagnosticSessionOfflineInspectorContractTests:
       sourceOperation: marker.metadata.sourceOperation,
       byteCount: marker.metadata.byteCount,
       sha256: String(repeating: "0", count: 64))
-    XCTAssertThrowsError(
+    #expect(
+      throws: DiagnosticSessionOfflineInspectorError
+        .digestMismatch("markers.json")
+    ) {
       try DiagnosticOfflineArtifact(
         metadata: wrongDigest,
         data: marker.data)
-    ) { error in
-      XCTAssertEqual(
-        error as? DiagnosticSessionOfflineInspectorError,
-        .digestMismatch("markers.json"))
     }
 
     let duplicate = DiagnosticSessionOfflineInput(
@@ -77,12 +75,11 @@ final class DiagnosticSessionOfflineInspectorContractTests:
       typedParameters: input.typedParameters,
       inventory: input.inventory + [input.inventory[0]],
       documents: input.documents)
-    XCTAssertThrowsError(
+    #expect(
+      throws: DiagnosticSessionOfflineInspectorError
+        .invalid("diagnostics_ambiguous_artifact_inventory")
+    ) {
       try DiagnosticSessionOfflineInspector().inspect(duplicate)
-    ) { error in
-      XCTAssertEqual(
-        error as? DiagnosticSessionOfflineInspectorError,
-        .invalid("diagnostics_ambiguous_artifact_inventory"))
     }
 
     var documents = input.documents
@@ -93,16 +90,15 @@ final class DiagnosticSessionOfflineInspectorContractTests:
       typedParameters: input.typedParameters,
       inventory: input.inventory,
       documents: documents)
-    XCTAssertThrowsError(
+    #expect(
+      throws: DiagnosticSessionOfflineInspectorError
+        .invalid("diagnostics_unexpected_session_document")
+    ) {
       try DiagnosticSessionOfflineInspector().inspect(unexpected)
-    ) { error in
-      XCTAssertEqual(
-        error as? DiagnosticSessionOfflineInspectorError,
-        .invalid("diagnostics_unexpected_session_document"))
     }
   }
 
-  func testSensitiveTextPreviewRequiresExplicitAccessAndDisclosesRepair()
+  @Test func sensitiveTextPreviewRequiresExplicitAccessAndDisclosesRepair()
     throws
   {
     let bytes = Data([0x61, 0xFF, 0x62])
@@ -115,14 +111,13 @@ final class DiagnosticSessionOfflineInspectorContractTests:
     let artifact = try DiagnosticOfflineArtifact(
       metadata: metadata,
       data: bytes)
-    XCTAssertThrowsError(
+    #expect(
+      throws: DiagnosticSessionOfflineInspectorError
+        .sensitiveContentRequiresExplicitAccess
+    ) {
       try DiagnosticSessionOfflineInspector().preview(
         artifact,
         contentAccessExplicit: false)
-    ) { error in
-      XCTAssertEqual(
-        error as? DiagnosticSessionOfflineInspectorError,
-        .sensitiveContentRequiresExplicitAccess)
     }
 
     let preview =
@@ -130,18 +125,18 @@ final class DiagnosticSessionOfflineInspectorContractTests:
         artifact,
         maximumCharacters: 2,
         contentAccessExplicit: true)
-    XCTAssertEqual(
-      preview.schemaVersion,
-      "arkdeck.diagnostics-preview/1")
-    XCTAssertEqual(preview.text, "a\u{FFFD}")
-    XCTAssertTrue(preview.replacedInvalidUTF8)
-    XCTAssertTrue(preview.wasClipped)
-    XCTAssertEqual(
-      preview.provenance.sources.map(\.artifactID),
-      ["artifact-hilog"])
+    #expect(
+      preview.schemaVersion
+        == "arkdeck.diagnostics-preview/1")
+    #expect(preview.text == "a\u{FFFD}")
+    #expect(preview.replacedInvalidUTF8)
+    #expect(preview.wasClipped)
+    #expect(
+      preview.provenance.sources.map(\.artifactID)
+        == ["artifact-hilog"])
   }
 
-  func testStructuredPreviewRejectsInvalidUTF8() throws {
+  @Test func structuredPreviewRejectsInvalidUTF8() throws {
     let bytes = Data([0x7B, 0xFF, 0x7D])
     let metadata = try self.metadata(
       id: "artifact-json",
@@ -149,20 +144,19 @@ final class DiagnosticSessionOfflineInspectorContractTests:
       mediaType: "application/json",
       privacy: "standard",
       data: bytes)
-    XCTAssertThrowsError(
+    #expect(
+      throws: DiagnosticSessionOfflineInspectorError
+        .invalid("diagnostics_invalid_structured_text")
+    ) {
       try DiagnosticSessionOfflineInspector().preview(
         DiagnosticOfflineArtifact(
           metadata: metadata,
           data: bytes),
         contentAccessExplicit: false)
-    ) { error in
-      XCTAssertEqual(
-        error as? DiagnosticSessionOfflineInspectorError,
-        .invalid("diagnostics_invalid_structured_text"))
     }
   }
 
-  func testTheAppCallsTheSharedOwner() throws {
+  @Test func theAppCallsTheSharedOwner() throws {
     let root = URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -172,11 +166,11 @@ final class DiagnosticSessionOfflineInspectorContractTests:
         path:
           "Sources/ArkDeckClientKit/DiagnosticSessionApplicationReader.swift"),
       encoding: .utf8)
-    XCTAssertTrue(
+    #expect(
       app.contains("DiagnosticSessionOfflineInspector().inspect"))
   }
 
-  func testPublishedSchemaPinsOutputAndParserVersions() throws {
+  @Test func publishedSchemaPinsOutputAndParserVersions() throws {
     let root = URL(filePath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
@@ -184,39 +178,39 @@ final class DiagnosticSessionOfflineInspectorContractTests:
     let data = try Data(
       contentsOf: root.appending(
         path: "Contracts/cli-diagnostics-offline.schema.json"))
-    let schema = try XCTUnwrap(
+    let schema = try #require(
       JSONSerialization.jsonObject(with: data)
         as? [String: Any])
-    let definitions = try XCTUnwrap(
+    let definitions = try #require(
       schema["$defs"] as? [String: Any])
-    let inspection = try XCTUnwrap(
+    let inspection = try #require(
       definitions["inspection"] as? [String: Any])
-    let inspectionProperties = try XCTUnwrap(
+    let inspectionProperties = try #require(
       inspection["properties"] as? [String: Any])
-    XCTAssertEqual(
+    #expect(
       (inspectionProperties["schemaVersion"]
-        as? [String: Any])?["const"] as? String,
-      DiagnosticSessionOfflineInspection.schemaVersion)
-    let preview = try XCTUnwrap(
+        as? [String: Any])?["const"] as? String
+        == DiagnosticSessionOfflineInspection.schemaVersion)
+    let preview = try #require(
       definitions["preview"] as? [String: Any])
-    let previewProperties = try XCTUnwrap(
+    let previewProperties = try #require(
       preview["properties"] as? [String: Any])
-    XCTAssertEqual(
+    #expect(
       (previewProperties["schemaVersion"]
-        as? [String: Any])?["const"] as? String,
-      DiagnosticArtifactOfflinePreview.schemaVersion)
-    let provenance = try XCTUnwrap(
+        as? [String: Any])?["const"] as? String
+        == DiagnosticArtifactOfflinePreview.schemaVersion)
+    let provenance = try #require(
       definitions["provenance"] as? [String: Any])
-    let provenanceProperties = try XCTUnwrap(
+    let provenanceProperties = try #require(
       provenance["properties"] as? [String: Any])
-    XCTAssertEqual(
+    #expect(
       (provenanceProperties["parser"]
-        as? [String: Any])?["const"] as? String,
-      DiagnosticSessionOfflineInspector.parserID)
-    XCTAssertEqual(
+        as? [String: Any])?["const"] as? String
+        == DiagnosticSessionOfflineInspector.parserID)
+    #expect(
       (provenanceProperties["parserVersion"]
-        as? [String: Any])?["const"] as? String,
-      DiagnosticSessionOfflineInspector.parserVersion)
+        as? [String: Any])?["const"] as? String
+        == DiagnosticSessionOfflineInspector.parserVersion)
   }
 
   private func fixture() throws

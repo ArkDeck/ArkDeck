@@ -1,27 +1,28 @@
 @testable import ArkDeckClientKit
+import ArkDeckCore
 import Foundation
-import XCTest
+import Testing
 
-final class UIDumpApplicationFacadeContractTests: XCTestCase {
-  func testViewerRequestPinsTargetAndEnablesOnlyPublishedCaptureInputs() throws {
+struct UIDumpApplicationFacadeContractTests {
+  @Test func viewerRequestPinsTargetAndEnablesOnlyPublishedCaptureInputs() throws {
     let target = UIDumpTargetPresentation(
       id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f", adoptedAtUTC: "2026-08-22T00:00:00Z")
     let request = try ViewerCaptureRequestBuilder.request(target: target, nonce: "test")
 
-    XCTAssertEqual(request.operation.reference, "capture.diagnostics@1")
-    XCTAssertEqual(request.target.targetID, "target-a")
-    XCTAssertEqual(request.target.expectedBindingRevision, 7)
-    XCTAssertEqual(request.inputs["durationSeconds"], .integer(1))
-    XCTAssertEqual(request.inputs["captureHilog"], .bool(false))
-    XCTAssertEqual(request.inputs["hilogFilters"], .array([]))
-    XCTAssertEqual(request.inputs["uiDump"], .bool(true))
-    XCTAssertEqual(request.inputs["crashLogs"], .bool(false))
-    XCTAssertEqual(request.inputs["uiScreenshot"], .bool(true))
-    XCTAssertEqual(request.inputs["uiComponentTree"], .bool(true))
-    XCTAssertEqual(request.inputs["redactionProfile"], .string("standard"))
+    #expect(request.operation.reference == "capture.diagnostics@1")
+    #expect(request.target.targetID == "target-a")
+    #expect(request.target.expectedBindingRevision == 7)
+    #expect(request.inputs["durationSeconds"] == .integer(1))
+    #expect(request.inputs["captureHilog"] == .bool(false))
+    #expect(request.inputs["hilogFilters"] == .array([]))
+    #expect(request.inputs["uiDump"] == .bool(true))
+    #expect(request.inputs["crashLogs"] == .bool(false))
+    #expect(request.inputs["uiScreenshot"] == .bool(true))
+    #expect(request.inputs["uiComponentTree"] == .bool(true))
+    #expect(request.inputs["redactionProfile"] == .string("standard"))
   }
 
-  func testAdvancedDumpRequestPinsOnlyTypedComponentDetailInputs() throws {
+  @Test func advancedDumpRequestPinsOnlyTypedComponentDetailInputs() throws {
     let target = UIDumpTargetPresentation(
       id: "target-a", bindingRevision: 7, toolVersion: "3.2.0f",
       adoptedAtUTC: "2026-08-22T00:00:00Z")
@@ -30,19 +31,19 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       selection: ViewerAdvancedDumpSelection(windowID: "60", componentID: "841"),
       nonce: "advanced")
 
-    XCTAssertEqual(request.operation.reference, "capture.diagnostics@1")
-    XCTAssertEqual(request.target.targetID, "target-a")
-    XCTAssertEqual(request.target.expectedBindingRevision, 7)
-    XCTAssertEqual(request.inputs["advancedDump"], .bool(true))
-    XCTAssertEqual(request.inputs["windowId"], .string("60"))
-    XCTAssertEqual(request.inputs["componentId"], .string("841"))
-    XCTAssertEqual(request.inputs["captureHilog"], .bool(false))
-    XCTAssertEqual(request.inputs["uiDump"], .bool(false))
-    XCTAssertEqual(request.inputs["uiScreenshot"], .bool(false))
-    XCTAssertEqual(request.inputs["uiComponentTree"], .bool(false))
+    #expect(request.operation.reference == "capture.diagnostics@1")
+    #expect(request.target.targetID == "target-a")
+    #expect(request.target.expectedBindingRevision == 7)
+    #expect(request.inputs["advancedDump"] == .bool(true))
+    #expect(request.inputs["windowId"] == .string("60"))
+    #expect(request.inputs["componentId"] == .string("841"))
+    #expect(request.inputs["captureHilog"] == .bool(false))
+    #expect(request.inputs["uiDump"] == .bool(false))
+    #expect(request.inputs["uiScreenshot"] == .bool(false))
+    #expect(request.inputs["uiComponentTree"] == .bool(false))
   }
 
-  func testViewerOnlyTreatsFreshConnectedCandidateAsCaptureReady() {
+  @Test func viewerOnlyTreatsFreshConnectedCandidateAsCaptureReady() {
     let connected = DeviceCandidatePresentation(
       connectKey: "usb-a", state: "Connected", adoptedTargetID: "target-a", bindingRevision: 7)
     let offline = DeviceCandidatePresentation(
@@ -51,15 +52,15 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       connectKey: "usb-c", state: "Connected", adoptedTargetID: "target-c", bindingRevision: 9,
       stateObservationHealth: .stale)
 
-    XCTAssertEqual(UIDumpWorkspaceResponseDecoding.targetConnection(for: connected), .connected)
-    XCTAssertFalse(UIDumpWorkspaceResponseDecoding.targetConnection(for: offline).isCaptureReady)
-    XCTAssertFalse(UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).isCaptureReady)
-    XCTAssertEqual(
-      UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).failureReason,
-      "HDC reported Connected, but that observation is stale")
+    #expect(UIDumpWorkspaceResponseDecoding.targetConnection(for: connected) == .connected)
+    #expect(!UIDumpWorkspaceResponseDecoding.targetConnection(for: offline).isCaptureReady)
+    #expect(!UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).isCaptureReady)
+    #expect(
+      UIDumpWorkspaceResponseDecoding.targetConnection(for: stale).failureReason
+        == "HDC reported Connected, but that observation is stale")
   }
 
-  func testParserRetainsRawFieldsAndUsesDeviceIdentityWhenUnique() throws {
+  @Test func parserRetainsRawFieldsAndUsesDeviceIdentityWhenUnique() throws {
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
       treeData: Data("""
@@ -68,28 +69,28 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       rawDumpData: Data(#"{"windows":[{"id":"w1"}]}"#.utf8),
       identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertTrue(capture.coordinatesAreVerified)
-    let toggle = try XCTUnwrap(capture.nodes.first { $0.deviceID == "42" })
-    XCTAssertEqual(toggle.identity, "device:42")
-    XCTAssertEqual(toggle.parentIdentity, "device:1")
-    XCTAssertEqual(capture.node(identity: "device:1")?.hitTestBehavior, "HitTestMode.Transparent")
-    let rootRawFields = try XCTUnwrap(capture.formattedRawFields(for: "device:1"))
-    XCTAssertTrue(rootRawFields.contains("unknown"))
-    XCTAssertFalse(
-      rootRawFields.contains("children"),
+    #expect(capture.coordinatesAreVerified)
+    let toggle = try #require(capture.nodes.first { $0.deviceID == "42" })
+    #expect(toggle.identity == "device:42")
+    #expect(toggle.parentIdentity == "device:1")
+    #expect(capture.node(identity: "device:1")?.hitTestBehavior == "HitTestMode.Transparent")
+    let rootRawFields = try #require(capture.formattedRawFields(for: "device:1"))
+    #expect(rootRawFields.contains("unknown"))
+    #expect(
+      !rootRawFields.contains("children"),
       "Raw dump must contain only the selected component, never its descendant tree")
-    XCTAssertFalse(rootRawFields.contains("childOnly"))
-    XCTAssertTrue(
-      try XCTUnwrap(capture.formattedRawFields(for: "device:42")).contains("childOnly"),
+    #expect(!rootRawFields.contains("childOnly"))
+    #expect(
+      capture.formattedRawFields(for: "device:42")?.contains("childOnly") == true,
       "provider-specific fields owned by the selected component must remain available")
-    XCTAssertEqual(
-      capture.advancedDumpSelection(for: "device:42"),
-      ViewerAdvancedDumpSelection(windowID: "60", componentID: "42"),
+    #expect(
+      capture.advancedDumpSelection(for: "device:42")
+        == ViewerAdvancedDumpSelection(windowID: "60", componentID: "42"),
       "Advanced Dump must use the selected component and its enclosing window, not raw fields")
-    XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID, "42")
+    #expect(ViewerHitTesting.node(in: capture, x: 60, y: 100)?.deviceID == "42")
   }
 
-  func testAdvancedDumpParserUsesCapturedKeyColonValueText() throws {
+  @Test func advancedDumpParserUsesCapturedKeyColonValueText() throws {
     let fields = try ViewerAdvancedDumpParser.parse(Data("""
       WaterFlow dump:
         accessibilityId : 841
@@ -97,23 +98,22 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
         scrollable : true
       """.utf8))
 
-    XCTAssertEqual(fields[0], ViewerDumpField(key: "WaterFlow dump", value: ""))
-    XCTAssertEqual(fields[1], ViewerDumpField(key: "accessibilityId", value: "841"))
-    XCTAssertEqual(
-      fields[2],
-      ViewerDumpField(key: "layoutConstraint", value: "{ minWidth: 0, maxWidth: 1280 }"))
-    XCTAssertEqual(fields[3], ViewerDumpField(key: "scrollable", value: "true"))
+    #expect(fields[0] == ViewerDumpField(key: "WaterFlow dump", value: ""))
+    #expect(fields[1] == ViewerDumpField(key: "accessibilityId", value: "841"))
+    #expect(
+      fields[2]
+        == ViewerDumpField(key: "layoutConstraint", value: "{ minWidth: 0, maxWidth: 1280 }"))
+    #expect(fields[3] == ViewerDumpField(key: "scrollable", value: "true"))
   }
 
-  func testAdvancedDumpParserRejectsSidecarNoticeInsteadOfFallingBackToRawFields() {
-    XCTAssertThrowsError(
+  @Test func advancedDumpParserRejectsSidecarNoticeInsteadOfFallingBackToRawFields() {
+    #expect(throws: ViewerCaptureFailure.advancedDumpRequiresSidecar) {
       try ViewerAdvancedDumpParser.parse(
-        Data("Dump saved to /data/app/example/files/arkui-comp.dump\n".utf8))) { error in
-      XCTAssertEqual(error as? ViewerCaptureFailure, .advancedDumpRequiresSidecar)
+        Data("Dump saved to /data/app/example/files/arkui-comp.dump\n".utf8))
     }
   }
 
-  func testParserFallsBackToStablePathForDuplicateDeviceIDsAndDisablesUnprovenCoordinates() throws {
+  @Test func parserFallsBackToStablePathForDuplicateDeviceIDsAndDisablesUnprovenCoordinates() throws {
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
       treeData: Data("""
@@ -122,21 +122,21 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       rawDumpData: nil,
       identity: ViewerCaptureIdentity(jobID: "job-1", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertFalse(capture.coordinatesAreVerified)
-    XCTAssertEqual(capture.nodes.map(\.identity), ["path:0", "path:0.0"])
-    XCTAssertNil(ViewerHitTesting.node(in: capture, x: 1, y: 1))
+    #expect(!capture.coordinatesAreVerified)
+    #expect(capture.nodes.map(\.identity) == ["path:0", "path:0.0"])
+    #expect(ViewerHitTesting.node(in: capture, x: 1, y: 1) == nil)
   }
 
-  func testScreenshotMappingClipsProviderBoundsToTheCapturedDisplay() throws {
-    let raw = try XCTUnwrap(ViewerBounds(x: -40, y: 1200, width: 800, height: 160))
-    let visible = try XCTUnwrap(
+  @Test func screenshotMappingClipsProviderBoundsToTheCapturedDisplay() throws {
+    let raw = try #require(ViewerBounds(x: -40, y: 1200, width: 800, height: 160))
+    let visible = try #require(
       ViewerScreenshotMapping.visibleBounds(
         raw, screenshotWidth: 720, screenshotHeight: 1280))
 
-    XCTAssertEqual(visible, ViewerBounds(x: 0, y: 1200, width: 720, height: 80))
+    #expect(visible == ViewerBounds(x: 0, y: 1200, width: 720, height: 80))
   }
 
-  func testScreenshotMappingAccumulatesClippingAncestorsForDrawingAndHitTesting() throws {
+  @Test func screenshotMappingAccumulatesClippingAncestorsForDrawingAndHitTesting() throws {
     let parent = viewerNode(
       identity: "parent", parent: nil, children: ["child"], type: "List",
       bounds: ViewerBounds(x: 0, y: 0, width: 100, height: 100), clipsChildren: true)
@@ -151,16 +151,16 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
         capturedAtUTC: "2026-08-22T00:00:00Z"),
       coordinatesAreVerified: true)
 
-    XCTAssertEqual(
-      ViewerScreenshotMapping.visibleBounds(of: child, in: capture),
-      ViewerBounds(x: 80, y: 80, width: 20, height: 20))
-    XCTAssertEqual(ViewerHitTesting.node(in: capture, x: 90, y: 90)?.identity, "child")
-    XCTAssertNil(
-      ViewerHitTesting.node(in: capture, x: 120, y: 120),
+    #expect(
+      ViewerScreenshotMapping.visibleBounds(of: child, in: capture)
+        == ViewerBounds(x: 80, y: 80, width: 20, height: 20))
+    #expect(ViewerHitTesting.node(in: capture, x: 90, y: 90)?.identity == "child")
+    #expect(
+      ViewerHitTesting.node(in: capture, x: 120, y: 120) == nil,
       "a child clipped out by the list cannot remain a screenshot hit target")
   }
 
-  func testHitTestingSelectsFloatingNavigationAboveDeeperContent() {
+  @Test func hitTestingSelectsFloatingNavigationAboveDeeperContent() {
     let full = ViewerBounds(x: 0, y: 0, width: 200, height: 200)
     let navigation = ViewerBounds(x: 10, y: 150, width: 180, height: 40)
     let root = viewerNode(
@@ -193,33 +193,33 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
         capturedAtUTC: "2026-08-24T00:00:00Z"),
       coordinatesAreVerified: true)
 
-    XCTAssertEqual(
-      ViewerHitTesting.node(in: capture, rootIdentity: "root", x: 160, y: 170)?.identity,
-      "icon",
+    #expect(
+      ViewerHitTesting.node(in: capture, rootIdentity: "root", x: 160, y: 170)?.identity
+        == "icon",
       "the foreground TabBar branch must win over a much deeper poster branch")
   }
 
-  func testDeepTreeIndentPreservesEveryLevelWithoutLosingReadableWidth() {
+  @Test func deepTreeIndentPreservesEveryLevelWithoutLosingReadableWidth() {
     let viewport = 760.0
     let indent = ViewerTreeLayoutPolicy.leadingIndent(
       depth: 50, maximumDepth: 50, viewportWidth: viewport)
     let previous = ViewerTreeLayoutPolicy.leadingIndent(
       depth: 49, maximumDepth: 50, viewportWidth: viewport)
 
-    XCTAssertEqual(indent, 456, accuracy: 0.001)
-    XCTAssertGreaterThanOrEqual(
-      indent - previous, 8,
+    #expect(abs(indent - 456) <= 0.001)
+    #expect(
+      indent - previous >= 8,
       "deep siblings must retain a perceivable hierarchy instead of sharing a clamped edge")
-    XCTAssertGreaterThanOrEqual(
-      viewport - indent, 300,
+    #expect(
+      viewport - indent >= 300,
       "a real fifty-level dump must not place the selected row's label outside the pane")
-    XCTAssertEqual(
+    #expect(
       ViewerTreeLayoutPolicy.leadingIndent(
-        depth: 2, maximumDepth: 8, viewportWidth: viewport),
-      42)
+        depth: 2, maximumDepth: 8, viewportWidth: viewport)
+        == 42)
   }
 
-  func testVisibleTreeProjectionIsLinearAndCycleSafe() {
+  @Test func visibleTreeProjectionIsLinearAndCycleSafe() {
     let root = viewerNode(identity: "root", parent: nil, children: ["section"])
     let section = viewerNode(
       identity: "section", parent: "root", children: ["target"], type: "Stack")
@@ -239,42 +239,42 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
         capturedAtUTC: "2026-08-22T00:00:00Z"),
       coordinatesAreVerified: true)
 
-    XCTAssertEqual(
+    #expect(
       capture.visibleTreeNodes(
         rootIdentity: nil, query: "", expandedNodeIdentities: ["root", "section", "target"])
-        .map(\.identity),
-      ["root", "section", "target"])
-    XCTAssertEqual(
+        .map(\.identity)
+        == ["root", "section", "target"])
+    #expect(
       capture.visibleTreeNodes(rootIdentity: nil, query: "wi-fi", expandedNodeIdentities: [])
-        .map(\.identity),
-      ["root", "section", "target"])
-    XCTAssertEqual(
-      capture.searchMatches(rootIdentity: nil, query: "wi-fi").map(\.identity),
-      ["target"],
+        .map(\.identity)
+        == ["root", "section", "target"])
+    #expect(
+      capture.searchMatches(rootIdentity: nil, query: "wi-fi").map(\.identity)
+        == ["target"],
       "the result counter must exclude ancestors shown only as tree context")
-    XCTAssertEqual(capture.subtreeNodes(rootIdentity: "section").map(\.identity), ["section", "target"])
+    #expect(capture.subtreeNodes(rootIdentity: "section").map(\.identity) == ["section", "target"])
   }
 
-  func testViewerSourceKeepsTreeTwoAxisScrollableAndCentersEveryReveal() throws {
+  @Test func viewerSourceKeepsTreeTwoAxisScrollableAndCentersEveryReveal() throws {
     let source = try String(
       contentsOf: repository.appending(
         path: "ArkDeckApp/Features/UIDump/UIDumpWorkspaceView.swift"),
       encoding: .utf8)
 
-    XCTAssertTrue(source.contains("ScrollView([.horizontal, .vertical])"))
-    XCTAssertTrue(source.contains(".scrollIndicators(.visible, axes: [.horizontal, .vertical])"))
-    XCTAssertTrue(source.contains(".scrollPosition($treeScrollPosition)"))
-    XCTAssertTrue(source.contains("position.scrollTo(id: identity, anchor: .center)"))
-    XCTAssertTrue(source.contains("treeScrollPosition.scrollTo(y: verticalOffset)"))
-    XCTAssertTrue(source.contains("viewer.search.matchCount"))
-    XCTAssertTrue(source.contains("viewer.search.previous"))
-    XCTAssertTrue(source.contains("viewer.search.next"))
-    XCTAssertFalse(
-      source.contains("static let unavailable = \"Unavailable\""),
+    #expect(source.contains("ScrollView([.horizontal, .vertical])"))
+    #expect(source.contains(".scrollIndicators(.visible, axes: [.horizontal, .vertical])"))
+    #expect(source.contains(".scrollPosition($treeScrollPosition)"))
+    #expect(source.contains("position.scrollTo(id: identity, anchor: .center)"))
+    #expect(source.contains("treeScrollPosition.scrollTo(y: verticalOffset)"))
+    #expect(source.contains("viewer.search.matchCount"))
+    #expect(source.contains("viewer.search.previous"))
+    #expect(source.contains("viewer.search.next"))
+    #expect(
+      !source.contains("static let unavailable = \"Unavailable\""),
       "missing optional fields must be omitted instead of rendered as Unavailable")
   }
 
-  func testParserRetainsOpaqueOptionalRawDumpWithoutRejectingVerifiedTree() throws {
+  @Test func parserRetainsOpaqueOptionalRawDumpWithoutRejectingVerifiedTree() throws {
     let rawDump = Data("Window #0: opaque provider inventory\\n".utf8)
     let capture = try ViewerCaptureParser.parse(
       screenshotData: png(width: 720, height: 1280),
@@ -284,21 +284,21 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
       rawDumpData: rawDump,
       identity: ViewerCaptureIdentity(jobID: "job-opaque", targetID: "target-a", bindingRevision: 7, capturedAtUTC: "2026-08-22T00:00:00Z"))
 
-    XCTAssertEqual(capture.rawDumpDocument, rawDump)
-    XCTAssertTrue(capture.coordinatesAreVerified)
+    #expect(capture.rawDumpDocument == rawDump)
+    #expect(capture.coordinatesAreVerified)
   }
 
-  func testProductionFacadeContainsNoFixtureOrRawCommandFallback() throws {
+  @Test func productionFacadeContainsNoFixtureOrRawCommandFallback() throws {
     let source = try String(
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/UIDumpApplicationFacade.swift"),
       encoding: .utf8)
-    XCTAssertTrue(source.contains("method: \"job.submit\""))
-    XCTAssertTrue(source.contains("method: \"artifact.read\""))
-    XCTAssertTrue(source.contains("allowSensitive\": .bool(true)"))
-    XCTAssertFalse(source.contains("FixtureApplicationProvider"))
-    XCTAssertFalse(source.contains("hidumper"))
-    XCTAssertFalse(source.contains("candidateArguments"))
+    #expect(source.contains("method: \"job.submit\""))
+    #expect(source.contains("method: \"artifact.read\""))
+    #expect(source.contains("allowSensitive\": .bool(true)"))
+    #expect(!source.contains("FixtureApplicationProvider"))
+    #expect(!source.contains("hidumper"))
+    #expect(!source.contains("candidateArguments"))
   }
 
   private func png(width: Int, height: Int) -> Data {

@@ -7,11 +7,11 @@
 // These pin against exactly that.
 
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class RuntimeHistoryApplicationContractTests: XCTestCase {
+struct RuntimeHistoryApplicationContractTests {
   private func decode(_ json: String) -> RuntimeHistoryPresentation {
     RuntimeHistoryResponseDecoding.presentation(from: Data(json.utf8))
   }
@@ -47,7 +47,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     ])
   }
 
-  func testBoundedPreviewReadsExactChunksAndVerifiesTheCompleteHash() async throws {
+  @Test func boundedPreviewReadsExactChunksAndVerifiesTheCompleteHash() async throws {
     let bytes = Data(repeating: 65, count: 300_000)
     let boundary = 256 * 1_024
     let transport = HistoryRPCScenario([
@@ -57,17 +57,17 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
     let result = await reader.readArtifact(
       jobID: "job-preview", artifact: previewArtifact(bytes), maximumBytes: 400_000, allowSensitive: false)
-    XCTAssertEqual(result, .loaded(bytes))
+    #expect(result == .loaded(bytes))
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["artifact.read", "artifact.read"])
-    XCTAssertEqual(calls.map { $0.1["offset"] }, [.integer(0), .integer(Int64(boundary))])
-    XCTAssertTrue(calls.allSatisfy {
+    #expect(calls.map(\.0) == ["artifact.read", "artifact.read"])
+    #expect(calls.map { $0.1["offset"] } == [.integer(0), .integer(Int64(boundary))])
+    #expect(calls.allSatisfy {
       $0.1["owner"] == .object(["kind": .string("job"), "id": .string("job-preview")]) && $0.1["artifactId"] == .string("artifact-preview")
         && $0.1["maxBytes"] == .integer(Int64(boundary)) && $0.1["allowSensitive"] == .bool(false)
     })
   }
 
-  func testPreviewPrivacyPublicationAndSizeRefusalsReadNoBytes() async {
+  @Test func previewPrivacyPublicationAndSizeRefusalsReadNoBytes() async {
     let bytes = Data("private".utf8)
     let transport = HistoryRPCScenario([])
     let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
@@ -81,13 +81,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     ] {
       guard case .failed = await reader.readArtifact(
         jobID: "job-preview", artifact: artifact, maximumBytes: limit, allowSensitive: false)
-      else { return XCTFail("preview bypassed its privacy or byte bound") }
+      else { Issue.record("preview bypassed its privacy or byte bound"); return }
     }
     let calls = await transport.recordedCalls()
-    XCTAssertTrue(calls.isEmpty)
+    #expect(calls.isEmpty)
   }
 
-  func testPreviewRejectsWrongOffsetEarlyEOFAndWrongHash() async throws {
+  @Test func previewRejectsWrongOffsetEarlyEOFAndWrongHash() async throws {
     let bytes = Data("proof".utf8)
     let cases: [(RuntimeArtifactPresentation, RuntimeHistoryTransportResult)] = [
       (previewArtifact(bytes), try chunk(bytes, total: bytes.count, offset: 1, eof: true)),
@@ -100,9 +100,9 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
       guard case .failed = await reader.readArtifact(
         jobID: "job-preview", artifact: artifact, maximumBytes: 100, allowSensitive: false)
-      else { return XCTFail("drifting bytes were presented as verified") }
+      else { Issue.record("drifting bytes were presented as verified"); return }
       let calls = await transport.recordedCalls()
-      XCTAssertEqual(calls.count, 1)
+      #expect(calls.count == 1)
     }
   }
 
@@ -113,7 +113,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       timeline: [], sessionID: "session-cancel", actualEffect: "readOnly")
   }
 
-  func testGlobalCancellationUsesFreshIdentityAndOnlyRequestsTheSafeBoundary() async throws {
+  @Test func globalCancellationUsesFreshIdentityAndOnlyRequestsTheSafeBoundary() async throws {
     let transport = HistoryRPCScenario([
       ("job.show", .success(try currentJobDetailResponse([
         "jobId": "job-cancel", "operation": "capture.diagnostics@1", "targetId": "target-cancel",
@@ -123,20 +123,20 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     ])
     let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
     let result = await control.cancel(cancellableJob())
-    XCTAssertEqual(result, .requested, "acceptance must not be projected as terminal cancelled")
+    #expect(result == .requested, "acceptance must not be projected as terminal cancelled")
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["job.show", "job.cancel"])
-    XCTAssertTrue(calls.allSatisfy { $0.1 == ["jobId": .string("job-cancel")] })
+    #expect(calls.map(\.0) == ["job.show", "job.cancel"])
+    #expect(calls.allSatisfy { $0.1 == ["jobId": .string("job-cancel")] })
   }
 
-  func testGlobalCancellationRefusesTerminalUnknownAndDriftingJobsWithoutCancelDispatch() async throws {
+  @Test func globalCancellationRefusesTerminalUnknownAndDriftingJobsWithoutCancelDispatch() async throws {
     let noRead = HistoryRPCScenario([])
     let closed = RuntimeJobControlXPCProvider(request: { await noRead.request($0, $1) })
     for job in [cancellableJob(state: "succeeded"), cancellableJob(unknown: true), cancellableJob(state: "unrecognized")] {
-      guard case .refused = await closed.cancel(job) else { return XCTFail("non-cancellable Job was accepted") }
+      guard case .refused = await closed.cancel(job) else { Issue.record("non-cancellable Job was accepted"); return }
     }
     let initialCalls = await noRead.recordedCalls()
-    XCTAssertTrue(initialCalls.isEmpty)
+    #expect(initialCalls.isEmpty)
 
     for drift: [String: Any] in [
       ["jobId": "another-job"], ["operation": "flash.dayu200@1"], ["targetId": "another-target"],
@@ -149,24 +149,25 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       status.merge(drift) { _, new in new }
       let transport = HistoryRPCScenario([("job.show", .success(try currentJobDetailResponse(status)))])
       let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
-      guard case .refused = await control.cancel(cancellableJob()) else { return XCTFail("fresh drift was accepted") }
+      guard case .refused = await control.cancel(cancellableJob()) else { Issue.record("fresh drift was accepted"); return }
       let calls = await transport.recordedCalls()
-      XCTAssertEqual(calls.map(\.0), ["job.show"])
+      #expect(calls.map(\.0) == ["job.show"])
     }
   }
 
-  func testCancellationDisconnectDuringFreshReadDoesNotDispatch() async {
+  @Test func cancellationDisconnectDuringFreshReadDoesNotDispatch() async {
     let transport = HistoryRPCScenario([("job.show", .failure("connection interrupted"))])
     let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
     guard case .refused = await control.cancel(cancellableJob()) else {
-      return XCTFail("cancellation requires current Job identity")
+      Issue.record("cancellation requires current Job identity")
+      return
     }
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["job.show"])
+    #expect(calls.map(\.0) == ["job.show"])
   }
 
   // A complete answer is the only thing that produces an available history.
-  func testACompleteJobListBecomesAvailableHistory() {
+  @Test func aCompleteJobListBecomesAvailableHistory() {
     let presentation = decode(
       """
       {
@@ -209,25 +210,26 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
 
-    XCTAssertEqual(presentation.availability, .available)
-    XCTAssertEqual(presentation.jobs.count, 1)
-    let job = try? XCTUnwrap(presentation.jobs.first)
-    XCTAssertEqual(job?.id, "job-1")
-    XCTAssertEqual(job?.operationReference, "observe.devices@1")
-    XCTAssertEqual(job?.targetID, "t-1")
-    XCTAssertEqual(job?.state, "succeeded")
-    XCTAssertEqual(job?.timeline, ["queued", "running", "succeeded"])
-    XCTAssertEqual(job?.needsAttention, false)
-    XCTAssertEqual(job?.executionMode, "execute")
-    XCTAssertEqual(job?.sessionID, "session-job-1")
-    XCTAssertEqual(job?.actualEffect, "readOnly")
-    XCTAssertEqual(job?.createdAtUTC, "2026-08-06T07:00:00Z")
-    XCTAssertEqual(job?.startedAtUTC, "2026-08-06T07:00:01Z")
-    XCTAssertEqual(job?.finishedAtUTC, "2026-08-06T07:00:02Z")
-    XCTAssertEqual(job?.requiresRecoveryGuidance, false)
+    #expect(presentation.availability == .available)
+    #expect(presentation.jobs.count == 1)
+    let job = presentation.jobs.first
+    #expect(job != nil)
+    #expect(job?.id == "job-1")
+    #expect(job?.operationReference == "observe.devices@1")
+    #expect(job?.targetID == "t-1")
+    #expect(job?.state == "succeeded")
+    #expect(job?.timeline == ["queued", "running", "succeeded"])
+    #expect(job?.needsAttention == false)
+    #expect(job?.executionMode == "execute")
+    #expect(job?.sessionID == "session-job-1")
+    #expect(job?.actualEffect == "readOnly")
+    #expect(job?.createdAtUTC == "2026-08-06T07:00:00Z")
+    #expect(job?.startedAtUTC == "2026-08-06T07:00:01Z")
+    #expect(job?.finishedAtUTC == "2026-08-06T07:00:02Z")
+    #expect(job?.requiresRecoveryGuidance == false)
   }
 
-  func testOptionalHistoryFactsAreNotInventedWhenAbsent() throws {
+  @Test func optionalHistoryFactsAreNotInventedWhenAbsent() throws {
     let presentation = decode(
       """
       {
@@ -262,56 +264,56 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
 
-    let job = try XCTUnwrap(presentation.jobs.first)
-    XCTAssertNil(job.executionMode)
-    XCTAssertNil(job.sessionID)
-    XCTAssertNil(job.actualEffect)
-    XCTAssertNil(job.createdAtUTC)
-    XCTAssertNil(job.startedAtUTC)
-    XCTAssertNil(job.finishedAtUTC)
+    let job = try #require(presentation.jobs.first)
+    #expect(job.executionMode == nil)
+    #expect(job.sessionID == nil)
+    #expect(job.actualEffect == nil)
+    #expect(job.createdAtUTC == nil)
+    #expect(job.startedAtUTC == nil)
+    #expect(job.finishedAtUTC == nil)
   }
 
-  func testWorkspaceKindProjectionDistinguishesSharedDiagnosticsRequests() {
-    XCTAssertEqual(
+  @Test func workspaceKindProjectionDistinguishesSharedDiagnosticsRequests() {
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
         inputs: [
           "uiDump": .bool(true),
           "uiScreenshot": .bool(true),
           "uiComponentTree": .bool(true),
-        ]),
-      .viewer)
-    XCTAssertEqual(
+        ])
+        == .viewer)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
-        inputs: ["traceCategories": .array([.string("ace")])]),
-      .trace)
-    XCTAssertEqual(
+        inputs: ["traceCategories": .array([.string("ace")])])
+        == .trace)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
         inputs: [
           "uiScreenshot": .bool(true),
           "captureHilog": .bool(false),
           "crashLogs": .bool(false),
-        ]),
-      .device)
-    XCTAssertEqual(
+        ])
+        == .device)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
         inputs: [
           "uiScreenshot": .bool(true),
           "captureHilog": .bool(true),
         ],
-        clientName: ArkDeckAgentClientName.debugLogsWorkspace),
-      .debug,
+        clientName: ArkDeckAgentClientName.debugLogsWorkspace)
+        == .debug,
       "a diagnostic capture with HiLog must not become Device merely because it has a screenshot")
-    XCTAssertEqual(
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
-        forOperation: "capture.diagnostics@1", inputs: [:]),
-      .diagnostics)
+        forOperation: "capture.diagnostics@1", inputs: [:])
+        == .diagnostics)
   }
 
-  func testDeviceWorkspaceReadsThePublishedHistoryNameAfterRename() throws {
+  @Test func deviceWorkspaceReadsThePublishedHistoryNameAfterRename() throws {
     let presentation = decode(
       """
       {
@@ -346,15 +348,15 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         }
       }
       """)
-    XCTAssertEqual(presentation.availability, .available)
-    XCTAssertEqual(try XCTUnwrap(presentation.jobs.first).workspaceKind, .device)
-    XCTAssertEqual(
-      String(decoding: try JSONEncoder().encode(RuntimeWorkspaceKind.device), as: UTF8.self),
-      "\"toolkit\"",
+    #expect(presentation.availability == .available)
+    #expect(presentation.jobs.first?.workspaceKind == .device)
+    #expect(
+      String(decoding: try JSONEncoder().encode(RuntimeWorkspaceKind.device), as: UTF8.self)
+        == "\"toolkit\"",
       "the rename must remain readable by an existing daemon or App")
   }
 
-  func testWorkspaceKindProjectionMapsOnlyKnownProductSurfaces() {
+  @Test func workspaceKindProjectionMapsOnlyKnownProductSurfaces() {
     let cases: [(String, RuntimeWorkspaceKind)] = [
       ("flash.dayu200@1", .flash),
       ("observe.device@1", .viewer),
@@ -364,21 +366,21 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       ("input.tap@1", .device),
     ]
     for (operation, expected) in cases {
-      XCTAssertEqual(
-        RuntimeWorkspaceKindProjection.kind(forOperation: operation, inputs: [:]),
-        expected,
-        operation)
+      #expect(
+        RuntimeWorkspaceKindProjection.kind(forOperation: operation, inputs: [:])
+          == expected,
+        "\(operation)")
     }
-    XCTAssertNil(
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
-        forOperation: "future.unknown@1", inputs: [:]))
-    XCTAssertNil(
+        forOperation: "future.unknown@1", inputs: [:]) == nil)
+    #expect(
       RuntimeWorkspaceKindProjection.unambiguousKind(
-        forOperation: "capture.diagnostics@1"),
+        forOperation: "capture.diagnostics@1") == nil,
       "an older daemon did not publish enough facts to guess a shared diagnostics origin")
   }
 
-  func testWorkspaceKindAndUnambiguousOperationProjectCurrentSummaries() throws {
+  @Test func workspaceKindAndUnambiguousOperationProjectCurrentSummaries() throws {
     let presentation = decode(
       """
       {
@@ -419,44 +421,44 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
 
-    XCTAssertEqual(presentation.jobs[0].workspaceKind, .viewer)
-    XCTAssertEqual(presentation.jobs[0].resolvedWorkspaceKind, .viewer)
-    XCTAssertNil(presentation.jobs[1].workspaceKind)
-    XCTAssertEqual(presentation.jobs[1].resolvedWorkspaceKind, .debug)
-    XCTAssertNil(presentation.jobs[2].resolvedWorkspaceKind)
+    #expect(presentation.jobs[0].workspaceKind == .viewer)
+    #expect(presentation.jobs[0].resolvedWorkspaceKind == .viewer)
+    #expect(presentation.jobs[1].workspaceKind == nil)
+    #expect(presentation.jobs[1].resolvedWorkspaceKind == .debug)
+    #expect(presentation.jobs[2].resolvedWorkspaceKind == nil)
   }
 
-  func testLegacyDetailParametersOnlyResolveUnambiguousSharedCaptures() {
-    XCTAssertEqual(
+  @Test func legacyDetailParametersOnlyResolveUnambiguousSharedCaptures() {
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
-        parameters: [.init(name: "uiComponentTree", value: "true")]),
-      .viewer)
-    XCTAssertEqual(
+        parameters: [.init(name: "uiComponentTree", value: "true")])
+        == .viewer)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
-        parameters: [.init(name: "traceCategories", value: "[\"ace\"]")]),
-      .trace)
-    XCTAssertEqual(
+        parameters: [.init(name: "traceCategories", value: "[\"ace\"]")])
+        == .trace)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
         parameters: [
           .init(name: "uiScreenshot", value: "true"),
           .init(name: "captureHilog", value: "false"),
           .init(name: "traceCategories", value: "[]"),
-        ]),
-      .device)
-    XCTAssertNil(
+        ])
+        == .device)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
-        forOperation: "capture.diagnostics@1", parameters: []))
-    XCTAssertNil(
+        forOperation: "capture.diagnostics@1", parameters: []) == nil)
+    #expect(
       RuntimeWorkspaceKindProjection.kind(
         forOperation: "capture.diagnostics@1",
-        parameters: [.init(name: "captureHilog", value: "true")]),
+        parameters: [.init(name: "captureHilog", value: "true")]) == nil,
       "the old evidence has no client provenance to separate Diagnostics and Debug")
   }
 
-  func testHistoryWorkspaceContextCarriesExactReadOnlyRecordAndRefusesMismatches() throws {
+  @Test func historyWorkspaceContextCarriesExactReadOnlyRecordAndRefusesMismatches() throws {
     let job = RuntimeJobSummaryPresentation(
       id: "job-viewer", operationReference: "capture.diagnostics@1",
       targetID: "TGT-1", state: "succeeded", waitingForHuman: false,
@@ -478,30 +480,30 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       ]),
       artifactResponse: .success(try currentArtifactPageResponse([])))
 
-    let context = try XCTUnwrap(RuntimeHistoryWorkspaceContext(job: job, detail: detail))
-    XCTAssertEqual(context.jobID, job.id)
-    XCTAssertEqual(context.operationReference, job.operationReference)
-    XCTAssertEqual(context.targetID, "TGT-1")
-    XCTAssertEqual(context.bindingRevision, 7)
-    XCTAssertEqual(context.executionMode, "execute")
-    XCTAssertEqual(context.sessionID, "session-viewer")
-    XCTAssertEqual(context.threadID, "thread-viewer")
-    XCTAssertEqual(context.parameters.map(\.name), ["uiComponentTree"])
+    let context = try #require(RuntimeHistoryWorkspaceContext(job: job, detail: detail))
+    #expect(context.jobID == job.id)
+    #expect(context.operationReference == job.operationReference)
+    #expect(context.targetID == "TGT-1")
+    #expect(context.bindingRevision == 7)
+    #expect(context.executionMode == "execute")
+    #expect(context.sessionID == "session-viewer")
+    #expect(context.threadID == "thread-viewer")
+    #expect(context.parameters.map(\.name) == ["uiComponentTree"])
 
     let anotherJob = RuntimeJobSummaryPresentation(
       id: "job-other", operationReference: job.operationReference,
       targetID: job.targetID, state: job.state, waitingForHuman: false,
       outcomeUnknown: false, outstandingResidueCount: 0, timeline: [],
       workspaceKind: .viewer)
-    XCTAssertNil(RuntimeHistoryWorkspaceContext(job: anotherJob, detail: detail))
+    #expect(RuntimeHistoryWorkspaceContext(job: anotherJob, detail: detail) == nil)
 
     let legacyShared = RuntimeJobSummaryPresentation(
       id: job.id, operationReference: job.operationReference,
       targetID: job.targetID, state: job.state, waitingForHuman: false,
       outcomeUnknown: false, outstandingResidueCount: 0, timeline: [])
-    let legacyContext = try XCTUnwrap(
+    let legacyContext = try #require(
       RuntimeHistoryWorkspaceContext(job: legacyShared, detail: detail))
-    XCTAssertEqual(legacyContext.workspaceKind, .viewer)
+    #expect(legacyContext.workspaceKind == .viewer)
 
     let ambiguousDetail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: job.id,
@@ -517,12 +519,12 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "parameters": ["captureHilog": true, "uiScreenshot": true],
       ]),
       artifactResponse: .success(try currentArtifactPageResponse([])))
-    XCTAssertNil(
-      RuntimeHistoryWorkspaceContext(job: legacyShared, detail: ambiguousDetail),
+    #expect(
+      RuntimeHistoryWorkspaceContext(job: legacyShared, detail: ambiguousDetail) == nil,
       "legacy diagnostics and Debug requests remain unknown without client provenance")
   }
 
-  func testPagedSummaryPreservesRuntimeCurrentRowsWithoutInventingACompactTimeline() throws {
+  @Test func pagedSummaryPreservesRuntimeCurrentRowsWithoutInventingACompactTimeline() throws {
     let cursor = "11111111-1111-4111-8111-111111111111.41"
     let data = try currentJobPageResponse([
       ["jobId": "job-old-current", "operation": "flash.dayu200@1", "targetId": "TGT-1",
@@ -531,21 +533,21 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
        "state": "succeeded", "current": false, "timeline": NSNull()],
     ], cursor: cursor)
     switch RuntimeHistoryResponseDecoding.page(from: data) {
-    case .unavailable(let reason): XCTFail("complete page must decode: \(reason)")
+    case .unavailable(let reason): Issue.record("complete page must decode: \(reason)")
     case .available(let jobs, let nextCursor):
-      XCTAssertEqual(jobs.map(\.id), ["job-old-current", "job-newest"])
-      XCTAssertEqual(jobs.map(\.timeline), [[], []])
-      XCTAssertTrue(jobs[0].requiresRecoveryGuidance)
-      XCTAssertEqual(nextCursor, cursor)
+      #expect(jobs.map(\.id) == ["job-old-current", "job-newest"])
+      #expect(jobs.map(\.timeline) == [[], []])
+      #expect(jobs[0].requiresRecoveryGuidance)
+      #expect(nextCursor == cursor)
     }
   }
 
   // The load-bearing distinction: a daemon that answered "no jobs" and a
   // daemon that could not be read must never produce the same presentation.
-  func testAnEmptyHistoryIsNotTheSameAsAnUnreadableOne() {
+  @Test func anEmptyHistoryIsNotTheSameAsAnUnreadableOne() {
     let empty = RuntimeHistoryResponseDecoding.presentation(from: try! currentJobPageResponse([]))
-    XCTAssertEqual(empty.availability, .available)
-    XCTAssertTrue(empty.jobs.isEmpty)
+    #expect(empty.availability == .available)
+    #expect(empty.jobs.isEmpty)
 
     for unreadable in [
       "",
@@ -557,10 +559,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       #"{"ok":true,"id":"x","result":"nope"}"#,
     ] {
       let presentation = decode(unreadable)
-      XCTAssertNotEqual(
-        presentation.availability, .available,
+      #expect(
+        presentation.availability != .available,
         "an unreadable answer must never present as available history: \(unreadable)")
-      XCTAssertTrue(
+      #expect(
         presentation.jobs.isEmpty,
         "an unavailable history must carry no jobs: \(unreadable)")
     }
@@ -568,15 +570,15 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
 
   // A daemon error is surfaced with its own code and message rather than
   // flattened into a generic failure the user cannot act on.
-  func testADaemonErrorKeepsItsCodeAndMessage() {
+  @Test func aDaemonErrorKeepsItsCodeAndMessage() {
     let presentation = decode(
       #"{"ok":false,"id":"x","error":{"code":"malformedFrame","message":"undecodable request frame"}}"#
     )
     let reason = reason(presentation)
-    XCTAssertNotNil(reason)
-    XCTAssertTrue(
+    #expect(reason != nil)
+    #expect(
       reason?.contains("malformedFrame") == true, "the code must survive: \(reason ?? "")")
-    XCTAssertTrue(
+    #expect(
       reason?.contains("undecodable request frame") == true,
       "the daemon's own message must survive: \(reason ?? "")")
   }
@@ -584,7 +586,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   // A job missing an identifying fact fails the whole read rather than being
   // silently dropped: a history that quietly omits rows is worse than one
   // that says it could not be read.
-  func testAJobMissingAnIdentifyingFactFailsTheWholeRead() {
+  @Test func aJobMissingAnIdentifyingFactFailsTheWholeRead() {
     for missing in ["jobId", "operation", "targetId", "state"] {
       var entry: [String: Any] = [
         "jobId": "job-1", "operation": "observe.devices@1", "targetId": "t-1",
@@ -595,15 +597,15 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         withJSONObject: ["ok": true, "id": "x", "result": [entry]])
       let presentation = RuntimeHistoryResponseDecoding.presentation(from: data ?? Data())
 
-      XCTAssertNotEqual(
-        presentation.availability, .available,
+      #expect(
+        presentation.availability != .available,
         "a job without \(missing) must not yield an available history")
-      XCTAssertTrue(presentation.jobs.isEmpty, "no partial row may survive a missing \(missing)")
+      #expect(presentation.jobs.isEmpty, "no partial row may survive a missing \(missing)")
     }
   }
 
   // An unknown outcome and a waiting job are never presentable as settled.
-  func testUnknownOutcomeAndHumanWaitBothRaiseNeedsAttention() {
+  @Test func unknownOutcomeAndHumanWaitBothRaiseNeedsAttention() {
     let presentation = decode(
       """
       {
@@ -673,13 +675,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
 
-    XCTAssertEqual(presentation.availability, .available)
-    XCTAssertEqual(presentation.jobs.map(\.needsAttention), [true, true, false])
-    XCTAssertEqual(presentation.jobs.map(\.requiresRecoveryGuidance), [true, true, false])
-    XCTAssertEqual(presentation.jobs.first?.outstandingResidueCount, 2)
+    #expect(presentation.availability == .available)
+    #expect(presentation.jobs.map(\.needsAttention) == [true, true, false])
+    #expect(presentation.jobs.map(\.requiresRecoveryGuidance) == [true, true, false])
+    #expect(presentation.jobs.first?.outstandingResidueCount == 2)
   }
 
-  func testRecoveryStatesRaiseGuidanceUntilRuntimeEstablishesTheCurrentEpoch() {
+  @Test func recoveryStatesRaiseGuidanceUntilRuntimeEstablishesTheCurrentEpoch() {
     for state in [
       "waitingForRecovery", "awaitingRebindConfirmation",
       "resumeAtConfirmedSafeBoundary", "userAbandonRequested",
@@ -688,29 +690,29 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         id: "job-\(state)", operationReference: "flash.dayu200", targetID: "t-1",
         state: state, waitingForHuman: false, outcomeUnknown: false,
         outstandingResidueCount: 0, timeline: [])
-      XCTAssertTrue(job.requiresRecoveryGuidance, state)
+      #expect(job.requiresRecoveryGuidance, "\(state)")
     }
 
     let running = RuntimeJobSummaryPresentation(
       id: "job-running", operationReference: "flash.dayu200", targetID: "t-1",
       state: "running", waitingForHuman: false, outcomeUnknown: false,
       outstandingResidueCount: 0, timeline: [])
-    XCTAssertFalse(running.requiresRecoveryGuidance)
-    XCTAssertTrue(running.isCurrentActivity)
+    #expect(!running.requiresRecoveryGuidance)
+    #expect(running.isCurrentActivity)
 
     let resolvedRecovery = RuntimeJobSummaryPresentation(
       id: "job-resolved-recovery", operationReference: "flash.dayu200", targetID: "t-1",
       state: "waitingForRecovery", waitingForHuman: false, outcomeUnknown: true,
       outstandingResidueCount: 0, timeline: ["running", "waitingForRecovery"],
       supersededByRecoveryEpochID: "recovery-epoch-current")
-    XCTAssertTrue(resolvedRecovery.hasEstablishedCurrentEpoch)
-    XCTAssertFalse(resolvedRecovery.requiresRecoveryGuidance)
-    XCTAssertFalse(
-      resolvedRecovery.isCurrentActivity,
+    #expect(resolvedRecovery.hasEstablishedCurrentEpoch)
+    #expect(!resolvedRecovery.requiresRecoveryGuidance)
+    #expect(
+      !resolvedRecovery.isCurrentActivity,
       "historical unknown states remain nonterminal for audit but are not current activity")
   }
 
-  func testTargetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {
+  @Test func targetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {
     let presentation = decode(
       """
       {
@@ -747,21 +749,21 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
 
-    let job = try XCTUnwrap(presentation.jobs.first)
-    XCTAssertTrue(job.outcomeUnknown, "the historical outcome is never rewritten")
-    XCTAssertEqual(
-      job.resolvedByTargetAliasResolutionID,
-      "target-alias-resolution-0123456789abcdef")
-    XCTAssertTrue(job.hasEstablishedCurrentEpoch)
-    XCTAssertFalse(
-      job.needsAttention,
+    let job = try #require(presentation.jobs.first)
+    #expect(job.outcomeUnknown, "the historical outcome is never rewritten")
+    #expect(
+      job.resolvedByTargetAliasResolutionID
+        == "target-alias-resolution-0123456789abcdef")
+    #expect(job.hasEstablishedCurrentEpoch)
+    #expect(
+      !job.needsAttention,
       "a later complete Flash established the current epoch without settling the old outcome")
-    XCTAssertFalse(
-      job.requiresRecoveryGuidance,
+    #expect(
+      !job.requiresRecoveryGuidance,
       "resolved History stays inspectable without remaining a global operator action")
   }
 
-  func testFlashActivityUsesRecencyAfterResolvedUnknownsWithoutRewritingHistory() throws {
+  @Test func flashActivityUsesRecencyAfterResolvedUnknownsWithoutRewritingHistory() throws {
     let presentation = decode(
       """
       {
@@ -851,17 +853,17 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       }
       """)
     let originalJobs = presentation.jobs
-    XCTAssertEqual(presentation.focusedFlashActivity?.id, "latest-flash")
-    XCTAssertEqual(
-      presentation.flashActivityJobs.map(\.id), ["latest-flash", "old-superseded", "old-alias"])
-    XCTAssertEqual(presentation.jobs, originalJobs, "the paged Runtime history remains untouched")
-    XCTAssertTrue(presentation.jobs[0].outcomeUnknown)
-    XCTAssertTrue(presentation.jobs[1].outcomeUnknown)
-    XCTAssertEqual(presentation.jobs[0].state, "waitingForRecovery")
-    XCTAssertEqual(presentation.jobs[1].state, "waitingForRecovery")
+    #expect(presentation.focusedFlashActivity?.id == "latest-flash")
+    #expect(
+      presentation.flashActivityJobs.map(\.id) == ["latest-flash", "old-superseded", "old-alias"])
+    #expect(presentation.jobs == originalJobs, "the paged Runtime history remains untouched")
+    #expect(presentation.jobs[0].outcomeUnknown)
+    #expect(presentation.jobs[1].outcomeUnknown)
+    #expect(presentation.jobs[0].state == "waitingForRecovery")
+    #expect(presentation.jobs[1].state == "waitingForRecovery")
   }
 
-  func testFlashActivityUnresolvedStopsOutrankNewerSuccessAndRunningJobs() {
+  @Test func flashActivityUnresolvedStopsOutrankNewerSuccessAndRunningJobs() {
     func job(_ id: String, state: String, unknown: Bool = false, waiting: Bool = false)
       -> RuntimeJobSummaryPresentation
     {
@@ -882,34 +884,34 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       ([success, running, recovery], "recovery"),
       ([success, running], "running"),
     ] {
-      XCTAssertEqual(
-        RuntimeHistoryPresentation(availability: .available, jobs: jobs).focusedFlashActivity?.id,
-        expected)
+      #expect(
+        RuntimeHistoryPresentation(availability: .available, jobs: jobs).focusedFlashActivity?.id
+          == expected)
     }
   }
 
-  func testFlashActivityMissingDatesAndEqualDatesHaveStableOrder() {
+  @Test func flashActivityMissingDatesAndEqualDatesHaveStableOrder() {
     let jobs = ["b", "a"].map { id in
       RuntimeJobSummaryPresentation(
         id: id, operationReference: "flash.dayu200", targetID: "t-1", state: "planned",
         waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0, timeline: [])
     }
     let missing = RuntimeHistoryPresentation(availability: .available, jobs: jobs)
-    XCTAssertEqual(missing.flashActivityJobs.map(\.id), ["a", "b"])
-    XCTAssertTrue(missing.flashActivityJobs.allSatisfy { $0.activityDate == nil })
+    #expect(missing.flashActivityJobs.map(\.id) == ["a", "b"])
+    #expect(missing.flashActivityJobs.allSatisfy { $0.activityDate == nil })
     let dated = jobs.map { job in
       RuntimeJobSummaryPresentation(
         id: job.id, operationReference: job.operationReference, targetID: job.targetID,
         state: job.state, waitingForHuman: false, outcomeUnknown: false,
         outstandingResidueCount: 0, timeline: [], createdAtUTC: "2026-08-06T08:00:00Z")
     }
-    XCTAssertEqual(
-      RuntimeHistoryPresentation(availability: .available, jobs: dated).flashActivityJobs.map(\.id),
-      ["a", "b"])
-    XCTAssertNil(RuntimeHistoryPresentation(availability: .available, jobs: []).focusedFlashActivity)
+    #expect(
+      RuntimeHistoryPresentation(availability: .available, jobs: dated).flashActivityJobs.map(\.id)
+        == ["a", "b"])
+    #expect(RuntimeHistoryPresentation(availability: .available, jobs: []).focusedFlashActivity == nil)
   }
 
-  func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
+  @Test func completeEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
     let status = RuntimeHistoryTransportResult.success(try currentJobDetailResponse([
       "jobId": "job-1",
       "operation": "observe.device@1",
@@ -961,24 +963,24 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       evidenceResponse: evidence,
       artifactResponse: artifacts)
 
-    XCTAssertEqual(detail.timelineAvailability, .available)
-    XCTAssertEqual(detail.timeline, ["queued", "running", "succeeded"])
-    XCTAssertEqual(detail.evidenceAvailability, .available)
-    XCTAssertEqual(detail.evidence?.providerID, "openharmony-hdc")
-    XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["includeToolFacts", "limit"])
-    XCTAssertEqual(detail.evidence?.parameters.map(\.value), ["true", "2"])
-    XCTAssertTrue(detail.evidence?.parametersWereReported == true)
-    XCTAssertEqual(detail.evidence?.typedParameters, ["includeToolFacts": .bool(true), "limit": .integer(2)])
-    XCTAssertEqual(detail.evidence?.observedBindingRevision, 8)
-    XCTAssertEqual(detail.artifactAvailability, .available)
-    XCTAssertEqual(detail.artifacts.count, 1)
-    XCTAssertEqual(detail.artifacts.first?.role, "raw")
-    XCTAssertEqual(detail.artifacts.first?.byteCount, 128)
-    XCTAssertEqual(detail.correlationAvailability, .available)
-    XCTAssertEqual(detail.correlation?.jobID, "job-1")
-    XCTAssertEqual(detail.correlation?.sessionID, "session-job-1")
-    XCTAssertEqual(detail.correlation?.targetID, "target-dayu200-a")
-    XCTAssertEqual(detail.correlation?.artifacts.map(\.id), ["artifact-1"])
+    #expect(detail.timelineAvailability == .available)
+    #expect(detail.timeline == ["queued", "running", "succeeded"])
+    #expect(detail.evidenceAvailability == .available)
+    #expect(detail.evidence?.providerID == "openharmony-hdc")
+    #expect(detail.evidence?.parameters.map(\.name) == ["includeToolFacts", "limit"])
+    #expect(detail.evidence?.parameters.map(\.value) == ["true", "2"])
+    #expect(detail.evidence?.parametersWereReported == true)
+    #expect(detail.evidence?.typedParameters == ["includeToolFacts": .bool(true), "limit": .integer(2)])
+    #expect(detail.evidence?.observedBindingRevision == 8)
+    #expect(detail.artifactAvailability == .available)
+    #expect(detail.artifacts.count == 1)
+    #expect(detail.artifacts.first?.role == "raw")
+    #expect(detail.artifacts.first?.byteCount == 128)
+    #expect(detail.correlationAvailability == .available)
+    #expect(detail.correlation?.jobID == "job-1")
+    #expect(detail.correlation?.sessionID == "session-job-1")
+    #expect(detail.correlation?.targetID == "target-dayu200-a")
+    #expect(detail.correlation?.artifacts.map(\.id) == ["artifact-1"])
   }
 
   /// Two separate things used to be reported as one: an envelope for a
@@ -987,7 +989,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   /// which sent an operator looking for an identity problem that was not
   /// there — measured on the 2026-09-07 GJ-4 window, where the missing fact
   /// was the whole story.
-  func testMissingPublishedFactsAreNotReportedAsAJobIdentityMismatch() throws {
+  @Test func missingPublishedFactsAreNotReportedAsAJobIdentityMismatch() throws {
     func detail(_ evidence: [String: Any]) throws -> RuntimeJobDetailPresentation {
       RuntimeJobDetailResponseDecoding.presentation(
         jobID: "job-1", operationReference: "flash.full-restore@1",
@@ -1013,32 +1015,32 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     // The Runtime could not prove the steps. That is a readable answer, and
     // an empty list is not the same claim as "unknown".
     let unknownSteps = try detail(complete)
-    XCTAssertEqual(unknownSteps.evidenceAvailability, .available)
-    XCTAssertEqual(unknownSteps.evidence?.actualStepKinds, [])
-    XCTAssertEqual(unknownSteps.evidence?.actualStepKindsWereReported, false)
-    XCTAssertEqual(unknownSteps.evidence?.providerID, "arkforge")
+    #expect(unknownSteps.evidenceAvailability == .available)
+    #expect(unknownSteps.evidence?.actualStepKinds == [])
+    #expect(unknownSteps.evidence?.actualStepKindsWereReported == false)
+    #expect(unknownSteps.evidence?.providerID == "arkforge")
 
     complete["actualStepKinds"] = ["flashPartition"]
     let reportedSteps = try detail(complete)
-    XCTAssertEqual(reportedSteps.evidence?.actualStepKinds, ["flashPartition"])
-    XCTAssertEqual(reportedSteps.evidence?.actualStepKindsWereReported, true)
+    #expect(reportedSteps.evidence?.actualStepKinds == ["flashPartition"])
+    #expect(reportedSteps.evidence?.actualStepKindsWereReported == true)
 
     var missingProvider = complete
     missingProvider["providerId"] = NSNull()
     guard case .unavailable(let missingReason) = try detail(missingProvider).evidenceAvailability
-    else { return XCTFail("an unpublishable fact must not read as available evidence") }
-    XCTAssertTrue(missingReason.contains("missing facts"), missingReason)
-    XCTAssertFalse(missingReason.contains("did not match"), missingReason)
+    else { Issue.record("an unpublishable fact must not read as available evidence"); return }
+    #expect(missingReason.contains("missing facts"), "\(missingReason)")
+    #expect(!missingReason.contains("did not match"), "\(missingReason)")
 
     // Negative control: a genuine identity mismatch still says so.
     var foreign = complete
     foreign["jobId"] = "job-somebody-else"
     guard case .unavailable(let foreignReason) = try detail(foreign).evidenceAvailability
-    else { return XCTFail("evidence for another Job must not be shown for this one") }
-    XCTAssertTrue(foreignReason.contains("did not match"), foreignReason)
+    else { Issue.record("evidence for another Job must not be shown for this one"); return }
+    #expect(foreignReason.contains("did not match"), "\(foreignReason)")
   }
 
-  func testCorrelationFailsIndependentlyWhenAnOlderStatusHasNoSessionIdentity() throws {
+  @Test func correlationFailsIndependentlyWhenAnOlderStatusHasNoSessionIdentity() throws {
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-old",
       operationReference: "observe.device@1",
@@ -1049,17 +1051,18 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       evidenceResponse: .failure("not relevant"),
       artifactResponse: .success(try currentArtifactPageResponse([])))
 
-    XCTAssertEqual(detail.timelineAvailability, .available)
-    XCTAssertEqual(detail.timeline, ["succeeded"])
-    XCTAssertEqual(detail.artifactAvailability, .available)
+    #expect(detail.timelineAvailability == .available)
+    #expect(detail.timeline == ["succeeded"])
+    #expect(detail.artifactAvailability == .available)
     guard case .unavailable(let reason) = detail.correlationAvailability else {
-      return XCTFail("missing Session identity must not create a correlation")
+      Issue.record("missing Session identity must not create a correlation")
+      return
     }
-    XCTAssertTrue(reason.contains("Session identity"))
-    XCTAssertNil(detail.correlation)
+    #expect(reason.contains("Session identity"))
+    #expect(detail.correlation == nil)
   }
 
-  func testTraceBeforeAndAfterFactsReachHistoryWithoutClaimingRestore() throws {
+  @Test func traceBeforeAndAfterFactsReachHistoryWithoutClaimingRestore() throws {
     let names = RuntimeTraceParameterName.allCases.map(\.rawValue)
     let before = names.enumerated().map { index, name -> [String: Any] in
       switch index {
@@ -1107,19 +1110,19 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       evidenceResponse: evidence,
       artifactResponse: .success(try currentArtifactPageResponse([])))
 
-    let parameters = try XCTUnwrap(detail.evidence?.traceParameters)
-    XCTAssertEqual(parameters.map(\.name), names)
-    XCTAssertEqual(parameters[0].beforeValue, "false")
-    XCTAssertEqual(parameters[0].afterValue, "false")
-    XCTAssertEqual(parameters[0].comparison, .unchanged)
-    XCTAssertEqual(parameters[1].beforeState, "missing")
-    XCTAssertEqual(parameters[1].afterValue, "true")
-    XCTAssertEqual(parameters[1].comparison, .changed)
-    XCTAssertEqual(parameters[2].comparison, .unverified)
-    XCTAssertEqual(detail.evidence?.parameters.map(\.name), ["durationSeconds", "traceCategories"])
+    let parameters = try #require(detail.evidence?.traceParameters)
+    #expect(parameters.map(\.name) == names)
+    #expect(parameters[0].beforeValue == "false")
+    #expect(parameters[0].afterValue == "false")
+    #expect(parameters[0].comparison == .unchanged)
+    #expect(parameters[1].beforeState == "missing")
+    #expect(parameters[1].afterValue == "true")
+    #expect(parameters[1].comparison == .changed)
+    #expect(parameters[2].comparison == .unverified)
+    #expect(detail.evidence?.parameters.map(\.name) == ["durationSeconds", "traceCategories"])
   }
 
-  func testHistoryRendersTraceDiffBeforeTypedInputsWithExplicitComparisonCopy() throws {
+  @Test func historyRendersTraceDiffBeforeTypedInputsWithExplicitComparisonCopy() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
@@ -1130,13 +1133,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeckApp/Resources/HistoryLocalizable.xcstrings"),
       encoding: .utf8)
 
-    let traceBranch = try XCTUnwrap(view.range(of: "if !evidence.traceParameters.isEmpty"))
-    let typedInputs = try XCTUnwrap(view.range(of: "history.parameters.typedInputs"))
-    XCTAssertLessThan(traceBranch.lowerBound, typedInputs.lowerBound)
-    XCTAssertTrue(view.contains("traceParameterTable(evidence.traceParameters)"))
-    XCTAssertTrue(view.contains("Table(parameters)"))
-    XCTAssertTrue(view.contains("parameter.comparison"))
-    XCTAssertTrue(view.contains("typedParameterGrid(evidence.parameters)"))
+    let traceBranch = try #require(view.range(of: "if !evidence.traceParameters.isEmpty"))
+    let typedInputs = try #require(view.range(of: "history.parameters.typedInputs"))
+    #expect(traceBranch.lowerBound < typedInputs.lowerBound)
+    #expect(view.contains("traceParameterTable(evidence.traceParameters)"))
+    #expect(view.contains("Table(parameters)"))
+    #expect(view.contains("parameter.comparison"))
+    #expect(view.contains("typedParameterGrid(evidence.parameters)"))
     for key in [
       "history.parameters.column.before",
       "history.parameters.column.after",
@@ -1145,14 +1148,14 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "history.parameters.comparison.changed",
       "history.parameters.comparison.unverified",
     ] {
-      XCTAssertTrue(localization.contains("\"\(key)\""), "missing localized key \(key)")
+      #expect(localization.contains("\"\(key)\""), "missing localized key \(key)")
     }
-    XCTAssertFalse(
-      localization.contains("history.parameters.comparison.restored"),
+    #expect(
+      !localization.contains("history.parameters.comparison.restored"),
       "equal readbacks must not be promoted into a restore claim")
   }
 
-  func testEvidenceForAnotherJobOrOperationIsUnavailable() throws {
+  @Test func evidenceForAnotherJobOrOperationIsUnavailable() throws {
     let evidence = try response([
       "jobId": "job-other",
       "operationReference": "observe.device@1",
@@ -1169,13 +1172,14 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       artifactResponse: .success(try currentArtifactPageResponse([])))
 
     guard case .unavailable(let reason) = detail.evidenceAvailability else {
-      return XCTFail("mismatched evidence must not become available")
+      Issue.record("mismatched evidence must not become available")
+      return
     }
-    XCTAssertTrue(reason.contains("did not match"))
-    XCTAssertNil(detail.evidence)
+    #expect(reason.contains("did not match"))
+    #expect(detail.evidence == nil)
   }
 
-  func testOneMalformedArtifactFailsTheSectionWithoutPartialRows() throws {
+  @Test func oneMalformedArtifactFailsTheSectionWithoutPartialRows() throws {
     let artifacts = RuntimeHistoryTransportResult.success(try currentArtifactPageResponse([
       [
         "artifactId": "artifact-complete",
@@ -1200,16 +1204,17 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       artifactResponse: artifacts)
 
     guard case .unavailable(let reason) = detail.artifactAvailability else {
-      return XCTFail("incomplete metadata must fail the complete Artifact section")
+      Issue.record("incomplete metadata must fail the complete Artifact section")
+      return
     }
-    XCTAssertTrue(reason.contains("incomplete"))
-    XCTAssertTrue(detail.artifacts.isEmpty, "no partial Artifact row may survive")
+    #expect(reason.contains("incomplete"))
+    #expect(detail.artifacts.isEmpty, "no partial Artifact row may survive")
   }
 
   // The App-facing surface has only bounded reads. If a mutating method is
   // ever added here it stops being a surface the sandboxed GUI may hold, so
   // the absence is pinned rather than assumed.
-  func testTheApplicationSurfaceExposesNoMutation() throws {
+  @Test func theApplicationSurfaceExposesNoMutation() throws {
     let source = try String(
       contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
@@ -1218,28 +1223,28 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
           path: "Sources/ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift"),
       encoding: .utf8)
 
-    let protocolBody = try XCTUnwrap(
+    let protocolBody = try #require(
       source.range(of: "public protocol RuntimeHistoryApplicationProviding: Sendable {")
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
-    XCTAssertEqual(
-      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 2,
+    #expect(
+      protocolBody.split(separator: "\n").filter { $0.contains("func ") }.count == 2,
       "the App-facing Runtime surface must expose only paged summary reads")
-    XCTAssertTrue(protocolBody.contains("func refreshHistory()"))
-    XCTAssertTrue(protocolBody.contains("func loadOlderHistory()"))
+    #expect(protocolBody.contains("func refreshHistory()"))
+    #expect(protocolBody.contains("func loadOlderHistory()"))
 
-    let detailProtocolBody = try XCTUnwrap(
+    let detailProtocolBody = try #require(
       source.range(of: "public protocol RuntimeJobDetailApplicationProviding: Sendable {")
         .map { source[$0.upperBound...] }
         .flatMap { rest in rest.range(of: "}").map { String(rest[..<$0.lowerBound]) } })
-    XCTAssertEqual(
-      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count, 3,
+    #expect(
+      detailProtocolBody.split(separator: "\n").filter { $0.contains("func ") }.count == 3,
       "the detail surface exposes only detail, bounded local preview and bounded export")
-    XCTAssertTrue(detailProtocolBody.contains("func loadJobDetail("))
-    XCTAssertTrue(detailProtocolBody.contains("func exportArtifact("))
-    XCTAssertTrue(detailProtocolBody.contains("func readArtifact("))
-    XCTAssertTrue(detailProtocolBody.contains("maximumBytes: Int"))
-    XCTAssertTrue(detailProtocolBody.contains("allowSensitive: Bool"))
+    #expect(detailProtocolBody.contains("func loadJobDetail("))
+    #expect(detailProtocolBody.contains("func exportArtifact("))
+    #expect(detailProtocolBody.contains("func readArtifact("))
+    #expect(detailProtocolBody.contains("maximumBytes: Int"))
+    #expect(detailProtocolBody.contains("allowSensitive: Bool"))
 
     // Only the read-only method may be named anywhere in this file: a
     // mutating method name appearing here would mean the App can compose a
@@ -1248,21 +1253,21 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "job.submit", "job.run", "job.cancel", "job.reconcile", "job.plan",
       "target.adopt", "artifact.import", "artifact.export",
     ] {
-      XCTAssertFalse(
-        source.contains("\"\(mutating)"),
+      #expect(
+        !source.contains("\"\(mutating)"),
         "the App-facing facade must not be able to name \(mutating)")
     }
-    XCTAssertTrue(source.contains("method: \"job.list\""))
-    XCTAssertTrue(source.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
-    XCTAssertTrue(source.contains("\"includeTimeline\": .bool(false)"))
-    XCTAssertTrue(source.contains("\"includeCurrent\": .bool(true)"))
-    XCTAssertTrue(source.contains("RuntimeAppReadResources.jobDetail("))
-    XCTAssertTrue(source.contains("request(\"job.evidence\""))
-    XCTAssertTrue(source.contains("RuntimeAppReadResources.artifactInventory("))
-    XCTAssertTrue(source.contains("method: \"artifact.read\""))
+    #expect(source.contains("method: \"job.list\""))
+    #expect(source.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
+    #expect(source.contains("\"includeTimeline\": .bool(false)"))
+    #expect(source.contains("\"includeCurrent\": .bool(true)"))
+    #expect(source.contains("RuntimeAppReadResources.jobDetail("))
+    #expect(source.contains("request(\"job.evidence\""))
+    #expect(source.contains("RuntimeAppReadResources.artifactInventory("))
+    #expect(source.contains("method: \"artifact.read\""))
   }
 
-  func testEveryAppWorkspaceUsesTheBoundedRecentSummaryPolicy() throws {
+  @Test func everyAppWorkspaceUsesTheBoundedRecentSummaryPolicy() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let clientKit = repository.appending(path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit")
@@ -1271,7 +1276,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "UIDumpApplicationFacade.swift",
     ] {
       let source = try String(contentsOf: clientKit.appending(path: file), encoding: .utf8)
-      XCTAssertTrue(
+      #expect(
         source.contains("params: RuntimeAppReadResources.recentSummaryParams"),
         "\(file) must not restore an unbounded startup history read")
     }
@@ -1279,18 +1284,18 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/DeviceListApplicationFacade.swift"),
       encoding: .utf8)
-    XCTAssertFalse(
-      deviceList.contains("method: \"job.list"),
+    #expect(
+      !deviceList.contains("method: \"job.list"),
       "device startup must use the daemon's compact projection, not read job history")
     let policy = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/RuntimeAppReadResources.swift"),
       encoding: .utf8)
-    XCTAssertTrue(policy.contains("\"pageSize\": .integer(250)"))
-    XCTAssertTrue(policy.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
-    XCTAssertTrue(policy.contains("\"includeTimeline\": .bool(false)"))
+    #expect(policy.contains("\"pageSize\": .integer(250)"))
+    #expect(policy.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
+    #expect(policy.contains("\"includeTimeline\": .bool(false)"))
   }
 
-  func testHistoryLoadsFullTimelineOnlyWithSelectedDetail() throws {
+  @Test func historyLoadsFullTimelineOnlyWithSelectedDetail() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
@@ -1301,15 +1306,15 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeckApp/Resources/HistoryLocalizable.xcstrings"),
       encoding: .utf8)
 
-    XCTAssertTrue(view.contains("detail.timelineAvailability"))
-    XCTAssertTrue(view.contains("timelineEntries(detail.timeline, job: job)"))
-    XCTAssertTrue(view.contains("presentation.hasOlderJobs"))
-    XCTAssertTrue(view.contains("history.loadOlder"))
-    XCTAssertTrue(view.contains("job.activityDate"))
-    XCTAssertTrue(localization.contains("\"history.action.loadOlder\""))
+    #expect(view.contains("detail.timelineAvailability"))
+    #expect(view.contains("timelineEntries(detail.timeline, job: job)"))
+    #expect(view.contains("presentation.hasOlderJobs"))
+    #expect(view.contains("history.loadOlder"))
+    #expect(view.contains("job.activityDate"))
+    #expect(localization.contains("\"history.action.loadOlder\""))
   }
 
-  func testHistoryActivityCenterClosesFilterCacheAndContextRegressions() throws {
+  @Test func historyActivityCenterClosesFilterCacheAndContextRegressions() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
@@ -1328,82 +1333,84 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "history.filter.session",
       "history.filter.device", "history.filter.time",
     ] {
-      XCTAssertTrue(view.contains(".accessibilityIdentifier(\"\(identifier)\")"))
+      #expect(view.contains(".accessibilityIdentifier(\"\(identifier)\")"))
     }
-    XCTAssertEqual(
+    #expect(
       view.components(separatedBy: ".accessibilityIdentifier(\"history.filter.search\")").count
-        - 1,
-      1,
+        - 1
+        == 1,
       "wide and compact layouts must share one search field rather than duplicate state")
-    XCTAssertTrue(view.contains("filterSidebar"))
-    XCTAssertTrue(view.contains("compactFilters"))
-    XCTAssertTrue(view.contains("filterPickers"))
-    XCTAssertTrue(view.contains(".contentShape(.rect)"))
+    #expect(view.contains("filterSidebar"))
+    #expect(view.contains("compactFilters"))
+    #expect(view.contains("filterPickers"))
+    #expect(view.contains(".contentShape(.rect)"))
 
-    XCTAssertFalse(
-      view.contains("@AppStorage"),
+    #expect(
+      !view.contains("@AppStorage"),
       "History saved filters must be owned by Runtime rather than the App container")
-    XCTAssertTrue(view.contains("RuntimeHistoryFilterQuery("))
-    XCTAssertTrue(view.contains("onSaveFilter?(currentFilterQuery)"))
-    XCTAssertTrue(view.contains("history.filter.reloadSaved"))
-    XCTAssertTrue(
+    #expect(view.contains("RuntimeHistoryFilterQuery("))
+    #expect(view.contains("onSaveFilter?(currentFilterQuery)"))
+    #expect(view.contains("history.filter.reloadSaved"))
+    #expect(
       view.contains("let generation = savedFilterGeneration"),
       "a mutation must carry the generation the view last read from the owner")
-    XCTAssertTrue(view.contains("expectedGeneration: generation"))
-    XCTAssertTrue(view.contains("savedFilterGeneration = resource.generation"))
-    XCTAssertGreaterThanOrEqual(
-      view.components(separatedBy: "self.savedFilterRequestID == requestID").count - 1,
-      3,
+    #expect(view.contains("expectedGeneration: generation"))
+    #expect(view.contains("savedFilterGeneration = resource.generation"))
+    #expect(
+      view.components(separatedBy: "self.savedFilterRequestID == requestID").count - 1
+        >= 3,
       "the load and both mutation legs must reject superseded replies")
-    XCTAssertFalse(
-      view.contains("UserDefaults"),
-      "the saved filter has one owner: reading it from this process's preferences is the "
-        + "shape that let an old App-local value republish itself into the Runtime")
-    XCTAssertFalse(
-      view.contains("history.savedFilter"),
+    #expect(
+      !view.contains("UserDefaults"),
+      """
+      the saved filter has one owner: reading it from this process's preferences is the \
+      shape that let an old App-local value republish itself into the Runtime
+      """)
+    #expect(
+      !view.contains("history.savedFilter"),
       "the retired App-local filter keys must not be read, written or removed here")
-    XCTAssertTrue(
+    #expect(
       view.contains("HistoryActivityFilter(rawValue: savedFilterQuery.activity) ?? .all"),
       "Runtime filters must restore normally and unknown values must fail to all")
 
-    XCTAssertTrue(view.contains("detailGeneration &+= 1"))
-    XCTAssertTrue(view.contains("self.detailsByJobID = [:]"))
-    XCTAssertTrue(view.contains("func reloadDetail(jobID:"))
-    XCTAssertTrue(
+    #expect(view.contains("detailGeneration &+= 1"))
+    #expect(view.contains("self.detailsByJobID = [:]"))
+    #expect(view.contains("func reloadDetail(jobID:"))
+    #expect(
       view.contains(".onChange(of: isRefreshInFlight)"),
       "refresh must restart an invalidated detail even when the cache was already empty")
-    XCTAssertTrue(view.contains("self.detailGeneration == generation"))
-    XCTAssertTrue(view.contains("self.detailRequestIDs[jobID] == requestID"))
-    let requestCheck = try XCTUnwrap(view.range(of: "self.detailRequestIDs[jobID] == requestID"))
-    let loadingRemoval = try XCTUnwrap(view.range(of: "self.loadingDetailJobIDs.remove(jobID)"))
-    XCTAssertLessThan(
-      requestCheck.lowerBound, loadingRemoval.lowerBound,
+    #expect(view.contains("self.detailGeneration == generation"))
+    #expect(view.contains("self.detailRequestIDs[jobID] == requestID"))
+    let requestCheck = try #require(view.range(of: "self.detailRequestIDs[jobID] == requestID"))
+    let loadingRemoval = try #require(view.range(of: "self.loadingDetailJobIDs.remove(jobID)"))
+    #expect(
+      requestCheck.lowerBound < loadingRemoval.lowerBound,
       "a superseded read must not clear the newer request's loading state")
-    XCTAssertTrue(view.contains("case .loading:"))
-    XCTAssertTrue(view.contains("history.loading"))
+    #expect(view.contains("case .loading:"))
+    #expect(view.contains("history.loading"))
 
-    let refresh = try XCTUnwrap(view.range(of: "  func refresh() {"))
-    let loadOlder = try XCTUnwrap(view.range(of: "  func loadOlder() {"))
-    let loadDetail = try XCTUnwrap(view.range(of: "  func loadDetail(jobID:"))
+    let refresh = try #require(view.range(of: "  func refresh() {"))
+    let loadOlder = try #require(view.range(of: "  func loadOlder() {"))
+    let loadDetail = try #require(view.range(of: "  func loadDetail(jobID:"))
     let refreshBody = String(view[refresh.lowerBound..<loadOlder.lowerBound])
     let olderBody = String(view[loadOlder.lowerBound..<loadDetail.lowerBound])
-    XCTAssertTrue(refreshBody.contains("historyGeneration &+= 1"))
-    XCTAssertTrue(refreshBody.contains("isLoadOlderInFlight = false"))
-    let generationGuard = try XCTUnwrap(
+    #expect(refreshBody.contains("historyGeneration &+= 1"))
+    #expect(refreshBody.contains("isLoadOlderInFlight = false"))
+    let generationGuard = try #require(
       olderBody.range(of: "self.historyGeneration == generation"))
-    let spinnerReset = try XCTUnwrap(
+    let spinnerReset = try #require(
       olderBody.range(of: "defer { self.isLoadOlderInFlight = false }"))
-    let assignment = try XCTUnwrap(olderBody.range(of: "self.presentation = next"))
-    XCTAssertLessThan(generationGuard.lowerBound, spinnerReset.lowerBound)
-    XCTAssertLessThan(generationGuard.lowerBound, assignment.lowerBound)
+    let assignment = try #require(olderBody.range(of: "self.presentation = next"))
+    #expect(generationGuard.lowerBound < spinnerReset.lowerBound)
+    #expect(generationGuard.lowerBound < assignment.lowerBound)
 
-    XCTAssertTrue(app.contains("RuntimeHistoryWorkspaceContext"))
-    XCTAssertTrue(app.contains("HistoryWorkspaceContextBanner"))
-    XCTAssertTrue(app.contains("openHistoryWorkspace"))
-    XCTAssertTrue(app.contains("openHistoryContext(context)"))
-    XCTAssertTrue(app.contains("historyContext: visibleHistoryContext"))
-    XCTAssertFalse(
-      app.contains("HistoryWorkspaceDestination"),
+    #expect(app.contains("RuntimeHistoryWorkspaceContext"))
+    #expect(app.contains("HistoryWorkspaceContextBanner"))
+    #expect(app.contains("openHistoryWorkspace"))
+    #expect(app.contains("openHistoryContext(context)"))
+    #expect(app.contains("historyContext: visibleHistoryContext"))
+    #expect(
+      !app.contains("HistoryWorkspaceDestination"),
       "History must pass exact record context rather than a destination-only navigation token")
 
     for key in [
@@ -1412,11 +1419,11 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "history.context.title", "history.context.readOnly", "history.detail.reload",
       "history.loading",
     ] {
-      XCTAssertTrue(localization.contains("\"\(key)\""), "missing localized key \(key)")
+      #expect(localization.contains("\"\(key)\""), "missing localized key \(key)")
     }
   }
 
-  func testHistoricalWorkspaceReadsRejectSupersededPresentationResults() throws {
+  @Test func historicalWorkspaceReadsRejectSupersededPresentationResults() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let viewer = try String(
@@ -1428,17 +1435,17 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let trace = try String(
       contentsOf: repository.appending(path: "ArkDeckApp/Features/Trace/TraceWorkspaceView.swift"),
       encoding: .utf8)
-    XCTAssertTrue(viewer.contains("self.captureGeneration == generation"))
-    XCTAssertTrue(viewer.contains("captureGeneration &+= 1"))
-    XCTAssertTrue(viewer.contains("viewer.history.loading"))
-    XCTAssertTrue(device.contains("self.screenGeneration == generation"))
-    XCTAssertTrue(device.contains("adopted.filter { $0.adoptedTargetID == targetID }"))
-    XCTAssertTrue(device.contains("liveness = DeviceFrameLiveness()"))
-    XCTAssertTrue(trace.contains("viewerReadGeneration == generation"))
-    XCTAssertTrue(trace.contains("self.viewerReadGeneration == viewerGenerationAtSubmission"))
+    #expect(viewer.contains("self.captureGeneration == generation"))
+    #expect(viewer.contains("captureGeneration &+= 1"))
+    #expect(viewer.contains("viewer.history.loading"))
+    #expect(device.contains("self.screenGeneration == generation"))
+    #expect(device.contains("adopted.filter { $0.adoptedTargetID == targetID }"))
+    #expect(device.contains("liveness = DeviceFrameLiveness()"))
+    #expect(trace.contains("viewerReadGeneration == generation"))
+    #expect(trace.contains("self.viewerReadGeneration == viewerGenerationAtSubmission"))
   }
 
-  func testDebugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {
+  @Test func debugArtifactRowsUseTheReviewedBoundedExporterInsteadOfAPlaceholderButton() throws {
     var repository = URL(filePath: #filePath)
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let view = try String(
@@ -1448,16 +1455,16 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       contentsOf: repository.appending(path: "ArkDeckApp/Resources/DebugLocalizable.xcstrings"),
       encoding: .utf8)
 
-    XCTAssertTrue(view.contains("runtimeArtifactRows("))
-    XCTAssertTrue(view.contains("model.exportArtifact("))
-    XCTAssertTrue(view.contains(".confirmationDialog("))
-    XCTAssertTrue(view.contains("allowSensitive: row.artifact.privacy == \"sensitive\""))
-    XCTAssertTrue(view.contains("exportStatesByArtifactID"))
-    XCTAssertFalse(
-      view.contains("Button(DebugL10n.text(\"debug.logs.export\")) {}"),
+    #expect(view.contains("runtimeArtifactRows("))
+    #expect(view.contains("model.exportArtifact("))
+    #expect(view.contains(".confirmationDialog("))
+    #expect(view.contains("allowSensitive: row.artifact.privacy == \"sensitive\""))
+    #expect(view.contains("exportStatesByArtifactID"))
+    #expect(
+      !view.contains("Button(DebugL10n.text(\"debug.logs.export\")) {}"),
       "Debug must not regress to a permanently disabled export placeholder")
-    XCTAssertFalse(
-      localization.contains("debug.blocked.artifactExport"),
+    #expect(
+      !localization.contains("debug.blocked.artifactExport"),
       "copy must not claim the reviewed artifact.read channel is unavailable")
   }
 }

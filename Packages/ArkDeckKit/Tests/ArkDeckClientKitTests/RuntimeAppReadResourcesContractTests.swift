@@ -1,10 +1,10 @@
 @testable import ArkDeckClientKit
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class RuntimeAppReadResourcesContractTests: XCTestCase {
+struct RuntimeAppReadResourcesContractTests {
   private let jobID = "job-app-read"
   private let revision = "11111111-1111-4111-8111-111111111111"
 
@@ -55,7 +55,7 @@ final class RuntimeAppReadResourcesContractTests: XCTestCase {
     ])
   }
 
-  func testTimelineFragmentsAcrossPagesKeepExactTextAndReadSelectors() async throws {
+  @Test func timelineFragmentsAcrossPagesKeepExactTextAndReadSelectors() async throws {
     let cursor = revision + ".next"
     let replies = Replies([
       pagedDetail,
@@ -65,17 +65,17 @@ final class RuntimeAppReadResourcesContractTests: XCTestCase {
     let result = try await RuntimeAppReadResources.jobDetail(jobID: jobID) {
       try await replies.send($0, $1)
     }
-    XCTAssertEqual(result, detail(.object([
+    #expect(result == detail(.object([
       "kind": .string("inline"), "entries": .array([.string("中🙂e\u{301}"), .string("")]),
     ])))
     let calls = await replies.calls
-    XCTAssertEqual(calls.map(\.0), ["job.show", "job.timeline", "job.timeline"])
-    XCTAssertEqual(calls[0].1, ["jobId": .string(jobID)])
-    XCTAssertEqual(calls[1].1, ["jobId": .string(jobID), "pageSize": .integer(1000)])
-    XCTAssertEqual(calls[2].1, ["jobId": .string(jobID), "pageSize": .integer(1000), "cursor": .string(cursor)])
+    #expect(calls.map(\.0) == ["job.show", "job.timeline", "job.timeline"])
+    #expect(calls[0].1 == ["jobId": .string(jobID)])
+    #expect(calls[1].1 == ["jobId": .string(jobID), "pageSize": .integer(1000)])
+    #expect(calls[2].1 == ["jobId": .string(jobID), "pageSize": .integer(1000), "cursor": .string(cursor)])
   }
 
-  func testMalformedInlineTimelineAndWrongNestedResourceFailBeforeAnotherRead() async throws {
+  @Test func malformedInlineTimelineAndWrongNestedResourceFailBeforeAnotherRead() async throws {
     let validTimeline = JSONValue.object(["kind": .string("inline"), "entries": .array([])])
     for invalid in [
       detail(validTimeline, schema: "arkdeck.job-summary/1"),
@@ -87,16 +87,16 @@ final class RuntimeAppReadResourcesContractTests: XCTestCase {
       let replies = Replies([invalid])
       do {
         _ = try await RuntimeAppReadResources.jobDetail(jobID: jobID) { try await replies.send($0, $1) }
-        XCTFail("malformed detail must fail")
+        Issue.record("malformed detail must fail")
       } catch let error as AgentExecutionControlFailure {
-        XCTAssertEqual(error.code, "recordUnreadable")
+        #expect(error.code == "recordUnreadable")
       }
       let calls = await replies.calls
-      XCTAssertEqual(calls.map(\.0), ["job.show"])
+      #expect(calls.map(\.0) == ["job.show"])
     }
   }
 
-  func testIncompleteOutOfOrderAndMixedSnapshotPagesNeverReturnPartialTimeline() async throws {
+  @Test func incompleteOutOfOrderAndMixedSnapshotPagesNeverReturnPartialTimeline() async throws {
     let cursor = revision + ".next"
     let first = page([fragment(0, 0, "first", last: false)], cursor: cursor)
     for pages in [
@@ -109,13 +109,13 @@ final class RuntimeAppReadResourcesContractTests: XCTestCase {
       let replies = Replies([pagedDetail] + pages)
       do {
         _ = try await RuntimeAppReadResources.jobDetail(jobID: jobID) { try await replies.send($0, $1) }
-        XCTFail("invalid pages must not produce a partial timeline")
+        Issue.record("invalid pages must not produce a partial timeline")
       } catch let error as AgentExecutionControlFailure {
-        XCTAssertEqual(error.code, "recordUnreadable")
+        #expect(error.code == "recordUnreadable")
       }
       let calls = await replies.calls
-      XCTAssertEqual(calls.count, pages.count + 1)
-      XCTAssertTrue(calls.allSatisfy { ["job.show", "job.timeline"].contains($0.0) })
+      #expect(calls.count == pages.count + 1)
+      #expect(calls.allSatisfy { ["job.show", "job.timeline"].contains($0.0) })
     }
   }
 }

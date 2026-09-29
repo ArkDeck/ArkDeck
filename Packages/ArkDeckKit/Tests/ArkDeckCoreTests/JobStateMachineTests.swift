@@ -1,11 +1,11 @@
 import Foundation
-import XCTest
+import Testing
 
 @testable import ArkDeckCore
 
-final class JobStateMachineTests: XCTestCase {
+struct JobStateMachineTests {
   // TEST-AC-JOB-001-01 / stateMachineProperty
-  func testTEST_AC_JOB_001_01_PlannedIsDistinctFromHardwareSuccess() throws {
+  @Test func TEST_AC_JOB_001_01_PlannedIsDistinctFromHardwareSuccess() throws {
     var machine = JobStateMachine(mode: .planOnly)
 
     try machine.handle(.startPreflight)
@@ -13,57 +13,57 @@ final class JobStateMachineTests: XCTestCase {
     try machine.handle(.workflowCompleted)
     try machine.handle(.finalizationCompleted)
 
-    XCTAssertEqual(machine.state, .planned)
-    XCTAssertNotEqual(machine.state, .succeeded)
+    #expect(machine.state == .planned)
+    #expect(machine.state != .succeeded)
   }
 
   // TEST-AC-JOB-001-02 / stateMachineProperty
-  func testTEST_AC_JOB_001_02_AllTerminalStatesRejectReentryAndNewSteps() throws {
+  @Test func TEST_AC_JOB_001_02_AllTerminalStatesRejectReentryAndNewSteps() throws {
     for terminalMachine in try makeTerminalMachines() {
       var machine = terminalMachine
       let terminalState = machine.state
 
-      XCTAssertNil(machine.activeStep, "\(terminalState.rawValue) retained an active step")
-      XCTAssertThrowsError(try machine.handle(.preflightPassed))
-      XCTAssertEqual(machine.state, terminalState)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .illegalTransition)
+      #expect(machine.activeStep == nil, "\(terminalState.rawValue) retained an active step")
+      #expect(throws: (any Error).self) { try machine.handle(.preflightPassed) }
+      #expect(machine.state == terminalState)
+      #expect(machine.invariantViolations.last?.kind == .illegalTransition)
 
       let step = try makeHostStep(id: "terminal-dispatch")
-      XCTAssertThrowsError(try machine.authorizeDispatch(of: step))
-      XCTAssertEqual(machine.state, terminalState)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .terminalStepDispatch)
+      #expect(throws: (any Error).self) { try machine.authorizeDispatch(of: step) }
+      #expect(machine.state == terminalState)
+      #expect(machine.invariantViolations.last?.kind == .terminalStepDispatch)
     }
   }
 
-  func testTerminalStatesHaveNoDestinationsForEitherMode() {
+  @Test func terminalStatesHaveNoDestinationsForEitherMode() {
     let terminalStates: Set<JobState> = [
       .planned, .succeeded, .recovered, .failed, .cancelled, .interrupted,
     ]
-    XCTAssertEqual(Set(JobState.allCases.filter(\.isTerminal)), terminalStates)
+    #expect(Set(JobState.allCases.filter(\.isTerminal)) == terminalStates)
 
     for mode in JobExecutionMode.allCases {
       for terminalState in terminalStates {
-        XCTAssertTrue(JobStateMachine.allowedDestinations(from: terminalState, mode: mode).isEmpty)
+        #expect(JobStateMachine.allowedDestinations(from: terminalState, mode: mode).isEmpty)
         for candidate in JobState.allCases {
-          XCTAssertFalse(
-            JobStateMachine.isAllowedTransition(from: terminalState, to: candidate, mode: mode)
+          #expect(
+            !JobStateMachine.isAllowedTransition(from: terminalState, to: candidate, mode: mode)
           )
         }
       }
     }
   }
 
-  func testJobStatesVersionTheRecoveryExtensionWithoutMutatingTheLockedJournalContract() throws {
+  @Test func jobStatesVersionTheRecoveryExtensionWithoutMutatingTheLockedJournalContract() throws {
     let contract = try loadContract(named: "journal-event.schema.json")
-    let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
-    let stateDefinition = try XCTUnwrap(definitions["jobState"] as? [String: Any])
-    let contractStates = try XCTUnwrap(stateDefinition["enum"] as? [String])
+    let definitions = try #require(contract["$defs"] as? [String: Any])
+    let stateDefinition = try #require(definitions["jobState"] as? [String: Any])
+    let contractStates = try #require(stateDefinition["enum"] as? [String])
 
-    XCTAssertEqual(JobState.schemaVersion, "1.0.0")
-    XCTAssertEqual(Set(JobState.allCases.map(\.rawValue)), Set(contractStates))
+    #expect(JobState.schemaVersion == "1.0.0")
+    #expect(Set(JobState.allCases.map(\.rawValue)) == Set(contractStates))
   }
 
-  func testCurrentJournalContainsTheCompleteRuntimeTransitionGraph() throws {
+  @Test func currentJournalContainsTheCompleteRuntimeTransitionGraph() throws {
     let contractPairs = try loadContractTransitionPairs()
     let swiftPairs = Set(
       JobExecutionMode.allCases.flatMap { mode in
@@ -74,56 +74,54 @@ final class JobStateMachineTests: XCTestCase {
         }
       })
 
-    XCTAssertEqual(swiftPairs, contractPairs)
+    #expect(swiftPairs == contractPairs)
   }
 
-  func testResumeMarkerDestinationSetsIncludeBothApprovedSafetyExits() {
-    XCTAssertEqual(
+  @Test func resumeMarkerDestinationSetsIncludeBothApprovedSafetyExits() {
+    #expect(
       JobStateMachine.allowedDestinations(
         from: .resumeAtConfirmedSafeBoundary,
         mode: .execute
-      ),
-      [.running, .finalizing, .waitingForRecovery]
+      ) == [.running, .finalizing, .waitingForRecovery]
     )
-    XCTAssertEqual(
+    #expect(
       JobStateMachine.allowedDestinations(
         from: .resumeAtConfirmedSafeBoundary,
         mode: .planOnly
-      ),
-      [.planning, .finalizing, .waitingForRecovery]
+      ) == [.planning, .finalizing, .waitingForRecovery]
     )
   }
 
   // TEST-AC-JOB-001-05 / autonomousCompleteOverwriteRecoveryContract
-  func testTEST_AC_JOB_001_05_CompleteProofUsesDistinctRecoveryAndTerminalState() throws {
+  @Test func TEST_AC_JOB_001_05_CompleteProofUsesDistinctRecoveryAndTerminalState() throws {
     var machine = try makeWaitingForRecoveryMachine()
     try machine.handle(.completeOverwriteRecoveryStarted)
-    XCTAssertEqual(machine.state, .recoveringByCompleteOverwrite)
+    #expect(machine.state == .recoveringByCompleteOverwrite)
 
     try machine.handle(.workflowCompleted)
-    XCTAssertEqual(machine.state, .finalizing)
+    #expect(machine.state == .finalizing)
     try machine.handle(.finalizationCompleted)
-    XCTAssertEqual(machine.state, .recovered)
-    XCTAssertNotEqual(machine.state, .succeeded)
+    #expect(machine.state == .recovered)
+    #expect(machine.state != .succeeded)
   }
 
-  func testPlanOnlyCannotEnterTheCompleteOverwriteRecoveryBranch() throws {
-    XCTAssertFalse(
-      JobStateMachine.isAllowedTransition(
+  @Test func planOnlyCannotEnterTheCompleteOverwriteRecoveryBranch() throws {
+    #expect(
+      !JobStateMachine.isAllowedTransition(
         from: .waitingForRecovery, to: .recoveringByCompleteOverwrite, mode: .planOnly))
-    XCTAssertFalse(
-      JobStateMachine.isAllowedTransition(
+    #expect(
+      !JobStateMachine.isAllowedTransition(
         from: .reconciling, to: .recoveringByCompleteOverwrite, mode: .planOnly))
   }
 
-  func testJournalContractContainsBothApprovedResumeMarkerPairsAndOldReaderRejectsThem() throws {
+  @Test func journalContractContainsBothApprovedResumeMarkerPairsAndOldReaderRejectsThem() throws {
     let contractPairs = try loadContractTransitionPairs()
     let newPairs: Set<StateTransitionPair> = [
       .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
       .init(from: .resumeAtConfirmedSafeBoundary, to: .waitingForRecovery),
     ]
 
-    XCTAssertTrue(newPairs.isSubset(of: contractPairs))
+    #expect(newPairs.isSubset(of: contractPairs))
     for (index, pair) in newPairs.sorted(by: { $0.to.rawValue < $1.to.rawValue }).enumerated() {
       let fixture = JournalStateTransitionFixture(
         schemaVersion: "1.0.0",
@@ -144,81 +142,81 @@ final class JobStateMachineTests: XCTestCase {
         JournalStateTransitionFixture.self,
         from: JSONEncoder().encode(fixture)
       )
-      XCTAssertEqual(decoded, fixture)
-      XCTAssertTrue(
+      #expect(decoded == fixture)
+      #expect(
         contractPairs.contains(.init(from: decoded.payload.from, to: decoded.payload.to))
       )
     }
 
     let oldReaderPairs = contractPairs.subtracting(newPairs)
     for pair in newPairs {
-      XCTAssertFalse(oldReaderPairs.contains(pair))
+      #expect(!oldReaderPairs.contains(pair))
     }
   }
 
-  func testExecutionModesRejectEachOthersExclusiveStates() {
+  @Test func executionModesRejectEachOthersExclusiveStates() {
     let executeExclusiveStates: Set<JobState> = [
       .running, .waitingForDevice, .awaitingRebindConfirmation,
     ]
 
     for from in JobState.allCases {
       let planDestinations = JobStateMachine.allowedDestinations(from: from, mode: .planOnly)
-      XCTAssertTrue(
+      #expect(
         planDestinations.isDisjoint(with: executeExclusiveStates),
         "planOnly accepted execute-only destination from \(from.rawValue)"
       )
-      XCTAssertFalse(
-        JobStateMachine.allowedDestinations(from: from, mode: .execute).contains(.planning),
+      #expect(
+        !JobStateMachine.allowedDestinations(from: from, mode: .execute).contains(.planning),
         "execute accepted planning from \(from.rawValue)"
       )
     }
     for executeOnlyState in executeExclusiveStates {
-      XCTAssertTrue(
+      #expect(
         JobStateMachine.allowedDestinations(from: executeOnlyState, mode: .planOnly).isEmpty
       )
     }
-    XCTAssertTrue(
+    #expect(
       JobStateMachine.allowedDestinations(from: .planning, mode: .execute).isEmpty
     )
   }
 
-  func testNormalResumeConfirmationSelectsOnlyTheModeCorrectExecutionPhase() throws {
+  @Test func normalResumeConfirmationSelectsOnlyTheModeCorrectExecutionPhase() throws {
     for mode in JobExecutionMode.allCases {
       var machine = try makeResumeMarkerMachine(mode: mode)
       let outcome = try machine.handle(.resumeConfirmed)
-      XCTAssertEqual(
-        outcome.transition,
-        .init(
-          from: .resumeAtConfirmedSafeBoundary,
-          to: mode == .execute ? .running : .planning
-        )
+      #expect(
+        outcome.transition
+          == .init(
+            from: .resumeAtConfirmedSafeBoundary,
+            to: mode == .execute ? .running : .planning
+          )
       )
     }
   }
 
-  func testModeExclusiveIllegalEdgeRecordsInvariantViolation() throws {
+  @Test func modeExclusiveIllegalEdgeRecordsInvariantViolation() throws {
     var planOnly = JobStateMachine(mode: .planOnly)
     try planOnly.handle(.startPreflight)
     try planOnly.handle(.preflightPassed)
 
-    XCTAssertThrowsError(try planOnly.handle(.waitForDevice))
-    XCTAssertEqual(planOnly.state, .planning)
-    XCTAssertEqual(planOnly.invariantViolations.last?.kind, .illegalTransition)
-    XCTAssertEqual(planOnly.invariantViolations.last?.attemptedState, .waitingForDevice)
+    #expect(throws: (any Error).self) { try planOnly.handle(.waitForDevice) }
+    #expect(planOnly.state == .planning)
+    #expect(planOnly.invariantViolations.last?.kind == .illegalTransition)
+    #expect(planOnly.invariantViolations.last?.attemptedState == .waitingForDevice)
   }
 
-  func testSuccessFinalizationCannotUseTheConfirmedFailureEdge() throws {
+  @Test func successFinalizationCannotUseTheConfirmedFailureEdge() throws {
     var execute = JobStateMachine(mode: .execute)
     try execute.handle(.startPreflight)
-    XCTAssertThrowsError(try execute.handle(.workflowCompleted))
-    XCTAssertEqual(execute.state, .preflight)
+    #expect(throws: (any Error).self) { try execute.handle(.workflowCompleted) }
+    #expect(execute.state == .preflight)
 
     var planOnly = JobStateMachine(mode: .planOnly)
-    XCTAssertThrowsError(try planOnly.handle(.workflowCompleted))
-    XCTAssertEqual(planOnly.state, .queued)
+    #expect(throws: (any Error).self) { try planOnly.handle(.workflowCompleted) }
+    #expect(planOnly.state == .queued)
   }
 
-  func testFailureCompensationHasASeparateFinalizationLaneAndRetainsOriginalFailure() throws {
+  @Test func failureCompensationHasASeparateFinalizationLaneAndRetainsOriginalFailure() throws {
     let compensation = try CompensationDescriptor(
       id: "compensation-uninstall", kind: .uninstallPackage,
       declaredEffect: .deviceMutation, declaredCancellation: .atSafeBoundary,
@@ -232,32 +230,40 @@ final class JobStateMachineTests: XCTestCase {
         "replacePolicy": .string("allow")], compensationDescriptors: [compensation])
     var machine = try makeFailedFinalizingMachine()
     let original = machine.originalFailure
-    XCTAssertThrowsError(try machine.authorizeDispatch(of: source))
-    XCTAssertThrowsError(try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: false))
+    #expect(throws: (any Error).self) { try machine.authorizeDispatch(of: source) }
+    #expect(throws: (any Error).self) {
+      try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: false)
+    }
     _ = try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true)
-    XCTAssertThrowsError(try machine.handle(.finalizationCompleted))
+    #expect(throws: (any Error).self) { try machine.handle(.finalizationCompleted) }
     try machine.handle(.externalOutcomeOrIdentityUnknown)
-    XCTAssertEqual(machine.state, .waitingForRecovery)
-    XCTAssertEqual(machine.originalFailure, original)
+    #expect(machine.state == .waitingForRecovery)
+    #expect(machine.originalFailure == original)
     try machine.handle(.recoveryRequested)
     let compensationFailure = WorkflowFailure(
       classification: .compensation, code: "stop-failed", summary: "compensation failed")
     try machine.handle(.recoveryEvaluated(.confirmedFailure(compensationFailure)))
-    XCTAssertEqual(machine.state, .finalizing)
-    XCTAssertEqual(machine.originalFailure, original)
+    #expect(machine.state == .finalizing)
+    #expect(machine.originalFailure == original)
     try machine.handle(.finalizationCompleted)
-    XCTAssertEqual(machine.state, .failed)
-    XCTAssertThrowsError(try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true))
+    #expect(machine.state == .failed)
+    #expect(throws: (any Error).self) {
+      try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true)
+    }
     var successfulFinalization = try makeFinalizingMachine(mode: .execute)
-    XCTAssertThrowsError(try successfulFinalization.authorizeCompensation(
-      compensation, declaredBy: source, sourceSucceeded: true))
+    #expect(throws: (any Error).self) {
+      try successfulFinalization.authorizeCompensation(
+        compensation, declaredBy: source, sourceSucceeded: true)
+    }
     var planOnly = try makeFinalizingMachine(mode: .planOnly)
-    XCTAssertThrowsError(try planOnly.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true))
-    XCTAssertFalse(JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .planOnly))
-    XCTAssertTrue(JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .execute))
+    #expect(throws: (any Error).self) {
+      try planOnly.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true)
+    }
+    #expect(!JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .planOnly))
+    #expect(JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .execute))
   }
 
-  func testFinalizationRequiresMatchingFinalizeStepCompletionBeforeTerminal() throws {
+  @Test func finalizationRequiresMatchingFinalizeStepCompletionBeforeTerminal() throws {
     let finalizingMachines: [(machine: JobStateMachine, expectedTerminal: JobState)] = [
       (try makeFinalizingMachine(mode: .execute), .succeeded),
       (try makeFinalizingMachine(mode: .planOnly), .planned),
@@ -269,69 +275,71 @@ final class JobStateMachineTests: XCTestCase {
       let finalizeStep = try makeFinalizeStep(id: "finalize-\(index)")
       _ = try machine.authorizeDispatch(of: finalizeStep)
 
-      XCTAssertThrowsError(try machine.handle(.finalizationCompleted))
-      XCTAssertEqual(machine.state, .finalizing)
-      XCTAssertEqual(machine.activeStep?.id, finalizeStep.id)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .activeStepStillRunning)
+      #expect(throws: (any Error).self) { try machine.handle(.finalizationCompleted) }
+      #expect(machine.state == .finalizing)
+      #expect(machine.activeStep?.id == finalizeStep.id)
+      #expect(machine.invariantViolations.last?.kind == .activeStepStillRunning)
 
-      XCTAssertThrowsError(try machine.completeAuthorizedStep(id: "wrong-finalize-step"))
-      XCTAssertEqual(machine.state, .finalizing)
-      XCTAssertEqual(machine.activeStep?.id, finalizeStep.id)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .activeStepMismatch)
+      #expect(throws: (any Error).self) {
+        try machine.completeAuthorizedStep(id: "wrong-finalize-step")
+      }
+      #expect(machine.state == .finalizing)
+      #expect(machine.activeStep?.id == finalizeStep.id)
+      #expect(machine.invariantViolations.last?.kind == .activeStepMismatch)
 
-      XCTAssertThrowsError(try machine.handle(.finalizationCompleted))
-      XCTAssertEqual(machine.state, .finalizing)
-      XCTAssertEqual(machine.activeStep?.id, finalizeStep.id)
+      #expect(throws: (any Error).self) { try machine.handle(.finalizationCompleted) }
+      #expect(machine.state == .finalizing)
+      #expect(machine.activeStep?.id == finalizeStep.id)
 
       try machine.completeAuthorizedStep(id: finalizeStep.id)
-      XCTAssertNil(machine.activeStep)
+      #expect(machine.activeStep == nil)
       try machine.handle(.finalizationCompleted)
-      XCTAssertEqual(machine.state, candidate.expectedTerminal)
-      XCTAssertNil(machine.activeStep)
+      #expect(machine.state == candidate.expectedTerminal)
+      #expect(machine.activeStep == nil)
     }
   }
 
-  func testNonFinalizeStepIsNotSilentlyClearedToReachATerminalState() throws {
+  @Test func nonFinalizeStepIsNotSilentlyClearedToReachATerminalState() throws {
     var machine = try makeRunningMachine()
     let step = try makeHostStep(id: "running-step")
     _ = try machine.authorizeDispatch(of: step)
 
-    XCTAssertThrowsError(try machine.handle(.workflowCompleted))
-    XCTAssertEqual(machine.state, .running)
-    XCTAssertEqual(machine.activeStep?.id, step.id)
-    XCTAssertEqual(machine.invariantViolations.last?.kind, .activeStepStillRunning)
+    #expect(throws: (any Error).self) { try machine.handle(.workflowCompleted) }
+    #expect(machine.state == .running)
+    #expect(machine.activeStep?.id == step.id)
+    #expect(machine.invariantViolations.last?.kind == .activeStepStillRunning)
   }
 
   // TEST-AC-JOB-001-03 / recoveryFaultInjection
-  func testTEST_AC_JOB_001_03_MissingDestructiveOutcomeStartsWaitingWithoutReplay() throws {
+  @Test func TEST_AC_JOB_001_03_MissingDestructiveOutcomeStartsWaitingWithoutReplay() throws {
     var machine = try JobStateMachine(
       mode: .execute,
       recoveringFrom: .running,
       finding: .missingDestructiveOutcome
     )
 
-    XCTAssertEqual(machine.state, .waitingForRecovery)
-    XCTAssertThrowsError(try machine.handle(.resumeConfirmed))
-    XCTAssertEqual(machine.state, .waitingForRecovery)
+    #expect(machine.state == .waitingForRecovery)
+    #expect(throws: (any Error).self) { try machine.handle(.resumeConfirmed) }
+    #expect(machine.state == .waitingForRecovery)
     do {
       _ = try machine.authorizeDispatch(of: makeFlashStep())
-      XCTFail("outcomeUnknown recovery state authorized destructive dispatch")
+      Issue.record("outcomeUnknown recovery state authorized destructive dispatch")
     } catch {
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .dispatchNotAllowedInState)
+      #expect(machine.invariantViolations.last?.kind == .dispatchNotAllowedInState)
     }
   }
 
-  func testRecoveryStatesRejectNormalWorkflowDispatch() throws {
+  @Test func recoveryStatesRejectNormalWorkflowDispatch() throws {
     let flash = try makeFlashStep()
 
     var waiting = try makeWaitingForRecoveryMachine()
-    XCTAssertThrowsError(try waiting.authorizeDispatch(of: flash))
-    XCTAssertEqual(waiting.invariantViolations.last?.kind, .dispatchNotAllowedInState)
+    #expect(throws: (any Error).self) { try waiting.authorizeDispatch(of: flash) }
+    #expect(waiting.invariantViolations.last?.kind == .dispatchNotAllowedInState)
 
     var reconciling = try makeWaitingForRecoveryMachine()
     try reconciling.handle(.recoveryRequested)
-    XCTAssertThrowsError(try reconciling.authorizeDispatch(of: flash))
-    XCTAssertEqual(reconciling.invariantViolations.last?.kind, .dispatchNotAllowedInState)
+    #expect(throws: (any Error).self) { try reconciling.authorizeDispatch(of: flash) }
+    #expect(reconciling.invariantViolations.last?.kind == .dispatchNotAllowedInState)
 
     var resuming = try makeWaitingForRecoveryMachine()
     try resuming.handle(.recoveryRequested)
@@ -344,13 +352,13 @@ final class JobStateMachineTests: XCTestCase {
             outcomeConfirmed: true,
             bindingConfirmed: true
           ))))
-    XCTAssertEqual(resuming.state, .resumeAtConfirmedSafeBoundary)
-    XCTAssertThrowsError(try resuming.authorizeDispatch(of: flash))
-    XCTAssertEqual(resuming.invariantViolations.last?.kind, .dispatchNotAllowedInState)
+    #expect(resuming.state == .resumeAtConfirmedSafeBoundary)
+    #expect(throws: (any Error).self) { try resuming.authorizeDispatch(of: flash) }
+    #expect(resuming.invariantViolations.last?.kind == .dispatchNotAllowedInState)
   }
 
   // TEST-AC-JOB-001-04 / stateMachineProperty
-  func testTEST_AC_JOB_001_04_ConfirmedPreflightFailureFinalizesAsFailed() throws {
+  @Test func TEST_AC_JOB_001_04_ConfirmedPreflightFailureFinalizesAsFailed() throws {
     var machine = JobStateMachine(mode: .execute)
     let failure = WorkflowFailure(
       classification: .preflight,
@@ -360,15 +368,15 @@ final class JobStateMachineTests: XCTestCase {
 
     try machine.handle(.startPreflight)
     let finalizing = try machine.handle(.confirmedFailure(failure))
-    XCTAssertEqual(finalizing.transition, .init(from: .preflight, to: .finalizing))
-    XCTAssertEqual(machine.originalFailure, failure)
+    #expect(finalizing.transition == .init(from: .preflight, to: .finalizing))
+    #expect(machine.originalFailure == failure)
 
     try machine.handle(.finalizationCompleted)
-    XCTAssertEqual(machine.state, .failed)
-    XCTAssertTrue(machine.state.isTerminal)
+    #expect(machine.state == .failed)
+    #expect(machine.state.isTerminal)
   }
 
-  func testLegacyResumeRecoveryRequiresEveryResumePrecondition() throws {
+  @Test func legacyResumeRecoveryRequiresEveryResumePrecondition() throws {
     let incompleteEvidenceVectors = [
       RecoveryResumeEvidence(
         restartSafe: false, safeBoundaryConfirmed: true, outcomeConfirmed: true,
@@ -388,10 +396,12 @@ final class JobStateMachineTests: XCTestCase {
       try rejectedMachine.handle(.recoveryRequested)
       let rejectedResume = try rejectedMachine.handle(
         .recoveryEvaluated(.resume(incompleteEvidence)))
-      XCTAssertEqual(rejectedMachine.state, .waitingForRecovery)
-      XCTAssertTrue(rejectedResume.directives.contains(.dispatchNoUnknownStep))
-      XCTAssertThrowsError(try rejectedMachine.authorizeDispatch(of: makeFlashStep()))
-      XCTAssertEqual(rejectedMachine.invariantViolations.last?.kind, .dispatchNotAllowedInState)
+      #expect(rejectedMachine.state == .waitingForRecovery)
+      #expect(rejectedResume.directives.contains(.dispatchNoUnknownStep))
+      #expect(throws: (any Error).self) {
+        try rejectedMachine.authorizeDispatch(of: makeFlashStep())
+      }
+      #expect(rejectedMachine.invariantViolations.last?.kind == .dispatchNotAllowedInState)
     }
 
     var machine = try makeWaitingForRecoveryMachine()
@@ -403,13 +413,13 @@ final class JobStateMachineTests: XCTestCase {
       bindingConfirmed: true
     )
     try machine.handle(.recoveryEvaluated(.resume(completeEvidence)))
-    XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
+    #expect(machine.state == .resumeAtConfirmedSafeBoundary)
     try machine.handle(.resumeConfirmed)
-    XCTAssertEqual(machine.state, .running)
+    #expect(machine.state == .running)
   }
 
   // TEST-AC-JOB-001-07 / recoveryDecisionJournalStateMachineContract
-  func testTEST_AC_JOB_001_07_ResumeMarkerUsesBinaryConfirmedOrUnknownDecision() throws {
+  @Test func TEST_AC_JOB_001_07_ResumeMarkerUsesBinaryConfirmedOrUnknownDecision() throws {
     let failure = WorkflowFailure(
       classification: .recovery,
       code: "confirmed-recovery-failure",
@@ -459,42 +469,42 @@ final class JobStateMachineTests: XCTestCase {
             evidence: vector.evidence,
             requestedDestination: vector.expectedDestination
           ))
-        XCTAssertEqual(
-          decision.transition,
-          .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
+        #expect(
+          decision.transition
+            == .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
         )
-        XCTAssertTrue(
+        #expect(
           contractPairs.contains(
             .init(from: .resumeAtConfirmedSafeBoundary, to: vector.expectedDestination)
           )
         )
 
         if vector.expectedDestination == .finalizing {
-          XCTAssertEqual(machine.originalFailure, failure)
+          #expect(machine.originalFailure == failure)
           let terminal = try machine.handle(.finalizationCompleted)
-          XCTAssertEqual(
-            [decision.transition, terminal.transition],
-            [
-              .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
-              .init(from: .finalizing, to: .failed),
-            ]
+          #expect(
+            [decision.transition, terminal.transition]
+              == [
+                .init(from: .resumeAtConfirmedSafeBoundary, to: .finalizing),
+                .init(from: .finalizing, to: .failed),
+              ]
           )
-          XCTAssertEqual(machine.state, .failed)
+          #expect(machine.state == .failed)
         } else {
-          XCTAssertEqual(machine.state, .waitingForRecovery)
-          XCTAssertNil(
-            machine.originalFailure,
+          #expect(machine.state == .waitingForRecovery)
+          #expect(
+            machine.originalFailure == nil,
             "unknown evidence must not become confirmed failure"
           )
-          XCTAssertTrue(decision.directives.contains(.dispatchNoUnknownStep))
-          XCTAssertTrue(decision.directives.contains(.preserveOutcomeUnknown))
+          #expect(decision.directives.contains(.dispatchNoUnknownStep))
+          #expect(decision.directives.contains(.preserveOutcomeUnknown))
         }
 
       }
     }
   }
 
-  func testResumeMarkerSemanticValidatorRejectsMismatchedEvidenceAndPair() throws {
+  @Test func resumeMarkerSemanticValidatorRejectsMismatchedEvidenceAndPair() throws {
     let failure = WorkflowFailure(
       classification: .recovery,
       code: "marker-mismatch",
@@ -540,96 +550,103 @@ final class JobStateMachineTests: XCTestCase {
 
       for (evidence, requestedDestination) in mismatches {
         var machine = try makeResumeMarkerMachine(mode: mode)
-        XCTAssertThrowsError(
+        #expect(throws: (any Error).self) {
           try machine.handle(
             .resumeMarkerEvaluated(
               evidence: evidence,
               requestedDestination: requestedDestination
             ))
-        )
-        XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
-        XCTAssertEqual(machine.invariantViolations.last?.kind, .resumeMarkerEvidenceMismatch)
-        XCTAssertEqual(machine.invariantViolations.last?.attemptedState, requestedDestination)
+        }
+        #expect(machine.state == .resumeAtConfirmedSafeBoundary)
+        #expect(machine.invariantViolations.last?.kind == .resumeMarkerEvidenceMismatch)
+        #expect(machine.invariantViolations.last?.attemptedState == requestedDestination)
       }
 
       var legacyFailureEvent = try makeResumeMarkerMachine(mode: mode)
-      XCTAssertThrowsError(try legacyFailureEvent.handle(.confirmedFailure(failure)))
-      XCTAssertEqual(
-        legacyFailureEvent.invariantViolations.last?.kind,
-        .resumeMarkerEvidenceMismatch
+      #expect(throws: (any Error).self) {
+        try legacyFailureEvent.handle(.confirmedFailure(failure))
+      }
+      #expect(
+        legacyFailureEvent.invariantViolations.last?.kind
+          == .resumeMarkerEvidenceMismatch
       )
 
       var legacyUnknownEvent = try makeResumeMarkerMachine(mode: mode)
-      XCTAssertThrowsError(try legacyUnknownEvent.handle(.externalOutcomeOrIdentityUnknown))
-      XCTAssertEqual(
-        legacyUnknownEvent.invariantViolations.last?.kind,
-        .resumeMarkerEvidenceMismatch
+      #expect(throws: (any Error).self) {
+        try legacyUnknownEvent.handle(.externalOutcomeOrIdentityUnknown)
+      }
+      #expect(
+        legacyUnknownEvent.invariantViolations.last?.kind
+          == .resumeMarkerEvidenceMismatch
       )
     }
   }
 
   // TEST-AC-JOB-001-06 / cancellationContract
-  func testTEST_AC_JOB_001_06_NormalCancellationUsesTheSafeBoundaryPath() throws {
+  @Test func TEST_AC_JOB_001_06_NormalCancellationUsesTheSafeBoundaryPath() throws {
     var machine = try makeRunningMachine()
     let step = try makeHostStep(id: "hash-for-cancellation")
     _ = try machine.authorizeDispatch(of: step)
-    XCTAssertEqual(machine.activeStep?.cancellation, .immediate)
+    #expect(machine.activeStep?.cancellation == .immediate)
 
     for invalidStepId in [nil, "different-step"] as [String?] {
-      XCTAssertThrowsError(
-        try machine.handle(.cancellationRequested(activeStepId: invalidStepId)))
-      XCTAssertEqual(machine.state, .running)
-      XCTAssertEqual(machine.activeStep?.id, step.id)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .activeStepMismatch)
+      #expect(throws: (any Error).self) {
+        try machine.handle(.cancellationRequested(activeStepId: invalidStepId))
+      }
+      #expect(machine.state == .running)
+      #expect(machine.activeStep?.id == step.id)
+      #expect(machine.invariantViolations.last?.kind == .activeStepMismatch)
     }
 
     let requested = try machine.handle(.cancellationRequested(activeStepId: step.id))
-    XCTAssertEqual(machine.state, .cancelRequested)
-    XCTAssertTrue(requested.directives.contains(.persistCancellationRequest))
+    #expect(machine.state == .cancelRequested)
+    #expect(requested.directives.contains(.persistCancellationRequest))
 
     try machine.handle(.cancellationAcknowledged)
-    XCTAssertEqual(machine.state, .cancellingAtSafeBoundary)
+    #expect(machine.state == .cancellingAtSafeBoundary)
     let cancelled = try machine.handle(.safeBoundaryReached)
-    XCTAssertTrue(cancelled.directives.contains(.persistCancellationOutcomeAndSafeBoundary))
-    XCTAssertEqual(machine.state, .cancelled)
-    XCTAssertNil(machine.activeStep)
+    #expect(cancelled.directives.contains(.persistCancellationOutcomeAndSafeBoundary))
+    #expect(machine.state == .cancelled)
+    #expect(machine.activeStep == nil)
   }
 
   // TEST-AC-JOB-003-01 / criticalCancellationContract
-  func testTEST_AC_JOB_003_01_CriticalCancellationNeverForceTerminatesCurrentProcess() throws {
+  @Test func TEST_AC_JOB_003_01_CriticalCancellationNeverForceTerminatesCurrentProcess() throws {
     var machine = try makeRunningMachine()
     let flash = try makeFlashStep()
     _ = try machine.authorizeDispatch(of: flash)
-    XCTAssertEqual(machine.activeStep?.cancellation, .criticalNonInterruptible)
+    #expect(machine.activeStep?.cancellation == .criticalNonInterruptible)
 
     let requested = try machine.handle(
       .cancellationRequested(activeStepId: flash.id)
     )
 
-    XCTAssertEqual(machine.state, .cancelRequested)
-    XCTAssertTrue(requested.directives.contains(.persistCancellationRequest))
-    XCTAssertTrue(requested.directives.contains(.waitForProviderSafeBoundary))
-    XCTAssertTrue(requested.directives.contains(.mustNotForceTerminateCurrentProcess))
+    #expect(machine.state == .cancelRequested)
+    #expect(requested.directives.contains(.persistCancellationRequest))
+    #expect(requested.directives.contains(.waitForProviderSafeBoundary))
+    #expect(requested.directives.contains(.mustNotForceTerminateCurrentProcess))
 
     try machine.handle(.cancellationAcknowledged)
-    XCTAssertEqual(machine.state, .cancellingAtSafeBoundary)
+    #expect(machine.state == .cancellingAtSafeBoundary)
   }
 
-  func testCriticalCancellationCannotUseMissingOrMismatchedStepIdentity() throws {
+  @Test func criticalCancellationCannotUseMissingOrMismatchedStepIdentity() throws {
     let flash = try makeFlashStep()
     for invalidStepId in [nil, "different-step"] as [String?] {
       var machine = try makeRunningMachine()
       _ = try machine.authorizeDispatch(of: flash)
 
-      XCTAssertThrowsError(try machine.handle(.cancellationRequested(activeStepId: invalidStepId)))
-      XCTAssertEqual(machine.state, .running)
-      XCTAssertEqual(machine.activeStep?.id, flash.id)
-      XCTAssertEqual(machine.invariantViolations.last?.kind, .activeStepMismatch)
+      #expect(throws: (any Error).self) {
+        try machine.handle(.cancellationRequested(activeStepId: invalidStepId))
+      }
+      #expect(machine.state == .running)
+      #expect(machine.activeStep?.id == flash.id)
+      #expect(machine.invariantViolations.last?.kind == .activeStepMismatch)
     }
   }
 
   // TEST-AC-JOB-004-01 / compensationFaultInjection
-  func testTEST_AC_JOB_004_01_CompensationFailureDoesNotReplaceCaptureFailure() throws {
+  @Test func TEST_AC_JOB_004_01_CompensationFailureDoesNotReplaceCaptureFailure() throws {
     let stopCapture = try makeCompensation(
       id: "stop-capture",
       kind: .stopRemoteCapture,
@@ -653,7 +670,7 @@ final class JobStateMachineTests: XCTestCase {
       ],
       terminalPath: .failure
     )
-    XCTAssertEqual(plan.map(\.descriptor.id), ["stop-capture", "restore-parameter"])
+    #expect(plan.map(\.descriptor.id) == ["stop-capture", "restore-parameter"])
 
     let captureFailure = WorkflowFailure(
       classification: .semantic,
@@ -673,12 +690,12 @@ final class JobStateMachineTests: XCTestCase {
       ]
     )
 
-    XCTAssertEqual(report.originalFailure, captureFailure)
-    XCTAssertEqual(report.compensationFailures, [restoreFailure])
-    XCTAssertTrue(report.needsAttention)
+    #expect(report.originalFailure == captureFailure)
+    #expect(report.compensationFailures == [restoreFailure])
+    #expect(report.needsAttention)
   }
 
-  func testCompensationTriggersApplyToExactlyTheirDeclaredTerminalPaths() throws {
+  @Test func compensationTriggersApplyToExactlyTheirDeclaredTerminalPaths() throws {
     let success = try makeCompensation(
       id: "success", kind: .stopApplication, trigger: .onSuccess,
       arguments: ["bundleName": .string("bundle"), "abilityName": .string("ability")])
@@ -696,21 +713,21 @@ final class JobStateMachineTests: XCTestCase {
         sourceStepId: "application", descriptors: [success, failure, cancel, any])
     ]
 
-    XCTAssertEqual(
+    #expect(
       CompensationPlanner.plan(completedStepsInExecutionOrder: completed, terminalPath: .success)
-        .map(\.descriptor.id),
-      ["any", "success"])
-    XCTAssertEqual(
+        .map(\.descriptor.id)
+        == ["any", "success"])
+    #expect(
       CompensationPlanner.plan(completedStepsInExecutionOrder: completed, terminalPath: .failure)
-        .map(\.descriptor.id),
-      ["any", "failure"])
-    XCTAssertEqual(
+        .map(\.descriptor.id)
+        == ["any", "failure"])
+    #expect(
       CompensationPlanner.plan(completedStepsInExecutionOrder: completed, terminalPath: .cancel)
-        .map(\.descriptor.id),
-      ["any", "cancel"])
+        .map(\.descriptor.id)
+        == ["any", "cancel"])
   }
 
-  func testPlanOnlyRejectsMutationDispatchWithoutChangingState() throws {
+  @Test func planOnlyRejectsMutationDispatchWithoutChangingState() throws {
     var machine = JobStateMachine(mode: .planOnly)
     try machine.handle(.startPreflight)
     try machine.handle(.preflightPassed)
@@ -727,10 +744,10 @@ final class JobStateMachineTests: XCTestCase {
       ]
     )
 
-    XCTAssertEqual(mutation.effect, .deviceMutation)
-    XCTAssertThrowsError(try machine.authorizeDispatch(of: mutation))
-    XCTAssertEqual(machine.state, .planning)
-    XCTAssertEqual(machine.invariantViolations.last?.kind, .planOnlyMutationDispatch)
+    #expect(mutation.effect == .deviceMutation)
+    #expect(throws: (any Error).self) { try machine.authorizeDispatch(of: mutation) }
+    #expect(machine.state == .planning)
+    #expect(machine.invariantViolations.last?.kind == .planOnlyMutationDispatch)
   }
 
   private func makeRunningMachine() throws -> JobStateMachine {
@@ -755,7 +772,7 @@ final class JobStateMachineTests: XCTestCase {
             outcomeConfirmed: true,
             bindingConfirmed: true
           ))))
-    XCTAssertEqual(machine.state, .resumeAtConfirmedSafeBoundary)
+    #expect(machine.state == .resumeAtConfirmedSafeBoundary)
     return machine
   }
 
@@ -772,12 +789,12 @@ final class JobStateMachineTests: XCTestCase {
     for step in ordinarySteps {
       do {
         _ = try machine.authorizeDispatch(of: step)
-        XCTFail("\(context) authorized \(step.effect.rawValue) step at resume marker")
+        Issue.record("\(context) authorized \(step.effect.rawValue) step at resume marker")
       } catch {
-        XCTAssertEqual(
-          machine.invariantViolations.last?.kind,
-          .dispatchNotAllowedInState,
-          context
+        #expect(
+          machine.invariantViolations.last?.kind
+            == .dispatchNotAllowedInState,
+          "\(context)"
         )
       }
     }
@@ -795,19 +812,19 @@ final class JobStateMachineTests: XCTestCase {
       }
       """#.utf8
     )
-    XCTAssertThrowsError(try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownKind)) { error in
-      XCTAssertEqual(
-        error as? WorkflowStepValidationError,
-        .unsupportedKind(rawKind: "provider.rawCommand", assumedEffect: .destructive),
-        context
-      )
+    #expect(
+      throws: WorkflowStepValidationError.unsupportedKind(
+        rawKind: "provider.rawCommand", assumedEffect: .destructive),
+      "\(context)"
+    ) {
+      try WorkflowStepDecoder.decodeCoreOrProviderStep(unknownKind)
     }
   }
 
   private func makeWaitingForRecoveryMachine() throws -> JobStateMachine {
     var machine = try makeRunningMachine()
     let outcome = try machine.handle(.externalOutcomeOrIdentityUnknown)
-    XCTAssertTrue(outcome.directives.contains(.preserveOutcomeUnknown))
+    #expect(outcome.directives.contains(.preserveOutcomeUnknown))
     return machine
   }
 
@@ -967,29 +984,29 @@ final class JobStateMachineTests: XCTestCase {
       .deletingLastPathComponent()
       .deletingLastPathComponent()
     let data = try Data(contentsOf: repositoryRoot.appending(path: "openspec/contracts/\(name)"))
-    return try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
 
   private func loadContractTransitionPairs() throws -> Set<StateTransitionPair> {
     let contract = try loadContract(named: "journal-event.schema.json")
-    let definitions = try XCTUnwrap(contract["$defs"] as? [String: Any])
-    let pairDefinition = try XCTUnwrap(definitions["stateTransitionPair"] as? [String: Any])
-    let alternatives = try XCTUnwrap(pairDefinition["oneOf"] as? [[String: Any]])
+    let definitions = try #require(contract["$defs"] as? [String: Any])
+    let pairDefinition = try #require(definitions["stateTransitionPair"] as? [String: Any])
+    let alternatives = try #require(pairDefinition["oneOf"] as? [[String: Any]])
 
     var pairs: Set<StateTransitionPair> = []
     for alternative in alternatives {
-      let properties = try XCTUnwrap(alternative["properties"] as? [String: Any])
-      let fromDefinition = try XCTUnwrap(properties["from"] as? [String: Any])
-      let toDefinition = try XCTUnwrap(properties["to"] as? [String: Any])
-      let fromRawValue = try XCTUnwrap(fromDefinition["const"] as? String)
-      let toRawValues = try XCTUnwrap(toDefinition["enum"] as? [String])
-      let from = try XCTUnwrap(JobState(rawValue: fromRawValue))
+      let properties = try #require(alternative["properties"] as? [String: Any])
+      let fromDefinition = try #require(properties["from"] as? [String: Any])
+      let toDefinition = try #require(properties["to"] as? [String: Any])
+      let fromRawValue = try #require(fromDefinition["const"] as? String)
+      let toRawValues = try #require(toDefinition["enum"] as? [String])
+      let from = try #require(JobState(rawValue: fromRawValue))
 
       for toRawValue in toRawValues {
         pairs.insert(
           StateTransitionPair(
             from: from,
-            to: try XCTUnwrap(JobState(rawValue: toRawValue))
+            to: try #require(JobState(rawValue: toRawValue))
           ))
       }
     }

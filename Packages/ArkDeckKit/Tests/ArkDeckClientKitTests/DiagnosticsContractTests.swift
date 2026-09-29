@@ -1,9 +1,10 @@
 import ArkDeckClientKit
 import Darwin
-import XCTest
+import Foundation
+import Testing
 
-final class DiagnosticsContractTests: XCTestCase {
-  func testTEST_AC_DIAG_001_01_boundedRotationAndCleanup() throws {
+struct DiagnosticsContractTests {
+  @Test func TEST_AC_DIAG_001_01_boundedRotationAndCleanup() throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-rotation")
     defer { try? FileManager.default.removeItem(at: base) }
     let configuration = try StructuredDiagnosticLogConfiguration(
@@ -25,33 +26,33 @@ final class DiagnosticsContractTests: XCTestCase {
       }
 
       let snapshot = try store.snapshot()
-      XCTAssertLessThanOrEqual(store.retainedBytes, configuration.quotaBytes)
-      XCTAssertEqual(snapshot.totalBytes, store.retainedBytes)
-      XCTAssertLessThanOrEqual(snapshot.totalBytes, configuration.quotaBytes)
-      XCTAssertGreaterThan(
-        snapshot.files.first?.name ?? "", "diagnostics-00000000000000000000.jsonl")
-      XCTAssertGreaterThan(snapshot.files.count, 0)
-      XCTAssertTrue(snapshot.files.allSatisfy { $0.data.last == 0x0A })
-      XCTAssertEqual(try DiagnosticsFixtures.redactedLogFiles(snapshot).count, snapshot.files.count)
-      lastSegment = logDirectory.appending(path: try XCTUnwrap(snapshot.files.last).name)
+      #expect(store.retainedBytes <= configuration.quotaBytes)
+      #expect(snapshot.totalBytes == store.retainedBytes)
+      #expect(snapshot.totalBytes <= configuration.quotaBytes)
+      #expect(
+        (snapshot.files.first?.name ?? "") > "diagnostics-00000000000000000000.jsonl")
+      #expect(snapshot.files.count > 0)
+      #expect(snapshot.files.allSatisfy { $0.data.last == 0x0A })
+      #expect(try DiagnosticsFixtures.redactedLogFiles(snapshot).count == snapshot.files.count)
+      lastSegment = logDirectory.appending(path: try #require(snapshot.files.last).name)
       print(
         "TEST-AC-DIAG-001-01 quota=\(configuration.quotaBytes) retained=\(snapshot.totalBytes) segments=\(snapshot.files.count)"
       )
     }
 
-    let handle = try FileHandle(forWritingTo: try XCTUnwrap(lastSegment))
+    let handle = try FileHandle(forWritingTo: try #require(lastSegment))
     try handle.seekToEnd()
     try handle.write(contentsOf: Data("torn-sensitive-tail".utf8))
     try handle.close()
     let reopened = try StructuredDiagnosticLogStore(
       directory: logDirectory, configuration: configuration)
     let repaired = try reopened.snapshot()
-    XCTAssertTrue(repaired.files.allSatisfy { $0.data.last == 0x0A })
-    XCTAssertFalse(repaired.files.contains { $0.data.contains(Data("torn-sensitive-tail".utf8)) })
-    XCTAssertLessThanOrEqual(repaired.totalBytes, configuration.quotaBytes)
+    #expect(repaired.files.allSatisfy { $0.data.last == 0x0A })
+    #expect(!repaired.files.contains { $0.data.contains(Data("torn-sensitive-tail".utf8)) })
+    #expect(repaired.totalBytes <= configuration.quotaBytes)
   }
 
-  func testTEST_AC_DIAG_001_02_fiveCategoriesRedactBeforeBothSinks() throws {
+  @Test func TEST_AC_DIAG_001_02_fiveCategoriesRedactBeforeBothSinks() throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-redaction")
     defer { try? FileManager.default.removeItem(at: base) }
     let store = try StructuredDiagnosticLogStore(directory: base.appending(path: "logs"))
@@ -73,60 +74,61 @@ final class DiagnosticsContractTests: XCTestCase {
     }
 
     let structured = try DiagnosticsFixtures.decodedRecords(store.snapshot())
-    XCTAssertEqual(Set(structured.map(\.category)), Set(SystemLogCategory.allCases))
-    XCTAssertEqual(Set(unified.records.map(\.category)), Set(SystemLogCategory.allCases))
-    XCTAssertEqual(structured, unified.records.map(DecodedDiagnosticRecord.init))
-    let structuredBytes = try XCTUnwrap(store.snapshot().files.first).data
+    #expect(Set(structured.map(\.category)) == Set(SystemLogCategory.allCases))
+    #expect(Set(unified.records.map(\.category)) == Set(SystemLogCategory.allCases))
+    #expect(structured == unified.records.map(DecodedDiagnosticRecord.init))
+    let structuredBytes = try #require(store.snapshot().files.first).data
     let unifiedBytes = try JSONEncoder().encode(unified.records)
     for sensitive in [
       DiagnosticsFixtures.deviceIdentifier, DiagnosticsFixtures.userPath,
       DiagnosticsFixtures.businessString,
     ] {
-      XCTAssertFalse(structuredBytes.contains(Data(sensitive.utf8)))
-      XCTAssertFalse(unifiedBytes.contains(Data(sensitive.utf8)))
+      #expect(!structuredBytes.contains(Data(sensitive.utf8)))
+      #expect(!unifiedBytes.contains(Data(sensitive.utf8)))
     }
-    XCTAssertTrue(structuredBytes.contains(Data("[REDACTED-DEVICE-ID]".utf8)))
-    XCTAssertTrue(structuredBytes.contains(Data("[REDACTED-USER-PATH]".utf8)))
-    XCTAssertTrue(structuredBytes.contains(Data("[REDACTED-BUSINESS-STRING]".utf8)))
-    XCTAssertEqual(Set(structured.map(\.correlationID)).count, 5)
+    #expect(structuredBytes.contains(Data("[REDACTED-DEVICE-ID]".utf8)))
+    #expect(structuredBytes.contains(Data("[REDACTED-USER-PATH]".utf8)))
+    #expect(structuredBytes.contains(Data("[REDACTED-BUSINESS-STRING]".utf8)))
+    #expect(Set(structured.map(\.correlationID)).count == 5)
     for file in try DiagnosticsFixtures.redactedLogFiles(store.snapshot()) {
-      XCTAssertTrue(file.data.contains(Data("\"eventName\":\"privacy.contract\"".utf8)))
-      XCTAssertTrue(file.data.contains(Data("\"publicCode\":\"diagnostics.test\"".utf8)))
+      #expect(file.data.contains(Data("\"eventName\":\"privacy.contract\"".utf8)))
+      #expect(file.data.contains(Data("\"publicCode\":\"diagnostics.test\"".utf8)))
       for correlationID in structured.map(\.correlationID) {
-        XCTAssertTrue(file.data.contains(Data(correlationID.utf8)))
+        #expect(file.data.contains(Data(correlationID.utf8)))
       }
     }
   }
 
-  func testTEST_AC_DIAG_001_02_untrustedExportLogIsRejected() throws {
+  @Test func TEST_AC_DIAG_001_02_untrustedExportLogIsRejected() throws {
     let malicious = Data(
       """
       {"category":"app","correlationId":"\(DiagnosticsFixtures.deviceIdentifier)","eventName":"\(DiagnosticsFixtures.deviceIdentifier)","fields":{"\(DiagnosticsFixtures.deviceIdentifier)":"\(DiagnosticsFixtures.businessString)","path":"\(DiagnosticsFixtures.userPath)"},"level":"warning","schemaVersion":"1.0.0","timestamp":"2026-07-17T08:00:00Z"}
 
       """.utf8)
-    XCTAssertThrowsError(
+    #expect(throws: (any Error).self) {
       try RedactedDiagnosticLogFile(
-        name: "diagnostics-00000000000000000000.jsonl", data: malicious))
+        name: "diagnostics-00000000000000000000.jsonl", data: malicious)
+    }
 
-    XCTAssertThrowsError(
+    let customerSecretError = #expect(throws: LocalDiagnosticBundleError.self) {
       try RedactedDiagnosticLogFile(name: "customer-secret.jsonl", data: malicious)
-    ) { error in
-      guard case .invalidInput = error as? LocalDiagnosticBundleError else {
-        return XCTFail("unexpected error: \(error)")
-      }
+    }
+    if case .invalidInput = customerSecretError {} else {
+      Issue.record("unexpected error: \(String(describing: customerSecretError))")
     }
     let unknownRootMember = Data(malicious.dropLast())
-    var object = try XCTUnwrap(
+    var object = try #require(
       try JSONSerialization.jsonObject(with: unknownRootMember) as? [String: Any])
     object["untrusted"] = DiagnosticsFixtures.businessString
     var invalidShape = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     invalidShape.append(0x0A)
-    XCTAssertThrowsError(
+    #expect(throws: (any Error).self) {
       try RedactedDiagnosticLogFile(
-        name: "diagnostics-00000000000000000001.jsonl", data: invalidShape))
+        name: "diagnostics-00000000000000000001.jsonl", data: invalidShape)
+    }
   }
 
-  func testTEST_AC_DIAG_001_02_typedFieldCannotMisclassifyDeviceIdentifier() throws {
+  @Test func TEST_AC_DIAG_001_02_typedFieldCannotMisclassifyDeviceIdentifier() throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-public-catalog")
     defer { try? FileManager.default.removeItem(at: base) }
     let store = try StructuredDiagnosticLogStore(directory: base.appending(path: "logs"))
@@ -135,22 +137,20 @@ final class DiagnosticsContractTests: XCTestCase {
       structuredStore: store, unifiedLogger: unified,
       auditClock: FixedDiagnosticAuditClock())
 
-    XCTAssertThrowsError(
+    #expect(throws: SystemLoggerError.invalidFieldPrivacy) {
       try logger.log(
         level: .warning, category: .app, eventName: .privacyContract,
         correlationID: DiagnosticCorrelationID(),
         fields: [.publicCode: .deviceIdentifier(DiagnosticsFixtures.deviceIdentifier)])
-    ) { error in
-      XCTAssertEqual(error as? SystemLoggerError, .invalidFieldPrivacy)
     }
-    XCTAssertTrue(unified.records.isEmpty)
-    XCTAssertFalse(
-      try store.snapshot().files.contains {
+    #expect(unified.records.isEmpty)
+    #expect(
+      try !store.snapshot().files.contains {
         $0.data.contains(Data(DiagnosticsFixtures.deviceIdentifier.utf8))
       })
   }
 
-  func testTEST_AC_DIAG_002_01_crashAndJobFailureCannotMaterializeExport() async throws {
+  @Test func TEST_AC_DIAG_002_01_crashAndJobFailureCannotMaterializeExport() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-trigger")
     defer { try? FileManager.default.removeItem(at: base) }
     let store = try StructuredDiagnosticLogStore(directory: base.appending(path: "logs"))
@@ -169,23 +169,21 @@ final class DiagnosticsContractTests: XCTestCase {
     let preview = try exporter.preview(request)
 
     for trigger in [DiagnosticExportTrigger.appCrash, .jobFailure] {
-      XCTAssertThrowsError(
+      #expect(throws: LocalDiagnosticBundleError.explicitUserInitiationRequired) {
         try exporter.export(request, trigger: trigger, approvedPreview: preview)
-      ) { error in
-        XCTAssertEqual(error as? LocalDiagnosticBundleError, .explicitUserInitiationRequired)
       }
-      XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+      #expect(!FileManager.default.fileExists(atPath: destination.path))
     }
 
     let materialized = try exporter.export(
       request, trigger: .userInitiated, approvedPreview: preview)
-    XCTAssertEqual(materialized.root, destination)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+    #expect(materialized.root == destination)
+    #expect(FileManager.default.fileExists(atPath: destination.path))
     let manifest = try Data(contentsOf: destination.appending(path: "bundle.json"))
-    XCTAssertTrue(manifest.contains(Data("\"automaticUploadEnabled\":false".utf8)))
+    #expect(manifest.contains(Data("\"automaticUploadEnabled\":false".utf8)))
   }
 
-  func testTEST_AC_DIAG_002_01_parentReplacementCannotRedirectPublishOrCleanup() async throws {
+  @Test func TEST_AC_DIAG_002_01_parentReplacementCannotRedirectPublishOrCleanup() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-parent-binding")
     defer { try? FileManager.default.removeItem(at: base) }
     let exportParent = base.appending(path: "approved-parent", directoryHint: .isDirectory)
@@ -209,24 +207,24 @@ final class DiagnosticsContractTests: XCTestCase {
       })
     let preview = try exporter.preview(request)
 
-    XCTAssertThrowsError(
+    let error = #expect(throws: LocalDiagnosticBundleError.self) {
       try exporter.export(request, trigger: .userInitiated, approvedPreview: preview)
-    ) { error in
-      guard case .invalidInput(let message) = error as? LocalDiagnosticBundleError else {
-        return XCTFail("unexpected error: \(error)")
-      }
-      XCTAssertTrue(message.contains("parent changed"))
     }
-    XCTAssertEqual(try Data(contentsOf: replacementMarkerURL), replacementMarker)
-    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
-    XCTAssertFalse(
-      FileManager.default.fileExists(
+    if case .invalidInput(let message) = error {
+      #expect(message.contains("parent changed"))
+    } else {
+      Issue.record("unexpected error: \(String(describing: error))")
+    }
+    #expect(try Data(contentsOf: replacementMarkerURL) == replacementMarker)
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
+    #expect(
+      !FileManager.default.fileExists(
         atPath: displacedParent.appending(path: "diagnostic-bundle").path))
     let displacedEntries = try FileManager.default.contentsOfDirectory(atPath: displacedParent.path)
-    XCTAssertFalse(displacedEntries.contains { $0.hasPrefix(".diagnostic-bundle.") })
+    #expect(!displacedEntries.contains { $0.hasPrefix(".diagnostic-bundle.") })
   }
 
-  func testTEST_AC_DIAG_002_01_previewRejectsParentReplacementBeforeExport() async throws {
+  @Test func TEST_AC_DIAG_002_01_previewRejectsParentReplacementBeforeExport() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-preview-parent")
     defer { try? FileManager.default.removeItem(at: base) }
     let exportParent = base.appending(path: "approved-parent", directoryHint: .isDirectory)
@@ -247,19 +245,17 @@ final class DiagnosticsContractTests: XCTestCase {
     let marker = exportParent.appending(path: "replacement-marker")
     try Data("replacement".utf8).write(to: marker)
 
-    XCTAssertThrowsError(
+    #expect(throws: LocalDiagnosticBundleError.previewScopeMismatch) {
       try exporter.export(request, trigger: .userInitiated, approvedPreview: approvedPreview)
-    ) { error in
-      XCTAssertEqual(error as? LocalDiagnosticBundleError, .previewScopeMismatch)
     }
-    XCTAssertTrue(FileManager.default.fileExists(atPath: marker.path))
-    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
-    XCTAssertFalse(
-      FileManager.default.fileExists(
+    #expect(FileManager.default.fileExists(atPath: marker.path))
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
+    #expect(
+      !FileManager.default.fileExists(
         atPath: displacedParent.appending(path: "diagnostic-bundle").path))
   }
 
-  func testTEST_AC_DIAG_002_01_previewEstimateIncludesManifestAtQuotaBoundary() async throws {
+  @Test func TEST_AC_DIAG_002_01_previewEstimateIncludesManifestAtQuotaBoundary() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-quota-boundary")
     defer { try? FileManager.default.removeItem(at: base) }
     let destination = base.appending(path: "diagnostic-bundle")
@@ -268,19 +264,19 @@ final class DiagnosticsContractTests: XCTestCase {
     let referencePreview = try LocalDiagnosticBundleExporter().preview(request)
     let insufficient = try LocalDiagnosticBundleExporter(
       maximumBundleBytes: referencePreview.estimatedBytes - 1)
-    XCTAssertThrowsError(try insufficient.preview(request)) { error in
-      XCTAssertEqual(error as? LocalDiagnosticBundleError, .bundleQuotaExceeded)
+    #expect(throws: LocalDiagnosticBundleError.bundleQuotaExceeded) {
+      try insufficient.preview(request)
     }
 
     let exact = try LocalDiagnosticBundleExporter(
       maximumBundleBytes: referencePreview.estimatedBytes)
     let exactPreview = try exact.preview(request)
-    XCTAssertEqual(exactPreview.estimatedBytes, referencePreview.estimatedBytes)
+    #expect(exactPreview.estimatedBytes == referencePreview.estimatedBytes)
     _ = try exact.export(request, trigger: .userInitiated, approvedPreview: exactPreview)
-    XCTAssertEqual(UInt64(try bundleData(destination).count), exactPreview.estimatedBytes)
+    #expect(UInt64(try bundleData(destination).count) == exactPreview.estimatedBytes)
   }
 
-  func testTEST_AC_DIAG_002_01_postRenameFailureCleansDestinationAndAllowsRetry() async throws {
+  @Test func TEST_AC_DIAG_002_01_postRenameFailureCleansDestinationAndAllowsRetry() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-rename-cleanup")
     defer { try? FileManager.default.removeItem(at: base) }
     let destination = base.appending(path: "diagnostic-bundle")
@@ -293,18 +289,19 @@ final class DiagnosticsContractTests: XCTestCase {
       })
     let approvedPreview = try failing.preview(request)
 
-    XCTAssertThrowsError(
-      try failing.export(request, trigger: .userInitiated, approvedPreview: approvedPreview))
-    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    #expect(throws: (any Error).self) {
+      try failing.export(request, trigger: .userInitiated, approvedPreview: approvedPreview)
+    }
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
     let parentEntries = try FileManager.default.contentsOfDirectory(atPath: base.path)
-    XCTAssertFalse(parentEntries.contains { $0.hasPrefix(".diagnostic-bundle.") })
+    #expect(!parentEntries.contains { $0.hasPrefix(".diagnostic-bundle.") })
 
     _ = try LocalDiagnosticBundleExporter().export(
       request, trigger: .userInitiated, approvedPreview: approvedPreview)
-    XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+    #expect(FileManager.default.fileExists(atPath: destination.path))
   }
 
-  func testTEST_AC_DIAG_002_01_postRenameMoveAwayReturnsOutcomeUnknown() async throws {
+  @Test func TEST_AC_DIAG_002_01_postRenameMoveAwayReturnsOutcomeUnknown() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-rename-move-away")
     defer { try? FileManager.default.removeItem(at: base) }
     let destination = base.appending(path: "diagnostic-bundle")
@@ -319,16 +316,14 @@ final class DiagnosticsContractTests: XCTestCase {
       })
     let approvedPreview = try failing.preview(request)
 
-    XCTAssertThrowsError(
+    #expect(throws: LocalDiagnosticBundleError.exportOutcomeUnknown) {
       try failing.export(request, trigger: .userInitiated, approvedPreview: approvedPreview)
-    ) { error in
-      XCTAssertEqual(error as? LocalDiagnosticBundleError, .exportOutcomeUnknown)
     }
-    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
-    XCTAssertTrue(FileManager.default.fileExists(atPath: movedDestination.path))
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
+    #expect(FileManager.default.fileExists(atPath: movedDestination.path))
   }
 
-  func testTEST_AC_DIAG_002_01_fifoReplacementFailsWithoutBlockingAndCleansUp() async throws {
+  @Test func TEST_AC_DIAG_002_01_fifoReplacementFailsWithoutBlockingAndCleansUp() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-fifo-replacement")
     defer { try? FileManager.default.removeItem(at: base) }
     let destination = base.appending(path: "diagnostic-bundle")
@@ -353,20 +348,20 @@ final class DiagnosticsContractTests: XCTestCase {
       })
     let approvedPreview = try exporter.preview(request)
 
-    XCTAssertThrowsError(
+    let error = #expect(throws: LocalDiagnosticBundleError.self) {
       try exporter.export(request, trigger: .userInitiated, approvedPreview: approvedPreview)
-    ) { error in
-      guard case .invalidInput(let message) = error as? LocalDiagnosticBundleError else {
-        return XCTFail("unexpected FIFO validation error: \(error)")
-      }
-      XCTAssertTrue(message.contains("changed before publication"))
     }
-    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+    if case .invalidInput(let message) = error {
+      #expect(message.contains("changed before publication"))
+    } else {
+      Issue.record("unexpected FIFO validation error: \(String(describing: error))")
+    }
+    #expect(!FileManager.default.fileExists(atPath: destination.path))
     let parentEntries = try FileManager.default.contentsOfDirectory(atPath: base.path)
-    XCTAssertFalse(parentEntries.contains { $0.hasPrefix(".diagnostic-bundle.diagnostics.") })
+    #expect(!parentEntries.contains { $0.hasPrefix(".diagnostic-bundle.diagnostics.") })
   }
 
-  func testTEST_MAC_M1_DIAG_001_rejectsNonOwnerOnlyLogDirectoryAndSegments() throws {
+  @Test func TEST_MAC_M1_DIAG_001_rejectsNonOwnerOnlyLogDirectoryAndSegments() throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-permissions")
     defer { try? FileManager.default.removeItem(at: base) }
     let permissiveDirectory = base.appending(path: "permissive-directory")
@@ -375,8 +370,8 @@ final class DiagnosticsContractTests: XCTestCase {
       attributes: [.posixPermissions: 0o700])
     try FileManager.default.setAttributes(
       [.posixPermissions: 0o755], ofItemAtPath: permissiveDirectory.path)
-    XCTAssertThrowsError(try StructuredDiagnosticLogStore(directory: permissiveDirectory)) {
-      XCTAssertEqual($0 as? SystemLoggerError, .unsafeLogDirectory)
+    #expect(throws: SystemLoggerError.unsafeLogDirectory) {
+      try StructuredDiagnosticLogStore(directory: permissiveDirectory)
     }
 
     let permissiveSegmentDirectory = base.appending(path: "permissive-segment")
@@ -387,12 +382,12 @@ final class DiagnosticsContractTests: XCTestCase {
       path: "diagnostics-00000000000000000000.jsonl")
     try Data().write(to: segment)
     try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: segment.path)
-    XCTAssertThrowsError(try StructuredDiagnosticLogStore(directory: permissiveSegmentDirectory)) {
-      XCTAssertEqual($0 as? SystemLoggerError, .invalidSegment)
+    #expect(throws: SystemLoggerError.invalidSegment) {
+      try StructuredDiagnosticLogStore(directory: permissiveSegmentDirectory)
     }
   }
 
-  func testTEST_MAC_M1_DIAG_001_writerLockReplacementFailsClosedForBothStores() throws {
+  @Test func TEST_MAC_M1_DIAG_001_writerLockReplacementFailsClosedForBothStores() throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-writer-lock")
     defer { try? FileManager.default.removeItem(at: base) }
     let logDirectory = base.appending(path: "logs")
@@ -413,16 +408,14 @@ final class DiagnosticsContractTests: XCTestCase {
       try FileManager.default.setAttributes(
         [.posixPermissions: 0o600], ofItemAtPath: writerLock.path)
 
-      XCTAssertThrowsError(try StructuredDiagnosticLogStore(directory: logDirectory)) { error in
-        XCTAssertEqual(error as? SystemLoggerError, .activeWriterExists)
+      #expect(throws: SystemLoggerError.activeWriterExists) {
+        try StructuredDiagnosticLogStore(directory: logDirectory)
       }
-      XCTAssertThrowsError(
+      #expect(throws: SystemLoggerError.unsafeLogDirectory) {
         try logger1.log(
           level: .info, category: .app, eventName: .privacyContract,
           correlationID: DiagnosticCorrelationID(),
           fields: [.publicCode: .publicCode(.diagnosticsTest)])
-      ) { error in
-        XCTAssertEqual(error as? SystemLoggerError, .unsafeLogDirectory)
       }
 
       let segmentNames = try FileManager.default.contentsOfDirectory(atPath: logDirectory.path)
@@ -431,11 +424,11 @@ final class DiagnosticsContractTests: XCTestCase {
         StructuredDiagnosticSnapshotFile(
           name: name, data: try Data(contentsOf: logDirectory.appending(path: name)))
       }
-      XCTAssertEqual(after, before)
+      #expect(after == before)
     }
   }
 
-  func testTEST_MAC_M1_DIAG_001_platformLoggingRotationAndRawExclusion() async throws {
+  @Test func TEST_MAC_M1_DIAG_001_platformLoggingRotationAndRawExclusion() async throws {
     let base = try DiagnosticsFixtures.temporaryDirectory(prefix: "diagnostics-platform")
     defer { try? FileManager.default.removeItem(at: base) }
     let configuration = try StructuredDiagnosticLogConfiguration(
@@ -462,38 +455,38 @@ final class DiagnosticsContractTests: XCTestCase {
       destination: destination, logs: DiagnosticsFixtures.redactedLogFiles(snapshot))
     let exporter = try LocalDiagnosticBundleExporter()
     let preview = try exporter.preview(request)
-    XCTAssertTrue(preview.deviceRawExcluded)
+    #expect(preview.deviceRawExcluded)
     // Device data has no way in: a request carries App values and App log
     // snapshots only, and the preview names exactly those entries.
-    XCTAssertEqual(
-      preview.includedEntries,
-      [
-        "bundle.json", "hdc/tool-placeholder.json",
-        "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
-      ])
+    #expect(
+      preview.includedEntries
+        == [
+          "bundle.json", "hdc/tool-placeholder.json",
+          "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
+        ])
     _ = try exporter.export(request, trigger: .userInitiated, approvedPreview: preview)
 
     let bundleBytes = try bundleData(destination)
     let productionUnifiedLogger = UnifiedSystemDiagnosticLogger(
       subsystem: "com.arkdeck.ArkDeck.DiagnosticsContractTests")
     unified.records.forEach(productionUnifiedLogger.log)
-    XCTAssertEqual(Set(unified.records.map(\.category)), Set(SystemLogCategory.allCases))
-    XCTAssertLessThanOrEqual(snapshot.totalBytes, configuration.quotaBytes)
+    #expect(Set(unified.records.map(\.category)) == Set(SystemLogCategory.allCases))
+    #expect(snapshot.totalBytes <= configuration.quotaBytes)
     for sensitive in [
       DiagnosticsFixtures.deviceIdentifier, DiagnosticsFixtures.userPath,
       DiagnosticsFixtures.businessString,
     ] {
-      XCTAssertFalse(bundleBytes.contains(Data(sensitive.utf8)))
+      #expect(!bundleBytes.contains(Data(sensitive.utf8)))
     }
     let paths = try FileManager.default.subpathsOfDirectory(atPath: destination.path).sorted()
-    XCTAssertFalse(
-      paths.contains(where: { $0.contains("artifacts/raw") || $0.hasSuffix(".trace") }))
-    XCTAssertEqual(
-      paths,
-      [
-        "bundle.json", "hdc", "hdc/tool-placeholder.json", "logs",
-        "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
-      ])
+    #expect(
+      !paths.contains(where: { $0.contains("artifacts/raw") || $0.hasSuffix(".trace") }))
+    #expect(
+      paths
+        == [
+          "bundle.json", "hdc", "hdc/tool-placeholder.json", "logs",
+          "logs/diagnostics-00000000000000000000.jsonl", "metadata.json",
+        ])
     try assertOwnerOnlyTree(destination)
     print(
       "TEST-MAC-M1-DIAG-001 quota=\(configuration.quotaBytes) logs=\(snapshot.totalBytes) entries=\(paths.count) rawExcluded=true unifiedCategories=\(unified.records.count)"
@@ -517,8 +510,8 @@ final class DiagnosticsContractTests: XCTestCase {
     for path in [""] + (try FileManager.default.subpathsOfDirectory(atPath: root.path)) {
       let url = path.isEmpty ? root : root.appending(path: path)
       let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-      let permissions = try XCTUnwrap(attributes[.posixPermissions] as? NSNumber).intValue
-      XCTAssertEqual(permissions & 0o077, 0, "expected owner-only permissions: \(url.path)")
+      let permissions = try #require(attributes[.posixPermissions] as? NSNumber).intValue
+      #expect(permissions & 0o077 == 0, "expected owner-only permissions: \(url.path)")
     }
   }
 }

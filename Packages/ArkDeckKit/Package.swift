@@ -6,18 +6,17 @@ import PackageDescription
 // and the CLI are Rust (CHG-2026-074); Swift carries no Runtime semantics, and
 // ArchitectureBoundaryContractTests refuses any target that brings them back.
 
-// What Xcode 27 turns on for new Swift code. Approachable concurrency: a
-// nonisolated async function runs on its caller's actor unless it is marked
-// @concurrent, and a conformance takes the isolation of its type. It changes
-// how those functions are called, so every target that links them compiles
-// with it. Member import visibility: a file sees only the members of modules
-// it imports itself.
-let approachableConcurrency: [SwiftSetting] = [
+// What Xcode 27 turns on for new Swift code, for every target. Approachable
+// concurrency: a nonisolated async function runs on its caller's actor unless
+// it is marked @concurrent, and a conformance takes the isolation of its type.
+// It changes how those functions are called, so every target that links them
+// compiles with it. Member import visibility: a file sees only the members of
+// modules it imports itself.
+let swiftSettings: [SwiftSetting] = [
   .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
   .enableUpcomingFeature("InferIsolatedConformances"),
+  .enableUpcomingFeature("MemberImportVisibility"),
 ]
-let swiftSettings: [SwiftSetting] =
-  approachableConcurrency + [.enableUpcomingFeature("MemberImportVisibility")]
 
 let package = Package(
   name: "ArkDeckKit",
@@ -83,10 +82,10 @@ let package = Package(
     ),
     .testTarget(
       name: "ArkDeckClientKitTests", dependencies: ["ArkDeckClientKit", "ArkDeckCore"],
-      swiftSettings: approachableConcurrency),
+      swiftSettings: swiftSettings),
     .testTarget(
       name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"],
-      swiftSettings: approachableConcurrency),
+      swiftSettings: swiftSettings),
     .testTarget(
       name: "ArkDeckTraceAdapterTests",
       dependencies: [
@@ -94,7 +93,7 @@ let package = Package(
         .product(name: "ArkTraceAppSupport", package: "ArkTrace"),
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ],
-      swiftSettings: approachableConcurrency),
+      swiftSettings: swiftSettings),
     .testTarget(
       name: "ArkDeckContractTests",
       dependencies: [
