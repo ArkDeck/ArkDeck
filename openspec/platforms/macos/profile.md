@@ -7,7 +7,7 @@
 > Core strategy：shared-rust-runtime-native-ui-shared-contract-vector-suite
 > Strategy status：proposed by CHG-2026-074; pending maintainer PR review
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash  
-> Minimum target：macOS 14
+> Minimum target：macOS 27（2026-09-29 与构建对齐：`MACOSX_DEPLOYMENT_TARGET = 27.0`,#2318）
 
 本文件只定义 macOS 实现；它不得覆盖 Core Requirement 或 AC。
 
