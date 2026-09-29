@@ -64,18 +64,77 @@ App 连 daemon 时要求两者都相等，所以**每次升级都必须把 App �
 从 Swift Runtime 首次切换到 Rust Runtime 时，第 3 步之前另有切换预检与回滚副本的步骤，按
 `docs/design/cross-platform/macos-rust-cutover-runbook.md` 执行，由维护者本人完成。
 
-## 维护者：构建 RC
+## 维护者：从 CI 产出 RC（Release candidates from CI）
 
-签名、公证与 staple 只由维护者用自己的证书与凭据执行。Agent 只维护脚本、在 CI 跑无签名结构检查，
-并在维护者产出 RC 后做只读验签。
+签名、公证与 staple 用维护者的证书与凭据执行，有两处：GitHub Actions 的
+[`release-rc.yml`](../../.github/workflows/release-rc.yml)（凭据是 `release` environment 的 secret），或维护者本机
+（见下一节）。两处跑的是同一个 `build_macos_release.py release`。Agent 不接触任何凭据：它维护脚本与 workflow、
+在 CI 跑无签名结构检查，并通过合入版本号变更触发 CI 产出 RC，再对产物做只读验签。
+
+### 一次性设置（维护者）
+
+1. 建 environment `release`，只允许 `main` 部署（Settings → Environments → New environment → Deployment
+   branches and tags → Selected branches → `main`）。secret 只放在这个 environment 里，不放仓库级：未合入
+   `main` 的代码拿不到它们，workflow 也没有 `pull_request` 触发。
+2. 建 App Store Connect API key 供公证用：App Store Connect → Users and Access → Integrations → Team Keys，
+   角色 Developer。记下 Key ID 与 Issuer ID，下载一次性的 `AuthKey_<KeyID>.p8`。
+3. 从钥匙串导出 Developer ID Application 证书与私钥为 `DeveloperID.p12`（设一个导出口令）；备好两个 helper
+   的 provisioning profile（`com.arkdeck.cli` 与 `com.arkdeck.agentd`）。
+4. 写入七个 secret（`gh` 需对本仓有 admin 权限；值从文件或标准输入读，不出现在命令行与 shell history）：
+
+   ```sh
+   base64 -i DeveloperID.p12 | gh secret set ARKDECK_DEVELOPER_ID_P12_BASE64 --env release
+   gh secret set ARKDECK_DEVELOPER_ID_P12_PASSWORD --env release          # 交互输入导出口令
+   base64 -i cli.provisionprofile | gh secret set ARKDECK_CLI_PROVISIONING_PROFILE_BASE64 --env release
+   base64 -i daemon.provisionprofile | gh secret set ARKDECK_DAEMON_PROVISIONING_PROFILE_BASE64 --env release
+   base64 -i AuthKey_<KeyID>.p8 | gh secret set ARKDECK_NOTARY_API_KEY_P8_BASE64 --env release
+   gh secret set ARKDECK_NOTARY_API_KEY_ID --env release                  # 交互输入 Key ID
+   gh secret set ARKDECK_NOTARY_API_ISSUER_ID --env release               # 交互输入 Issuer ID
+   ```
+
+   写完删除本地的 `.p12` 与 `.p8` 副本（`.p8` 在 App Store Connect 只能下载一次，需要时吊销重建即可）。
+
+### workflow 做什么
+
+- 触发：`main` 上 `scripts/release/release-version.json` 有变更的 push（即版本号或 build 号变更的 PR 合入），
+  或手动 `workflow_dispatch`（只接受 `main`，别的 ref 在第一步失败）。同时只跑一个 RC，且不会被后来者取消。
+- 同一版本与 build 已有未过期 artifact `arkdeck-rc-<版本>-<build>`，或某个 GitHub Release 已带
+  `ArkDeck-<版本>-<build>.dmg` 时，不再构建，job 以 notice 结束；要新 RC 就递增 build 号。
+- 先在无凭据时拉取依赖：本仓 `rust/` 的 `cargo fetch --locked`；ArkForge（公开仓库）按 `rust/Cargo.toml` 的 pin
+  精确 checkout 到 `$RUNNER_TEMP/ArkForge` 并 `cargo fetch --locked`。
+- 再装凭据：Developer ID 身份导入本 job 新建的临时钥匙串（口令在 job 内随机生成并 mask，`set-key-partition-list`
+  允许 codesign 无提示使用，并加入用户钥匙串搜索列表，因为 `xcodebuild -exportArchive` 与 ArkForge 打包脚本
+  只从搜索列表找身份）；`.p12` 导入后即删；两个 profile 与 `.p8` 写成 `$RUNNER_TEMP` 下的文件，后续步骤只拿路径。
+- 构建：`ARKDECK_CODESIGN_KEYCHAIN`、两个 profile 路径与 API key 三元组交给
+  `build_macos_release.py release --output "$RUNNER_TEMP/rc" --arkforge-checkout "$RUNNER_TEMP/ArkForge"`。
+- 构建之后、上传之前的清理步骤无论成败都执行（`if: always()`）：删临时钥匙串与全部凭据文件。
+- 成功时上传 artifact `arkdeck-rc-<版本>-<build>`（DMG、`release-receipt.json`、两份公证日志，保留 90 天），
+  job summary 给出 DMG 的 SHA-256。
+
+### 产出一个 RC
+
+```sh
+python3 scripts/release/release_version.py bump-build     # 在 agent/** 分支上，提交并开 PR
+# PR 合入 main 后 release-rc.yml 自动运行
+gh run list --workflow release-rc.yml --branch main --limit 1
+gh run download <run-id> -n arkdeck-rc-<版本>-<build> -D /abs/arkdeck-rc-<版本>-<build>
+```
+
+下载后按下文「产出目录」核对：`release-receipt.json` 的 `source.revision` 等于合入提交，DMG 的 SHA-256 与
+receipt 一致；`xcrun stapler validate` 与 `spctl --assess --type open --context context:primary-signature` 可在任意
+Mac 上只读复核。
+
+## 维护者：本机构建 RC
+
+凭据在维护者本人已登录的钥匙串里；锁屏或 Agent 沙盒里取不到，所以这条路径只由维护者在自己的终端执行。
 
 前提：
 
 - 本仓 checkout 干净，位于要发布的 `main` 提交；`python3 scripts/release/release_version.py check` 通过。
 - ArkForge checkout 干净，`HEAD` 等于 `rust/Cargo.toml` 的 pin（脚本核对，不等即失败），且已
   `cargo fetch`（其打包脚本用 `--offline` 构建）。
-- 钥匙串里有 Developer ID Application 身份；两个 helper 的 provisioning profile；`notarytool store-credentials`
-  存好的 keychain profile。
+- 钥匙串里有 Developer ID Application 身份；两个 helper 的 provisioning profile；公证凭据二选一：
+  `notarytool store-credentials` 存好的 keychain profile，或 App Store Connect API key。
 
 版本号：`scripts/release/release-version.json` 是唯一来源，`release_version.py` 把它同步到 pbxproj 与两个
 helper Info.plist。发 RC 前由维护者决定是否递增 build 号：
@@ -98,8 +157,14 @@ python3 scripts/release/build_macos_release.py release \
   --arkforge-checkout /abs/ArkForge
 ```
 
-可选：`ARKDECK_CODESIGN_IDENTITY`（缺省 `Developer ID Application: Hanfeng Fu (8AQTYW5FKR)`）、
-`ARKDECK_NOTARY_KEYCHAIN`（notary profile 不在默认钥匙串时）。
+公证凭据恰好给一种，两种都给或都不给时预检失败：`ARKDECK_NOTARY_KEYCHAIN_PROFILE`（可加
+`ARKDECK_NOTARY_KEYCHAIN`，profile 不在默认钥匙串时），或 API key 三元组 `ARKDECK_NOTARY_API_KEY_PATH`（`.p8` 的
+绝对路径）、`ARKDECK_NOTARY_API_KEY_ID`、`ARKDECK_NOTARY_API_ISSUER_ID`（传给 `notarytool --key --key-id --issuer`，
+只有路径进参数，key 内容不进日志）。
+
+可选：`ARKDECK_CODESIGN_IDENTITY`（缺省 `Developer ID Application: Hanfeng Fu (8AQTYW5FKR)`）；
+`ARKDECK_CODESIGN_KEYCHAIN`（身份所在钥匙串的绝对路径，路径不含空白：本仓的 codesign 调用带 `--keychain`，App
+archive 经 `OTHER_CODE_SIGN_FLAGS` 带上；它还必须在用户钥匙串搜索列表里，预检核对）。
 
 脚本依次：预检（版本一致、checkout 干净、ArkForge pin、签名身份、notary 凭据）→ `build-helpers.sh` 的 Rust 模式
 （helper 对签名、公证、staple、spctl）→ ArkForge 的 `packaging/macos/package-arkforge.sh`（Developer ID、

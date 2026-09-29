@@ -19,6 +19,7 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
 SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
 SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
+RELEASE_RC_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release-rc.yml"
 SWIFTPM_CACHE_KEY = (
     "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6"
     "-image-${{ steps.runner-image.outputs.version }}"
@@ -870,6 +871,164 @@ def validate_cache_retention_contract(text: str) -> None:
         raise WorkflowContractError("Only the trusted maintenance job may delete caches")
 
 
+RELEASE_RC_SECRETS = (
+    "ARKDECK_DEVELOPER_ID_P12_BASE64",
+    "ARKDECK_DEVELOPER_ID_P12_PASSWORD",
+    "ARKDECK_CLI_PROVISIONING_PROFILE_BASE64",
+    "ARKDECK_DAEMON_PROVISIONING_PROFILE_BASE64",
+    "ARKDECK_NOTARY_API_KEY_P8_BASE64",
+    "ARKDECK_NOTARY_API_KEY_ID",
+    "ARKDECK_NOTARY_API_ISSUER_ID",
+)
+RELEASE_RC_INSTALL_STEP = "Install release credentials"
+RELEASE_RC_BUILD_STEP = "Build the signed and notarized release candidate"
+RELEASE_RC_CLEANUP_STEP = "Remove release credentials"
+RELEASE_RC_UPLOAD_STEP = "Keep the release candidate"
+RELEASE_RC_BUILDS_ONLY_NEW = "steps.existing.outputs.exists == 'false'"
+
+
+def _steps(job_text: str) -> list[tuple[str, str]]:
+    """(name, text) of each step of a job block, in order; every step is named."""
+    lines = job_text.splitlines(keepends=True)
+    steps_index = [index for index, line in enumerate(lines) if line == "    steps:\n"]
+    if len(steps_index) != 1:
+        raise WorkflowContractError("job must have exactly one steps list")
+    steps: list[tuple[str, list[str]]] = []
+    for line in lines[steps_index[0] + 1:]:
+        if line.startswith("      - "):
+            match = re.fullmatch(r"      - name: (.+)\n", line)
+            if match is None:
+                raise WorkflowContractError(f"every step must start with its name: {line!r}")
+            steps.append((match.group(1), [line]))
+        elif steps:
+            steps[-1][1].append(line)
+    return [(name, "".join(body)) for name, body in steps]
+
+
+def validate_release_rc_contract(text: str) -> None:
+    """The signed release candidate: main only, credentials in one job.
+
+    The workflow never runs code that has not merged: its only triggers are a
+    push to main that changes the release version and a dispatch refused off
+    main. Its secrets live in the `release` environment and reach two steps of
+    its one job (the credential install and the build); the step after the
+    build removes the temporary keychain and credential files whatever
+    happened, before anything is uploaded.
+    """
+
+    meaningful = "".join(line + "\n" for _, line in _meaningful_lines(text))
+    if extract_event_names(text) != ("push", "workflow_dispatch"):
+        raise WorkflowContractError(
+            "the release candidate runs on a push to main or a dispatch, never on PR code"
+        )
+    for event in ("pull_request", "pull_request_target", "workflow_run", "workflow_call"):
+        if event in meaningful:
+            raise WorkflowContractError(f"the release candidate must not run on {event}")
+    if (
+        "  push:\n"
+        "    branches: [main]\n"
+        "    paths:\n"
+        "      - scripts/release/release-version.json\n"
+        "  workflow_dispatch:\n"
+    ) not in meaningful:
+        raise WorkflowContractError(
+            "the release candidate is built when release-version.json changes on main"
+        )
+    if "permissions:\n  contents: read\n" not in text or re.search(r": write\b", meaningful):
+        raise WorkflowContractError("the release candidate workflow must not write to the repository")
+    if "concurrency:\n  group: release-rc\n  cancel-in-progress: false\n" not in text:
+        raise WorkflowContractError("release candidates must run one at a time and never be cancelled")
+    if extract_job_names(text) != ("release-rc",):
+        raise WorkflowContractError("the release candidate is one job")
+    job = _job_block(text, "release-rc")
+    for token in ("    runs-on: macos-26\n", "    environment: release\n"):
+        if token not in job:
+            raise WorkflowContractError(f"the release job must carry: {token.strip()}")
+    if re.search(r"\bset -[a-z]*x", meaningful) or "set -o xtrace" in meaningful:
+        raise WorkflowContractError("the release workflow must never trace its commands")
+
+    steps = _steps(job)
+    names = [name for name, _ in steps]
+    for name in (RELEASE_RC_INSTALL_STEP, RELEASE_RC_BUILD_STEP, RELEASE_RC_CLEANUP_STEP,
+                 RELEASE_RC_UPLOAD_STEP):
+        if names.count(name) != 1:
+            raise WorkflowContractError(f"the release job must have exactly one step: {name}")
+    body = dict(steps)
+    first_name, first = steps[0]
+    if (
+        first_name != "Require protected main"
+        or '          if [ "$GITHUB_REF" != refs/heads/main ]; then\n' not in first
+        or "            exit 1\n" not in first
+        or "        if:" in first
+    ):
+        raise WorkflowContractError("the release job must first refuse any ref but main")
+
+    referenced = re.findall(r"\$\{\{\s*secrets\.([A-Za-z0-9_]+)\s*\}\}", text)
+    if sorted(referenced) != sorted(RELEASE_RC_SECRETS) or "secrets:" in meaningful:
+        raise WorkflowContractError(
+            "the release job must reference exactly its seven secrets, each once"
+        )
+    allowed = {RELEASE_RC_INSTALL_STEP, RELEASE_RC_BUILD_STEP}
+    for name, step in steps:
+        if "secrets." in step and name not in allowed:
+            raise WorkflowContractError(f"release secrets must not reach the step: {name}")
+    outside = text.replace(body[RELEASE_RC_INSTALL_STEP], "").replace(body[RELEASE_RC_BUILD_STEP], "")
+    if "secrets." in outside:
+        raise WorkflowContractError("release secrets must be scoped to their two steps")
+
+    install = body[RELEASE_RC_INSTALL_STEP]
+    for token in (
+        "          umask 077\n",
+        "          keychain_password=$(openssl rand -hex 32)\n",
+        '          echo "::add-mask::$keychain_password"\n',
+        "-T /usr/bin/codesign",
+        "security set-key-partition-list",
+        '          rm -f "$credentials/developer-id.p12"\n',
+        '          security list-keychains -d user -s "${search_list[@]}"\n',
+    ):
+        if token not in install:
+            raise WorkflowContractError(f"credential install must carry: {token.strip()}")
+    if install.index("::add-mask::$keychain_password") > install.index("security create-keychain"):
+        raise WorkflowContractError("the keychain password must be masked before it is used")
+    # A secret is only ever piped into base64 and on into a file.
+    for line in install.splitlines():
+        if re.search(r"\b(echo|printf)\b", line) and re.search(r"\$\{?ARKDECK_[A-Z0-9_]+", line):
+            if not re.fullmatch(
+                r"          printf '%s' \"\$ARKDECK_[A-Z0-9_]+_BASE64\" \| base64 --decode > \"\$credentials/[a-z.0-9-]+\"",
+                line,
+            ):
+                raise WorkflowContractError(f"credential install must not print a secret: {line.strip()}")
+    build = body[RELEASE_RC_BUILD_STEP]
+    if "python3 scripts/release/build_macos_release.py release" not in build or "--arkforge-checkout" not in build:
+        raise WorkflowContractError("the release job must build through build_macos_release.py release")
+
+    cleanup = body[RELEASE_RC_CLEANUP_STEP]
+    for token in (
+        "        if: always()\n",
+        '            security delete-keychain "$keychain" || status=1\n',
+        '          rm -rf "$credentials" || status=1\n',
+    ):
+        if token not in cleanup:
+            raise WorkflowContractError(f"credential cleanup must carry: {token.strip()}")
+    install_at, build_at = names.index(RELEASE_RC_INSTALL_STEP), names.index(RELEASE_RC_BUILD_STEP)
+    cleanup_at, upload_at = names.index(RELEASE_RC_CLEANUP_STEP), names.index(RELEASE_RC_UPLOAD_STEP)
+    if not install_at < build_at < cleanup_at < upload_at or cleanup_at != build_at + 1:
+        raise WorkflowContractError(
+            "credential cleanup must follow the build directly and precede the upload"
+        )
+    for name, step in steps[names.index("Skip a release candidate that already exists") + 1:]:
+        if name != RELEASE_RC_CLEANUP_STEP and RELEASE_RC_BUILDS_ONLY_NEW not in step:
+            raise WorkflowContractError(f"an existing release candidate must not be rebuilt: {name}")
+    upload = body[RELEASE_RC_UPLOAD_STEP]
+    for token in (
+        "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        "          name: ${{ steps.version.outputs.artifact }}\n",
+        "          if-no-files-found: error\n",
+    ):
+        if token not in upload:
+            raise WorkflowContractError(f"the release candidate upload must carry: {token.strip()}")
+
+
 def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
     """Pin the Rust lanes' locked fetch: the deploy key for that fetch alone."""
 
@@ -1304,6 +1463,74 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             self.assertNotEqual(changed, text)
             with self.assertRaises(WorkflowContractError):
                 validate_cache_retention_contract(changed)
+
+    def test_release_candidate_keeps_its_credentials_to_main_and_one_job(self) -> None:
+        text = RELEASE_RC_WORKFLOW_PATH.read_text(encoding="utf-8")
+        validate_release_rc_contract(text)
+        install_env = "          ARKDECK_NOTARY_API_KEY_P8_BASE64: ${{ secrets.ARKDECK_NOTARY_API_KEY_P8_BASE64 }}\n"
+        cleanup_start = text.index("      - name: Remove release credentials\n")
+        upload_start = text.index("      - name: Keep the release candidate\n")
+        summary_start = text.index("      - name: Release candidate summary\n")
+        cleanup = text[cleanup_start:upload_start]
+        upload = text[upload_start:summary_start]
+        mutations = {
+            "pull_request trigger": text.replace(
+                "  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request:\n    branches: [main]\n"),
+            "pull_request_target trigger": text.replace(
+                "  workflow_dispatch:\n", "  workflow_dispatch:\n  pull_request_target:\n"),
+            "any branch": text.replace("    branches: [main]\n", '    branches: [main, "agent/**"]\n'),
+            "no version path": text.replace("      - scripts/release/release-version.json\n", "      - scripts/**\n"),
+            "no environment": text.replace("    environment: release\n", ""),
+            "another environment": text.replace("    environment: release\n", "    environment: staging\n"),
+            "no main check": text.replace(
+                '          if [ "$GITHUB_REF" != refs/heads/main ]; then\n', "          if false; then\n"),
+            "cancellable": text.replace("  cancel-in-progress: false\n", "  cancel-in-progress: true\n"),
+            "write permission": text.replace("permissions:\n  contents: read\n", "permissions:\n  contents: write\n"),
+            "cleanup on success only": text.replace(
+                "      - name: Remove release credentials\n        if: always()\n",
+                "      - name: Remove release credentials\n        if: success()\n"),
+            "cleanup keeps the keychain": text.replace(
+                '            security delete-keychain "$keychain" || status=1\n', "            :\n"),
+            "cleanup after the upload": text[:cleanup_start] + upload + cleanup + text[summary_start:],
+            "secret in the job env": text.replace(
+                "      CARGO_TERM_COLOR: always\n",
+                "      CARGO_TERM_COLOR: always\n"
+                "      ARKDECK_NOTARY_API_KEY_ID: ${{ secrets.ARKDECK_NOTARY_API_KEY_ID }}\n"),
+            "secret in the ArkForge checkout": text.replace(
+                "      - name: Check out ArkForge at the pinned revision\n",
+                "      - name: Check out ArkForge at the pinned revision\n        env:\n"
+                "          KEY: ${{ secrets.ARKDECK_NOTARY_API_KEY_P8_BASE64 }}\n"),
+            "an eighth secret": text.replace(
+                install_env, install_env + "          OTHER: ${{ secrets.OTHER_SECRET }}\n"),
+            "unmasked keychain password": text.replace(
+                '          echo "::add-mask::$keychain_password"\n', ""),
+            "traced credential install": text.replace(
+                "          set -euo pipefail\n          umask 077\n",
+                "          set -euxo pipefail\n          umask 077\n"),
+            "printed secret": text.replace(
+                "          umask 077\n", '          umask 077\n          echo "$ARKDECK_DEVELOPER_ID_P12_PASSWORD"\n'),
+            ".p12 kept": text.replace('          rm -f "$credentials/developer-id.p12"\n', ""),
+            "rebuilds an existing RC": text.replace(
+                "      - name: Build the signed and notarized release candidate\n"
+                "        if: steps.existing.outputs.exists == 'false'\n",
+                "      - name: Build the signed and notarized release candidate\n"),
+            "upload of nothing passes": text.replace(
+                "          if-no-files-found: error\n", "          if-no-files-found: warn\n"),
+        }
+        for case, mutated in mutations.items():
+            with self.subTest(case):
+                self.assertNotEqual(mutated, text)
+                with self.assertRaises(WorkflowContractError):
+                    validate_release_rc_contract(mutated)
+        # No other workflow names the release environment or its secrets.
+        for path in sorted((REPOSITORY_ROOT / ".github/workflows").glob("*.yml")):
+            if path == RELEASE_RC_WORKFLOW_PATH:
+                continue
+            other = path.read_text(encoding="utf-8")
+            with self.subTest(workflow=path.name):
+                self.assertNotIn("environment: release", other)
+                for secret in RELEASE_RC_SECRETS:
+                    self.assertNotIn(secret, other)
 
     def test_rust_recordings_are_preserved_after_failures(self) -> None:
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")

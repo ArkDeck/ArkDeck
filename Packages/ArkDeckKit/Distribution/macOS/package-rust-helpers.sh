@@ -24,6 +24,9 @@
 #
 # Usage: package-rust-helpers.sh <binaries> <staging> <cli-profile>
 #          <daemon-profile> <identity> <--timestamp|--timestamp=none>
+# Environment: ARKDECK_CODESIGN_KEYCHAIN (optional) names the keychain that
+# holds <identity>, such as the release-rc workflow's temporary one; an ad hoc
+# signature ignores it.
 set -euo pipefail
 if [[ "$#" != 6 ]]; then
   echo "usage: package-rust-helpers.sh <binaries> <staging> <cli-profile> <daemon-profile>" \
@@ -53,6 +56,14 @@ if [[ "$identity" == - ]]; then
   anchor=""
 else
   anchor="anchor apple generic and certificate leaf[subject.OU] = \"$team_identifier\" and "
+fi
+keychain_arguments=()
+if [[ "$identity" != - && -n "${ARKDECK_CODESIGN_KEYCHAIN:-}" ]]; then
+  if [[ "$ARKDECK_CODESIGN_KEYCHAIN" != /* || ! -f "$ARKDECK_CODESIGN_KEYCHAIN" ]]; then
+    echo "ARKDECK_CODESIGN_KEYCHAIN must be an absolute path to a keychain file" >&2
+    exit 66
+  fi
+  keychain_arguments=(--keychain "$ARKDECK_CODESIGN_KEYCHAIN")
 fi
 
 for executable in arkdeck arkdeck-agentd; do
@@ -96,9 +107,9 @@ chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/ar
 # the Data Protection Keychain under the shared access group, and the helper
 # validator requires both entitlements.
 codesign --force --sign "$identity" --options runtime "$timestamp" \
-  --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
+  ${keychain_arguments[@]+"${keychain_arguments[@]}"} --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
 codesign --force --sign "$identity" --options runtime "$timestamp" \
-  --entitlements "$distribution_root/ArkDeckCLI.entitlements" "$cli_bundle"
+  ${keychain_arguments[@]+"${keychain_arguments[@]}"} --entitlements "$distribution_root/ArkDeckCLI.entitlements" "$cli_bundle"
 codesign --verify --strict --deep --verbose=2 "$cli_bundle"
 codesign --verify --strict -R "=${anchor}identifier \"com.arkdeck.agentd\"" "$daemon_bundle"
 codesign --verify --strict -R "=${anchor}identifier \"com.arkdeck.cli\"" "$cli_bundle"
