@@ -209,6 +209,11 @@ def tool(name: str, arguments: list[str]) -> int:
             return 0
     elif name == "hdiutil":
         if arguments[0] == "create":
+            busy = state / "hdiutil-busy"
+            if failure == "hdiutil-busy-always" or (failure == "hdiutil-busy-once" and not busy.exists()):
+                busy.touch()
+                print("hdiutil: create failed - Resource busy", file=sys.stderr)
+                return 1
             dmg = Path(arguments[-1])
             key = hashlib.sha256(str(dmg).encode()).hexdigest()
             shutil.copytree(option(arguments, "-srcfolder"), state / key, symlinks=True)
@@ -541,6 +546,20 @@ class Release(Fixture):
         result = self.run_script(self.arguments, 1)
         self.assertIn("'Invalid'", result.stderr)
         self.assertEqual(self.called("xcrun", "stapler", "staple")[-1][-1].endswith(".dmg"), False)
+
+    def test_busy_hdiutil_create_is_retried(self):
+        self.env["FIXTURE_FAIL"] = "hdiutil-busy-once"
+        self.env["ARKDECK_HDIUTIL_RETRY_SECONDS"] = "0"
+        self.run_script(self.arguments, 0)
+        self.assertEqual(len(self.called("hdiutil", "create")), 2)
+
+    def test_hdiutil_create_that_stays_busy_publishes_nothing(self):
+        self.env["FIXTURE_FAIL"] = "hdiutil-busy-always"
+        self.env["ARKDECK_HDIUTIL_RETRY_SECONDS"] = "0"
+        result = self.run_script(self.arguments, 1)
+        self.assertIn("Resource busy", result.stderr)
+        self.assertEqual(len(self.called("hdiutil", "create")), 5)
+        self.assertEqual(self.called("hdiutil", "attach"), [])
 
     def test_dmg_signing_failure_publishes_nothing(self):
         self.env["FIXTURE_FAIL"] = "dmg-sign"
