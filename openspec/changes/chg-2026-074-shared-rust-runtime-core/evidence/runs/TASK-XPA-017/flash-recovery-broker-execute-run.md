@@ -152,4 +152,4 @@ Not run:
 
 ## CI
 
-Pending.
+Final: #2307 head `12cd6e6e2`, Swift CI run 36427055435 success (the `swift` aggregate and every selected lane), SDD Guard run 36427054721 success; squash-merged as `6edb4e479` on 2026-09-28. Recorded by the docs-only follow-up (TASK-XPA-017).

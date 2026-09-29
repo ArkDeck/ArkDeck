@@ -128,5 +128,6 @@ The first push (#2311, run 36439216948) was red in two lanes this PR caused:
 the Rust host-independent checks (`spec/baselines/swift-single-v1.json` not
 regenerated after `HDCFixtures.swift` left a generator input) and
 `ds-interactions` (the seven orphaned localization keys). Both are fixed above;
-the Swift and App lanes were green. The final result is recorded by the
-follow-up PR.
+the Swift and App lanes were green.
+
+Final: #2311 head `e57377491`, Swift CI run 36440456252 success (the `swift` aggregate and every selected lane), SDD Guard run 36440455385 success; squash-merged as `32db20b10` on 2026-09-28. Recorded by the docs-only follow-up (TASK-XPA-017).

@@ -141,4 +141,4 @@ smoke reader by the recorded stand-ins.
 
 ## CI
 
-Recorded by the next slice or a docs-only follow-up.
+Final: #2308 head `289fcb0f7`, Swift CI run 36430301497 success (the `swift` aggregate and every selected lane), SDD Guard run 36430301088 success; squash-merged as `f574ad984` on 2026-09-28. Recorded by the docs-only follow-up (TASK-XPA-017).

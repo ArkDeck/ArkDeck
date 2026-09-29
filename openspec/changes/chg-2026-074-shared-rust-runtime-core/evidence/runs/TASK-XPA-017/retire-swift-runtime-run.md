@@ -112,5 +112,6 @@ view only, at `arkdeck-soak`'s
 ("descriptors 24 / 16"). Judged an invalid run by the four criteria: no Rust
 source changed here, it is a known load-sensitive resource bound, it passed in
 twice elsewhere in the same job and in #2311's run of the same Rust tree, and nothing in
-the diff reaches it. The rebase onto `32db20b10` reruns it; the final result is
-recorded by the follow-up PR.
+the diff reaches it. The rebase onto `32db20b10` reran it.
+
+Final: #2312 head `9cfd2fe0d`, Swift CI run 36449252325 success (the `swift` aggregate and every selected lane), SDD Guard run 36449252163 success; squash-merged as `57ba8e36f` on 2026-09-29. Recorded by the docs-only follow-up (TASK-XPA-017).
