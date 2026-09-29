@@ -16,8 +16,9 @@
 //     and composition targets (TASK-XPA-017) are deleted, the manifest holds
 //     exactly the targets listed below, and none may return under its name.
 //   - What stays in ArkDeckKit is the App's side: ClientKit (the App's typed
-//     client of the Rust daemon), Core (shared value contracts), and the
-//     small libraries those tests and the App still link.
+//     client of the Rust daemon), Core (shared value contracts) and the Trace
+//     adapter. The Swift runtime client, runtime contracts and bootstrap
+//     registry that only tests still linked are deleted too (TASK-XPA-017).
 //   - There is no in-process decision plane and no model surface.
 //
 // When one of these tests fails, the fix is almost never to edit the test.
@@ -36,10 +37,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   private static let allowedImports: [String: Set<String>] = [
     "ArkDeckCore": [],
     "ArkDeckClientKit": ["ArkDeckCore"],
-    "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckTraceAdapter": [],
-    "ArkDeckAgentClient": ["ArkDeckCore"],
-    "ArkDeckBootstrap": ["ArkDeckCore"],
   ]
 
   /// Test-only executables the remaining tests and the App UI tests run.
@@ -50,17 +48,15 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckClientKitTests": ["ArkDeckClientKit", "ArkDeckCore"],
     "ArkDeckCoreTests": ["ArkDeckCore"],
     "ArkDeckTraceAdapterTests": ["ArkDeckTraceAdapter"],
-    "ArkDeckContractTests": [
-      "ArkDeckClientKit", "ArkDeckCore", "ArkDeckRuntime", "ArkDeckAgentClient",
-      "ArkDeckBootstrap", "ArkDeckFakeHDCFixture",
-    ],
+    "ArkDeckContractTests": ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckFakeHDCFixture"],
   ]
 
   /// Deleted targets whose names and source directories must never return:
   /// the Swift CLI (TASK-XPA-018), the Swift daemon, engine, storage,
   /// process, provider, composition and launchd targets with their crash and
-  /// soak fixtures (TASK-XPA-017), and the in-process decision plane
-  /// (CHG-2026-064). Their recorded oracles live on as Rust replays.
+  /// soak fixtures, the test-only runtime contract, runtime client and
+  /// bootstrap registry libraries (TASK-XPA-017), and the in-process decision
+  /// plane (CHG-2026-064). Their recorded oracles live on as Rust replays.
   private static let deletedTargets: [(target: String, path: String)] = [
     ("ArkDeckCLI", "Sources/ArkDeckCLI"),
     ("ArkDeckAgentDaemon", "Sources/ArkDeckAgentDaemon"),
@@ -77,16 +73,16 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     ("ArkDeckRuntimePortFixture", "Tests/ArkDeckRuntimePortFixture"),
     ("ArkDeckFakeHapSignerFixture", "Tests/ArkDeckFakeHapSignerFixture"),
     ("ArkDeckHarness", "Sources/ArkDeckHarness"),
+    ("ArkDeckRuntime", "Sources/ArkDeckRuntime"),
+    ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient"),
+    ("ArkDeckBootstrap", "Sources/ArkDeckBootstrap"),
   ]
 
   /// Where each remaining library target's sources live.
   private static let targetRoots: [(target: String, path: String)] = [
     ("ArkDeckCore", "Sources/ArkDeckCore"),
     ("ArkDeckClientKit", "Sources/ArkDeckClientKit"),
-    ("ArkDeckRuntime", "Sources/ArkDeckRuntime"),
     ("ArkDeckTraceAdapter", "Sources/ArkDeckTraceAdapter"),
-    ("ArkDeckAgentClient", "Sources/ArkDeckAgentClient"),
-    ("ArkDeckBootstrap", "Sources/ArkDeckBootstrap"),
   ]
 
   // MARK: - 1. The package holds no Swift Runtime

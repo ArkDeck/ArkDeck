@@ -8,10 +8,8 @@
 // contracts are catchable. When narrowing hides anything referenced here,
 // this package stops compiling — that is the gate.
 
-import ArkDeckAgentClient
 import ArkDeckClientKit
 import ArkDeckCore
-import ArkDeckRuntime
 import ArkDeckTraceAdapter
 import Foundation
 
@@ -22,25 +20,7 @@ private enum TraceAdapterSurface {
   static let make = ArkDeckTraceConfiguration.make(bundleURL:cachesDirectory:)
 }
 
-// MARK: - ArkDeckAgentClient: runtime client entry point and error contract
-
-private enum AgentClientSurface {
-  static let client: AgentClient.Type = AgentClient.self
-  static let request = AgentClient.request(method:params:id:timeoutSeconds:)
-
-  static func branches(_ body: () throws -> Void) -> String? {
-    do {
-      try body()
-      return nil
-    } catch let error as AgentClientError {
-      return "\(error)"
-    } catch {
-      return nil
-    }
-  }
-}
-
-// MARK: - ArkDeckRuntime: current v1 wire models, request semantics, rejection contract
+// MARK: - ArkDeckCore: current v1 wire models, request semantics, rejection contract
 
 private enum RuntimeSurface {
   static let errorCodes = RuntimeOperationErrorCode.allCases
@@ -49,7 +29,6 @@ private enum RuntimeSurface {
   static let clientContext = \RuntimeOperationRequest.clientContext
   static let rejection: RuntimeOperationRequestRejection.Type =
     RuntimeOperationRequestRejection.self
-  static let humanAction: HumanActionRequired.Type = HumanActionRequired.self
 }
 
 // MARK: - ArkDeckCore: job/catalog vocabulary

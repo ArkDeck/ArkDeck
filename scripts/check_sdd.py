@@ -647,12 +647,13 @@ REGISTRY_SURFACE_ROOTS = (
 )
 
 _READONLY_PIN = (
-    "content hash pinned by Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift "
-    "and consumed at runtime; migrating needs a change owning Sources/**"
+    "frozen HDC read-only probe registry bytes recorded by the deleted Swift provider "
+    "and replayed by HDCProbeRegistryContractTests and arkdeck-provider-hdc; migrating "
+    "needs a change owning those recordings"
 )
 _TRACE_PIN = (
-    "content hash pinned by Sources/ArkDeckOpenHarmony/TraceProbeAdapter.swift; "
-    "migrating needs a change owning Sources/**"
+    "frozen OPENHARMONY-TRACE-PROBES@1.0.0 registry bytes the Rust TraceProbe "
+    "(arkdeck-provider-hdc) follows; migrating needs a change owning that registry"
 )
 _FIXTURES = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Probes/1.0.0"
 

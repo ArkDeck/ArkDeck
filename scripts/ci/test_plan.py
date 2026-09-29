@@ -58,7 +58,6 @@ class PathClassificationTests(unittest.TestCase):
         for target in (
             "ArkDeckClientKit",
             "ArkDeckCore",
-            "ArkDeckRuntime",
             "ArkDeckTraceAdapter",
         ):
             with self.subTest(target=target):
@@ -71,8 +70,6 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_non_app_package_targets_skip_redundant_xcode_lane(self):
         for path in (
-            "Packages/ArkDeckKit/Sources/ArkDeckAgentClient/Client.swift",
-            "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/Registry.swift",
             "Packages/ArkDeckKit/Tests/ArkDeckFakeHDCFixture/main.swift",
             "Packages/ArkDeckKit/LaunchAgents/README.md",
         ):

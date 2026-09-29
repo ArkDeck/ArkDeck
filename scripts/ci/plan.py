@@ -76,7 +76,6 @@ RUST_CONTRACT_INPUT_FILES = frozenset({
 APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckClientKit/",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
-    "Packages/ArkDeckKit/Sources/ArkDeckRuntime/",
     "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/",
 )
 # The @arkdeck/ds interaction tests execute the docs/design prototype draft and
