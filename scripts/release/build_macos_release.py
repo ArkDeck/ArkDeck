@@ -633,9 +633,21 @@ def attach(dmg: Path, mountpoint: Path, environment: Mapping[str, str]) -> str:
         entities = plistlib.loads(output.encode()).get("system-entities", [])
     except (plistlib.InvalidFileException, ValueError) as error:
         raise ReleaseError("hdiutil attach returned no plist") from error
+    # hdiutil reports the mount point with symbolic links resolved (a runner's
+    # TMPDIR is under /var/folders, reported as /private/var/folders), so both
+    # sides are compared resolved.
+    wanted = os.path.realpath(mountpoint)
     for entity in entities:
-        if entity.get("mount-point") == str(mountpoint) and entity.get("dev-entry"):
+        if entity.get("mount-point") and entity.get("dev-entry") \
+                and os.path.realpath(entity["mount-point"]) == wanted:
             return str(entity["dev-entry"])
+    # Never leave an image attached that this script cannot account for.
+    for entity in entities:
+        if entity.get("dev-entry") and entity.get("mount-point"):
+            try:
+                run(["hdiutil", "detach", "-force", entity["dev-entry"]], env=environment)
+            except ReleaseError:
+                pass
     raise ReleaseError("hdiutil attach did not report the requested mount point")
 
 

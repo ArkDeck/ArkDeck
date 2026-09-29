@@ -223,8 +223,11 @@ def tool(name: str, arguments: list[str]) -> int:
             key = Path(arguments[-1]).read_text().split()[-1]
             mountpoint = option(arguments, "-mountpoint")
             shutil.copytree(state / key, mountpoint, symlinks=True, dirs_exist_ok=True)
+            reported = os.path.realpath(mountpoint) if failure == "attach-resolved" else mountpoint
+            if failure == "attach-elsewhere":
+                reported = "/Volumes/Somewhere Else"
             sys.stdout.buffer.write(plistlib.dumps({"system-entities": [
-                {"dev-entry": "/dev/disk99s1", "mount-point": mountpoint},
+                {"dev-entry": "/dev/disk99s1", "mount-point": reported},
             ]}))
             return 0
         if arguments[0] in ("detach", "verify"):
@@ -560,6 +563,25 @@ class Release(Fixture):
         self.assertIn("Resource busy", result.stderr)
         self.assertEqual(len(self.called("hdiutil", "create")), 5)
         self.assertEqual(self.called("hdiutil", "attach"), [])
+
+    def test_mount_point_reported_through_a_resolved_symlink_is_accepted(self):
+        # A runner's TMPDIR sits under a symlink (/var -> /private/var); hdiutil
+        # reports the resolved mount point.
+        real = self.root / "real-tmp"
+        real.mkdir()
+        link = self.root / "linked-tmp"
+        link.symlink_to(real)
+        self.env["TMPDIR"] = str(link)
+        self.env["FIXTURE_FAIL"] = "attach-resolved"
+        self.run_script(self.arguments, 0)
+        self.assertEqual(len(self.called("hdiutil", "detach")), 1)
+
+    def test_unaccounted_mount_point_is_detached_and_publishes_nothing(self):
+        self.env["FIXTURE_FAIL"] = "attach-elsewhere"
+        result = self.run_script(self.arguments, 1)
+        self.assertIn("did not report the requested mount point", result.stderr)
+        self.assertTrue(self.called("hdiutil", "detach", "-force"))
+        self.assertEqual(sorted(p.name for p in self.output.iterdir()) if self.output.exists() else [], [])
 
     def test_dmg_signing_failure_publishes_nothing(self):
         self.env["FIXTURE_FAIL"] = "dmg-sign"
