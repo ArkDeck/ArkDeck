@@ -37,7 +37,7 @@ concurrency:
 jobs:
   release-rc:
     name: Signed and notarized release candidate
-    runs-on: macos-26
+    runs-on: xcode-27
     environment: release
     # Three notarizations (helper pair, App, DMG) wait on Apple; each may take
     # from minutes to hours, the builds about half an hour.
@@ -47,7 +47,7 @@ jobs:
       contents: read
       actions: read
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
       CARGO_TERM_COLOR: always
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     steps:
@@ -108,7 +108,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Exact Xcode 26.6 preflight
+      - name: Exact Xcode 27.0 preflight
         if: steps.existing.outputs.exists == 'false'
         run: |
           set -eu

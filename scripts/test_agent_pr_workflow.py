@@ -941,7 +941,7 @@ def validate_release_rc_contract(text: str) -> None:
     if extract_job_names(text) != ("release-rc",):
         raise WorkflowContractError("the release candidate is one job")
     job = _job_block(text, "release-rc")
-    for token in ("    runs-on: macos-26\n", "    environment: release\n"):
+    for token in ("    runs-on: xcode-27\n", "    environment: release\n"):
         if token not in job:
             raise WorkflowContractError(f"the release job must carry: {token.strip()}")
     if re.search(r"\bset -[a-z]*x", meaningful) or "set -o xtrace" in meaningful:
