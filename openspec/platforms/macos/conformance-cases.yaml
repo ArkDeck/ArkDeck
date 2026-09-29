@@ -2,7 +2,7 @@ suite: PLATFORM-MACOS-CASES-0.1.0
 platform: macos
 version: 0.1.0
 support_cells:
-  - { id: macos-14-arm64-developer-id, os_version_family: "14", architecture: arm64, package_format: app-bundle-developer-id }
+  - { id: macos-27-arm64-developer-id, os_version_family: "27", architecture: arm64, package_format: app-bundle-developer-id }
 cases:
   - { id: MAC-M0A-DIST-001, test_id: TEST-MAC-M0A-DIST-001, method: "ADR lint plus independent signed review.", expected_result: "Exactly one distribution path, entitlement set, rejected alternatives, risks and revalidation triggers are recorded.", expected_source: "openspec/platforms/macos/conformance-cases.yaml#MAC-M0A-DIST-001", minimum_evidence: manualReview }
   - { id: MAC-M0A-HDC-001, test_id: TEST-MAC-M0A-HDC-001, method: "Installed-tool discovery and semantic-failure matrix.", expected_result: "Every candidate reports path, version and hash; semantic failures are non-success.", expected_source: "openspec/platforms/macos/conformance-cases.yaml#MAC-M0A-HDC-001", minimum_evidence: platform }
