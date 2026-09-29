@@ -572,6 +572,15 @@ enum DebugHAPSubmission {
     @Sendable (String, [String: JSONValue]?) async
     -> Result<Data, DebugXPCReadFailure>
 
+  /// Reads and hashes a whole package, so it runs on the concurrent pool
+  /// rather than on the caller's actor.
+  @concurrent
+  private static func inspectPackage(
+    _ file: URL, allowsHSP: Bool
+  ) async throws -> DebugHAPLocalArtifact {
+    try DebugHAPLocalArtifactInspector.inspect(file, allowsHSP: allowsHSP)
+  }
+
   static func submit(
     target: DebugTargetPresentation,
     fileURL: URL,
@@ -602,9 +611,7 @@ enum DebugHAPSubmission {
       var locals: [DebugHAPLocalArtifact] = []
       for (index, file) in files.enumerated() {
         try Task.checkCancellation()
-        let local = try await Task.detached(priority: .userInitiated) {
-          try DebugHAPLocalArtifactInspector.inspect(file, allowsHSP: index > 0)
-        }.value
+        let local = try await Self.inspectPackage(file, allowsHSP: index > 0)
         guard !locals.contains(where: { $0.sha256 == local.sha256 }) else {
           throw DebugHAPPackageSelection.Failure.duplicatePackage
         }
@@ -1056,6 +1063,15 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
       diagnosticsDurationSeconds: diagnosticsDurationSeconds)
   }
 
+  /// Reads and parses the whole library, so it runs on the concurrent pool
+  /// rather than on this actor.
+  @concurrent
+  private static func inspectNativeLibrary(
+    _ fileURL: URL
+  ) async throws -> DebugNativeLibraryLocalArtifact {
+    try DebugNativeLibraryLocalArtifactInspector.inspect(fileURL)
+  }
+
   func prepareNativeLibrary(
     target: DebugTargetPresentation,
     fileURL: URL,
@@ -1077,9 +1093,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
       if gainedScope { fileURL.stopAccessingSecurityScopedResource() }
     }
     do {
-      let local = try await Task.detached(priority: .userInitiated) {
-        try DebugNativeLibraryLocalArtifactInspector.inspect(fileURL)
-      }.value
+      let local = try await Self.inspectNativeLibrary(fileURL)
 
       let receipt = try await RuntimeAppArtifactUpload.upload(
         fileURL: fileURL, kind: "native-library", targetID: target.id,

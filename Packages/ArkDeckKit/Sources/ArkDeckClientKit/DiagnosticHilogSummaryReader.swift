@@ -12,6 +12,9 @@ public struct DiagnosticHilogSummaryReader: Sendable {
     self.provider = provider
   }
 
+  /// Decodes and verifies the summary artifact here, so it runs on the
+  /// concurrent pool rather than on its caller's actor.
+  @concurrent
   public func load(_ context: RuntimeHistoryWorkspaceContext) async -> DiagnosticHilogSummaryLoadResult {
     guard context.operationReference == "analyzer.summarize-hilog@1",
       context.state == "succeeded", context.executionMode == "execute"

@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 public enum UpdateNetworkError: Error, Equatable, Sendable {
   case invalidInitialURL
@@ -155,16 +156,17 @@ package final class URLSessionUpdateHTTPStreamer: UpdateHTTPStreaming, @unchecke
   }
 }
 
-private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate,
-  @unchecked Sendable
-{
+private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate, Sendable {
+  private struct State {
+    weak var session: URLSession?
+    var redirectCount = 0
+    var receivedBytes: UInt64 = 0
+    var terminal = false
+  }
+
   private let maximumBytes: UInt64
   private let continuation: AsyncThrowingStream<Data, any Error>.Continuation
-  private let lock = NSLock()
-  private weak var session: URLSession?
-  private var redirectCount = 0
-  private var receivedBytes: UInt64 = 0
-  private var terminal = false
+  private let state = Mutex(State())
 
   init(
     maximumBytes: UInt64,
@@ -175,7 +177,7 @@ private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate,
   }
 
   func attach(session: URLSession) {
-    lock.withLock { self.session = session }
+    state.withLock { $0.session = session }
   }
 
   func urlSession(
@@ -186,9 +188,9 @@ private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate,
     completionHandler: @escaping (URLRequest?) -> Void
   ) {
     do {
-      let nextCount = lock.withLock {
-        redirectCount += 1
-        return redirectCount
+      let nextCount = state.withLock {
+        $0.redirectCount += 1
+        return $0.redirectCount
       }
       completionHandler(
         try UpdateRedirectPolicy.redirectedRequest(
@@ -226,11 +228,11 @@ private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate,
   }
 
   func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
-    let accepted = lock.withLock {
-      guard !terminal, UInt64(data.count) <= maximumBytes - min(maximumBytes, receivedBytes) else {
-        return false
-      }
-      receivedBytes += UInt64(data.count)
+    let accepted = state.withLock { state in
+      guard !state.terminal,
+        UInt64(data.count) <= maximumBytes - min(maximumBytes, state.receivedBytes)
+      else { return false }
+      state.receivedBytes += UInt64(data.count)
       return true
     }
     guard accepted else {
@@ -254,10 +256,10 @@ private final class UpdateStreamingDelegate: NSObject, URLSessionDataDelegate,
   }
 
   private func finish(throwing error: (any Error)? = nil) {
-    let shouldFinish = lock.withLock {
-      guard !terminal else { return false }
-      terminal = true
-      return true
+    let (shouldFinish, session) = state.withLock { state -> (Bool, URLSession?) in
+      guard !state.terminal else { return (false, nil) }
+      state.terminal = true
+      return (true, state.session)
     }
     guard shouldFinish else { return }
     if let error {

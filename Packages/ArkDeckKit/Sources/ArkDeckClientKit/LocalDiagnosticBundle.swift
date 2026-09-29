@@ -942,7 +942,7 @@ package struct LocalDiagnosticBundleExporter: Sendable {
   }
 
   private static func timestamp() -> String {
-    ISO8601Timestamps.string(from: Date(), includingFractionalSeconds: true)
+    ISO8601Timestamps.string(from: Date.now, includingFractionalSeconds: true)
   }
 
 }

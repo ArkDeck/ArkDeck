@@ -13,7 +13,6 @@ enum OverviewRemoteServerPresentation: Equatable {
 
 /// Resolves only an explicit target-to-source binding. A configured source,
 /// recent source, or first source is never treated as the target's server.
-@MainActor
 @Observable
 final class OverviewRemoteServerViewModel {
   private(set) var presentation: OverviewRemoteServerPresentation = .loading

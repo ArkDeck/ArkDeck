@@ -2,6 +2,7 @@ import ArkDeckCore
 import Darwin
 import Foundation
 import OSLog
+import Synchronization
 
 // `PORT-LOGGING-001`: the App's own bounded, redacted diagnostics. The App is
 // its only writer — the auto-updater logs through it — and no daemon code uses
@@ -15,7 +16,7 @@ public protocol DiagnosticAuditClock: Sendable {
 public struct SystemDiagnosticAuditClock: DiagnosticAuditClock {
   public init() {}
 
-  public var nowUTC: Date { Date() }
+  public var nowUTC: Date { Date.now }
 }
 
 public enum SystemLogCategory: String, Codable, CaseIterable, Sendable {
@@ -298,22 +299,28 @@ public struct StructuredDiagnosticLogSnapshot: Equatable, Sendable {
   }
 }
 
-public final class StructuredDiagnosticLogStore: @unchecked Sendable {
+public final class StructuredDiagnosticLogStore: Sendable {
   private struct Segment {
     let sequence: UInt64
     let name: String
     var size: Int
   }
 
+  /// Everything a write changes. It is reachable only under the lock.
+  private struct State {
+    var currentDescriptor: Int32
+    var segments: [Segment]
+    var poisoned = false
+
+    var totalBytes: Int { segments.reduce(0) { $0 + $1.size } }
+  }
+
   public let directory: URL
   public let configuration: StructuredDiagnosticLogConfiguration
 
-  private let lock = NSLock()
   private let directoryDescriptor: Int32
   private let writerLockDescriptor: Int32
-  private var currentDescriptor: Int32
-  private var segments: [Segment]
-  private var poisoned = false
+  private let state: Mutex<State>
 
   public init(
     directory: URL,
@@ -372,8 +379,7 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
       }
       directoryDescriptor = openedDirectory
       writerLockDescriptor = openedWriterLock
-      currentDescriptor = openedCurrent
-      segments = loaded
+      state = Mutex(State(currentDescriptor: openedCurrent, segments: loaded))
     } catch {
       if openedCurrent >= 0 { Darwin.close(openedCurrent) }
       if openedWriterLock >= 0 {
@@ -387,7 +393,7 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
   }
 
   deinit {
-    Darwin.close(currentDescriptor)
+    Darwin.close(state.withLock { $0.currentDescriptor })
     _ = flock(writerLockDescriptor, LOCK_UN)
     Darwin.close(writerLockDescriptor)
     _ = flock(directoryDescriptor, LOCK_UN)
@@ -402,101 +408,96 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
       throw SystemLoggerError.recordLimitExceeded
     }
 
-    lock.lock()
-    defer { lock.unlock() }
-    guard !poisoned else { throw SystemLoggerError.writerPoisoned }
-    do {
-      try validateBindings()
-      if segments[segments.count - 1].size > 0,
-        segments[segments.count - 1].size + bytes.count > configuration.segmentBytes
-      {
-        try rotate()
+    try state.withLock { state in
+      guard !state.poisoned else { throw SystemLoggerError.writerPoisoned }
+      do {
+        try validateBindings(state)
+        if state.segments[state.segments.count - 1].size > 0,
+          state.segments[state.segments.count - 1].size + bytes.count
+            > configuration.segmentBytes
+        {
+          try rotate(&state)
+        }
+        try pruneForAppend(&state, byteCount: bytes.count)
+        try validateBindings(state)
+        try Self.writeAll(bytes, descriptor: state.currentDescriptor)
+        try Self.fullSync(state.currentDescriptor)
+        state.segments[state.segments.count - 1].size += bytes.count
+      } catch {
+        state.poisoned = true
+        throw error
       }
-      try pruneForAppend(byteCount: bytes.count)
-      try validateBindings()
-      try Self.writeAll(bytes, descriptor: currentDescriptor)
-      try Self.fullSync(currentDescriptor)
-      segments[segments.count - 1].size += bytes.count
-    } catch {
-      poisoned = true
-      throw error
     }
   }
 
   public func snapshot() throws -> StructuredDiagnosticLogSnapshot {
-    lock.lock()
-    defer { lock.unlock() }
-    guard !poisoned else { throw SystemLoggerError.writerPoisoned }
-    try validateBindings()
-    try Self.fullSync(currentDescriptor)
-    var files: [StructuredDiagnosticSnapshotFile] = []
-    var total = 0
-    for segment in segments {
-      let descriptor = try Self.openSegment(
-        segment, directoryDescriptor: directoryDescriptor, directoryURL: directory)
-      defer { Darwin.close(descriptor) }
-      let data = try Self.readExactly(descriptor: descriptor, byteCount: segment.size)
-      files.append(StructuredDiagnosticSnapshotFile(name: segment.name, data: data))
-      total += data.count
+    try state.withLock { state in
+      guard !state.poisoned else { throw SystemLoggerError.writerPoisoned }
+      try validateBindings(state)
+      try Self.fullSync(state.currentDescriptor)
+      var files: [StructuredDiagnosticSnapshotFile] = []
+      var total = 0
+      for segment in state.segments {
+        let descriptor = try Self.openSegment(
+          segment, directoryDescriptor: directoryDescriptor, directoryURL: directory)
+        defer { Darwin.close(descriptor) }
+        let data = try Self.readExactly(descriptor: descriptor, byteCount: segment.size)
+        files.append(StructuredDiagnosticSnapshotFile(name: segment.name, data: data))
+        total += data.count
+      }
+      guard total <= configuration.quotaBytes else { throw SystemLoggerError.quotaExceeded }
+      return StructuredDiagnosticLogSnapshot(files: files, totalBytes: total)
     }
-    guard total <= configuration.quotaBytes else { throw SystemLoggerError.quotaExceeded }
-    return StructuredDiagnosticLogSnapshot(files: files, totalBytes: total)
   }
 
   public var retainedBytes: Int {
-    lock.lock()
-    defer { lock.unlock() }
-    return segments.reduce(0) { $0 + $1.size }
+    state.withLock { $0.totalBytes }
   }
 
   public var segmentCount: Int {
-    lock.lock()
-    defer { lock.unlock() }
-    return segments.count
+    state.withLock { $0.segments.count }
   }
 
-  private func rotate() throws {
-    try Self.fullSync(currentDescriptor)
-    Darwin.close(currentDescriptor)
-    guard let last = segments.last, last.sequence < UInt64.max else {
+  private func rotate(_ state: inout State) throws {
+    try Self.fullSync(state.currentDescriptor)
+    Darwin.close(state.currentDescriptor)
+    guard let last = state.segments.last, last.sequence < UInt64.max else {
       throw SystemLoggerError.invalidSegment
     }
     let next = Segment(
       sequence: last.sequence + 1, name: Self.segmentName(last.sequence + 1), size: 0)
     do {
-      currentDescriptor = try Self.createSegment(
+      state.currentDescriptor = try Self.createSegment(
         next, directoryDescriptor: directoryDescriptor, directoryURL: directory)
-      segments.append(next)
+      state.segments.append(next)
     } catch {
-      currentDescriptor = -1
+      state.currentDescriptor = -1
       throw error
     }
   }
 
-  private func pruneForAppend(byteCount: Int) throws {
-    while totalBytes + byteCount > configuration.quotaBytes, segments.count > 1 {
-      let oldest = segments.removeFirst()
+  private func pruneForAppend(_ state: inout State, byteCount: Int) throws {
+    while state.totalBytes + byteCount > configuration.quotaBytes, state.segments.count > 1 {
+      let oldest = state.segments.removeFirst()
       guard Darwin.unlinkat(directoryDescriptor, oldest.name, 0) == 0 else {
-        segments.insert(oldest, at: 0)
+        state.segments.insert(oldest, at: 0)
         throw SystemLoggerError.fileOperationFailed(errno: errno)
       }
       try Self.fullSync(directoryDescriptor)
     }
-    guard totalBytes + byteCount <= configuration.quotaBytes else {
+    guard state.totalBytes + byteCount <= configuration.quotaBytes else {
       throw SystemLoggerError.quotaExceeded
     }
   }
 
-  private var totalBytes: Int { segments.reduce(0) { $0 + $1.size } }
-
-  private func validateBindings() throws {
+  private func validateBindings(_ state: State) throws {
     try Self.validateOwnedDirectory(descriptor: directoryDescriptor, url: directory)
     try Self.validateWriterLock(
       descriptor: writerLockDescriptor, directoryDescriptor: directoryDescriptor)
-    guard let current = segments.last else { throw SystemLoggerError.invalidSegment }
+    guard let current = state.segments.last else { throw SystemLoggerError.invalidSegment }
     var opened = stat()
     var linked = stat()
-    guard fstat(currentDescriptor, &opened) == 0,
+    guard fstat(state.currentDescriptor, &opened) == 0,
       fstatat(directoryDescriptor, current.name, &linked, AT_SYMLINK_NOFOLLOW) == 0,
       opened.st_mode & S_IFMT == S_IFREG, linked.st_mode & S_IFMT == S_IFREG,
       opened.st_uid == geteuid(), linked.st_uid == geteuid(), opened.st_nlink == 1,
@@ -699,7 +700,7 @@ public final class StructuredDiagnosticLogStore: @unchecked Sendable {
 
 /// `PORT-LOGGING-001` facade. Sensitive input is transformed into a redacted record before either
 /// the Unified Logging sink or the durable structured store can observe it.
-public final class SystemLogger: @unchecked Sendable {
+public final class SystemLogger: Sendable {
   private let structuredStore: StructuredDiagnosticLogStore
   private let unifiedLogger: any UnifiedDiagnosticLogging
   private let auditClock: any DiagnosticAuditClock

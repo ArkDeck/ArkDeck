@@ -1,6 +1,7 @@
 import ArkDeckCore
 import Darwin
 import Foundation
+import Synchronization
 
 public enum RuntimeUpdateStateStoreError: Error, Equatable, Sendable {
   case unsafeDirectory
@@ -37,10 +38,10 @@ public struct RuntimeUpdateSnapshot: Codable, Equatable, Sendable {
     self.state = state
     self.activeOperationID = activeOperationID
     self.cancellationRequested = cancellationRequested
-    self.updatedAtUTC = updatedAtUTC ?? ISO8601Timestamps.string(from: Date())
+    self.updatedAtUTC = updatedAtUTC ?? ISO8601Timestamps.string(from: Date.now)
   }
 
-  public static func initial(now: Date = Date()) -> RuntimeUpdateSnapshot {
+  public static func initial(now: Date = Date.now) -> RuntimeUpdateSnapshot {
     RuntimeUpdateSnapshot(
       generation: 0, state: .idle,
       updatedAtUTC: ISO8601Timestamps.string(from: now))
@@ -125,7 +126,7 @@ public struct RuntimeUpdateStatusProjection: Equatable, Sendable {
   }
 }
 
-public final class RuntimeUpdateOperationLease: @unchecked Sendable {
+public final class RuntimeUpdateOperationLease: Sendable {
   fileprivate let descriptor: Int32
 
   fileprivate init(descriptor: Int32) {
@@ -141,7 +142,7 @@ public final class RuntimeUpdateOperationLease: @unchecked Sendable {
 /// A canonical, owner-only, cross-process state store with a separate process-lifetime operation
 /// lease. State readers never block on a network transfer; a crashed writer automatically releases
 /// the lease, allowing explicit cleanup to settle its in-progress record without guessing liveness.
-public final class RuntimeUpdateStateStore: @unchecked Sendable {
+public final class RuntimeUpdateStateStore: Sendable {
   private static let stateName = "state-v1.json"
   private static let stateLockName = ".state-v1.lock"
   private static let operationLockName = ".operation-v1.lock"
@@ -153,7 +154,7 @@ public final class RuntimeUpdateStateStore: @unchecked Sendable {
 
   public init(directory: URL, now: @escaping @Sendable () -> Date = Date.init) {
     self.directory = directory.standardizedFileURL
-    self.processLock = RuntimeUpdateProcessLockRegistry.shared.lock(for: self.directory.path)
+    self.processLock = RuntimeUpdateProcessLocks.lock(for: self.directory.path)
     self.now = now
   }
 
@@ -432,13 +433,13 @@ public final class RuntimeUpdateStateStore: @unchecked Sendable {
   }
 }
 
-private final class RuntimeUpdateProcessLockRegistry: @unchecked Sendable {
-  static let shared = RuntimeUpdateProcessLockRegistry()
-  private let registryLock = NSLock()
-  private var locks: [String: NSLock] = [:]
+/// One lock per state directory, shared by every store instance in this
+/// process; the file locks order the processes.
+private enum RuntimeUpdateProcessLocks {
+  private static let locks = Mutex<[String: NSLock]>([:])
 
-  func lock(for path: String) -> NSLock {
-    registryLock.withLock {
+  static func lock(for path: String) -> NSLock {
+    locks.withLock { locks in
       if let existing = locks[path] { return existing }
       let lock = NSLock()
       locks[path] = lock

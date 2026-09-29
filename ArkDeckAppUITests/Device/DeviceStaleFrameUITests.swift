@@ -8,6 +8,7 @@ import XCTest
 /// screen — only whether the workspace refused.
 ///
 /// Opt-in, because it needs an adopted device and a real capture.
+@MainActor
 final class DeviceStaleFrameUITests: XCTestCase {
   private static let realDeviceEnvironmentKey = "ARKDECK_UI_TEST_DEVICE_REAL_DEVICE"
 

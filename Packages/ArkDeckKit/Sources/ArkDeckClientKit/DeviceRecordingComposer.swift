@@ -44,6 +44,9 @@ public enum DeviceRecordingComposer {
   /// frames at the same instant and the second would never be shown.
   static let minimumFrameSeconds = 0.001
 
+  /// Decodes and draws every frame, so it runs on the concurrent pool rather
+  /// than on its caller's actor.
+  @concurrent
   public static func compose(
     frames: [DeviceFrameArchive.Frame],
     frameDurationsSeconds: [Double],

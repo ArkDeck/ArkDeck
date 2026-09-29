@@ -1,4 +1,5 @@
 import AppKit
+import ArkDeckClientKit
 import ArkDeckTraceAdapter
 import ArkTraceAnalysis
 import ArkTraceAppSupport
@@ -8,7 +9,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 nonisolated func traceViewerText(_ key: String) -> String {
-    Bundle.main.localizedString(forKey: key, value: key, table: "TraceViewerLocalizable")
+    String(localized: String.LocalizationValue(key), table: "TraceViewerLocalizable")
 }
 
 private nonisolated func traceViewerText(_ key: String, values: [String: String]) -> String {
@@ -333,7 +334,6 @@ struct TraceViewerRootView: View {
         }
     }
 
-    @MainActor
     private func presentOpenPanel() {
         let panel = NSOpenPanel()
         panel.title = traceViewerText("viewer.openPanel.title")
@@ -1599,7 +1599,6 @@ private struct InspectorFocusButton: NSViewRepresentable {
         }
     }
 
-    @MainActor
     final class Coordinator: NSObject {
         var onFocusRequestConsumed: @MainActor (UInt64) -> Void
         var action: @MainActor () -> Void

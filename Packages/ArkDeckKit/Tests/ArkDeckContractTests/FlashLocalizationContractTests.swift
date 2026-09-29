@@ -32,7 +32,7 @@ final class FlashLocalizationContractTests: XCTestCase {
       encoding: .utf8)
 
     XCTAssertTrue(localizationSource.contains("table: \"FlashLocalizable\""))
-    XCTAssertTrue(localizationSource.contains("Bundle.main.localizedString"))
+    XCTAssertTrue(localizationSource.contains("String(localized: String.LocalizationValue(key), table: \"FlashLocalizable\")"))
 
     let forbiddenPatterns = [
       #"(?<![A-Za-z0-9_])(?:Text|Label|Button|Picker|GroupBox|LabeledContent|TextField)\(\s*\"flash\."#,

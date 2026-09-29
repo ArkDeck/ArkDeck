@@ -9,8 +9,5 @@ import Foundation
 /// the runtime published, and translating them would make the operation log
 /// disagree with the evidence it is reporting.
 func deviceText(_ key: String) -> String {
-  Bundle.main.localizedString(
-    forKey: key,
-    value: key,
-    table: "DeviceLocalizable")
+  String(localized: String.LocalizationValue(key), table: "DeviceLocalizable")
 }

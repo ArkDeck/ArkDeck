@@ -8,8 +8,5 @@ import Foundation
 /// are deliberately not routed through here. Translating them would make the
 /// reader disagree with the evidence it is reading.
 func diagnosticsText(_ key: String) -> String {
-  Bundle.main.localizedString(
-    forKey: key,
-    value: key,
-    table: "DiagnosticsLocalizable")
+  String(localized: String.LocalizationValue(key), table: "DiagnosticsLocalizable")
 }

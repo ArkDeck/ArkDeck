@@ -3,7 +3,6 @@ import Foundation
 import Observation
 import SwiftUI
 
-@MainActor
 @Observable
 final class DeviceWorkspaceViewModel {
   /// Below this the pointer did not travel: the gesture is a press at one

@@ -8,7 +8,7 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testPagingRemainsBoundedAndRetryKeepsTheSameCursor() async throws {
     let transport = ControlledHistoryTransport()
     let provider = RuntimeHistoryXPCProvider(request: transport.request)
-    let first = await startRead(provider.refreshHistory, through: transport, index: 0)
+    let first = await startRead({ await provider.refreshHistory() }, through: transport, index: 0)
     await transport.complete(0, with: try page(["head"], cursor: "older"))
     let initial = await first.value
     XCTAssertEqual(initial.jobs.map(\.id), ["head"])
@@ -18,14 +18,14 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
     XCTAssertEqual(firstParams["includeTimeline"], .bool(false))
     XCTAssertEqual(firstParams["includeCurrent"], .bool(true))
 
-    let older = await startRead(provider.loadOlderHistory, through: transport, index: 1)
+    let older = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 1)
     await transport.complete(1, with: .failure("temporarily unavailable"))
     let failedPage = await older.value
     XCTAssertEqual(failedPage.jobs, initial.jobs)
     XCTAssertTrue(failedPage.hasOlderJobs)
     XCTAssertEqual(failedPage.olderJobsLoadFailure, "temporarily unavailable")
 
-    let retry = await startRead(provider.loadOlderHistory, through: transport, index: 2)
+    let retry = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 2)
     let retryParams = await transport.params(at: 2)
     XCTAssertEqual(retryParams["cursor"], .string("older"))
     XCTAssertEqual(retryParams["includeCurrent"], .bool(true))
@@ -43,18 +43,18 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testLateOlderSuccessCannotAppendRowsOrReplaceTheRefreshedCursor() async throws {
     let transport = ControlledHistoryTransport()
     let provider = RuntimeHistoryXPCProvider(request: transport.request)
-    let first = await startRead(provider.refreshHistory, through: transport, index: 0)
+    let first = await startRead({ await provider.refreshHistory() }, through: transport, index: 0)
     await transport.complete(0, with: try page(["old-head"], cursor: "old-cursor"))
     _ = await first.value
-    let older = await startRead(provider.loadOlderHistory, through: transport, index: 1)
-    let refresh = await startRead(provider.refreshHistory, through: transport, index: 2)
+    let older = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 1)
+    let refresh = await startRead({ await provider.refreshHistory() }, through: transport, index: 2)
     await transport.complete(2, with: try page(["new-head"], cursor: "new-cursor"))
     let refreshed = await refresh.value
     await transport.complete(1, with: try page(["stale-tail"], cursor: "stale-cursor"))
     let stale = await older.value
     XCTAssertEqual(stale, refreshed)
 
-    let newOlder = await startRead(provider.loadOlderHistory, through: transport, index: 3)
+    let newOlder = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 3)
     let params = await transport.params(at: 3)
     XCTAssertEqual(params["cursor"], .string("new-cursor"))
     await transport.complete(3, with: try page(["new-tail"]))
@@ -66,11 +66,11 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testLateOlderFailureCannotAddAnErrorOrReenableExhaustedPaging() async throws {
     let transport = ControlledHistoryTransport()
     let provider = RuntimeHistoryXPCProvider(request: transport.request)
-    let first = await startRead(provider.refreshHistory, through: transport, index: 0)
+    let first = await startRead({ await provider.refreshHistory() }, through: transport, index: 0)
     await transport.complete(0, with: try page(["old-head"], cursor: "old-cursor"))
     _ = await first.value
-    let older = await startRead(provider.loadOlderHistory, through: transport, index: 1)
-    let refresh = await startRead(provider.refreshHistory, through: transport, index: 2)
+    let older = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 1)
+    let refresh = await startRead({ await provider.refreshHistory() }, through: transport, index: 2)
     await transport.complete(2, with: try page(["new-head"]))
     let refreshed = await refresh.value
     await transport.complete(1, with: .failure("stale page error"))
@@ -83,11 +83,11 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testOlderCompletionDuringRefreshCannotMaskTheRefreshFailure() async throws {
     let transport = ControlledHistoryTransport()
     let provider = RuntimeHistoryXPCProvider(request: transport.request)
-    let first = await startRead(provider.refreshHistory, through: transport, index: 0)
+    let first = await startRead({ await provider.refreshHistory() }, through: transport, index: 0)
     await transport.complete(0, with: try page(["old-head"], cursor: "old-cursor"))
     _ = await first.value
-    let older = await startRead(provider.loadOlderHistory, through: transport, index: 1)
-    let refresh = await startRead(provider.refreshHistory, through: transport, index: 2)
+    let older = await startRead({ await provider.loadOlderHistory() }, through: transport, index: 1)
+    let refresh = await startRead({ await provider.refreshHistory() }, through: transport, index: 2)
     await transport.complete(1, with: try page(["stale-tail"], cursor: "stale-cursor"))
     let stale = await older.value
     XCTAssertEqual(stale, .loading)
@@ -102,8 +102,8 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testLateRefreshCannotReplaceTheNewestRefreshFailure() async throws {
     let transport = ControlledHistoryTransport()
     let provider = RuntimeHistoryXPCProvider(request: transport.request)
-    let old = await startRead(provider.refreshHistory, through: transport, index: 0)
-    let new = await startRead(provider.refreshHistory, through: transport, index: 1)
+    let old = await startRead({ await provider.refreshHistory() }, through: transport, index: 0)
+    let new = await startRead({ await provider.refreshHistory() }, through: transport, index: 1)
     await transport.complete(1, with: .success(Data("not JSON".utf8)))
     let failed = await new.value
     await transport.complete(0, with: try page(["stale-head"], cursor: "stale-cursor"))
@@ -118,6 +118,10 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
 
   /// No sleeps or daemon access: hold each real provider read at its await
   /// boundary and choose exactly which response wins the race.
+  ///
+  /// Callers pass a closure that calls the provider, never the method itself:
+  /// with approachable concurrency, `provider.loadOlderHistory` as a function
+  /// value resolves to the protocol extension's default, which only refreshes.
   private func startRead(
     _ read: @escaping @Sendable () async -> RuntimeHistoryPresentation,
     through transport: ControlledHistoryTransport,

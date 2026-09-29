@@ -8,8 +8,5 @@ import Foundation
 /// through here: they are identifiers the device publishes, and translating
 /// them would make the inspector disagree with the Raw dump beside it.
 func viewerText(_ key: String) -> String {
-  Bundle.main.localizedString(
-    forKey: key,
-    value: key,
-    table: "UIDumpLocalizable")
+  String(localized: String.LocalizationValue(key), table: "UIDumpLocalizable")
 }

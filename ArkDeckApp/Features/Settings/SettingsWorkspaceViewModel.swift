@@ -281,10 +281,5 @@ final class TraceCacheSettingsViewModel {
 }
 
 func settingsText(_ key: String) -> String {
-  NSLocalizedString(
-    key,
-    tableName: "SettingsLocalizable",
-    bundle: .main,
-    value: key,
-    comment: "")
+  String(localized: String.LocalizationValue(key), table: "SettingsLocalizable")
 }

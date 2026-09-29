@@ -10,7 +10,6 @@ import SwiftUI
 /// restart anything from this surface, and adoption is named as the CLI act
 /// it is. ClientKit owns the bounded authorization polling and terminal
 /// classification; the App renders its published window and result.
-@MainActor
 @Observable
 final class DeviceListViewModel {
   static let maximumDisplayNameLength = 64
@@ -125,9 +124,9 @@ final class DeviceListViewModel {
     let provider = provider
     // A task created on the App's main actor does not start until the first
     // window has finished its initial SwiftUI/AppKit work. Start only the
-    // Sendable, read-only provider call off that actor, then return to the
-    // model for the single publication below.
-    Task.detached(priority: .userInitiated) { [weak self] in
+    // Sendable, read-only provider call off that actor (`@concurrent`), then
+    // return to the model for the single publication below.
+    Task(priority: .userInitiated) { @concurrent [weak self] in
       let current = await provider.startupCandidates()
       guard !Task.isCancelled else { return }
       await self?.finishRefresh(current, generation: generation, isStartup: true)

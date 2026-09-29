@@ -10,7 +10,6 @@ import os
 /// Launch template owns process/loader/first-frame timing; these regions add
 /// the product milestones that matter after the process begins building the
 /// SwiftUI shell.
-@MainActor
 enum AppStartupPerformance {
   private static let clock = ContinuousClock()
   private static let signposter = OSSignposter(
@@ -86,7 +85,6 @@ extension Duration {
 /// workspace before the first frame. Only projections rendered by the shell
 /// itself are eager; a workspace pays its setup cost when its branch first
 /// becomes visible.
-@MainActor
 @Observable
 private final class ArkDeckAppModelStore {
   let autoUpdate: AutoUpdateViewModel
@@ -279,7 +277,6 @@ struct ArkDeckApp: App {
     }
   }
 
-  @MainActor
   private func presentTraceOpenPanel() {
     let panel = NSOpenPanel()
     panel.title = traceViewerText("viewer.openPanel.title")
@@ -294,7 +291,6 @@ struct ArkDeckApp: App {
     }
   }
 
-  @MainActor
   private func openTrace(_ url: URL) {
     guard url.isFileURL else { return }
     models.traceDocument.open(url)
@@ -1479,7 +1475,6 @@ private struct AutoUpdateSettingsView: View {
   }
 }
 
-@MainActor
 @Observable
 private final class AutoUpdateViewModel {
   private(set) var automaticChecksEnabled = true
@@ -1529,6 +1524,11 @@ private final class AutoUpdateViewModel {
     service = nil
   }
 
+  @concurrent
+  private static func makeService() async -> RuntimeUpdateApplicationFacade? {
+    try? AutoUpdateApplicationFacade.make()
+  }
+
   func startup() {
     guard !started else { return }
     started = true
@@ -1536,12 +1536,11 @@ private final class AutoUpdateViewModel {
       Task { await synchronize() }
       return
     }
-    Task { [weak self] in
-      // Storage discovery and diagnostic log scanning are not UI work. Build
-      // the actor away from the main actor, after connected devices are visible.
-      let service = await Task.detached(priority: .utility) {
-        try? AutoUpdateApplicationFacade.make()
-      }.value
+    // Storage discovery, diagnostic log scanning and the automatic check are
+    // not UI work: the whole startup runs at utility priority, and the facade
+    // is built off the main actor, after connected devices are visible.
+    Task(priority: .utility) { [weak self] in
+      let service = await Self.makeService()
       guard let self, !Task.isCancelled else { return }
       guard let service else {
         statusKey = "update.status.unavailable"
@@ -1681,7 +1680,6 @@ private final class AutoUpdateViewModel {
 }
 
 private struct FinderUpdateArtifactRevealer: UpdateArtifactRevealing {
-  @MainActor
   func revealInFinder(_ url: URL) throws {
     NSWorkspace.shared.activateFileViewerSelecting([url])
   }
@@ -1690,7 +1688,6 @@ private struct FinderUpdateArtifactRevealer: UpdateArtifactRevealing {
 /// Bridges the App presentation to a domain-owned state provider. The model
 /// has no candidate, process runner, lifecycle executor, or durable-audit
 /// access of its own.
-@MainActor
 @Observable
 private final class HDCStatusViewModel {
   private(set) var presentation: HDCClientDiagnosticsPresentation = .loading
@@ -1774,7 +1771,6 @@ private final class HDCStatusViewModel {
   }
 }
 
-@MainActor
 @Observable
 private final class OverviewCapabilityViewModel {
   private(set) var presentation = OverviewCapabilityMatrixPresentation.loading
@@ -1864,16 +1860,19 @@ private final class OverviewCapabilityViewModel {
 /// Opt-in host integration entry point. Uses the production ClientKit providers
 /// under the real App identity/sandbox; accepts only a refresh signal on stdin.
 /// It never selects a transport, changes authority, or dispatches a device job.
-@MainActor
 private enum RuntimeReadonlySmoke {
   static var started = false
+
+  /// Standard input blocks, so it is read off the main actor.
+  @concurrent
+  private static func nextLine() async -> String? { readLine() }
 
   static func run() async {
     guard !started else { return }
     started = true
     let history = RuntimeHistoryApplicationFacade.make(arguments: [])
     let filters = RuntimeHistoryFilterApplicationFacade.make(arguments: [])
-    while let line = await Task.detached(operation: { readLine() }).value {
+    while let line = await nextLine() {
       guard line == "refresh" else { exit(64) }
       let snapshot = await history.refreshHistory()
       let filter = await filters.loadHistoryFilter()

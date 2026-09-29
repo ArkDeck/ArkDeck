@@ -7,6 +7,7 @@ import Logging
 import NIOCore
 @preconcurrency import NIOSSH
 import Security
+import Synchronization
 
 // Remote build sources are deliberately narrower than a terminal. The App can
 // save one SSH endpoint, list directories below one canonical build root and
@@ -386,7 +387,7 @@ package actor ProductionRemoteBuildSourceBindingProvider:
     var current = try await bindings.load().filter { $0.targetID != targetID }
     current.append(
       RemoteBuildSourceBindingRecord(
-        targetID: targetID, sourceID: sourceID, boundAt: Date()))
+        targetID: targetID, sourceID: sourceID, boundAt: Date.now))
     try await bindings.replace(current)
   }
 
@@ -611,11 +612,11 @@ package actor ProductionRemoteBuildSourceProvider: RemoteBuildSourceProviding {
         authentication: normalized.authentication,
         hostPublicKey: observation.hostPublicKey,
         hostKeyFingerprint: Self.fingerprint(observation.hostPublicKey),
-        lastVerifiedAt: Date())
+        lastVerifiedAt: Date.now)
       let token = UUID()
       pending[token] = PendingRemoteBuildSource(
         record: record, credentialData: credentialData,
-        expiresAt: Date().addingTimeInterval(Self.probeLifetime))
+        expiresAt: Date.now.addingTimeInterval(Self.probeLifetime))
       try await auditEvent(
         correlationID: correlationID, phase: "outcome", action: "probe",
         sourceID: sourceID, relativePath: nil, outcome: "confirmed")
@@ -640,7 +641,7 @@ package actor ProductionRemoteBuildSourceProvider: RemoteBuildSourceProviding {
   public func save(probe: RemoteBuildSourceProbe) async throws -> RemoteBuildSourcePresentation {
     guard let staged = pending.removeValue(forKey: probe.trustToken),
       staged.record.id == probe.id,
-      staged.expiresAt > Date()
+      staged.expiresAt > Date.now
     else { throw RemoteBuildSourceError.probeExpired }
     let correlationID = UUID()
     try await auditEvent(
@@ -792,11 +793,10 @@ package actor ProductionRemoteBuildSourceProvider: RemoteBuildSourceProviding {
             while offset < size {
               try Task.checkCancellation()
               let requested = UInt32(min(UInt64(Self.readChunkBytes), size - offset))
-              var buffer = try await file.read(from: offset, length: requested)
+              let buffer = try await file.read(from: offset, length: requested)
               guard buffer.readableBytes > 0 else { throw RemoteBuildSourceError.fileChanged }
-              let chunk = buffer.readData(length: buffer.readableBytes) ?? Data()
-              contents.append(chunk)
-              offset += UInt64(chunk.count)
+              contents.append(contentsOf: buffer.readableBytesView)
+              offset += UInt64(buffer.readableBytes)
               guard offset <= size else { throw RemoteBuildSourceError.fileChanged }
             }
             let after = try await file.readAttributes()
@@ -1033,7 +1033,7 @@ package actor ProductionRemoteBuildSourceProvider: RemoteBuildSourceProviding {
         eventID: UUID(), correlationID: correlationID,
         phase: phase, action: action, sourceID: sourceID,
         relativePathSHA256: relativePath.map { SHA256Hex.string(of: Data($0.utf8)) },
-        outcome: outcome, observedAt: Date()))
+        outcome: outcome, observedAt: Date.now))
   }
 
   private func mapConnectionError(_ error: Error) -> Error {
@@ -1044,14 +1044,14 @@ package actor ProductionRemoteBuildSourceProvider: RemoteBuildSourceProviding {
 }
 
 private final class RemoteBuildDefaultIdentityDelegate: NIOSSHClientUserAuthenticationDelegate,
-  @unchecked Sendable
+  Sendable
 {
   private let username: String
-  private var keys: [NIOSSHPrivateKey]
+  private let keys: Mutex<[NIOSSHPrivateKey]>
 
-  init(username: String, keys: [NIOSSHPrivateKey]) {
+  init(username: String, keys: sending [NIOSSHPrivateKey]) {
     self.username = username
-    self.keys = keys
+    self.keys = Mutex(keys)
   }
 
   func nextAuthenticationType(
@@ -1062,7 +1062,7 @@ private final class RemoteBuildDefaultIdentityDelegate: NIOSSHClientUserAuthenti
       nextChallengePromise.fail(SSHClientError.unsupportedPrivateKeyAuthentication)
       return
     }
-    guard !keys.isEmpty else {
+    guard let key = keys.withLock({ $0.isEmpty ? nil : $0.removeFirst() }) else {
       nextChallengePromise.fail(SSHClientError.allAuthenticationOptionsFailed)
       return
     }
@@ -1070,7 +1070,7 @@ private final class RemoteBuildDefaultIdentityDelegate: NIOSSHClientUserAuthenti
       NIOSSHUserAuthenticationOffer(
         username: username,
         serviceName: "",
-        offer: .privateKey(.init(privateKey: keys.removeFirst()))))
+        offer: .privateKey(.init(privateKey: key))))
   }
 }
 
@@ -1127,19 +1127,14 @@ package enum SystemSSHIdentityResolver {
 private struct RemoteBuildHostKeyMismatch: Error, Sendable {}
 
 private final class RemoteBuildHostKeyValidator: NIOSSHClientServerAuthenticationDelegate,
-  @unchecked Sendable
+  Sendable
 {
   private let expectedOpenSSH: String?
-  private let lock = NSLock()
-  private var observed: String?
+  private let observed = Mutex<String?>(nil)
 
   init(expectedOpenSSH: String?) { self.expectedOpenSSH = expectedOpenSSH }
 
-  var observedOpenSSH: String? {
-    lock.lock()
-    defer { lock.unlock() }
-    return observed
-  }
+  var observedOpenSSH: String? { observed.withLock { $0 } }
 
   func validateHostKey(
     hostKey: NIOSSHPublicKey,
@@ -1150,9 +1145,7 @@ private final class RemoteBuildHostKeyValidator: NIOSSHClientServerAuthenticatio
       validationCompletePromise.fail(RemoteBuildHostKeyMismatch())
       return
     }
-    lock.lock()
-    observed = canonical
-    lock.unlock()
+    observed.withLock { $0 = canonical }
     validationCompletePromise.succeed(())
   }
 }

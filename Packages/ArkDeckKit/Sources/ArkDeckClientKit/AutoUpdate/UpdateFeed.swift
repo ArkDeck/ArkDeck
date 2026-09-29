@@ -2,6 +2,7 @@ import ArkDeckCore
 import CryptoKit
 import Darwin
 import Foundation
+import Synchronization
 
 public enum UpdateFeedError: Error, Equatable, Sendable {
   case feedTooLarge
@@ -302,7 +303,7 @@ public protocol UpdateReplayStoring: Sendable {
 
 /// Serializes replay admission across both store instances and App processes, then persists the
 /// highest accepted record with an atomic same-directory rename and durable file/directory sync.
-package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Sendable {
+package final class FileUpdateReplayStore: UpdateReplayStoring, Sendable {
   private static let stateName = "replay-state-v1.json"
   private static let lockName = ".replay-state-v1.lock"
   private static let maximumStateBytes = 4 * 1_024
@@ -312,7 +313,7 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
 
   public init(directory: URL) {
     self.directory = directory.standardizedFileURL
-    self.processLock = UpdateReplayProcessLockRegistry.shared.lock(for: self.directory.path)
+    self.processLock = UpdateReplayProcessLocks.lock(for: self.directory.path)
   }
 
   public static func production() throws -> FileUpdateReplayStore {
@@ -528,13 +529,13 @@ package final class FileUpdateReplayStore: UpdateReplayStoring, @unchecked Senda
   }
 }
 
-private final class UpdateReplayProcessLockRegistry: @unchecked Sendable {
-  static let shared = UpdateReplayProcessLockRegistry()
-  private let registryLock = NSLock()
-  private var locks: [String: NSLock] = [:]
+/// One lock per replay directory, shared by every store instance in this
+/// process; the file lock orders the processes.
+private enum UpdateReplayProcessLocks {
+  private static let locks = Mutex<[String: NSLock]>([:])
 
-  func lock(for path: String) -> NSLock {
-    registryLock.withLock {
+  static func lock(for path: String) -> NSLock {
+    locks.withLock { locks in
       if let existing = locks[path] { return existing }
       let lock = NSLock()
       locks[path] = lock

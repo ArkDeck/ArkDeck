@@ -101,15 +101,14 @@ final class XPCConnectionBox: @unchecked Sendable {
       let current = generation
       xpc_connection_set_event_handler(peer.value) { [weak self] event in
         guard let self, xpc_get_type(event) == XPC_TYPE_ERROR else { return }
+        // The XPC object is not Sendable; only the failure it maps to crosses
+        // to the queue.
+        let failure = Self.failure(
+          for: event, otherwise: "Runtime connection interrupted; run runtime service update")
         self.queue.async {
           guard self.generation == current else { return }
           if let active = self.active {
-            self.finish(
-              .failure(
-                Self.failure(
-                  for: event,
-                  otherwise: "Runtime connection interrupted; run runtime service update")),
-              token: active.token, invalid: true)
+            self.finish(.failure(failure), token: active.token, invalid: true)
           } else {
             self.invalidate()
           }

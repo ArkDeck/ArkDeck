@@ -1698,7 +1698,6 @@ private enum HistoryTimeFilter: String, CaseIterable, Identifiable {
 
 /// Bridges the App to two read-only domain readers. Detail requests are keyed
 /// by Job ID and ignored if the Job disappears during a concurrent refresh.
-@MainActor
 @Observable
 final class RuntimeHistoryViewModel {
   private(set) var presentation: RuntimeHistoryPresentation = .loading

@@ -5,7 +5,7 @@ import Observation
 import SwiftUI
 
 private func jobsText(_ key: String) -> String {
-  Bundle.main.localizedString(forKey: key, value: key, table: "JobsLocalizable")
+  String(localized: String.LocalizationValue(key), table: "JobsLocalizable")
 }
 
 private struct EstablishedCurrentEpochRelation {
@@ -13,7 +13,6 @@ private struct EstablishedCurrentEpochRelation {
   let messageKey: String
 }
 
-@MainActor
 @Observable
 private final class GlobalJobInspectorModel {
   private(set) var detail: RuntimeJobDetailPresentation?
