@@ -185,10 +185,10 @@ class RunSwiftPMTests(unittest.TestCase):
                 ("--arch=arm64",),
                 ("--arch=x86_64",),
                 ("--triple",),
-                ("--triple", "arm64-apple-macosx26.0"),
-                ("--triple", "x86_64-apple-macosx26.0"),
-                ("--triple=arm64-apple-macosx26.0",),
-                ("--triple=x86_64-apple-macosx26.0",),
+                ("--triple", "arm64-apple-macosx27.0"),
+                ("--triple", "x86_64-apple-macosx27.0"),
+                ("--triple=arm64-apple-macosx27.0",),
+                ("--triple=x86_64-apple-macosx27.0",),
             ):
                 with self.subTest(command=command, options=options):
                     result, cache_root = self.invoke(command, *options)

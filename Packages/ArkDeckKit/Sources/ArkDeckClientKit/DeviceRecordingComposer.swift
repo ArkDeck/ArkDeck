@@ -84,42 +84,52 @@ public enum DeviceRecordingComposer {
         AVVideoWidthKey: width,
         AVVideoHeightKey: height,
       ])
-    input.expectsMediaDataInRealTime = false
-    let adaptor = AVAssetWriterInputPixelBufferAdaptor(
-      assetWriterInput: input,
-      sourcePixelBufferAttributes: [
-        kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32ARGB,
-        kCVPixelBufferWidthKey as String: width,
-        kCVPixelBufferHeightKey as String: height,
-      ])
     guard writer.canAdd(input) else {
       throw CompositionFailure.writeFailed("the writer refused a video input")
     }
-    writer.add(input)
-    guard writer.startWriting() else {
-      throw CompositionFailure.writeFailed("\(writer.error.map { "\($0)" } ?? "writing refused")")
+    // The frames are drawn with Core Graphics, so every buffer has to be one
+    // a bitmap context can draw into.
+    let attributes = CVPixelBufferCreationAttributes(
+      pixelFormatType: CVPixelFormatType(rawValue: kCVPixelFormatType_32ARGB),
+      size: CVImageSize(width: width, height: height),
+      compatibility: [.cgImage, .cgBitmapContext])
+    // The receiver adds the input to the writer. Its asynchronous append is
+    // the non-real-time path: it waits until the input can take the next
+    // frame, which is what polling isReadyForMoreMediaData used to do here.
+    let receiver = writer.inputPixelBufferReceiver(
+      for: input, pixelBufferAttributes: attributes)
+    do {
+      try writer.start()
+    } catch {
+      throw CompositionFailure.writeFailed("\(writer.error ?? error)")
     }
     writer.startSession(atSourceTime: .zero)
+    let pool: CVMutablePixelBuffer.Pool
+    do {
+      pool = try receiver.pixelBufferPool
+        ?? CVMutablePixelBuffer.Pool(pixelBufferAttributes: attributes)
+    } catch {
+      throw CompositionFailure.writeFailed("\(error)")
+    }
 
     // 600 divides the frame rates a person would name and keeps the rounding
     // error under a millisecond at the spacing this actually produces.
     let timescale: CMTimeScale = 600
     var elapsed = 0.0
     for (index, image) in images.enumerated() {
-      guard let buffer = pixelBuffer(from: image, width: width, height: height) else {
+      guard let buffer = pixelBuffer(from: image, in: pool) else {
         throw CompositionFailure.frameNotDecodable(name: frames[index].name)
       }
-      while !input.isReadyForMoreMediaData {
-        try? await Task.sleep(nanoseconds: 2_000_000)
-      }
       let time = CMTime(seconds: elapsed, preferredTimescale: timescale)
-      guard adaptor.append(buffer, withPresentationTime: time) else {
+      do {
+        try await receiver.append(buffer, with: time)
+      } catch {
         throw CompositionFailure.writeFailed(
-          "\(writer.error.map { "\($0)" } ?? "frame \(frames[index].name) was refused")")
+          "frame \(frames[index].name) was refused: \(writer.error ?? error)")
       }
       elapsed += max(frameDurationsSeconds[index], minimumFrameSeconds)
     }
-    input.markAsFinished()
+    receiver.finish()
     await writer.finishWriting()
     guard writer.status == .completed else {
       throw CompositionFailure.writeFailed(
@@ -131,28 +141,24 @@ public enum DeviceRecordingComposer {
       durationSeconds: elapsed)
   }
 
+  /// Draws one frame into a buffer from `pool` and hands it over read-only:
+  /// once the writer has it, nothing here may change it.
   private static func pixelBuffer(
-    from image: CGImage, width: Int, height: Int
-  ) -> CVPixelBuffer? {
-    var buffer: CVPixelBuffer?
-    let status = CVPixelBufferCreate(
-      kCFAllocatorDefault, width, height, kCVPixelFormatType_32ARGB,
-      [
-        kCVPixelBufferCGImageCompatibilityKey: true,
-        kCVPixelBufferCGBitmapContextCompatibilityKey: true,
-      ] as CFDictionary,
-      &buffer)
-    guard status == kCVReturnSuccess, let buffer else { return nil }
-    CVPixelBufferLockBaseAddress(buffer, [])
-    defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
-    guard
-      let context = CGContext(
-        data: CVPixelBufferGetBaseAddress(buffer), width: width, height: height,
-        bitsPerComponent: 8, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-        space: CGColorSpaceCreateDeviceRGB(),
-        bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
-    else { return nil }
-    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-    return buffer
+    from image: CGImage, in pool: CVMutablePixelBuffer.Pool
+  ) -> CVReadOnlyPixelBuffer? {
+    guard var buffer = try? pool.makeMutablePixelBuffer() else { return nil }
+    let drawn = buffer.accessUnsafeMutableRawPlaneBytes { planes in
+      guard
+        let plane = planes.first,
+        let context = CGContext(
+          data: plane.bytes.baseAddress, width: image.width, height: image.height,
+          bitsPerComponent: 8, bytesPerRow: plane.properties.bytesPerRow,
+          space: CGColorSpaceCreateDeviceRGB(),
+          bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue)
+      else { return false }
+      context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+      return true
+    }
+    return drawn ? CVReadOnlyPixelBuffer(buffer) : nil
   }
 }

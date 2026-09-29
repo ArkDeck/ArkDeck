@@ -1,4 +1,4 @@
-// swift-tools-version: 6.3
+// swift-tools-version: 6.4
 
 import PackageDescription
 
@@ -7,7 +7,7 @@ import PackageDescription
 // ArchitectureBoundaryContractTests refuses any target that brings them back.
 let package = Package(
   name: "ArkDeckKit",
-  platforms: [.macOS(.v26)],
+  platforms: [.macOS(.v27)],
   products: [
     .library(name: "ArkDeckClientKit", targets: ["ArkDeckClientKit"]),
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),

@@ -21,7 +21,7 @@ SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
 RELEASE_RC_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "release-rc.yml"
 SWIFTPM_CACHE_KEY = (
-    "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6"
+    "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0"
     "-image-${{ steps.runner-image.outputs.version }}"
     "-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
 )
@@ -436,8 +436,8 @@ def validate_automatic_check_contract(
     required_swift_tests = (
         "    needs: plan\n",
         "    if: needs.plan.outputs.swift == 'true'\n",
-        "    runs-on: macos-26\n",
-        "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer",
+        "    runs-on: xcode-27\n",
+        "DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer",
         "ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm",
         "python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
         # The SwiftPM cache is keyed by runner image build: a C compile is
@@ -452,12 +452,12 @@ def validate_automatic_check_contract(
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         SWIFTPM_CACHE_KEY,
         "          restore-keys: |\n"
-        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-"
         "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
-        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "image-${{ steps.runner-image.outputs.version }}-\n"
-        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
         "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
         "--num-workers 8",
         "        if: >-\n"
@@ -469,14 +469,14 @@ def validate_automatic_check_contract(
     required_app_build = (
         "    needs: plan\n",
         "    if: needs.plan.outputs.app == 'true'\n",
-        "    runs-on: macos-26\n",
+        "    runs-on: xcode-27\n",
         "ARKDECK_XCODE_CACHE_ROOT: ${{ runner.temp }}/arkdeck-xcode",
         "python3 scripts/ci/test_run_xcodebuild.py",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "          restore-keys: |\n"
-        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-"
         "${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-\n"
-        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+        "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
         "sh scripts/ci/run-xcodebuild.sh",
         "        if: >-\n"
         "          success() &&\n"
@@ -651,10 +651,10 @@ RUST_POLICY_TOKENS = (
 RUST_NATIVE_JOB_TOKENS = (
     "    needs: policy\n",
     "      fail-fast: false\n",
-    "        os: [ubuntu-latest, macos-26, windows-latest]\n",
+    "        os: [ubuntu-latest, xcode-27, windows-latest]\n",
     "    runs-on: ${{ matrix.os }}\n",
-    "    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}\n",
-    "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}\n",
+    "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
+    "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}\n",
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
     "run: python rust/scripts/ci-workspace.py compact\n",
@@ -941,7 +941,7 @@ def validate_release_rc_contract(text: str) -> None:
     if extract_job_names(text) != ("release-rc",):
         raise WorkflowContractError("the release candidate is one job")
     job = _job_block(text, "release-rc")
-    for token in ("    runs-on: macos-26\n", "    environment: release\n"):
+    for token in ("    runs-on: xcode-27\n", "    environment: release\n"):
         if token not in job:
             raise WorkflowContractError(f"the release job must carry: {token.strip()}")
     if re.search(r"\bset -[a-z]*x", meaningful) or "set -o xtrace" in meaningful:
@@ -1334,8 +1334,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             ),
             rust.replace("  workflow_call:\n", "  push:\n"),
             rust.replace(
-                "os: [ubuntu-latest, macos-26, windows-latest]",
-                "os: [ubuntu-latest, macos-26]",
+                "os: [ubuntu-latest, xcode-27, windows-latest]",
+                "os: [ubuntu-latest, xcode-27]",
             ),
             rust.replace("run: python rust/scripts/test_contract_checks.py", "run: true"),
             rust.replace(
@@ -1734,8 +1734,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n",
-                    "      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer\n"
+                    "      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer\n",
+                    "      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer\n"
                     "      INVALID_JOB_CACHE: ${{ runner.temp }}/invalid\n",
                     1,
                 ),
@@ -1745,7 +1745,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+                    "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
                     "",
                 ),
             ),
@@ -1810,7 +1810,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace(
-                    "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
+                    "            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-\n",
                     "",
                 ),
             ),

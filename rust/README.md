@@ -69,9 +69,9 @@ inventory, then asks Cargo to run two queues with the same workspace features.
 Only five audited integration targets with unique temporary roots may overlap
 the conservative queue; fixed-oracle, port and spawning tests remain together.
 New targets default to that queue. Custom harnesses and doctests still run;
-either queue or doctest failure fails the lane. The `rust-test-timings-macos-26`
+either queue or doctest failure fails the lane. The `rust-test-timings-xcode-27`
 artifact records compilation, queue and doctest durations and complete logs for
-the checkout, and `rust-contract-test-timings-macos-26` for the published and
+the checkout, and `rust-contract-test-timings-xcode-27` for the published and
 candidate views. Run `python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
 

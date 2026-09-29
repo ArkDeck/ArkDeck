@@ -53,7 +53,7 @@ concurrency:
 jobs:
   ui-tests:
     if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'ui-tests'
-    runs-on: macos-26
+    runs-on: xcode-27
     concurrency:
       group: arkdeck-macos-background
       cancel-in-progress: false
@@ -67,7 +67,7 @@ jobs:
     # cold CI build with the margin the slow lanes use.
     timeout-minutes: 45
     env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - name: Checkout default branch with runner Git
         run: |

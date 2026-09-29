@@ -14,8 +14,8 @@
 
 <p align="center">
   <a href="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml"><img src="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml/badge.svg" alt="Swift CI"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2026%20Apple%20silicon-blue" alt="平台：Apple 芯片上的 macOS 26">
-  <img src="https://img.shields.io/badge/toolchain-Xcode%2026.6%20%7C%20Swift%206.3-5f4b8b" alt="工具链：Xcode 26.6 与 Swift 6.3">
+  <img src="https://img.shields.io/badge/platform-macOS%2027%20Apple%20silicon-blue" alt="平台：Apple 芯片上的 macOS 27">
+  <img src="https://img.shields.io/badge/toolchain-Xcode%2027.0%20%7C%20Swift%206.4-5f4b8b" alt="工具链：Xcode 27.0 与 Swift 6.4">
   <img src="https://img.shields.io/badge/status-0.1.0%20preview-orange" alt="状态：0.1.0 预览版">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="协议：MIT"></a>
 </p>
@@ -59,7 +59,7 @@ ArkDeck 是一个面向真实 OpenHarmony 开发板的本地优先工作台。ma
 
 ArkDeck 目前是早期预览版（`0.1.0`）。已知的边界：
 
-- 唯一支持的宿主环境是 Apple 芯片上的 macOS 26。
+- 唯一支持的宿主环境是 Apple 芯片上的 macOS 27。
 - 刷机目前只支持一块板子：DAYU200（RK3568）。
 - Windows 和 Linux 端口尚未开始；首个稳定版发布前，接口、目录 schema 和配置步骤都可能变化。
 
@@ -94,8 +94,8 @@ flowchart LR
 
 你需要：
 
-- Apple 芯片上的 macOS 26
-- Xcode 26.6 与 Swift 6.3
+- Apple 芯片上的 macOS 27
+- Xcode 27.0 与 Swift 6.4
 - 一个 OpenHarmony `hdc` 可执行文件（真机工作流需要）
 - 一台已完成首次信任授权的 USB 直连设备
 
