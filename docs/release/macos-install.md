@@ -102,10 +102,15 @@ App 连 daemon 时要求两者都相等，所以**每次升级都必须把 App �
   `ArkDeck-<版本>-<build>.dmg` 时，不再构建，job 以 notice 结束；要新 RC 就递增 build 号。
 - 先在无凭据时拉取依赖：本仓 `rust/` 的 `cargo fetch --locked`；ArkForge（公开仓库）按 `rust/Cargo.toml` 的 pin
   精确 checkout 到 `$RUNNER_TEMP/ArkForge` 并 `cargo fetch --locked`。
+- 构建缓存也在装凭据之前恢复：cargo registry 与 git 源、`rust/target` 与 ArkForge 的 `target`（两个打包脚本都把
+  二进制复制出来再签副本，target 里没有签过名的东西）、xcodebuild 的 SwiftPM clones（按已提交的两份
+  `Package.resolved` 取键，archive 只用其中钉住的修订）。key 含 runner 镜像版本与 rustc；DerivedData 每次全新，
+  不用 Xcode compilation caching。只在 `main` 上成功构建了 RC、凭据清理之后，精确 key 未命中时才保存。
 - 再装凭据：Developer ID 身份导入本 job 新建的临时钥匙串（口令在 job 内随机生成并 mask，`set-key-partition-list`
   允许 codesign 无提示使用，并加入用户钥匙串搜索列表，因为 `xcodebuild -exportArchive` 与 ArkForge 打包脚本
   只从搜索列表找身份）；`.p12` 导入后即删；两个 profile 与 `.p8` 写成 `$RUNNER_TEMP` 下的文件，后续步骤只拿路径。
-- 构建：`ARKDECK_CODESIGN_KEYCHAIN`、两个 profile 路径与 API key 三元组交给
+- 构建：`ARKDECK_CODESIGN_KEYCHAIN`、两个 profile 路径、API key 三元组与 SwiftPM clones 目录
+  （`ARKDECK_XCODE_SOURCE_PACKAGES`）交给
   `build_macos_release.py release --output "$RUNNER_TEMP/rc" --arkforge-checkout "$RUNNER_TEMP/ArkForge"`。
 - 构建之后、上传之前的清理步骤无论成败都执行（`if: always()`）：删临时钥匙串与全部凭据文件。
 - 成功时上传 artifact `arkdeck-rc-<版本>-<build>`（DMG、`release-receipt.json`、两份公证日志，保留 90 天），
@@ -164,15 +169,19 @@ python3 scripts/release/build_macos_release.py release \
 
 可选：`ARKDECK_CODESIGN_IDENTITY`（缺省 `Developer ID Application: Hanfeng Fu (8AQTYW5FKR)`）；
 `ARKDECK_CODESIGN_KEYCHAIN`（身份所在钥匙串的绝对路径，路径不含空白：本仓的 codesign 调用带 `--keychain`，App
-archive 经 `OTHER_CODE_SIGN_FLAGS` 带上；它还必须在用户钥匙串搜索列表里，预检核对）。
+archive 经 `OTHER_CODE_SIGN_FLAGS` 带上；它还必须在用户钥匙串搜索列表里，预检核对）；
+`ARKDECK_XCODE_SOURCE_PACKAGES`（xcodebuild 的 SwiftPM clones 目录，绝对路径）。
 
-脚本依次：预检（版本一致、checkout 干净、ArkForge pin、签名身份、notary 凭据）→ `build-helpers.sh` 的 Rust 模式
-（helper 对签名、公证、staple、spctl）→ ArkForge 的 `packaging/macos/package-arkforge.sh`（Developer ID、
-hardened runtime、timestamp，按签名后字节写 manifest）→ App 的 Release archive 与 Developer ID 导出
-（`scripts/release/ExportOptions.plist`），App 单独公证、staple、spctl → 组装 DMG → DMG 签名（timestamp）→
+脚本先预检（版本一致、checkout 干净、ArkForge pin、签名身份、notary 凭据），再**同时**构建三个组件（输入互不
+相干；任一失败即停下其余组件的进程组，报出失败的组件名，什么都不产出）：`build-helpers.sh` 的 Rust 模式
+（helper 对签名、公证、staple、spctl）；ArkForge 的 `packaging/macos/package-arkforge.sh`（Developer ID、
+hardened runtime、timestamp，按签名后字节写 manifest）；App 的 Release archive（所有 target 含 SwiftPM 包都只编
+arm64：`ARCHS=arm64 ONLY_ACTIVE_ARCH=NO` 在命令行给出，因为项目里的 `ARCHS` 管不到包 target；包只用
+`Package.resolved` 钉住的修订）与 Developer ID 导出（`scripts/release/ExportOptions.plist`），核对每个 Mach-O 都是
+单一 arm64 切片后单独公证、staple、spctl。三者都成功后 → 组装 DMG → DMG 签名（timestamp）→
 `notarytool submit --wait` → `stapler staple` 与 `validate` → DMG 的 `spctl` → 挂载 DMG 核对：各项目录树与暂存时
 逐字节一致、严格验签、App 的身份要求、App 对 daemon 的完整要求（身份、Team、版本号与 build 号）、挂载后 App 与
-CLI 的 `spctl` 与 staple、ArkForge 两个可执行文件的 Team。
+CLI 的 `spctl` 与 staple、ArkForge 两个可执行文件的 Team、三个组件的每个 Mach-O 都是单一 arm64 切片。
 
 ArkForge.bundle 不单独 staple（它不是 `.app`，也不能多出文件），由 DMG 的公证覆盖；把它从已 staple 的 DMG
 复制出来即可。

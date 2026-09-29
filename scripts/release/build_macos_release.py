@@ -18,7 +18,8 @@ Two modes share one assembly and verification path:
 release   (Developer ID identity, provisioning profiles, notary credentials:
           the maintainer's own Keychain, or the release-rc workflow's
           temporary keychain and App Store Connect API key) builds every
-          component from a clean checkout:
+          component from a clean checkout, the three at once (they share no
+          input; the first failure stops the others and names its component):
           1. the Rust helper pair through
              Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh, which
              signs, notarizes, staples and assesses the pair itself;
@@ -26,10 +27,11 @@ release   (Developer ID identity, provisioning profiles, notary credentials:
              packaging/macos/package-arkforge.sh, only when that checkout is
              clean and its HEAD equals the pin; the bundle is covered by the
              DMG's notarization (a bare bundle cannot carry a stapled ticket);
-          3. the App: `xcodebuild archive` (Release) and `-exportArchive` with
-             scripts/release/ExportOptions.plist, then notarized, stapled and
-             assessed on its own so it passes Gatekeeper offline once copied
-             out of the DMG;
+          3. the App: `xcodebuild archive` (Release, arm64 only for every
+             target, packages at their Package.resolved revisions) and
+             `-exportArchive` with scripts/release/ExportOptions.plist, then
+             notarized, stapled and assessed on its own so it passes
+             Gatekeeper offline once copied out of the DMG;
           then assembles the DMG, signs it with a secure timestamp, notarizes
           it (`notarytool submit --wait`), staples and validates it, assesses
           it with spctl, mounts it and verifies what it carries: the trees
@@ -40,8 +42,9 @@ release   (Developer ID identity, provisioning profiles, notary credentials:
           Every Mach-O in the App, the CLI and ArkForge.bundle (the App's
           nested trace_streamer included) must carry a Developer ID signature
           of this Team with hardened runtime and a secure timestamp and no
-          get-task-allow; this is checked right after each component is built,
-          before the App is uploaded, and again on the mounted DMG.
+          get-task-allow, and be a thin arm64 slice; this is checked right
+          after each component is built (the App's before its upload), and
+          again on the mounted DMG.
 
 unsigned  (anyone, CI included; no identity, no credentials, nothing sent to
           Apple) takes already built components (--app, --helpers,
@@ -68,7 +71,8 @@ Usage:
                ARKDECK_NOTARY_API_ISSUER_ID (an App Store Connect API key);
            ARKDECK_CODESIGN_IDENTITY, ARKDECK_CODESIGN_KEYCHAIN (optional; the
            keychain that holds the identity, which must also be on the user
-           keychain search list)
+           keychain search list); ARKDECK_XCODE_SOURCE_PACKAGES (optional; an
+           absolute directory for xcodebuild's SwiftPM clones)
   build_macos_release.py unsigned --output DIR --app APP --helpers DIR
       --arkforge-bundle DIR [--arkforge-checkout DIR]
 """
@@ -76,19 +80,23 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import os
 import plistlib
 import re
 import shutil
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 RELEASE = Path(__file__).resolve().parent
 REPO = RELEASE.parents[1]
@@ -138,7 +146,60 @@ def require(condition: bool, message: str) -> None:
         raise ReleaseError(message)
 
 
+class Cancelled(Exception):
+    """A component step stopped because another component failed first. Not a
+    ReleaseError, so no check mistakes it for a finding of its own."""
+
+
 # -- processes -----------------------------------------------------------------
+
+# The three components build concurrently (build_components). Every child runs
+# in its own process group, so the first failure can stop the others' whole
+# trees (build-helpers.sh and its cargo, xcodebuild and its compilers); each
+# component thread names its output lines so interleaved logs stay readable.
+_CANCELLED = threading.Event()
+_CHILDREN: set[subprocess.Popen] = set()
+_STOPPED: set[subprocess.Popen] = set()
+_CHILDREN_LOCK = threading.Lock()
+_OUTPUT_LOCK = threading.Lock()
+_COMPONENT = threading.local()
+# How long a streamed step's output may trail its exit: a daemon the step
+# started may hold the pipe open after the step itself has finished.
+_RELAY_GRACE = 10.0
+
+
+def _signal_group(process: subprocess.Popen, signum: int) -> None:
+    try:
+        os.killpg(process.pid, signum)
+    except (ProcessLookupError, PermissionError):
+        pass
+
+
+def _stop(process: subprocess.Popen) -> None:
+    """SIGTERM a child's group once. A second one would interrupt the EXIT
+    trap the first one started (build-helpers.sh removes its temporary
+    directories there)."""
+    with _CHILDREN_LOCK:
+        if process in _STOPPED:
+            return
+        _STOPPED.add(process)
+    _signal_group(process, signal.SIGTERM)
+
+
+def cancel_children() -> None:
+    _CANCELLED.set()
+    with _CHILDREN_LOCK:
+        children = list(_CHILDREN)
+    for process in children:
+        _stop(process)
+
+
+def _relay(stream: Any, label: str, tail: collections.deque) -> None:
+    for line in stream:
+        tail.append(line.rstrip("\n"))
+        with _OUTPUT_LOCK:
+            sys.stderr.write(f"[{label}] {line}" if line.endswith("\n") else f"[{label}] {line}\n")
+            sys.stderr.flush()
 
 
 def run(
@@ -151,29 +212,76 @@ def run(
     merge_stderr: bool = False,
 ) -> str:
     argv = [str(argument) for argument in arguments]
+    if _CANCELLED.is_set():
+        raise Cancelled(f"{argv[0]} not started: another component failed")
+    label = getattr(_COMPONENT, "label", None)
+    # A build step's own output goes to stderr: stdout carries only the DMG
+    # path this script prints at the end. Inside a component it is relayed
+    # line by line under the component's name.
+    relayed = not capture and label is not None
+    if capture:
+        stdout: Any = subprocess.PIPE
+        stderr: Any = subprocess.STDOUT if merge_stderr else subprocess.PIPE
+    elif relayed:
+        stdout, stderr = subprocess.PIPE, subprocess.STDOUT
+    else:
+        stdout, stderr = sys.stderr, None
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             argv,
             env=dict(env) if env is not None else None,
             cwd=cwd,
-            # A build step's own output goes to stderr: stdout carries only
-            # the DMG path this script prints at the end.
-            stdout=subprocess.PIPE if capture else sys.stderr,
-            stderr=(subprocess.STDOUT if merge_stderr else subprocess.PIPE) if capture else None,
+            stdin=subprocess.DEVNULL,
+            stdout=stdout,
+            stderr=stderr,
             text=True,
-            timeout=timeout,
-            check=False,
+            errors="replace",
+            start_new_session=True,
         )
     except FileNotFoundError as error:
         raise ReleaseError(f"{argv[0]} is not available: {error}") from error
-    if result.returncode != 0:
-        diagnostics = result.stdout if merge_stderr else result.stderr
-        detail = (diagnostics or "").strip().splitlines()[-5:] if capture else []
+    with _CHILDREN_LOCK:
+        _CHILDREN.add(process)
+    if _CANCELLED.is_set():
+        _stop(process)
+    tail: collections.deque = collections.deque(maxlen=5)
+    reader = None
+    output, diagnostics = "", ""
+    try:
+        if relayed:
+            reader = threading.Thread(target=_relay, args=(process.stdout, label, tail), daemon=True)
+            reader.start()
+            process.wait(timeout=timeout)
+        else:
+            output, diagnostics = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _signal_group(process, signal.SIGKILL)
+        process.wait()
+        raise ReleaseError(f"{' '.join(argv[:3])} did not finish within {timeout:.0f} s") from None
+    except BaseException:
+        _stop(process)
+        process.wait()
+        raise
+    finally:
+        with _CHILDREN_LOCK:
+            _CHILDREN.discard(process)
+            _STOPPED.discard(process)
+        if reader is not None:
+            reader.join(_RELAY_GRACE)
+    if process.returncode != 0:
+        if _CANCELLED.is_set():
+            raise Cancelled(f"{argv[0]} stopped: another component failed")
+        if relayed:
+            detail = list(tail)
+        elif capture:
+            detail = ((output if merge_stderr else diagnostics) or "").strip().splitlines()[-5:]
+        else:
+            detail = []
         raise ReleaseError(
-            f"{' '.join(argv[:3])} exited {result.returncode}"
+            f"{' '.join(argv[:3])} exited {process.returncode}"
             + (": " + " | ".join(detail) if detail else "")
         )
-    return result.stdout or ""
+    return output or ""
 
 
 # -- digests and trees ---------------------------------------------------------
@@ -439,6 +547,21 @@ def verify_nested_code(root: Path, environment: Mapping[str, str]) -> None:
     require(not rejected, "nested code notarization would reject: " + "; ".join(rejected))
 
 
+def verify_arm64_only(root: Path, environment: Mapping[str, str]) -> None:
+    """Every Mach-O under `root` is a thin arm64 slice, as check-rust-helpers.py
+    and package-rust-helpers.sh require of the helpers: the release targets
+    macOS 27 on Apple silicon, and a universal or Intel slice means a build
+    setting stopped reaching some target."""
+    files = mach_o_files(root)
+    require(bool(files), f"{root.name} carries no Mach-O code")
+    wrong = []
+    for path in files:
+        architectures = run(["lipo", "-archs", path], env=environment).split()
+        if architectures != ["arm64"]:
+            wrong.append(f"{root.name}/{path.relative_to(root).as_posix()} is {' '.join(architectures) or 'unknown'}")
+    require(not wrong, "the release is thin arm64 only: " + "; ".join(wrong))
+
+
 # -- release-only build steps --------------------------------------------------
 
 
@@ -535,6 +658,7 @@ def preflight_release(environment: Mapping[str, str], identity: str) -> None:
     ]
     require(not missing, "release needs " + ", ".join(missing))
     notary = notary_arguments(environment)
+    source_packages(environment)
     keychain = codesign_keychain(environment)
     if keychain is not None:
         search_list = run(["security", "list-keychains", "-d", "user"], env=environment)
@@ -577,6 +701,19 @@ def build_arkforge(work: Path, checkout: Path, environment: Mapping[str, str], i
     return output
 
 
+def source_packages(environment: Mapping[str, str]) -> list[str]:
+    """ARKDECK_XCODE_SOURCE_PACKAGES: where xcodebuild keeps its SwiftPM
+    clones, such as the release-rc workflow's cached directory. Only package
+    sources live there; every package resolves to the revision the committed
+    Package.resolved pins (-onlyUsePackageVersionsFromResolvedFile), and
+    DerivedData stays fresh under the work directory."""
+    directory = environment.get("ARKDECK_XCODE_SOURCE_PACKAGES", "")
+    if not directory:
+        return []
+    require(Path(directory).is_absolute(), "ARKDECK_XCODE_SOURCE_PACKAGES must be an absolute path")
+    return ["-clonedSourcePackagesDirPath", directory]
+
+
 def build_app(work: Path, environment: Mapping[str, str]) -> Path:
     archive = work / "ArkDeck.xcarchive"
     export = work / "export"
@@ -584,9 +721,16 @@ def build_app(work: Path, environment: Mapping[str, str]) -> Path:
     # A command-line setting replaces the project's, so the Release
     # configuration's own `--timestamp` is restated beside the keychain.
     signing = [f"OTHER_CODE_SIGN_FLAGS=--timestamp --keychain {keychain}"] if keychain else []
+    # Apple silicon only, as the helpers and ArkForge are: macOS 27, the
+    # deployment target, runs on nothing else. The project's ARCHS = arm64
+    # reaches the App target alone; SwiftPM package targets keep their own
+    # Release default (both slices), so the setting is given at invocation
+    # scope, which every target of the build takes. ONLY_ACTIVE_ARCH=NO builds
+    # exactly ARCHS for the generic destination.
     run(["xcodebuild", "-project", PROJECT, "-scheme", "ArkDeck", "-configuration", "Release",
          "-destination", "generic/platform=macOS", "-derivedDataPath", work / "DerivedData",
-         "-archivePath", archive, *signing, "archive"],
+         *source_packages(environment), "-onlyUsePackageVersionsFromResolvedFile",
+         "-archivePath", archive, "ARCHS=arm64", "ONLY_ACTIVE_ARCH=NO", *signing, "archive"],
         env=environment, cwd=REPO, capture=False)
     run(["xcodebuild", "-exportArchive", "-archivePath", archive,
          "-exportOptionsPlist", EXPORT_OPTIONS, "-exportPath", export],
@@ -605,6 +749,74 @@ def notarize_app(work: Path, app: Path, environment: Mapping[str, str], logs: Pa
     run(["xcrun", "stapler", "staple", app], env=environment)
     run(["spctl", "--assess", "--type", "execute", "--verbose=2", app], env=environment)
     return result
+
+
+# -- concurrent component builds -----------------------------------------------
+
+
+def build_components(steps: Mapping[str, Callable[[], Any]]) -> dict[str, Any]:
+    """Run each component's build (and its own notarization) at once: they
+    share no input, and together they are most of the release's time.
+
+    The first failure stops the others (their process groups get SIGTERM, and
+    a step not yet started never starts). Every component thread has ended
+    before this returns or raises, so no child outlives the work directory.
+    Failures are reported in the order `steps` names the components, each with
+    its component's name; a component stopped only because another failed is
+    not reported. Nothing is published unless every component succeeded."""
+    _CANCELLED.clear()
+
+    def labelled(name: str, step: Callable[[], Any]) -> Any:
+        _COMPONENT.label = name
+        return step()
+
+    with ThreadPoolExecutor(max_workers=len(steps), thread_name_prefix="component") as pool:
+        futures = {name: pool.submit(labelled, name, step) for name, step in steps.items()}
+        try:
+            for future in as_completed(futures.values()):
+                if future.exception() is not None:
+                    cancel_children()
+        except BaseException:
+            cancel_children()
+            raise
+    errors = {name: future.exception() for name, future in futures.items() if future.exception() is not None}
+    if not errors:
+        return {name: future.result() for name, future in futures.items()}
+    failures = [(name, error) for name, error in errors.items() if not isinstance(error, Cancelled)]
+    for _, error in failures:
+        if not isinstance(error, (ReleaseError, OSError)):
+            raise error
+    require(bool(failures), "every component build was stopped: " + "; ".join(map(str, errors.values())))
+    raise ReleaseError("; ".join(f"{name} failed: {error}" for name, error in failures))
+
+
+def build_release_components(work: Path, checkout: Path, environment: Mapping[str, str], identity: str,
+                             publish: Path) -> tuple[Path, Path, Path, dict[str, Any]]:
+    """Each component is checked right after it is built; the App's nested
+    code and its architecture before the App is uploaded."""
+
+    def helpers() -> Path:
+        cli = build_helpers(work, environment, identity)
+        verify_nested_code(cli, environment)
+        return cli
+
+    def arkforge() -> Path:
+        bundle = build_arkforge(work, checkout, environment, identity)
+        verify_nested_code(bundle, environment)
+        return bundle
+
+    def app() -> tuple[Path, dict[str, str]]:
+        bundle = build_app(work, environment)
+        # Before the upload: an exported App whose nested helper lost its
+        # hardened runtime or timestamp, or that carries an Intel slice,
+        # fails here, not at Apple.
+        verify_arm64_only(bundle, environment)
+        verify_nested_code(bundle, environment)
+        return bundle, notarize_app(work, bundle, environment, publish)
+
+    built = build_components({CLI: helpers, ARKFORGE: arkforge, APP: app})
+    app_bundle, app_notarization = built[APP]
+    return app_bundle, built[CLI], built[ARKFORGE], {"app": app_notarization}
 
 
 # -- shared assembly and verification ------------------------------------------
@@ -633,9 +845,21 @@ def attach(dmg: Path, mountpoint: Path, environment: Mapping[str, str]) -> str:
         entities = plistlib.loads(output.encode()).get("system-entities", [])
     except (plistlib.InvalidFileException, ValueError) as error:
         raise ReleaseError("hdiutil attach returned no plist") from error
+    # hdiutil reports the mount point with symbolic links resolved (a runner's
+    # TMPDIR is under /var/folders, reported as /private/var/folders), so both
+    # sides are compared resolved.
+    wanted = os.path.realpath(mountpoint)
     for entity in entities:
-        if entity.get("mount-point") == str(mountpoint) and entity.get("dev-entry"):
+        if entity.get("mount-point") and entity.get("dev-entry") \
+                and os.path.realpath(entity["mount-point"]) == wanted:
             return str(entity["dev-entry"])
+    # Never leave an image attached that this script cannot account for.
+    for entity in entities:
+        if entity.get("dev-entry") and entity.get("mount-point"):
+            try:
+                run(["hdiutil", "detach", "-force", entity["dev-entry"]], env=environment)
+            except ReleaseError:
+                pass
     raise ReleaseError("hdiutil attach did not report the requested mount point")
 
 
@@ -672,6 +896,7 @@ def verify_mounted(mount: Path, staged: Mapping[str, str], unsigned: bool, versi
             env=environment)
     for name in (APP, CLI, ARKFORGE):
         verify_nested_code(mount / name, environment)
+        verify_arm64_only(mount / name, environment)
 
 
 def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, str]) -> Path:
@@ -706,15 +931,8 @@ def build(mode: str, arguments: argparse.Namespace, environment: Mapping[str, st
             for path, flag in ((app, "--app"), (arguments.helpers, "--helpers"), (arkforge, "--arkforge-bundle")):
                 require(path.is_absolute(), f"{flag} must be an absolute path")
         else:
-            cli = build_helpers(work, environment, identity)
-            verify_nested_code(cli, environment)
-            arkforge = build_arkforge(work, arguments.arkforge_checkout, environment, identity)
-            verify_nested_code(arkforge, environment)
-            app = build_app(work, environment)
-            # Before the upload: an exported App whose nested helper lost its
-            # hardened runtime or timestamp fails here, not at Apple.
-            verify_nested_code(app, environment)
-            notarization = {"app": notarize_app(work, app, environment, publish)}
+            app, cli, arkforge, notarization = build_release_components(
+                work, arguments.arkforge_checkout, environment, identity, publish)
 
         components = {
             APP: inspect_bundle(app, "com.arkdeck.desktop", versions),

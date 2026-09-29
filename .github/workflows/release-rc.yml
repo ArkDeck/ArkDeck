@@ -40,7 +40,9 @@ jobs:
     runs-on: xcode-27
     environment: release
     # Three notarizations (helper pair, App, DMG) wait on Apple; each may take
-    # from minutes to hours, the builds about half an hour.
+    # from minutes to hours. The helper pair, ArkForge and the App build
+    # concurrently and the first two notarizations overlap (about 11 minutes
+    # of build step sequentially in run 36590793565, mostly the App archive).
     timeout-minutes: 300
     # actions: read lists this repository's artifacts for the duplicate check.
     permissions:
@@ -125,6 +127,65 @@ jobs:
           rustc --version
           cargo --version
 
+      # Build caches (TASK-XPA-017 release speed). Every cache is restored
+      # here, before any credential exists on the runner, and saved only at
+      # the end of a successful main run, after the credentials are removed.
+      # They hold build inputs and unsigned intermediates only: the cargo
+      # registry and git sources, the two release target directories (both
+      # packagers copy the binaries out of them and sign the copies), and
+      # xcodebuild's SwiftPM clones. Nothing signed, no keychain and no
+      # credential file lives under a cached path, and no Rust crate of this
+      # repository reads an ARKDECK_* variable at compile time. A stale entry
+      # cannot change what is signed: cargo rebuilds every crate whose
+      # sources, toolchain or flags differ (the fresh checkout's mtimes rebuild
+      # the workspace crates every time), and xcodebuild checks packages out
+      # at exactly the committed Package.resolved revisions
+      # (-onlyUsePackageVersionsFromResolvedFile) and compiles them into a
+      # fresh DerivedData. Xcode compilation caching is not used: its content
+      # store would carry compiled objects from an earlier run into the
+      # signed App. Keys carry the runner image build and the resolved rustc,
+      # so a new image or toolchain starts from its own entries.
+      - name: Identify release build caches
+        id: caches
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          set -euo pipefail
+          if [ -z "${ImageVersion:-}" ]; then
+            echo "::warning::ImageVersion is unset; the release build caches key on 'unknown'"
+          fi
+          rustc_id=$(cd rust && rustc -vV | shasum -a 256 | cut -c1-16)
+          pin=$(PYTHONDONTWRITEBYTECODE=1 python3 -c 'import sys; sys.path.insert(0, "scripts/release"); import build_macos_release; print(build_macos_release.arkforge_pin())')
+          {
+            echo "image=${ImageOS:-unknown}-${ImageVersion:-unknown}"
+            echo "rustc=$rustc_id"
+            echo "arkforge-pin=$pin"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the cargo registry and git sources
+        id: cargo-home-cache
+        if: steps.existing.outputs.exists == 'false'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: arkdeck-release-cargo-home-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock') }}-arkforge-${{ steps.caches.outputs.arkforge-pin }}
+          restore-keys: |
+            arkdeck-release-cargo-home-v1-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Restore the Rust helper release target
+        id: rust-target-cache
+        if: steps.existing.outputs.exists == 'false'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: rust/target
+          key: arkdeck-release-rust-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            arkdeck-release-rust-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-
+
       # Every network fetch happens before any credential exists on the runner.
       # ArkForge is public, so neither fetch needs a key.
       - name: Fetch the locked Rust dependency graph
@@ -148,6 +209,30 @@ jobs:
           test "$(git -C "$checkout" rev-parse HEAD)" = "$pin"
           (cd "$checkout" && cargo fetch --locked)
           echo "ARKDECK_ARKFORGE_CHECKOUT=$checkout" >> "$GITHUB_ENV"
+
+      - name: Restore the ArkForge release target
+        id: arkforge-target-cache
+        if: steps.existing.outputs.exists == 'false'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/ArkForge/target
+          key: arkdeck-release-arkforge-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-${{ steps.caches.outputs.arkforge-pin }}
+          restore-keys: |
+            arkdeck-release-arkforge-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-
+
+      # xcodebuild's SwiftPM clones: package sources only, keyed on the
+      # committed Package.resolved files.
+      - name: Restore the SwiftPM clones
+        id: swiftpm-cache
+        if: steps.existing.outputs.exists == 'false'
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm/SourcePackages
+          key: arkdeck-release-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/ArkDeckKit/Package.resolved') }}
+          restore-keys: |
+            arkdeck-release-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
       # The Developer ID identity goes into a keychain of this job's own, with
       # a random password masked before first use; codesign may use its key
@@ -214,6 +299,7 @@ jobs:
         env:
           ARKDECK_NOTARY_API_KEY_ID: ${{ secrets.ARKDECK_NOTARY_API_KEY_ID }}
           ARKDECK_NOTARY_API_ISSUER_ID: ${{ secrets.ARKDECK_NOTARY_API_ISSUER_ID }}
+          ARKDECK_XCODE_SOURCE_PACKAGES: ${{ runner.temp }}/arkdeck-swiftpm/SourcePackages
         run: >-
           python3 scripts/release/build_macos_release.py release
           --output "$RUNNER_TEMP/rc"
@@ -258,3 +344,56 @@ jobs:
             echo "- DMG SHA-256: \`$sha256\`"
             echo "- Signed, notarized and stapled by build_macos_release.py; see release-receipt.json and the notary logs in the artifact."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Saved only from a successful main run, after the credentials are gone,
+      # and only when the exact key missed.
+      - name: Save the cargo registry and git sources
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.existing.outputs.exists == 'false' &&
+          steps.cargo-home-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: arkdeck-release-cargo-home-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/Cargo.lock') }}-arkforge-${{ steps.caches.outputs.arkforge-pin }}
+
+      - name: Save the Rust helper release target
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.existing.outputs.exists == 'false' &&
+          steps.rust-target-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: rust/target
+          key: arkdeck-release-rust-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-${{ hashFiles('rust/Cargo.lock') }}
+
+      - name: Save the ArkForge release target
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.existing.outputs.exists == 'false' &&
+          steps.arkforge-target-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/ArkForge/target
+          key: arkdeck-release-arkforge-target-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.caches.outputs.image }}-rustc-${{ steps.caches.outputs.rustc }}-${{ steps.caches.outputs.arkforge-pin }}
+
+      - name: Save the SwiftPM clones
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.existing.outputs.exists == 'false' &&
+          steps.swiftpm-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm/SourcePackages
+          key: arkdeck-release-swiftpm-v1-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/ArkDeckKit/Package.resolved') }}

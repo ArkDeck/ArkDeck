@@ -1027,6 +1027,84 @@ def validate_release_rc_contract(text: str) -> None:
     ):
         if token not in upload:
             raise WorkflowContractError(f"the release candidate upload must carry: {token.strip()}")
+    _validate_release_rc_caches(steps, install_at, cleanup_at)
+
+
+RELEASE_RC_CACHE_ACTIONS = {
+    "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9": "restore",
+    "actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9": "save",
+}
+# Nothing the credential install writes, nothing signed and nothing built by
+# xcodebuild may be cached: only build inputs and the unsigned cargo targets.
+RELEASE_RC_UNCACHEABLE = (
+    "arkdeck-release-credentials", "keychain", ".p12", ".p8", "provisionprofile",
+    "${{ runner.temp }}/rc", "DerivedData", "xcarchive", "export", "CompilationCache",
+)
+RELEASE_RC_CACHE_SAVE_CONDITION = (
+    "        if: >-\n"
+    "          success() &&\n"
+    "          github.ref == 'refs/heads/main' &&\n"
+    "          steps.existing.outputs.exists == 'false' &&\n"
+)
+
+
+def _cache_paths(step: str) -> tuple[str, ...]:
+    lines = step.splitlines()
+    for index, line in enumerate(lines):
+        if line == "          path: |":
+            block = []
+            for item in lines[index + 1:]:
+                if not item.startswith("            "):
+                    break
+                block.append(item.strip())
+            return tuple(block) or ("",)
+        if line.startswith("          path: "):
+            return (line.removeprefix("          path: ").strip(),)
+    raise WorkflowContractError("a release cache step must name its path")
+
+
+def _validate_release_rc_caches(steps: list[tuple[str, str]], install_at: int, cleanup_at: int) -> None:
+    """Build caches restore before any credential exists and are saved only
+    after the credentials are removed, from a successful main run that built
+    an RC; neither kind touches a secret, the credential files, the keychain
+    or a signed or xcodebuild-built product."""
+
+    restored: set[tuple[str, ...]] = set()
+    saved: list[tuple[str, tuple[str, ...]]] = []
+    for index, (name, step) in enumerate(steps):
+        if "actions/cache" not in step:
+            continue
+        uses = re.search(r"^        uses: (\S+)", step, re.MULTILINE)
+        kind = RELEASE_RC_CACHE_ACTIONS.get(uses.group(1) if uses else "")
+        if kind is None:
+            raise WorkflowContractError(
+                f"release caches use the pinned actions/cache/restore or actions/cache/save only: {name}"
+            )
+        if "secrets." in step or "\n        env:" in step:
+            raise WorkflowContractError(f"a release cache step takes no secret and no environment: {name}")
+        paths = _cache_paths(step)
+        for path in paths:
+            if not path or any(token.lower() in path.lower() for token in RELEASE_RC_UNCACHEABLE):
+                raise WorkflowContractError(f"a release cache must not hold {path!r}: {name}")
+        if kind == "restore":
+            if index > install_at:
+                raise WorkflowContractError(f"release caches are restored before the credentials: {name}")
+            if RELEASE_RC_BUILDS_ONLY_NEW not in step:
+                raise WorkflowContractError(f"an existing release candidate restores no cache: {name}")
+            restored.add(paths)
+        else:
+            if index < cleanup_at:
+                raise WorkflowContractError(
+                    f"release caches are saved only after the credentials are removed: {name}"
+                )
+            if RELEASE_RC_CACHE_SAVE_CONDITION not in step:
+                raise WorkflowContractError(
+                    f"release caches are saved only from a successful main run that built an RC: {name}"
+                )
+            saved.append((name, paths))
+    for name, paths in saved:
+        if paths not in restored:
+            raise WorkflowContractError(f"a release cache saves only what it restored: {name}")
 
 
 def validate_arkforge_cargo_fetch(fetch_text: str) -> None:
@@ -1517,6 +1595,47 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             "upload of nothing passes": text.replace(
                 "          if-no-files-found: error\n", "          if-no-files-found: warn\n"),
         }
+        # Build caches: restored before the credentials, saved after they are
+        # removed and only from a successful main run, never holding a
+        # credential, a keychain, a signed or an xcodebuild-built product.
+        swiftpm_start = text.index("      - name: Restore the SwiftPM clones\n")
+        install_start = text.index("      - name: Install release credentials\n")
+        build_start = text.index("      - name: Build the signed and notarized release candidate\n")
+        swiftpm_restore = text[swiftpm_start:install_start]
+        save_start = text.index("      - name: Save the SwiftPM clones\n")
+        swiftpm_save = text[save_start:]
+        swiftpm_path = "          path: ${{ runner.temp }}/arkdeck-swiftpm/SourcePackages\n"
+        restore_uses = "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9"
+        mutations.update({
+            "cache restored after the credentials": (
+                text[:swiftpm_start] + text[install_start:build_start] + swiftpm_restore + text[build_start:]),
+            "cache saved before the credentials are removed": (
+                text[:cleanup_start] + swiftpm_save.rstrip("\n") + "\n\n" + text[cleanup_start:save_start]),
+            "cache saved off main": text.replace("          github.ref == 'refs/heads/main' &&\n", "", 1),
+            "cache saved after a failure": text.replace(
+                "        if: >-\n          success() &&\n", "        if: >-\n          always() &&\n", 1),
+            "cache saved for an existing RC": text.replace(
+                "          github.ref == 'refs/heads/main' &&\n          steps.existing.outputs.exists == 'false' &&\n",
+                "          github.ref == 'refs/heads/main' &&\n", 1),
+            "credentials cached": text.replace(
+                swiftpm_path, "          path: ${{ runner.temp }}/arkdeck-release-credentials\n"),
+            "keychain cached": text.replace(
+                "            ~/.cargo/git/db\n", "            ~/.cargo/git/db\n            ~/Library/Keychains\n"),
+            "release candidate cached": text.replace(swiftpm_path, "          path: ${{ runner.temp }}/rc\n"),
+            "DerivedData cached": text.replace(
+                swiftpm_path, "          path: ${{ runner.temp }}/arkdeck-swiftpm/DerivedData\n"),
+            "save of a path never restored": text[:save_start] + swiftpm_save.replace(
+                swiftpm_path, "          path: ${{ runner.temp }}/arkdeck-swiftpm\n"),
+            "combined cache action": text.replace(
+                restore_uses, "        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", 1),
+            "unpinned cache action": text.replace(restore_uses, "        uses: actions/cache/restore@v6", 1),
+            "secret in a cache step": text.replace(
+                swiftpm_restore,
+                swiftpm_restore.replace(
+                    "        continue-on-error: true\n",
+                    "        continue-on-error: true\n        env:\n"
+                    "          KEY: ${{ secrets.ARKDECK_NOTARY_API_KEY_ID }}\n")),
+        })
         for case, mutated in mutations.items():
             with self.subTest(case):
                 self.assertNotEqual(mutated, text)
