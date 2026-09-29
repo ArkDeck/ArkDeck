@@ -4,8 +4,8 @@ name: Rust CI
 # swift aggregate, so a Rust failure cannot leave branch protection green.
 #
 # ArkForge's crates come from its private repository at the revision
-# Package.swift pins, so each job's locked fetch needs the read-only deploy key
-# the Swift lanes use. The caller passes that one secret and nothing else; it
+# rust/Cargo.toml pins, so each job's locked fetch needs the read-only deploy
+# key. The caller passes that one secret and nothing else; it
 # reaches only the fetch steps, which build and run nothing, and the key is
 # removed before any later step runs checked-out code
 # (scripts/ci/arkforge-cargo-fetch.sh).
@@ -97,10 +97,11 @@ jobs:
         working-directory: .
         run: python rust/scripts/test_ci_execution.py
 
-      # One ArkForge revision for both lanes: the Rust pin, locked, must be the
-      # one Package.swift pins, and ArkForge's own wire and StepPermit vectors
-      # must still hold at it (from the checkout the fetch above cached).
-      - name: One ArkForge revision for both lanes, and its published vectors
+      # One ArkForge revision: every ArkForge crate, locked, at the one
+      # revision rust/Cargo.toml pins (the Swift SDK pin was deleted with the
+      # Swift Runtime), and ArkForge's own wire and StepPermit vectors must
+      # still hold at it (from the checkout the fetch above cached).
+      - name: One ArkForge revision, and its published vectors
         working-directory: .
         run: python rust/scripts/check-arkforge-pin.py --run-vectors
 

@@ -613,8 +613,8 @@ RUST_POLICY_TOKENS = (
     "run: cargo fmt --all --check",
     "        working-directory: .\n"
     "        run: python rust/scripts/test_contract_checks.py\n",
-    # One ArkForge revision for both lanes, and ArkForge's own wire and
-    # StepPermit vectors rerun at it.
+    # One ArkForge revision, and ArkForge's own wire and StepPermit vectors
+    # rerun at it.
     "        working-directory: .\n"
     "        run: python rust/scripts/check-arkforge-pin.py --run-vectors\n",
     # cargo-deny and cargo-vet are memoized between hosted runs. The memo

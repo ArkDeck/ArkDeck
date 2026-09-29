@@ -2,29 +2,20 @@
 
 import PackageDescription
 
+// The App's side of ArkDeck. The Runtime (daemon, engine, storage, providers)
+// and the CLI are Rust (CHG-2026-074); Swift carries no Runtime semantics, and
+// ArchitectureBoundaryContractTests refuses any target that brings them back.
 let package = Package(
   name: "ArkDeckKit",
   platforms: [.macOS(.v26)],
   products: [
     .library(name: "ArkDeckClientKit", targets: ["ArkDeckClientKit"]),
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),
-    .library(name: "ArkDeckProcess", targets: ["ArkDeckProcess"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
-    .library(name: "ArkDeckOpenHarmony", targets: ["ArkDeckOpenHarmony"]),
-    .library(name: "ArkDeckWorkflows", targets: ["ArkDeckWorkflows"]),
-    .library(name: "ArkDeckStorage", targets: ["ArkDeckStorage"]),
     .library(name: "ArkDeckTraceAdapter", targets: ["ArkDeckTraceAdapter"]),
-    .library(name: "ArkDeckAgentDaemon", targets: ["ArkDeckAgentDaemon"]),
     .library(name: "ArkDeckAgentClient", targets: ["ArkDeckAgentClient"]),
     .library(name: "ArkDeckBootstrap", targets: ["ArkDeckBootstrap"]),
-    .library(name: "ArkDeckLaunchAgent", targets: ["ArkDeckLaunchAgent"]),
-    .executable(name: "arkdeck-agentd", targets: ["ArkDeckAgentDaemonMain"]),
-    .executable(name: "ArkDeckJournalCrashFixture", targets: ["ArkDeckJournalCrashFixture"]),
-    .executable(name: "ArkDeckRuntimePortFixture", targets: ["ArkDeckRuntimePortFixture"]),
     .executable(name: "ArkDeckFakeHDCFixture", targets: ["ArkDeckFakeHDCFixture"]),
-    .executable(name: "ArkDeckEngineCrashFixture", targets: ["ArkDeckEngineCrashFixture"]),
-    .executable(name: "ArkDeckRuntimeSoakFixture", targets: ["ArkDeckRuntimeSoakFixture"]),
-    .executable(name: "ArkDeckFakeHapSignerFixture", targets: ["ArkDeckFakeHapSignerFixture"]),
   ],
   dependencies: [
     .package(
@@ -43,15 +34,12 @@ let package = Package(
       url: "https://github.com/apple/swift-log.git",
       exact: "1.15.0"),
     .package(
-      url: "https://github.com/ArkDeck/ArkForge.git",
-      revision: "c1dc0553b42627581583abfba3fec34d13343282"),
-    .package(
       url: "https://github.com/ArkDeck/ArkTrace.git",
       revision: "9172c9525f954ec397e0555d7d03cd4367f3efcf"),
   ],
   targets: [
     // The App's client library. It carries the App-side SSH remote build
-    // source, so the SSH stack is linked here rather than by Workflows.
+    // source, so the SSH stack is linked here.
     .target(
       name: "ArkDeckClientKit",
       dependencies: [
@@ -65,50 +53,7 @@ let package = Package(
     .target(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
-    .target(
-      name: "ArkDeckProcess", dependencies: ["ArkDeckCore"],
-      swiftSettings: [.strictMemorySafety()]),
     .target(name: "ArkDeckRuntime", dependencies: ["ArkDeckCore"]),
-    .target(name: "ArkDeckOpenHarmony", dependencies: ["ArkDeckCore", "ArkDeckProcess"]),
-    // The runtime control plane and providers. The harness plane was removed
-    // by CHG-2026-064: decisions come from external agents through the
-    // published caller surface, so no target may reintroduce an in-process
-    // decision plane (see ArchitectureBoundaryContractTests).
-    .target(
-      name: "ArkDeckWorkflows",
-      dependencies: [
-        "ArkDeckClientKit",
-        "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
-        "ArkDeckStorage",
-        .product(name: "ArkForgeProtocol", package: "ArkForge"),
-        .product(name: "ArkForgeClient", package: "ArkForge"),
-      ],
-      exclude: ["AgentComposition"],
-      resources: [
-        // Shared with the Rust helper packager; keep this target's bundle name.
-        .copy("../../Resources/OpenHarmonyNativeCodeSign")
-      ],
-      linkerSettings: [
-        .linkedFramework("Security"),
-        .linkedFramework("LocalAuthentication"),
-      ]),
-    // Product composition above the runtime plane: the runtime-owned isolated
-    // workspace machinery, the flash evolution campaign host, and the native
-    // agent-chat composition. This target lives under
-    // Sources/ArkDeckWorkflows/AgentComposition as a carve-out so
-    // ArkDeckWorkflows itself never gains a composition edge.
-    .target(
-      name: "ArkDeckAgentComposition",
-      dependencies: [
-        "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckStorage",
-        "ArkDeckWorkflows", "ArkDeckAgentClient",
-      ],
-      path: "Sources/ArkDeckWorkflows/AgentComposition"),
-    .target(
-      name: "ArkDeckStorage",
-      dependencies: ["ArkDeckCore"],
-      linkerSettings: [.linkedLibrary("sqlite3")]
-    ),
     // ArkTrace owns every shared engine source. ArkDeck keeps only its fixed
     // product profile and app-bundle adapter in this target.
     .target(
@@ -118,74 +63,20 @@ let package = Package(
         .product(name: "ArkTraceRuntime", package: "ArkTrace"),
       ]),
     .target(
-      name: "ArkDeckAgentDaemon",
-      dependencies: ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
-    ),
-    .target(
       name: "ArkDeckAgentClient",
       dependencies: ["ArkDeckCore"]
     ),
-    // Current-user, pre-daemon typed bundle/tool registry shared by both
-    // executable composition roots. It owns no launchd command surface and
-    // grants no Runtime execution authority.
+    // Current-user, pre-daemon typed bundle/tool registry. It owns no launchd
+    // command surface and grants no Runtime execution authority.
     .target(
       name: "ArkDeckBootstrap",
       dependencies: ["ArkDeckCore"],
       linkerSettings: [.linkedFramework("Security")]
     ),
-    .target(
-      name: "ArkDeckLaunchAgent",
-      dependencies: [
-        "ArkDeckCore",
-        .product(name: "ArkForgeClient", package: "ArkForge"),
-      ],
-      path: "LaunchAgents",
-      exclude: ["README.md"],
-      resources: [.copy("com.arkdeck.agentd.plist")],
-      linkerSettings: [.linkedFramework("Security")]
-    ),
-    .executableTarget(
-      name: "ArkDeckAgentDaemonMain",
-      dependencies: [
-        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckClientKit", "ArkDeckCore",
-        "ArkDeckBootstrap", "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage",
-        "ArkDeckTraceAdapter",
-        "ArkDeckWorkflows",
-      ]
-    ),
-    .executableTarget(
-      name: "ArkDeckJournalCrashFixture",
-      dependencies: ["ArkDeckCore", "ArkDeckStorage"],
-      path: "Tests/ArkDeckJournalCrashFixture"
-    ),
-    .executableTarget(
-      name: "ArkDeckRuntimePortFixture",
-      dependencies: ["ArkDeckRuntime"],
-      path: "Tests/ArkDeckRuntimePortFixture"
-    ),
+    // The fake HDC the App UI tests point the App at.
     .executableTarget(
       name: "ArkDeckFakeHDCFixture",
       path: "Tests/ArkDeckFakeHDCFixture"
-    ),
-    .executableTarget(
-      name: "ArkDeckEngineCrashFixture",
-      dependencies: [
-        "ArkDeckBootstrap", "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckStorage",
-        "ArkDeckWorkflows", "ArkDeckLaunchAgent",
-      ],
-      path: "Tests/ArkDeckEngineCrashFixture"
-    ),
-    .executableTarget(
-      name: "ArkDeckRuntimeSoakFixture",
-      dependencies: [
-        "ArkDeckAgentClient", "ArkDeckAgentDaemon", "ArkDeckCore", "ArkDeckOpenHarmony",
-        "ArkDeckStorage", "ArkDeckWorkflows",
-      ],
-      path: "Tests/ArkDeckRuntimeSoakFixture"
-    ),
-    .executableTarget(
-      name: "ArkDeckFakeHapSignerFixture",
-      path: "Tests/ArkDeckFakeHapSignerFixture"
     ),
     .testTarget(name: "ArkDeckClientKitTests", dependencies: ["ArkDeckClientKit", "ArkDeckCore"]),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),

@@ -539,7 +539,7 @@ def attach(dmg: Path, mountpoint: Path, environment: Mapping[str, str]) -> str:
 def daemon_requirement(versions: Mapping[str, str]) -> str:
     """ArkDeckAgentXPC.serverCodeRequirement for this release's App."""
     return (
-        f'{ANCHOR} and (identifier "com.arkdeck.agentd" or identifier "com.arkdeck.agentd.facade") '
+        f'{ANCHOR} and identifier "com.arkdeck.agentd" '
         f'and info[CFBundleShortVersionString] = "{versions["version"]}" '
         f'and info[CFBundleVersion] = "{versions["build"]}"'
     )

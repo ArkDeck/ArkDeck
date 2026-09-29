@@ -6,7 +6,7 @@ let arguments = CommandLine.arguments
 let count = arguments.count > 1 ? Int(arguments[1]) ?? 1 : 1
 let contractMode = arguments.contains("--contract")
 let version = arguments.count > 2 ? arguments[2] : "0.1.0"
-let requirement = "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and (identifier \"com.arkdeck.agentd\" or identifier \"com.arkdeck.agentd.facade\") and info[CFBundleShortVersionString] = \"\(version)\" and info[CFBundleVersion] = \"1\""
+let requirement = "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.agentd\" and info[CFBundleShortVersionString] = \"\(version)\" and info[CFBundleVersion] = \"1\""
 let queue = DispatchQueue(label: "xpa-probe")
 let connection = xpc_connection_create_mach_service("com.arkdeck.agentd", queue, 0)
 guard xpc_connection_set_peer_code_signing_requirement(connection, requirement) == 0 else { exit(65) }

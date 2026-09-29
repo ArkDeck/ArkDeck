@@ -1,8 +1,8 @@
 #!/bin/sh
 # Fetch the Rust workspace's locked dependency graph. Its ArkForge crates come
-# from ArkForge's private repository at the revision Package.swift pins, so
-# this fetch needs the same repository-scoped read-only deploy key the Swift
-# lanes use, and nothing after it does.
+# from ArkForge's private repository at the revision rust/Cargo.toml pins,
+# so this fetch needs the repository-scoped read-only deploy key, and nothing
+# after it does.
 #
 # arkforge-package-auth.sh writes the key and the Git transport that uses it.
 # Here that transport goes to a private file instead of GITHUB_ENV and is

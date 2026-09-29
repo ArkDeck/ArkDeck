@@ -354,8 +354,8 @@ class Release(Fixture):
         self.assertTrue(any(call[:4] == ["spctl", "--assess", "--type", "open"] for call in self.calls))
         requirements = [option(call, "-R") for call in self.called("codesign", "--verify") if "-R" in call]
         self.assertIn(
-            f'=anchor apple generic and certificate leaf[subject.OU] = "{TEAM}" and (identifier '
-            f'"com.arkdeck.agentd" or identifier "com.arkdeck.agentd.facade") and '
+            f'=anchor apple generic and certificate leaf[subject.OU] = "{TEAM}" and identifier '
+            f'"com.arkdeck.agentd" and '
             f'info[CFBundleShortVersionString] = "{VERSIONS["version"]}" and '
             f'info[CFBundleVersion] = "{VERSIONS["build"]}"', requirements)
         self.assertEqual(len([call for call in self.called("spctl", "--assess", "--type", "execute")

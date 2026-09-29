@@ -712,13 +712,12 @@ final class AutoUpdateContractTests: XCTestCase {
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    let arkForgeRevision = "c1dc0553b42627581583abfba3fec34d13343282"
     let arkTraceRevision = "9172c9525f954ec397e0555d7d03cd4367f3efcf"
     XCTAssertEqual(
-      package.components(separatedBy: ".package(").count - 1, 7,
+      package.components(separatedBy: ".package(").count - 1, 6,
       "the package's direct remote-source dependency set is closed")
-    XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkForge.git"))
-    XCTAssertTrue(package.contains("revision: \"\(arkForgeRevision)\""))
+    // The ArkForge Swift SDK left with the Swift Runtime (CHG-2026-074).
+    XCTAssertFalse(package.contains("ArkDeck/ArkForge"))
     XCTAssertTrue(package.contains("https://github.com/ArkDeck/ArkTrace.git"))
     XCTAssertTrue(package.contains("revision: \"\(arkTraceRevision)\""))
     for dependency in [
@@ -738,9 +737,6 @@ final class AutoUpdateContractTests: XCTestCase {
       as? [String: Any]
     let pins = try XCTUnwrap(packageResolution?["pins"] as? [[String: Any]])
     let expectedPins: [String: (location: String, revision: String, version: String?)] = [
-      "arkforge": (
-        "https://github.com/ArkDeck/ArkForge.git",
-        arkForgeRevision, nil),
       "arktrace": (
         "https://github.com/ArkDeck/ArkTrace.git",
         arkTraceRevision, nil),
@@ -787,13 +783,6 @@ final class AutoUpdateContractTests: XCTestCase {
       XCTAssertEqual(state["revision"] as? String, expected.revision, identity)
       XCTAssertEqual(state["version"] as? String, expected.version, identity)
     }
-    let arkForgePin = try XCTUnwrap(pinsByIdentity["arkforge"])
-    XCTAssertEqual(
-      arkForgePin["location"] as? String,
-      "https://github.com/ArkDeck/ArkForge.git")
-    XCTAssertEqual(
-      (arkForgePin["state"] as? [String: Any])?["revision"] as? String,
-      arkForgeRevision)
     let arkTracePin = try XCTUnwrap(pinsByIdentity["arktrace"])
     XCTAssertEqual(
       arkTracePin["location"] as? String,

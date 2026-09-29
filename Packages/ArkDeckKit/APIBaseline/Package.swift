@@ -25,14 +25,8 @@ let package = Package(
       dependencies: [
         .product(name: "ArkDeckClientKit", package: "ArkDeckKit"),
         .product(name: "ArkDeckCore", package: "ArkDeckKit"),
-        .product(name: "ArkDeckProcess", package: "ArkDeckKit"),
         .product(name: "ArkDeckRuntime", package: "ArkDeckKit"),
-        .product(name: "ArkDeckOpenHarmony", package: "ArkDeckKit"),
-        .product(name: "ArkDeckWorkflows", package: "ArkDeckKit"),
-        .product(name: "ArkDeckStorage", package: "ArkDeckKit"),
-        .product(name: "ArkDeckAgentDaemon", package: "ArkDeckKit"),
         .product(name: "ArkDeckAgentClient", package: "ArkDeckKit"),
-        .product(name: "ArkDeckLaunchAgent", package: "ArkDeckKit"),
         .product(name: "ArkDeckTraceAdapter", package: "ArkDeckKit"),
       ])
   ]
