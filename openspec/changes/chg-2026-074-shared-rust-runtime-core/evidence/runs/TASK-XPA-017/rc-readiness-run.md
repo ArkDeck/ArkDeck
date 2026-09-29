@@ -176,4 +176,4 @@ or Swift source changed); `generate-contract.py --check` (no contract input chan
 
 ## CI
 
-Pending; recorded by the next slice or a docs-only follow-up.
+Final: #2310 head `2a57e18bb`, Swift CI run 36438602989 success (the `swift` aggregate and every selected lane), SDD Guard run 36438602042 success; squash-merged as `2f75ae8e5` on 2026-09-28. Recorded by the docs-only follow-up (TASK-XPA-017).

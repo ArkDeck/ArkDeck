@@ -90,5 +90,4 @@ needed: no contract input changed.
 
 ## CI
 
-To be recorded by the next slice or a docs-only follow-up (PR number, run id,
-conclusion).
+Final: #2309 head `1ba6df618`, Swift CI run 36435219467 success (the `swift` aggregate and every selected lane), SDD Guard run 36435218789 success; squash-merged as `0359580e3` on 2026-09-28. Recorded by the docs-only follow-up (TASK-XPA-017).

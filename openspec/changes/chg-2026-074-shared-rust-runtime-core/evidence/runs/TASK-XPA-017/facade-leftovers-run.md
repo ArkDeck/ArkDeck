@@ -65,4 +65,6 @@ while `TemporaryDirectory` removed its scratch checkout. Invalid run by the four
 criteria: the script is not in this diff, the error is a cleanup race with a git
 process still writing the pack directory, the suite passes locally (20 tests,
 OK), and nothing in it reads `arkdeck-agentd`'s build script. Re-pushed with
-this note; the final run is recorded by a docs-only follow-up.
+this note.
+
+Final: #2314 head `60974c7f2`, Swift CI run 36453518871 success (the `swift` aggregate and every selected lane), SDD Guard run 36453518475 success; squash-merged as `d247f62a6` on 2026-09-29. Recorded by the docs-only follow-up (TASK-XPA-017).
