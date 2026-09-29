@@ -132,11 +132,11 @@ jobs:
   swift-tests:
     needs: plan
     if: needs.plan.outputs.swift == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
       CI: "true"
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - name: Checkout exact revision with runner Git
         env:
@@ -150,7 +150,7 @@ jobs:
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
-      - name: Exact Xcode 26.6 preflight
+      - name: Exact Xcode 27.0 preflight
         run: |
           set -eu
           test -d "$DEVELOPER_DIR"
@@ -167,12 +167,13 @@ jobs:
 
       # llbuild re-runs a C compile when any discovered input changed identity,
       # and the SDK modulemaps and headers every C file includes differ between
-      # runner image builds although the toolchain is the same Xcode 26.6.
-      # Measured over the swift-tests runs of #1827..#1851: a cache restored on
-      # the image build that saved it recompiled 0 C units; every cross-image
-      # restore recompiled all 257 (BoringSSL, NIO shims, Citadel), 1.2 minutes
-      # on the 3 vCPU runner. Image deployments take days and both builds serve
-      # jobs meanwhile, so about half of the runs in a rollout paid it.
+      # runner image builds although the toolchain is the same pinned Xcode.
+      # Measured on Xcode 26.6 over the swift-tests runs of #1827..#1851: a
+      # cache restored on the image build that saved it recompiled 0 C units;
+      # every cross-image restore recompiled all 257 (BoringSSL, NIO shims,
+      # Citadel), 1.2 minutes on the 3 vCPU runner. Image deployments take
+      # days and both builds serve jobs meanwhile, so about half of the runs
+      # in a rollout paid it.
       # swift-driver keeps its own incremental record, so Swift targets were
       # never affected. The image build therefore joins the cache key: exact
       # inputs first, then the newest same-image protected-main entry, and
@@ -195,11 +196,11 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
-            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
-            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
       - name: ArkDeckKit full test suite (8 workers)
         env:
@@ -219,16 +220,16 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
 
   app-build:
     needs: plan
     if: needs.plan.outputs.app == 'true'
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 30
     env:
       CI: "true"
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
     steps:
       - name: Checkout exact revision with runner Git
         env:
@@ -242,7 +243,7 @@ jobs:
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
-      - name: Exact Xcode 26.6 preflight
+      - name: Exact Xcode 27.0 preflight
         run: |
           set -eu
           test -d "$DEVELOPER_DIR"
@@ -258,10 +259,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
-            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
+            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-
+            arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-
 
       - name: Build ArkDeck app and UI-test bundle
         env:
@@ -277,7 +278,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-xcode
-          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
+          key: arkdeck-xcode-v2-${{ runner.os }}-${{ runner.arch }}-xcode-27.0-${{ hashFiles('ArkDeck.xcodeproj/project.pbxproj', 'Packages/ArkDeckKit/Package.swift', 'Packages/ArkDeckKit/Package.resolved') }}-${{ github.sha }}
 
   # The @arkdeck/ds interaction tests execute the docs/design prototype draft
   # and cross-check the audit matrix, implementation-coverage.json and the App

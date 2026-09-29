@@ -113,7 +113,7 @@ jobs:
     # that is an open gap in the SPK-1 report.
     if: github.event_name == 'schedule' && github.event.schedule == '0 17 * * *'
     needs: harness-tests
-    runs-on: macos-26
+    runs-on: xcode-27
     concurrency:
       group: arkdeck-macos-background
       cancel-in-progress: false
@@ -206,7 +206,7 @@ jobs:
       (github.event_name == 'schedule' && github.event.schedule == '0 3 * * 0')
       || github.event_name == 'workflow_dispatch'
     needs: harness-tests
-    runs-on: macos-26
+    runs-on: xcode-27
     concurrency:
       group: arkdeck-macos-background
       cancel-in-progress: false

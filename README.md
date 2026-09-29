@@ -14,8 +14,8 @@
 
 <p align="center">
   <a href="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml"><img src="https://github.com/ArkDeck/ArkDeck/actions/workflows/swift-ci.yml/badge.svg" alt="Swift CI"></a>
-  <img src="https://img.shields.io/badge/platform-macOS%2026%20Apple%20silicon-blue" alt="Platform: macOS 26 on Apple silicon">
-  <img src="https://img.shields.io/badge/toolchain-Xcode%2026.6%20%7C%20Swift%206.3-5f4b8b" alt="Toolchain: Xcode 26.6 and Swift 6.3">
+  <img src="https://img.shields.io/badge/platform-macOS%2027%20Apple%20silicon-blue" alt="Platform: macOS 27 on Apple silicon">
+  <img src="https://img.shields.io/badge/toolchain-Xcode%2027.0%20%7C%20Swift%206.4-5f4b8b" alt="Toolchain: Xcode 27.0 and Swift 6.4">
   <img src="https://img.shields.io/badge/status-0.1.0%20preview-orange" alt="Status: 0.1.0 preview">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License: MIT"></a>
 </p>
@@ -59,7 +59,7 @@ Raw artifacts stay on your machine and are immutable once written; exporting any
 
 ArkDeck is an early preview (`0.1.0`). Current limitations:
 
-- macOS 26 on Apple silicon is the only supported host.
+- macOS 27 on Apple silicon is the only supported host.
 - Flashing supports exactly one board today: the DAYU200 (RK3568).
 - Windows and Linux ports have not started, and interfaces, catalog schemas and setup steps may change before a first stable release.
 
@@ -96,8 +96,8 @@ Module boundaries are documented in [Architecture Rules](./docs/ArchitectureRule
 
 You need:
 
-- macOS 26 on Apple silicon
-- Xcode 26.6 with Swift 6.3
+- macOS 27 on Apple silicon
+- Xcode 27.0 with Swift 6.4
 - an OpenHarmony `hdc` executable, for real-device work
 - a USB-connected device with first-use trust already granted
 

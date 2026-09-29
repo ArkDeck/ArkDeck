@@ -177,22 +177,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-26, windows-latest]
+        os: [ubuntu-latest, xcode-27, windows-latest]
     runs-on: ${{ matrix.os }}
     # On macOS the workspace tests take about 8 to 12 minutes, against 1 to
     # 1.6 on the other hosts (#2311, run 36440456252: 12.2 on macOS). The
     # 50-minute bound predates moving the contract views to their own job and
     # stays until cold-cache runs of this job alone have been measured; the
-    # other hosts keep 30, which still stops a hung job early. The check is
-    # on the prefix, so a newer macOS runner label keeps the longer bound.
-    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}
+    # other hosts keep 30, which still stops a hung job early. GitHub names
+    # its macOS images after the Xcode major they carry (xcode-27 runs macOS
+    # 27), so the check is on that prefix and a newer image keeps the longer
+    # bound.
+    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}
     defaults:
       run:
         shell: bash
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
-      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
+      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
         working-directory: .
@@ -350,20 +352,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-26, windows-latest]
+        os: [ubuntu-latest, xcode-27, windows-latest]
     runs-on: ${{ matrix.os }}
     # A change to the contract inputs builds, lints and tests both views, each
     # in its own target: 27.6 minutes on macOS from main's cache on #2311
     # (run 36440456252), against 3.2 on Linux and 4.6 on Windows. So macOS
     # gets 50 minutes and the other hosts 30, as the workspace job does.
-    timeout-minutes: ${{ startsWith(matrix.os, 'macos') && 50 || 30 }}
+    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}
     defaults:
       run:
         shell: bash
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
-      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'macos') && '2' || '1' }}
+      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
         working-directory: .

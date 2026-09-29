@@ -13,6 +13,10 @@
   helper Info.plist 的 `LSMinimumSystemVersion` 26.0),发布 DMG 只能装在 macOS 26 及以后。
   发布入口是 `scripts/release/build_macos_release.py`,DMG 另含 Rust CLI/daemon 与 ArkForge.bundle
   (`docs/release/macos-install.md`)。要不要把支持格改回 14 或改写本 ADR,由维护者决定。
+- Note(2026-09-29,正文不改写):最低系统升到 macOS 27.0——`MACOSX_DEPLOYMENT_TARGET = 27.0`、
+  ArkDeckKit 的 `platforms: [.macOS(.v27)]`、两个 helper 的 `LSMinimumSystemVersion` 27.0,
+  发布 DMG 只能装在 macOS 27 及以后;上一条记的 26.0 由此失效。构建工具链是 Xcode 27.0 / Swift 6.4,
+  CI 的 macOS 车道随之换到 GitHub `xcode-27`(macOS 27)镜像。
 
 ## Decision
 
