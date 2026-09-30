@@ -1,8 +1,8 @@
 #![cfg(windows)]
 
 use arkdeck_platform::{
-    LocalConnection, LocalEndpoint, LocalListener, LoopbackServerLease, ServerIdentity,
-    VerifiedTool, random_bytes,
+    Latch, LocalConnection, LocalEndpoint, LocalListener, LoopbackServerLease, Readiness,
+    ServerIdentity, VerifiedTool, random_bytes,
 };
 use sha2::{Digest, Sha256};
 use std::io::{self, Read, Write};
@@ -213,4 +213,149 @@ fn peer_close_racing_timeout_completes_before_releasing_read_buffer() {
         closer.join().unwrap();
         assert_eq!(server.read(&mut [0; 64]).unwrap(), 0);
     }
+}
+
+fn client(endpoint: &LocalEndpoint) -> std::fs::File {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(endpoint.as_path())
+        .unwrap()
+}
+
+#[test]
+fn a_set_latch_ends_accepting_and_wins_over_a_waiting_client() {
+    let endpoint = endpoint();
+    let mut listener = LocalListener::bind(&endpoint).unwrap();
+    let latch = std::sync::Arc::new(Latch::new().unwrap());
+    // Set while accept waits: the wait ends without a connection.
+    let setter = {
+        let latch = std::sync::Arc::clone(&latch);
+        std::thread::spawn(move || {
+            // Not a synchronisation: set before or during the wait, the answer
+            // is the same; the pause only makes the blocked wait the likely one.
+            std::thread::sleep(Duration::from_millis(100));
+            latch.set();
+        })
+    };
+    assert!(listener.accept_until_latch(&latch).unwrap().is_none());
+    setter.join().unwrap();
+    assert!(latch.is_set());
+    // A client already waiting is never accepted once the latch is set.
+    let _waiting = client(&endpoint);
+    for _ in 0..3 {
+        assert!(listener.accept_until_latch(&latch).unwrap().is_none());
+    }
+    // Stopped listening, the name refuses a new client.
+    drop(_waiting);
+    let _lock = listener.stop_listening();
+    assert!(
+        std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(endpoint.as_path())
+            .is_err()
+    );
+}
+
+#[test]
+fn an_unset_latch_accepts_the_next_client() {
+    let endpoint = endpoint();
+    let mut listener = LocalListener::bind(&endpoint).unwrap();
+    let latch = Latch::new().unwrap();
+    let mut client = client(&endpoint);
+    let mut served = listener.accept_until_latch(&latch).unwrap().unwrap();
+    client.write_all(b"x").unwrap();
+    let mut byte = [0; 1];
+    served.read_exact(&mut byte).unwrap();
+    assert_eq!(&byte, b"x");
+}
+
+#[test]
+fn a_connection_waits_for_its_next_byte_its_end_or_the_latch() {
+    let endpoint = endpoint();
+    let mut listener = LocalListener::bind(&endpoint).unwrap();
+    let mut client = client(&endpoint);
+    let served = listener.accept().unwrap();
+    let latch = Latch::new().unwrap();
+    assert_eq!(
+        served
+            .wait_readable(&latch, Duration::from_millis(100))
+            .unwrap(),
+        Readiness::TimedOut
+    );
+    client.write_all(b"{").unwrap();
+    // Waiting reads nothing: the byte stays for the read.
+    for _ in 0..2 {
+        assert_eq!(
+            served
+                .wait_readable(&latch, Duration::from_secs(10))
+                .unwrap(),
+            Readiness::Readable
+        );
+    }
+    latch.set();
+    assert_eq!(
+        served
+            .wait_readable(&latch, Duration::from_secs(10))
+            .unwrap(),
+        Readiness::Latched
+    );
+    let mut served = served;
+    let mut byte = [0; 1];
+    served.read_exact(&mut byte).unwrap();
+    assert_eq!(&byte, b"{");
+    // A peer that has gone reads as readable; the read reports the end.
+    let fresh = Latch::new().unwrap();
+    drop(client);
+    assert_eq!(
+        served
+            .wait_readable(&fresh, Duration::from_secs(10))
+            .unwrap(),
+        Readiness::Readable
+    );
+    assert_eq!(served.read(&mut byte).unwrap(), 0);
+}
+
+#[test]
+fn a_closer_ends_a_blocked_read_and_every_later_transfer() {
+    let endpoint = endpoint();
+    let mut listener = LocalListener::bind(&endpoint).unwrap();
+    let mut client = client(&endpoint);
+    let mut served = listener.accept().unwrap();
+    served
+        .set_read_timeout(Some(Duration::from_secs(30)))
+        .unwrap();
+    served.write_all(b"reply").unwrap();
+    let closer = served.closer().unwrap();
+    let reading = std::thread::spawn(move || {
+        let started = Instant::now();
+        let count = served.read(&mut [0; 16]).unwrap();
+        (count, started.elapsed(), served)
+    });
+    // Not a synchronisation: closed before or during the read, the
+    // answer is the same; the pause makes the blocked read the likely one.
+    std::thread::sleep(Duration::from_millis(200));
+    closer.close();
+    let (count, waited, mut served) = reading.join().unwrap();
+    assert_eq!(count, 0);
+    assert!(waited < Duration::from_secs(10), "{waited:?}");
+    assert_eq!(served.read(&mut [0; 16]).unwrap(), 0);
+    assert_eq!(
+        served.write(b"late").unwrap_err().kind(),
+        io::ErrorKind::BrokenPipe
+    );
+    let latch = Latch::new().unwrap();
+    assert_eq!(
+        served
+            .wait_readable(&latch, Duration::from_secs(10))
+            .unwrap(),
+        Readiness::Readable
+    );
+    drop(served);
+    drop(closer);
+    // The reply written before the close still reaches the peer, then its end.
+    let mut rest = Vec::new();
+    client.read_to_end(&mut rest).unwrap();
+    assert_eq!(rest, b"reply");
 }

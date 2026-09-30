@@ -23,11 +23,19 @@ pub(crate) mod host_store;
 mod identity;
 mod process;
 mod server;
+mod state;
+mod stop;
 pub use account::{application_support_directory, arkdeck_application_support_root};
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
 pub(crate) use process::spawn;
 pub use server::LoopbackServerLease;
+pub use state::{
+    GuardAcquisition, GuardObject, InstanceScope, OwnerLock, SingleInstanceGuard, StateRoot,
+};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+pub use stop::{Latch, StopSignal};
 
 pub(crate) struct Handle(OwnedHandle);
 impl Handle {
@@ -40,6 +48,10 @@ impl Handle {
     }
     pub(crate) fn raw(&self) -> HANDLE {
         self.0.as_raw_handle()
+    }
+    /// Gives up ownership: the handle stays open for the life of the process.
+    pub(crate) fn leak(self) -> HANDLE {
+        std::os::windows::io::IntoRawHandle::into_raw_handle(self.0)
     }
     pub(crate) fn into_file(self) -> std::fs::File {
         self.0.into()
@@ -88,16 +100,12 @@ fn endpoint_name(endpoint: &LocalEndpoint) -> io::Result<Vec<u16>> {
     wide(endpoint.as_path().as_os_str())
 }
 
-struct PipeSecurity(LocalAllocation);
-impl PipeSecurity {
-    fn new() -> io::Result<Self> {
-        let token = Token::current()?;
-        let sddl = format!(
-            "O:{}D:P(A;;GA;;;{})",
-            token.owner()?.text()?,
-            token.logon()?.text()?
-        );
-        let sddl = wide(OsStr::new(&sddl))?;
+/// A self-relative security descriptor made from SDDL, for creating an
+/// object with exactly that owner and DACL; never inherited by a child.
+pub(crate) struct SecurityDescriptor(LocalAllocation);
+impl SecurityDescriptor {
+    pub(crate) fn from_sddl(sddl: &str) -> io::Result<Self> {
+        let sddl = wide(OsStr::new(sddl))?;
         let mut descriptor = null_mut();
         // SAFETY: NUL-terminated SDDL and valid allocation output pointer.
         bool_result(unsafe {
@@ -110,12 +118,27 @@ impl PipeSecurity {
         })?;
         Ok(Self(LocalAllocation(descriptor)))
     }
-    fn attributes(&self) -> SECURITY_ATTRIBUTES {
+    pub(crate) fn attributes(&self) -> SECURITY_ATTRIBUTES {
         SECURITY_ATTRIBUTES {
             nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
             lpSecurityDescriptor: self.0.0,
             bInheritHandle: 0,
         }
+    }
+}
+
+struct PipeSecurity(SecurityDescriptor);
+impl PipeSecurity {
+    fn new() -> io::Result<Self> {
+        let token = Token::current()?;
+        Ok(Self(SecurityDescriptor::from_sddl(&format!(
+            "O:{}D:P(A;;GA;;;{})",
+            token.owner()?.text()?,
+            token.logon()?.text()?
+        ))?))
+    }
+    fn attributes(&self) -> SECURITY_ATTRIBUTES {
+        self.0.attributes()
     }
 }
 
@@ -168,6 +191,40 @@ impl LocalListener {
     }
 
     pub fn accept(&mut self) -> io::Result<LocalConnection> {
+        self.accept_or_stop(None)?
+            .ok_or_else(|| io::Error::other("an accept without a stop source was stopped"))
+    }
+
+    /// The next authenticated connection, or `None` once `stop` has been
+    /// requested, whichever is ready first; a requested stop wins over a
+    /// waiting connection, which is then never accepted.
+    pub fn accept_until(&mut self, stop: &StopSignal) -> io::Result<Option<LocalConnection>> {
+        self.accept_or_stop(Some(stop.raw()))
+    }
+
+    /// As [`Self::accept_until`], for a serving generation's own latch.
+    pub fn accept_until_latch(&mut self, stop: &Latch) -> io::Result<Option<LocalConnection>> {
+        self.accept_or_stop(Some(stop.raw()))
+    }
+
+    /// Stops listening: the waiting pipe instance is closed, so a client is
+    /// refused from now on (every instance still connected keeps the name,
+    /// which no second daemon can then create with
+    /// `FILE_FLAG_FIRST_PIPE_INSTANCE`). The Unix facade hands back its
+    /// transport directory's lock here; a pipe has none, and the daemon's
+    /// owner lock and single-instance guard stay with its composition until
+    /// it has drained.
+    pub fn stop_listening(self) -> ListenerLock {
+        drop(self);
+        ListenerLock { _private: () }
+    }
+
+    fn accept_or_stop(&mut self, stop: Option<HANDLE>) -> io::Result<Option<LocalConnection>> {
+        if let Some(stop) = stop
+            && signalled(stop)?
+        {
+            return Ok(None);
+        }
         let event = new_event()?;
         let mut overlapped = OVERLAPPED {
             hEvent: event.raw(),
@@ -178,14 +235,27 @@ impl LocalListener {
             let error = io::Error::last_os_error();
             match error.raw_os_error().map(|code| code as u32) {
                 Some(ERROR_PIPE_CONNECTED) => Ok(()),
-                Some(ERROR_IO_PENDING) => {
-                    complete(self.pending.raw(), &mut overlapped, None).map(|_| ())
-                }
+                Some(ERROR_IO_PENDING) => match stop {
+                    None => complete(self.pending.raw(), &mut overlapped, None).map(|_| ()),
+                    Some(stop) => {
+                        if !connected_before_stop(self.pending.raw(), &overlapped, stop)? {
+                            // A client that connected meanwhile is never
+                            // served; stopping closes its instance.
+                            return Ok(None);
+                        }
+                        Ok(())
+                    }
+                },
                 _ => Err(error),
             }
         } else {
             Ok(())
         };
+        if let Some(stop) = stop
+            && signalled(stop)?
+        {
+            return Ok(None);
+        }
         if let Err(error) = connection {
             if matches!(
                 error.raw_os_error().map(|code| code as u32),
@@ -219,12 +289,85 @@ impl LocalListener {
                 format!("pipe client authentication refused: {error}"),
             )
         })?;
-        Ok(LocalConnection::new(connected, peer))
+        Ok(Some(LocalConnection::new(connected, peer)))
+    }
+}
+
+/// Waits for a pending `ConnectNamedPipe` or the stop, whichever is first;
+/// the stop wins when both are signalled. A stopped wait cancels the connect
+/// and collects its completion before the OVERLAPPED may be freed.
+fn connected_before_stop(pipe: HANDLE, overlapped: &OVERLAPPED, stop: HANDLE) -> io::Result<bool> {
+    let handles = [stop, overlapped.hEvent];
+    // SAFETY: two live handles; the stop comes first.
+    let wait = unsafe { WaitForMultipleObjects(2, handles.as_ptr(), 0, INFINITE) };
+    let wait_error = io::Error::last_os_error();
+    let mut transferred = 0;
+    if wait == WAIT_OBJECT_0 + 1 {
+        // SAFETY: the signalled operation's result, valid output storage.
+        bool_result(unsafe { GetOverlappedResult(pipe, overlapped, &mut transferred, 0) })?;
+        return Ok(true);
+    }
+    // SAFETY: cancel this exact operation and wait for its completion.
+    unsafe {
+        CancelIoEx(pipe, overlapped);
+        GetOverlappedResult(pipe, overlapped, &mut transferred, 1);
+    }
+    if wait == WAIT_OBJECT_0 {
+        Ok(false)
+    } else {
+        Err(wait_error)
+    }
+}
+
+/// What a listener that stopped listening still holds. A pipe has no
+/// transport lock of its own (see [`LocalListener::stop_listening`]).
+pub struct ListenerLock {
+    _private: (),
+}
+
+/// What [`LocalConnection::wait_readable`] saw first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Readiness {
+    Readable,
+    Latched,
+    TimedOut,
+}
+
+/// Ends a connection from outside the thread that serves it: every
+/// transfer in flight on it is cancelled, and every later one finds it ended
+/// (a read reports its end, a write fails). The pipe itself is closed when
+/// its connection is dropped, so a peer still reads the replies already
+/// written before it sees the end.
+pub struct ConnectionCloser {
+    pipe: Handle,
+    closed: Arc<AtomicBool>,
+}
+
+impl ConnectionCloser {
+    pub fn close(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        // SAFETY: a live duplicate of the connection's pipe handle; a null
+        // OVERLAPPED cancels every operation this process has on the pipe.
+        unsafe {
+            CancelIoEx(self.pipe.raw(), null());
+        }
+    }
+}
+
+/// Whether a stop or latch event is set now; nothing is consumed.
+fn signalled(event: HANDLE) -> io::Result<bool> {
+    // SAFETY: a live event handle; no wait.
+    match unsafe { WaitForSingleObject(event, 0) } {
+        WAIT_OBJECT_0 => Ok(true),
+        WAIT_TIMEOUT => Ok(false),
+        _ => Err(io::Error::last_os_error()),
     }
 }
 
 pub struct LocalConnection {
     pipe: Handle,
+    // Set by this connection's closer; every transfer looks at it.
+    closed: Arc<AtomicBool>,
     // Pins the connection's original process object and immutable image file.
     peer: ProcessIdentity,
     read_timeout: Mutex<Option<Duration>>,
@@ -235,6 +378,7 @@ impl LocalConnection {
     fn new(pipe: Handle, peer: ProcessIdentity) -> Self {
         Self {
             pipe,
+            closed: Arc::new(AtomicBool::new(false)),
             peer,
             read_timeout: Mutex::new(Some(Duration::from_secs(10))),
             write_timeout: Mutex::new(Some(Duration::from_secs(10))),
@@ -266,6 +410,93 @@ impl LocalConnection {
         }
         Ok(Self::new(pipe, peer))
     }
+    /// A second handle that ends this connection from another thread.
+    pub fn closer(&self) -> io::Result<ConnectionCloser> {
+        let mut duplicate = null_mut();
+        // SAFETY: duplicates this connection's live pipe handle within this
+        // process, not inheritable; the copy is owned at once.
+        bool_result(unsafe {
+            DuplicateHandle(
+                GetCurrentProcess(),
+                self.pipe.raw(),
+                GetCurrentProcess(),
+                &mut duplicate,
+                0,
+                0,
+                DUPLICATE_SAME_ACCESS,
+            )
+        })?;
+        Ok(ConnectionCloser {
+            pipe: Handle::new(duplicate)?,
+            closed: Arc::clone(&self.closed),
+        })
+    }
+
+    /// Waits until this connection has something to read (or its peer has
+    /// gone, or its closer ended it, which the read then reports), the latch
+    /// is set, or `timeout` passes; a set latch is seen first. Nothing is
+    /// read: a zero-byte read completes once data is there.
+    pub fn wait_readable(&self, latch: &Latch, timeout: Duration) -> io::Result<Readiness> {
+        if latch.is_set() {
+            return Ok(Readiness::Latched);
+        }
+        if self.closed.load(Ordering::SeqCst) {
+            return Ok(Readiness::Readable);
+        }
+        let event = new_event()?;
+        let overlapped = OVERLAPPED {
+            hEvent: event.raw(),
+            ..Default::default()
+        };
+        let mut nothing = 0u8;
+        // SAFETY: a zero-length read into live storage; the OVERLAPPED and
+        // its event stay alive until its completion is collected below.
+        let started = unsafe {
+            ReadFile(
+                self.pipe.raw(),
+                &mut nothing,
+                0,
+                null_mut(),
+                std::ptr::from_ref(&overlapped).cast_mut(),
+            )
+        };
+        if started != 0 {
+            return Ok(Readiness::Readable);
+        }
+        if io::Error::last_os_error().raw_os_error() != Some(ERROR_IO_PENDING as i32) {
+            // A pipe that ended or failed: the read reports it.
+            return Ok(Readiness::Readable);
+        }
+        if self.closed.load(Ordering::SeqCst) {
+            // SAFETY: cancel this exact operation; its completion is collected below.
+            unsafe { CancelIoEx(self.pipe.raw(), &overlapped) };
+        }
+        let millis = timeout.as_millis().min(u128::from(u32::MAX - 1)) as u32;
+        let handles = [latch.raw(), event.raw()];
+        // SAFETY: two live handles; the latch comes first, so it wins when
+        // both are signalled.
+        let wait = unsafe { WaitForMultipleObjects(2, handles.as_ptr(), 0, millis) };
+        let wait_error = io::Error::last_os_error();
+        if wait != WAIT_OBJECT_0 + 1 {
+            // SAFETY: cancel this exact operation; collected below.
+            unsafe { CancelIoEx(self.pipe.raw(), &overlapped) };
+        }
+        let mut transferred = 0;
+        // SAFETY: waits for this operation's completion before the OVERLAPPED
+        // and the byte are freed.
+        let completed =
+            unsafe { GetOverlappedResult(self.pipe.raw(), &overlapped, &mut transferred, 1) };
+        let cancelled = completed == 0
+            && io::Error::last_os_error().raw_os_error() == Some(ERROR_OPERATION_ABORTED as i32);
+        Ok(match wait {
+            WAIT_OBJECT_0 => Readiness::Latched,
+            _ if !cancelled => Readiness::Readable,
+            _ if self.closed.load(Ordering::SeqCst) => Readiness::Readable,
+            WAIT_TIMEOUT => Readiness::TimedOut,
+            _ => return Err(wait_error),
+        })
+    }
+
     /// The process ID returned for this exact pipe instance, retained for SPK-3.
     pub fn authenticated_peer_pid(&self) -> u32 {
         self.peer.pid
@@ -310,6 +541,7 @@ impl Read for LocalConnection {
             .map_err(|_| io::Error::other("read timeout lock poisoned"))?;
         transfer(
             self.pipe.raw(),
+            &self.closed,
             bytes.as_mut_ptr(),
             bytes.len(),
             timeout,
@@ -329,6 +561,7 @@ impl Write for LocalConnection {
             .map_err(|_| io::Error::other("write timeout lock poisoned"))?;
         transfer(
             self.pipe.raw(),
+            &self.closed,
             bytes.as_ptr().cast_mut(),
             bytes.len(),
             timeout,
@@ -396,11 +629,20 @@ fn complete(
 
 fn transfer(
     pipe: HANDLE,
+    closed: &AtomicBool,
     buffer: *mut u8,
     length: usize,
     timeout: Option<Duration>,
     writing: bool,
 ) -> io::Result<usize> {
+    // A connection its closer ended reads its end and refuses writes.
+    if closed.load(Ordering::SeqCst) {
+        return if writing {
+            Err(io::Error::from(io::ErrorKind::BrokenPipe))
+        } else {
+            Ok(0)
+        };
+    }
     let event = new_event()?;
     let mut overlapped = OVERLAPPED {
         hEvent: event.raw(),
@@ -425,6 +667,12 @@ fn transfer(
     } else {
         let error = io::Error::last_os_error();
         if error.raw_os_error() == Some(ERROR_IO_PENDING as i32) {
+            // A close between the look above and this transfer starting
+            // could not cancel it: cancel it here.
+            if closed.load(Ordering::SeqCst) {
+                // SAFETY: cancel this exact operation; `complete` drains it.
+                unsafe { CancelIoEx(pipe, &overlapped) };
+            }
             complete(pipe, &mut overlapped, timeout)
         } else {
             Err(error)
@@ -440,6 +688,14 @@ fn transfer(
                 ) =>
         {
             Ok(0)
+        }
+        // Cancelled by the connection's closer: its end.
+        Err(_) if closed.load(Ordering::SeqCst) => {
+            if writing {
+                Err(io::Error::from(io::ErrorKind::BrokenPipe))
+            } else {
+                Ok(0)
+            }
         }
         Err(error) => Err(error),
     }

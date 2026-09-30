@@ -2,45 +2,16 @@
 //! or rewriting existing state and never perform admission or journal
 //! recovery. The Rust Job owner's connection adds exactly Swift
 //! RuntimeJobRepository's admission and state updates.
+pub use crate::job_index::AdmissionVerdict;
+use crate::job_index::{self, Admission, DATABASE, ROWS, corrupt, current_layout};
 use arkdeck_platform::{HostDirectory, HostReadLock, HostSqlite, SqliteValue};
-use std::collections::BTreeSet;
 use std::fs::{File, OpenOptions};
 use std::io;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-const DATABASE: &str = "runtime-jobs.sqlite3";
 const LOCK: &str = ".rust-job-owner.lock";
-// Swift RuntimeJobRepository.schemaStatements byte for byte: SQLite keeps this
-// text in sqlite_schema, so a store created here reads back as Swift's own.
-const SCHEMA: &[&str] = &[
-    concat!(
-        "CREATE TABLE runtime_job(\n",
-        "  job_id TEXT PRIMARY KEY,\n",
-        "  idempotency_key TEXT NOT NULL UNIQUE,\n",
-        "  request_hash TEXT NOT NULL,\n",
-        "  state TEXT NOT NULL,\n",
-        "  admission_sequence INTEGER NOT NULL,\n",
-        "  created_at_utc TEXT NOT NULL,\n",
-        "  created_at_order_key TEXT NOT NULL,\n",
-        "  updated_at_utc TEXT NOT NULL,\n",
-        "  version INTEGER NOT NULL CHECK(version >= 1),\n",
-        "  initial_record_json BLOB\n",
-        ")"
-    ),
-    "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
-    "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
-    "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
-];
-
-/// Swift RuntimeJobAdmissionVerdict.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum AdmissionVerdict {
-    Admitted,
-    Duplicate(String),
-    Conflict,
-}
 
 /// A refused or uncertain Job index or record write. `Invalid` and `Refused`
 /// changed nothing. `OutcomeUnknown` began a durable change whose result is not
@@ -75,18 +46,6 @@ pub(super) struct JobRow {
     pub order_key: String,
 }
 
-fn corrupt() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        "Runtime Job repository is missing, unsafe, or does not match its current layout",
-    )
-}
-fn normalize(sql: &str) -> String {
-    sql.chars()
-        .filter(|c| !c.is_whitespace())
-        .flat_map(char::to_lowercase)
-        .collect()
-}
 pub(super) fn identifier(value: &str) -> bool {
     (1..=128).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
@@ -155,43 +114,6 @@ fn inspection(root: &HostDirectory, path: &Path) -> io::Result<(HostSqlite, bool
         indexed,
     ))
 }
-fn current_layout(db: &mut HostSqlite) -> io::Result<()> {
-    if db.query("PRAGMA user_version", &[], 1024)? != vec![vec![SqliteValue::Integer(1)]] {
-        return Err(corrupt());
-    }
-    let objects = db.query(
-        "SELECT name, sql FROM sqlite_schema ORDER BY name",
-        &[],
-        64 * 1024,
-    )?;
-    let mut definitions = BTreeSet::new();
-    let mut indexes = BTreeSet::new();
-    for row in objects {
-        match row.as_slice() {
-            [SqliteValue::Text(_), SqliteValue::Text(sql)] => {
-                definitions.insert(normalize(sql));
-            }
-            [SqliteValue::Text(name), SqliteValue::Null] => {
-                indexes.insert(name.clone());
-            }
-            _ => return Err(corrupt()),
-        }
-    }
-    if definitions != SCHEMA.iter().map(|s| normalize(s)).collect()
-        || indexes
-            != [
-                "sqlite_autoindex_runtime_job_1".into(),
-                "sqlite_autoindex_runtime_job_2".into(),
-            ]
-            .into()
-    {
-        return Err(corrupt());
-    }
-    Ok(())
-}
-/// Every column of a Job's index row, in `job_row`'s order.
-const ROWS: &str = "SELECT job_id, idempotency_key, request_hash, state, created_at_utc, updated_at_utc, version, initial_record_json, created_at_order_key, admission_sequence FROM runtime_job";
-
 /// One row of `ROWS`, checked as every reader of the index checks it.
 fn job_row(row: Vec<SqliteValue>) -> io::Result<JobRow> {
     if row.len() != 10 || row[9].integer().is_none_or(|n| n <= 0) {
@@ -315,56 +237,6 @@ fn validate_rows(db: &mut HostSqlite) -> io::Result<()> {
         }
     }
 }
-/// The row a Job's idempotency key already owns, as Swift admission reads it.
-fn admitted(
-    db: &mut HostSqlite,
-    idempotency_key: &str,
-    request_hash: &str,
-) -> io::Result<Option<AdmissionVerdict>> {
-    let rows = db.query(
-        "SELECT job_id, request_hash FROM runtime_job WHERE idempotency_key = ? LIMIT 1",
-        &[SqliteValue::Text(idempotency_key.into())],
-        16 * 1024,
-    )?;
-    match rows.as_slice() {
-        [] => Ok(None),
-        [row] => match row.as_slice() {
-            [SqliteValue::Text(id), SqliteValue::Text(stored)] => {
-                Ok(Some(if stored == request_hash {
-                    AdmissionVerdict::Duplicate(id.clone())
-                } else {
-                    AdmissionVerdict::Conflict
-                }))
-            }
-            _ => Err(corrupt()),
-        },
-        _ => Err(corrupt()),
-    }
-}
-/// A record may only advance the row that indexes it: Rust readers refuse a
-/// row whose record names another request or creation time.
-fn describes(
-    db: &mut HostSqlite,
-    id: &str,
-    idempotency_key: &str,
-    created: &str,
-) -> io::Result<()> {
-    let rows = db.query(
-        "SELECT idempotency_key, created_at_utc FROM runtime_job WHERE job_id = ?",
-        &[SqliteValue::Text(id.into())],
-        16 * 1024,
-    )?;
-    if rows
-        != [vec![
-            SqliteValue::Text(idempotency_key.into()),
-            SqliteValue::Text(created.into()),
-        ]]
-    {
-        return Err(corrupt());
-    }
-    Ok(())
-}
-
 /// Where a Job index lives: in a directory of its own, as the isolated
 /// development owner keeps it, or at the Runtime's state root, which it shares
 /// with the Runtime's other owners as Swift's
@@ -453,12 +325,7 @@ impl JobRepository {
                     .mode(0o600)
                     .open(path.join(DATABASE))?;
                 let mut db = HostSqlite::open(&path.join(DATABASE), false, false)?;
-                db.execute("BEGIN IMMEDIATE", &[])?;
-                for statement in SCHEMA {
-                    db.execute(statement, &[])?;
-                }
-                db.execute("PRAGMA user_version=1", &[])?;
-                db.execute("COMMIT", &[])?;
+                job_index::create(&mut db)?;
                 drop(db);
                 file.sync_all()?;
                 File::open(path)?.sync_all()?;
@@ -487,12 +354,7 @@ impl JobRepository {
             );
             checked?;
             end?;
-            if db.query("PRAGMA journal_mode=WAL", &[], 1024)?
-                != vec![vec![SqliteValue::Text("wal".into())]]
-            {
-                return Err(io::Error::other("Runtime SQLite WAL mode is unavailable"));
-            }
-            db.execute("PRAGMA synchronous=FULL", &[])?;
+            job_index::owner_journal(&mut db)?;
         }
         root.validate_path(path)?;
         lock.mark_catalog_initialized(&root, LOCK)?;
@@ -588,7 +450,7 @@ impl JobRepository {
     ) -> io::Result<AdmissionVerdict> {
         self.validate()?;
         let mut db = self.db.lock().map_err(|_| corrupt())?;
-        let verdict = admitted(&mut db, idempotency_key, request_hash)?;
+        let verdict = job_index::admitted(&mut db, idempotency_key, request_hash)?;
         drop(db);
         self.validate()?;
         Ok(verdict.unwrap_or(AdmissionVerdict::Admitted))
@@ -611,36 +473,18 @@ impl JobRepository {
             JobWriteError::Invalid("The Job creation time is not a Runtime timestamp")
         })?;
         self.write(|db| {
-            if let Some(verdict) = admitted(db, idempotency_key, request_hash)? {
-                return Ok(verdict);
-            }
-            let next = db.query(
-                "SELECT COALESCE(MAX(admission_sequence), 0) + 1 FROM runtime_job",
-                &[],
-                1024,
-            )?;
-            let [row] = next.as_slice() else {
-                return Err(corrupt());
-            };
-            let Some(sequence) = row.first().and_then(SqliteValue::integer).filter(|n| *n > 0)
-            else {
-                return Err(corrupt());
-            };
-            db.execute(
-                "INSERT INTO runtime_job(job_id, idempotency_key, request_hash, state, admission_sequence, created_at_utc, created_at_order_key, updated_at_utc, version, initial_record_json) VALUES(?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
-                &[
-                    SqliteValue::Text(id.into()),
-                    SqliteValue::Text(idempotency_key.into()),
-                    SqliteValue::Text(request_hash.into()),
-                    SqliteValue::Text(state.into()),
-                    SqliteValue::Integer(sequence),
-                    SqliteValue::Text(created.into()),
-                    SqliteValue::Text(created_key.clone()),
-                    SqliteValue::Text(created.into()),
-                    SqliteValue::Blob(record.to_vec()),
-                ],
-            )?;
-            Ok(AdmissionVerdict::Admitted)
+            job_index::admit(
+                db,
+                &Admission {
+                    id,
+                    idempotency_key,
+                    request_hash,
+                    state,
+                    created,
+                    created_key: &created_key,
+                    record,
+                },
+            )
         })
     }
 
@@ -648,7 +492,7 @@ impl JobRepository {
     pub fn describes(&self, id: &str, idempotency_key: &str, created: &str) -> io::Result<()> {
         self.validate()?;
         let mut db = self.db.lock().map_err(|_| corrupt())?;
-        describes(&mut db, id, idempotency_key, created)
+        job_index::describes(&mut db, id, idempotency_key, created)
     }
 
     /// Swift RuntimeJobRepository.updateJobState, as one write transaction on
@@ -665,22 +509,7 @@ impl JobRepository {
         order_key(updated).map_err(|_| {
             JobWriteError::Invalid("The Job update time is not a Runtime timestamp")
         })?;
-        self.write(|db| {
-            describes(db, id, idempotency_key, created)?;
-            let changed = db.execute(
-                "UPDATE runtime_job SET state = ?, updated_at_utc = ?, version = version + 1, initial_record_json = ? WHERE job_id = ?",
-                &[
-                    SqliteValue::Text(state.into()),
-                    SqliteValue::Text(updated.into()),
-                    SqliteValue::Blob(record.to_vec()),
-                    SqliteValue::Text(id.into()),
-                ],
-            )?;
-            if changed != 1 {
-                return Err(corrupt());
-            }
-            Ok(())
-        })
+        self.write(|db| job_index::update(db, id, idempotency_key, created, state, updated, record))
     }
 
     /// One IMMEDIATE transaction on the owner connection. A failure before

@@ -97,7 +97,11 @@ pub use macos_server::{
     process_argument_record, process_arguments, verifies_managed_process,
 };
 #[cfg(windows)]
-pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
+pub use windows::{
+    ConnectionCloser, GuardAcquisition, GuardObject, InstanceScope, Latch, ListenerLock,
+    LocalConnection, LocalListener, LoopbackServerLease, OwnerLock, Readiness, SingleInstanceGuard,
+    StateRoot, StopSignal, default_user_endpoint,
+};
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
 #[derive(Clone, Debug)]
@@ -207,9 +211,9 @@ pub use windows::host_store::{
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use host_sqlite::{HostSqlite, SqliteValue};
 
 #[cfg(target_os = "macos")]

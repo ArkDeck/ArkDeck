@@ -211,6 +211,48 @@ On macOS, `ARKDECK_RUNTIME_COMPOSITION=production` selects the
 instead, which refuses `ARKDECK_ENDPOINT` and `ARKDECK_HDC_SHA256`; nothing sets
 it before the M5 cutover.
 
+On Windows the daemon owns a state root and stops and drains like the Unix
+daemon (TASK-XPA-002 S5, `crates/arkdeck-agentd/src/windows_lifecycle.rs`).
+Without input it is the account's daemon over `%LOCALAPPDATA%\ArkDeck\Agentd`,
+resolved with `SHGetKnownFolderPath(FOLDERID_LocalAppData)` for its own token
+(the variable is not read) and created owner-only (owner and a protected DACL of
+the user SID and SYSTEM); `cargo run -p arkdeck-agentd` therefore creates that
+directory. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
+user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
+text) instead; only the lifecycle is composed over it, and every input from which
+the isolated macOS owner composes an owner (development HDC, USB relations,
+code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
+inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
+keeps the read-only foundation over a private pipe that owns no state root, as
+the black-box check runs it. Before anything else is created or probed, a
+daemon with a root takes, in order: the single-instance guard, a named mutex
+`Local\ArkDeck.Agentd.<user SID>` (`Local\ArkDeck.Agentd.Dev.<user SID>.<root
+file id>`) with the same owner-only DACL, refused if an existing object is not
+the user's; the owner lock, `LockFileEx` on a byte far beyond the end of
+`instance.lock` (`.owner.lock` in a development root); its stop event
+`<guard>.Stop.<pid>`; and its pipe with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(`\\.\pipe\arkdeck-agentd-<logon SID>`, or `…-dev-<logon SID>-<root file id>`,
+which an `ARKDECK_ENDPOINT` beside a development root must equal). It then
+reports the `instance.json` its predecessor left (`previous instance: pid …,
+started …`) and replaces it atomically (a POSIX-semantics rename) with its own,
+in Swift's shape. A second start over a held root answers `already running`
+from that document and exits 0. The guard is in the session namespace: a
+`Global\` mutex needs no privilege (only a `Global\` file mapping does), but it
+could be squatted by any other account, and the exclusion across the logon
+sessions of one account is already the owner lock's, which the kernel releases
+when its holder dies. The daemon stops for its stop event (set by
+`InstanceScope::request_stop`, SIGTERM's counterpart; only the user can set it)
+or a console Ctrl+C or Ctrl+Break, and drains as on Unix: the pipe closes, the
+frames being answered finish, then every open connection is ended, within one
+20-second deadline. After a complete drain it releases the owner lock and then
+the guard, on the thread that took it, and prints `arkdeck-agentd stopped`; one
+the deadline cut short exits holding them. A successor that finds the guard
+abandoned (`WAIT_ABANDONED`, its holder died with it) says so and starts as the
+start after a crash that every start already is; nothing is replayed.
+`tests/windows_lifecycle_process.rs` drives these over development roots. The
+CLI does not start the daemon yet (decision 11), and its daemon identity check
+is unchanged.
+
 ## Isolated macOS History owner
 
 The Rust daemon directly serves `history.filter.list/save/delete` when

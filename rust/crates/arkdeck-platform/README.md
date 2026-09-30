@@ -155,3 +155,35 @@ DAYU200/current Windows HDC profile are reviewed. A zero exit code for candidate
 does not prove the connected board's identity, and an empty result does not pass
 hardware acceptance. Existing Windows tuple/driver/signing gaps are not replaced
 with a fixture, fabricated hash registration or a support declaration.
+
+## Runtime SQLite (TASK-XPA-005)
+
+`HostSqlite` (`src/host_sqlite.rs`) links the SQLite the OS ships and adds no
+crate or C source: the system `libsqlite3` on macOS, `winsqlite3.dll` on
+Windows (in System32 since Windows 10; import library `winsqlite3.lib` in the
+Windows SDK `um\x64` and `um\arm64`). winsqlite3 exports the undecorated
+`sqlite3_*` names and declares its fixed-argument API `__stdcall`, which the
+binding spells `extern "system"`: that is the C convention on x64 and ARM64.
+Linux does not build it yet.
+
+Two Windows differences are handled inside `open`, so callers see the macOS
+behaviour:
+
+- The win32 VFS ignores `SQLITE_OPEN_NOFOLLOW` (measured: winsqlite3 3.51.1
+  opens a symbolic link to a database). `open` refuses a final path component
+  that is a reparse point with `SQLITE_CANTOPEN_SYMLINK` (1550), the answer
+  the unix VFS gives, checked as that VFS checks it: before the open.
+- The path is passed as UTF-8, which winsqlite3 converts to UTF-16; a path with
+  no Unicode spelling is refused. Verbatim (`\?\`) and drive paths name the
+  same database.
+
+winsqlite3 follows Windows servicing rather than a pinned release, so `open`
+refuses a library older than 3.33.0 (`sqlite_schema`, NOFOLLOW). The Job
+index's SQL (`arkdeck-hoststore/src/job_index.rs`) replays every Job index the
+Swift oracle recorded under `rust/tests/fixtures` on each platform's library
+and reads back the recorded schema, `user_version`, journal mode and rows. The
+measured library facts are in the TASK-XPA-005 run record; print them with:
+
+```sh
+cargo test -p arkdeck-platform --lib linked_library_supports_the_runtime_store -- --nocapture
+```
