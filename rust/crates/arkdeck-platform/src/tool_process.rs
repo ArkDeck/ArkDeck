@@ -8,7 +8,12 @@
 //! 0.25 s), and a cancellation probe asked before the spawn and while the
 //! child runs. The analyzer runner is this runner with its source retained.
 use super::macos_process::RunningChild;
-use super::{READER_CLEANUP_TIMEOUT, VerifiedTool, invalid};
+use super::tool_request::check_limits;
+pub(super) use super::tool_request::{MAX_CAPTURE_BYTES, MAX_TIMEOUT};
+use super::{
+    READER_CLEANUP_TIMEOUT, ToolExecution, ToolRequest, ToolRunError, ToolTermination,
+    VerifiedTool, invalid,
+};
 use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io::{self, Read};
@@ -21,70 +26,12 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::time::{Duration, Instant};
 
-pub(super) const MAX_CAPTURE_BYTES: usize = 64 * 1024 * 1024;
-pub(super) const MAX_TIMEOUT: Duration = Duration::from_secs(3600);
 /// Swift `terminateProcessGroup`: how long TERM has before KILL.
 const TERMINATION_GRACE: Duration = Duration::from_millis(250);
 /// Swift `terminateProcessGroup`: how long a killed group has to disappear.
 const KILL_GRACE: Duration = Duration::from_secs(1);
 /// Swift `waitForGroupToDisappear`: how often the group is looked for.
 const DRAIN_PROBE: Duration = Duration::from_millis(10);
-
-#[derive(Clone, Copy, Debug)]
-pub struct ToolLimits {
-    pub timeout: Duration,
-    /// Each stream keeps this many bytes; the rest is read and dropped.
-    pub capture_bytes: usize,
-}
-
-/// What a caller asks of one tool child, as Swift's `ProcessRequest` does.
-pub struct ToolRequest<'a> {
-    pub arguments: &'a [OsString],
-    /// Overlaid on the clean base environment (`PATH`, `LANG`, `LC_ALL`); the
-    /// parent's environment is never inherited. `PATH` and dynamic-loader
-    /// variables cannot be overlaid; keys and values carry no NUL and keys no
-    /// `=`.
-    pub environment: &'a [(OsString, OsString)],
-    /// Child-only, applied by the spawn's file actions; the daemon's own
-    /// directory never changes. Must be an absolute, canonical, existing
-    /// directory, as Swift requires. `None` is `/`.
-    pub working_directory: Option<&'a Path>,
-    pub limits: ToolLimits,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ToolTermination {
-    Exited(i32),
-    Signalled(i32),
-    /// The deadline passed; the process group was terminated.
-    TimedOut,
-    /// Cancelled before the child was spawned, or while it ran, when its
-    /// process group was terminated. `drained` holds when no member of the
-    /// group was left: Swift's positive proof that nothing survived.
-    Cancelled {
-        drained: bool,
-    },
-}
-
-#[derive(Debug)]
-pub struct ToolExecution {
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    /// Either stream produced more than it kept.
-    pub truncated: bool,
-    pub termination: ToolTermination,
-    /// Swift's receipt `durationSeconds`: monotonic time from the spawn to the
-    /// child's end (or to its termination).
-    pub duration: Duration,
-}
-
-#[derive(Debug)]
-pub enum ToolRunError {
-    /// Refused before the child ran any executable code.
-    Refused(io::Error),
-    /// The child may have run; what it did cannot be observed.
-    Unobservable(io::Error),
-}
 
 /// Why a child that had not finished was stopped.
 #[derive(Clone, Copy)]
@@ -135,15 +82,7 @@ impl VerifiedTool {
         ) -> io::Result<RunningChild>,
     ) -> Result<ToolExecution, ToolRunError> {
         let limits = request.limits;
-        if limits.timeout.is_zero()
-            || limits.timeout > MAX_TIMEOUT
-            || limits.capture_bytes == 0
-            || limits.capture_bytes > MAX_CAPTURE_BYTES
-        {
-            return Err(ToolRunError::Refused(invalid(
-                "tool budget must be 1 s..1 h and 1 byte..64 MiB per stream",
-            )));
-        }
+        check_limits(limits).map_err(ToolRunError::Refused)?;
         validate_environment(request.environment).map_err(ToolRunError::Refused)?;
         let directory = request
             .working_directory

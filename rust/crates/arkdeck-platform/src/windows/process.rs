@@ -1,4 +1,4 @@
-use super::identity::{file_identity, process_image};
+use super::identity::{file_identity, process_image, process_started};
 use super::{Handle, bool_result, wide};
 use crate::{VerifiedTool, denied, invalid};
 use std::ffi::{OsStr, OsString};
@@ -24,11 +24,22 @@ pub(crate) struct RunningChild {
     job: Handle,
     assigned: bool,
     cleaned: bool,
+    /// The child's PID and its `GetProcessTimes` creation time, both read
+    /// while it was still suspended.
+    pub(crate) pid: u32,
+    pub(crate) started: u64,
     pub(crate) stdout: Option<PipeReader>,
     pub(crate) stderr: Option<PipeReader>,
 }
 
 pub(crate) struct PipeReader(File);
+
+impl PipeReader {
+    /// The pipe's read end, for a blocking reader thread.
+    pub(crate) fn into_file(self) -> File {
+        self.0
+    }
+}
 
 impl Read for PipeReader {
     fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
@@ -68,7 +79,7 @@ impl Read for PipeReader {
 }
 
 impl RunningChild {
-    pub(crate) fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
+    pub(crate) fn try_wait(&self) -> io::Result<Option<ExitStatus>> {
         // SAFETY: retained process handle; zero wait only reads kernel state.
         match unsafe { WaitForSingleObject(self.process.raw(), 0) } {
             WAIT_TIMEOUT => Ok(None),
@@ -81,19 +92,59 @@ impl RunningChild {
             _ => Err(io::Error::last_os_error()),
         }
     }
+    /// Terminates every process of the child's Job object at once: the
+    /// Windows form of a group kill. There is no TERM on Windows, so no
+    /// grace precedes it (gate inventory §8 question 4).
+    pub(crate) fn terminate_group(&self) -> io::Result<()> {
+        // SAFETY: this unnamed job holds only this child and its
+        // descendants; before job assignment the child is still suspended.
+        bool_result(unsafe {
+            if self.assigned {
+                TerminateJobObject(self.job.raw(), TERMINATED_EXIT_CODE)
+            } else {
+                TerminateProcess(self.process.raw(), TERMINATED_EXIT_CODE)
+            }
+        })
+    }
+
+    /// No process of the child's Job object is left, the child included.
+    pub(crate) fn group_drained(&self) -> io::Result<bool> {
+        // SAFETY: retained process handle; zero wait only reads kernel state.
+        let wait = unsafe { WaitForSingleObject(self.process.raw(), 0) };
+        if !matches!(wait, WAIT_OBJECT_0 | WAIT_TIMEOUT) {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(wait == WAIT_OBJECT_0 && (!self.assigned || self.active_processes()? == 0))
+    }
+
+    fn active_processes(&self) -> io::Result<u32> {
+        let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+        // SAFETY: class and output length match the accounting structure.
+        bool_result(unsafe {
+            QueryInformationJobObject(
+                self.job.raw(),
+                JobObjectBasicAccountingInformation,
+                std::ptr::from_mut(&mut accounting).cast(),
+                size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
+                null_mut(),
+            )
+        })?;
+        Ok(accounting.ActiveProcesses)
+    }
+
+    /// The process `process` names is a member of this child's Job object.
+    pub(crate) fn job_contains(&self, process: HANDLE) -> io::Result<bool> {
+        let mut member = 0;
+        // SAFETY: both handles are live; the output is a plain BOOL.
+        bool_result(unsafe { IsProcessInJob(process, self.job.raw(), &mut member) })?;
+        Ok(self.assigned && member != 0)
+    }
+
     pub(crate) fn kill_and_wait(&mut self) -> io::Result<()> {
         if self.cleaned {
             return Ok(());
         }
-        // SAFETY: this unnamed job contains only this read-only child and its
-        // descendants. Before job assignment the child is still suspended.
-        bool_result(unsafe {
-            if self.assigned {
-                TerminateJobObject(self.job.raw(), 1)
-            } else {
-                TerminateProcess(self.process.raw(), 1)
-            }
-        })?;
+        self.terminate_group()?;
         let deadline = Instant::now() + crate::process::CLEANUP_TIMEOUT;
         loop {
             // SAFETY: retained process handle prevents PID-reuse confusion.
@@ -101,20 +152,12 @@ impl RunningChild {
             if !matches!(wait, WAIT_OBJECT_0 | WAIT_TIMEOUT) {
                 return Err(io::Error::last_os_error());
             }
-            let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
-            if self.assigned {
-                // SAFETY: class and output length match the accounting structure.
-                bool_result(unsafe {
-                    QueryInformationJobObject(
-                        self.job.raw(),
-                        JobObjectBasicAccountingInformation,
-                        std::ptr::from_mut(&mut accounting).cast(),
-                        size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
-                        null_mut(),
-                    )
-                })?;
-            }
-            if wait == WAIT_OBJECT_0 && accounting.ActiveProcesses == 0 {
+            let active = if self.assigned {
+                self.active_processes()?
+            } else {
+                0
+            };
+            if wait == WAIT_OBJECT_0 && active == 0 {
                 self.cleaned = true;
                 return Ok(());
             }
@@ -135,9 +178,9 @@ impl Drop for RunningChild {
             // Drop must not repeat a timed-out wait. Closing the job is a second
             // kernel-enforced termination request for all assigned descendants.
             unsafe {
-                TerminateJobObject(self.job.raw(), 1);
+                TerminateJobObject(self.job.raw(), TERMINATED_EXIT_CODE);
                 if !self.assigned {
-                    TerminateProcess(self.process.raw(), 1);
+                    TerminateProcess(self.process.raw(), TERMINATED_EXIT_CODE);
                 }
             }
         }
@@ -196,6 +239,13 @@ impl Drop for Attributes {
     }
 }
 
+/// The exit code of a child its owner terminated (a deadline, a
+/// cancellation, a stop or cleanup).
+pub(crate) const TERMINATED_EXIT_CODE: u32 = 1;
+
+/// Each output pipe's buffer: a writer blocks only once this much is unread.
+const OUTPUT_PIPE_BYTES: u32 = 64 * 1024;
+
 fn output_pipe() -> io::Result<(Handle, Handle)> {
     let attributes = SECURITY_ATTRIBUTES {
         nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
@@ -204,7 +254,7 @@ fn output_pipe() -> io::Result<(Handle, Handle)> {
     };
     let (mut read, mut write) = (null_mut(), null_mut());
     // SAFETY: valid output pointers; both handles immediately enter RAII ownership.
-    bool_result(unsafe { CreatePipe(&mut read, &mut write, &attributes, 0) })?;
+    bool_result(unsafe { CreatePipe(&mut read, &mut write, &attributes, OUTPUT_PIPE_BYTES) })?;
     let read = Handle::new(read)?;
     let write = Handle::new(write)?;
     // SAFETY: only the read handle's inheritance flag is changed.
@@ -216,6 +266,23 @@ pub(crate) fn spawn(
     tool: &VerifiedTool,
     args: &[OsString],
     environment: &[(OsString, OsString)],
+) -> io::Result<RunningChild> {
+    spawn_in(tool, args, environment, None)
+}
+
+/// The names of the base environment every child starts from, nothing
+/// inherited: the system directory as the only search path, and the two
+/// names the system itself needs.
+pub(crate) const BASE_ENVIRONMENT: [&str; 3] = ["PATH", "SystemRoot", "WINDIR"];
+
+/// `spawn` with a child-only working directory (NUL-terminated UTF-16,
+/// validated by the caller; `None` is the Windows directory). The
+/// environment rows are overlaid on the base; a caller validates them first.
+pub(crate) fn spawn_in(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&[u16]>,
 ) -> io::Result<RunningChild> {
     if !tool
         .path
@@ -288,22 +355,32 @@ pub(crate) fn spawn(
     windows_directory.truncate(length + 1);
     let root = String::from_utf16(&windows_directory[..length])
         .map_err(|_| invalid("invalid Windows system directory"))?;
-    let mut environment_rows = vec![
-        format!("PATH={root}\\System32"),
-        format!("SystemRoot={root}"),
-        format!("WINDIR={root}"),
-    ];
+    let system = format!("{root}\\System32");
+    let mut environment_rows: Vec<(Vec<u16>, Vec<u16>)> = BASE_ENVIRONMENT
+        .iter()
+        .zip([system.as_str(), root.as_str(), root.as_str()])
+        .map(|(key, value)| (key.encode_utf16().collect(), value.encode_utf16().collect()))
+        .collect();
     for (key, value) in environment {
-        environment_rows.push(format!(
-            "{}={}",
-            key.to_string_lossy(),
-            value.to_string_lossy()
-        ));
+        environment_rows.push((key.encode_wide().collect(), value.encode_wide().collect()));
     }
-    environment_rows.sort_unstable_by_key(|row| row.to_ascii_uppercase());
+    // CreateProcessW takes the block sorted by name, case-insensitively.
+    environment_rows.sort_by_cached_key(|(key, _)| uppercase(key));
     let mut environment_block = Vec::new();
-    for row in environment_rows {
-        environment_block.extend(wide(OsStr::new(&row))?);
+    for (key, value) in environment_rows {
+        if key.is_empty()
+            || key.contains(&0)
+            || key.contains(&u16::from(b'='))
+            || value.contains(&0)
+        {
+            return Err(invalid(
+                "environment names must be non-empty without = or NUL, values without NUL",
+            ));
+        }
+        environment_block.extend(key);
+        environment_block.push(u16::from(b'='));
+        environment_block.extend(value);
+        environment_block.push(0);
     }
     environment_block.push(0);
     let mut info = PROCESS_INFORMATION::default();
@@ -322,7 +399,7 @@ pub(crate) fn spawn(
                 | CREATE_UNICODE_ENVIRONMENT
                 | EXTENDED_STARTUPINFO_PRESENT,
             environment_block.as_ptr().cast(),
-            windows_directory.as_ptr(),
+            working_directory.map_or(windows_directory.as_ptr(), <[u16]>::as_ptr),
             &startup.StartupInfo,
             &mut info,
         )
@@ -334,6 +411,8 @@ pub(crate) fn spawn(
         job,
         assigned: false,
         cleaned: false,
+        pid: info.dwProcessId,
+        started: 0,
         stdout: Some(PipeReader(stdout.into_file())),
         stderr: Some(PipeReader(stderr.into_file())),
     };
@@ -341,6 +420,8 @@ pub(crate) fn spawn(
         // SAFETY: child is suspended and has not had a chance to spawn descendants.
         bool_result(unsafe { AssignProcessToJobObject(child.job.raw(), child.process.raw()) })?;
         child.assigned = true;
+        // Read while suspended: a child that ends at once still has a birth.
+        child.started = process_started(child.process.raw())?;
         let image_path = process_image(child.process.raw())?.canonicalize()?;
         let image = crate::process::open_locked_file(&image_path)?;
         if image_path != tool.path || file_identity(&image)? != tool.identity {
@@ -369,6 +450,23 @@ pub(crate) fn spawn(
     drop(out_write);
     drop(err_write);
     Ok(child)
+}
+
+/// A UTF-16 name folded as the environment block sorts and compares names.
+pub(crate) fn uppercase(name: &[u16]) -> Vec<u16> {
+    let mut folded = Vec::with_capacity(name.len());
+    for unit in char::decode_utf16(name.iter().copied()) {
+        match unit {
+            Ok(character) => {
+                let mut buffer = [0; 2];
+                for upper in character.to_uppercase() {
+                    folded.extend_from_slice(upper.encode_utf16(&mut buffer));
+                }
+            }
+            Err(unpaired) => folded.push(unpaired.unpaired_surrogate()),
+        }
+    }
+    folded
 }
 
 /// Encode an argv array for CreateProcessW's C-runtime parser. This never runs
@@ -454,9 +552,120 @@ mod tests {
             job: Handle::new(unsafe { CreateEventW(null(), 1, 0, null()) }).unwrap(),
             assigned: true,
             cleaned: false,
+            pid: 0,
+            started: 0,
             stdout: None,
             stderr: None,
         };
         assert!(child.kill_and_wait().is_err());
+    }
+
+    const TREE_REPORT: &str = "ARKDECK_JOB_TREE_REPORT";
+    const HANG: &str = "ARKDECK_JOB_TREE_HANG";
+
+    /// A grandchild's body: selected by name in a re-execution of this test
+    /// binary with `ARKDECK_JOB_TREE_HANG` set, it never ends on its own.
+    /// Run as an ordinary test, it does nothing.
+    #[test]
+    fn job_tree_grandchild() {
+        if std::env::var_os(HANG).is_some() {
+            loop {
+                std::thread::park();
+            }
+        }
+    }
+
+    /// A child's body: it starts a grandchild (which joins the child's Job),
+    /// names it in the report file (written whole, then renamed) and never
+    /// ends on its own. Run as an ordinary test, it does nothing.
+    #[test]
+    fn job_tree_child() {
+        let Some(report) = std::env::var_os(TREE_REPORT) else {
+            return;
+        };
+        let mut grandchild = std::process::Command::new(std::env::current_exe().unwrap())
+            .args(["--exact", "windows::process::tests::job_tree_grandchild"])
+            .env(HANG, "1")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let report = std::path::PathBuf::from(report);
+        let partial = report.with_extension("partial");
+        std::fs::write(&partial, grandchild.id().to_string()).unwrap();
+        std::fs::rename(&partial, &report).unwrap();
+        // The grandchild never ends on its own: this waits until the Job
+        // ends them both.
+        let _ = grandchild.wait();
+        loop {
+            std::thread::park();
+        }
+    }
+
+    /// Kill-on-close alone: a child whose owner neither terminated nor
+    /// waited for its Job (the cleanup is skipped here on purpose) still
+    /// ends with its whole tree once the last Job handle closes.
+    #[test]
+    fn closing_the_job_handle_kills_a_live_child_tree() {
+        use sha2::{Digest, Sha256};
+        let executable = std::env::current_exe().unwrap().canonicalize().unwrap();
+        let digest = format!("{:x}", Sha256::digest(std::fs::read(&executable).unwrap()));
+        let tool = VerifiedTool::open(&executable, &digest).unwrap();
+        let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "arkdeck-job-tree-{:032x}",
+            u128::from_le_bytes(crate::random_bytes().unwrap())
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        let report = directory.join("grandchild");
+        let mut child = spawn_in(
+            &tool,
+            &[
+                "--exact".into(),
+                "windows::process::tests::job_tree_child".into(),
+            ],
+            &[(TREE_REPORT.into(), report.clone().into_os_string())],
+            None,
+        )
+        .unwrap();
+        let open = |pid| {
+            // SAFETY: query-only access; the handle is owned at once.
+            Handle::new(unsafe {
+                OpenProcess(
+                    PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_SYNCHRONIZE,
+                    0,
+                    pid,
+                )
+            })
+            .unwrap()
+        };
+        let ended_within = |process: &Handle, within: Duration| {
+            // SAFETY: live owned process handle with SYNCHRONIZE access.
+            let wait = unsafe { WaitForSingleObject(process.raw(), within.as_millis() as u32) };
+            assert!(wait == WAIT_OBJECT_0 || wait == WAIT_TIMEOUT);
+            wait == WAIT_OBJECT_0
+        };
+        let child_process = open(child.pid);
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let pid = loop {
+            if let Some(pid) = std::fs::read_to_string(&report)
+                .ok()
+                .and_then(|text| text.parse::<u32>().ok())
+            {
+                break pid;
+            }
+            assert!(Instant::now() < deadline, "the grandchild was never named");
+            assert!(!ended_within(&child_process, Duration::from_millis(10)));
+        };
+        let grandchild = open(pid);
+        // Opened while the grandchild is alive: it is a member of the Job.
+        assert!(child.job_contains(grandchild.raw()).unwrap());
+        assert!(!ended_within(&grandchild, Duration::ZERO));
+        // Skip the owner's own termination: only the Job handle closes.
+        child.cleaned = true;
+        drop(child);
+        assert!(ended_within(&child_process, Duration::from_secs(5)));
+        assert!(ended_within(&grandchild, Duration::from_secs(5)));
+        let _ = std::fs::remove_dir_all(&directory);
     }
 }

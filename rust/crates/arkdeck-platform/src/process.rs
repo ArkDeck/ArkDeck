@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 
 const MAX_TOOL_BYTES: u64 = 512 * 1024 * 1024;
 pub(crate) const CLEANUP_TIMEOUT: Duration = Duration::from_secs(5);
-const READER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
+pub(crate) const READER_CLEANUP_TIMEOUT: Duration = Duration::from_secs(1);
 
 #[derive(Clone, Copy, Debug)]
 pub struct ProcessLimits {
@@ -720,14 +720,17 @@ mod pty_exchange;
 #[cfg(target_os = "macos")]
 pub use pty_exchange::{PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest};
 
-#[cfg(target_os = "macos")]
-#[path = "tool_process.rs"]
-mod tool_process;
-#[cfg(target_os = "macos")]
-pub use tool_process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
+#[cfg(any(target_os = "macos", windows))]
+#[path = "tool_request.rs"]
+pub(crate) mod tool_request;
+#[cfg(any(target_os = "macos", windows))]
+pub use tool_request::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
 #[cfg(target_os = "macos")]
 #[path = "managed_server.rs"]
 mod managed_server;
+#[cfg(target_os = "macos")]
+#[path = "tool_process.rs"]
+mod tool_process;
 
 /// Swift `ProcessExecutableIdentityReceipt`: what a launch-window audit
 /// records about the executable a lifecycle command is about to run through
@@ -767,7 +770,7 @@ impl VerifiedTool {
     }
 }
 #[cfg(target_os = "macos")]
-pub use managed_server::{ManagedServer, ServerExit, ServerLaunch, ServerStop};
+pub use managed_server::ManagedServer;
 
 #[cfg(target_os = "macos")]
 #[path = "verified_launch.rs"]
