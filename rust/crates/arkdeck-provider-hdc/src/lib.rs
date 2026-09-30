@@ -13,7 +13,7 @@ pub use debug_read::{DebugInventory, DebugReadTemplate, debug_inventory};
 #[cfg(any(target_os = "macos", windows))]
 mod dispatch;
 mod host_diagnostics;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod lifecycle;
 mod live_mode;
 #[cfg(any(target_os = "macos", windows))]
@@ -29,7 +29,7 @@ mod provider;
 mod rockchip_hdc;
 mod rockchip_loader;
 mod semantic;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod status;
 mod target_observation;
 mod trace_probe;
@@ -50,7 +50,7 @@ pub use debug_hap::{
 #[cfg(any(target_os = "macos", windows))]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
 pub use host_diagnostics::{DIAGNOSTIC_REPORTS_DIRECTORY, signal_death, signal_number};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use lifecycle::{
     LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, LifecycleReceipt,
     PostDispatchObservation, PreparedLifecycle, generation,
@@ -105,13 +105,17 @@ pub use rockchip_loader::{
     loader_summary, rebind_summary, transition_evidence_summary,
 };
 pub use semantic::{CommandFailure, CommandOutcome, SemanticOutputParser};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use status::{
     CommandlessIdentity, HdcStatusObserver, IdentityObservation, IdentityObserver, ManagedLaunch,
     ManagedProcessVerifier, NativeSignature, STATUS_SCHEMA_VERSION, SignatureInspector,
-    StartupDiagnostics, StatusExecutable, SupervisedServer, SupervisorState, SystemManagedProcess,
+    StartupDiagnostics, StatusExecutable, SupervisedServer, SupervisorState,
     published_client_version, server_endpoint_ref, unconfigured_status,
 };
+// The kernel's managed-process predicate is macOS's; on Windows the managed
+// server itself proves its process (`ManagedServer::verifies`).
+#[cfg(target_os = "macos")]
+pub use status::SystemManagedProcess;
 pub use target_observation::{
     BootstrapFailure, DAYU200_LOADER_PRODUCT_ID, DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations,
     ObservedCandidate, REGISTRY_UNAVAILABLE, ROCKUSB_VENDOR_ID, Reading, UsbRegistryRelations,

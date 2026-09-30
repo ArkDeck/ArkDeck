@@ -51,7 +51,6 @@ impl ProcessDispatch {
 
     /// Revalidate the retained executable without launching a process. This
     /// is host discovery only; dispatch still revalidates at its own boundary.
-    #[cfg(target_os = "macos")]
     pub fn tool_identity_current(&self) -> bool {
         self.tool.launch_identity().is_ok()
     }
