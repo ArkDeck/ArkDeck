@@ -23,17 +23,28 @@ Build mode (default), from one recorded checkout:
      the zip with the zip's SHA-256 added.
   5. Builds the MSIX form (r12 decision 10) with the same layout (daemon at the package root,
      CLI in `bin\`), write virtualization off (ruling 8), identity `CN=ArkDeck Development`
-     (ruling 12). The MSIX is never signed here: its development certificate and the
-     production signature are maintainer steps. Its SHA-256 goes into the manifest.
+     (ruling 12). It is signed only through -MsixSignCommand (see below); its SHA-256 goes into
+     the manifest.
+  6. With -FeedBaseUri, writes the App Installer feed `ArkDeck.appinstaller` beside the MSIX,
+     from the MSIX this run built (package name, publisher, version and architecture read from
+     its AppxManifest.xml), so feed and package always come from one revision.
 
--SigningMode:
+-SigningMode (the executables):
   none         nothing is signed (CI); the CLI and the App refuse the daemon, so no smoke runs.
   development  rust/scripts/windows-dev-identity.ps1 sign with the host-trusted development
                certificate (-Thumbprint, else ARKDECK_DEV_SIGNER_THUMBPRINT from the process or
                HKCU\Environment). Not an installation identity (design L.1 item 22).
-Production signing (Azure Artifact Signing, publisher identity, ruling 17) is the maintainer's:
-the runtime part is rust/scripts/windows-package-xcopy.ps1 -SigningMode production; this script
-refuses to produce a production RC.
+  production   the maintainer's command (-ProductionSignCommand, else
+               ARKDECK_PRODUCTION_SIGN_COMMAND), called once per file with the file's path as its
+               only argument, for the daemon and the CLI (through windows-package-xcopy.ps1) and
+               for ArkDeck.exe. Each must then verify with a timestamp, and all three must carry
+               one publisher identity (maintainer ruling 17). A clean checkout only. This script
+               holds no credential; an unconfigured command fails before anything is built.
+-MsixSignCommand (else ARKDECK_MSIX_SIGN_COMMAND), in any mode: the maintainer's command that
+signs the MSIX, called with its path. The MSIX must then verify, and its signer's subject must be
+the manifest's Publisher (a package whose publisher is not its certificate's subject does not
+install); with -SigningMode production it must be timestamped. Without it the MSIX stays unsigned
+and is recorded as not installable.
 
 -Smoke after a development build (or -SmokeZip <zip> alone, for a package built before) installs the zip into a new private directory under the
 account's local application data (owner-only: the user and SYSTEM), with a private development
@@ -45,18 +56,24 @@ state root inside it, and then:
   - runs the App's UIA smoke (windows/App.UITests `InstalledRcTests`) against the installed
     `ArkDeck.exe`: the App connects to that daemon, shows its doctor report and no recovery
     banner;
-  - runs doctor again, stops the daemon through its stop event and waits for its exit;
-  - uninstalls by removing the directory, and checks that no process runs from it, that the
+  - runs doctor again;
+  - uninstalls with windows/scripts/uninstall-rc.ps1 (the daemon stopped through its stop
+    event, the directory removed), and checks that no process runs from it, that the
     account's local application data holds no entry it did not hold before, and that
     `%LOCALAPPDATA%\ArkDeck` is as it was.
+The uninstall is windows/scripts/uninstall-rc.ps1, run against the installed directory and its
+development root: it stops the daemon through its stop event and removes the directory.
 It never sleeps to synchronise; it changes no certificate store and starts nothing but the
 installed executables and the UIA test host.
 #>
 [CmdletBinding(DefaultParameterSetName = 'Build')]
 param(
     [Parameter(Mandatory, ParameterSetName = 'Build')][string]$OutputDirectory,
-    [Parameter(ParameterSetName = 'Build')][ValidateSet('none', 'development')][string]$SigningMode = 'none',
+    [Parameter(ParameterSetName = 'Build')][ValidateSet('none', 'development', 'production')][string]$SigningMode = 'none',
     [Parameter(ParameterSetName = 'Build')][string]$Thumbprint,
+    [Parameter(ParameterSetName = 'Build')][string]$ProductionSignCommand,
+    [Parameter(ParameterSetName = 'Build')][string]$MsixSignCommand,
+    [Parameter(ParameterSetName = 'Build')][string]$FeedBaseUri,
     [Parameter(ParameterSetName = 'Build')][switch]$AllowDirty,
     [Parameter(ParameterSetName = 'Build')][switch]$SkipMsix,
     [Parameter(ParameterSetName = 'Build')][switch]$Smoke,
@@ -77,6 +94,12 @@ $CliName = 'arkdeck.exe'
 $AppName = 'ArkDeck.exe'
 $CommandTimeoutMs = 300000
 $DaemonDeadlineMs = 30000
+$FeedName = 'ArkDeck.appinstaller'
+$AppInstallerNamespace = 'http://schemas.microsoft.com/appx/appinstaller/2021'
+
+# Get-CertificatePin, Get-PublisherIdentity, Get-VerifiedSigner and Invoke-ProductionSigning,
+# shared with rust/scripts/windows-package-xcopy.ps1.
+. (Join-Path $PSScriptRoot '..\..\rust\scripts\windows-signing-common.ps1')
 
 function Invoke-Checked([string]$File, [string[]]$Arguments, [string]$WorkingDirectory) {
     $previous = Get-Location
@@ -130,6 +153,64 @@ function Invoke-DevelopmentSigning([string]$Path, [string]$thumbprint, [string]$
     return $pin
 }
 
+# A maintainer's signing command, resolved before anything is built: an unconfigured or absent
+# command fails at once.
+function Resolve-SignCommand([string]$Value, [string]$Variable, [string]$What, [bool]$Required) {
+    $command = if ($Value) { $Value } else { [Environment]::GetEnvironmentVariable($Variable) }
+    if (-not $command) {
+        if ($Required) { throw "$What is not configured: pass it or set $Variable to the maintainer's signing command. Nothing was built or signed." }
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $command -PathType Leaf)) { throw "The signing command $command does not exist. Nothing was built or signed." }
+    return (Resolve-Path -LiteralPath $command).Path
+}
+
+# The feed's base URI: absolute https, ending in '/', where the maintainer hosts the feed and the
+# MSIX side by side.
+function Test-FeedBaseUri([string]$Value) {
+    $uri = $null
+    if (-not [Uri]::TryCreate($Value, [UriKind]::Absolute, [ref]$uri) -or $uri.Scheme -ne 'https' -or -not $Value.EndsWith('/') -or $uri.Query -or $uri.Fragment) {
+        throw "-FeedBaseUri must be an absolute https URI ending in '/', with no query or fragment: $Value"
+    }
+    return $Value
+}
+
+# The App Installer feed of one built MSIX: its identity as the package itself declares it.
+function New-AppInstallerFeed([string]$Path, [string]$BaseUri, [string]$MsixName, $Identity) {
+    $settings = [System.Xml.XmlWriterSettings]::new()
+    $settings.Indent = $true
+    $settings.Encoding = [System.Text.UTF8Encoding]::new($false)
+    $settings.NewLineChars = "`n"
+    $writer = [System.Xml.XmlWriter]::Create($Path, $settings)
+    try {
+        $writer.WriteStartDocument()
+        $writer.WriteStartElement('AppInstaller', $AppInstallerNamespace)
+        $writer.WriteAttributeString('Version', $Identity.Version)
+        $writer.WriteAttributeString('Uri', "$BaseUri$FeedName")
+        $writer.WriteStartElement('MainPackage', $AppInstallerNamespace)
+        $writer.WriteAttributeString('Name', $Identity.Name)
+        $writer.WriteAttributeString('Publisher', $Identity.Publisher)
+        $writer.WriteAttributeString('Version', $Identity.Version)
+        $writer.WriteAttributeString('ProcessorArchitecture', $Identity.ProcessorArchitecture)
+        $writer.WriteAttributeString('Uri', "$BaseUri$MsixName")
+        $writer.WriteEndElement()
+        $writer.WriteStartElement('UpdateSettings', $AppInstallerNamespace)
+        $writer.WriteStartElement('OnLaunch', $AppInstallerNamespace)
+        $writer.WriteAttributeString('HoursBetweenUpdateChecks', '0')
+        $writer.WriteAttributeString('ShowPrompt', 'true')
+        $writer.WriteAttributeString('UpdateBlocksActivation', 'false')
+        $writer.WriteEndElement()
+        $writer.WriteElementString('ForceUpdateFromAnyVersion', $AppInstallerNamespace, 'false')
+        $writer.WriteStartElement('AutomaticBackgroundTask', $AppInstallerNamespace)
+        $writer.WriteEndElement()
+        $writer.WriteEndElement()
+        $writer.WriteEndElement()
+        $writer.WriteEndDocument()
+    } finally {
+        $writer.Dispose()
+    }
+}
+
 function Get-FileList([string]$Directory) {
     $root = (Resolve-Path -LiteralPath $Directory).Path.TrimEnd('\') + '\'
     return @(Get-ChildItem -LiteralPath $Directory -Recurse -File | Where-Object { $_.Name -ne $ManifestName } | Sort-Object FullName | ForEach-Object {
@@ -146,7 +227,14 @@ function New-RcBuild {
     if ($dirty -and -not $AllowDirty) {
         throw "The checkout at $repository is not clean ($($status.Count) entries); commit or remove them, or pass -AllowDirty (recorded in the manifest).`n$($status -join "`n")"
     }
+    if ($SigningMode -eq 'production' -and $dirty) { throw 'A production release candidate is built from a clean checkout only.' }
+    # Signing and the feed are configured before anything is built: an unconfigured mode fails at once.
     $thumbprint = if ($SigningMode -eq 'development') { Resolve-DevelopmentThumbprint } else { $null }
+    $productionCommand = if ($SigningMode -eq 'production') { Resolve-SignCommand $ProductionSignCommand 'ARKDECK_PRODUCTION_SIGN_COMMAND' 'Production signing' $true } else { $null }
+    $msixCommand = Resolve-SignCommand $MsixSignCommand 'ARKDECK_MSIX_SIGN_COMMAND' 'MSIX signing' $false
+    if ($msixCommand -and $SkipMsix) { throw '-MsixSignCommand needs the MSIX; drop -SkipMsix.' }
+    $feedBase = if ($FeedBaseUri) { Test-FeedBaseUri $FeedBaseUri } else { $null }
+    if ($feedBase -and $SkipMsix) { throw '-FeedBaseUri needs the MSIX; drop -SkipMsix.' }
     $dotnet = Get-Dotnet
     $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'scripts/release/release-version.json') -Raw | ConvertFrom-Json
     [void](New-Item -ItemType Directory -Path $OutputDirectory)
@@ -156,6 +244,7 @@ function New-RcBuild {
     $runtimeOutput = Join-Path $output 'runtime'
     $xcopy = @('-NoProfile', '-NonInteractive', '-File', (Join-Path $repository 'rust/scripts/windows-package-xcopy.ps1'), '-OutputDirectory', $runtimeOutput, '-SigningMode', $SigningMode)
     if ($thumbprint) { $xcopy += @('-Thumbprint', $thumbprint) }
+    if ($productionCommand) { $xcopy += @('-ProductionSignCommand', $productionCommand) }
     if ($AllowDirty) { $xcopy += '-AllowDirty' }
     & (Get-Pwsh) @xcopy | Out-Host
     if ($LASTEXITCODE -ne 0) { throw "windows-package-xcopy.ps1 exited $LASTEXITCODE" }
@@ -177,9 +266,18 @@ function New-RcBuild {
         if (Test-Path -LiteralPath (Join-Path $appPublish $name)) { throw "The App's publish output already holds $name." }
     }
     $appPin = $null
+    $appPath = Join-Path $appPublish $AppName
     if ($SigningMode -eq 'development') {
-        $appPin = Invoke-DevelopmentSigning (Join-Path $appPublish $AppName) $thumbprint $repository
+        $appPin = Invoke-DevelopmentSigning $appPath $thumbprint $repository
         if ($appPin -ne $runtimeManifest.signing.signerSha256) { throw "The App and the runtime carry different signers." }
+    } elseif ($SigningMode -eq 'production') {
+        [void](Invoke-ProductionSigning @($appPath) $productionCommand)
+        $appSigner = Get-VerifiedSigner $appPath $true
+        $appPublisher = Get-PublisherIdentity $appSigner.certificate
+        $runtimePublisher = $runtimeManifest.signing.publisher
+        if ($appPublisher.organization -ne $runtimePublisher.organization -or $appPublisher.eku -ne $runtimePublisher.eku) {
+            throw "ArkDeck.exe carries publisher $($appPublisher.organization) / $($appPublisher.eku), not the runtime's $($runtimePublisher.organization) / $($runtimePublisher.eku)."
+        }
     }
 
     # 3. The xcopy form: the App beside its daemon, the CLI in bin\.
@@ -221,11 +319,24 @@ function New-RcBuild {
             if ($inside[$file] -ne (Get-Sha256 (Join-Path $runtimeStage $file))) { throw "The MSIX's $file is not the runtime build's." }
         }
         $identity = $appx.Package.Identity
+        # The signing hook: the maintainer's command signs the package in place.
+        $msixSigning = [ordered]@{ signed = $false; installable = $false; note = 'Unsigned: Windows installs only a signed MSIX (the development certificate of ruling 12, or the production publisher).' }
+        if ($msixCommand) {
+            [void](Invoke-ProductionSigning @($packages[0].FullName) $msixCommand)
+            $signer = Get-VerifiedSigner $packages[0].FullName ($SigningMode -eq 'production')
+            if ($signer.subject -ne $identity.Publisher) {
+                throw "The MSIX is signed by $($signer.subject), but its manifest names the publisher $($identity.Publisher); Windows would refuse to install it."
+            }
+            $msixSigning = [ordered]@{ signed = $true; installable = $true; signerSubject = $signer.subject; signerSha256 = $signer.pin; timestamped = $signer.timestamped; command = [System.IO.Path]::GetFileName($msixCommand) }
+            $packages[0].Refresh()
+        }
         $msix = [ordered]@{
             name                        = $packages[0].Name
             bytes                       = $packages[0].Length
             sha256                      = Get-Sha256 $packages[0].FullName
-            signed                      = $false
+            signed                      = $msixSigning.signed
+            signing                     = $msixSigning
+            processorArchitecture       = $identity.ProcessorArchitecture
             identityName                = $identity.Name
             publisher                   = $identity.Publisher
             packageVersion              = $identity.Version
@@ -235,6 +346,23 @@ function New-RcBuild {
             entries                     = $entries.Count
         }
         Copy-Item -LiteralPath $packages[0].FullName -Destination $output
+        if ($feedBase) {
+            $feedPath = Join-Path $output $FeedName
+            New-AppInstallerFeed $feedPath $feedBase $packages[0].Name $identity
+            [xml]$feed = Get-Content -LiteralPath $feedPath -Raw
+            if ($feed.AppInstaller.MainPackage.Version -ne $identity.Version -or $feed.AppInstaller.MainPackage.Name -ne $identity.Name -or $feed.AppInstaller.MainPackage.Publisher -ne $identity.Publisher) {
+                throw 'The App Installer feed does not name the MSIX this run built.'
+            }
+            $msix.appInstaller = [ordered]@{
+                name           = $FeedName
+                bytes          = (Get-Item -LiteralPath $feedPath).Length
+                sha256         = Get-Sha256 $feedPath
+                uri            = "$feedBase$FeedName"
+                mainPackageUri = "$feedBase$($packages[0].Name)"
+                version        = $identity.Version
+                note           = 'Host the feed and the MSIX at these URIs; App Installer updates only to a higher package version, so the package Version in windows/App/Package.appxmanifest must increase with each published RC.'
+            }
+        }
     }
 
     $manifest = [ordered]@{
@@ -258,8 +386,13 @@ function New-RcBuild {
         signing        = [ordered]@{
             mode         = $SigningMode
             signerSha256 = $runtimeManifest.signing.signerSha256
-            signed       = if ($SigningMode -eq 'development') { @($AppName, $CliName, $DaemonName) } else { @() }
-            note         = if ($SigningMode -eq 'development') { 'Host-trusted development signer (design L.1 item 22); not an installation identity.' } else { 'Unsigned: the CLI and the App refuse this daemon until it is signed.' }
+            publisher    = if ($SigningMode -eq 'production') { $runtimeManifest.signing.publisher } else { $null }
+            signed       = if ($SigningMode -ne 'none') { @($AppName, "bin/$CliName", $DaemonName) } else { @() }
+            note         = switch ($SigningMode) {
+                'development' { 'Host-trusted development signer (design L.1 item 22); not an installation identity.' }
+                'production' { 'Production signatures, timestamped, one publisher identity (maintainer ruling 17).' }
+                default { 'Unsigned: the CLI and the App refuse this daemon until it is signed.' }
+            }
         }
         runtime        = [ordered]@{ manifest = 'runtime/manifest.json'; zipSha256 = $runtimeManifest.zip.sha256 }
         layout         = [ordered]@{
@@ -268,9 +401,18 @@ function New-RcBuild {
             cli    = "bin/$CliName"
             note   = "NTFS names are case-insensitive: the CLI cannot sit beside ArkDeck.exe. The App's daemon is its sibling by default; the CLI is given ARKDECK_DAEMON_PATH."
         }
-        daemonConfiguration = [ordered]@{
-            ARKDECK_DAEMON_SIGNER_SHA256 = $runtimeManifest.signing.signerSha256
-            ARKDECK_DAEMON_PATH          = "the App: unset ($DaemonName beside ArkDeck.exe); the CLI: <install>\$DaemonName"
+        daemonConfiguration = if ($SigningMode -eq 'production') {
+            [ordered]@{
+                ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $runtimeManifest.signing.publisher.organization
+                ARKDECK_DAEMON_PUBLISHER_EKU          = $runtimeManifest.signing.publisher.eku
+                ARKDECK_DAEMON_PATH                   = "the CLI: <install>\$DaemonName"
+                note                                  = 'The App reads only ARKDECK_DAEMON_SIGNER_SHA256 or ARKDECK_DAEMON_PACKAGE_FAMILY today: its publisher-identity pin (ruling 17) is not implemented yet.'
+            }
+        } else {
+            [ordered]@{
+                ARKDECK_DAEMON_SIGNER_SHA256 = $runtimeManifest.signing.signerSha256
+                ARKDECK_DAEMON_PATH          = "the App: unset ($DaemonName beside ArkDeck.exe); the CLI: <install>\$DaemonName"
+            }
         }
         msix           = $msix
         files          = Get-FileList $stage
@@ -282,7 +424,8 @@ function New-RcBuild {
     $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $output $ManifestName) -Encoding utf8NoBOM
     Write-Host "rc       $zip"
     Write-Host "sha256   $($manifest.zip.sha256)"
-    if ($msix) { Write-Host "msix     $($msix.name) (unsigned) $($msix.sha256)" }
+    if ($msix) { Write-Host "msix     $($msix.name) ($(if ($msix.signed) { 'signed' } else { 'unsigned' })) $($msix.sha256)" }
+    if ($msix -and $msix.Contains('appInstaller')) { Write-Host "feed     $($msix.appInstaller.name) -> $($msix.appInstaller.uri)" }
     return [pscustomobject]@{ Zip = $zip; Output = $output; Manifest = $manifest; Repository = (Invoke-Checked git @('-C', $PSScriptRoot, 'rev-parse', '--show-toplevel')).Trim() }
 }
 
@@ -313,16 +456,6 @@ function Get-Json([string]$Text) {
     try { return $Text | ConvertFrom-Json -Depth 64 } catch { return $null }
 }
 
-# The development root's stop event, as InstanceScope::stop_event_name spells it.
-function Request-DaemonStop($Instance) {
-    if ($Instance.socketPath -notmatch '-([0-9a-f]{16}-[0-9a-f]{32})$') { throw "The instance document names an unexpected pipe $($Instance.socketPath)." }
-    $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    $name = "Local\ArkDeck.Agentd.Dev.$user.$($Matches[1]).Stop.$($Instance.pid)"
-    $event = [System.Threading.EventWaitHandle]::OpenExisting($name)
-    try { [void]$event.Set() } finally { $event.Dispose() }
-    return $name
-}
-
 # A directory owned by the user with a protected DACL of the user and SYSTEM.
 function New-PrivateDirectory([string]$Path) {
     $user = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
@@ -337,7 +470,7 @@ function New-PrivateDirectory([string]$Path) {
 
 function Get-TreeListing([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return @() }
-    return @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)|$($_.Length)|$($_.LastWriteTimeUtc.Ticks)" } | Sort-Object)
+    return @(Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue | ForEach-Object { "$($_.FullName)|$(if ($_.PSIsContainer) { 0 } else { $_.Length })|$($_.LastWriteTimeUtc.Ticks)" } | Sort-Object)
 }
 
 function Invoke-RcSmoke($Built) {
@@ -371,6 +504,9 @@ function Invoke-RcSmoke($Built) {
         }
         $record.files = $installed.Count
         $pin = $manifest.signing.signerSha256
+        if ($manifest.signing.mode -eq 'production') {
+            throw 'A production RC cannot be smoked by this script yet: the App pins its daemon only by a certificate SHA-256 or a package family, not by the publisher identity (ruling 17). Follow evidence/runs/TASK-XPA-022/windows-clean-host-smoke-runbook.md.'
+        }
         if (-not $pin) { throw 'The package is unsigned; the CLI and the App refuse an unsigned daemon, so there is nothing to smoke.' }
         foreach ($name in @($AppName, "bin\$CliName", $DaemonName)) {
             $signature = Get-AuthenticodeSignature -LiteralPath (Join-Path $install $name)
@@ -435,8 +571,17 @@ function Invoke-RcSmoke($Built) {
         & $step 'doctor (daemon running)' $again
         if ($again.exitCode -ne 0 -or (Get-Json $again.stdout).ok -ne $true) { throw "doctor (daemon running) exited $($again.exitCode)." }
 
-        $record.stopEvent = Request-DaemonStop $instance
-        if (-not $daemon.WaitForExit($DaemonDeadlineMs)) { throw "The daemon did not exit within $($DaemonDeadlineMs / 1000) s of its stop event." }
+        # Uninstall: the uninstall script stops the installed daemon through its stop event and
+        # removes the installed directory.
+        $uninstall = Invoke-Process (Get-Pwsh) @('-NoProfile', '-NonInteractive', '-File', (Join-Path $PSScriptRoot 'uninstall-rc.ps1'),
+            '-InstallDirectory', $install, '-DevelopmentStateRoot', $state) $environment $work
+        & $step 'uninstall-rc.ps1' $uninstall
+        $answer = Get-Json $uninstall.stdout
+        if ($uninstall.exitCode -ne 0 -or -not $answer -or $answer.removed -ne $true -or $answer.daemon.running -ne $true -or $answer.daemon.pid -ne [int]$instance.pid) {
+            throw "uninstall-rc.ps1 exited $($uninstall.exitCode): $($uninstall.stdout) $($uninstall.stderr)"
+        }
+        if (-not $daemon.HasExited) { throw 'The daemon still runs after the uninstall.' }
+        $record.uninstallScript = [ordered]@{ removed = $answer.removed; daemonStopped = $answer.daemon.exited; kept = $answer.kept }
         $daemon = $null
         $result = 'PASS'
     } catch {
@@ -477,7 +622,9 @@ if ($PSCmdlet.ParameterSetName -eq 'SmokeOnly') {
     Invoke-RcSmoke ([pscustomobject]@{ Zip = $zip; Output = (Split-Path -Parent $zip); Repository = (Invoke-Checked git @('-C', $PSScriptRoot, 'rev-parse', '--show-toplevel')).Trim() })
     return
 }
-if ($Smoke -and $SigningMode -ne 'development') { throw '-Smoke needs -SigningMode development: the clients refuse an unsigned daemon.' }
+if ($Smoke -and $SigningMode -ne 'development') {
+    throw '-Smoke needs -SigningMode development: the clients refuse an unsigned daemon, and the App cannot pin a production daemon by publisher identity yet.'
+}
 $outputExisted = Test-Path -LiteralPath $OutputDirectory
 try {
     $built = New-RcBuild
