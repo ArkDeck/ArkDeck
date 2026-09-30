@@ -2485,6 +2485,25 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+The managed server's start and stop follow #2131's semantics on Windows as
+well.
+- A start refuses an endpoint something already listens on before launching
+  anything, and names the holder.
+- The stop's `end_proved_process` (the macOS one's Windows counterpart) ends
+  only the process a proof names: a replacement server a confirmed restart
+  left outside the Runtime's Job. It opens the PID once, which pins it, and
+  checks the receipt's birth and this user on that handle before
+  `TerminateProcess`. Another birth, or a PID of 4 or less, ends nothing.
+  Windows has no TERM, so the grace is not waited.
+- `windows_tool_dispatch.rs` proves the end, and that no other birth is ever
+  ended. `windows_managed_hdc.rs` runs restart, then stop, then start: the
+  replacement blocks the start, and once the proved replacement is ended,
+  the next start owns the endpoint.
+- The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
+  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
+  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
+  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
+
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use

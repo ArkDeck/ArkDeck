@@ -34,8 +34,9 @@ mod loopback_ports {
 mod windows {
     use super::loopback_ports::free_port;
     use arkdeck_platform::{
-        LoopbackServerLease, ManagedServer, ServerExit, ServerIdentityReceipt, ToolExecution,
-        ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool, random_bytes,
+        LoopbackServerLease, ManagedServer, ProvedProcessEnd, ServerExit, ServerIdentityReceipt,
+        ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool,
+        end_proved_process, random_bytes,
     };
     use sha2::{Digest, Sha256};
     use std::cell::{Cell, RefCell};
@@ -235,6 +236,10 @@ mod windows {
         (
             "a_dropped_server_takes_its_child_tree_with_it",
             a_dropped_server_takes_its_child_tree_with_it,
+        ),
+        (
+            "a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is",
+            a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is,
         ),
         (
             "the_listener_owner_is_proved_by_image_birth_and_exact_listener_without_argv",
@@ -1006,6 +1011,92 @@ mod windows {
         let mut server = ManagedServer::launch(tool, &arguments, &[], 4096).unwrap();
         wait_until_listening(&mut server, &ready);
         server
+    }
+
+    /// A child the test spawned itself, outside any Job, as `kill -r` leaves
+    /// the replacement server; killed on drop if a check failed first.
+    struct Detached(std::process::Child);
+
+    impl Drop for Detached {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    /// The daemon's stop ends the replacement a confirmed restart proved
+    /// (TASK-XPA-014 on macOS; `end_proved_process`): a server of the
+    /// verified tool that no Job of this process holds, found on the
+    /// endpoint by the commandless proof. A receipt of another birth, or of
+    /// no PID of its own, ends nothing; the proved one is terminated, its
+    /// exit finished and its listener gone, and asking again finds it
+    /// already ended.
+    fn a_proved_server_outside_the_job_is_ended_and_no_other_birth_ever_is() {
+        let tool = this_tool();
+        let endpoint = loopback(free_port());
+        let scratch = Scratch::new("replacement");
+        let ready = scratch.0.join("ready");
+        let child = std::process::Command::new(tool.path())
+            .args(args(&[
+                "listen",
+                ready.to_str().unwrap(),
+                &endpoint.to_string(),
+            ]))
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let replacement = Detached(child);
+        let observed = Observed::open(replacement.0.id());
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while !ready.exists() {
+            assert!(Instant::now() < deadline, "the replacement never listened");
+            assert!(!observed.ended_within(Duration::from_millis(10)));
+        }
+        let lease = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+        let receipt = lease.identity().clone();
+        assert_eq!(receipt.pid as u32, replacement.0.id());
+
+        // Another birth at the same PID, or no PID of its own: nothing ends.
+        let mut other = receipt.clone();
+        other.start_microseconds += 1;
+        assert_eq!(
+            end_proved_process(&other, Duration::from_millis(250), Duration::from_secs(1)).unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        for pid in [0, 4, -1] {
+            let mut system = receipt.clone();
+            system.pid = pid;
+            assert_eq!(
+                end_proved_process(&system, Duration::from_millis(250), Duration::from_secs(1))
+                    .unwrap_err()
+                    .kind(),
+                ErrorKind::InvalidInput
+            );
+        }
+        assert!(!observed.ended_within(Duration::ZERO));
+        lease.revalidate().unwrap();
+
+        // The proved one is ended, its exit finished: no listener remains.
+        assert_eq!(
+            end_proved_process(&receipt, Duration::from_millis(250), Duration::from_secs(5))
+                .unwrap(),
+            ProvedProcessEnd::Killed
+        );
+        assert!(observed.ended_within(Duration::ZERO));
+        assert_eq!(
+            LoopbackServerLease::acquire(&tool, endpoint)
+                .unwrap_err()
+                .kind(),
+            ErrorKind::NotFound
+        );
+        assert_eq!(
+            end_proved_process(&receipt, Duration::from_millis(250), Duration::from_secs(1))
+                .unwrap(),
+            ProvedProcessEnd::AlreadyEnded
+        );
+        drop(lease);
     }
 
     fn the_listener_owner_is_proved_by_image_birth_and_exact_listener_without_argv() {
