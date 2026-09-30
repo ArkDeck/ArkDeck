@@ -713,8 +713,57 @@ On Windows the host primitive under the writer, `HostJournalAppender`, and the
 rest of the durable host store have their NTFS implementation (TASK-XPA-005,
 `crates/arkdeck-platform/README.md`): `.manifest.lock` held with `LockFileEx`,
 `FlushFileBuffers` for fsync + `F_FULLFSYNC`, the same names and bytes. The
-writer itself stays macOS-gated until its decoders' host text and time
-primitives (G03/G04 of the TASK-XPA-004 gate inventory) are portable.
+writer, the replay and the events reader run on Windows too; see "Job Journal
+owners on Windows".
+
+## Job Journal owners on Windows (TASK-XPA-005)
+
+With the NTFS host store and the portable host text and calendar on main,
+`arkdeck-hoststore` builds its Job Journal owners on macOS and Windows alike
+(`cfg(any(target_os = "macos", windows))`; Linux has no durable host store
+and still builds none of them): the closed Journal decoder
+(`JournalEvent`, `JOURNAL_KINDS`), the record factories
+(`job_journal_events`), the replay (`ReplayFacts`), `JournalWriter` and
+`inspect_journal`, the Job events reader (`job_events`, with its `jec1`
+cursor, hence `aes-gcm` on Windows), and the Session Manifest decoder with
+the Recovery Manifest, step-argument, strict-JSON and Swift text helpers it
+reads through. The code is the macOS code; nothing is forked by OS, and the
+Journal's bytes on NTFS are the bytes macOS writes.
+
+The GJ-1 hop at the owner level runs on every host that builds it. In
+`tests/job_journal_corpus.rs` every distinct Journal under `rust/tests/fixtures`
+(231 on this checkout, 2,907 records) is written again record by record by
+`JournalWriter` into a fresh owner-only directory; each is the recorded bytes
+and replays to the facts its recorded bytes replay to. In
+`tests/job_journal_restart.rs` (its own binary: it spawns itself), for the
+recorded `observe.device@1` Job, one process dies inside an append halfway through
+the Journal (a byte prefix of the record is left), the next repairs the torn
+tail, completes the Journal, copies it into the Session record by record and
+publishes the Session's recorded `manifest.json` write-once under
+`.manifest.lock`, then dies holding everything open; the test process then
+reads the Journals, their facts and the Manifest back as recorded, and a
+second publication and any further append are refused.
+`tests/job_journal_process_death.rs` (both write points) and the writer,
+replay and events unit tests run on Windows unchanged, their scratch roots
+made owner-only by the store (`HostDirectory::open_or_create_private`)
+because a directory the standard library creates on Windows inherits the
+temporary directory's DACL, which the store refuses.
+
+Still macOS-only, and why:
+
+- The Job owner (`JobStore`), which admits Jobs, persists `job-record.json`
+  and serves `job.events` over the reader: it stands on the SQLite Job index
+  (`job_repository`, WM1 slice S3). `JobRecord` imports the index's row types
+  and the Job plan's digest (`job_plan`, over device facts and Artifact
+  reads), so the record decoder and its Foundation pretty-print writer wait
+  with it.
+- Session publication (`SessionPublisher`), which composes the Manifest
+  from the Job record and holds the Session owner (`SessionStore`,
+  `snapshot_pager`): it needs `JobStore`/`JobRecord`, and the Session owner
+  needs `document_metadata`/`remove_document`, which still take
+  `std::fs::Metadata`.
+- The cutover facts (the only caller of the replay's destructive-intent
+  check) and the Session inventory.
 
 ## Job index and record writers (TASK-XPA-014)
 

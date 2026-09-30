@@ -173,7 +173,6 @@ mod tests {
     use serde_json::json;
     use std::{
         fs,
-        os::unix::fs::DirBuilderExt,
         path::{Path, PathBuf},
     };
 
@@ -189,7 +188,7 @@ mod tests {
                 .canonicalize()
                 .unwrap()
                 .join(format!("journal-writer-{nonce:032x}"));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            crate::test_private::create_private_directory(&path);
             Self(path)
         }
         fn with(name: &str) -> Self {
