@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-"""Retain the newest main Rust build cache for each runner/cache format.
+"""Retain the newest main Rust build caches for each runner/cache format.
 
+Per runner/cache format this keeps the newest entry, plus the newest entry of
+one other runner image while the retained Rust entries fit RUST_BUDGET_BYTES:
+two images of a hosted runner often serve side by side, and each needs its own
+entry because the image is part of the key (ci-workspace.py).
 Never touches branch entries or SwiftPM, Xcode, policy-tool or other caches.
 Deletion runs in a separate trusted workflow after a successful main CI run.
 """
@@ -13,18 +17,28 @@ import subprocess
 
 RUST_KEY = re.compile(
     r"arkdeck-rust-build-(?:v1-[0-9a-f]{64}-[0-9a-f]{40}|"
-    r"v2-(?P<host>(?:Linux|macOS|Windows)-(?:X64|ARM64))-[0-9a-f]{64}-\d{4}-\d{2}-\d{2})\Z"
+    r"v2-(?P<host>(?:Linux|macOS|Windows)-(?:X64|ARM64))-[0-9a-f]{64}-\d{4}-\d{2}-\d{2}|"
+    r"v3-(?P<v3host>(?:Linux|macOS|Windows)-(?:X64|ARM64))-image-(?P<image>[A-Za-z0-9._]+)"
+    r"-[0-9a-f]{64}-[0-9a-f]{64}-\d{4}-\d{2}-\d{2})\Z"
 )
+# Every retained main Rust entry together, newest images first. The GitHub
+# limit is 10 GB per repository; on 2026-09-30 one entry per host and job came
+# to 3.2 GB and the newest SwiftPM and Xcode entries to 1.8 GB, so this leaves
+# 3.2 GB for a run's fresh saves before the next retention pass. The newest
+# entry of each runner/cache format is kept even beyond it, as before.
+RUST_BUDGET_BYTES = 5_000_000_000
 
 
 def removals(entries: list[dict]) -> list[dict]:
     newest = {}
+    other_image = {}
     remove = []
     formats = {}
     for entry in entries:
         match = RUST_KEY.fullmatch(entry["key"])
-        if entry["ref"] == "refs/heads/main" and match and match["host"]:
-            formats.setdefault(entry.get("version"), set()).add(match["host"])
+        host = match and (match["host"] or match["v3host"])
+        if entry["ref"] == "refs/heads/main" and host:
+            formats.setdefault(entry.get("version"), set()).add(host)
     for entry in sorted(entries, key=lambda x: (x["created_at"], x["id"]), reverse=True):
         match = RUST_KEY.fullmatch(entry["key"])
         if entry["ref"] != "refs/heads/main" or not match:
@@ -35,12 +49,26 @@ def removals(entries: list[dict]) -> list[dict]:
         if not version:
             continue
         hosts = formats.get(version, set())
-        host = match["host"] or (next(iter(hosts)) if len(hosts) == 1 else "legacy")
+        host = match["host"] or match["v3host"] or (next(iter(hosts)) if len(hosts) == 1 else "legacy")
         group = (host, version)
-        if group in newest:
-            remove.append(entry)
-        else:
+        if group not in newest:
             newest[group] = entry
+            continue
+        # A second image only ever through a v3 key, which names it; v1/v2
+        # entries have no image and go once anything newer exists.
+        image = match["image"]
+        kept = RUST_KEY.fullmatch(newest[group]["key"])["image"]
+        if image and image != kept and group not in other_image:
+            other_image[group] = entry
+        else:
+            remove.append(entry)
+    budget = RUST_BUDGET_BYTES - sum(entry.get("size_in_bytes", 0) for entry in newest.values())
+    for entry in sorted(other_image.values(), key=lambda x: (x["created_at"], x["id"]), reverse=True):
+        size = entry.get("size_in_bytes", 0)
+        if size <= budget:
+            budget -= size
+        else:
+            remove.append(entry)
     return remove
 
 

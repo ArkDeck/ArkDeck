@@ -241,8 +241,16 @@ jobs:
 
       # Cargo fingerprints include source mtimes and absolute paths. Restore
       # both the stable source mirror and its products, then synchronize exact
-      # checkout bytes without retimestamping unchanged files. Toolchain, image,
-      # build flags and dependency manifests must match even for prefix hits.
+      # checkout bytes without retimestamping unchanged files. Protected main
+      # restores only an entry whose toolchain, image, build flags and
+      # dependency manifests all match, so what it saves never carries another
+      # manifest set's products. A run off main, which never saves, may then
+      # fall back to main's newest entry for the same host, image, toolchain,
+      # flags and cache root whatever the manifests; Cargo's fingerprints
+      # rebuild what differs. On 2026-09-30, 30 of 34 Windows workspace misses
+      # were manifest sets main had never saved, and a miss cost the macOS
+      # workspace job, the Swift CI critical path, about 4 minutes (TASK-XPA-002
+      # windows-ci-speed-analysis-20260930.md).
       # The cache root is part of the key, so this job's products and the
       # contract views' (under the `contracts` job's own root) are separate
       # entries; neither job restores, carries or saves the other's.
@@ -262,7 +270,9 @@ jobs:
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
           key: ${{ steps.rust-cache-key.outputs.key }}
-          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
+          restore-keys: |
+            ${{ steps.rust-cache-key.outputs.prefix }}
+            ${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}
 
       - name: Synchronize exact sources and fresh Git references
         working-directory: .
@@ -414,7 +424,8 @@ jobs:
         run: sh ../scripts/ci/arkforge-cargo-fetch.sh
 
       # The views' Cargo targets live under this job's own cache root, keyed
-      # apart from the workspace job's (see there).
+      # apart from the workspace job's; the restore order is the workspace
+      # job's (see there).
       - name: Configure task-owned Rust CI paths
         run: |
           echo "ARKDECK_RUST_CACHE_ROOT=$RUNNER_TEMP/arkdeck-rust-contracts" >> "$GITHUB_ENV"
@@ -431,7 +442,9 @@ jobs:
         with:
           path: ${{ env.ARKDECK_RUST_CACHE_ROOT }}
           key: ${{ steps.rust-cache-key.outputs.key }}
-          restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}
+          restore-keys: |
+            ${{ steps.rust-cache-key.outputs.prefix }}
+            ${{ github.ref != 'refs/heads/main' && steps.rust-cache-key.outputs.fallback || '' }}
 
       - name: Synchronize exact sources and fresh Git references
         working-directory: .
