@@ -1910,6 +1910,69 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+## Windows xcopy package (TASK-XPA-022)
+
+The daemon and the CLI also ship as an xcopy package for CI and headless use
+(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is the MSIX,
+which this package does not cover.
+[`scripts/windows-package-xcopy.ps1`](scripts/windows-package-xcopy.ps1)
+(PowerShell 7.2+) builds it from one recorded checkout:
+
+```powershell
+pwsh -File rust/scripts/windows-package-xcopy.ps1 -OutputDirectory D:\out\xcopy -SigningMode development -Smoke
+```
+
+It refuses an existing output directory, and a build that fails removes the
+output directory it created. It also refuses a checkout with any
+change or untracked file unless `-AllowDirty`, which the manifest records with
+the entries it found; a production package is never built from a dirty
+checkout. It runs `cargo build --release --locked -p arkdeck-agentd -p
+arkdeck-cli --target x86_64-pc-windows-msvc` and stages `arkdeck.exe` and
+`arkdeck-agentd.exe` side by side, because the CLI's default daemon is its
+sibling. It then signs both (`-SigningMode`):
+
+| Mode | Signer |
+| --- | --- |
+| `none` | Nothing is signed. The CLI refuses this daemon, since there is no signer to pin. |
+| `development` | `windows-dev-identity.ps1 sign` with the host-trusted development certificate (`-Thumbprint`, else `ARKDECK_DEV_SIGNER_THUMBPRINT` from the process or the user environment). This is not an installation identity. |
+| `production` | An external command the maintainer supplies (`-ProductionSignCommand`, else `ARKDECK_PRODUCTION_SIGN_COMMAND`), called once per file with the file's path as its only argument. For example, a wrapper around `signtool sign /fd SHA256 /tr <timestamp URL> /td SHA256 /dlib <Artifact Signing dlib> /dmdf <metadata.json>`. The script holds no credential. If no command is configured, it fails before building. |
+
+Each signed file must pass `Get-AuthenticodeSignature` with status `Valid`, and
+both files must carry the same signer. A production signature must also carry
+a timestamp; `-ExpectedSignerSha256` optionally pins the expected certificate.
+The pin is the SHA-256 of the signer certificate's DER. The script writes
+`manifest.json` (`arkdeck.windows-xcopy-package/1`) inside the package. It
+records the revision, the dirty flag and entries, `rustc -V`, `cargo -V`, the
+target, the cargo arguments, each file's size and SHA-256, the signing mode and
+the signer pin. The script then zips the package directory
+(`arkdeck-<version>-windows-x64-<revision>.zip`) and writes the same manifest
+beside the zip with the zip's SHA-256 added. Last, it prints the pin to
+configure. To use the package, unpack it anywhere and set
+`ARKDECK_DAEMON_SIGNER_SHA256` to that pin; `ARKDECK_DAEMON_PATH` stays unset,
+so the CLI uses its sibling daemon. Nothing is installed or registered, and
+uninstalling is deleting the directory. The daemon's state (`%LOCALAPPDATA%\ArkDeck\Agentd`,
+or a development root) is separate from the package and stays after that.
+
+`-Smoke` (after a build), or `-SmokeZip <zip>` alone (for example on a clean
+host), unpacks the zip into a new directory under `-SmokeParent` (default: the
+temporary directory). It checks each file against the manifest and the
+daemon's signer against the pin. Then, with the pin and a private development
+state root inside that directory, it runs `arkdeck --output json doctor`, which
+must answer `ok: true`. If the CLI starts its daemon (decision 11), that daemon
+must be the unpacked one. Otherwise the smoke starts the unpacked daemon itself,
+waits for its `listening on` line, and runs doctor on the root's pipe. It runs
+`runtime service verify`, which is recorded as unavailable when the CLI does not
+serve it on Windows. It stops the daemon through the root's stop event (what
+`InstanceScope::request_stop` sets), waits for it to exit (`arkdeck-agentd
+stopped`), and removes the directory. It synchronises on output, exit and the
+instance document, never on sleeps. The smoke writes its record to
+`smoke.json` beside the zip, or to `-SmokeRecord`.
+
+The development-signed package passes `Get-AuthenticodeSignature` only on a host
+that trusts the development certificate. A clean host needs the production
+signature. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/xcopy-package-run.md`.
+
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::{LifecycleAction, LifecycleCommand, PreparedLifecycle}`
