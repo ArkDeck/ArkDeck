@@ -138,8 +138,9 @@ pub(crate) fn valid_format_timestamp(value: &str) -> bool {
 }
 
 /// Date comparison value for Artifact discovery using the already-pinned
-/// FormatStyle parser and the existing platform Gregorian calendar primitive.
-#[cfg(target_os = "macos")]
+/// FormatStyle parser and the portable Gregorian calendar primitive. Its
+/// Artifact and flash callers are still macOS-only.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
     let parsed = Reader {
         bytes: value.as_bytes(),
@@ -154,7 +155,7 @@ pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
     seconds.is_finite().then_some(seconds)
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod artifact_date_tests {
     use super::*;
     #[test]
@@ -210,6 +211,7 @@ mod artifact_date_tests {
         assert!(valid_format_timestamp(&utc_now().unwrap()));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn precise_timestamps_truncate_to_milliseconds() {
         // Swift `ISO8601Timestamps.string(from:includingFractionalSeconds:)`

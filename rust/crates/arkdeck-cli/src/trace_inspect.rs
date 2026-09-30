@@ -363,8 +363,7 @@ fn sha256(value: &Value) -> bool {
 
 /// Swift `RuntimeTraceInspectionParser.safe`: non-empty, at most 128 UTF-8
 /// bytes, no solidus or backslash, and no scalar of Foundation's
-/// `controlCharacters` (Cc and Cf). Off macOS, where Swift's CLI does not run,
-/// the format characters are not known to this check.
+/// `controlCharacters` (Cc and Cf).
 fn safe(value: &Value) -> bool {
     value.as_str().is_some_and(|text| {
         !text.is_empty()
@@ -374,14 +373,10 @@ fn safe(value: &Value) -> bool {
     })
 }
 
-#[cfg(target_os = "macos")]
+/// Foundation's `controlCharacters` (Cc and Cf), the same pinned table on
+/// every host.
 fn control(scalar: char) -> bool {
     arkdeck_platform::host_control_character(scalar)
-}
-
-#[cfg(not(target_os = "macos"))]
-fn control(scalar: char) -> bool {
-    scalar.is_control()
 }
 
 #[cfg(test)]

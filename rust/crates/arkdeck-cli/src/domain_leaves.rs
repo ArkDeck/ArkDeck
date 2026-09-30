@@ -348,20 +348,15 @@ fn capture_base(ui_dump: bool, screenshot: bool, tree: bool) -> Map<String, Valu
 
 /// Swift `DebugTypedValueValidator.isSafeHilogComponent`: 1…200 characters
 /// (grapheme clusters), each scalar in Foundation's `alphanumerics` (general
-/// categories L*, M*, N*) or one of `._:-`. Off macOS, where Swift has no CLI
-/// and CoreFoundation's table is not linked, a scalar is alphanumeric as Rust
-/// classifies it (a declared difference for marks).
+/// categories L*, M*, N*, the platform's pinned table on every host) or one
+/// of `._:-`.
 fn hilog_component(value: &str) -> bool {
     use unicode_segmentation::UnicodeSegmentation;
-    #[cfg(target_os = "macos")]
-    let alphanumeric = arkdeck_platform::host_alphanumeric;
-    #[cfg(not(target_os = "macos"))]
-    let alphanumeric = char::is_alphanumeric;
     !value.is_empty()
         && value.graphemes(true).count() <= 200
         && value
             .chars()
-            .all(|scalar| alphanumeric(scalar) || "._:-".contains(scalar))
+            .all(|scalar| arkdeck_platform::host_alphanumeric(scalar) || "._:-".contains(scalar))
 }
 
 /// The path as Swift's `URL(filePath:).path` prints it: a relative path

@@ -1,8 +1,10 @@
 //! The Gregorian calendar helpers leave nothing behind on the calling
-//! thread. Foundation autoreleases a date-components object for each
-//! decomposition, and a Rust thread has no autorelease pool of its own: until
-//! each call drained its own, every object stayed allocated until the thread
-//! exited, which a Runtime owner's thread does not do (TASK-XPA-025 soak).
+//! thread. Through Foundation they autoreleased a date-components object for
+//! each decomposition, and a Rust thread has no autorelease pool of its own:
+//! until each call drained its own, every object stayed allocated until the
+//! thread exited, which a Runtime owner's thread does not do (TASK-XPA-025
+//! soak). They are portable arithmetic now (TASK-XPA-004); this keeps the
+//! guarantee on the macOS allocator the soak measured.
 //! This file holds one test so that no other test allocates while it counts.
 #![cfg(target_os = "macos")]
 
