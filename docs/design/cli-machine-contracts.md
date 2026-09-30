@@ -127,7 +127,8 @@ cache status`, `job list|show|status|events|timeline|result|evidence|wait|
 cancel|reconcile`, `agent list|status`, `human-action list|show`, `artifact
 list|inspect|read|export|quota`, `capability list`, `runtime storage
 status|policy`, `session list|show|pin|unpin|export preview|export
-apply|cleanup preview|cleanup apply`), `notImplemented` where a leaf
+apply|cleanup preview|cleanup apply`, `history filter list|save|delete`),
+`notImplemented` where a leaf
 it reaches is refused off macOS for a macOS host primitive (the Import upload
 kinds, and the macOS-only families below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target

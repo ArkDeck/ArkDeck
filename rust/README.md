@@ -2621,6 +2621,26 @@ bundle is refused with nothing published, and, with
 releases. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
+## Windows History filter owner (TASK-XPA-012)
+
+`arkdeck-hoststore` builds the History filter owner (`HistoryStore`) on
+Windows: the macOS code over the host store's NTFS directory, the same
+`history-filter.json` (the store's frozen encoding) under
+`.history-filter.lock`. Both macOS compositions keep them in the state
+directory itself; the host store cannot open a Windows root itself (any
+directory of this user for a development root, one that grants SYSTEM for
+the account's), so the Windows daemon composes the owner over the root's
+private `history-filter`, as it keeps the Job store in `jobs-state`. The
+census names it at its macOS position (`…, storage, history,
+workspaceProjects, …`), and `history.filter.list|save|delete` answer from
+it. Its unit tests run on both hosts and replay the committed control-frame
+corpus at the recorded time, the document bytes pinned;
+`arkdeck-agentd/tests/windows_history_filter_process.rs` replays the corpus
+over the real daemon across restarts, reads a document Swift wrote as Swift
+answered it and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `history filter
+list|save|delete` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-history-filter-owner-run.md`.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in

@@ -128,7 +128,7 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     history: Option<arkdeck_hoststore::HistoryStore>,
     #[cfg(any(target_os = "macos", windows))]
     workspace_projects: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceProjectStore>>,
@@ -1024,7 +1024,7 @@ impl Host {
         self.workspace = Some(std::sync::Arc::new(composition.with_inspector(inspector)));
         Ok(self)
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
         self.history = Some(history);
         self
@@ -1330,6 +1330,7 @@ impl Host {
             ("artifacts", self.artifacts.is_some()),
             ("imports", self.imports.is_some()),
             ("storage", self.storage.is_some()),
+            ("history", self.history.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("planning", self.planning.is_some()),
             ("agentExecutions", self.agents.is_some()),
@@ -1377,7 +1378,7 @@ impl Host {
             #[cfg(target_os = "macos")]
             bootstrap: None,
             provider,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             history: None,
             #[cfg(any(target_os = "macos", windows))]
             workspace_projects: None,
@@ -3181,7 +3182,7 @@ impl HostServices for Host {
             ])),
         })
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn history_filter(
         &self,
         method: &str,
