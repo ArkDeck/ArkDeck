@@ -113,10 +113,18 @@ development MSIX.
      same table as `runs/TASK-XPA-022/windows-rc-package-run.md`.
    - `Add-AppxPackage` succeeds.
    - `Get-AppxPackage ArkDeck.Development` shows `PackageFamilyName`.
-4. **Packaged smoke.** Launch *ArkDeck* from Start. **Expected:** the App starts the packaged
-   daemon, shows the doctor report and protocol 1.0.0, and shows no recovery banner.
-5. Record the package family. It is the MSIX daemon pin (`ARKDECK_DAEMON_PACKAGE_FAMILY`, ruling
-   17). Remove the package with `Remove-AppxPackage <PackageFullName>` when done.
+4. **Packaged smoke.** Set `ARKDECK_DAEMON_SIGNER_SHA256=<pin>` as a user environment variable
+   (a Start-menu launch reads the persistent environment), run the packaged
+   `<InstallLocation>\bin\arkdeck.exe --output json doctor` with
+   `ARKDECK_DAEMON_PATH=<InstallLocation>\arkdeck-agentd.exe`, which starts the packaged daemon
+   (decision 11: the App does not start it), then launch *ArkDeck* from Start. **Expected:**
+   doctor `ok: true`; the App shows the doctor report and protocol 1.0.0, and no recovery
+   banner.
+5. Record the package family. It is not the daemon pin: a CLI-started daemon has no package
+   identity, so the MSIX daemon is pinned like the xcopy one, by the signer here and by the
+   publisher identity in production (delegated minor decision, see
+   `runs/TASK-XPA-007/clientkit-publisher-pin-run.md`). Remove the package with
+   `Remove-AppxPackage <PackageFullName>` and the user variable when done.
 6. **Record:** `runs/TASK-XPA-022/msix-development-signing-<date>-run.md`. Include the package
    family, the MSIX SHA-256 and the smoke result. Leave out the thumbprint and the user SID.
 

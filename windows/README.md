@@ -43,7 +43,8 @@ holds no runtime semantics: everything it shows is a projection read from the lo
   `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION`. Layer 1: the pipe object's owner SID must equal
   this process token's owner SID. Layer 2: the connection's server PID is opened and held, its image
   must be the installed daemon (canonical path and file id), signed by the pinned Authenticode
-  signer (SHA-256 of the certificate DER) or running in the installed MSIX package family, and the
+  signer (SHA-256 of the certificate DER) or by the pinned publisher (ruling 17), or running in
+  the installed MSIX package family, and the
   PID must not change; the image file and its ancestor directories are held for the connection.
 - **Failures are typed.** `ControlFailureKind.DaemonUnavailable` (with a `DaemonUnavailableReason`)
   means nothing ran; the UI shows `ControlFailure.Banner`, the daemon-unavailable recovery banner,

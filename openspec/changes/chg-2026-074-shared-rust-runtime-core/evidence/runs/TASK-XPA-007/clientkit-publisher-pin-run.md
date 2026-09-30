@@ -122,8 +122,8 @@ the daemon (decision 11: the client-started daemon lives in the CLI).
      files staying Authenticode-signed if the package is re-signed (the Store re-signs the
      package, not the files inside).
 
-**Recommendation: option 3 now**, recorded as the MSIX form's configuration in the clean-host
-runbook once the maintainer agrees. It needs no code, matches ruling 17 for both forms, and
+**Recommendation: option 3 now** (accepted as delegated minor decision 4 below), recorded as
+the MSIX form's configuration in the clean-host runbook. It needs no code, matches ruling 17 for both forms, and
 covers every way the daemon can be started. Option 1 can be added later if the maintainer wants
 the package family as a proof of its own (for example for a Store listing), and is compatible
 with 3. Option 2 is not recommended.
@@ -138,9 +138,14 @@ with 3. Option 2 is not recommended.
    (`InstanceMismatch`), as for any refused identity.
 3. **The production smoke configures the clients by publisher only**, no certificate hash,
    so it proves the configuration a user will have.
+4. **The MSIX daemon is pinned by its publisher identity (option 3 above).** Accepted by the
+   lead after #2416 under the user's standing instruction for minor decisions; delegated minor
+   decision, pending the next rulings batch. No code change: an MSIX installation is
+   configured with `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and `ARKDECK_DAEMON_PUBLISHER_EKU`,
+   the package family optional beside them. The clean-host runbook's step 8 and
+   `docs/release/windows-install.md` state it. Options 1 and 2 are not taken.
 
 ## Not changed
 
 - No Rust source (the Rust client already pins the publisher), so no cfg gate changed and the
   macOS cross-check does not apply.
-- The MSIX package-family question (above) is the maintainer's.
