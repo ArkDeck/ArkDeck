@@ -97,7 +97,11 @@ pub use macos_server::{
     process_argument_record, process_arguments, verifies_managed_process,
 };
 #[cfg(windows)]
-pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
+pub use windows::{
+    ConnectionCloser, GuardAcquisition, GuardObject, InstanceScope, Latch, ListenerLock,
+    LocalConnection, LocalListener, LoopbackServerLease, OwnerLock, Readiness, SingleInstanceGuard,
+    StateRoot, StopSignal, default_user_endpoint,
+};
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
 #[derive(Clone, Debug)]

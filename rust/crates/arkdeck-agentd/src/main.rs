@@ -53,10 +53,13 @@ mod production;
 mod tool_selection_startup;
 #[cfg(all(test, target_os = "macos"))]
 mod tool_selection_startup_tests;
+#[cfg(windows)]
+mod windows_lifecycle;
 #[cfg(all(test, target_os = "macos"))]
 mod workspace_project_control;
 
 use arkdeck_control::Control;
+#[cfg(unix)]
 use arkdeck_platform::{LocalEndpoint, LocalListener, default_user_endpoint};
 #[cfg(unix)]
 use std::io::{self, Write};
@@ -273,6 +276,28 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // SIGINT are recorded, and the serving loop drains and stops for them.
     #[cfg(unix)]
     let stop = arkdeck_platform::StopSignal::install()?;
+    // The Windows daemon's state root, single-instance guard, owner lock,
+    // stop request and pipe, all taken before anything else is started, or
+    // the answer that another daemon owns the root (`windows_lifecycle.rs`).
+    #[cfg(windows)]
+    let windows_lifecycle::Serving {
+        stop,
+        listener,
+        authority,
+    } = match windows_lifecycle::start(
+        development.as_deref(),
+        std::env::var_os("ARKDECK_ENDPOINT").as_deref(),
+        &host::utc_now(),
+        &|name| std::env::var_os(name).is_some(),
+    )? {
+        windows_lifecycle::Start::Serve(serving) => serving,
+        // As Swift's second instance: the Runtime serving keeps serving.
+        windows_lifecycle::Start::AlreadyRunning(instance) => {
+            println!("{}", instance.running());
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            return Ok(());
+        }
+    };
     // The ArkForge lane either owner composes, whose daemon it stops after
     // its drain and before the managed server. A start that fails once it is
     // composed stops it on the way out, after the managed server
@@ -285,6 +310,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // on the way out, first (`managed_hdc::Launched`).
     #[cfg(target_os = "macos")]
     let mut managed_hdc: Option<managed_hdc::Launched> = None;
+    #[cfg(unix)]
     let endpoint = match std::env::var_os("ARKDECK_ENDPOINT") {
         Some(path) => LocalEndpoint::new(path),
         None => default_user_endpoint()?,
@@ -657,7 +683,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             arkdeck_hoststore::RockchipStartup::default(),
         )
     };
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(all(unix, not(target_os = "macos")))]
     if development.is_some() {
         return Err("development host-store owner is not yet supported on this platform".into());
     }
@@ -744,8 +770,6 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     };
     #[cfg(all(unix, not(target_os = "macos")))]
     let listener = LocalListener::bind(&endpoint)?;
-    #[cfg(not(unix))]
-    let listener = LocalListener::bind(&endpoint)?;
     #[cfg(target_os = "macos")]
     if let Some(configuration) = app_ingress {
         // The isolated or the production composition, which owns no Swift
@@ -761,19 +785,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(socket) = &production_socket {
         production::report(&format!("arkdeck-agentd listening on {}", socket.display()));
     }
+    #[cfg(windows)]
+    if let Some(authority) = &authority {
+        println!(
+            "arkdeck-agentd listening on {}",
+            authority.endpoint.as_path().display()
+        );
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
     let socket_drain = arkdeck_agentd::serve_control(
         listener,
         Arc::clone(&control),
-        |listener| {
-            #[cfg(unix)]
-            {
-                listener.accept_until(&stop)
-            }
-            #[cfg(not(unix))]
-            {
-                listener.accept().map(Some)
-            }
-        },
+        |listener| listener.accept_until(&stop),
         CONNECTION_IDLE,
         DRAIN_DEADLINE,
     )?;
@@ -812,10 +835,23 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         let _ = io::stdout().flush();
         std::process::exit(if recompose { 70 } else { 0 });
     }
-    #[cfg(not(unix))]
+    // The same drain on Windows: the pipe is closed, the frames being
+    // answered finish, then every connection is ended, within one deadline.
+    // A complete drain lets go of the owner lock and then the
+    // single-instance guard, on the thread that took it; one the deadline
+    // cut short exits holding them, and its successor finds the guard
+    // abandoned and starts as after a crash (`windows_lifecycle.rs`).
+    #[cfg(windows)]
     {
-        let _ = socket_drain;
-        unreachable!("only a stop request ends accepting");
+        drop(socket_drain.listener_lock);
+        if socket_drain.complete
+            && let Some(authority) = authority
+        {
+            authority.release();
+        }
+        println!("arkdeck-agentd stopped");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+        std::process::exit(0);
     }
 }
 

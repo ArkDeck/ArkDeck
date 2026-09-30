@@ -40,6 +40,19 @@ pub(crate) fn file_identity(file: &File) -> io::Result<FileIdentity> {
     })
 }
 
+impl FileIdentity {
+    /// The volume serial and the 128-bit file id, in lowercase hexadecimal:
+    /// a name for this file that no path spelling or rename changes.
+    pub(crate) fn text(&self) -> String {
+        let index: String = self
+            .index
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        format!("{:016x}-{index}", self.volume)
+    }
+}
+
 pub(crate) fn reject_reparse_file(file: &File) -> io::Result<()> {
     let mut info = BY_HANDLE_FILE_INFORMATION::default();
     // SAFETY: live file handle and initialized output storage.
@@ -224,7 +237,7 @@ impl Token {
         let storage = self.information(TokenOwner)?;
         Sid::copy(storage.header::<TOKEN_OWNER>()?.Owner)
     }
-    fn user(&self) -> io::Result<Sid> {
+    pub(crate) fn user(&self) -> io::Result<Sid> {
         let storage = self.information(TokenUser)?;
         Sid::copy(storage.header::<TOKEN_USER>()?.User.Sid)
     }
@@ -269,6 +282,32 @@ pub(crate) fn require_pipe_owner(pipe: HANDLE) -> io::Result<()> {
         ));
     }
     Ok(())
+}
+
+/// Whether the kernel object or file behind `handle` is owned by this
+/// process's user SID (the handle needs `READ_CONTROL`).
+pub(crate) fn owned_by_current_user(handle: HANDLE, kind: SE_OBJECT_TYPE) -> io::Result<bool> {
+    let mut owner = null_mut();
+    let mut descriptor = null_mut();
+    // SAFETY: live handle; GetSecurityInfo allocates the security descriptor,
+    // which the allocation guard releases.
+    let status = unsafe {
+        GetSecurityInfo(
+            handle,
+            kind,
+            OWNER_SECURITY_INFORMATION,
+            &mut owner,
+            null_mut(),
+            null_mut(),
+            null_mut(),
+            &mut descriptor,
+        )
+    };
+    let _allocation = LocalAllocation(descriptor);
+    if status != ERROR_SUCCESS {
+        return Err(io::Error::from_raw_os_error(status as i32));
+    }
+    Ok(Sid::copy(owner)?.equals(&Token::current()?.user()?))
 }
 
 pub(crate) struct ProcessIdentity {
