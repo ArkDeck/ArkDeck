@@ -219,7 +219,7 @@ class PathClassificationTests(unittest.TestCase):
     def test_every_windows_generator_and_test_input_selects_windows(self):
         root = SCRIPT.resolve().parents[2]
         declared = []
-        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py"):
+        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py", "generate-app-icons.py"):
             spec = importlib.util.spec_from_file_location(
                 "arkdeck_windows_" + script.replace("-", "_")[:-3], root / "windows/scripts" / script
             )
@@ -743,7 +743,7 @@ class WindowsLaneTests(unittest.TestCase):
             commands = [" ".join(c) for c in PLAN.local_commands(pathlib.Path(directory), self.plan(windows=True))]
         build = commands.index("dotnet build windows/ArkDeck.Windows.slnx -c Release")
         test = commands.index("dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build")
-        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py"):
+        for script in ("generate-clientkit.py", "generate-ui-strings.py", "generate-xaml-tokens.py", "generate-app-icons.py"):
             with self.subTest(generator=script):
                 generator = next(i for i, c in enumerate(commands) if c.endswith(f"windows/scripts/{script} --check"))
                 self.assertLess(generator, build)
