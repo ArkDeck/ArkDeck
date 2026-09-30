@@ -382,6 +382,7 @@ impl TargetDocument {
     /// whether that changed the document. The exact current edge is
     /// idempotent; a missing, ambiguous, colliding or skipped lineage refuses
     /// with Swift's `storeFailure` and changes nothing.
+    #[cfg(target_os = "macos")]
     pub fn advance_binding_lineage(
         &mut self,
         advance: &crate::rockchip_binding::LineageAdvance,
