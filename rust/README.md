@@ -1182,6 +1182,32 @@ recorded store), the host's mutation-root test (`host_tests.rs`), and
 the authority's census through the real daemon across a restart, and with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck artifact list|quota` and
 `arkdeck capability list` against a dev-signed daemon).
+
+## XPA-AC-7 kill matrix on Windows (TASK-XPA-005)
+
+Three test binaries measure the matrix on NTFS; no product code differs from
+macOS for it:
+- `arkdeck-hoststore/tests/windows_crash_window.rs` replays the Swift
+  crash-window oracle (`rust/tests/fixtures/crash-window`) as
+  `crash_window.rs` does on macOS. The Rust runner, in a child process, is
+  killed at the four windows (before or after an intent, before or after the
+  capability consume). The store it leaves is Swift's `crash/` byte for byte.
+  Two starts, two reconciles, a new tap and every read then answer and leave
+  what Swift's did, and nothing is dispatched after the death. The fake HDC
+  is the oracle's table answered in process; it reports the tool identity
+  current, as the macOS dispatch over the fake's verified script does.
+- `tests/windows_artifact_publication_death.rs`: a Job product's publication
+  killed after its payload, its seal and its index entry leaves no half-record
+  (the macOS test's cases, over an `observe.device@1` Job). The quota counts
+  what the indexes name, the sweep keeps the unfinished Job's products, and a
+  start recovers the Job without changing an Artifact.
+- `arkdeck-agentd/tests/windows_kill_matrix_process.rs`: the real daemon over
+  each window's crash store. Its first start is Swift's first start. The test
+  then terminates it with no drain; the next start is Swift's second, and the
+  third changes nothing. The requests after the death answer as Swift's did,
+  or, where they need the Windows HDC tuple, are refused with nothing written
+  or dispatched: a device Job's reconcile, and a new tap's admission.
+
 ## Job reconciler and agent executions on Windows (TASK-XPA-005)
 
 `JobReconciler` (`job_reconcile.rs` with `job_reconcile_device.rs`), the agent
