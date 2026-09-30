@@ -12,9 +12,11 @@ use super::{OracleProbe, debug_hap, document, fixed_now, fixed_precise_now};
 use arkdeck_contract::{sha256_hex, validate_method_value};
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
-    JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher,
-    SessionStore, StorageClaims, TargetStore, list_cleanup_debt,
+    JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher, SessionStore,
+    StorageClaims, TargetStore,
 };
+#[cfg(target_os = "macos")]
+use arkdeck_hoststore::{JobResultReader, list_cleanup_debt};
 use arkdeck_platform::VerifiedTool;
 use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch, ProcessDispatch};
 use serde_json::{Map, Value, json};
@@ -242,6 +244,9 @@ impl Owners {
 /// the replay leaves below the root must be Swift's byte for byte: a
 /// continued Job's record with its recovery load's `recovered: journal
 /// clean` and its settled residue, and the ledger with its settlements.
+/// macOS only: it dispatches to the shared fake HDC, a POSIX shell script,
+/// and continues cleanup debt, which the Windows runner does not yet.
+#[cfg(target_os = "macos")]
 pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);

@@ -755,6 +755,14 @@ SHA-256: %4$@</value>
     <value>Cancel</value>
     <comment>settings.common.cancel (SettingsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_humanRequired_title" xml:space="preserve">
+    <value>Human action is required</value>
+    <comment>jobRecovery.humanRequired.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_humanRequired_guidance" xml:space="preserve">
+    <value>Review the recorded reason and evidence before continuing through an approved Runtime path.</value>
+    <comment>jobRecovery.humanRequired.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -1370,5 +1378,329 @@ SHA-256: %4$@</value>
   <data name="windows_sessions_pinnedNo" xml:space="preserve">
     <value>No</value>
     <comment>windows.sessions.pinnedNo (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_agents" xml:space="preserve">
+    <value>Agents</value>
+    <comment>windows.navigation.agents (Windows only)</comment>
+  </data>
+  <data name="windows_agents_subtitle" xml:space="preserve">
+    <value>The agent executions the Runtime runs and the human actions they wait on. Starting an agent stays in the CLI.</value>
+    <comment>windows.agents.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_agents_unavailable" xml:space="preserve">
+    <value>Agent executions unavailable</value>
+    <comment>windows.agents.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions_unavailable" xml:space="preserve">
+    <value>Human actions unavailable</value>
+    <comment>windows.agents.humanActions.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_agents_executions" xml:space="preserve">
+    <value>Agent executions</value>
+    <comment>windows.agents.executions (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions" xml:space="preserve">
+    <value>Waiting for you</value>
+    <comment>windows.agents.humanActions (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions_empty" xml:space="preserve">
+    <value>No human action is waiting.</value>
+    <comment>windows.agents.humanActions.empty (Windows only)</comment>
+  </data>
+  <data name="windows_agents_empty" xml:space="preserve">
+    <value>No agent execution is recorded.</value>
+    <comment>windows.agents.empty (Windows only)</comment>
+  </data>
+  <data name="windows_agents_select" xml:space="preserve">
+    <value>Select an agent execution to see it.</value>
+    <comment>windows.agents.select (Windows only)</comment>
+  </data>
+  <data name="windows_agents_operation" xml:space="preserve">
+    <value>Operation</value>
+    <comment>windows.agents.operation (Windows only)</comment>
+  </data>
+  <data name="windows_agents_state" xml:space="preserve">
+    <value>State</value>
+    <comment>windows.agents.state (Windows only)</comment>
+  </data>
+  <data name="windows_agents_generation" xml:space="preserve">
+    <value>Generation</value>
+    <comment>windows.agents.generation (Windows only)</comment>
+  </data>
+  <data name="windows_agents_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>windows.agents.job (Windows only)</comment>
+  </data>
+  <data name="windows_agents_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>windows.agents.target (Windows only)</comment>
+  </data>
+  <data name="windows_agents_deadline" xml:space="preserve">
+    <value>Deadline</value>
+    <comment>windows.agents.deadline (Windows only)</comment>
+  </data>
+  <data name="windows_agents_observed" xml:space="preserve">
+    <value>Last observed</value>
+    <comment>windows.agents.observed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_next" xml:space="preserve">
+    <value>Next</value>
+    <comment>windows.agents.next (Windows only)</comment>
+  </data>
+  <data name="windows_agents_failure" xml:space="preserve">
+    <value>Failure</value>
+    <comment>windows.agents.failure (Windows only)</comment>
+  </data>
+  <data name="windows_agents_outcomeUnknown" xml:space="preserve">
+    <value>The outcome is unknown: check the device before running it again.</value>
+    <comment>windows.agents.outcomeUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_agents_row" xml:space="preserve">
+    <value>%1$@ · %2$@</value>
+    <comment>windows.agents.row (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_category" xml:space="preserve">
+    <value>Category</value>
+    <comment>windows.agents.action.category (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_minimum" xml:space="preserve">
+    <value>What to do</value>
+    <comment>windows.agents.action.minimum (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_expires" xml:space="preserve">
+    <value>Expires</value>
+    <comment>windows.agents.action.expires (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_row" xml:space="preserve">
+    <value>%1$@ · %2$@ · expires %3$@</value>
+    <comment>windows.agents.action.row (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_choose" xml:space="preserve">
+    <value>Choose one</value>
+    <comment>windows.agents.action.choose (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_chooseFirst" xml:space="preserve">
+    <value>Choose one of the listed values first.</value>
+    <comment>windows.agents.action.chooseFirst (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_resume" xml:space="preserve">
+    <value>Resume</value>
+    <comment>windows.agents.action.resume (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_resumed" xml:space="preserve">
+    <value>Resumed: the Runtime continues.</value>
+    <comment>windows.agents.action.resumed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_refused" xml:space="preserve">
+    <value>The Runtime did not resume</value>
+    <comment>windows.agents.action.refused (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon" xml:space="preserve">
+    <value>Abandon…</value>
+    <comment>windows.agents.abandon (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_title" xml:space="preserve">
+    <value>Abandon this agent execution?</value>
+    <comment>windows.agents.abandon.title (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_message" xml:space="preserve">
+    <value>The Runtime stops agent execution %1$@ (generation %2$@). It cannot be resumed afterwards.</value>
+    <comment>windows.agents.abandon.message (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_confirm" xml:space="preserve">
+    <value>Abandon</value>
+    <comment>windows.agents.abandon.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_done" xml:space="preserve">
+    <value>Abandoned.</value>
+    <comment>windows.agents.abandon.done (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_failed" xml:space="preserve">
+    <value>The agent execution was not abandoned</value>
+    <comment>windows.agents.abandon.failed (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_imports" xml:space="preserve">
+    <value>Imports</value>
+    <comment>windows.navigation.imports (Windows only)</comment>
+  </data>
+  <data name="windows_imports_subtitle" xml:space="preserve">
+    <value>Files uploaded to the Runtime and published as Artifacts for an adopted Target. Each file is checked, sent in verified chunks and published by the Runtime.</value>
+    <comment>windows.imports.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_imports_unavailable" xml:space="preserve">
+    <value>Imports unavailable</value>
+    <comment>windows.imports.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_imports_targets_unavailable" xml:space="preserve">
+    <value>Targets unavailable</value>
+    <comment>windows.imports.targets.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_imports_new" xml:space="preserve">
+    <value>New Import</value>
+    <comment>windows.imports.new (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind" xml:space="preserve">
+    <value>Kind</value>
+    <comment>windows.imports.kind (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_hap" xml:space="preserve">
+    <value>HAP (.hap, .hsp)</value>
+    <comment>windows.imports.kind.hap (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_nativeLibrary" xml:space="preserve">
+    <value>Native library (lib….so)</value>
+    <comment>windows.imports.kind.nativeLibrary (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_workspacePatch" xml:space="preserve">
+    <value>Workspace patch (.patch, .diff)</value>
+    <comment>windows.imports.kind.workspacePatch (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_flashBundle" xml:space="preserve">
+    <value>Flash bundle (images.tar.gz)</value>
+    <comment>windows.imports.kind.flashBundle (Windows only)</comment>
+  </data>
+  <data name="windows_imports_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>windows.imports.target (Windows only)</comment>
+  </data>
+  <data name="windows_imports_noTargets" xml:space="preserve">
+    <value>No Target is adopted: adopt one in the CLI first.</value>
+    <comment>windows.imports.noTargets (Windows only)</comment>
+  </data>
+  <data name="windows_imports_file" xml:space="preserve">
+    <value>File</value>
+    <comment>windows.imports.file (Windows only)</comment>
+  </data>
+  <data name="windows_imports_noFile" xml:space="preserve">
+    <value>No file chosen.</value>
+    <comment>windows.imports.noFile (Windows only)</comment>
+  </data>
+  <data name="windows_imports_chooseFile" xml:space="preserve">
+    <value>Choose file…</value>
+    <comment>windows.imports.chooseFile (Windows only)</comment>
+  </data>
+  <data name="windows_imports_chooseFileFirst" xml:space="preserve">
+    <value>Choose a file first.</value>
+    <comment>windows.imports.chooseFileFirst (Windows only)</comment>
+  </data>
+  <data name="windows_imports_start" xml:space="preserve">
+    <value>Import</value>
+    <comment>windows.imports.start (Windows only)</comment>
+  </data>
+  <data name="windows_imports_progress" xml:space="preserve">
+    <value>Upload progress</value>
+    <comment>windows.imports.progress (Windows only)</comment>
+  </data>
+  <data name="windows_imports_progress_value" xml:space="preserve">
+    <value>Sent %1$@ of %2$@</value>
+    <comment>windows.imports.progress.value (Windows only)</comment>
+  </data>
+  <data name="windows_imports_cancel" xml:space="preserve">
+    <value>Cancel upload</value>
+    <comment>windows.imports.cancel (Windows only)</comment>
+  </data>
+  <data name="windows_imports_busy" xml:space="preserve">
+    <value>An upload is in progress.</value>
+    <comment>windows.imports.busy (Windows only)</comment>
+  </data>
+  <data name="windows_imports_done" xml:space="preserve">
+    <value>Imported %1$@ as Artifact %2$@.</value>
+    <comment>windows.imports.done (Windows only)</comment>
+  </data>
+  <data name="windows_imports_failed" xml:space="preserve">
+    <value>Import failed</value>
+    <comment>windows.imports.failed (Windows only)</comment>
+  </data>
+  <data name="windows_imports_cancelled" xml:space="preserve">
+    <value>Upload cancelled; the partial Import was aborted.</value>
+    <comment>windows.imports.cancelled (Windows only)</comment>
+  </data>
+  <data name="windows_imports_list" xml:space="preserve">
+    <value>Imports</value>
+    <comment>windows.imports.list (Windows only)</comment>
+  </data>
+  <data name="windows_imports_empty" xml:space="preserve">
+    <value>No Import is recorded.</value>
+    <comment>windows.imports.empty (Windows only)</comment>
+  </data>
+  <data name="windows_imports_select" xml:space="preserve">
+    <value>Select an Import to see it.</value>
+    <comment>windows.imports.select (Windows only)</comment>
+  </data>
+  <data name="windows_imports_row" xml:space="preserve">
+    <value>%1$@ · %2$@ · %3$@</value>
+    <comment>windows.imports.row (Windows only)</comment>
+  </data>
+  <data name="windows_imports_name" xml:space="preserve">
+    <value>Name</value>
+    <comment>windows.imports.name (Windows only)</comment>
+  </data>
+  <data name="windows_imports_size" xml:space="preserve">
+    <value>Size</value>
+    <comment>windows.imports.size (Windows only)</comment>
+  </data>
+  <data name="windows_imports_state" xml:space="preserve">
+    <value>State</value>
+    <comment>windows.imports.state (Windows only)</comment>
+  </data>
+  <data name="windows_imports_generation" xml:space="preserve">
+    <value>Generation</value>
+    <comment>windows.imports.generation (Windows only)</comment>
+  </data>
+  <data name="windows_imports_created" xml:space="preserve">
+    <value>Created</value>
+    <comment>windows.imports.created (Windows only)</comment>
+  </data>
+  <data name="windows_imports_artifact" xml:space="preserve">
+    <value>Artifact</value>
+    <comment>windows.imports.artifact (Windows only)</comment>
+  </data>
+  <data name="windows_imports_digest" xml:space="preserve">
+    <value>Artifact digest</value>
+    <comment>windows.imports.digest (Windows only)</comment>
+  </data>
+  <data name="windows_imports_mediaType" xml:space="preserve">
+    <value>Media type</value>
+    <comment>windows.imports.mediaType (Windows only)</comment>
+  </data>
+  <data name="windows_imports_privacy" xml:space="preserve">
+    <value>Privacy</value>
+    <comment>windows.imports.privacy (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release" xml:space="preserve">
+    <value>Release…</value>
+    <comment>windows.imports.release (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_title" xml:space="preserve">
+    <value>Release this Import?</value>
+    <comment>windows.imports.release.title (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_message" xml:space="preserve">
+    <value>The Runtime releases Import %1$@ (generation %2$@). A Job can no longer use its Artifact.</value>
+    <comment>windows.imports.release.message (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_confirm" xml:space="preserve">
+    <value>Release</value>
+    <comment>windows.imports.release.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_done" xml:space="preserve">
+    <value>Released.</value>
+    <comment>windows.imports.release.done (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_failed" xml:space="preserve">
+    <value>The Import was not released</value>
+    <comment>windows.imports.release.failed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_id" xml:space="preserve">
+    <value>Human action</value>
+    <comment>windows.agents.action.id (Windows only)</comment>
+  </data>
+  <data name="windows_imports_id" xml:space="preserve">
+    <value>Import</value>
+    <comment>windows.imports.id (Windows only)</comment>
+  </data>
+  <data name="windows_imports_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>windows.imports.sha256 (Windows only)</comment>
   </data>
 </root>

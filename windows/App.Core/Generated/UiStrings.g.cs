@@ -194,6 +194,8 @@ public static class UiStrings
     public const string HistoryEvidenceEffect = "history.evidence.effect";
     public const string HistoryEvidenceFirstEvidence = "history.evidence.firstEvidence";
     public const string SettingsCommonCancel = "settings.common.cancel";
+    public const string JobRecoveryHumanRequiredTitle = "jobRecovery.humanRequired.title";
+    public const string JobRecoveryHumanRequiredGuidance = "jobRecovery.humanRequired.guidance";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -348,6 +350,87 @@ public static class UiStrings
     public const string WindowsHistoryEvidenceStatus = "windows.history.evidence.status";
     public const string WindowsSessionsPinnedYes = "windows.sessions.pinnedYes";
     public const string WindowsSessionsPinnedNo = "windows.sessions.pinnedNo";
+    public const string WindowsNavigationAgents = "windows.navigation.agents";
+    public const string WindowsAgentsSubtitle = "windows.agents.subtitle";
+    public const string WindowsAgentsUnavailable = "windows.agents.unavailable";
+    public const string WindowsAgentsHumanActionsUnavailable = "windows.agents.humanActions.unavailable";
+    public const string WindowsAgentsExecutions = "windows.agents.executions";
+    public const string WindowsAgentsHumanActions = "windows.agents.humanActions";
+    public const string WindowsAgentsHumanActionsEmpty = "windows.agents.humanActions.empty";
+    public const string WindowsAgentsEmpty = "windows.agents.empty";
+    public const string WindowsAgentsSelect = "windows.agents.select";
+    public const string WindowsAgentsOperation = "windows.agents.operation";
+    public const string WindowsAgentsState = "windows.agents.state";
+    public const string WindowsAgentsGeneration = "windows.agents.generation";
+    public const string WindowsAgentsJob = "windows.agents.job";
+    public const string WindowsAgentsTarget = "windows.agents.target";
+    public const string WindowsAgentsDeadline = "windows.agents.deadline";
+    public const string WindowsAgentsObserved = "windows.agents.observed";
+    public const string WindowsAgentsNext = "windows.agents.next";
+    public const string WindowsAgentsFailure = "windows.agents.failure";
+    public const string WindowsAgentsOutcomeUnknown = "windows.agents.outcomeUnknown";
+    public const string WindowsAgentsRow = "windows.agents.row";
+    public const string WindowsAgentsActionCategory = "windows.agents.action.category";
+    public const string WindowsAgentsActionMinimum = "windows.agents.action.minimum";
+    public const string WindowsAgentsActionExpires = "windows.agents.action.expires";
+    public const string WindowsAgentsActionRow = "windows.agents.action.row";
+    public const string WindowsAgentsActionChoose = "windows.agents.action.choose";
+    public const string WindowsAgentsActionChooseFirst = "windows.agents.action.chooseFirst";
+    public const string WindowsAgentsActionResume = "windows.agents.action.resume";
+    public const string WindowsAgentsActionResumed = "windows.agents.action.resumed";
+    public const string WindowsAgentsActionRefused = "windows.agents.action.refused";
+    public const string WindowsAgentsAbandon = "windows.agents.abandon";
+    public const string WindowsAgentsAbandonTitle = "windows.agents.abandon.title";
+    public const string WindowsAgentsAbandonMessage = "windows.agents.abandon.message";
+    public const string WindowsAgentsAbandonConfirm = "windows.agents.abandon.confirm";
+    public const string WindowsAgentsAbandonDone = "windows.agents.abandon.done";
+    public const string WindowsAgentsAbandonFailed = "windows.agents.abandon.failed";
+    public const string WindowsNavigationImports = "windows.navigation.imports";
+    public const string WindowsImportsSubtitle = "windows.imports.subtitle";
+    public const string WindowsImportsUnavailable = "windows.imports.unavailable";
+    public const string WindowsImportsTargetsUnavailable = "windows.imports.targets.unavailable";
+    public const string WindowsImportsNew = "windows.imports.new";
+    public const string WindowsImportsKind = "windows.imports.kind";
+    public const string WindowsImportsKindHap = "windows.imports.kind.hap";
+    public const string WindowsImportsKindNativeLibrary = "windows.imports.kind.nativeLibrary";
+    public const string WindowsImportsKindWorkspacePatch = "windows.imports.kind.workspacePatch";
+    public const string WindowsImportsKindFlashBundle = "windows.imports.kind.flashBundle";
+    public const string WindowsImportsTarget = "windows.imports.target";
+    public const string WindowsImportsNoTargets = "windows.imports.noTargets";
+    public const string WindowsImportsFile = "windows.imports.file";
+    public const string WindowsImportsNoFile = "windows.imports.noFile";
+    public const string WindowsImportsChooseFile = "windows.imports.chooseFile";
+    public const string WindowsImportsChooseFileFirst = "windows.imports.chooseFileFirst";
+    public const string WindowsImportsStart = "windows.imports.start";
+    public const string WindowsImportsProgress = "windows.imports.progress";
+    public const string WindowsImportsProgressValue = "windows.imports.progress.value";
+    public const string WindowsImportsCancel = "windows.imports.cancel";
+    public const string WindowsImportsBusy = "windows.imports.busy";
+    public const string WindowsImportsDone = "windows.imports.done";
+    public const string WindowsImportsFailed = "windows.imports.failed";
+    public const string WindowsImportsCancelled = "windows.imports.cancelled";
+    public const string WindowsImportsList = "windows.imports.list";
+    public const string WindowsImportsEmpty = "windows.imports.empty";
+    public const string WindowsImportsSelect = "windows.imports.select";
+    public const string WindowsImportsRow = "windows.imports.row";
+    public const string WindowsImportsName = "windows.imports.name";
+    public const string WindowsImportsSize = "windows.imports.size";
+    public const string WindowsImportsState = "windows.imports.state";
+    public const string WindowsImportsGeneration = "windows.imports.generation";
+    public const string WindowsImportsCreated = "windows.imports.created";
+    public const string WindowsImportsArtifact = "windows.imports.artifact";
+    public const string WindowsImportsDigest = "windows.imports.digest";
+    public const string WindowsImportsMediaType = "windows.imports.mediaType";
+    public const string WindowsImportsPrivacy = "windows.imports.privacy";
+    public const string WindowsImportsRelease = "windows.imports.release";
+    public const string WindowsImportsReleaseTitle = "windows.imports.release.title";
+    public const string WindowsImportsReleaseMessage = "windows.imports.release.message";
+    public const string WindowsImportsReleaseConfirm = "windows.imports.release.confirm";
+    public const string WindowsImportsReleaseDone = "windows.imports.release.done";
+    public const string WindowsImportsReleaseFailed = "windows.imports.release.failed";
+    public const string WindowsAgentsActionId = "windows.agents.action.id";
+    public const string WindowsImportsId = "windows.imports.id";
+    public const string WindowsImportsSha256 = "windows.imports.sha256";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -538,6 +621,8 @@ public static class UiStrings
         HistoryEvidenceEffect,
         HistoryEvidenceFirstEvidence,
         SettingsCommonCancel,
+        JobRecoveryHumanRequiredTitle,
+        JobRecoveryHumanRequiredGuidance,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -692,5 +777,86 @@ public static class UiStrings
         WindowsHistoryEvidenceStatus,
         WindowsSessionsPinnedYes,
         WindowsSessionsPinnedNo,
+        WindowsNavigationAgents,
+        WindowsAgentsSubtitle,
+        WindowsAgentsUnavailable,
+        WindowsAgentsHumanActionsUnavailable,
+        WindowsAgentsExecutions,
+        WindowsAgentsHumanActions,
+        WindowsAgentsHumanActionsEmpty,
+        WindowsAgentsEmpty,
+        WindowsAgentsSelect,
+        WindowsAgentsOperation,
+        WindowsAgentsState,
+        WindowsAgentsGeneration,
+        WindowsAgentsJob,
+        WindowsAgentsTarget,
+        WindowsAgentsDeadline,
+        WindowsAgentsObserved,
+        WindowsAgentsNext,
+        WindowsAgentsFailure,
+        WindowsAgentsOutcomeUnknown,
+        WindowsAgentsRow,
+        WindowsAgentsActionCategory,
+        WindowsAgentsActionMinimum,
+        WindowsAgentsActionExpires,
+        WindowsAgentsActionRow,
+        WindowsAgentsActionChoose,
+        WindowsAgentsActionChooseFirst,
+        WindowsAgentsActionResume,
+        WindowsAgentsActionResumed,
+        WindowsAgentsActionRefused,
+        WindowsAgentsAbandon,
+        WindowsAgentsAbandonTitle,
+        WindowsAgentsAbandonMessage,
+        WindowsAgentsAbandonConfirm,
+        WindowsAgentsAbandonDone,
+        WindowsAgentsAbandonFailed,
+        WindowsNavigationImports,
+        WindowsImportsSubtitle,
+        WindowsImportsUnavailable,
+        WindowsImportsTargetsUnavailable,
+        WindowsImportsNew,
+        WindowsImportsKind,
+        WindowsImportsKindHap,
+        WindowsImportsKindNativeLibrary,
+        WindowsImportsKindWorkspacePatch,
+        WindowsImportsKindFlashBundle,
+        WindowsImportsTarget,
+        WindowsImportsNoTargets,
+        WindowsImportsFile,
+        WindowsImportsNoFile,
+        WindowsImportsChooseFile,
+        WindowsImportsChooseFileFirst,
+        WindowsImportsStart,
+        WindowsImportsProgress,
+        WindowsImportsProgressValue,
+        WindowsImportsCancel,
+        WindowsImportsBusy,
+        WindowsImportsDone,
+        WindowsImportsFailed,
+        WindowsImportsCancelled,
+        WindowsImportsList,
+        WindowsImportsEmpty,
+        WindowsImportsSelect,
+        WindowsImportsRow,
+        WindowsImportsName,
+        WindowsImportsSize,
+        WindowsImportsState,
+        WindowsImportsGeneration,
+        WindowsImportsCreated,
+        WindowsImportsArtifact,
+        WindowsImportsDigest,
+        WindowsImportsMediaType,
+        WindowsImportsPrivacy,
+        WindowsImportsRelease,
+        WindowsImportsReleaseTitle,
+        WindowsImportsReleaseMessage,
+        WindowsImportsReleaseConfirm,
+        WindowsImportsReleaseDone,
+        WindowsImportsReleaseFailed,
+        WindowsAgentsActionId,
+        WindowsImportsId,
+        WindowsImportsSha256,
     ];
 }

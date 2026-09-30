@@ -1240,6 +1240,25 @@ through the real daemon across a restart, on the daemon's own clock, and with
 `arkdeck job reconcile|agent status|human-action show` against a dev-signed
 daemon).
 
+HAR crash-resume (TASK-XPA-006, without the Windows HDC tuple):
+`tests/windows_agent_human_action_resume.rs` runs `agent_human_action_raise.rs`'s
+adoption and resume cases on NTFS, over the oracle's fake HDC answered in
+process.
+- A run that names no Target adopts the one proved device and owns one Job,
+  which the runner completes. A budget expiring during the identity readback
+  or at the Target commit, or a USB identity that changes during adoption,
+  commits no Target and no Job.
+- A process that crashes between the Target commit and the execution's own
+  commit is resumed by a new one with every owner reopened. It keeps the
+  original budget and adopts nothing twice.
+- `physicalConnection`, `deviceTrustPrompt` and `ambiguousIdentity` actions
+  are resumed only by their durable references. The original intent is
+  kept, and concurrent resumes own one Job. A changed selection is an
+  idempotency conflict, and an expired action or untrusted clock is refused
+  with no HDC call. The action ends `resolvedByFreshProbe`.
+- A process that crashes after the resume and before the Job is admitted
+  continues to one Job, or is refused once the budget has passed.
+
 The contract publishes an agent execution's `failureCode`, an agent human
 action's `selectionSchema` and `agent.run`'s orchestration refusals as Swift
 answers them (#2389), so the process test reads the pick-a-device execution
@@ -1447,7 +1466,14 @@ verified the same way, so the facts a deployment carries are that file's; the
 standalone and production daemons refuse that variable at startup, as they refuse
 every other development one, and a named helper that does not verify fails
 startup. With no helper anywhere the operation stays unavailable with
-`provider_tool_unavailable`, as before. Once the Target's facts hold, the library's lease (a Job Artifact or an
+`provider_tool_unavailable`, as before. The Windows daemon composes the
+bundled helper the same way (TASK-XPA-009): the xcopy and RC packages carry the
+checked-in resource beside `arkdeck-agentd.exe` in the same bundle layout, and
+the census names `codeSignHelper` in its macOS position. No Windows HDC tuple
+is registered, so there the helper waits behind that gate (the operation
+answers `provider_not_registered`), and a named development helper is refused
+at startup, since on macOS only a development HDC's admission names one.
+`tests/windows_code_sign_helper_process.rs` measures it. Once the Target's facts hold, the library's lease (a Job Artifact or an
 Import) is resolved and bound to them, its bytes are read, and each step's
 action is named from them (`StepAction::Native`, claimed by the operation before
 any step kind): the provider verifies them as the expected ABI's code-signed ELF,
@@ -1457,6 +1483,27 @@ rollback a failure past the publish applies. The library's facts name its
 capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
 replay the native-library oracle's plans and submissions; `job.run` runs the
 admitted Job (below), and `agent.run` admits the deployment it starts at once.
+
+On Windows (TASK-XPA-008 and XPA-009) the same four replays run over the
+oracle's layout below the temporary directory, owner-only as the store makes it
+and each published payload sealed by the store. A plan's digest covers its
+sends' arguments, which name the package's, the library's and the helper's host
+paths, so a Windows root digests the same plan document with its own paths.
+`hap_plan_digest` and `native_plan_digest` (the documents split out of
+`materialize_hap` and `materialize_native`) reproduce every Swift plan digest of
+both oracles over the paths Swift named, on every host. The replays read the
+plan digests and whatever they derive (the Runtime capability's ID, a use's
+query and scope fingerprints, its receipt and outcome hashes) as Swift's
+through a one-to-one relabelling (`support::debug_hap::HostLabels`); every other
+byte of the answers, the capability store and ledger, the Job records, the
+admission journals and the index rows must be Swift's, and on macOS nothing is
+relabelled. With no HDC composition (the Windows daemon's until the Windows HDC
+tuple is registered) an admitted HAP or deployment is refused before its first
+step with zero dispatch and no use consumed, and the daemon refuses every
+recorded `debug.hap@1` plan and submission before admission
+(`windows_job_admission_process.rs`). The runs themselves (`debug_hap_run.rs`,
+`native_library_run.rs`) stay macOS-only: they dispatch to the shared fake HDC,
+a POSIX shell script.
 
 ## Job run (TASK-XPA-014)
 
@@ -1712,6 +1759,20 @@ journal is not written. The daemon answers both methods from its Artifact and
 Job owners. The device oracles' lists and continuations and the committed
 corpus are replayed through them, and `tests/cleanup_debt_continue.rs` covers
 what no oracle records.
+
+On Windows (TASK-XPA-012) the same code builds and the daemon answers both
+methods from its Artifact and Job owners, through the runner `job.run` uses
+there (`windows_runner`), with no HDC composition: a continuation of a debt the
+ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
+`internalFailure("provider hdc is unavailable")`) before any readback or retry,
+and the ledger is not written. The control-layer corpus replay
+(`cleanup_debt_control.rs`) runs on both hosts;
+`arkdeck-agentd/tests/windows_cleanup_debt_process.rs` lists Swift's recorded
+debug HAP ledger exactly as the corpus records it across a restart, proves the
+refusal for both owed debts with the ledger's bytes unchanged, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `recovery cleanup list`, `cleanup-debt
+list` and `recovery cleanup continue` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-cleanup-debt-owner-run.md`.
 
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
@@ -2485,6 +2546,17 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+A device command names its target in one place:
+`arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
+`-t <connectKey>` before the command's own arguments. Every plan the provider
+lowers goes through it: observation, capture, Debug HAP and reads, native
+library, port forward, pointer input, trace probe, live mode, and the Rockchip
+reads and Loader entry. `operation::tests::every_target_flag_is_added_here`
+fails if any other non-test code writes `-t` before a connect key. On Windows,
+`windows_managed_hdc.rs` runs a lowered device plan through `ProcessDispatch`:
+the fake process face receives exactly `-t <key> shell param get
+const.product.name`. A plan with no connect key runs nothing.
+
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use
@@ -2506,7 +2578,13 @@ the entries it found; a production package is never built from a dirty
 checkout. It runs `cargo build --release --locked -p arkdeck-agentd -p
 arkdeck-cli --target x86_64-pc-windows-msvc` and stages `arkdeck.exe` and
 `arkdeck-agentd.exe` side by side, because the CLI's default daemon is its
-sibling. It then signs both (`-SigningMode`):
+sibling. Beside them it stages the OpenHarmony code-sign helper a native
+deployment sends to the device (TASK-XPA-009): the checked-in
+`arkdeck-code-sign-enable` at the recorded revision, at
+`ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/` where the
+daemon looks beside itself. It is an arm64 ELF, data on the host, so it is
+never Authenticode-signed; the manifest pins its bytes as it pins the
+executables'. It then signs both executables (`-SigningMode`):
 
 | Mode | Signer |
 | --- | --- |

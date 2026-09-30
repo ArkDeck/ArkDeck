@@ -3,6 +3,12 @@
 //! Swift oracle found it before its first request, a dispatcher that fails
 //! the replay on any dispatch, an imported package, and the bytes of every
 //! file below a directory.
+//!
+//! The fake's driver is a POSIX shell script at a fixed macOS root, so on
+//! Windows only the replays that dispatch nothing (planning and admission)
+//! run: the same layout below the temporary directory, owner-only as the
+//! store makes it, with each published payload sealed by the store.
+#[cfg(unix)]
 use super::chmod;
 use arkdeck_contract::{ImportIntent, WireError, encode_import_chunk, sha256_hex};
 use arkdeck_hoststore::{ArtifactReadStore, ImportBinding, ImportUploadStore};
@@ -12,8 +18,58 @@ use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
 
+#[cfg(unix)]
 pub const ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
+#[cfg(unix)]
 const LOCK: &str = "/private/tmp/arkdeck-hdc-oracle.lock";
+
+/// The oracle's root: the fake's fixed one on macOS; on Windows the same
+/// name below the temporary directory.
+fn root() -> PathBuf {
+    #[cfg(unix)]
+    let root = PathBuf::from(ROOT);
+    #[cfg(windows)]
+    let root = super::fixture_fs::temporary_root().join("arkdeck-hdc-oracle");
+    root
+}
+
+/// A directory `rebuild` creates: owner-only (0700 on macOS).
+fn private_dir(path: &Path) {
+    #[cfg(unix)]
+    {
+        fs::create_dir(path).unwrap();
+        chmod(path, 0o700);
+    }
+    #[cfg(windows)]
+    super::fixture_fs::private_dir(path);
+}
+
+/// `source` copied into `directory` as `name`, owner read/write only (0600
+/// on macOS; on Windows its owner-only directory's DACL).
+fn owner_only_copy(source: &Path, directory: &Path, name: &std::ffi::OsStr) {
+    fs::copy(source, directory.join(name)).unwrap();
+    #[cfg(unix)]
+    chmod(&directory.join(name), 0o600);
+}
+
+/// `source` published into `directory` as `name` and sealed: 0400 on
+/// macOS; on Windows created and sealed by the store itself.
+fn sealed_copy(source: &Path, directory: &Path, name: &std::ffi::OsStr) {
+    #[cfg(unix)]
+    {
+        fs::copy(source, directory.join(name)).unwrap();
+        chmod(&directory.join(name), 0o400);
+    }
+    #[cfg(windows)]
+    {
+        let directory = arkdeck_platform::HostDirectory::open(directory).unwrap();
+        let name = name.to_str().unwrap();
+        directory
+            .create_document(name, &fs::read(source).unwrap())
+            .unwrap();
+        directory.seal_document(name).unwrap();
+    }
+}
 
 /// Planning and admission dispatch nothing; a call here fails the replay.
 pub struct NoDispatch;
@@ -31,7 +87,13 @@ pub fn exclusive() -> File {
         .write(true)
         .create(true)
         .truncate(false)
-        .open(LOCK)
+        .open({
+            #[cfg(unix)]
+            let lock = PathBuf::from(LOCK);
+            #[cfg(windows)]
+            let lock = super::fixture_fs::temporary_root().join("arkdeck-hdc-oracle.lock");
+            lock
+        })
         .unwrap();
     lock.lock().unwrap();
     lock
@@ -41,7 +103,7 @@ pub fn exclusive() -> File {
 /// Swift oracle's adoption wrote, the packages it published before any
 /// request, and the empty Job (`store`), Sessions and Session owner roots.
 pub fn rebuild(fixture: &Path) -> PathBuf {
-    let root = PathBuf::from(ROOT);
+    let root = root();
     let _ = fs::remove_dir_all(&root);
     for directory in [
         root.clone(),
@@ -51,21 +113,20 @@ pub fn rebuild(fixture: &Path) -> PathBuf {
         root.join("Sessions"),
         root.join("session-owner"),
     ] {
-        fs::create_dir(&directory).unwrap();
-        chmod(&directory, 0o700);
+        private_dir(&directory);
     }
     fs::copy(fixture.join("hdc"), root.join("hdc")).unwrap();
+    #[cfg(unix)]
     chmod(&root.join("hdc"), 0o700);
     fs::copy(fixture.join("hdc-answers.sh"), root.join("hdc-answers.sh")).unwrap();
     fs::write(root.join("hdc-invocations.log"), b"").unwrap();
-    fs::copy(
-        fixture.join("targets-state/targets.json"),
-        root.join("targets-state/targets.json"),
-    )
-    .unwrap();
     // Owner-only, as the Target owner requires and Swift wrote it; a checkout
     // leaves the fixture group-readable.
-    chmod(&root.join("targets-state/targets.json"), 0o600);
+    owner_only_copy(
+        &fixture.join("targets-state").join("targets.json"),
+        &root.join("targets-state"),
+        "targets.json".as_ref(),
+    );
     // The Artifacts the oracle published before any request, as a Job
     // publishes them: each payload sealed, its index owner-only.
     for input in fs::read_dir(fixture.join("artifacts"))
@@ -78,20 +139,15 @@ pub fn rebuild(fixture: &Path) -> PathBuf {
             continue;
         }
         let destination = root.join("artifacts").join(&name);
-        fs::create_dir(&destination).unwrap();
-        chmod(&destination, 0o700);
+        private_dir(&destination);
         for file in fs::read_dir(&input).unwrap() {
             let file = file.unwrap().path();
             let file_name = file.file_name().unwrap();
-            fs::copy(&file, destination.join(file_name)).unwrap();
-            chmod(
-                &destination.join(file_name),
-                if file_name == "index.json" {
-                    0o600
-                } else {
-                    0o400
-                },
-            );
+            if file_name == "index.json" {
+                owner_only_copy(&file, &destination, file_name);
+            } else {
+                sealed_copy(&file, &destination, file_name);
+            }
         }
     }
     root
@@ -185,4 +241,129 @@ pub fn tree_bytes(root: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
 /// empty.
 pub fn invocations(root: &Path) -> Vec<u8> {
     fs::read(root.join("hdc-invocations.log")).unwrap()
+}
+
+/// The values a replay derives from its packages' host paths, read as the
+/// Swift oracle's. A HAP plan's digest covers each send's arguments, which
+/// name the package's host path: on macOS the replay's root is the oracle's,
+/// so nothing is relabelled and every value must be Swift's as it is; on
+/// Windows the root is spelled otherwise, so its plan digest and whatever is
+/// derived from it (the Runtime capability named by the plan) differ, and
+/// only those. Each Windows value maps to exactly one Swift value and back,
+/// and is replaced only where it is a whole JSON string, in one pass, so a
+/// replay that relabels them still proves every other byte is Swift's.
+/// `hap_plan_digest`'s unit test proves the digests themselves are Swift's
+/// over the oracle's paths, and `capability_write.rs` the capability store's
+/// hashes over Swift's inputs.
+#[derive(Default)]
+pub struct HostLabels {
+    swift: BTreeMap<String, String>,
+    host: BTreeMap<String, String>,
+}
+
+/// The capability store members derived from a plan digest and the Runtime
+/// capability it names: the IDs, the fingerprints of a use's query and scope,
+/// and the hash chain of its receipt and outcomes.
+pub const DERIVED: [&str; 7] = [
+    "capabilityID",
+    "materializedPlanDigest",
+    "queryFingerprintSHA256",
+    "authorizationScopeFingerprintSHA256",
+    "receiptSHA256",
+    "recordSHA256",
+    "previousRecordSHA256",
+];
+
+impl HostLabels {
+    /// Learns every string under one of `keys` in `host` as the one at the
+    /// same place in `swift`, walking both documents together (Windows only).
+    pub fn learn_keys(&mut self, host: &Value, swift: &Value, keys: &[&str]) {
+        match (host, swift) {
+            (Value::Object(host), Value::Object(swift)) => {
+                for (key, value) in host {
+                    let Some(other) = swift.get(key) else {
+                        continue;
+                    };
+                    match (keys.contains(&key.as_str()), value.as_str(), other.as_str()) {
+                        (true, Some(value), Some(other)) => self.learn_value(value, other),
+                        _ => self.learn_keys(value, other, keys),
+                    }
+                }
+            }
+            (Value::Array(host), Value::Array(swift)) => {
+                for (value, other) in host.iter().zip(swift) {
+                    self.learn_keys(value, other, keys);
+                }
+            }
+            _ => (),
+        }
+    }
+
+    /// A value this host derived where Swift's replay derived `swift`: the
+    /// same value on macOS; on Windows learned as its label.
+    pub fn derived(&mut self, host: &str, swift: &str) {
+        #[cfg(windows)]
+        self.learn_value(host, swift);
+        #[cfg(not(windows))]
+        assert_eq!(host, swift);
+    }
+
+    /// The host value read as `swift` (itself on macOS).
+    pub fn host(&self, swift: &str) -> String {
+        self.host
+            .get(swift)
+            .cloned()
+            .unwrap_or_else(|| swift.to_owned())
+    }
+
+    /// Learns `actual`'s string at `pointer` as `expected`'s at the same
+    /// place (Windows only; on macOS nothing is learned).
+    pub fn learn(&mut self, actual: &Value, expected: &Value, pointer: &str) {
+        #[cfg(windows)]
+        if let (Some(host), Some(swift)) = (
+            actual.pointer(pointer).and_then(Value::as_str),
+            expected.pointer(pointer).and_then(Value::as_str),
+        ) {
+            self.learn_value(host, swift);
+        }
+        #[cfg(not(windows))]
+        let _ = (actual, expected, pointer);
+    }
+
+    /// Learns one host value as one Swift value (Windows only).
+    pub fn learn_value(&mut self, host: &str, swift: &str) {
+        #[cfg(windows)]
+        {
+            assert_eq!(host.len(), swift.len(), "{host} relabels {swift}");
+            if let Some(previous) = self.swift.insert(host.to_owned(), swift.to_owned()) {
+                assert_eq!(previous, swift, "{host} reads as two Swift values");
+            }
+            if let Some(previous) = self.host.insert(swift.to_owned(), host.to_owned()) {
+                assert_eq!(previous, host, "{swift} is read from two host values");
+            }
+        }
+        #[cfg(not(windows))]
+        let _ = (host, swift);
+    }
+
+    /// `bytes` with every learned host value read as Swift's where it is a
+    /// whole quoted string, in one pass (no replacement is read again).
+    pub fn swift_bytes(&self, bytes: &[u8]) -> Vec<u8> {
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        text.split('"')
+            .map(|segment| self.swift.get(segment).map_or(segment, String::as_str))
+            .collect::<Vec<_>>()
+            .join("\"")
+            .into_bytes()
+    }
+
+    /// `value` with every learned host value read as Swift's.
+    pub fn swift(&self, value: &Value) -> Value {
+        serde_json::from_slice(&self.swift_bytes(&serde_json::to_vec(value).unwrap())).unwrap()
+    }
+
+    /// How many host values were relabelled.
+    pub fn len(&self) -> usize {
+        self.swift.len()
+    }
 }

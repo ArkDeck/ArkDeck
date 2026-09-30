@@ -21,7 +21,7 @@
 //!   Imports from release.
 //!
 //! Fixture data is isolated host evidence, never a device acceptance result.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
@@ -29,12 +29,13 @@ use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{
     AdmissionRefusal, AgentEngine, AgentExecutionStore, ArtifactReadStore, CapabilityQuery,
     CapabilityStore, CapabilityUseOutcome, DeviceHolds, HdcComposition, ImportUploadStore,
-    JobAdmitter, JobCanceller, JobPlanner, JobStore, MutationAuthority, TargetStore,
-    WorkflowEffect,
+    JobAdmitter, JobCanceller, JobPlanner, JobRunner, JobStore, MutationAuthority,
+    MutationExecution, TargetStore, WorkflowEffect,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use support::debug_hap::{self, NoDispatch};
@@ -215,6 +216,7 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
     let hdc = owners.hdc();
     let admitter = owners.admitter(&hdc);
     let (mut plans, mut submissions, mut differences) = (0, 0, Vec::new());
+    let mut labels = debug_hap::HostLabels::default();
     for exchange in cases["exchanges"].as_array().unwrap() {
         let params = exchange["params"].as_object().unwrap();
         let actual = match exchange["method"].as_str().unwrap() {
@@ -234,6 +236,12 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
             _ => continue,
         };
         let actual = support::legacy_plan_answer(actual);
+        labels.learn(
+            &actual,
+            &exchange["answer"],
+            "/result/materializedPlanDigest",
+        );
+        let actual = labels.swift(&actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",
@@ -248,7 +256,12 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
     // is written; the uses came with the runs this replay does not make.
     let swift = read(&fixture.join("store/capabilities").join(CHECKPOINT));
     let issued = read(&owners.capability_file(CHECKPOINT));
-    if envelopes(&issued) != envelopes(&swift) {
+    labels.learn_keys(
+        &json!(envelopes(&issued)),
+        &json!(envelopes(&swift)),
+        &["capabilityID"],
+    );
+    if labels.swift(&json!(envelopes(&issued))) != json!(envelopes(&swift)) {
         differences.push(format!(
             "capabilities:\n  swift {}\n  rust  {}",
             json!(envelopes(&swift)),
@@ -288,7 +301,7 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
             "materializedStableTargetIdentitySHA256",
             "materializedBindingRevision",
         ] {
-            if ours[member] != theirs[member] {
+            if labels.swift(&ours[member]) != theirs[member] {
                 differences.push(format!(
                     "{case} {member}:\n  swift {}\n  rust  {}",
                     theirs[member], ours[member]
@@ -311,7 +324,7 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
             .take(2)
             .collect::<Vec<_>>()
             .concat();
-        if fs::read(directory.join("journal.jsonl")).unwrap() != admitted {
+        if labels.swift_bytes(&fs::read(directory.join("journal.jsonl")).unwrap()) != admitted {
             differences.push(format!("{case}: the admission journal differs"));
         }
     }
@@ -338,7 +351,7 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
     for member in ["userVersion", "journalMode", "schema"] {
         assert_eq!(index[member], recorded[member], "index {member}");
     }
-    if admission(&index) != admission(&recorded) {
+    if labels.swift(&json!(admission(&index))) != json!(admission(&recorded)) {
         differences.push(format!(
             "admission rows:\n  swift {}\n  rust  {}",
             json!(admission(&recorded)),
@@ -429,11 +442,30 @@ fn entry_facts(fixture: &Path) -> BTreeMap<String, String> {
 
 /// Writes a use a Swift run took through the store's own consume and outcome
 /// writes, with the query that run carried: the capability's exact inputs,
-/// the materialized plan and the entry package's facts. Nothing runs.
-fn write_use(store: &CapabilityStore, recorded: &RecordedUse, facts: &BTreeMap<String, String>) {
+/// the materialized plan and the entry package's facts. Nothing runs. The
+/// capability and the plan digest are this host's for the Swift ones (the
+/// same on macOS; see `debug_hap::HostLabels`), the plan's read from the Job
+/// this replay admitted.
+fn write_use(
+    owners: &Owners,
+    recorded: &RecordedUse,
+    facts: &BTreeMap<String, String>,
+    labels: &mut debug_hap::HostLabels,
+) {
+    let store = &owners.capabilities;
     let text = |value: &Value| value.as_str().unwrap().to_owned();
     let (capability, consumption) = (&recorded.capability, &recorded.consumption);
-    let id = text(&capability["capabilityID"]);
+    let id = labels.host(&text(&capability["capabilityID"]));
+    let plan = text(
+        &read(
+            &owners
+                .store
+                .join("jobs")
+                .join(text(&consumption["jobID"]))
+                .join("job-record.json"),
+        )["materializedPlanDigest"],
+    );
+    labels.derived(&plan, &text(&consumption["materializedPlanDigest"]));
     let reference = text(&consumption["operationReference"]);
     let (operation, version) = reference.split_once('@').unwrap();
     let query = CapabilityQuery {
@@ -442,7 +474,7 @@ fn write_use(store: &CapabilityStore, recorded: &RecordedUse, facts: &BTreeMap<S
         effect: WorkflowEffect::parse(consumption["effect"].as_str().unwrap()).unwrap(),
         target_stable_identity_sha256: Some(text(&consumption["targetStableIdentitySHA256"])),
         target_binding_revision: consumption["bindingRevision"].as_i64(),
-        plan_digest: Some(text(&consumption["materializedPlanDigest"])),
+        plan_digest: Some(plan),
         inputs: capability["exactInputs"].as_object().unwrap().clone(),
         artifact_facts: facts.clone(),
         workspace_identity_sha256: None,
@@ -459,7 +491,10 @@ fn write_use(store: &CapabilityStore, recorded: &RecordedUse, facts: &BTreeMap<S
             &text(&consumption["consumedAtUTC"]),
         )
         .unwrap_or_else(|error| panic!("{id} {reservation}: {}", error.swift()));
-    assert_eq!(receipt.receipt_sha256, text(&consumption["receiptSHA256"]));
+    labels.derived(
+        &receipt.receipt_sha256,
+        &text(&consumption["receiptSHA256"]),
+    );
     for outcome in &recorded.outcomes {
         store
             .record_outcome(
@@ -484,6 +519,9 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc();
     let admitter = owners.admitter(&hdc);
+    let swift = fixture.join("store/capabilities");
+    let swift_capabilities = envelopes(&read(&swift.join(CHECKPOINT)));
+    let mut labels = debug_hap::HostLabels::default();
     let mut written = 0;
     for exchange in cases["exchanges"].as_array().unwrap() {
         let name = exchange["name"].as_str().unwrap();
@@ -496,6 +534,12 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
                     "{name}"
                 );
                 assert_eq!(uses(&owners.store), before, "{name} consumed a use");
+                // The capabilities issued so far, in Swift's install order.
+                labels.learn_keys(
+                    &json!(envelopes(&read(&owners.capability_file(CHECKPOINT)))),
+                    &json!(swift_capabilities),
+                    &["capabilityID"],
+                );
             }
             // In place of each run, the use it took, as Swift recorded it.
             "job.run" => {
@@ -505,7 +549,7 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
                 else {
                     continue;
                 };
-                write_use(&owners.capabilities, &recorded[job], &facts);
+                write_use(&owners, &recorded[job], &facts, &mut labels);
                 written += 1;
             }
             _ => (),
@@ -516,11 +560,29 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
     // The packages set's install wrote the checkpoint over the installed
     // run's use, and every later admission reused the first capability: the
     // store is Swift's, byte for byte, and as private as Swift left it.
-    let swift = fixture.join("store/capabilities");
     for name in [CHECKPOINT, LEDGER] {
+        let ours = fs::read(owners.capability_file(name)).unwrap();
+        let theirs = fs::read(swift.join(name)).unwrap();
+        // Each document (the checkpoint, every ledger line) with its derived
+        // values read as Swift's; on macOS nothing is relabelled.
+        let documents = |bytes: &[u8]| -> Vec<Value> {
+            if name == CHECKPOINT {
+                return vec![serde_json::from_slice(bytes).unwrap()];
+            }
+            bytes
+                .split(|byte| *byte == b'\n')
+                .filter(|line| !line.is_empty())
+                .map(|line| serde_json::from_slice(line).unwrap())
+                .collect()
+        };
+        labels.learn_keys(
+            &json!(documents(&ours)),
+            &json!(documents(&theirs)),
+            &debug_hap::DERIVED,
+        );
         assert_eq!(
-            String::from_utf8(fs::read(owners.capability_file(name)).unwrap()).unwrap(),
-            String::from_utf8(fs::read(swift.join(name)).unwrap()).unwrap(),
+            String::from_utf8(labels.swift_bytes(&ours)).unwrap(),
+            String::from_utf8(theirs).unwrap(),
             "{name}"
         );
     }
@@ -528,11 +590,24 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
         .unwrap()
         .map(|entry| {
             let entry = entry.unwrap();
-            let mode = entry.metadata().unwrap().permissions().mode() & 0o7777;
-            (
-                entry.file_name().into_string().unwrap(),
-                format!("{mode:o}"),
-            )
+            let name = entry.file_name().into_string().unwrap();
+            // Its mode on macOS; on Windows `600` for a document the store
+            // reads as exactly owner read/write, the DACL Swift's 0600 is.
+            #[cfg(unix)]
+            let mode = format!(
+                "{:o}",
+                entry.metadata().unwrap().permissions().mode() & 0o7777
+            );
+            #[cfg(windows)]
+            let mode =
+                match arkdeck_platform::HostDirectory::open(&owners.store.join("capabilities"))
+                    .unwrap()
+                    .owner_only_document(&name)
+                {
+                    Ok(_) => "600".to_owned(),
+                    Err(error) => format!("not owner-only: {error}"),
+                };
+            (name, mode)
         })
         .collect();
     entries.sort();
@@ -564,7 +639,7 @@ fn between_swifts_uses_the_admissions_leave_swifts_store_and_an_unknown_use_bloc
         })
         .map(|recorded| {
             (
-                recorded.capability["capabilityID"].as_str().unwrap(),
+                labels.host(recorded.capability["capabilityID"].as_str().unwrap()),
                 &recorded.consumption["ordinal"],
             )
         })
@@ -740,8 +815,7 @@ fn an_agent_run_admits_the_hap_it_will_run() {
     let hdc = owners.hdc();
     let admitter = owners.admitter(&hdc);
     let executions = owners.root.join("agent-executions");
-    fs::create_dir(&executions).unwrap();
-    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
+    support::fixture_fs::private_dir(&executions);
     let agents = AgentExecutionStore::open(&executions).unwrap();
     let engine = AgentEngine {
         targets: &owners.targets,
@@ -822,6 +896,78 @@ fn an_admitted_hap_is_cancelled_at_preflight_with_no_use_spent() {
     );
     assert_eq!(record["state"], "cancelled");
     assert!(record.get("admissionEvidence").is_none());
+    assert_eq!(
+        debug_hap::tree_bytes(&owners.store.join("capabilities")),
+        capabilities
+    );
+    assert_eq!(uses(&owners.store), 0);
+    assert!(debug_hap::invocations(&owners.root).is_empty());
+}
+
+/// The Windows daemon composes no HDC until the Windows HDC tuple is
+/// registered, so its runner has none: an admitted HAP is refused before its
+/// first step with zero dispatch, even beside the mutation owner its use would
+/// be consumed through. No use is consumed, nothing is journaled, and the Job
+/// waits in `preflight`; the install, its start and every compensation of its
+/// plan (the rollback of a failure past the install) stay behind the tuple.
+#[test]
+fn without_an_hdc_composition_an_admitted_hap_is_not_run_and_consumes_no_use() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let hdc = owners.hdc();
+    let installed = exchange(&cases, "installed.submit");
+    let job = owners
+        .admitter(&hdc)
+        .handle(installed["params"].as_object().unwrap())
+        .unwrap()["jobId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let journal =
+        |job: &str| fs::read(owners.store.join("jobs").join(job).join("journal.jsonl")).unwrap();
+    let before = journal(&job);
+    let capabilities = debug_hap::tree_bytes(&owners.store.join("capabilities"));
+    let runner = JobRunner {
+        imports: None,
+        mutation: Some(MutationExecution {
+            authority: owners.authority(),
+            state_root: &owners.root,
+        }),
+        jobs: &owners.jobs,
+        artifacts: &owners.artifacts,
+        analyzer: None,
+        quota: 8 << 30,
+        home: "",
+        now: fixed_now,
+        precise_now: fixed_precise_now,
+        sessions: None,
+        cancellation: None,
+        after_commit: None,
+        hdc: None,
+        workspace: None,
+    };
+    let refused = runner
+        .handle(&Map::from_iter([("jobId".into(), json!(job))]))
+        .unwrap_err();
+    assert_eq!(
+        (refused.code, refused.message.as_str()),
+        (
+            "rejected",
+            format!("job {job} runs debug.hap@1, which the Rust Runtime does not execute yet")
+                .as_str()
+        )
+    );
+    assert_eq!(
+        refused.details,
+        Map::from_iter([
+            ("phase".into(), json!("preAdmission")),
+            ("newDispatchCount".into(), json!(0)),
+        ])
+    );
+    assert_eq!(journal(&job), before);
+    assert_eq!(owners.jobs.read_snapshot(&job).unwrap().state, "preflight");
     assert_eq!(
         debug_hap::tree_bytes(&owners.store.join("capabilities")),
         capabilities

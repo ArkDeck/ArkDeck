@@ -103,6 +103,16 @@ These are pending the next rulings batch.
 3. **The journal snapshot on Windows** compares size, write time and creation time of the same
    open handle. Std exposes no change time or file index on stable Rust. The open handle rules
    out a replaced file.
+4. **The measured prewarm wait in a checkpoint seal.** The replay was flaky: 1 failure in 8
+   Windows runs.
+   - **Cause.** A Session publication's `checkpointSeal` is the digest of the Job record it was
+     given. That record's timeline names the prewarm wait in measured milliseconds, which the
+     oracle labels (`consume wait <ms> ms`). When the run measures a wait other than 0 ms, the
+     sealed bytes differ from Swift's.
+   - **Fix.** `AsSwift::learn_measured_waits` reads such a record's seal as Swift's, on both
+     hosts. It does so only when that record measured a non-zero wait.
+   - **Proof.** With a forced 400 ms prewarm, the six stories that publish fail without it and
+     pass with it.
 
 ## Left out, and why
 

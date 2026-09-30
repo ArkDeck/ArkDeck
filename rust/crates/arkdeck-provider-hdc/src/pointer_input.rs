@@ -485,12 +485,7 @@ impl PointerAction {
             }
         };
         let spec = &self.0;
-        let mut arguments = vec![
-            "-t".to_owned(),
-            key.to_owned(),
-            "shell".into(),
-            "uinput".into(),
-        ];
+        let mut arguments = crate::device_arguments(key, ["shell".to_owned(), "uinput".to_owned()]);
         if let Some(display_id) = spec.display_id {
             arguments.push("-D".into());
             arguments.push(display_id.to_string());

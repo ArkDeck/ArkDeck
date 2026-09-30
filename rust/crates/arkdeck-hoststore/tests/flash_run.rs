@@ -23,9 +23,6 @@
 //! platform wrote it (`AsSwift`) before it is compared; nothing else is.
 #![cfg(any(target_os = "macos", windows))]
 
-#[cfg(windows)]
-#[path = "fixture_fs/mod.rs"]
-mod fixture_fs;
 mod support;
 
 use arkdeck_hoststore::{
@@ -64,12 +61,12 @@ fn lock_path() -> PathBuf {
 /// On Windows the fixed root is below the temporary directory.
 #[cfg(windows)]
 fn root_path() -> PathBuf {
-    fixture_fs::temporary_root().join("arkdeck-flash-run-oracle")
+    support::fixture_fs::temporary_root().join("arkdeck-flash-run-oracle")
 }
 
 #[cfg(windows)]
 fn lock_path() -> PathBuf {
-    fixture_fs::temporary_root().join("arkdeck-flash-run-oracle.lock")
+    support::fixture_fs::temporary_root().join("arkdeck-flash-run-oracle.lock")
 }
 /// Every story the oracle recorded, in its order.
 const STORIES: [&str; 8] = [
@@ -158,7 +155,7 @@ fn lay_down() -> PathBuf {
     fn private(path: &Path) {
         if !path.exists() {
             private(path.parent().unwrap());
-            fixture_fs::private_dir(path);
+            support::fixture_fs::private_dir(path);
         }
     }
     let root = root_path();
@@ -554,7 +551,15 @@ fn normalized_value(value: &Value) -> Value {
 
 /// What a replay wrote, read as it would read published on Swift's platform:
 /// the platform profile, and every digest over bytes that name it, taken as
-/// the digest of those bytes naming Swift's. On macOS it changes nothing.
+/// the digest of those bytes naming Swift's. On macOS it changes nothing of
+/// the platform.
+///
+/// On both hosts it also reads a Session publication's checkpoint seal the
+/// way the oracle labels the measured prewarm wait (`normalized`): the seal
+/// is the digest of the Job record the publication was given, whose timeline
+/// names that wait in milliseconds. A Job record that measured a wait other
+/// than 0 ms seals other bytes than Swift's; its seal is then read as
+/// Swift's, and so is every digest over a record that names it.
 #[derive(Default)]
 struct AsSwift {
     /// Each digest over bytes that name this platform, and the digest of
@@ -613,6 +618,38 @@ impl AsSwift {
     #[cfg(unix)]
     fn learn(_root: &Path) -> Self {
         Self::default()
+    }
+
+    /// The checkpoint seals of the Job records below `root` that measured a
+    /// prewarm wait other than 0 ms, each taken as the seal Swift's record
+    /// of the same Job has in `recorded`.
+    fn learn_measured_waits(mut self, root: &Path, recorded: &Path) -> Self {
+        let seal = |text: &str| {
+            serde_json::from_str::<Value>(text).ok().and_then(|record| {
+                record["sessionPublicationRecord"]["checkpointSeal"]["sha256"]
+                    .as_str()
+                    .map(str::to_owned)
+            })
+        };
+        for (path, kind, _) in walk(root) {
+            if kind != "file" || !path.ends_with("/job-record.json") {
+                continue;
+            }
+            let Ok(bytes) = fs::read(root.join(&path)) else {
+                continue;
+            };
+            let text = String::from_utf8_lossy(&bytes);
+            if normalized(&text) == text.replace("consume wait 0 ms", "consume wait <ms> ms") {
+                continue;
+            }
+            let swift = fs::read_to_string(recorded.join("files").join(&path)).ok();
+            if let (Some(here), Some(swift)) = (seal(&text), swift.as_deref().and_then(seal))
+                && here != swift
+            {
+                self.digests.insert(here, swift);
+            }
+        }
+        self
     }
 
     fn read(&self, text: &str) -> String {
@@ -688,7 +725,8 @@ fn play(story: &str) -> Vec<String> {
         }
     }
     drop(owners);
-    let swift = AsSwift::learn(&root);
+    let swift =
+        AsSwift::learn(&root).learn_measured_waits(&root, &fixture().join("stories").join(story));
     for (exchange, (name, answer)) in cases["exchanges"].as_array().unwrap().iter().zip(answers) {
         let answer = swift.value(&answer);
         if answer != exchange["answer"] {

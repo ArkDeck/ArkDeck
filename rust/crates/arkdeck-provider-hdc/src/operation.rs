@@ -310,11 +310,10 @@ impl Action {
                     "factsUnavailable(\"{step_id} has no descriptor-bound target connect key\")"
                 ));
             };
-            Ok(["-t", key]
-                .iter()
-                .chain(tail)
-                .map(|argument| (*argument).to_owned())
-                .collect())
+            Ok(device_arguments(
+                key,
+                tail.iter().map(|argument| (*argument).to_owned()),
+            ))
         };
         let (arguments, timeout, capture_bytes) = match self {
             Self::ObserveTool => (vec!["-v".into()], TIMEOUT, CAPTURE_BYTES),
@@ -505,6 +504,21 @@ fn observe_storage(receipt: &Receipt, required_bytes: i64) -> Outcome {
 
 /// Swift `stableIdentitySHA256(connectKey:)`: the HDC identity a connect key
 /// names, which confirmation checks against the adopted binding.
+/// Swift `deviceArguments`: the one place a device command names its
+/// target. HDC's `-t <connectKey>` goes before the command's own arguments,
+/// and nothing else in this crate adds it (`every_target_flag_is_added_here`).
+pub fn device_arguments(
+    connect_key: &str,
+    command: impl IntoIterator<Item = String>,
+) -> Vec<String> {
+    let mut arguments = vec![TARGET_FLAG.to_owned(), connect_key.to_owned()];
+    arguments.extend(command);
+    arguments
+}
+
+/// HDC's target option, which only [`device_arguments`] writes.
+const TARGET_FLAG: &str = "-t";
+
 pub fn stable_identity_sha256(connect_key: &str) -> String {
     hex(&Sha256::digest(connect_key.to_lowercase().as_bytes()))
 }
@@ -955,5 +969,54 @@ mod tests {
         );
         assert_eq!(judge(&window, &receipt("")), empty);
         assert_eq!(judge(&window, &truncated), over);
+    }
+
+    /// XPA-AC-2's single injection point: every device plan this crate lowers
+    /// names its target through [`device_arguments`], and no other code
+    /// outside the tests writes HDC's `-t` before a connect key. The flag's
+    /// only literal is [`TARGET_FLAG`]; a device-side `-t` (a trace tag, an
+    /// image type) follows a command, never a connect key.
+    #[test]
+    fn every_target_flag_is_added_here() {
+        let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        let mut offenders = Vec::new();
+        for entry in std::fs::read_dir(&source).unwrap() {
+            let path = entry.unwrap().path();
+            if path.extension().is_none_or(|extension| extension != "rs") {
+                continue;
+            }
+            let text = std::fs::read_to_string(&path)
+                .unwrap()
+                .replace("\r\n", "\n");
+            let code = text.split("\n#[cfg(test)]\nmod ").next().unwrap();
+            let compact: String = code.chars().filter(|c| !c.is_whitespace()).collect();
+            for pattern in [
+                "\"-t\".to_owned(),key",
+                "\"-t\".to_string(),key",
+                "\"-t\".into(),key",
+                "[\"-t\",key",
+                "[\"-t\",connect_key",
+                "\"-t\".to_owned(),connect_key",
+            ] {
+                if compact.contains(pattern) {
+                    offenders.push(format!("{}: {pattern}", path.display()));
+                }
+            }
+            if path.file_name().unwrap() != "operation.rs" && compact.contains("TARGET_FLAG") {
+                offenders.push(format!("{}: TARGET_FLAG", path.display()));
+            }
+        }
+        assert!(offenders.is_empty(), "{offenders:?}");
+        assert_eq!(
+            device_arguments(KEY, ["shell".to_owned(), "ls".to_owned()]),
+            ["-t", KEY, "shell", "ls"]
+        );
+        assert_eq!(
+            Action::QueryProperty(Property::ProductName)
+                .lower("probe", Some(KEY))
+                .unwrap()
+                .arguments[..2],
+            ["-t", KEY]
+        );
     }
 }

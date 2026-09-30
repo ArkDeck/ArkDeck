@@ -755,6 +755,14 @@ SHA-256：%4$@</value>
     <value>取消</value>
     <comment>settings.common.cancel (SettingsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobRecovery_humanRequired_title" xml:space="preserve">
+    <value>需要人工处理</value>
+    <comment>jobRecovery.humanRequired.title (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobRecovery_humanRequired_guidance" xml:space="preserve">
+    <value>请先检查已记录的原因和证据，再通过已批准的 Runtime 路径继续。</value>
+    <comment>jobRecovery.humanRequired.guidance (JobsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -1370,5 +1378,329 @@ SHA-256：%4$@</value>
   <data name="windows_sessions_pinnedNo" xml:space="preserve">
     <value>否</value>
     <comment>windows.sessions.pinnedNo (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_agents" xml:space="preserve">
+    <value>Agent</value>
+    <comment>windows.navigation.agents (Windows only)</comment>
+  </data>
+  <data name="windows_agents_subtitle" xml:space="preserve">
+    <value>Runtime 运行的 Agent 执行，以及它们正在等待的人工操作。启动 Agent 仍在 CLI 中进行。</value>
+    <comment>windows.agents.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_agents_unavailable" xml:space="preserve">
+    <value>无法读取 Agent 执行</value>
+    <comment>windows.agents.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions_unavailable" xml:space="preserve">
+    <value>无法读取人工操作</value>
+    <comment>windows.agents.humanActions.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_agents_executions" xml:space="preserve">
+    <value>Agent 执行</value>
+    <comment>windows.agents.executions (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions" xml:space="preserve">
+    <value>等待你处理</value>
+    <comment>windows.agents.humanActions (Windows only)</comment>
+  </data>
+  <data name="windows_agents_humanActions_empty" xml:space="preserve">
+    <value>当前没有等待中的人工操作。</value>
+    <comment>windows.agents.humanActions.empty (Windows only)</comment>
+  </data>
+  <data name="windows_agents_empty" xml:space="preserve">
+    <value>当前没有 Agent 执行记录。</value>
+    <comment>windows.agents.empty (Windows only)</comment>
+  </data>
+  <data name="windows_agents_select" xml:space="preserve">
+    <value>选择一个 Agent 执行以查看详情。</value>
+    <comment>windows.agents.select (Windows only)</comment>
+  </data>
+  <data name="windows_agents_operation" xml:space="preserve">
+    <value>操作</value>
+    <comment>windows.agents.operation (Windows only)</comment>
+  </data>
+  <data name="windows_agents_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>windows.agents.state (Windows only)</comment>
+  </data>
+  <data name="windows_agents_generation" xml:space="preserve">
+    <value>代次</value>
+    <comment>windows.agents.generation (Windows only)</comment>
+  </data>
+  <data name="windows_agents_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>windows.agents.job (Windows only)</comment>
+  </data>
+  <data name="windows_agents_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>windows.agents.target (Windows only)</comment>
+  </data>
+  <data name="windows_agents_deadline" xml:space="preserve">
+    <value>截止时间</value>
+    <comment>windows.agents.deadline (Windows only)</comment>
+  </data>
+  <data name="windows_agents_observed" xml:space="preserve">
+    <value>最近观察</value>
+    <comment>windows.agents.observed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_next" xml:space="preserve">
+    <value>下一步</value>
+    <comment>windows.agents.next (Windows only)</comment>
+  </data>
+  <data name="windows_agents_failure" xml:space="preserve">
+    <value>失败原因</value>
+    <comment>windows.agents.failure (Windows only)</comment>
+  </data>
+  <data name="windows_agents_outcomeUnknown" xml:space="preserve">
+    <value>结果未知：再次运行前请先检查设备。</value>
+    <comment>windows.agents.outcomeUnknown (Windows only)</comment>
+  </data>
+  <data name="windows_agents_row" xml:space="preserve">
+    <value>%1$@ · %2$@</value>
+    <comment>windows.agents.row (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_category" xml:space="preserve">
+    <value>类别</value>
+    <comment>windows.agents.action.category (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_minimum" xml:space="preserve">
+    <value>需要执行的操作</value>
+    <comment>windows.agents.action.minimum (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_expires" xml:space="preserve">
+    <value>到期时间</value>
+    <comment>windows.agents.action.expires (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_row" xml:space="preserve">
+    <value>%1$@ · %2$@ · %3$@ 到期</value>
+    <comment>windows.agents.action.row (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_choose" xml:space="preserve">
+    <value>请选择一项</value>
+    <comment>windows.agents.action.choose (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_chooseFirst" xml:space="preserve">
+    <value>请先选择列出的一项。</value>
+    <comment>windows.agents.action.chooseFirst (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_resume" xml:space="preserve">
+    <value>继续</value>
+    <comment>windows.agents.action.resume (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_resumed" xml:space="preserve">
+    <value>已继续：Runtime 会接着执行。</value>
+    <comment>windows.agents.action.resumed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_refused" xml:space="preserve">
+    <value>Runtime 未继续</value>
+    <comment>windows.agents.action.refused (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon" xml:space="preserve">
+    <value>放弃…</value>
+    <comment>windows.agents.abandon (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_title" xml:space="preserve">
+    <value>放弃这个 Agent 执行？</value>
+    <comment>windows.agents.abandon.title (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_message" xml:space="preserve">
+    <value>Runtime 会停止 Agent 执行 %1$@（代次 %2$@），之后不能再继续。</value>
+    <comment>windows.agents.abandon.message (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_confirm" xml:space="preserve">
+    <value>放弃</value>
+    <comment>windows.agents.abandon.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_done" xml:space="preserve">
+    <value>已放弃。</value>
+    <comment>windows.agents.abandon.done (Windows only)</comment>
+  </data>
+  <data name="windows_agents_abandon_failed" xml:space="preserve">
+    <value>Agent 执行未放弃</value>
+    <comment>windows.agents.abandon.failed (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_imports" xml:space="preserve">
+    <value>导入</value>
+    <comment>windows.navigation.imports (Windows only)</comment>
+  </data>
+  <data name="windows_imports_subtitle" xml:space="preserve">
+    <value>上传到 Runtime、并作为某个已接管 Target 的 Artifact 发布的文件。每个文件都会先检查，再分块校验发送，最后由 Runtime 发布。</value>
+    <comment>windows.imports.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_imports_unavailable" xml:space="preserve">
+    <value>无法读取导入</value>
+    <comment>windows.imports.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_imports_targets_unavailable" xml:space="preserve">
+    <value>无法读取 Target</value>
+    <comment>windows.imports.targets.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_imports_new" xml:space="preserve">
+    <value>新建导入</value>
+    <comment>windows.imports.new (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind" xml:space="preserve">
+    <value>类型</value>
+    <comment>windows.imports.kind (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_hap" xml:space="preserve">
+    <value>HAP（.hap、.hsp）</value>
+    <comment>windows.imports.kind.hap (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_nativeLibrary" xml:space="preserve">
+    <value>原生库（lib….so）</value>
+    <comment>windows.imports.kind.nativeLibrary (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_workspacePatch" xml:space="preserve">
+    <value>工作区补丁（.patch、.diff）</value>
+    <comment>windows.imports.kind.workspacePatch (Windows only)</comment>
+  </data>
+  <data name="windows_imports_kind_flashBundle" xml:space="preserve">
+    <value>刷机包（images.tar.gz）</value>
+    <comment>windows.imports.kind.flashBundle (Windows only)</comment>
+  </data>
+  <data name="windows_imports_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>windows.imports.target (Windows only)</comment>
+  </data>
+  <data name="windows_imports_noTargets" xml:space="preserve">
+    <value>尚未接管任何 Target：请先在 CLI 中接管。</value>
+    <comment>windows.imports.noTargets (Windows only)</comment>
+  </data>
+  <data name="windows_imports_file" xml:space="preserve">
+    <value>文件</value>
+    <comment>windows.imports.file (Windows only)</comment>
+  </data>
+  <data name="windows_imports_noFile" xml:space="preserve">
+    <value>未选择文件。</value>
+    <comment>windows.imports.noFile (Windows only)</comment>
+  </data>
+  <data name="windows_imports_chooseFile" xml:space="preserve">
+    <value>选择文件…</value>
+    <comment>windows.imports.chooseFile (Windows only)</comment>
+  </data>
+  <data name="windows_imports_chooseFileFirst" xml:space="preserve">
+    <value>请先选择文件。</value>
+    <comment>windows.imports.chooseFileFirst (Windows only)</comment>
+  </data>
+  <data name="windows_imports_start" xml:space="preserve">
+    <value>导入</value>
+    <comment>windows.imports.start (Windows only)</comment>
+  </data>
+  <data name="windows_imports_progress" xml:space="preserve">
+    <value>上传进度</value>
+    <comment>windows.imports.progress (Windows only)</comment>
+  </data>
+  <data name="windows_imports_progress_value" xml:space="preserve">
+    <value>已发送 %1$@，共 %2$@</value>
+    <comment>windows.imports.progress.value (Windows only)</comment>
+  </data>
+  <data name="windows_imports_cancel" xml:space="preserve">
+    <value>取消上传</value>
+    <comment>windows.imports.cancel (Windows only)</comment>
+  </data>
+  <data name="windows_imports_busy" xml:space="preserve">
+    <value>正在上传。</value>
+    <comment>windows.imports.busy (Windows only)</comment>
+  </data>
+  <data name="windows_imports_done" xml:space="preserve">
+    <value>已导入 %1$@，Artifact 为 %2$@。</value>
+    <comment>windows.imports.done (Windows only)</comment>
+  </data>
+  <data name="windows_imports_failed" xml:space="preserve">
+    <value>导入失败</value>
+    <comment>windows.imports.failed (Windows only)</comment>
+  </data>
+  <data name="windows_imports_cancelled" xml:space="preserve">
+    <value>已取消上传；未完成的导入已中止。</value>
+    <comment>windows.imports.cancelled (Windows only)</comment>
+  </data>
+  <data name="windows_imports_list" xml:space="preserve">
+    <value>导入</value>
+    <comment>windows.imports.list (Windows only)</comment>
+  </data>
+  <data name="windows_imports_empty" xml:space="preserve">
+    <value>当前没有导入记录。</value>
+    <comment>windows.imports.empty (Windows only)</comment>
+  </data>
+  <data name="windows_imports_select" xml:space="preserve">
+    <value>选择一个导入以查看详情。</value>
+    <comment>windows.imports.select (Windows only)</comment>
+  </data>
+  <data name="windows_imports_row" xml:space="preserve">
+    <value>%1$@ · %2$@ · %3$@</value>
+    <comment>windows.imports.row (Windows only)</comment>
+  </data>
+  <data name="windows_imports_name" xml:space="preserve">
+    <value>名称</value>
+    <comment>windows.imports.name (Windows only)</comment>
+  </data>
+  <data name="windows_imports_size" xml:space="preserve">
+    <value>大小</value>
+    <comment>windows.imports.size (Windows only)</comment>
+  </data>
+  <data name="windows_imports_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>windows.imports.state (Windows only)</comment>
+  </data>
+  <data name="windows_imports_generation" xml:space="preserve">
+    <value>代次</value>
+    <comment>windows.imports.generation (Windows only)</comment>
+  </data>
+  <data name="windows_imports_created" xml:space="preserve">
+    <value>创建时间</value>
+    <comment>windows.imports.created (Windows only)</comment>
+  </data>
+  <data name="windows_imports_artifact" xml:space="preserve">
+    <value>Artifact</value>
+    <comment>windows.imports.artifact (Windows only)</comment>
+  </data>
+  <data name="windows_imports_digest" xml:space="preserve">
+    <value>Artifact 摘要</value>
+    <comment>windows.imports.digest (Windows only)</comment>
+  </data>
+  <data name="windows_imports_mediaType" xml:space="preserve">
+    <value>媒体类型</value>
+    <comment>windows.imports.mediaType (Windows only)</comment>
+  </data>
+  <data name="windows_imports_privacy" xml:space="preserve">
+    <value>隐私级别</value>
+    <comment>windows.imports.privacy (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release" xml:space="preserve">
+    <value>释放…</value>
+    <comment>windows.imports.release (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_title" xml:space="preserve">
+    <value>释放这个导入？</value>
+    <comment>windows.imports.release.title (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_message" xml:space="preserve">
+    <value>Runtime 会释放导入 %1$@（代次 %2$@），之后 Job 不能再使用它的 Artifact。</value>
+    <comment>windows.imports.release.message (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_confirm" xml:space="preserve">
+    <value>释放</value>
+    <comment>windows.imports.release.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_done" xml:space="preserve">
+    <value>已释放。</value>
+    <comment>windows.imports.release.done (Windows only)</comment>
+  </data>
+  <data name="windows_imports_release_failed" xml:space="preserve">
+    <value>导入未释放</value>
+    <comment>windows.imports.release.failed (Windows only)</comment>
+  </data>
+  <data name="windows_agents_action_id" xml:space="preserve">
+    <value>人工操作</value>
+    <comment>windows.agents.action.id (Windows only)</comment>
+  </data>
+  <data name="windows_imports_id" xml:space="preserve">
+    <value>导入</value>
+    <comment>windows.imports.id (Windows only)</comment>
+  </data>
+  <data name="windows_imports_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>windows.imports.sha256 (Windows only)</comment>
   </data>
 </root>

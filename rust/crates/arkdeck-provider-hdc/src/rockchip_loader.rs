@@ -33,10 +33,10 @@ const MAXIMUM_EVIDENCE_STDERR_BYTES: usize = 200;
 /// selection when another target is present.
 pub fn enter_loader_plan(connect_key: &str) -> ProcessPlan {
     ProcessPlan {
-        arguments: ["-t", connect_key, "shell", "reboot", "loader"]
-            .iter()
-            .map(|value| (*value).to_owned())
-            .collect(),
+        arguments: crate::device_arguments(
+            connect_key,
+            ["shell", "reboot", "loader"].map(str::to_owned),
+        ),
         timeout: ENTER_LOADER_TIMEOUT,
         capture_bytes: ENTER_LOADER_CAPTURE_BYTES,
     }

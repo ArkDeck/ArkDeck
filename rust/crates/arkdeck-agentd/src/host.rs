@@ -195,7 +195,7 @@ pub struct Host {
     usb_registry: bool,
     /// The bundled OpenHarmony code-sign helper this composition verified;
     /// without one a native deployment stays unavailable.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     code_sign_helper: Option<arkdeck_provider_hdc::CodeSignHelper>,
     /// The combined human-action owner over the agent executions and the
     /// union control-action owner.
@@ -622,7 +622,7 @@ impl Host {
     /// the composition that found it (`code_sign_helper.rs`). With one,
     /// `deploy.native-library.app-owned@1` is available and planned; without
     /// one it stays unavailable, as Swift's composition leaves it.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_code_sign_helper(mut self, helper: arkdeck_provider_hdc::CodeSignHelper) -> Self {
         self.code_sign_helper = Some(helper);
         self
@@ -1336,6 +1336,7 @@ impl Host {
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
+            ("codeSignHelper", self.code_sign_helper.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -1421,7 +1422,7 @@ impl Host {
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
             #[cfg(any(target_os = "macos", windows))]
             usb_registry: false,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             code_sign_helper: None,
             #[cfg(any(target_os = "macos", windows))]
             human_actions: None,
@@ -2570,6 +2571,50 @@ impl HostServices for Host {
             hdc: hdc.as_ref(),
             workspace: self.workspace.as_deref(),
         }
+        .continue_cleanup_debt(params)
+    }
+    /// `cleanupDebt.list` and `cleanupDebt.continue` on Windows: the macOS
+    /// answers over this composition's Artifact and Job owners, through the
+    /// runner `job.run` uses here. No HDC composition is built (no Windows
+    /// HDC tuple is registered), so a continuation of a debt the ledger owes
+    /// is refused (`rejected`, the provider unavailable) after the ledger and
+    /// the Job are read and before any readback or retry is sent; nothing is
+    /// written to the ledger.
+    #[cfg(windows)]
+    fn cleanup_debt(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let foundation = || WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        };
+        let Some(artifacts) = &self.artifacts else {
+            return Err(foundation());
+        };
+        if method == "cleanupDebt.list" {
+            return arkdeck_hoststore::list_cleanup_debt(artifacts).map_err(|message| WireError {
+                code: "internalError".into(),
+                message,
+                details: None,
+            });
+        }
+        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return Err(foundation());
+        };
+        // A continuation publishes no Session and cancels nothing.
+        windows_runner(
+            state_root,
+            jobs,
+            artifacts,
+            self.imports.as_deref(),
+            self.authority(),
+            &self.home,
+            None,
+            None,
+        )
         .continue_cleanup_debt(params)
     }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A

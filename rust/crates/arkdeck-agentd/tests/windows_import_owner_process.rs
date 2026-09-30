@@ -13,8 +13,14 @@
 //!   same receipt, released, and its Artifact stays readable;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
-//!   `artifact import hap`, `inspect`, `list` and `release`. Without that
-//!   variable this test says so and checks nothing.
+//!   `artifact import hap`, `native-library` (the recorded code-signed ELF of
+//!   `rust/tests/fixtures/deploy-native-library`) and `workspace-patch` upload
+//!   and commit their exact bytes; `inspect`, `list` and `release` answer for
+//!   them; `abort` ends an Import begun and not committed; `flash-bundle` is
+//!   refused at publication (AF-W1) with nothing published. The measured
+//!   leaves are Windows `implemented` in the coverage manifest the CLI renders
+//!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
+//!   checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -292,7 +298,96 @@ fn gj1_import_commands_run_through_the_cli_against_a_dev_signed_daemon() {
         &generation,
     ]);
     assert_eq!(released["state"], "released", "{released}");
+
+    // The other published kinds the Windows owner validates: each committed
+    // with its exact bytes and listed.
+    let native = std::fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../tests/fixtures/deploy-native-library/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397",
+    ))
+    .unwrap();
+    let patch: &[u8] = b"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n+line\n";
+    for (kind, name, bytes) in [
+        ("native-library", "libentry.so", native.as_slice()),
+        ("workspace-patch", "change.patch", patch),
+    ] {
+        let file = root.file(name, bytes);
+        let committed = run(&[
+            "artifact",
+            "import",
+            kind,
+            "--import-request-id",
+            &format!("windows-cli-{kind}"),
+            "--target",
+            TARGET,
+            "--file",
+            file.to_str().unwrap(),
+        ]);
+        assert_eq!(committed["state"], "committed", "{kind}: {committed}");
+        assert_eq!(
+            committed["receipt"]["artifactDigest"],
+            sha256(bytes),
+            "{kind}: {committed}"
+        );
+        let id = committed["importId"].as_str().unwrap();
+        let shown = run(&["artifact", "import", "inspect", "--import", id]);
+        assert_eq!(shown["import"]["receipt"], committed["receipt"], "{shown}");
+    }
+    let listed = run(&["artifact", "import", "list"]);
+    assert_eq!(listed["items"].as_array().unwrap().len(), 3, "{listed}");
+
+    // A flash bundle uploads and is refused at publication: nothing is
+    // published until the Flash archive reader is on Windows (AF-W1).
+    let bundle = root.file("images.tar.gz", b"\x1f\x8bnot-an-archive");
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "artifact",
+            "import",
+            "flash-bundle",
+            "--import-request-id",
+            "windows-cli-flash-bundle",
+            "--target",
+            TARGET,
+            "--file",
+            bundle.to_str().unwrap(),
+            "--device-profile",
+            "dayu200",
+        ],
+    );
+    assert_ne!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["ok"], false, "{envelope}");
+
+    // An Import begun and not committed is aborted through the CLI.
+    let begun = answered(
+        &pipe,
+        "artifact.import.begin",
+        intent("windows-cli-abort", "hap", HAP),
+    );
+    let aborted = run(&[
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "windows-cli-abort",
+        "--expected-generation",
+        begun["generation"].as_str().unwrap(),
+    ]);
+    assert_eq!(aborted["importId"], begun["importId"], "{aborted}");
+    assert_eq!(aborted["state"], "aborted", "{aborted}");
     running.stop(&root.0);
+    assert_measured(&[
+        "artifact.import.workspace-patch",
+        "artifact.import.begin",
+        "artifact.import.append",
+        "artifact.import.commit",
+        "artifact.import.inspection",
+        "artifact.import.inspect",
+        "artifact.import.list",
+        "artifact.import.release",
+        "artifact.import.abort",
+    ]);
 }
 
 fn daemon(executable: &Path, root: &Path) -> Command {
@@ -484,4 +579,29 @@ fn cli(daemon: &Path, pin: &str, pipe: &str, arguments: &[&str]) -> (Option<i32>
     let envelope = serde_json::from_slice(&output.stdout)
         .unwrap_or_else(|_| panic!("{arguments:?}: {output:?}"));
     (output.status.code(), envelope)
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }
