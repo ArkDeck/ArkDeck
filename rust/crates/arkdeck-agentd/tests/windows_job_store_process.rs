@@ -22,7 +22,9 @@
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): `job status`, `job show`,
 //!   `job events`, `job timeline` and `job list` print the same answers after
-//!   a restart. Without that variable this test says so and checks nothing.
+//!   a restart, and each is Windows `implemented` in the coverage manifest
+//!   the CLI renders (`WINDOWS_MEASURED_LEAVES`). Without that variable this
+//!   test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -710,4 +712,36 @@ fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
         );
     }
     second.stop(&root.0);
+    assert_measured(&[
+        "job.status",
+        "job.show",
+        "job.events",
+        "job.timeline",
+        "job.list",
+    ]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }

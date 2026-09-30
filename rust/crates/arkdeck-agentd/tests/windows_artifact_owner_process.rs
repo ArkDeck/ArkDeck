@@ -24,8 +24,9 @@
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): `artifact list`, `inspect`,
 //!   `read`, `export` and `quota` answer the same, with the CLI verifying the
-//!   daemon's image and signer. Without that variable this test says so and
-//!   checks nothing.
+//!   daemon's image and signer, and each is Windows `implemented` in the
+//!   coverage manifest the CLI renders (`WINDOWS_MEASURED_LEAVES`). Without
+//!   that variable this test says so and checks nothing.
 //!
 //! The recorded bytes and digests themselves, and every export refusal, are
 //! proved at the owner (`arkdeck-hoststore/tests/windows_artifact_owners.rs`);
@@ -700,4 +701,36 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     );
     running.stop(&root.0);
     assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
+    assert_measured(&[
+        "artifact.list",
+        "artifact.inspect",
+        "artifact.read",
+        "artifact.export",
+        "artifact.quota",
+    ]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }
