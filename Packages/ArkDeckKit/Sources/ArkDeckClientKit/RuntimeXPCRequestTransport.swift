@@ -308,12 +308,25 @@ package enum RuntimeXPCRequestTransport {
     method == "job.run" ? runtimeJobTimeoutSeconds : ordinaryTimeoutSeconds
   }
 
+  /// Arms the reply deadline: `fire` runs once `seconds` have passed, and does
+  /// nothing if a reply or failure won first.
+  package typealias ArmTimeout =
+    @Sendable (_ seconds: TimeInterval, _ fire: @escaping @Sendable () -> Void) -> Void
+
+  /// The production deadline: a global queue's timer on wall time.
+  package static let dispatchTimeout: ArmTimeout = { seconds, fire in
+    DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + seconds, execute: fire)
+  }
+
   /// Internal seam for the silent-endpoint contract test. The start closure
   /// may reply, fail, reply twice, or never reply; every path remains bounded
-  /// and the first terminal signal wins.
+  /// and the first terminal signal wins. `armTimeout` is where the deadline
+  /// is armed, so a test can read the bound it is given and pass the
+  /// deadline without racing wall time.
   package static func awaitReply(
     timeoutSeconds: TimeInterval,
     cleanup: @escaping @Sendable () -> Void = {},
+    armTimeout: ArmTimeout = dispatchTimeout,
     start: @escaping @Sendable (@escaping Reply) -> Void
   ) async -> ResultValue {
     await withCheckedContinuation { continuation in
@@ -341,8 +354,8 @@ package enum RuntimeXPCRequestTransport {
           finish(.failure(.timedOut))
         })
       completion.withLock { $0.timeout = timeout }
-      DispatchQueue.global(qos: .userInitiated).asyncAfter(
-        deadline: .now() + max(0, timeoutSeconds), execute: timeout.item)
+      // A work item that a reply cancelled returns at once when performed.
+      armTimeout(max(0, timeoutSeconds)) { timeout.item.perform() }
       start(finish)
     }
   }

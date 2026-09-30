@@ -7,16 +7,39 @@ import os
 @testable import ArkDeckClientKit
 
 struct RuntimeXPCRequestTransportTests {
+  /// A live endpoint that never invokes its reply closure is bounded by the
+  /// caller's own deadline, not by any other bound (the ordinary deadline is
+  /// 120 s): the transport arms exactly the deadline it was given, and when
+  /// that deadline passes the wait ends as a timeout that claims no
+  /// rejection. The deadline is passed by the test, not waited for on a
+  /// loaded runner's wall clock.
   @Test func sharedTransportBoundsASilentEndpointWithoutClaimingRejection() async {
-    let startedAt = ContinuousClock.now
-    let result = await RuntimeXPCRequestTransport.awaitReply(timeoutSeconds: 0.01) { _ in
+    let armed = OSAllocatedUnfairLock<[TimeInterval]>(initialState: [])
+    let result = await RuntimeXPCRequestTransport.awaitReply(
+      timeoutSeconds: 0.01,
+      armTimeout: { seconds, fire in
+        armed.withLock { $0.append(seconds) }
+        // The deadline passes after the silent endpoint has started.
+        DispatchQueue.global().async(execute: fire)
+      }
+    ) { _ in
       // Reproduces a live endpoint that never invokes its reply closure.
     }
 
     #expect(result == .failure(.timedOut))
-    #expect(startedAt.duration(to: .now) < .seconds(1))
+    #expect(armed.withLock { $0 } == [0.01])
     #expect(!RuntimeXPCRequestTransport.Failure.timedOut.message.contains("retry"))
     #expect(RuntimeXPCRequestTransport.Failure.timedOut.message.contains("may already"))
+  }
+
+  /// The production deadline fires on its own: a silent endpoint behind the
+  /// dispatch timer still ends as a timeout. How long a loaded runner takes
+  /// to deliver it is not this test's question; the time limit only turns a
+  /// timer that never fires into a failure instead of a hang.
+  @Test(.timeLimit(.minutes(1)))
+  func productionDeadlineEndsASilentEndpoint() async {
+    let result = await RuntimeXPCRequestTransport.awaitReply(timeoutSeconds: 0.01) { _ in }
+    #expect(result == .failure(.timedOut))
   }
 
   @Test func sharedTransportUsesTheFirstTerminalSignalAndCleansUpOnce() async {
