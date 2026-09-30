@@ -1,7 +1,7 @@
 use super::*;
 use std::{
     fs,
-    os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
+    os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt, symlink},
     path::PathBuf,
 };
 struct Root(PathBuf);

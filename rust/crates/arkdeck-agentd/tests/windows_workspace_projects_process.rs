@@ -263,7 +263,7 @@ fn projects_register_over_the_pipe_and_survive_a_restart() {
     assert!(
         first
             .seen
-            .contains(&"arkdeck-agentd owners: targets, workspaceProjects".to_owned()),
+            .contains(&"arkdeck-agentd owners: targets, artifacts, workspaceProjects".to_owned()),
         "{:?}",
         first.seen
     );

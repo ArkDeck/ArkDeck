@@ -71,7 +71,7 @@ impl BundleRegistryReadStore {
         &self,
         lock: &HostReadLock,
         bytes: &[u8],
-        identity: &std::fs::Metadata,
+        identity: &arkdeck_platform::HostFileIdentity,
     ) -> Result<(), WireError> {
         self.registration_binding(lock)?;
         self.validate_index(bytes, identity).map_err(unreadable)

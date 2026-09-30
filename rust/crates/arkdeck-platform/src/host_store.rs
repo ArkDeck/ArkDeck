@@ -363,9 +363,11 @@ impl HostDirectory {
         Ok(Self(file, Ownership::ExportParent))
     }
 
-    /// Metadata of a private regular document, resolved relative to the held
-    /// directory. Snapshot retention uses this instead of trusting path stats.
-    pub fn document_metadata(&self, name: &str) -> io::Result<std::fs::Metadata> {
+    /// The identity of a private regular document, resolved relative to the
+    /// held directory. Snapshot retention uses this instead of trusting path
+    /// stats. A change of the file's mode, owner or links moves its change
+    /// time, which the identity carries.
+    pub fn document_metadata(&self, name: &str) -> io::Result<HostFileIdentity> {
         if !matches!(self.1, Ownership::Private) {
             return Err(fail());
         }
@@ -376,21 +378,28 @@ impl HostDirectory {
         if metadata.dev() != linked.st_dev as u64 || metadata.ino() != linked.st_ino {
             return Err(fail());
         }
-        Ok(metadata)
+        Ok(HostFileIdentity::of(&metadata))
+    }
+
+    /// [`Self::document_metadata`] of a document that is exactly owner
+    /// read/write (Swift `RockchipPostFlashHDCBindingStore.validateFile`).
+    pub fn owner_only_document(&self, name: &str) -> io::Result<HostFileIdentity> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let file = self.open_at(name, 0)?;
+        let metadata = owner_only(&file, self.1)?;
+        let linked = self.stat_at(name)?;
+        if metadata.dev() != linked.st_dev as u64 || metadata.ino() != linked.st_ino {
+            return Err(fail());
+        }
+        Ok(HostFileIdentity::of(&metadata))
     }
 
     /// Reclaim exactly the private document inspected by snapshot retention.
     /// The caller holds its snapshot-store lock throughout selection and unlink.
-    pub fn remove_document(&self, name: &str, expected: &std::fs::Metadata) -> io::Result<()> {
-        let current = self.document_metadata(name)?;
-        if current.dev() != expected.dev()
-            || current.ino() != expected.ino()
-            || current.len() != expected.len()
-            || current.mtime() != expected.mtime()
-            || current.mtime_nsec() != expected.mtime_nsec()
-            || current.ctime() != expected.ctime()
-            || current.ctime_nsec() != expected.ctime_nsec()
-        {
+    pub fn remove_document(&self, name: &str, expected: &HostFileIdentity) -> io::Result<()> {
+        if self.document_metadata(name)? != *expected {
             return Err(fail());
         }
         let name = segment(name)?;

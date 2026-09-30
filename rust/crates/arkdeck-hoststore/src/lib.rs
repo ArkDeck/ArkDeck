@@ -328,7 +328,10 @@ mod history_owner;
 pub use history_owner::HistoryStore;
 #[cfg(target_os = "macos")]
 mod session_owner;
-#[cfg(target_os = "macos")]
+// The private snapshot pages `artifact.list` keeps (and every other macOS
+// pager), on the durable host store both OSes have.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod snapshot_pager;
 #[cfg(target_os = "macos")]
 pub use session_owner::{ActiveSessions, SessionStore};
@@ -342,7 +345,10 @@ mod session_cleanup_records;
 pub use session_cleanup_records::{
     CleanupRecord, CleanupState, SessionCleanupRecords, SessionExportRecords,
 };
-#[cfg(target_os = "macos")]
+// Its physical-path rule serves the Artifact export on macOS and Windows; the
+// Session export facts are still macOS-only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_export_destination;
 #[cfg(target_os = "macos")]
 pub use session_export_destination::session_export_destination_facts;
@@ -350,7 +356,10 @@ pub use session_export_destination::session_export_destination_facts;
 pub use session_inventory::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
 #[cfg(target_os = "macos")]
 pub use session_inventory::{SessionExportSnapshot, session_export_snapshot};
-#[cfg(target_os = "macos")]
+// The Artifact index decoder the read owner shares; the usage and quota
+// answers are still macOS-only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod artifact_usage;
 #[cfg(target_os = "macos")]
 pub use artifact_usage::ArtifactUsage;
@@ -714,20 +723,24 @@ mod deveco_registry_owner;
 #[cfg(target_os = "macos")]
 pub use deveco_registry_owner::DevEcoRegistryStore;
 
-#[cfg(target_os = "macos")]
+// The Artifact read, inspect, list and export owners (TASK-XPA-006), on the
+// durable host store's export, file-export and payload-cache primitives,
+// which macOS and Windows both have.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod artifact_read_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_read_owner::{
     ArtifactPublicationFault, ArtifactReadPage, ArtifactReadRange, ArtifactReadSnapshot,
     ArtifactReadStore, MAX_ARTIFACT_READ_BYTES,
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod artifact_projection;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod artifact_resources;
 
 #[cfg(target_os = "macos")]
@@ -735,9 +748,9 @@ mod import_upload;
 #[cfg(target_os = "macos")]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod artifact_export;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use artifact_export::ArtifactExportRequest;
 
 #[cfg(target_os = "macos")]

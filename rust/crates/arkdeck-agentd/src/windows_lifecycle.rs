@@ -13,7 +13,8 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners are composed over it (see
+//!   lifecycle only the Target owners, the Artifact read and export owner
+//!   and the workspace project owner are composed over it (see
 //!   [`Authority::compose`]); every input that would compose another owner
 //!   on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
@@ -122,6 +123,14 @@ impl Authority {
     ///   yet (its integration change waits for the maintainer's samples),
     ///   so no relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
+    /// * the Artifact read and export owner (`ArtifactReadStore`) over the
+    ///   root's `artifacts` (the name the macOS isolated owner and production
+    ///   composition both give it): the same Job index documents, payloads
+    ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
+    ///   belongs to a Job, which the Job owner proves before anything is
+    ///   read, listed or exported; no Job owner is composed on Windows yet,
+    ///   so `artifact.list`, `inspect`, `read` and `export` are refused and
+    ///   read and write nothing, as the macOS daemon answers without one;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -134,8 +143,10 @@ impl Authority {
     ///   that no workspace Job names a project or preset, every project or
     ///   preset mutation is refused (`recordUnreadable`, no new dispatch).
     ///
-    /// Composing opens the stores, which read their documents under their
-    /// locks; a store it cannot read ends the start, as on macOS.
+    /// An existing owner directory is never re-permissioned; one that is not
+    /// owner-only is refused when its owner opens it. Composing opens the
+    /// stores, which read their documents under their locks; a store it
+    /// cannot open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
         let name = if self.development {
@@ -156,6 +167,25 @@ impl Authority {
             )
         })?;
         let host = host.with_targets(targets);
+        let name = "artifacts";
+        let path = self.root.private_child(name).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                self.root.path().join(name).display()
+            )
+        })?;
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&path).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })?;
+        report(&format!(
+            "arkdeck-agentd composes the Artifact owner over {}; no Job owner is composed, so \
+             every Job's Artifact is refused before it is read",
+            path.display()
+        ));
+        let host = host.with_artifacts(artifacts);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(

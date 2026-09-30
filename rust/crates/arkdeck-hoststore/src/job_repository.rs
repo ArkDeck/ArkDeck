@@ -7,7 +7,7 @@ use crate::job_index::{self, Admission, DATABASE, ROWS, corrupt, current_layout}
 use arkdeck_platform::{HostDirectory, HostReadLock, HostSqlite, SqliteValue};
 use std::fs::{File, OpenOptions};
 use std::io;
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -363,7 +363,7 @@ impl JobRepository {
             root,
             path: path.into(),
             lock,
-            identity: (metadata.dev(), metadata.ino()),
+            identity: (metadata.device, metadata.inode),
             writable,
             db: Mutex::new(db),
         })
@@ -378,7 +378,7 @@ impl JobRepository {
         self.lock.validate_link(&self.root, LOCK)?;
         validate_files(&self.root)?;
         let metadata = self.root.document_metadata(DATABASE)?;
-        if (metadata.dev(), metadata.ino()) != self.identity {
+        if (metadata.device, metadata.inode) != self.identity {
             return Err(corrupt());
         }
         Ok(())
