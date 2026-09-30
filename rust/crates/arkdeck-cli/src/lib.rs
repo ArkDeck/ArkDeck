@@ -93,6 +93,8 @@ pub mod runtime_service;
 pub mod runtime_service_install;
 #[cfg(target_os = "macos")]
 pub mod runtime_service_verify;
+#[cfg(windows)]
+pub mod runtime_service_windows;
 #[cfg(target_os = "macos")]
 pub mod signing_inputs;
 pub mod signing_leaves;

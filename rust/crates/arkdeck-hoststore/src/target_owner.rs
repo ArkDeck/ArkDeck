@@ -54,6 +54,8 @@ pub struct TargetStore {
     lanes: crate::device_lane::DeviceMutationLanes,
 }
 /// The Target a binding lineage advance left, and whether it moved.
+/// (Rockchip binding lineage, GJ-4: composed on macOS only.)
+#[cfg(target_os = "macos")]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct AdvancedTarget {
     pub(crate) target_id: String,
@@ -458,6 +460,8 @@ impl TargetStore {
     }
     /// Resolve only existing durable Target authority for a new Import intent.
     /// No wire input supplies a binding, route, observation or inspected fact.
+    /// Its one consumer, the Import owner, is composed on macOS only.
+    #[cfg(target_os = "macos")]
     pub fn resolve_import_binding(
         &self,
         intent: &arkdeck_contract::ImportIntent,
@@ -774,6 +778,7 @@ impl TargetStore {
     /// document under both locks and published only when it changed it. A
     /// refusal is Swift's rendered `storeFailure`; a document this store cannot
     /// read or publish is refused in the same case, with this store's detail.
+    #[cfg(target_os = "macos")]
     pub(crate) fn advance_binding_lineage(
         &self,
         advance: &crate::rockchip_binding::LineageAdvance,
@@ -996,26 +1001,40 @@ impl TargetStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt, symlink};
     use std::{
         fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
         sync::{Arc, Barrier},
     };
     const NOW: &str = "2026-09-12T00:00:00Z";
     struct Root(PathBuf);
+    /// A document a test writes, private to its owner: mode `0600` on Unix;
+    /// on Windows the owner-only DACL it inherits from the private root.
+    fn private_file(path: &std::path::Path) {
+        #[cfg(unix)]
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+        #[cfg(windows)]
+        let _ = path;
+    }
     impl Root {
         fn new() -> Self {
             let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
                 "target-owner-{:x}",
                 u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
             ));
+            #[cfg(unix)]
             fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            // Created by the store itself, so its owner and protected DACL
+            // are the store's whatever the account's default owner is.
+            #[cfg(windows)]
+            HostDirectory::open_or_create_private(&path).unwrap();
             Self(path)
         }
         fn write(&self, name: &str, value: &Value) {
             let path = self.0.join(name);
             fs::write(&path, serde_json::to_vec(value).unwrap()).unwrap();
-            fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+            private_file(&path);
         }
         fn targets(&self) {
             self.write("targets.json",&json!({"schemaVersion":"1.0.0","targets":[{"targetID":"target-fixture","stablePhysicalIdentitySHA256":"a".repeat(64),"bindingRevision":1,"connectKey":"fixture-address","toolVersion":"fixture-tool","adoptedAtUTC":NOW}]}));
@@ -1039,7 +1058,7 @@ mod tests {
         for name in ["targets.json", "target-display-names.json"] {
             let path = root.0.join(name);
             fs::copy(source.join(name), &path).unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            private_file(&path);
         }
         root
     }
@@ -1131,6 +1150,7 @@ mod tests {
             Ok(Some((2, "post-flash-hdc-address".into())))
         );
     }
+    #[cfg(target_os = "macos")]
     #[test]
     fn hdc_imports_bind_the_identity_the_route_names() {
         let root = alias_root();
@@ -1460,7 +1480,12 @@ mod tests {
         assert_eq!(fs::read(root.0.join(NAMES)).unwrap(), names);
         root.targets();
         fs::remove_file(root.0.join(NAMES)).unwrap();
+        // A second name of another document: a symbolic link on Unix, a hard
+        // link on Windows (a symbolic link there needs a privilege).
+        #[cfg(unix)]
         symlink("targets.json", root.0.join(NAMES)).unwrap();
+        #[cfg(windows)]
+        fs::hard_link(root.0.join("targets.json"), root.0.join(NAMES)).unwrap();
         assert_eq!(
             owner
                 .handle("target.list", &Map::new(), NOW)
@@ -1479,7 +1504,7 @@ mod tests {
         let source = PathBuf::from(source);
         for name in ["targets.json", NAMES] {
             fs::copy(source.join(name), root.0.join(name)).unwrap();
-            fs::set_permissions(root.0.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+            private_file(&root.0.join(name));
         }
         let before = fs::read(root.0.join("targets.json")).unwrap();
         let owner = root.open();

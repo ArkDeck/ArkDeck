@@ -351,19 +351,25 @@ pub use session_export_manifest::{RedactedSessionManifest, redact_session_manife
 mod session_export_redaction;
 pub use session_export_redaction::SessionExportRedactor;
 
-#[cfg(target_os = "macos")]
+// The Target owners (TASK-XPA-004) on macOS and Windows: the same
+// `targets.json` bytes under the same `.targets.lock` on both. Off macOS
+// only some members of theirs are used; the Job, Import and Rockchip
+// consumers of the rest are composed on macOS only.
+#[cfg(any(target_os = "macos", windows))]
 mod device_lane;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use device_lane::{LaneState, MutationLane};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod target_document;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod target_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use target_owner::{ObservationReference, TargetStore};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod target_observation;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use target_observation::{
     Adopted, Observation, ObservationError, Snapshot, Sources, TargetObservations, adoption_answer,
     parse_reference,

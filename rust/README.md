@@ -146,7 +146,10 @@ cargo run -p arkdeck-cli -- --output json device candidates
 ```
 
 The CLI verifies health on the authenticated connection before the business
-request. It never starts a daemon or reconnects/replays a lost request. A normal
+request. It never reconnects to or replays a lost request. On macOS and Unix it
+never starts a daemon (the LaunchAgent manages the installed one); on Windows it
+starts the daemon it needs when that daemon's pipe is absent (decision 11, see
+the Windows paragraph below). A normal
 `doctor` returns its report even when readiness is false; `--require-healthy`
 returns exit 69 for that report. All 30 Catalog operations are unavailable
 because this phase has no operation execution provider. Without a usable HDC
@@ -217,9 +220,13 @@ Without input it is the account's daemon over `%LOCALAPPDATA%\ArkDeck\Agentd`,
 resolved with `SHGetKnownFolderPath(FOLDERID_LocalAppData)` for its own token
 (the variable is not read) and created owner-only (owner and a protected DACL of
 the user SID and SYSTEM); `cargo run -p arkdeck-agentd` therefore creates that
-directory. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
+directory. An existing `ArkDeck` or `Agentd` directory whose DACL grants anyone
+but the user and SYSTEM anything (or has no DACL) refuses the start; its access is
+never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
-text) instead; only the lifecycle is composed over it, and every input from which
+text) instead; beside the lifecycle only the
+[Target owners](#windows-target-owners-task-xpa-004) are composed over either
+root, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
 code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
 inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
@@ -249,9 +256,65 @@ the guard, on the thread that took it, and prints `arkdeck-agentd stopped`; one
 the deadline cut short exits holding them. A successor that finds the guard
 abandoned (`WAIT_ABANDONED`, its holder died with it) says so and starts as the
 start after a crash that every start already is; nothing is replayed.
-`tests/windows_lifecycle_process.rs` drives these over development roots. The
-CLI does not start the daemon yet (decision 11), and its daemon identity check
-is unchanged.
+`tests/windows_lifecycle_process.rs` drives these over development roots.
+
+The Windows daemon is started by its client and is single-instance (CHG-2026-074
+r12 decision 11; TASK-XPA-002, `crates/arkdeck-client/src/start.rs`, the
+implementation choices proposed for maintainer review in the
+[run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/client-started-daemon-run.md)).
+Before a command sends anything, the CLI resolves the daemon it may start: the
+account's (no `ARKDECK_ENDPOINT`), or a development root's
+(`ARKDECK_DEVELOPMENT_STATE_ROOT`, reached on the root's own pipe; an
+`ARKDECK_ENDPOINT` beside it must be that pipe). A private `ARKDECK_ENDPOINT`
+names a daemon no client starts. Only when that pipe is absent does the client
+take the starters' turn (a named mutex `<guard>.Start` beside the guard, so
+concurrent starters launch one daemon), look at the pipe again, and launch the
+pinned image (`ARKDECK_DAEMON_PATH` or the CLI's sibling). Before launch it checks
+that file: a trusted Authenticode signature by the pinned certificate. A package
+family can only be proved on a running process. With no identity configured,
+nothing is launched. The image is held against replacement while it is launched
+detached: `DETACHED_PROCESS`, no console window, no inherited handle and no
+standard streams, the image alone as its argument array, in its own directory,
+with the caller's environment minus `ARKDECK_ENDPOINT`. The client waits up to 20
+seconds for the pipe. It then makes the same check every connection makes: the
+pipe owner SID and the server process's image path and signer pin or package
+family. A process that fails that check is reported with the PID this client
+started (`runtimeUnavailable`, `details.daemonStart.outcome` `identityRefused`)
+and is never trusted. A daemon that finds the root held exits `already running`,
+and the holder's pipe is used. No frame is sent while starting, and a request
+lost later is never replayed. Nothing starts a daemon again within a command.
+
+`runtime service status|verify|restart` are the Windows forms of the LaunchAgent
+leaves (`crates/arkdeck-cli/src/runtime_service_windows.rs`). They use the macOS
+envelopes and exit statuses, with `daemonService` where macOS has
+`launchAgent`. None of them starts anything except restart's successor.
+`status` reports the installed image (`daemonImage`), the state root (its kind,
+path, presence, and `accessFindings`: grants to anyone but the user and SYSTEM)
+and the pipe. It also reports the daemon's `health` over a verified connection
+when the pipe exists.
+
+`verify` succeeds (`runtimeVerified: true`) when the image is the pinned one and
+the account's root is absent (the first start creates it owner-only) or
+owner-only. A daemon that runs must also prove its identity and answer `health`
+(`runtime`, else `null`). Otherwise the document comes with exit 69. `--job`,
+`--target` and `--execution-id` are `unsupportedOnPlatform` for now.
+
+`restart` refuses a service that is not ready or has no running daemon (69) and
+current Jobs as macOS does (75). A daemon that composes no Job owner has none.
+Otherwise it sets the running daemon's stop event and waits, within
+`--maximum-wait-seconds` (default 30), for its single-instance guard. It then
+starts the successor through the client start path and proves a new PID, the
+same catalog digest and the same closed Jobs (`restartProof`). A drain its
+deadline cut short leaves the guard abandoned: `restart.drain` says
+`deadlineElapsed`, the guard stays abandoned, and the successor starts as after
+a crash.
+
+`install`, `update`, `uninstall` and the `agentd` spellings stay macOS-only.
+`tests/windows_client_start_process.rs` (in `arkdeck-agentd`) and the CLI's
+`tests/windows_runtime_service.rs` drive these. The signed paths use a copy of
+the daemon signed with the host-trusted development signer
+(`ARKDECK_DEV_SIGNER_THUMBPRINT`, `scripts/windows-dev-identity.ps1`) and are
+skipped, saying so, without one.
 
 ## Isolated macOS History owner
 
@@ -1905,6 +1968,26 @@ were seen and Swift's closed failure category classified from the diagnostic
 after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
 it with shell scripts that print the signer's prompts; no signer is launched.
 
+## Windows PTY prompt/secret exchange (TASK-XPA-011, G19)
+
+`VerifiedTool::run_pty_exchange` and its `Pty*` types build on Windows with
+the macOS signature and errors (`src/windows/pty.rs`). The verified tool is
+attached to a pseudo console (`CreatePseudoConsole`,
+`PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`) through the tool runner's spawn:
+argv array, no shell, suspended, image proved before resume, kill-on-close
+Job, clean environment, no inherited handle. Each exact prompt is matched in
+the rendered console output and answered with its secret and CR in one write
+from a wiped buffer; a rendered secret, a repeated or out-of-order prompt, an
+early exit, the budget, the deadline and a cancellation end the exchange, and
+every path ends the Job and closes the console. Windows differences: echo is
+the child's choice and is detected (`SecretEchoDetected`) rather than cleared
+by the parent, a secret must be UTF-8 without control characters, and a
+prompt's trailing space is not matchable (the console renders it as a cursor
+move). `tests/windows_pty_exchange.rs` is a `harness = false` target whose
+fake signer is the test binary on the pseudo console; no signer is launched.
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
@@ -2383,10 +2466,10 @@ confirms it:
   or zero, and then no relation is formed).
 
 `UsbRegistryRelations::system()` reads this census on Windows. The Windows
-daemon does not compose it yet: the Target observation owner it would feed
-(`Host::with_usb_registry_relations` and the HDC, observation and adoption
-owners beside it) is still composed on macOS only, so the Windows Runtime keeps
-reading no relation until that owner is ported.
+daemon composes the Target observation owner it feeds (see
+[Windows Target owners](#windows-target-owners-task-xpa-004)) and reads it by the
+macOS rule: only beside a registered HDC the composition started as its managed
+server. No Windows HDC tuple is registered yet, so it reads no relation.
 
 Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
 sets, and this host's census answering with well-formed entries, shape only);
@@ -2394,6 +2477,60 @@ the provider's `tests/windows_usb_census.rs` (a synthetic node through the
 Windows rule proving a scripted HDC's candidate and holding the adoption's final
 check, a replug or a missing name, arrival or serial proving nothing, and on
 Windows this host's tree through `system()`). None of it is device evidence.
+
+## Windows Target owners (TASK-XPA-004)
+
+A Windows daemon that owns a state root composes the Target owners over it
+(`windows_lifecycle::Authority::compose`), in the macOS layout: `targets` below
+`%LOCALAPPDATA%\ArkDeck\Agentd` (Swift's production layout) or `targets-state`
+below a development root (the isolated owner's). The directory is created
+relative to the held root handle with the host store's owner-only descriptor
+(owner and sole grantee the user SID, protected) when absent
+(`StateRoot::private_child`), so it is private although the account root also
+grants SYSTEM; an existing one is never re-permissioned, and one that is not
+owner-only refuses the start (exit 69, `the Target store … is unusable`).
+
+- The Target store (`arkdeck_hoststore::TargetStore`, now compiled on macOS and
+  Windows): `targets.json` and `target-display-names.json` under `.targets.lock`
+  and `.target-display-names.lock`, on the NTFS host store, the same bytes as
+  macOS. `target.list`, `target.show`, `target.availability`,
+  `target.display-name.set|clear` answer from it, `doctor` counts its Targets,
+  and a restart reads back what it holds. A torn document or a lock name that
+  is not a lock file fails closed without a write; two writers have one CAS
+  winner and a writer waits out another owner's locks, as on macOS.
+- The Target observation owner (`TargetObservations`) with the USB relations
+  the macOS rule names (`development_usb::relation_source`): the Windows census
+  only beside a registered HDC the composition started as its managed server.
+  No Windows HDC tuple is registered yet (its integration change waits for the
+  maintainer's samples), so nothing is observed or dispatched:
+  `device.observations` answers `rejected` (`hdc.notConfigured`),
+  `device.display-name.*` finds no snapshot (`resourceConflict`, phase
+  `candidateDisplayNameOwner`, `newDispatchCount: 0`), and `target.adopt`
+  refuses before admission as Swift's owner refuses a snapshot it cannot take:
+  `operationUnavailable`, details `{"phase": "preAdmission",
+  "newDispatchCount": 0}` (a malformed reference is `invalidInput` first). The
+  CLI therefore reports a refusal (exit 69), not an unknown outcome. macOS
+  answers the same whenever its Target owner has no HDC (a production
+  composition without `ARKDECK_HDC_PATH`); a composition without a Target owner
+  (the read-only foundation) keeps its `rejected`.
+- The stable identity is `stable_identity_sha256_for_serial` (the SHA-256 of
+  the trimmed, lowercased serial) on both platforms; a node without a serial,
+  or a serial two nodes carry, proves no relation and nothing is adopted.
+
+Still macOS-only beside these owners: the Rockchip binding lineage and
+post-flash alias (GJ-4), the Import binding the Target store resolves, the Job,
+Artifact, Session and bootstrap-registry owners, and every HDC composition.
+Tests: the store's unit tests (now on NTFS too);
+`arkdeck-hoststore/tests/windows_target_owners.rs` (the Swift adoption oracle's
+board through a scripted HDC and the Windows census rule: the same Target and
+`targets.json` bytes, an idempotent re-adoption, the trust stop, no serial or
+two boards proving nothing, torn and replaced-lock documents failing closed);
+`arkdeck-agentd/tests/windows_target_owners_process.rs` (the real daemon over a
+development root through its pipe, a restart reading the names back, the
+zero-dispatch refusals, a non-private Target directory refusing the start, and
+the same hops through the real CLI against a copy of the daemon signed with the
+host-trusted development signer, skipped with a message when
+`ARKDECK_DEV_SIGNER_THUMBPRINT` is not set).
 
 ## Trace Runtime probe (TASK-XPA-016, M1)
 
@@ -3100,3 +3237,39 @@ or provides hardware acceptance evidence. See
 [the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
 and [the SPK-11 record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md)
 for validation, the three-run Rust numbers and the remaining scope.
+
+The workload tests (`tests/workload.rs`) run one at a time: the gate reads
+process-wide counters, and libtest runs one binary's tests as threads of one
+process, so a sibling test's descriptors would count as another run's growth.
+
+### Windows transport soak
+
+On Windows the same executable soaks the named-pipe serving path: each cycle
+binds a private `\\.\pipe\arkdeck-soak-<run>` with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(so a generation that did not release every instance fails the next bind),
+serves the shared `serve_control` loop, and connects `--jobs-per-cycle` times
+with the production client, which verifies the server's image and Authenticode
+signer as the CLI does. The Job owners are macOS-only until the Job store
+reaches Windows (G01), so every exchange is a verified health handshake and a
+refused `job.list`, and the document says `workload: windows-pipe-transport/v1`
+and counts no Job. The same growth bounds apply to the Windows counters: the
+peak working set for `maxResidentSetBytes` and open handles
+(`GetProcessHandleCount`) for the descriptor fields; `workingSetBytes` and
+`privateBytes` are recorded beside them. The client pins the soak's own image,
+so run a copy signed with the host-trusted development certificate:
+
+```powershell
+New-Item -ItemType Directory $env:TEMP\soak-bin | Out-Null
+Copy-Item target\release\arkdeck-soak.exe $env:TEMP\soak-bin\
+$signed = pwsh -File scripts\windows-dev-identity.ps1 sign `
+  -Thumbprint $env:ARKDECK_DEV_SIGNER_THUMBPRINT -Path $env:TEMP\soak-bin\arkdeck-soak.exe
+$env:ARKDECK_SOAK_SIGNER_SHA256 = ($signed | ConvertFrom-Json).pin
+& $env:TEMP\soak-bin\arkdeck-soak.exe --state-directory $env:TEMP\adksoak-1 `
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+Without the pin it refuses before creating anything; the Job-store fixtures
+(`--seed-recovery`, `--measure-journal`, `--seed-artifact-bench`) are refused on
+Windows. `cargo test -p arkdeck-soak --test windows_pipe -- --ignored` runs the
+signed leg with `ARKDECK_DEV_SIGNER_THUMBPRINT` set. Enablement only: formal
+Windows measurement belongs to phase A on a quiet reference host.

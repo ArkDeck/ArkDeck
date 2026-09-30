@@ -240,6 +240,25 @@ def assert_quiet_host() -> dict:
         raise harness.HostTooBusy("performance measurement requires one-minute load < 4",
                                   facts={"oneMinuteLoad": load, "loadThreshold": 4,
                                          "processCheckPerformed": False, "conflictingBuildProcesses": None})
+    if harness.on_windows():
+        from . import windows_host
+
+        def conflict(stem, arguments):
+            # The same rule on Windows spellings: a path may use either
+            # separator and a quoted argument ends in a quote.
+            return stem in {"cargo", "rustc", "xcodebuild"} or (
+                stem.startswith("python")
+                and re.search(r'(?:^|[ /\\"])plan\.py(?:[\s"]|$)', arguments) is not None)
+
+        command = windows_host.conflicting_command(conflict)
+        if command is not None:
+            raise harness.HostTooBusy(f"performance measurement refused while {command} is running",
+                                      facts={"oneMinuteLoad": load, "loadThreshold": min(4, harness.quiet_load_ceiling()),
+                                             "processCheckPerformed": True, "conflictingBuildProcesses": None,
+                                             "firstConflictingCommand": command})
+        return {"oneMinuteLoad": load, "conflictingBuildProcesses": 0,
+                "processCheckPerformed": True, "loadThreshold": min(4, harness.quiet_load_ceiling()),
+                "loadSource": windows_host.LOAD_SOURCE}
     processes = subprocess.run(["ps", "-axo", "comm=,args="], capture_output=True,
                                text=True, check=True, timeout=10)
     for line in processes.stdout.splitlines():

@@ -714,10 +714,10 @@ use macos_process::{spawn, spawn_canonical, spawn_in};
 mod shell_channel;
 #[cfg(target_os = "macos")]
 pub use shell_channel::{DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "pty_exchange.rs"]
-mod pty_exchange;
-#[cfg(target_os = "macos")]
+pub(crate) mod pty_exchange;
+#[cfg(any(target_os = "macos", windows))]
 pub use pty_exchange::{PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest};
 
 #[cfg(any(target_os = "macos", windows))]

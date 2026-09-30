@@ -34,7 +34,10 @@ mod cutover_preflight;
 mod development_admission;
 #[cfg(target_os = "macos")]
 mod development_mutation;
-#[cfg(target_os = "macos")]
+// The USB relation rule the Target observations read by, on macOS and
+// Windows; its development relation file is composed on macOS only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(windows, allow(dead_code))]
 mod development_usb;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
@@ -316,6 +319,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         None => default_user_endpoint()?,
     };
     let host = host::Host::from_environment();
+    // The owners a Windows daemon of a state root composes over it
+    // (`windows_lifecycle::Authority::compose`); the private-endpoint
+    // foundation owns no root and composes none.
+    #[cfg(windows)]
+    let host = match &authority {
+        Some(authority) => authority.compose(host)?,
+        None => host,
+    };
     // Swift's `HDCNativeCodeSignHelperArtifact.bundled()`: the helper this
     // bundle holds, verified. Without one, a native deployment stays
     // unavailable with the reason the availability answer carries; a helper
