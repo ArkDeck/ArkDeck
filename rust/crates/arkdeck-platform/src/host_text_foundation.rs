@@ -126,6 +126,9 @@ mod parity {
     use crate::host_whitespace_or_newline;
     use crate::{host_alphanumeric, host_canonical_text, host_control_character};
 
+    /// A character-set membership test, portable or Foundation.
+    type Predicate = fn(char) -> bool;
+
     fn report(name: &str, mismatches: &[String], total: usize) {
         assert!(
             mismatches.is_empty(),
@@ -149,7 +152,7 @@ mod parity {
 
     #[test]
     fn character_sets_match_corefoundation_for_every_scalar() {
-        let sets: [(&str, fn(char) -> bool, fn(char) -> bool); 3] = [
+        let sets: [(&str, Predicate, Predicate); 3] = [
             (
                 "controlCharacters",
                 host_control_character,

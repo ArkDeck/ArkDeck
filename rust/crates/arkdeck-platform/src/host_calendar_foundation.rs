@@ -360,7 +360,7 @@ mod parity {
         let mut mismatches = Vec::new();
         let mut total = 0;
         let mut starts = instants(3_000, -3.2e11, 2.6e11);
-        starts.extend([0.0, -0.125, 0.999_999_999_8, 0.1, 810_000_000.123_456_789]);
+        starts.extend([0.0, -0.125, 0.999_999_999_8, 0.1, 810_000_000.123_456_8]);
         starts.push(host_gregorian_seconds(9999, 12, 1, 8, 0, 0).unwrap());
         for at in starts {
             for days in [
