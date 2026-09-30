@@ -41,6 +41,8 @@ dependencies = [
 name = "arkdeck-agentd"
 version = "0.1.0"
 dependencies = [
+ "arkdeck-cli",
+ "arkdeck-client",
  "arkdeck-contract",
  "arkdeck-control",
  "arkdeck-hoststore",

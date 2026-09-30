@@ -98,9 +98,10 @@ pub use macos_server::{
 };
 #[cfg(windows)]
 pub use windows::{
-    ConnectionCloser, GuardAcquisition, GuardObject, InstanceScope, Latch, ListenerLock,
-    LocalConnection, LocalListener, LoopbackServerLease, OwnerLock, Readiness, SingleInstanceGuard,
-    StateRoot, StopSignal, default_user_endpoint,
+    ConnectionCloser, DetachedDaemon, GuardAcquisition, GuardObject, ImagePin, InstanceScope,
+    Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, OWNER_ONLY_REMEDY,
+    OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot, StopSignal,
+    await_pipe_instance, default_user_endpoint, pipe_present, verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.

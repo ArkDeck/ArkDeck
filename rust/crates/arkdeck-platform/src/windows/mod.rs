@@ -18,6 +18,7 @@ use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
 mod account;
+mod daemon_start;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
@@ -26,12 +27,17 @@ mod server;
 mod state;
 mod stop;
 pub use account::{application_support_directory, arkdeck_application_support_root};
+pub use daemon_start::{
+    DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
+};
+pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
 pub(crate) use process::spawn;
 pub use server::LoopbackServerLease;
 pub use state::{
-    GuardAcquisition, GuardObject, InstanceScope, OwnerLock, SingleInstanceGuard, StateRoot,
+    GuardAcquisition, GuardObject, InstanceScope, OWNER_ONLY_REMEDY, OwnerLock,
+    SingleInstanceGuard, StateRoot,
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
