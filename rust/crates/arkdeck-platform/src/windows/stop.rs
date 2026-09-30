@@ -18,7 +18,9 @@ use std::io;
 use std::ptr::{null, null_mut};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use windows_sys::Win32::Foundation::*;
-use windows_sys::Win32::System::Console::{CTRL_BREAK_EVENT, CTRL_C_EVENT, SetConsoleCtrlHandler};
+use windows_sys::Win32::System::Console::{
+    CTRL_BREAK_EVENT, CTRL_C_EVENT, GenerateConsoleCtrlEvent, SetConsoleCtrlHandler,
+};
 use windows_sys::Win32::System::Threading::*;
 
 /// The installed stop event, for the console control handler; null until
@@ -149,4 +151,21 @@ impl Latch {
     pub(crate) fn raw(&self) -> HANDLE {
         self.0.raw()
     }
+}
+
+/// Sends Ctrl+Break to one console process group that shares this process's
+/// console: a child this process started with `CREATE_NEW_PROCESS_GROUP`,
+/// whose process id names the group. What a console user's Ctrl+Break asks
+/// of that group, for tests and tools that stop a process they started
+/// (Ctrl+C cannot be targeted at a group). Group 0, every process on the
+/// console this one included, is refused.
+pub fn send_console_break(group: u32) -> io::Result<()> {
+    if group == 0 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Ctrl+Break is sent only to a named process group",
+        ));
+    }
+    // SAFETY: plain values; the system delivers the event asynchronously.
+    bool_result(unsafe { GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, group) })
 }

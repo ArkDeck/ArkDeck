@@ -44,7 +44,7 @@ pub use state::{
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-pub use stop::{Latch, StopSignal};
+pub use stop::{Latch, StopSignal, send_console_break};
 
 pub(crate) struct Handle(OwnedHandle);
 impl Handle {
