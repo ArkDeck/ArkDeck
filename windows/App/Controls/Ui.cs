@@ -213,6 +213,40 @@ internal static class Ui
         status.DispatcherQueue.TryEnqueue(() => Announce(status));
     }
 
+    /// <summary>A disclosure (macOS DisclosureGroup) as a Fluent Expander. Keyboard focus lands on
+    /// its header toggle, so that is the element named and identified.</summary>
+    public static Expander Disclosure(string id, string header, UIElement content)
+    {
+        var expander = new Expander { Header = header, Content = content, HorizontalAlignment = HorizontalAlignment.Stretch };
+        // Keyboard focus lands on the header toggle, which exists once the template is applied
+        // (which can follow Loaded); it carries the identifier and name.
+        void Name(int attempt)
+        {
+            if (Descendant<Microsoft.UI.Xaml.Controls.Primitives.ToggleButton>(expander) is { } toggle)
+            {
+                AutomationProperties.SetAutomationId(toggle, id);
+                AutomationProperties.SetName(toggle, header);
+            }
+            else if (attempt < 20)
+            {
+                expander.DispatcherQueue.TryEnqueue(Microsoft.UI.Dispatching.DispatcherQueuePriority.Low, () => Name(attempt + 1));
+            }
+        }
+        expander.Loaded += (_, _) => Name(0);
+        return expander;
+    }
+
+    private static T? Descendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) return match;
+            if (Descendant<T>(child) is { } nested) return nested;
+        }
+        return null;
+    }
+
     /// <summary>A Fluent content dialog in the App's window: title, content, a primary action
     /// and a close action (no secondary action, no disabled button).</summary>
     public static ContentDialog Dialog(XamlRoot root, string automationId, string title, UIElement content, string primary, string close)

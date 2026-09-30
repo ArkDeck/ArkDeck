@@ -46,6 +46,7 @@ public sealed partial class MainWindow : Window
                      (NavAgents, UiStrings.WindowsNavigationAgents),
                      (NavImports, UiStrings.WindowsNavigationImports),
                      (NavDebug, UiStrings.WindowsNavigationDebug),
+                     (NavFlash, UiStrings.WindowsNavigationFlash),
                      (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
@@ -158,6 +159,7 @@ public sealed partial class MainWindow : Window
                 "agents" => new AgentsPage(),
                 "imports" => new ImportsPage(),
                 "debug" => new DebugPage(),
+                "flash" => new FlashPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;

@@ -1722,6 +1722,838 @@ SHA-256: %4$@</value>
     <value>%@ accepts only letters, digits and . _ : - — the value never reaches a shell.</value>
     <comment>debug.typed.invalidIdentifier (DebugLocalizable.xcstrings)</comment>
   </data>
+  <data name="flash_action_cancel" xml:space="preserve">
+    <value>Cancel remaining steps</value>
+    <comment>flash.action.cancel (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_cancel_help" xml:space="preserve">
+    <value>If a partition write is in progress, Runtime finishes that critical step and stops only at the next safe boundary.</value>
+    <comment>flash.action.cancel.help (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_refresh" xml:space="preserve">
+    <value>Refresh Flash facts</value>
+    <comment>flash.action.refresh (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_available" xml:space="preserve">
+    <value>AVAILABLE — Runtime can materialize flash.full-restore@1</value>
+    <comment>flash.availability.available (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_checking" xml:space="preserve">
+    <value>Checking Runtime availability</value>
+    <comment>flash.availability.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_scope" xml:space="preserve">
+    <value>Availability describes the production Runtime. Preparing a preview never submits or runs an operation.</value>
+    <comment>flash.availability.scope (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_title" xml:space="preserve">
+    <value>Availability</value>
+    <comment>flash.availability.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_unavailable" xml:space="preserve">
+    <value>UNAVAILABLE — Flash execution is blocked</value>
+    <comment>flash.availability.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_detail" xml:space="preserve">
+    <value>The selected board matches one adopted Runtime target, while another board is still the active Flash binding. Click Flash once; Runtime will re-read the unique USB identity, atomically activate only the exact selected target, refresh prerequisites, and stop before any write if those facts drift.</value>
+    <comment>flash.binding.unprepared.hdc.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_title" xml:space="preserve">
+    <value>Selected DAYU200 needs active binding</value>
+    <comment>flash.binding.unprepared.hdc.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_bound" xml:space="preserve">
+    <value>Loader is bound to the selected device</value>
+    <comment>flash.bootloader.bound (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_detail" xml:space="preserve">
+    <value>ArkDeck found one DAYU200 in Loader mode, but it is not yet linked to a durable target. Select the device, then click Flash once; Runtime will bind the Loader, refresh the exact plan, and continue only if every prerequisite passes.</value>
+    <comment>flash.bootloader.unbound.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_title" xml:space="preserve">
+    <value>DAYU200 is already in Loader mode</value>
+    <comment>flash.bootloader.unbound.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unprepared_detail" xml:space="preserve">
+    <value>ArkDeck found the selected DAYU200 in Loader mode, but its historical binding needs a fresh Runtime attestation. Click Flash once; Runtime will re-attest the selected Loader, refresh the exact plan, and continue only if every prerequisite passes.</value>
+    <comment>flash.bootloader.unprepared.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_checking" xml:space="preserve">
+    <value>Checking RockUSB device access</value>
+    <comment>flash.deviceAccess.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_nextStep" xml:space="preserve">
+    <value>Minimum next step</value>
+    <comment>flash.deviceAccess.nextStep (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observationValue" xml:space="preserve">
+    <value>%1$d device(s) · %2$@</value>
+    <comment>flash.deviceAccess.observationValue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observations" xml:space="preserve">
+    <value>Observed</value>
+    <comment>flash.deviceAccess.observations (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_chooseSupportedLoaderObservation" xml:space="preserve">
+    <value>Use the supported DAYU200 Loader device shown above, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.chooseSupportedLoaderObservation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_inspectControlledDiagnostics" xml:space="preserve">
+    <value>Have the device or tool vendor inspect the controlled probe diagnostics.</value>
+    <comment>flash.deviceAccess.remediation.inspectControlledDiagnostics (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reconnectOrEnterLoader" xml:space="preserve">
+    <value>Reconnect the board or put it into Loader mode, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.reconnectOrEnterLoader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_repairDriverOutsideArkDeck" xml:space="preserve">
+    <value>Ask the device or tool vendor to repair the host USB driver or libusb backend outside ArkDeck, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.repairDriverOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reviewDevicePermissionOutsideArkDeck" xml:space="preserve">
+    <value>Ask a system administrator to grant this user access to the RockUSB device outside ArkDeck, then re-check.</value>
+    <comment>flash.deviceAccess.remediation.reviewDevicePermissionOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_reprobe" xml:space="preserve">
+    <value>Re-check device access</value>
+    <comment>flash.deviceAccess.reprobe (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility" xml:space="preserve">
+    <value>Responsible party</value>
+    <comment>flash.deviceAccess.responsibility (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_deviceOrToolVendor" xml:space="preserve">
+    <value>Device or tool vendor</value>
+    <comment>flash.deviceAccess.responsibility.deviceOrToolVendor (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_systemAdministrator" xml:space="preserve">
+    <value>System administrator</value>
+    <comment>flash.deviceAccess.responsibility.systemAdministrator (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_user" xml:space="preserve">
+    <value>Device operator</value>
+    <comment>flash.deviceAccess.responsibility.user (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_title" xml:space="preserve">
+    <value>Rockchip device access</value>
+    <comment>flash.deviceAccess.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_toolUnavailable" xml:space="preserve">
+    <value>ArkForge RockUSB discovery is unavailable</value>
+    <comment>flash.deviceAccess.toolUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_accessible" xml:space="preserve">
+    <value>Loader device access is ready</value>
+    <comment>flash.deviceAccess.verdict.accessible (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_driverUnavailable" xml:space="preserve">
+    <value>Host driver or libusb backend is unavailable</value>
+    <comment>flash.deviceAccess.verdict.driverUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_malformedOutput" xml:space="preserve">
+    <value>The registered probe returned unknown output</value>
+    <comment>flash.deviceAccess.verdict.malformedOutput (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_offline" xml:space="preserve">
+    <value>Device is offline or not in Loader mode</value>
+    <comment>flash.deviceAccess.verdict.offline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_permissionDenied" xml:space="preserve">
+    <value>Host permission denies RockUSB access</value>
+    <comment>flash.deviceAccess.verdict.permissionDenied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_probeFailed" xml:space="preserve">
+    <value>The registered device probe failed</value>
+    <comment>flash.deviceAccess.verdict.probeFailed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_protocolBlocked" xml:space="preserve">
+    <value>A device was found, but it is not a supported DAYU200 Loader target</value>
+    <comment>flash.deviceAccess.verdict.protocolBlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_destructive" xml:space="preserve">
+    <value>Destructive</value>
+    <comment>flash.effect.destructive (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_deviceMutation" xml:space="preserve">
+    <value>Device mutation</value>
+    <comment>flash.effect.deviceMutation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_hostOnly" xml:space="preserve">
+    <value>Host only</value>
+    <comment>flash.effect.hostOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_readOnly" xml:space="preserve">
+    <value>Read only</value>
+    <comment>flash.effect.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_fileAccess" xml:space="preserve">
+    <value>Unable to read the selected file. Select the image bundle again.</value>
+    <comment>flash.error.fileAccess (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_format" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z image archive.</value>
+    <comment>flash.error.format (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_invalid" xml:space="preserve">
+    <value>Choose a complete, valid DAYU200 image archive.</value>
+    <comment>flash.error.invalid (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_plan" xml:space="preserve">
+    <value>Unable to materialize the exact plan. Review the detail below.</value>
+    <comment>flash.error.plan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unreadable" xml:space="preserve">
+    <value>Unable to read the image bundle. Select it again.</value>
+    <comment>flash.error.unreadable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unsupported" xml:space="preserve">
+    <value>This image bundle does not match the selected DAYU200 profile.</value>
+    <comment>flash.error.unsupported (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_planRequired" xml:space="preserve">
+    <value>Prepare an exact execute plan before flashing.</value>
+    <comment>flash.execute.planRequired (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_prerequisiteBlocker" xml:space="preserve">
+    <value>Required Runtime prerequisites are unknown or not satisfied. Keep the intended DAYU200 connected, prepare its cross-mode binding, then prepare the exact plan again.</value>
+    <comment>flash.execute.prerequisiteBlocker (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_terminal" xml:space="preserve">
+    <value>Runtime Flash finished: %@</value>
+    <comment>flash.execute.terminal (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_image_choose" xml:space="preserve">
+    <value>Choose image bundle…</value>
+    <comment>flash.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_partitions" xml:space="preserve">
+    <value>The plan overwrites %d mapped partitions.</value>
+    <comment>flash.impact.partitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_preserved" xml:space="preserve">
+    <value>Orphan images, unmapped partitions, and sector gaps remain untouched.</value>
+    <comment>flash.impact.preserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_userdata" xml:space="preserve">
+    <value>userdata is overwritten; existing user data is destroyed.</value>
+    <comment>flash.impact.userdata (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_archiveHash" xml:space="preserve">
+    <value>Archive SHA-256</value>
+    <comment>flash.plan.archiveHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_build" xml:space="preserve">
+    <value>Embedded build</value>
+    <comment>flash.plan.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest" xml:space="preserve">
+    <value>Plan digest</value>
+    <comment>flash.plan.digest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest_materializedAtSubmission" xml:space="preserve">
+    <value>Materialized by Runtime at submission (recorded on the job)</value>
+    <comment>flash.plan.digest.materializedAtSubmission (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageHash" xml:space="preserve">
+    <value>Image SHA-256</value>
+    <comment>flash.plan.imageHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageSize" xml:space="preserve">
+    <value>Image size</value>
+    <comment>flash.plan.imageSize (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan" xml:space="preserve">
+    <value>ArkForge lane plan (preview)</value>
+    <comment>flash.plan.lanePlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_bundleNotInLaneStore" xml:space="preserve">
+    <value>Not previewable yet: this bundle has never entered the lane store; it becomes previewable after its first flash</value>
+    <comment>flash.plan.lanePlan.bundleNotInLaneStore (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_deviceNotObserved" xml:space="preserve">
+    <value>Device not observed</value>
+    <comment>flash.plan.lanePlan.deviceNotObserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_laneNotComposed" xml:space="preserve">
+    <value>This runtime has no ArkForge lane composed</value>
+    <comment>flash.plan.lanePlan.laneNotComposed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_pending" xml:space="preserve">
+    <value>Asking arkforged for a pre-materialization…</value>
+    <comment>flash.plan.lanePlan.pending (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_planNotExecutable" xml:space="preserve">
+    <value>arkforged declined an executable plan</value>
+    <comment>flash.plan.lanePlan.planNotExecutable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_unavailable" xml:space="preserve">
+    <value>Preview unavailable</value>
+    <comment>flash.plan.lanePlan.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_partitionCount" xml:space="preserve">
+    <value>Mapped partition images: %d</value>
+    <comment>flash.plan.partitionCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_preparing" xml:space="preserve">
+    <value>Reading, hashing, and validating the image bundle…</value>
+    <comment>flash.plan.preparing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisites" xml:space="preserve">
+    <value>Execution prerequisites</value>
+    <comment>flash.plan.prerequisites (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesAwaitPlan" xml:space="preserve">
+    <value>Profile prerequisites are listed once an exact plan exists.</value>
+    <comment>flash.plan.prerequisitesAwaitPlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesNote" xml:space="preserve">
+    <value>These are the latest read-only Runtime observations. Unknown is never upgraded by the App; Runtime verifies every required prerequisite again before a critical write.</value>
+    <comment>flash.plan.prerequisitesNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_size" xml:space="preserve">
+    <value>Archive size</value>
+    <comment>flash.plan.size (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_stepSetDigest" xml:space="preserve">
+    <value>Step-set digest</value>
+    <comment>flash.plan.stepSetDigest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_title" xml:space="preserve">
+    <value>Exact plan</value>
+    <comment>flash.plan.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_writeForbidden" xml:space="preserve">
+    <value>Archive members excluded from writes</value>
+    <comment>flash.plan.writeForbidden (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_binding" xml:space="preserve">
+    <value>Device binding</value>
+    <comment>flash.postflight.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_build" xml:space="preserve">
+    <value>System build</value>
+    <comment>flash.postflight.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_comparison" xml:space="preserve">
+    <value>Expected %1$@ · observed %2$@</value>
+    <comment>flash.postflight.comparison (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_match" xml:space="preserve">
+    <value>%1$@ matches. Expected %2$@; observed %3$@.</value>
+    <comment>flash.postflight.match (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_mismatch" xml:space="preserve">
+    <value>%1$@ does not match. Expected %2$@; observed %3$@.</value>
+    <comment>flash.postflight.mismatch (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_title" xml:space="preserve">
+    <value>Postflight checks</value>
+    <comment>flash.postflight.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_loader" xml:space="preserve">
+    <value>Loader mode</value>
+    <comment>flash.prerequisite.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_notApplicable" xml:space="preserve">
+    <value>Not applicable for this profile</value>
+    <comment>flash.prerequisite.notApplicable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_optional" xml:space="preserve">
+    <value>Optional for this profile</value>
+    <comment>flash.prerequisite.optional (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_recoveryPath" xml:space="preserve">
+    <value>Recovery path available</value>
+    <comment>flash.prerequisite.recoveryPath (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_required" xml:space="preserve">
+    <value>Required by this profile</value>
+    <comment>flash.prerequisite.required (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_stablePower" xml:space="preserve">
+    <value>Stable host and device power</value>
+    <comment>flash.prerequisite.stablePower (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_satisfied" xml:space="preserve">
+    <value>Satisfied</value>
+    <comment>flash.prerequisite.status.satisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unknown" xml:space="preserve">
+    <value>Unknown</value>
+    <comment>flash.prerequisite.status.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unsatisfied" xml:space="preserve">
+    <value>Not satisfied</value>
+    <comment>flash.prerequisite.status.unsatisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_unlocked" xml:space="preserve">
+    <value>Device write access</value>
+    <comment>flash.prerequisite.unlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_profile_label" xml:space="preserve">
+    <value>Device profile</value>
+    <comment>flash.profile.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_criticalWrite" xml:space="preserve">
+    <value>Writing a partition — this critical step cannot be interrupted. Stopping only prevents later steps. Do not close the lid, sleep the Mac, disconnect power, or unplug the device.</value>
+    <comment>flash.runtime.criticalWrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_empty" xml:space="preserve">
+    <value>No Runtime Flash jobs</value>
+    <comment>flash.runtime.empty (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_emptyDescription" xml:space="preserve">
+    <value>Preparing or confirming a local plan does not create a Job. Authorized Runtime execution will appear here.</value>
+    <comment>flash.runtime.emptyDescription (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>flash.runtime.job (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_jobCount" xml:space="preserve">
+    <value>Runtime Flash jobs: %d</value>
+    <comment>flash.runtime.jobCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_openRecord" xml:space="preserve">
+    <value>Open Runtime record</value>
+    <comment>flash.runtime.openRecord (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_outcomeUnknownGuidance" xml:space="preserve">
+    <value>The old device effect remains unknown. Runtime will automatically recognize or run an exact complete-overwrite recovery when proof is sufficient; a user confirmation cannot override missing proof.</value>
+    <comment>flash.runtime.outcomeUnknownGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_readOnly" xml:space="preserve">
+    <value>Read only: this card cannot cancel, retry, reconcile, or resume.</value>
+    <comment>flash.runtime.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_recoveryTitle" xml:space="preserve">
+    <value>A Runtime Flash job needs attention</value>
+    <comment>flash.runtime.recoveryTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_residue" xml:space="preserve">
+    <value>Outstanding cleanup items: %d</value>
+    <comment>flash.runtime.residue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_cancelled" xml:space="preserve">
+    <value>Runtime reports cancellation. Review the last confirmed stage before disconnecting the device.</value>
+    <comment>flash.runtime.result.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_failed" xml:space="preserve">
+    <value>Runtime reports failure. Use the Job record to find the last confirmed stage before recovery.</value>
+    <comment>flash.runtime.result.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_inProgress" xml:space="preserve">
+    <value>Runtime is still processing this Job. Progress is stage-based; no percentage is fabricated.</value>
+    <comment>flash.runtime.result.inProgress (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_interrupted" xml:space="preserve">
+    <value>Runtime reports an interruption. Open the Job record before deciding the device state.</value>
+    <comment>flash.runtime.result.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_needsAction" xml:space="preserve">
+    <value>Runtime stopped at a non-overridable safety blocker. This page cannot supply missing device-state proof.</value>
+    <comment>flash.runtime.result.needsAction (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_outcomeUnknown" xml:space="preserve">
+    <value>Device effect is unknown. Do not treat this Job as finished or start another flash.</value>
+    <comment>flash.runtime.result.outcomeUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_planned" xml:space="preserve">
+    <value>Plan-only Job completed. No device mutation was dispatched.</value>
+    <comment>flash.runtime.result.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_succeeded" xml:space="preserve">
+    <value>Runtime reports success after the Flash and postflight checks.</value>
+    <comment>flash.runtime.result.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_supersededByRecovery" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed complete-overwrite recovery established the current target state.</value>
+    <comment>flash.runtime.result.supersededByRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_targetAliasResolved" xml:space="preserve">
+    <value>This Job's outcome remains unknown, but a later confirmed full Flash proved its target was an alias and established the current device state.</value>
+    <comment>flash.runtime.result.targetAliasResolved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_unknown" xml:space="preserve">
+    <value>Runtime returned an unfamiliar state. Open the record before deciding what to do.</value>
+    <comment>flash.runtime.result.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_target" xml:space="preserve">
+    <value>Target</value>
+    <comment>flash.runtime.target (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_timeline" xml:space="preserve">
+    <value>Observed Runtime timeline</value>
+    <comment>flash.runtime.timeline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_title" xml:space="preserve">
+    <value>Runtime Flash activity</value>
+    <comment>flash.runtime.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailable" xml:space="preserve">
+    <value>Runtime Flash activity is unavailable</value>
+    <comment>flash.runtime.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailableNote" xml:space="preserve">
+    <value>An unreadable history is not an empty history. Refresh after Runtime becomes reachable.</value>
+    <comment>flash.runtime.unavailableNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_waitingForHumanGuidance" xml:space="preserve">
+    <value>Runtime stopped for an operator decision. Open the Job record and follow its exact recovery instruction; confirmation on this page cannot resume it.</value>
+    <comment>flash.runtime.waitingForHumanGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_awaitingRebindConfirmation" xml:space="preserve">
+    <value>Waiting for device rebind confirmation</value>
+    <comment>flash.state.awaitingRebindConfirmation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelRequested" xml:space="preserve">
+    <value>Cancel requested</value>
+    <comment>flash.state.cancelRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelled" xml:space="preserve">
+    <value>Cancelled</value>
+    <comment>flash.state.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancellingAtSafeBoundary" xml:space="preserve">
+    <value>Cancelling at a safe boundary</value>
+    <comment>flash.state.cancellingAtSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_failed" xml:space="preserve">
+    <value>Failed</value>
+    <comment>flash.state.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_finalizing" xml:space="preserve">
+    <value>Finalizing</value>
+    <comment>flash.state.finalizing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_interrupted" xml:space="preserve">
+    <value>Interrupted</value>
+    <comment>flash.state.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planned" xml:space="preserve">
+    <value>Planned</value>
+    <comment>flash.state.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planning" xml:space="preserve">
+    <value>Planning</value>
+    <comment>flash.state.planning (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_preflight" xml:space="preserve">
+    <value>Preflight</value>
+    <comment>flash.state.preflight (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_queued" xml:space="preserve">
+    <value>Queued</value>
+    <comment>flash.state.queued (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_reconciling" xml:space="preserve">
+    <value>Reconciling device outcome</value>
+    <comment>flash.state.reconciling (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recovered" xml:space="preserve">
+    <value>Recovered by complete overwrite</value>
+    <comment>flash.state.recovered (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recoveringByCompleteOverwrite" xml:space="preserve">
+    <value>Recovering by complete overwrite</value>
+    <comment>flash.state.recoveringByCompleteOverwrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_resumeAtConfirmedSafeBoundary" xml:space="preserve">
+    <value>Ready to resume at a confirmed boundary</value>
+    <comment>flash.state.resumeAtConfirmedSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_running" xml:space="preserve">
+    <value>Running</value>
+    <comment>flash.state.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_succeeded" xml:space="preserve">
+    <value>Succeeded</value>
+    <comment>flash.state.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_userAbandonRequested" xml:space="preserve">
+    <value>Waiting to confirm abandonment</value>
+    <comment>flash.state.userAbandonRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForDevice" xml:space="preserve">
+    <value>Waiting for device</value>
+    <comment>flash.state.waitingForDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForRecovery" xml:space="preserve">
+    <value>Waiting for recovery</value>
+    <comment>flash.state.waitingForRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_binding" xml:space="preserve">
+    <value>Binding revision</value>
+    <comment>flash.target.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_guidance" xml:space="preserve">
+    <value>Connect and adopt a DAYU200 in ArkDeck Runtime, then refresh this workspace.</value>
+    <comment>flash.target.guidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_historyMissing" xml:space="preserve">
+    <value>The historical target is not available. Select a current target explicitly to prepare a new plan; refreshing never switches devices for a historical run.</value>
+    <comment>flash.target.historyMissing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_label" xml:space="preserve">
+    <value>Exact target</value>
+    <comment>flash.target.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_none" xml:space="preserve">
+    <value>No adopted target is available</value>
+    <comment>flash.target.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_toolVersion" xml:space="preserve">
+    <value>Adopted tool version</value>
+    <comment>flash.target.toolVersion (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_unavailable" xml:space="preserve">
+    <value>unavailable</value>
+    <comment>flash.target.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_authority" xml:space="preserve">
+    <value>This click acknowledges the shown impact. Runtime still rechecks the exact target, image, plan, and prerequisites before any device effect.</value>
+    <comment>flash.workspace.action.authority (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_blocked" xml:space="preserve">
+    <value>%d required safety check(s) are unknown or not satisfied. Flash remains blocked.</value>
+    <comment>flash.workspace.action.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_impact" xml:space="preserve">
+    <value>This erases user data on %@.</value>
+    <comment>flash.workspace.action.impact (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_power" xml:space="preserve">
+    <value>Keep the device connected and on stable power. Do not close the Mac during flashing.</value>
+    <comment>flash.workspace.action.power (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_submit" xml:space="preserve">
+    <value>Erase data and start flashing</value>
+    <comment>flash.workspace.action.submit (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details" xml:space="preserve">
+    <value>Show flash details</value>
+    <comment>flash.workspace.details (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_configuration" xml:space="preserve">
+    <value>Target, profile, and prerequisites</value>
+    <comment>flash.workspace.details.configuration (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_hide" xml:space="preserve">
+    <value>Hide flash details</value>
+    <comment>flash.workspace.details.hide (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_detail" xml:space="preserve">
+    <value>%@ · binding revision %d</value>
+    <comment>flash.workspace.device.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_none" xml:space="preserve">
+    <value>No current device</value>
+    <comment>flash.workspace.device.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_change" xml:space="preserve">
+    <value>Change image…</value>
+    <comment>flash.workspace.image.change (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_choose" xml:space="preserve">
+    <value>Choose image…</value>
+    <comment>flash.workspace.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseHelp" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z DAYU200 image archive</value>
+    <comment>flash.workspace.image.chooseHelp (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseTitle" xml:space="preserve">
+    <value>Choose an image to flash</value>
+    <comment>flash.workspace.image.chooseTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_retry" xml:space="preserve">
+    <value>Retry image validation</value>
+    <comment>flash.workspace.image.retry (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_validating" xml:space="preserve">
+    <value>Validating the image and materializing the exact plan…</value>
+    <comment>flash.workspace.image.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_effect" xml:space="preserve">
+    <value>Highest effect</value>
+    <comment>flash.workspace.plan.effect (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_loader" xml:space="preserve">
+    <value>Enter Loader and bind identity</value>
+    <comment>flash.workspace.plan.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_prepare" xml:space="preserve">
+    <value>Prepare and validate</value>
+    <comment>flash.workspace.plan.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_stage" xml:space="preserve">
+    <value>Plan stage</value>
+    <comment>flash.workspace.plan.stage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_steps" xml:space="preserve">
+    <value>Steps</value>
+    <comment>flash.workspace.plan.steps (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_summary" xml:space="preserve">
+    <value>%d steps · highest effect: %@</value>
+    <comment>flash.workspace.plan.summary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_verify" xml:space="preserve">
+    <value>Read back, reboot, and verify</value>
+    <comment>flash.workspace.plan.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_write" xml:space="preserve">
+    <value>Write partitions</value>
+    <comment>flash.workspace.plan.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_bootloader" xml:space="preserve">
+    <value>Entering Bootloader</value>
+    <comment>flash.workspace.progress.bootloader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_extracting" xml:space="preserve">
+    <value>Extracting image archive</value>
+    <comment>flash.workspace.progress.extracting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_importing" xml:space="preserve">
+    <value>Importing image</value>
+    <comment>flash.workspace.progress.importing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_indeterminate" xml:space="preserve">
+    <value>Waiting for the next confirmed Runtime progress boundary.</value>
+    <comment>flash.workspace.progress.indeterminate (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_keepConnected" xml:space="preserve">
+    <value>Do not unplug, power off, or close the Mac. The current partition write will not be force-stopped.</value>
+    <comment>flash.workspace.progress.keepConnected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partition" xml:space="preserve">
+    <value>Flashing %@ partition</value>
+    <comment>flash.workspace.progress.partition (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionDetail" xml:space="preserve">
+    <value>%d/%d partitions completed · current partition %d%% · image write %d%%</value>
+    <comment>flash.workspace.progress.partitionDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionUnknown" xml:space="preserve">
+    <value>current</value>
+    <comment>flash.workspace.progress.partitionUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_rebooting" xml:space="preserve">
+    <value>Rebooting device</value>
+    <comment>flash.workspace.progress.rebooting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_reconnecting" xml:space="preserve">
+    <value>Waiting for device to reconnect</value>
+    <comment>flash.workspace.progress.reconnecting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_running" xml:space="preserve">
+    <value>Running</value>
+    <comment>flash.workspace.progress.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_validating" xml:space="preserve">
+    <value>Validating image</value>
+    <comment>flash.workspace.progress.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingPartitions" xml:space="preserve">
+    <value>Verifying written partitions</value>
+    <comment>flash.workspace.progress.verifyingPartitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingSystem" xml:space="preserve">
+    <value>Verifying flashed system</value>
+    <comment>flash.workspace.progress.verifyingSystem (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blocked" xml:space="preserve">
+    <value>Flash blocked</value>
+    <comment>flash.workspace.readiness.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blockerCount" xml:space="preserve">
+    <value>%d required check(s) need attention</value>
+    <comment>flash.workspace.readiness.blockerCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkCount" xml:space="preserve">
+    <value>%d required safety check(s) passed</value>
+    <comment>flash.workspace.readiness.checkCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checking" xml:space="preserve">
+    <value>Checking device</value>
+    <comment>flash.workspace.readiness.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkingDetail" xml:space="preserve">
+    <value>Runtime is validating the selected image and device facts</value>
+    <comment>flash.workspace.readiness.checkingDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_chooseImage" xml:space="preserve">
+    <value>Choose an image to run the exact safety checks</value>
+    <comment>flash.workspace.readiness.chooseImage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDevice" xml:space="preserve">
+    <value>Device required</value>
+    <comment>flash.workspace.readiness.noDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDeviceDetail" xml:space="preserve">
+    <value>Connect and adopt one DAYU200 target</value>
+    <comment>flash.workspace.readiness.noDeviceDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_planFailedDetail" xml:space="preserve">
+    <value>The exact plan could not be materialized</value>
+    <comment>flash.workspace.readiness.planFailedDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_ready" xml:space="preserve">
+    <value>Device ready</value>
+    <comment>flash.workspace.readiness.ready (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_selected" xml:space="preserve">
+    <value>Device selected</value>
+    <comment>flash.workspace.readiness.selected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_again" xml:space="preserve">
+    <value>Flash again</value>
+    <comment>flash.workspace.result.again (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_history" xml:space="preserve">
+    <value>Open History</value>
+    <comment>flash.workspace.result.history (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_state" xml:space="preserve">
+    <value>Runtime finished with state: %@. The device is not shown as successfully flashed.</value>
+    <comment>flash.workspace.result.state (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_stopped" xml:space="preserve">
+    <value>Flash stopped</value>
+    <comment>flash.workspace.result.stopped (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_success" xml:space="preserve">
+    <value>Flash succeeded</value>
+    <comment>flash.workspace.result.success (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_successDetail" xml:space="preserve">
+    <value>The device reconnected and its reported build and binding match the selected image and exact plan.</value>
+    <comment>flash.workspace.result.successDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_unverified" xml:space="preserve">
+    <value>Runtime did not provide complete postflight proof. The device is not shown as successfully flashed.</value>
+    <comment>flash.workspace.result.unverified (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_prepare" xml:space="preserve">
+    <value>Prepare</value>
+    <comment>flash.workspace.stage.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_verify" xml:space="preserve">
+    <value>Reboot &amp; verify</value>
+    <comment>flash.workspace.stage.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_write" xml:space="preserve">
+    <value>Write image</value>
+    <comment>flash.workspace.stage.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_subtitle" xml:space="preserve">
+    <value>Choose an image and start flashing. During the run, the page focuses on progress; when done, it shows the result.</value>
+    <comment>flash.workspace.subtitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_title" xml:space="preserve">
+    <value>Flash</value>
+    <comment>flash.workspace.title (FlashLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -2697,5 +3529,29 @@ SHA-256: %4$@</value>
   <data name="windows_debug_selectedTab" xml:space="preserve">
     <value>%@ tab</value>
     <comment>windows.debug.selectedTab (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_flash" xml:space="preserve">
+    <value>Flash</value>
+    <comment>windows.navigation.flash (Windows only)</comment>
+  </data>
+  <data name="windows_flash_action_power" xml:space="preserve">
+    <value>Keep the device connected and on stable power. Do not shut down, sleep or unplug the PC during flashing.</value>
+    <comment>windows.flash.action.power (Windows only)</comment>
+  </data>
+  <data name="windows_flash_progress_keepConnected" xml:space="preserve">
+    <value>Do not unplug, power off, or put the PC to sleep. The current partition write will not be force-stopped.</value>
+    <comment>windows.flash.progress.keepConnected (Windows only)</comment>
+  </data>
+  <data name="windows_flash_runtime_criticalWrite" xml:space="preserve">
+    <value>Writing a partition — this critical step cannot be interrupted. Stopping only prevents later steps. Do not put the PC to sleep, disconnect power, or unplug the device.</value>
+    <comment>windows.flash.runtime.criticalWrite (Windows only)</comment>
+  </data>
+  <data name="windows_flash_chooseImage_invalid" xml:space="preserve">
+    <value>Choose a .tar.gz, .zip, or .7z image archive.</value>
+    <comment>windows.flash.chooseImage.invalid (Windows only)</comment>
+  </data>
+  <data name="windows_flash_targetChanged" xml:space="preserve">
+    <value>The selected target changed; the exact plan is prepared again.</value>
+    <comment>windows.flash.targetChanged (Windows only)</comment>
   </data>
 </root>

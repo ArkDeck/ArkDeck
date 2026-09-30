@@ -86,7 +86,7 @@ public sealed partial class DebugPage
         {
             inputs.Children.Add(Ui.Text("debug.artifacts.logicalName.invalid", S.Text(UiStrings.DebugArtifactsLogicalNameInvalid)));
         }
-        inputs.Children.Add(Disclosure("debug.artifacts.advanced", S.Text(UiStrings.DebugArtifactsAdvanced), Ui.Stack(6,
+        inputs.Children.Add(Ui.Disclosure("debug.artifacts.advanced", S.Text(UiStrings.DebugArtifactsAdvanced), Ui.Stack(6,
             Ui.Fact("debug.artifacts.verification", S.Text(UiStrings.DebugArtifactsVerification), S.Text(UiStrings.DebugArtifactsVerifyMaps)),
             Ui.Fact("debug.artifacts.rollback", S.Text(UiStrings.DebugArtifactsRollback), S.Text(UiStrings.DebugArtifactsRollbackAuto)),
             Ui.Text("debug.artifacts.policy.required", S.Text(UiStrings.DebugArtifactsPolicyRequired), "ArkDeckCaptionStyle"))));
@@ -322,7 +322,7 @@ public sealed partial class DebugPage
             capture.Children.Add(Ui.Text("debug.logs.filters.invalid", S.Format(UiStrings.DebugLogsFiltersInvalid, string.Join(", ", invalid))));
         }
         capture.Children.Add(Ui.Text("debug.logs.rawSave", S.Text(UiStrings.DebugLogsRawSave), "ArkDeckCaptionStyle"));
-        var request = Disclosure("debug.logs.request", S.Text(UiStrings.DebugLogsRequestTitle), Ui.Stack(4,
+        var request = Ui.Disclosure("debug.logs.request", S.Text(UiStrings.DebugLogsRequestTitle), Ui.Stack(4,
                 Ui.Fact("debug.logs.request.operation", S.Text(UiStrings.DebugAvailabilityOperation), DebugOperations.CaptureDiagnostics),
                 Ui.Fact("debug.logs.request.duration", "durationSeconds", _logSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)),
                 Ui.Fact("debug.logs.request.filters", "hilogFilters", "[" + string.Join(", ", LogFilterTokens()) + "]"),
@@ -553,7 +553,7 @@ public sealed partial class DebugPage
         _tab.Children.Add(Section("debug.apps.lifecycle", UiStrings.DebugAppsLifecycleTitle, null, false, lifecycle));
 
         var plan = Ui.Stack(8);
-        var request = Disclosure("debug.apps.request", S.Text(UiStrings.DebugLogsRequestTitle), Ui.Stack(4,
+        var request = Ui.Disclosure("debug.apps.request", S.Text(UiStrings.DebugLogsRequestTitle), Ui.Stack(4,
                 Ui.Fact("debug.apps.request.operation", S.Text(UiStrings.DebugAvailabilityOperation), DebugOperations.DebugHap),
                 Ui.Fact("debug.apps.request.package", S.Text(UiStrings.DebugAppsPackageTitle), _hapPath is null ? "—" : Path.GetFileName(_hapPath)),
                 Ui.Fact("debug.apps.request.additional", S.Text(UiStrings.DebugAppsAdditionalTitle), _additionalHaps.Count == 0 ? "—" : string.Join("\n", _additionalHaps.Select(Path.GetFileName))),
@@ -943,33 +943,6 @@ public sealed partial class DebugPage
         AutomationProperties.SetName(box, header);
         box.TextChanged += (_, _) => changed(box.Text);
         return box;
-    }
-
-    /// <summary>A disclosure (macOS DisclosureGroup) as a Fluent Expander. Keyboard focus lands on
-    /// its header toggle, so that is the element named and identified.</summary>
-    private static Expander Disclosure(string id, string header, UIElement content)
-    {
-        var expander = new Expander { Header = header, Content = content, HorizontalAlignment = HorizontalAlignment.Stretch };
-        expander.Loaded += (_, _) =>
-        {
-            if (Descendant<Microsoft.UI.Xaml.Controls.Primitives.ToggleButton>(expander) is { } toggle)
-            {
-                AutomationProperties.SetAutomationId(toggle, id);
-                AutomationProperties.SetName(toggle, header);
-            }
-        };
-        return expander;
-    }
-
-    private static T? Descendant<T>(DependencyObject root) where T : DependencyObject
-    {
-        for (var i = 0; i < Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root); i++)
-        {
-            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
-            if (child is T match) return match;
-            if (Descendant<T>(child) is { } nested) return nested;
-        }
-        return null;
     }
 
     /// <summary>A closed choice (macOS Picker) as a ComboBox with a header.</summary>

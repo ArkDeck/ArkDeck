@@ -194,6 +194,9 @@ public sealed record JobTerminal(string JobId, string State, bool OutcomeUnknown
     }
 }
 
+/// <summary>A Job as <c>job.show</c> reads it: its terminal facts and its status object.</summary>
+public sealed record JobShown(JobTerminal Terminal, JsonObject Status);
+
 /// <summary>A submitted Job: its identifier (<c>arkdeck.job-acceptance/1</c>).</summary>
 public sealed record JobAcceptance(string JobId)
 {
@@ -306,8 +309,18 @@ public sealed partial class SurfaceLoader
     {
         var run = await Action("job.run", Params(("jobId", new JsonString(jobId))), v => Json.Object(v, "a Job status"), cli).ConfigureAwait(false);
         if (run.Answer.Unavailable is { } refused) return new(Loaded<JobTerminal>.Not(refused), run.DaemonFailure, run.Reached);
+        var shown = await ShowAsync(jobId, cli).ConfigureAwait(false);
+        return new(shown.Answer.Value is { } value ? Loaded<JobTerminal>.Of(value.Terminal) : Loaded<JobTerminal>.Not(shown.Answer.Unavailable!),
+            shown.DaemonFailure, shown.Reached);
+    }
+
+    /// <summary>A Job's status presentation (<c>job.show</c>, its timeline inline or paged
+    /// through <c>job.timeline</c>): the terminal facts, and the status object for the facts a
+    /// workspace reads beyond them (a Flash's <c>processProgress</c>).</summary>
+    internal async Task<SessionActionState<JobShown>> ShowAsync(string jobId, string cli)
+    {
         var detail = await Action("job.show", Params(("jobId", new JsonString(jobId))), v => Json.Object(v, "a Job"), cli).ConfigureAwait(false);
-        if (detail.Answer.Unavailable is { } unread) return new(Loaded<JobTerminal>.Not(unread), detail.DaemonFailure, detail.Reached);
+        if (detail.Answer.Unavailable is { } unread) return new(Loaded<JobShown>.Not(unread), detail.DaemonFailure, detail.Reached);
         try
         {
             var show = detail.Answer.Value!;
@@ -320,12 +333,12 @@ public sealed partial class SurfaceLoader
                 : await TimelinePagesAsync(jobId).ConfigureAwait(false);
             var state = TypedJson.Required(job, "state", TypedJson.String);
             var unknown = TypedJson.Required(job, "outcomeUnknown", TypedJson.Bool);
-            return new(Loaded<JobTerminal>.Of(new JobTerminal(jobId, state, unknown, JobTerminal.FailureCodeOf(job, state, unknown), entries)),
+            return new(Loaded<JobShown>.Of(new JobShown(new JobTerminal(jobId, state, unknown, JobTerminal.FailureCodeOf(job, state, unknown), entries), job)),
                 detail.DaemonFailure, detail.Reached);
         }
         catch (Exception error) when (error is ContractException or InvalidCastException or KeyNotFoundException or FormatException)
         {
-            return new(Loaded<JobTerminal>.Not(Unavailable.Unreadable(error, cli)), detail.DaemonFailure, true);
+            return new(Loaded<JobShown>.Not(Unavailable.Unreadable(error, cli)), detail.DaemonFailure, true);
         }
     }
 

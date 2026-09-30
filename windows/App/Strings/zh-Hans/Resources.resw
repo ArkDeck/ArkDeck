@@ -1722,6 +1722,838 @@ SHA-256：%4$@</value>
     <value>%@ 只接受字母、数字和 . _ : -；该值绝不会进入 shell。</value>
     <comment>debug.typed.invalidIdentifier (DebugLocalizable.xcstrings)</comment>
   </data>
+  <data name="flash_action_cancel" xml:space="preserve">
+    <value>取消后续步骤</value>
+    <comment>flash.action.cancel (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_cancel_help" xml:space="preserve">
+    <value>若正在写入分区，Runtime 会完成该临界步骤，仅在下一个安全边界停止。</value>
+    <comment>flash.action.cancel.help (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_action_refresh" xml:space="preserve">
+    <value>刷新刷机状态</value>
+    <comment>flash.action.refresh (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_available" xml:space="preserve">
+    <value>AVAILABLE — Runtime 可生成 flash.full-restore@1 计划</value>
+    <comment>flash.availability.available (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_checking" xml:space="preserve">
+    <value>正在检查 Runtime 可用性</value>
+    <comment>flash.availability.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_scope" xml:space="preserve">
+    <value>可用性来自生产 Runtime。生成预览不会提交或执行任何操作。</value>
+    <comment>flash.availability.scope (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_title" xml:space="preserve">
+    <value>可用性</value>
+    <comment>flash.availability.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_availability_unavailable" xml:space="preserve">
+    <value>UNAVAILABLE — 刷机执行已阻断</value>
+    <comment>flash.availability.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_detail" xml:space="preserve">
+    <value>所选开发板精确匹配一个已采用的 Runtime 目标，但另一台设备仍是当前刷机绑定。只需点击一次刷机；Runtime 会重新读取唯一 USB 身份，仅原子激活精确选中的目标并刷新前置条件；若事实发生漂移，将在任何写入前停止。</value>
+    <comment>flash.binding.unprepared.hdc.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_binding_unprepared_hdc_title" xml:space="preserve">
+    <value>所选 DAYU200 需要切换为当前绑定</value>
+    <comment>flash.binding.unprepared.hdc.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_bound" xml:space="preserve">
+    <value>Loader 已绑定到所选设备</value>
+    <comment>flash.bootloader.bound (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_detail" xml:space="preserve">
+    <value>ArkDeck 已发现一台处于 Loader 模式的 DAYU200，但它尚未关联到持久设备。请选择该设备，然后只需点击一次刷机；Runtime 会绑定 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</value>
+    <comment>flash.bootloader.unbound.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unbound_title" xml:space="preserve">
+    <value>DAYU200 已进入 Loader 模式</value>
+    <comment>flash.bootloader.unbound.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_bootloader_unprepared_detail" xml:space="preserve">
+    <value>ArkDeck 已发现所选 DAYU200 处于 Loader 模式，但其历史绑定需要由 Runtime 重新核验。只需点击一次刷机；Runtime 会重新核验所选 Loader、刷新精确计划，并仅在全部前置条件通过后继续。</value>
+    <comment>flash.bootloader.unprepared.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_checking" xml:space="preserve">
+    <value>正在检查 RockUSB 设备访问</value>
+    <comment>flash.deviceAccess.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_nextStep" xml:space="preserve">
+    <value>最小修复步骤</value>
+    <comment>flash.deviceAccess.nextStep (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observationValue" xml:space="preserve">
+    <value>%1$d 台设备 · %2$@</value>
+    <comment>flash.deviceAccess.observationValue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_observations" xml:space="preserve">
+    <value>已发现</value>
+    <comment>flash.deviceAccess.observations (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_chooseSupportedLoaderObservation" xml:space="preserve">
+    <value>选择上方受支持的 DAYU200 Loader 设备，然后重新检查。</value>
+    <comment>flash.deviceAccess.remediation.chooseSupportedLoaderObservation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_inspectControlledDiagnostics" xml:space="preserve">
+    <value>请设备或工具供应方检查受控探测诊断。</value>
+    <comment>flash.deviceAccess.remediation.inspectControlledDiagnostics (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reconnectOrEnterLoader" xml:space="preserve">
+    <value>重新连接开发板或让其进入 Loader 模式，然后重新检查。</value>
+    <comment>flash.deviceAccess.remediation.reconnectOrEnterLoader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_repairDriverOutsideArkDeck" xml:space="preserve">
+    <value>请设备或工具供应方在 ArkDeck 外修复主机 USB 驱动或 libusb backend，然后重新检查。</value>
+    <comment>flash.deviceAccess.remediation.repairDriverOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_remediation_reviewDevicePermissionOutsideArkDeck" xml:space="preserve">
+    <value>请系统管理员在 ArkDeck 外为当前用户授予 RockUSB 设备访问权限，然后重新检查。</value>
+    <comment>flash.deviceAccess.remediation.reviewDevicePermissionOutsideArkDeck (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_reprobe" xml:space="preserve">
+    <value>重新检查设备访问</value>
+    <comment>flash.deviceAccess.reprobe (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility" xml:space="preserve">
+    <value>处理责任方</value>
+    <comment>flash.deviceAccess.responsibility (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_deviceOrToolVendor" xml:space="preserve">
+    <value>设备或工具供应方</value>
+    <comment>flash.deviceAccess.responsibility.deviceOrToolVendor (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_systemAdministrator" xml:space="preserve">
+    <value>系统管理员</value>
+    <comment>flash.deviceAccess.responsibility.systemAdministrator (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_responsibility_user" xml:space="preserve">
+    <value>设备操作员</value>
+    <comment>flash.deviceAccess.responsibility.user (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_title" xml:space="preserve">
+    <value>Rockchip 设备访问</value>
+    <comment>flash.deviceAccess.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_toolUnavailable" xml:space="preserve">
+    <value>ArkForge RockUSB 探测不可用</value>
+    <comment>flash.deviceAccess.toolUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_accessible" xml:space="preserve">
+    <value>Loader 设备访问就绪</value>
+    <comment>flash.deviceAccess.verdict.accessible (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_driverUnavailable" xml:space="preserve">
+    <value>主机驱动或 libusb backend 不可用</value>
+    <comment>flash.deviceAccess.verdict.driverUnavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_malformedOutput" xml:space="preserve">
+    <value>已注册探测返回未知输出</value>
+    <comment>flash.deviceAccess.verdict.malformedOutput (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_offline" xml:space="preserve">
+    <value>设备离线或未进入 Loader 模式</value>
+    <comment>flash.deviceAccess.verdict.offline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_permissionDenied" xml:space="preserve">
+    <value>主机权限拒绝 RockUSB 访问</value>
+    <comment>flash.deviceAccess.verdict.permissionDenied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_probeFailed" xml:space="preserve">
+    <value>已注册设备探测失败</value>
+    <comment>flash.deviceAccess.verdict.probeFailed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_deviceAccess_verdict_protocolBlocked" xml:space="preserve">
+    <value>已发现设备，但它不是受支持的 DAYU200 Loader 目标</value>
+    <comment>flash.deviceAccess.verdict.protocolBlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_destructive" xml:space="preserve">
+    <value>破坏性</value>
+    <comment>flash.effect.destructive (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_deviceMutation" xml:space="preserve">
+    <value>设备变更</value>
+    <comment>flash.effect.deviceMutation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_hostOnly" xml:space="preserve">
+    <value>仅主机</value>
+    <comment>flash.effect.hostOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_effect_readOnly" xml:space="preserve">
+    <value>只读</value>
+    <comment>flash.effect.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_fileAccess" xml:space="preserve">
+    <value>无法读取所选文件，请重新选择镜像包。</value>
+    <comment>flash.error.fileAccess (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_format" xml:space="preserve">
+    <value>请选择 .tar.gz、.zip 或 .7z 格式的镜像压缩包。</value>
+    <comment>flash.error.format (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_invalid" xml:space="preserve">
+    <value>请选择完整且有效的 DAYU200 镜像压缩包。</value>
+    <comment>flash.error.invalid (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_plan" xml:space="preserve">
+    <value>无法生成精确计划，请查看下方详情。</value>
+    <comment>flash.error.plan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unreadable" xml:space="preserve">
+    <value>无法读取镜像包，请重新选择。</value>
+    <comment>flash.error.unreadable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_error_unsupported" xml:space="preserve">
+    <value>此镜像包与所选 DAYU200 配置不匹配。</value>
+    <comment>flash.error.unsupported (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_planRequired" xml:space="preserve">
+    <value>刷机前请先生成精确执行计划。</value>
+    <comment>flash.execute.planRequired (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_prerequisiteBlocker" xml:space="preserve">
+    <value>必需的 Runtime 前置条件未知或未满足。请保持目标 DAYU200 连接，完成跨模式绑定后重新生成精确计划。</value>
+    <comment>flash.execute.prerequisiteBlocker (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_execute_terminal" xml:space="preserve">
+    <value>Runtime 刷机结束：%@</value>
+    <comment>flash.execute.terminal (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_image_choose" xml:space="preserve">
+    <value>选择镜像包…</value>
+    <comment>flash.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_partitions" xml:space="preserve">
+    <value>计划将覆盖 %d 个已映射分区。</value>
+    <comment>flash.impact.partitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_preserved" xml:space="preserve">
+    <value>孤立镜像、未映射分区和扇区间隙均不会被写入。</value>
+    <comment>flash.impact.preserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_impact_userdata" xml:space="preserve">
+    <value>userdata 将被覆盖，现有用户数据会被清除。</value>
+    <comment>flash.impact.userdata (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_archiveHash" xml:space="preserve">
+    <value>归档 SHA-256</value>
+    <comment>flash.plan.archiveHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_build" xml:space="preserve">
+    <value>内嵌系统版本</value>
+    <comment>flash.plan.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest" xml:space="preserve">
+    <value>计划摘要</value>
+    <comment>flash.plan.digest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_digest_materializedAtSubmission" xml:space="preserve">
+    <value>提交时由 Runtime 物化（记录于任务）</value>
+    <comment>flash.plan.digest.materializedAtSubmission (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageHash" xml:space="preserve">
+    <value>镜像 SHA-256</value>
+    <comment>flash.plan.imageHash (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_imageSize" xml:space="preserve">
+    <value>镜像大小</value>
+    <comment>flash.plan.imageSize (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan" xml:space="preserve">
+    <value>ArkForge lane 计划（预物化）</value>
+    <comment>flash.plan.lanePlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_bundleNotInLaneStore" xml:space="preserve">
+    <value>暂不可预览：该镜像包尚未进入 lane 存储；首刷之后即可预览</value>
+    <comment>flash.plan.lanePlan.bundleNotInLaneStore (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_deviceNotObserved" xml:space="preserve">
+    <value>设备未被观察到</value>
+    <comment>flash.plan.lanePlan.deviceNotObserved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_laneNotComposed" xml:space="preserve">
+    <value>当前 Runtime 未组合 ArkForge lane</value>
+    <comment>flash.plan.lanePlan.laneNotComposed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_pending" xml:space="preserve">
+    <value>正在向 arkforged 请求预物化……</value>
+    <comment>flash.plan.lanePlan.pending (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_planNotExecutable" xml:space="preserve">
+    <value>arkforged 拒绝给出可执行计划</value>
+    <comment>flash.plan.lanePlan.planNotExecutable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_lanePlan_unavailable" xml:space="preserve">
+    <value>预览不可用</value>
+    <comment>flash.plan.lanePlan.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_partitionCount" xml:space="preserve">
+    <value>已映射分区镜像：%d</value>
+    <comment>flash.plan.partitionCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_preparing" xml:space="preserve">
+    <value>正在读取、哈希并校验镜像包……</value>
+    <comment>flash.plan.preparing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisites" xml:space="preserve">
+    <value>执行前置条件</value>
+    <comment>flash.plan.prerequisites (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesAwaitPlan" xml:space="preserve">
+    <value>生成精确计划后展示 profile 前置条件。</value>
+    <comment>flash.plan.prerequisitesAwaitPlan (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_prerequisitesNote" xml:space="preserve">
+    <value>以下为 Runtime 最新只读探测结果。App 不会把 unknown 猜成满足；Runtime 会在临界写入前再次验证全部必需前置条件。</value>
+    <comment>flash.plan.prerequisitesNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_size" xml:space="preserve">
+    <value>归档大小</value>
+    <comment>flash.plan.size (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_stepSetDigest" xml:space="preserve">
+    <value>步骤集摘要</value>
+    <comment>flash.plan.stepSetDigest (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_title" xml:space="preserve">
+    <value>精确计划</value>
+    <comment>flash.plan.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_plan_writeForbidden" xml:space="preserve">
+    <value>禁止写入的归档成员</value>
+    <comment>flash.plan.writeForbidden (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_binding" xml:space="preserve">
+    <value>设备绑定</value>
+    <comment>flash.postflight.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_build" xml:space="preserve">
+    <value>系统构建版本</value>
+    <comment>flash.postflight.build (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_comparison" xml:space="preserve">
+    <value>期望 %1$@ · 实测 %2$@</value>
+    <comment>flash.postflight.comparison (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_match" xml:space="preserve">
+    <value>%1$@ 匹配。期望 %2$@；实测 %3$@。</value>
+    <comment>flash.postflight.match (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_mismatch" xml:space="preserve">
+    <value>%1$@ 不匹配。期望 %2$@；实测 %3$@。</value>
+    <comment>flash.postflight.mismatch (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_postflight_title" xml:space="preserve">
+    <value>刷写后检查</value>
+    <comment>flash.postflight.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_loader" xml:space="preserve">
+    <value>Loader 模式</value>
+    <comment>flash.prerequisite.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_notApplicable" xml:space="preserve">
+    <value>此设备配置不适用</value>
+    <comment>flash.prerequisite.notApplicable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_optional" xml:space="preserve">
+    <value>此设备配置为可选</value>
+    <comment>flash.prerequisite.optional (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_recoveryPath" xml:space="preserve">
+    <value>具备恢复路径</value>
+    <comment>flash.prerequisite.recoveryPath (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_required" xml:space="preserve">
+    <value>此设备配置要求</value>
+    <comment>flash.prerequisite.required (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_stablePower" xml:space="preserve">
+    <value>主机与设备供电稳定</value>
+    <comment>flash.prerequisite.stablePower (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_satisfied" xml:space="preserve">
+    <value>已满足</value>
+    <comment>flash.prerequisite.status.satisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unknown" xml:space="preserve">
+    <value>未知</value>
+    <comment>flash.prerequisite.status.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_status_unsatisfied" xml:space="preserve">
+    <value>未满足</value>
+    <comment>flash.prerequisite.status.unsatisfied (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_prerequisite_unlocked" xml:space="preserve">
+    <value>设备写入权限</value>
+    <comment>flash.prerequisite.unlocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_profile_label" xml:space="preserve">
+    <value>设备配置</value>
+    <comment>flash.profile.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_criticalWrite" xml:space="preserve">
+    <value>正在写入分区——临界区不可中断；停止只会阻止后续步骤。请勿合盖、手动睡眠、断电或拔线。</value>
+    <comment>flash.runtime.criticalWrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_empty" xml:space="preserve">
+    <value>尚无 Runtime 刷机 Job</value>
+    <comment>flash.runtime.empty (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_emptyDescription" xml:space="preserve">
+    <value>在本地生成或确认计划不会创建 Job；经授权的 Runtime 执行会显示在这里。</value>
+    <comment>flash.runtime.emptyDescription (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>flash.runtime.job (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_jobCount" xml:space="preserve">
+    <value>Runtime 刷机 Job：%d</value>
+    <comment>flash.runtime.jobCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_openRecord" xml:space="preserve">
+    <value>打开 Runtime 记录</value>
+    <comment>flash.runtime.openRecord (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_outcomeUnknownGuidance" xml:space="preserve">
+    <value>旧设备影响仍然未知。证明充分时，Runtime 会自动识别或执行精确的完整覆写恢复；用户确认不能绕过缺失的证明。</value>
+    <comment>flash.runtime.outcomeUnknownGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_readOnly" xml:space="preserve">
+    <value>只读：此卡片不能取消、重试、核对或恢复执行。</value>
+    <comment>flash.runtime.readOnly (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_recoveryTitle" xml:space="preserve">
+    <value>Runtime 刷机 Job 需要处理</value>
+    <comment>flash.runtime.recoveryTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_residue" xml:space="preserve">
+    <value>未清理项目：%d</value>
+    <comment>flash.runtime.residue (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_cancelled" xml:space="preserve">
+    <value>Runtime 报告已取消。断开设备前，请核对最后确认的阶段。</value>
+    <comment>flash.runtime.result.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_failed" xml:space="preserve">
+    <value>Runtime 报告失败。开始恢复前，请从 Job 记录确认最后完成的阶段。</value>
+    <comment>flash.runtime.result.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_inProgress" xml:space="preserve">
+    <value>Runtime 仍在处理此 Job。进度按真实阶段展示，不生成虚假百分比。</value>
+    <comment>flash.runtime.result.inProgress (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_interrupted" xml:space="preserve">
+    <value>Runtime 报告执行中断。判断设备状态前，请打开 Job 记录。</value>
+    <comment>flash.runtime.result.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_needsAction" xml:space="preserve">
+    <value>Runtime 已停在不可绕过的安全阻塞处。此页面不能补足缺失的设备状态证明。</value>
+    <comment>flash.runtime.result.needsAction (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_outcomeUnknown" xml:space="preserve">
+    <value>设备影响未知。不要把此 Job 视为完成，也不要开始下一次刷机。</value>
+    <comment>flash.runtime.result.outcomeUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_planned" xml:space="preserve">
+    <value>仅计划 Job 已完成，未派发设备变更。</value>
+    <comment>flash.runtime.result.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_succeeded" xml:space="preserve">
+    <value>Runtime 报告刷机及 postflight 检查成功。</value>
+    <comment>flash.runtime.result.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_supersededByRecovery" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整覆写恢复已建立当前目标状态。</value>
+    <comment>flash.runtime.result.supersededByRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_targetAliasResolved" xml:space="preserve">
+    <value>此 Job 的结果仍未知，但后续已确认的完整刷机证明其目标是别名，并建立了当前设备状态。</value>
+    <comment>flash.runtime.result.targetAliasResolved (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_result_unknown" xml:space="preserve">
+    <value>Runtime 返回了未知状态。决定下一步前，请打开记录。</value>
+    <comment>flash.runtime.result.unknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_target" xml:space="preserve">
+    <value>目标</value>
+    <comment>flash.runtime.target (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_timeline" xml:space="preserve">
+    <value>Runtime 观测时间线</value>
+    <comment>flash.runtime.timeline (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_title" xml:space="preserve">
+    <value>Runtime 刷机活动</value>
+    <comment>flash.runtime.title (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailable" xml:space="preserve">
+    <value>Runtime 刷机活动不可用</value>
+    <comment>flash.runtime.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_unavailableNote" xml:space="preserve">
+    <value>无法读取历史不等于历史为空。Runtime 恢复可达后请刷新。</value>
+    <comment>flash.runtime.unavailableNote (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_runtime_waitingForHumanGuidance" xml:space="preserve">
+    <value>Runtime 已停下等待操作员决定。请打开 Job 记录并遵循其精确恢复指引；此页面的确认不能恢复执行。</value>
+    <comment>flash.runtime.waitingForHumanGuidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_awaitingRebindConfirmation" xml:space="preserve">
+    <value>等待设备重新绑定确认</value>
+    <comment>flash.state.awaitingRebindConfirmation (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelRequested" xml:space="preserve">
+    <value>已请求取消</value>
+    <comment>flash.state.cancelRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancelled" xml:space="preserve">
+    <value>已取消</value>
+    <comment>flash.state.cancelled (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_cancellingAtSafeBoundary" xml:space="preserve">
+    <value>正在安全边界取消</value>
+    <comment>flash.state.cancellingAtSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_failed" xml:space="preserve">
+    <value>失败</value>
+    <comment>flash.state.failed (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_finalizing" xml:space="preserve">
+    <value>正在完成记录</value>
+    <comment>flash.state.finalizing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_interrupted" xml:space="preserve">
+    <value>已中断</value>
+    <comment>flash.state.interrupted (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planned" xml:space="preserve">
+    <value>仅计划完成</value>
+    <comment>flash.state.planned (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_planning" xml:space="preserve">
+    <value>正在生成计划</value>
+    <comment>flash.state.planning (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_preflight" xml:space="preserve">
+    <value>正在执行前检查</value>
+    <comment>flash.state.preflight (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_queued" xml:space="preserve">
+    <value>已排队</value>
+    <comment>flash.state.queued (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_reconciling" xml:space="preserve">
+    <value>正在核对设备结果</value>
+    <comment>flash.state.reconciling (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recovered" xml:space="preserve">
+    <value>已通过完整覆写恢复</value>
+    <comment>flash.state.recovered (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_recoveringByCompleteOverwrite" xml:space="preserve">
+    <value>正在通过完整覆写恢复</value>
+    <comment>flash.state.recoveringByCompleteOverwrite (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_resumeAtConfirmedSafeBoundary" xml:space="preserve">
+    <value>可从已确认边界恢复</value>
+    <comment>flash.state.resumeAtConfirmedSafeBoundary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_running" xml:space="preserve">
+    <value>正在执行</value>
+    <comment>flash.state.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_succeeded" xml:space="preserve">
+    <value>成功</value>
+    <comment>flash.state.succeeded (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_userAbandonRequested" xml:space="preserve">
+    <value>等待确认结束恢复</value>
+    <comment>flash.state.userAbandonRequested (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForDevice" xml:space="preserve">
+    <value>正在等待设备</value>
+    <comment>flash.state.waitingForDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_state_waitingForRecovery" xml:space="preserve">
+    <value>等待恢复</value>
+    <comment>flash.state.waitingForRecovery (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_binding" xml:space="preserve">
+    <value>绑定修订号</value>
+    <comment>flash.target.binding (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_guidance" xml:space="preserve">
+    <value>请先在 ArkDeck Runtime 中连接并接管 DAYU200，然后刷新此工作区。</value>
+    <comment>flash.target.guidance (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_historyMissing" xml:space="preserve">
+    <value>历史目标当前不可用。请显式选择当前目标后准备新计划；刷新不会替历史运行切换设备。</value>
+    <comment>flash.target.historyMissing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_label" xml:space="preserve">
+    <value>精确目标</value>
+    <comment>flash.target.label (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_none" xml:space="preserve">
+    <value>没有可用的已接管目标</value>
+    <comment>flash.target.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_toolVersion" xml:space="preserve">
+    <value>接管时工具版本</value>
+    <comment>flash.target.toolVersion (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_target_unavailable" xml:space="preserve">
+    <value>不可用</value>
+    <comment>flash.target.unavailable (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_authority" xml:space="preserve">
+    <value>此次点击仅表示知晓上方影响；任何设备副作用前，Runtime 仍会重新校验精确目标、镜像、计划与前置条件。</value>
+    <comment>flash.workspace.action.authority (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_blocked" xml:space="preserve">
+    <value>%d 项必需安全检查未知或未满足，刷机保持阻断。</value>
+    <comment>flash.workspace.action.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_impact" xml:space="preserve">
+    <value>将擦除 %@ 上的用户数据。</value>
+    <comment>flash.workspace.action.impact (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_power" xml:space="preserve">
+    <value>请保持设备连接和稳定供电，刷机期间不要合盖。</value>
+    <comment>flash.workspace.action.power (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_action_submit" xml:space="preserve">
+    <value>擦除数据并开始刷机</value>
+    <comment>flash.workspace.action.submit (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details" xml:space="preserve">
+    <value>查看刷机详情</value>
+    <comment>flash.workspace.details (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_configuration" xml:space="preserve">
+    <value>目标、配置与前置条件</value>
+    <comment>flash.workspace.details.configuration (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_details_hide" xml:space="preserve">
+    <value>收起刷机详情</value>
+    <comment>flash.workspace.details.hide (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_detail" xml:space="preserve">
+    <value>%@ · 绑定修订号 %d</value>
+    <comment>flash.workspace.device.detail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_device_none" xml:space="preserve">
+    <value>没有当前设备</value>
+    <comment>flash.workspace.device.none (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_change" xml:space="preserve">
+    <value>更换镜像…</value>
+    <comment>flash.workspace.image.change (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_choose" xml:space="preserve">
+    <value>选择镜像…</value>
+    <comment>flash.workspace.image.choose (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseHelp" xml:space="preserve">
+    <value>请选择 .tar.gz、.zip 或 .7z 格式的 DAYU200 镜像压缩包</value>
+    <comment>flash.workspace.image.chooseHelp (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_chooseTitle" xml:space="preserve">
+    <value>选择要刷入的镜像</value>
+    <comment>flash.workspace.image.chooseTitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_retry" xml:space="preserve">
+    <value>重新校验镜像</value>
+    <comment>flash.workspace.image.retry (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_image_validating" xml:space="preserve">
+    <value>正在校验镜像并生成精确计划…</value>
+    <comment>flash.workspace.image.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_effect" xml:space="preserve">
+    <value>最高影响</value>
+    <comment>flash.workspace.plan.effect (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_loader" xml:space="preserve">
+    <value>进入 Loader 与身份绑定</value>
+    <comment>flash.workspace.plan.loader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_prepare" xml:space="preserve">
+    <value>准备与校验</value>
+    <comment>flash.workspace.plan.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_stage" xml:space="preserve">
+    <value>计划阶段</value>
+    <comment>flash.workspace.plan.stage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_steps" xml:space="preserve">
+    <value>步骤数</value>
+    <comment>flash.workspace.plan.steps (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_summary" xml:space="preserve">
+    <value>%d 个步骤 · 最高影响：%@</value>
+    <comment>flash.workspace.plan.summary (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_verify" xml:space="preserve">
+    <value>回读、重启与验证</value>
+    <comment>flash.workspace.plan.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_plan_write" xml:space="preserve">
+    <value>写入分区</value>
+    <comment>flash.workspace.plan.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_bootloader" xml:space="preserve">
+    <value>正在进入 Bootloader</value>
+    <comment>flash.workspace.progress.bootloader (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_extracting" xml:space="preserve">
+    <value>正在解压镜像</value>
+    <comment>flash.workspace.progress.extracting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_importing" xml:space="preserve">
+    <value>正在导入镜像</value>
+    <comment>flash.workspace.progress.importing (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_indeterminate" xml:space="preserve">
+    <value>正在等待 Runtime 回报下一个已确认的进度节点。</value>
+    <comment>flash.workspace.progress.indeterminate (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_keepConnected" xml:space="preserve">
+    <value>请勿拔线、断电或合盖；当前分区写入不会被强制中断。</value>
+    <comment>flash.workspace.progress.keepConnected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partition" xml:space="preserve">
+    <value>正在刷写 %@ 分区</value>
+    <comment>flash.workspace.progress.partition (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionDetail" xml:space="preserve">
+    <value>已完成 %d/%d 个分区 · 当前分区 %d%% · 镜像写入总进度 %d%%</value>
+    <comment>flash.workspace.progress.partitionDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_partitionUnknown" xml:space="preserve">
+    <value>当前</value>
+    <comment>flash.workspace.progress.partitionUnknown (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_rebooting" xml:space="preserve">
+    <value>正在重启设备</value>
+    <comment>flash.workspace.progress.rebooting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_reconnecting" xml:space="preserve">
+    <value>正在等待设备重新连接</value>
+    <comment>flash.workspace.progress.reconnecting (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_running" xml:space="preserve">
+    <value>运行中</value>
+    <comment>flash.workspace.progress.running (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_validating" xml:space="preserve">
+    <value>正在校验镜像</value>
+    <comment>flash.workspace.progress.validating (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingPartitions" xml:space="preserve">
+    <value>正在校验已刷写分区</value>
+    <comment>flash.workspace.progress.verifyingPartitions (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_progress_verifyingSystem" xml:space="preserve">
+    <value>正在验证刷机结果</value>
+    <comment>flash.workspace.progress.verifyingSystem (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blocked" xml:space="preserve">
+    <value>刷机已阻断</value>
+    <comment>flash.workspace.readiness.blocked (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_blockerCount" xml:space="preserve">
+    <value>%d 项必需检查需要处理</value>
+    <comment>flash.workspace.readiness.blockerCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkCount" xml:space="preserve">
+    <value>%d 项必需安全检查通过</value>
+    <comment>flash.workspace.readiness.checkCount (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checking" xml:space="preserve">
+    <value>正在检查设备</value>
+    <comment>flash.workspace.readiness.checking (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_checkingDetail" xml:space="preserve">
+    <value>Runtime 正在校验所选镜像与设备事实</value>
+    <comment>flash.workspace.readiness.checkingDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_chooseImage" xml:space="preserve">
+    <value>选择镜像后执行精确安全检查</value>
+    <comment>flash.workspace.readiness.chooseImage (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDevice" xml:space="preserve">
+    <value>需要设备</value>
+    <comment>flash.workspace.readiness.noDevice (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_noDeviceDetail" xml:space="preserve">
+    <value>请连接并接管一台 DAYU200 目标</value>
+    <comment>flash.workspace.readiness.noDeviceDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_planFailedDetail" xml:space="preserve">
+    <value>无法生成精确计划</value>
+    <comment>flash.workspace.readiness.planFailedDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_ready" xml:space="preserve">
+    <value>设备已就绪</value>
+    <comment>flash.workspace.readiness.ready (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_readiness_selected" xml:space="preserve">
+    <value>设备已选择</value>
+    <comment>flash.workspace.readiness.selected (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_again" xml:space="preserve">
+    <value>再次刷机</value>
+    <comment>flash.workspace.result.again (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_history" xml:space="preserve">
+    <value>打开历史记录</value>
+    <comment>flash.workspace.result.history (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_state" xml:space="preserve">
+    <value>Runtime 以状态 %@ 结束；设备不会显示为刷机成功。</value>
+    <comment>flash.workspace.result.state (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_stopped" xml:space="preserve">
+    <value>刷机已停止</value>
+    <comment>flash.workspace.result.stopped (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_success" xml:space="preserve">
+    <value>刷机成功</value>
+    <comment>flash.workspace.result.success (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_successDetail" xml:space="preserve">
+    <value>设备已重新连接，回报构建版本与绑定均与所选镜像及精确计划一致。</value>
+    <comment>flash.workspace.result.successDetail (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_result_unverified" xml:space="preserve">
+    <value>Runtime 未提供完整的刷写后证明；设备不会显示为刷机成功。</value>
+    <comment>flash.workspace.result.unverified (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_prepare" xml:space="preserve">
+    <value>准备</value>
+    <comment>flash.workspace.stage.prepare (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_verify" xml:space="preserve">
+    <value>重启与验证</value>
+    <comment>flash.workspace.stage.verify (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_stage_write" xml:space="preserve">
+    <value>写入镜像</value>
+    <comment>flash.workspace.stage.write (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_subtitle" xml:space="preserve">
+    <value>选择镜像后开始刷机；进行中只突出进度，完成后直接显示结果。</value>
+    <comment>flash.workspace.subtitle (FlashLocalizable.xcstrings)</comment>
+  </data>
+  <data name="flash_workspace_title" xml:space="preserve">
+    <value>刷机</value>
+    <comment>flash.workspace.title (FlashLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -2697,5 +3529,29 @@ SHA-256：%4$@</value>
   <data name="windows_debug_selectedTab" xml:space="preserve">
     <value>%@ 标签页</value>
     <comment>windows.debug.selectedTab (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_flash" xml:space="preserve">
+    <value>刷机</value>
+    <comment>windows.navigation.flash (Windows only)</comment>
+  </data>
+  <data name="windows_flash_action_power" xml:space="preserve">
+    <value>请保持设备连接和稳定供电，刷机期间不要关机、睡眠或拔掉电脑电源。</value>
+    <comment>windows.flash.action.power (Windows only)</comment>
+  </data>
+  <data name="windows_flash_progress_keepConnected" xml:space="preserve">
+    <value>请勿拔线、断电或让电脑睡眠，当前分区写入不会被强行中断。</value>
+    <comment>windows.flash.progress.keepConnected (Windows only)</comment>
+  </data>
+  <data name="windows_flash_runtime_criticalWrite" xml:space="preserve">
+    <value>正在写入分区——此关键步骤不可中断，停止只会阻止后续步骤。请勿让电脑睡眠、断电或拔线。</value>
+    <comment>windows.flash.runtime.criticalWrite (Windows only)</comment>
+  </data>
+  <data name="windows_flash_chooseImage_invalid" xml:space="preserve">
+    <value>请选择 .tar.gz、.zip 或 .7z 镜像压缩包。</value>
+    <comment>windows.flash.chooseImage.invalid (Windows only)</comment>
+  </data>
+  <data name="windows_flash_targetChanged" xml:space="preserve">
+    <value>所选 Target 已变更，将重新准备精确计划。</value>
+    <comment>windows.flash.targetChanged (Windows only)</comment>
   </data>
 </root>

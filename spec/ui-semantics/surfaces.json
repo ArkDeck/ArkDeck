@@ -566,6 +566,53 @@
         {"automationId": "debug.artifacts.jobs.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "The Job owner is not configured"]}]},
         {"automationId": "debug.artifacts.chooseLibrary", "origin": "macos", "role": "button", "name": ["@debug.artifacts.chooseLibrary"]}
       ]
+    },
+    {
+      "id": "flash.flash",
+      "scenario": "flash",
+      "page": "flash",
+      "elements": [
+        {"automationId": "flash.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.flash"]},
+        {"automationId": "flash.refresh", "origin": "macos", "role": "button", "name": ["@flash.action.refresh"]},
+        {"automationId": "flash.workspace.title", "origin": "macos", "role": "text", "name": ["@flash.workspace.subtitle"]},
+        {"automationId": "flash.workspace.currentDevice", "origin": "macos", "role": "text", "name": ["DAYU200"]},
+        {"automationId": "flash.workspace.currentDevice.detail", "origin": "windows", "role": "text", "name": [{"format": "flash.workspace.device.detail", "args": ["TGT-FIXTURE-1", "3"]}]},
+        {"automationId": "flash.workspace.readiness", "origin": "macos", "role": "text", "name": ["@flash.workspace.readiness.selected"]},
+        {"automationId": "flash.workspace.readiness.detail", "origin": "windows", "role": "text", "name": ["@flash.workspace.readiness.chooseImage"]},
+        {"automationId": "flash.image.value", "origin": "macos", "role": "text", "name": ["@flash.workspace.image.chooseTitle"]},
+        {"automationId": "flash.image.choose", "origin": "macos", "role": "button", "name": ["@flash.workspace.image.choose"]},
+        {"automationId": "flash.workspace.details", "origin": "macos", "role": "button", "name": ["@flash.workspace.details"]}
+      ]
+    },
+    {
+      "id": "flash.flash.details",
+      "scenario": "flash",
+      "page": "flash",
+      "steps": [{"invoke": "flash.workspace.details"}],
+      "elements": [
+        {"automationId": "flash.workspace.details", "origin": "macos", "role": "button", "name": ["@flash.workspace.details.hide"]},
+        {"automationId": "flash.availability.status", "origin": "macos", "role": "text", "name": ["@flash.availability.available"]},
+        {"automationId": "flash.deviceAccess.verdict", "origin": "macos", "role": "text", "name": ["@flash.deviceAccess.verdict.accessible"]},
+        {"automationId": "flash.deviceAccess.reprobe", "origin": "macos", "role": "button", "name": ["@flash.deviceAccess.reprobe"]},
+        {"automationId": "flash.bootloader.bound", "origin": "macos", "role": "text", "name": ["@flash.bootloader.bound"]},
+        {"automationId": "flash.profile", "origin": "macos", "role": "comboBox", "name": ["@flash.profile.label"]},
+        {"automationId": "flash.target", "origin": "macos", "role": "comboBox", "name": ["@flash.target.label"]},
+        {"automationId": "flash.plan.prerequisitesAwaitPlan", "origin": "windows", "role": "text", "name": ["@flash.plan.prerequisitesAwaitPlan"]},
+        {"automationId": "flash.runtime.empty", "origin": "macos", "role": "text", "name": ["@flash.runtime.empty"]}
+      ]
+    },
+    {
+      "id": "flash.foundation",
+      "scenario": "foundation",
+      "page": "flash",
+      "steps": [{"invoke": "flash.workspace.details"}],
+      "elements": [
+        {"automationId": "flash.workspace.readiness", "origin": "macos", "role": "text", "name": ["@flash.workspace.readiness.blocked"]},
+        {"automationId": "flash.availability.status", "origin": "macos", "role": "text", "name": ["@flash.availability.unavailable"]},
+        {"automationId": "flash.deviceAccess.unavailable", "origin": "macos", "role": "text", "name": ["@flash.deviceAccess.toolUnavailable"]},
+        {"automationId": "flash.target.empty", "origin": "macos", "role": "text", "name": ["@flash.target.none"]},
+        {"automationId": "flash.target.guidance", "origin": "windows", "role": "text", "name": ["@flash.target.guidance"]}
+      ]
     }
   ]
 }

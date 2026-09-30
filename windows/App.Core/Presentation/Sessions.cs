@@ -181,12 +181,15 @@ public sealed record JobEvidenceFacts(
     string? FirstEvidenceStepAtUtc,
     IReadOnlyList<string>? ActualStepKinds,
     IReadOnlyList<string> Blockers,
-    IReadOnlyList<string> MissingRequiredArtifacts)
+    IReadOnlyList<string> MissingRequiredArtifacts,
+    string? ObservedFirmware = null,
+    long? ObservedBindingRevision = null)
 {
     public static JobEvidenceFacts Parse(JsonValue value)
     {
         var o = Json.Object(value, "Job evidence");
         var authority = o.TryGetValue("authority", out var a) && a is JsonObject ao ? ao : null;
+        var observation = o.TryGetValue("observation", out var ob) && ob is JsonObject oo ? oo : null;
         return new(
             TypedJson.Required(o, "status", TypedJson.String),
             TypedJson.Required(o, "providerId", TypedJson.String),
@@ -200,7 +203,10 @@ public sealed record JobEvidenceFacts(
             Json.NullableString(o, "firstEvidenceStepAtUtc"),
             TypedJson.Required(o, "actualStepKinds", v => v is JsonNull ? null : TypedJson.List(v, TypedJson.String)),
             TypedJson.Required(o, "blockers", v => TypedJson.List(v, TypedJson.String)),
-            TypedJson.Required(o, "missingRequiredArtifacts", v => TypedJson.List(v, TypedJson.String)));
+            TypedJson.Required(o, "missingRequiredArtifacts", v => TypedJson.List(v, TypedJson.String)),
+            observation is null ? null : Json.OptionalString(observation, "firmware"),
+            observation is not null && observation.TryGetValue("bindingRevision", out var observed) && observed is JsonNumber n && n.TryGetInt64(out var revision)
+                ? revision : null);
     }
 }
 
