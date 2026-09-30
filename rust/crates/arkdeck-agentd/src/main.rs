@@ -16,7 +16,7 @@ mod arkforge_execution;
 mod arkforge_lane;
 #[cfg(any(target_os = "macos", windows))]
 mod bootstrap_readers;
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod cleanup_debt_control;
 #[cfg(any(target_os = "macos", windows))]
 mod code_sign_helper;

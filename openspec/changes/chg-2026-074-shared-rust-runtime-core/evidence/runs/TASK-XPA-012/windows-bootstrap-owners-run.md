@@ -78,9 +78,9 @@ retirement.
   - Measured and added to `WINDOWS_MEASURED_LEAVES`: `runtime.bundle.list`,
     `runtime.tool.list|inspect|remove`.
   - `cli-feature-coverage.json` was regenerated with `arkdeck maintainer contracts export`:
-    Windows `implemented` 61 → 67, `partial` 79 → 82, unset 116 → 107.
+    Windows `implemented` 62 → 68, `partial` 78 → 81, unset 116 → 107, over `main` with #2425.
   - The six oracle pins of its digest were substituted
-    (`380e91ed…` → `a6728334…`).
+    (`b5ada317…` → `b81ebc47…`).
 
 ## Delegated minor decisions (pending the next rulings batch)
 

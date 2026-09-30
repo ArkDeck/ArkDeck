@@ -2026,7 +2026,7 @@
       "feature": "cleanupDebt.list",
       "implementationStatusByPlatform": {
         "macos": "implemented",
-        "windows": "partial"
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [

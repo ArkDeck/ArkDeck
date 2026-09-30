@@ -452,6 +452,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.import.list",
     "artifact.import.release",
     "artifact.import.abort",
+    // The cleanup debt ledger over Swift's recorded debug HAP debts
+    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
+    // without a registered HDC a debt is refused before its readback.
+    "recovery.cleanup.list",
+    "cleanup-debt.list",
     // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
     // the bundle inventory, and a DevEco toolchain's inspection, listing and
     // retirement. Not the registrations, nor `runtime tool select`: a daemon

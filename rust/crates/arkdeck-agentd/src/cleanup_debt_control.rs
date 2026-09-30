@@ -15,7 +15,6 @@ use arkdeck_control::Control;
 use arkdeck_hoststore::{ArtifactReadStore, JobStore};
 use serde_json::{Value, json};
 use std::fs;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
 const LEDGER: &str = "cleanup-debt.json";
@@ -24,16 +23,38 @@ const FOUNDATION: &str = "this method is unavailable in the read-only Rust found
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        // A local drive's plain spelling on Windows (`D:\…`), which the
+        // owners compare their roots with.
+        #[cfg(windows)]
+        let temporary = match temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) => PathBuf::from(plain),
+            None => temporary,
+        };
+        let root = temporary.join(format!(
             "cleanup-debt-control-{:x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
         for name in ["artifacts", "jobs"] {
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(root.join(name))
-                .unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::DirBuilderExt;
+                fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(root.join(name))
+                    .unwrap();
+            }
+            // Owner-only, as the host store opens every directory; the
+            // root itself stays an ordinary directory.
+            #[cfg(windows)]
+            {
+                fs::create_dir_all(&root).unwrap();
+                arkdeck_platform::HostDirectory::open_or_create_private(&root.join(name)).unwrap();
+            }
         }
         Self(root)
     }
@@ -41,19 +62,26 @@ impl Root {
         self.0.join("artifacts")
     }
     fn control(&self) -> Control<crate::host::Host> {
-        Control::new(
-            crate::host::Host::from_environment()
-                .with_artifacts(ArtifactReadStore::open(&self.artifacts()).unwrap())
-                .with_jobs(JobStore::open(&self.0.join("jobs")).unwrap()),
-        )
-        .unwrap()
+        let host = crate::host::Host::from_environment()
+            .with_artifacts(ArtifactReadStore::open(&self.artifacts()).unwrap())
+            .with_jobs(JobStore::open(&self.0.join("jobs")).unwrap());
+        // The Windows runner is composed over the state root the Job planner
+        // plans against, which the Windows daemon composes with the Job owner.
+        #[cfg(windows)]
+        let host = host.with_planning(&self.0);
+        Control::new(host).unwrap()
     }
     /// The ledger as the Runtime writes it: owner-only, as the host store
-    /// reads every file.
+    /// reads every file (on Windows it inherits its directory's owner-only
+    /// DACL).
     fn owe(&self, records: &[Value]) {
         let ledger = self.artifacts().join(LEDGER);
         fs::write(&ledger, serde_json::to_vec(records).unwrap()).unwrap();
-        fs::set_permissions(&ledger, fs::Permissions::from_mode(0o600)).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&ledger, fs::Permissions::from_mode(0o600)).unwrap();
+        }
     }
 }
 impl Drop for Root {
