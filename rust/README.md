@@ -921,39 +921,54 @@ the `document_metadata`/`remove_document` port and the export submodules;
 the HDC lifecycle interlock and the current-Job census (over
 `hdc_impact_source`); the Job owner's Import, workspace, retention and
 Session-continuity censuses; Flash recovery; and the runner and
-reconciler. The planner and the admitter build on Windows without their
-owners (next section).
+reconciler. The planner and the admitter build on Windows (next section).
 
 ## Job planner and admitter on Windows (TASK-XPA-005)
 
 `JobPlanner` (`job_plan.rs`) and `JobAdmitter` (`job_admission.rs`) build
-on Windows with none of the owners they materialize and authorize against:
-no HDC provider (no Windows HDC tuple is registered; its integration change
-waits for the maintainer's samples), no workspace or analyzer provider, no
-Artifact or Import owner and no capability authority. Those fields and the
-code that reads them stay `cfg(target_os = "macos")`; on macOS only
-attributes were added (and the native deployment's reference is spelled in
-`job_plan.rs` rather than read from `device_steps`). On Windows
-`materialized` refuses an HDC or workspace operation as `provider <id> is
-not registered` and an analyzer as `… is runtime unavailable:
-analyzer.profileUnavailable`, the refusals macOS answers without that
-owner, after the Import holds (a request with Import inputs is refused as
-without an Import owner). Everything before materialization is the macOS
-code: the typed request, the Catalog and its inputs, the idempotency
-lookup (a retry answers with the existing Job, `deduplicated`) and the
-admission interlock. The Windows daemon composes both (`Host::with_planning`
-over its root, census `targets, jobs, planning`) and answers `job.plan` and
-`job.submit` with them, every refusal carrying `{"phase": "preAdmission",
-"newDispatchCount": 0}`; nothing is admitted. Not on Windows: the Flash
-operations (no Flash lane; `… is not materialized by the Rust Runtime yet`)
-and the ArkTrace analysis request's cross-field check (the analyzer's
-parser, G20). `arkdeck-agentd/tests/windows_job_admission_process.rs`
-checks it against the real daemon over its pipe and, with
-`ARKDECK_DEV_SIGNER_THUMBPRINT`, through `arkdeck job plan|submit` against a
-dev-signed daemon, before and after a restart, with the recorded Swift
-`observe.device@1` Jobs in the store: a fresh submission is refused, the
-recorded one retried is answered with its recorded Job, and the store's
-files are unchanged.
+on Windows with the macOS members, constructed the same way on both hosts.
+Ported with them: the HDC composition's device facts (`device_facts`), the
+device steps (`device_steps`) and cleanup debt (`cleanup_debt`), the
+per-operation device plans (debug HAP, native library, screen sequence and
+capture), the capability store and policy (`capability_store`,
+`capability_policy`; the store directory is the host store's owner-only
+directory on Windows) and `catalog_review`; the Artifact read owner comes
+from #2356. Members whose owner is not built on Windows yet are types with
+no value there, so they are always `None`: `ImportUploadStore` (its
+publication needs the Artifact publication and Flash archive owners),
+`WorkspaceComposition` (the workspace provider crate and the DevEco owners),
+`AnalyzerComposition` (a trait nothing implements: the ArkTrace profiles pin
+a trace_streamer Windows does not have) and `MutationAuthority` (the Session
+root owner and the Job owner's continuity census). Still `cfg(target_os =
+"macos")`: the Flash planner and admitter (the ArkForge lane, AF-W1), the
+analyzer profile and the analyzer paths of the planner (`AnalyzerProfile`,
+`materialize`, `unmaterialized_analyzer`, the ArkTrace cross-field check),
+`workspace_plan`, and the authority's uses (`preauthorize*`, the
+capability-gap repair, `submit_for_agent`); on Windows their stand-ins
+answer what macOS answers without the owner. On macOS only attributes were
+added.
+
+The Windows daemon composes the planner over its root with the Artifact
+owner and no HDC provider (no Windows HDC tuple is registered; the
+integration change waits for the maintainer's samples), so `job.plan` and
+`job.submit` of `observe.device@1` are refused `provider hdc is not
+registered`, `{"phase": "preAdmission", "newDispatchCount": 0}`, and
+nothing is admitted; a retry of an existing Job is answered with it
+(`deduplicated`), the idempotency lookup coming before materialization. A
+Flash operation is `… is not materialized by the Rust Runtime yet`.
+
+Tests on Windows: `arkdeck-hoststore/tests/windows_observe_device_admission.rs`
+replays the Swift `observe.device@1` oracle's `job.plan` and `job.submit`
+exchanges in process with an HDC composition over the recorded Target (a
+dispatcher that fails the test if called): every plan, fingerprint, plan
+digest and Job identity is Swift's; without an HDC provider every one is
+refused before admission. `tests/capability_read.rs` (93 reads) and
+`tests/capability_write.rs` (the M2 oracle stores rewritten byte for byte)
+now run on Windows too, over owner-only directories and without the POSIX
+permission bits. `arkdeck-agentd/tests/windows_job_admission_process.rs`
+checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
+through `arkdeck job plan|submit` against a dev-signed daemon, before and
+after a restart.
 
 ## Job index and record writers (TASK-XPA-014)
 

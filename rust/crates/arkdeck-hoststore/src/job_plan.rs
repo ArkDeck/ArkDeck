@@ -5,31 +5,27 @@
 //! Nothing is admitted, journaled, reserved or dispatched, so every refusal is
 //! pre-admission with zero new dispatch.
 //!
-//! On Windows (TASK-XPA-005, GJ-1) the planner is the same code with none of
-//! the owners it materializes against: no HDC, workspace or analyzer
-//! provider and no Artifact or Import owner is composed there yet (the HDC
-//! waits for the Windows HDC tuple's registration). Every operation is
-//! therefore refused before admission exactly as macOS refuses it without
-//! that owner; the owners' own code stays macOS-only until it is ported.
-#[cfg(target_os = "macos")]
+//! On Windows (TASK-XPA-005, GJ-1) the planner is the same code over the
+//! same owners, but two of them do not exist there yet: the ArkForge Flash
+//! lane (`flash_plan`, AF-W1) and the analyzers' ArkTrace profiles
+//! (`AnalyzerProfile`, `analyzer_composition`; no Windows trace_streamer).
+//! The Flash planner stays macOS-only; the `analyzer` member is there but no
+//! analyzer can be named (`AnalyzerComposition` has no implementation on
+//! Windows), so a Windows plan of an analyzer operation is refused as macOS
+//! refuses it without an analyzer. The Import and workspace owners have no
+//! value on Windows yet either (`ImportUploadStore`, `WorkspaceComposition`),
+//! so both members are `None` there, and the daemon composes no HDC provider
+//! until the Windows HDC tuple is registered.
 use crate::ArtifactReadStore;
-#[cfg(target_os = "macos")]
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
-#[cfg(target_os = "macos")]
 use crate::device_facts::{self, HdcComposition};
-#[cfg(target_os = "macos")]
 use crate::device_steps::{self, ActionRefusal};
 use crate::operation_catalog::{CatalogOperation, InputRefusal};
 use crate::operation_request::OperationRequest;
-#[cfg(target_os = "macos")]
 use crate::session_json;
-use arkdeck_contract::CATALOG_DIGEST;
-#[cfg(target_os = "macos")]
-use arkdeck_contract::sha256_hex;
+use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
-#[cfg(target_os = "macos")]
 use std::collections::BTreeMap;
-#[cfg(target_os = "macos")]
 use std::io;
 #[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
@@ -37,16 +33,13 @@ use std::path::Path;
 #[cfg(target_os = "macos")]
 use std::path::PathBuf;
 
-#[cfg(target_os = "macos")]
 #[path = "debug_hap_plan.rs"]
 mod debug_hap_plan;
 #[cfg(target_os = "macos")]
 #[path = "flash_plan.rs"]
 mod flash_plan;
-#[cfg(target_os = "macos")]
 #[path = "native_library_plan.rs"]
 mod native_library_plan;
-#[cfg(target_os = "macos")]
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
 #[cfg(target_os = "macos")]
@@ -61,7 +54,8 @@ pub(crate) use flash_plan::{
     PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
     is_flash, plan_completion_arguments,
 };
-#[cfg(target_os = "macos")]
+// The native deployment runner reads it (macOS only yet).
+#[cfg_attr(windows, allow(unused_imports))]
 pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
@@ -72,8 +66,6 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-/// `device_steps::NATIVE`, which that macOS module also names.
-const NATIVE: &str = "deploy.native-library.app-owned@1";
 const MATERIALIZED: [&str; 28] = [
     "analyzer.extract-crash-signature@1",
     "analyzer.summarize-hilog@1",
@@ -88,7 +80,7 @@ const MATERIALIZED: [&str; 28] = [
     "port-forward.create@1",
     "port-forward.remove@1",
     "debug.hap@1",
-    NATIVE,
+    device_steps::NATIVE,
     "capture.screen-sequence@1",
     "workspace.prepare-isolated-copy@1",
     "workspace.apply-patch@1",
@@ -316,40 +308,33 @@ fn internal_failure() -> PlanRefusal {
 /// permits Swift consults while materializing.
 #[derive(Clone, Copy)]
 pub struct JobPlanner<'a> {
-    #[cfg(target_os = "macos")]
     pub artifacts: Option<&'a ArtifactReadStore>,
-    #[cfg(target_os = "macos")]
     pub imports: Option<&'a crate::ImportUploadStore>,
     /// The analyzers the host composed, which an analyzer operation is
-    /// planned against.
-    #[cfg(target_os = "macos")]
+    /// planned against (none on Windows yet: their ArkTrace profiles need a
+    /// trace_streamer Windows does not have).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub analyzer: Option<&'a dyn crate::AnalyzerComposition>,
     pub state_root: &'a Path,
     /// The HDC composition a device-bound operation materializes against;
     /// without one no HDC provider is registered.
-    #[cfg(target_os = "macos")]
     pub hdc: Option<&'a HdcComposition<'a>>,
     /// The workspace provider a workspace operation materializes against;
     /// without one no workspace provider is registered.
-    #[cfg(target_os = "macos")]
     pub workspace: Option<&'a crate::WorkspaceComposition>,
 }
 
 /// A materialized plan: its digest and, for a device-bound plan, the Target
 /// identity and binding revision it binds.
-#[cfg_attr(windows, allow(dead_code))]
+// A device mutation's capability query reads the Artifact facts (macOS only
+// yet: no capability authority is composed on Windows).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) struct Materialized<'a> {
-    #[cfg(target_os = "macos")]
     _import_use: Option<crate::import_upload::ImportUse<'a>>,
     /// The registration a workspace Job materializes against, held until the
     /// plan or admission is done with it.
-    #[cfg(target_os = "macos")]
     _workspace_use: Option<crate::WorkspaceUse<'a>>,
-    /// Nothing is materialized on Windows yet; a plan is always refused.
-    #[cfg(windows)]
-    _owners: std::marker::PhantomData<&'a ()>,
     pub(crate) digest: String,
-    #[cfg(target_os = "macos")]
     pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
@@ -464,8 +449,8 @@ impl<'a> JobPlanner<'a> {
         })
     }
 
-    /// Without an analyzer composition the host names no reason, so nothing
-    /// is refused here, as on macOS without one.
+    /// Without an analyzer composition the host names no reason, so
+    /// nothing is refused here, as on macOS without one.
     #[cfg(windows)]
     pub(crate) fn unmaterialized_analyzer(
         &self,
@@ -512,7 +497,7 @@ impl<'a> JobPlanner<'a> {
                 InputRefusal::Invalid(message) => refusal("invalidInput", message),
                 InputRefusal::Unsupported(message) => refusal("rejected", message),
             })?;
-        // The ArkTrace request parser is the analyzer's (macOS-only, G20).
+        // The ArkTrace request parser is the analyzers' own (macOS only).
         #[cfg(target_os = "macos")]
         if descriptor.reference() == crate::analyzer_composition::TRACE_ANALYSIS
             && crate::arktrace_analysis::AnalysisRequest::parse(&request.inputs).is_err()
@@ -528,7 +513,6 @@ impl<'a> JobPlanner<'a> {
     /// Swift's Import holds, then `materializeTypedPlanBeforeAuthorization`:
     /// the materialized plan document's digest and, for a device-bound plan,
     /// what it binds.
-    #[cfg(target_os = "macos")]
     pub(crate) fn materialized(
         &self,
         request: &OperationRequest,
@@ -563,37 +547,8 @@ impl<'a> JobPlanner<'a> {
         })
     }
 
-    /// The same order on Windows, where none of the providers is composed:
-    /// the Import holds, then the refusal macOS answers without the
-    /// operation's provider — an HDC or workspace provider that is not
-    /// registered (`materialize_device`, `materialize_workspace`), an
-    /// analyzer without a profile (`materialize`'s
-    /// `analyzer_composition::runtime_availability`).
-    #[cfg(windows)]
-    pub(crate) fn materialized(
-        &self,
-        request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<Materialized<'a>, PlanRefusal> {
-        self.import_hold(request, descriptor)?;
-        if descriptor.provider == "analyzer" {
-            return Err(refusal(
-                "invalidInput",
-                format!(
-                    "{} is runtime unavailable: analyzer.profileUnavailable",
-                    descriptor.reference()
-                ),
-            ));
-        }
-        Err(refusal(
-            "invalidInput",
-            format!("provider {} is not registered", descriptor.provider),
-        ))
-    }
-
     /// Swift `acquireImportInputs`: the holds a request's Import inputs take
     /// before anything is materialized, released when the plan is done.
-    #[cfg(target_os = "macos")]
     pub(crate) fn import_hold(
         &self,
         request: &OperationRequest,
@@ -618,28 +573,8 @@ impl<'a> JobPlanner<'a> {
             .map_err(|error| refusal("invalidInput", error.message))
     }
 
-    /// Without an Import owner, a request naming Import inputs is refused
-    /// as macOS refuses it without one.
-    #[cfg(windows)]
-    pub(crate) fn import_hold(
-        &self,
-        request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<(), PlanRefusal> {
-        let references = crate::job_owner::import_references::ImportReference::inputs(
-            &request.inputs,
-            descriptor,
-        )
-        .map_err(|_| refusal("invalidInput", "Import input references are malformed"))?;
-        if references.is_empty() {
-            return Ok(());
-        }
-        Err(refusal("invalidInput", "Import input owner is unavailable"))
-    }
-
     /// Swift consults a Runtime debug attempt permit for every plan; this
     /// Runtime reads none, so a request that has one is refused.
-    #[cfg(target_os = "macos")]
     fn refuse_debug_permit(&self, request: &OperationRequest) -> Result<(), PlanRefusal> {
         let permit = self
             .state_root
@@ -659,7 +594,6 @@ impl<'a> JobPlanner<'a> {
     /// Target's facts checked against the request, then every selected step
     /// as the engine or the HDC provider materializes it, the provider's with
     /// the exact arguments its executor will run.
-    #[cfg(target_os = "macos")]
     fn materialize_device(
         &self,
         request: &OperationRequest,
@@ -809,7 +743,6 @@ impl<'a> JobPlanner<'a> {
     /// `validateResolvedInputArtifact` for an analyzer source: a published Job
     /// Artifact collected from the request's own target. A refusal is the
     /// error Swift interpolates into its message.
-    #[cfg(target_os = "macos")]
     fn resolve_lease(
         &self,
         artifacts: &ArtifactReadStore,
@@ -851,6 +784,24 @@ impl<'a> JobPlanner<'a> {
             ));
         }
         Ok(leased)
+    }
+
+    /// Without an analyzer composition, Swift `AnalyzerProvider.runtimeAvailability`
+    /// finds no profile for the operation's analyzer (`runtime_availability`
+    /// with none): the analyzer operations are the only ones planned here.
+    #[cfg(windows)]
+    fn materialize(
+        &self,
+        _request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<String, PlanRefusal> {
+        Err(refusal(
+            "invalidInput",
+            format!(
+                "{} is runtime unavailable: analyzer.profileUnavailable",
+                descriptor.reference()
+            ),
+        ))
     }
 
     /// The materialized plan document's digest, as Swift
@@ -965,6 +916,26 @@ impl<'a> JobPlanner<'a> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
+    }
+}
+
+/// No workspace composition is built on Windows yet
+/// (`absent_owners::WorkspaceComposition`), so a workspace operation meets
+/// `workspace_plan`'s refusal without one.
+#[cfg(windows)]
+impl JobPlanner<'_> {
+    fn materialize_workspace(
+        &self,
+        _request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<(String, BTreeMap<String, String>), PlanRefusal> {
+        let Some(workspace) = self.workspace else {
+            return Err(refusal(
+                "invalidInput",
+                format!("provider {} is not registered", descriptor.provider),
+            ));
+        };
+        match *workspace {}
     }
 }
 

@@ -39,6 +39,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
@@ -233,10 +234,15 @@ impl CapabilityStore {
     /// Swift `RuntimeCapabilityStore.init`: the directory, created private
     /// when absent. Nothing in it is read or written until a call.
     pub fn open(directory: &Path) -> io::Result<Self> {
+        #[cfg(target_os = "macos")]
         std::fs::DirBuilder::new()
             .recursive(true)
             .mode(0o700)
             .create(directory)?;
+        // The host store's owner-only directory (the user the only grantee),
+        // created when absent; an existing one is opened as it is.
+        #[cfg(windows)]
+        HostDirectory::open_or_create_private(directory)?;
         Ok(Self {
             directory: directory.to_path_buf(),
         })

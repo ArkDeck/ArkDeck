@@ -10,10 +10,15 @@
 //! install wrote that checkpoint, then every event of the ledger in its order.
 //! The checkpoint and the ledger must then be Swift's byte for byte, and the
 //! store's entries exactly Swift's, as private as Swift left them.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows the stores live in the host store's owner-only directories,
+//! whose files are owner-only as Swift's `0600` files are; permission bits,
+//! which NTFS does not have, are not compared.
+#![cfg(any(target_os = "macos", windows))]
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
@@ -42,8 +47,31 @@ fn scratch(label: &str) -> PathBuf {
             .unwrap()
             .as_nanos()
     ));
-    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    private_directory(&root);
     root
+}
+
+/// A directory only its owner can use: `0700` on macOS, the host store's
+/// owner-only descriptor on Windows.
+fn private_directory(path: &Path) {
+    #[cfg(target_os = "macos")]
+    fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
+
+/// An entry's permission bits as the oracle spells them; NTFS has none, so
+/// on Windows every entry reads as the oracle's owner-only `600`.
+#[cfg(target_os = "macos")]
+fn mode(entry: &fs::DirEntry) -> String {
+    format!(
+        "{:o}",
+        entry.metadata().unwrap().permissions().mode() & 0o7777
+    )
+}
+#[cfg(windows)]
+fn mode(_entry: &fs::DirEntry) -> String {
+    "600".to_owned()
 }
 
 fn text(value: &Value) -> &str {
@@ -222,11 +250,7 @@ fn replay(oracle: &str) -> usize {
         .unwrap()
         .map(|entry| {
             let entry = entry.unwrap();
-            let mode = entry.metadata().unwrap().permissions().mode() & 0o7777;
-            (
-                entry.file_name().into_string().unwrap(),
-                format!("{mode:o}"),
-            )
+            (entry.file_name().into_string().unwrap(), mode(&entry))
         })
         .collect();
     actual.sort();
@@ -508,12 +532,10 @@ fn a_resolved_outcome_refuses_every_further_change_as_swift_does() {
     let source = oracle.join("store/capabilities");
     let root = scratch("resolved");
     let directory = root.join("capabilities");
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&directory)
-        .unwrap();
+    private_directory(&directory);
     for name in [CHECKPOINT, LEDGER, LOCK] {
         fs::copy(source.join(name), directory.join(name)).unwrap();
+        #[cfg(target_os = "macos")]
         fs::set_permissions(directory.join(name), fs::Permissions::from_mode(0o600)).unwrap();
     }
     let store = CapabilityStore::open(&directory).unwrap();

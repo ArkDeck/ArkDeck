@@ -358,6 +358,21 @@ impl Host {
         self.planning = Some(state_root.to_owned());
         self
     }
+    /// The Job planner over this Windows composition's owners, as macOS
+    /// builds it: the Artifact owner, and no Import owner, workspace or HDC
+    /// provider (none is composed on Windows yet; the HDC waits for the
+    /// Windows HDC tuple's registration) and no analyzer.
+    #[cfg(windows)]
+    fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
+        arkdeck_hoststore::JobPlanner {
+            imports: None,
+            artifacts: self.artifacts.as_deref(),
+            analyzer: None,
+            state_root,
+            hdc: None,
+            workspace: None,
+        }
+    }
     #[cfg(any(target_os = "macos", windows))]
     pub fn with_artifacts(mut self, artifacts: arkdeck_hoststore::ArtifactReadStore) -> Self {
         self.artifacts = Some(std::sync::Arc::new(artifacts));
@@ -1872,9 +1887,9 @@ impl HostServices for Host {
                 ])),
             })
     }
-    /// `job.plan` on Windows: the Job planner with none of its owners (no
-    /// Flash planning either), so a plan is refused before admission with
-    /// zero dispatch, as on macOS.
+    /// `job.plan` on Windows: the Job planner (no Flash planning, no Flash
+    /// lane being composed), so a device plan is refused before admission
+    /// with zero dispatch, as on macOS without an HDC provider.
     #[cfg(windows)]
     fn job_plan(
         &self,
@@ -1887,7 +1902,7 @@ impl HostServices for Host {
                 details: None,
             });
         };
-        arkdeck_hoststore::JobPlanner { state_root }
+        self.planner(state_root)
             .handle(params)
             .map_err(|refusal| WireError {
                 code: refusal.code.into(),
@@ -1914,9 +1929,11 @@ impl HostServices for Host {
             });
         };
         arkdeck_hoststore::JobAdmitter {
-            planner: arkdeck_hoststore::JobPlanner { state_root },
+            planner: self.planner(state_root),
             jobs,
             now: arkdeck_hoststore::runtime_now,
+            // No mutation authority is composed on Windows yet.
+            authority: None,
         }
         .handle(params)
         .map_err(|refusal| WireError {

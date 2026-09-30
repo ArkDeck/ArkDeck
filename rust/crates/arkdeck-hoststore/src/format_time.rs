@@ -171,7 +171,7 @@ pub(crate) fn utc_precise_now() -> Option<String> {
 
 /// Unix seconds of a canonical plain UTC timestamp (`utc_timestamp`'s own
 /// spelling, which the Runtime clock produces); any other spelling is none.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn plain_utc_seconds(text: &str) -> Option<u64> {
     let bytes = text.as_bytes();
     if bytes.len() != 20 || !text.is_ascii() {

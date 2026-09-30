@@ -292,6 +292,7 @@ pub(super) fn primary_facts(
 mod tests {
     use super::*;
     use crate::capability_store::{CapabilityQuery, Effect};
+    use std::path::PathBuf;
     #[test]
     fn owner_facts_use_swift_strings_and_reproduce_native_policy_identity() {
         let index: Value = serde_json::from_slice(include_bytes!(

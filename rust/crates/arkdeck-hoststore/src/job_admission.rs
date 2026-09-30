@@ -19,10 +19,14 @@
 //! Nothing is dispatched: an admitted Job waits in `preflight` for an
 //! executor.
 //!
-//! On Windows (TASK-XPA-005, GJ-1) the same admission runs without a
-//! capability authority, a Flash lane or an Agent engine: the planner
-//! refuses every operation before admission (`job_plan`), so nothing is
-//! admitted yet; the authority's code stays macOS-only until it is ported.
+//! On Windows (TASK-XPA-005, GJ-1) the same admission runs over the same
+//! members, but two owners do not exist there yet: the mutation authority
+//! (`MutationAuthority` has no value on Windows: it proves the Runtime's
+//! mutation state across the Session root, whose owner and the Job owner's
+//! continuity census are not built there) and the ArkForge Flash lane
+//! (`FlashAdmitter`, AF-W1); nor is the Agent engine that
+//! `submit_for_agent` serves. So nothing above `readOnly` is admitted on
+//! Windows, as macOS admits nothing above it without an authority.
 use crate::JobStore;
 #[cfg(target_os = "macos")]
 use crate::capability_policy::{self, DeviceHolds, IssueFailure};
@@ -237,8 +241,18 @@ pub struct JobAdmitter<'a> {
     pub planner: JobPlanner<'a>,
     pub jobs: &'a JobStore,
     pub now: fn() -> Option<String>,
-    #[cfg(target_os = "macos")]
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub authority: Option<MutationAuthority<'a>>,
+}
+
+/// The mutation authority, not composed on Windows yet (its Session root
+/// owner and the Job owner's mutation-state continuity census are not built
+/// there): a type with no value, so `authority` is always `None`.
+#[cfg(windows)]
+#[derive(Clone, Copy)]
+pub enum MutationAuthority<'a> {
+    #[allow(dead_code)]
+    Never(std::convert::Infallible, std::marker::PhantomData<&'a ()>),
 }
 
 impl JobAdmitter<'_> {

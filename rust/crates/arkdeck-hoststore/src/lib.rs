@@ -19,6 +19,14 @@ pub use workspace_project::{
 };
 #[cfg(target_os = "macos")]
 mod workspace_composition;
+// The workspace provider has no value on Windows yet (it needs the
+// workspace provider crate and the DevEco owners); the Job planner is the
+// same code with none.
+#[cfg(windows)]
+#[path = "absent_workspace_composition.rs"]
+mod workspace_composition;
+#[cfg(windows)]
+pub use workspace_composition::WorkspaceComposition;
 #[cfg(target_os = "macos")]
 pub use workspace_composition::{
     CompositionNotes, ResolvedToolchain, ToolchainResolver, WorkspaceComposition,
@@ -123,6 +131,14 @@ pub use job_plan::{
 pub use job_plan::{JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
 mod analyzer_composition;
+// No analyzer exists on Windows yet (its ArkTrace profiles pin a
+// trace_streamer Windows does not have); the Job planner is the same code
+// with none.
+#[cfg(windows)]
+#[path = "absent_analyzer_composition.rs"]
+mod analyzer_composition;
+#[cfg(windows)]
+pub use analyzer_composition::AnalyzerComposition;
 #[cfg(target_os = "macos")]
 mod arktrace_doctor;
 #[cfg(target_os = "macos")]
@@ -163,30 +179,33 @@ pub use operation_availability::{
 };
 #[cfg(target_os = "macos")]
 mod debug_read;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod device_facts;
 #[cfg(target_os = "macos")]
 mod trace_probe;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use device_facts::HdcComposition;
 #[cfg(target_os = "macos")]
 mod capture_documents;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod cleanup_debt;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use cleanup_debt::list_cleanup_debt;
 #[cfg(target_os = "macos")]
 mod cleanup_debt_continue;
 #[cfg(target_os = "macos")]
 mod device_run;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod device_steps;
 #[cfg(any(target_os = "macos", windows))]
 mod job_admission;
-#[cfg(any(target_os = "macos", windows))]
-pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
 #[cfg(target_os = "macos")]
-pub use job_admission::{FlashAdmitter, MutationAuthority};
+pub use job_admission::FlashAdmitter;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtime_now};
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
@@ -284,11 +303,13 @@ mod operation_request;
 pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
 #[cfg(target_os = "macos")]
 mod artifact_quota;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod capability_policy;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use capability_policy::DeviceHolds;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod capability_store;
 // Foundation's JSON member-name and text rules, on the portable host text:
 // the Recovery Manifest a Session Manifest carries needs them on Windows too.
@@ -298,7 +319,7 @@ mod strict_json;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod swift_decoding;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use capability_store::{
     Capability as RuntimeCapability, CapabilityDenial, CapabilityQuery, CapabilityRefusal,
     CapabilityStore, CapabilityStoreError, ConsumptionReceipt, Effect as WorkflowEffect,
@@ -764,6 +785,14 @@ mod artifact_resources;
 mod import_upload;
 #[cfg(target_os = "macos")]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
+// The Import owner has no value on Windows yet (its publication needs the
+// Artifact publication and Flash archive owners); the Job planner is the
+// same code with none.
+#[cfg(windows)]
+#[path = "absent_import_upload.rs"]
+mod import_upload;
+#[cfg(windows)]
+pub use import_upload::ImportUploadStore;
 
 #[cfg(any(target_os = "macos", windows))]
 mod artifact_export;
