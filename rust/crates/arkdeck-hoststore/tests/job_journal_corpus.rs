@@ -6,8 +6,8 @@
 
 mod journal_scratch;
 
-use arkdeck_hoststore::{JournalEvent, JournalWriter, inspect_journal};
-use journal_scratch::{Root, fixtures, records};
+use arkdeck_hoststore::{JournalEvent, JournalWriteError, JournalWriter, inspect_journal};
+use journal_scratch::{Root, fixtures, records, write_private_file};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
@@ -52,16 +52,18 @@ fn every_recorded_journal_written_again_is_its_bytes_and_replays_to_its_facts() 
     for (index, (path, journal)) in fixture_journals().into_iter().enumerate() {
         let recorded = match inspect_journal(&{
             let directory = root.private(&format!("recorded-{index}"));
-            fs::write(directory.join("journal.jsonl"), &journal).unwrap();
+            write_private_file(&directory.join("journal.jsonl"), &journal);
             directory
         }) {
-            // Journals recorded torn or broken are the refusal oracles' own
-            // inputs; the writer never produces them.
             Ok(facts) if !facts.has_torn_tail => facts,
-            _ => {
+            // Journals recorded torn or breaking the replay rules are the
+            // refusal oracles' own inputs; the writer never produces them.
+            // Any other refusal (the store's) fails the test.
+            Ok(_) | Err(JournalWriteError::Invalid(_)) => {
                 refused += 1;
                 continue;
             }
+            Err(error) => panic!("{}: {error}", path.display()),
         };
         let directory = root.private(&format!("written-{index}"));
         let mut writer = JournalWriter::open(&directory, true).unwrap();

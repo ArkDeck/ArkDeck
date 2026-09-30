@@ -117,7 +117,14 @@ and visibility, the unit tests' macOS scratch roots are created with mode 0700 a
 
 ## CI
 
-To be recorded, not verified.
+First round (PR #2345): `Rust workspace (xcode-27)` failed both new tests on macOS. Cause: the
+tests copied recorded Journals with `fs::write`, which leaves mode 0644 under the usual umask, and
+`inspect_journal` opens a private directory whose reads refuse any group or other bit (Windows'
+inherited owner-only DACL passed). The corpus test counted those store refusals as "recorded torn"
+and so wrote nothing (`0 0`); the restart test's `recorded_facts` unwrapped the refusal. Fixed in
+the tests: recorded copies are created 0600 on macOS (`journal_scratch::write_private_file`), and
+the corpus test skips only a torn replay or a replay-rule refusal, failing on any other refusal.
+No store check changed. Final result: to be recorded, not verified.
 
 ## Open for the maintainer / next slices
 

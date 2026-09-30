@@ -37,6 +37,19 @@ pub fn private_directories(path: &Path) {
     }
 }
 
+/// Creates the file `path` holding `bytes`, readable and writable by the
+/// owner alone, as the private store requires of what it reads: mode 0600 on
+/// macOS (`fs::write` would leave 0644 under the usual umask); on Windows the
+/// owner-only DACL a private directory's new entries inherit.
+pub fn write_private_file(path: &Path, bytes: &[u8]) {
+    use std::io::Write;
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options.open(path).unwrap().write_all(bytes).unwrap();
+}
+
 pub struct Root(pub PathBuf);
 impl Root {
     pub fn new(label: &str) -> Self {
@@ -63,6 +76,6 @@ impl Drop for Root {
 /// The facts the Rust replay derives from `journal`'s bytes as recorded.
 pub fn recorded_facts(root: &Root, name: &str, journal: &[u8]) -> ReplayFacts {
     let directory = root.private(name);
-    fs::write(directory.join("journal.jsonl"), journal).unwrap();
+    write_private_file(&directory.join("journal.jsonl"), journal);
     inspect_journal(&directory).unwrap()
 }
