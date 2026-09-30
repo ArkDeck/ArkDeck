@@ -172,7 +172,8 @@ def key(source: Path, root: str) -> str:
         "cargo": subprocess.check_output(["cargo", "-V"], cwd=source / "rust", text=True),
         "image": os.environ.get("ImageVersion", "unknown"),
         "root": str(Path(root).resolve()),
-        "flags": {k: os.environ.get(k, "") for k in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER")},
+        "flags": {k: os.environ.get(k, "") for k in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "RUSTC_WRAPPER",
+                                                  "CARGO_INCREMENTAL")},
         "inputs": {},
     }
     for directory, children, files in os.walk(source / "rust"):

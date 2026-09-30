@@ -526,8 +526,9 @@ def validate_automatic_check_contract(
         '          fi\n',
     )
     # TASK-XPA-007: the Windows client lane. Exact repository bytes (the
-    # generator check, embedded schema digests and corpus wire tests compare
-    # them), the SDK global.json pins, then generator check, build and tests.
+    # generator checks, embedded schema digests and corpus wire tests compare
+    # them), the SDK global.json pins, then the three generator checks (ClientKit
+    # bindings, App strings, App tokens), build and tests.
     required_windows = (
         "    needs: plan\n",
         "    if: needs.plan.outputs.windows == 'true'\n",
@@ -537,6 +538,8 @@ def validate_automatic_check_contract(
         "        with:\n"
         "          global-json-file: windows/global.json\n",
         "        run: python windows/scripts/generate-clientkit.py --check\n",
+        "        run: python windows/scripts/generate-ui-strings.py --check\n",
+        "        run: python windows/scripts/generate-xaml-tokens.py --check\n",
         "        run: dotnet build windows/ArkDeck.Windows.slnx -c Release\n",
         "        run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build\n",
     )
@@ -594,13 +597,15 @@ def validate_automatic_check_contract(
             "git config core.autocrlf false",
             "uses: actions/setup-dotnet@",
             "generate-clientkit.py --check",
+            "generate-ui-strings.py --check",
+            "generate-xaml-tokens.py --check",
             "dotnet build windows/ArkDeck.Windows.slnx",
             "dotnet test windows/ArkDeck.Windows.slnx",
         )
     ]
     if windows_order != sorted(windows_order):
         raise WorkflowContractError(
-            "Windows ClientKit job must keep bytes, pin the SDK, check the generator, build, then test"
+            "Windows ClientKit job must keep bytes, pin the SDK, check the generators, build, then test"
         )
     for token in required_aggregate:
         if token not in swift_aggregate_job:
@@ -697,6 +702,9 @@ RUST_NATIVE_JOB_TOKENS = (
     "    runs-on: ${{ matrix.os }}\n",
     "    timeout-minutes: ${{ startsWith(matrix.os, 'xcode') && 50 || 30 }}\n",
     "      ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}\n",
+    # Incremental state is never reused across jobs (compact deletes it before
+    # a save), so writing it is pure cost; the value is in the cache key.
+    '      CARGO_INCREMENTAL: "0"\n',
     "run: python rust/scripts/ci-workspace.py key\n",
     "run: python rust/scripts/ci-workspace.py prepare\n",
     "run: python rust/scripts/ci-workspace.py compact\n",
@@ -1544,6 +1552,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             workspace.replace("restore-keys: ${{ steps.rust-cache-key.outputs.prefix }}", "restore-keys: arkdeck-rust-build-"),
             workspace.replace("run: python rust/scripts/ci-workspace.py prepare", "run: true"),
             workspace.replace(" && '2' || '1'", " && '4' || '1'"),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', "", 1),
+            workspace.replace('      CARGO_INCREMENTAL: "0"\n', '      CARGO_INCREMENTAL: "1"\n'),
         ):
             self.assertNotEqual(mutated, workspace)
             with self.assertRaises(WorkflowContractError):
@@ -1920,6 +1930,24 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "        run: python windows/scripts/generate-clientkit.py --check\n",
                     "        run: true # generator unchecked\n",
+                ),
+            ),
+            (
+                "Windows lane skips the App strings check",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: python windows/scripts/generate-ui-strings.py --check\n",
+                    "        run: true # strings unchecked\n",
+                ),
+            ),
+            (
+                "Windows lane skips the App tokens check",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: python windows/scripts/generate-xaml-tokens.py --check\n",
+                    "        run: true # tokens unchecked\n",
                 ),
             ),
             (

@@ -25,10 +25,12 @@ mod deveco_files;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
+mod inspected_directory;
 mod managed;
 mod pinned_file;
 mod process;
 mod pty;
+mod publisher;
 mod server;
 pub(crate) mod shell;
 mod state;
@@ -51,6 +53,7 @@ pub use deveco_files::{
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
+pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{
     HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file,

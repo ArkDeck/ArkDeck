@@ -90,16 +90,19 @@ DS_INTERACTION_INPUT_PREFIXES = (
     "docs/design/",
 )
 DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
-# The Windows client (TASK-XPA-007): windows/** plus every input its generator
-# (windows/scripts/generate-clientkit.py INPUTS) and its tests read, so a
-# schema, registry, corpus or pattern edit cannot skip the ClientKit checks.
-# test_plan verifies coverage against the generator's actual INPUTS.
+# The Windows client (TASK-XPA-007): windows/** plus every input its generators
+# (INPUTS of windows/scripts/generate-clientkit.py, generate-ui-strings.py and
+# generate-xaml-tokens.py) and its tests read, so a schema, registry, corpus,
+# pattern, shared string, design token or coverage edit cannot skip the Windows
+# checks. test_plan verifies coverage against the generators' actual INPUTS.
 WINDOWS_DIR = "windows"
 WINDOWS_SOLUTION = "windows/ArkDeck.Windows.slnx"
 WINDOWS_INPUT_PREFIXES = (
     "windows/",
     "spec/control/methods/",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
+    # The shared UI semantics: bilingual strings and the UIA semantic snapshots.
+    "spec/ui-semantics/",
 )
 WINDOWS_INPUT_FILES = frozenset({
     "Packages/ArkDeckKit/Contracts/control-protocol.json",
@@ -107,6 +110,15 @@ WINDOWS_INPUT_FILES = frozenset({
     "rust/crates/arkdeck-contract/src/schema_patterns.json",
     # The end-to-end ClientKit test signs its daemon copy with it.
     "rust/scripts/windows-dev-identity.ps1",
+    # The App's shared strings are these macOS tables' values (generate-ui-strings.py).
+    "ArkDeckApp/Resources/Localizable.xcstrings",
+    "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
+    "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+    # The App's theme is generated from the design tokens (generate-xaml-tokens.py).
+    "docs/design/arkdeck-ds/src/tokens.css",
+    # The App's tests read the Job state classes and the CLI coverage commands.
+    "spec/recovery/job-state-preflight.json",
+    "openspec/contracts/cli-feature-coverage.json",
 })
 
 
@@ -615,6 +627,8 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
         commands.extend(
             [
                 (python, "windows/scripts/generate-clientkit.py", "--check"),
+                (python, "windows/scripts/generate-ui-strings.py", "--check"),
+                (python, "windows/scripts/generate-xaml-tokens.py", "--check"),
                 ("dotnet", "build", WINDOWS_SOLUTION, "-c", "Release"),
                 ("dotnet", "test", WINDOWS_SOLUTION, "-c", "Release", "--no-build"),
             ]

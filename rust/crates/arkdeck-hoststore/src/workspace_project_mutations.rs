@@ -252,7 +252,9 @@ impl WorkspaceProjectStore {
     }
 }
 
-#[cfg(test)]
+// Unix fixtures (`mode`, `/`-rooted paths); the Windows owner is measured by
+// `tests/windows_workspace_project.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::DirBuilderExt;

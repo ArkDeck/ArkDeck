@@ -1,6 +1,11 @@
 <Project>
-  <!-- Toolchain pins of the Windows client (SPK-4, 2026-09-30). Change only together with a run record. -->
+  <!-- Toolchain pins of the Windows client (SPK-4, 2026-09-30; the App pins are SPK-4's).
+       Change only together with a run record. -->
   <ItemGroup>
     <PackageVersion Include="MSTest" Version="4.4.1" />
+    <PackageVersion Include="Microsoft.WindowsAppSDK" Version="2.5.1" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2705" />
+    <PackageVersion Include="Microsoft.Windows.SDK.BuildTools.WinApp" Version="0.7.0" />
+    <PackageVersion Include="FlaUI.UIA3" Version="5.0.0" />
   </ItemGroup>
 </Project>
