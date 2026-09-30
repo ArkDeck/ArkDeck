@@ -476,7 +476,8 @@ struct HistoryDocument {
 
 // Foundation String equality is canonically equivalent, so comparing a string
 // to its NFC spelling does not reject decomposed spellings. Preserve their bytes.
-#[cfg(target_os = "macos")]
+// The character sets and NFC are the platform's pinned Foundation tables on
+// every host, never another platform's own Unicode data.
 fn valid_host_text(value: &str, trimmed: bool, allow_tab: bool) -> bool {
     use arkdeck_platform::{host_control_character, host_whitespace_or_newline};
     (!trimmed
@@ -493,20 +494,8 @@ fn valid_host_text(value: &str, trimmed: bool, allow_tab: bool) -> bool {
             .all(|c| !host_control_character(c) || (allow_tab && c == '\t'))
 }
 
-// This candidate is a macOS migration. Do not silently substitute another
-// platform's Unicode tables for the Foundation owner being compared.
-#[cfg(not(target_os = "macos"))]
-fn valid_host_text(_: &str, _: bool, _: bool) -> bool {
-    false
-}
-
-#[cfg(target_os = "macos")]
 fn canonical_host_text(value: &str) -> Result<String, DecodeError> {
     arkdeck_platform::host_canonical_text(value).ok_or(DecodeError::Shape)
-}
-#[cfg(not(target_os = "macos"))]
-fn canonical_host_text(_: &str) -> Result<String, DecodeError> {
-    Err(DecodeError::Shape)
 }
 
 /// Decode the frozen field set, re-encode durable bytes, and derive the list

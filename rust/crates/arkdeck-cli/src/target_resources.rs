@@ -20,24 +20,18 @@ fn positive(v: &Value) -> Option<u64> {
         .filter(|n| (1..=i64::MAX as u64).contains(n) && n.to_string() == s)
 }
 /// A caller-facing display name as the Runtime publishes it: 1…256 UTF-8
-/// bytes, trimmed and free of control characters, by the host's own character
-/// sets where it has them (`device wait` adds the host's precomposition).
+/// bytes, trimmed and free of control characters, by Foundation's character
+/// sets (the platform's pinned tables on every host; `device wait` adds its
+/// precomposition).
 pub(super) fn display_name(s: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        (1..=256).contains(&s.len())
-            && s.chars()
-                .next()
-                .is_some_and(|c| !arkdeck_platform::host_whitespace_or_newline(c))
-            && s.chars()
-                .next_back()
-                .is_some_and(|c| !arkdeck_platform::host_whitespace_or_newline(c))
-            && !s.chars().any(arkdeck_platform::host_control_character)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        (1..=256).contains(&s.len()) && s.trim() == s && !s.chars().any(char::is_control)
-    }
+    (1..=256).contains(&s.len())
+        && s.chars()
+            .next()
+            .is_some_and(|c| !arkdeck_platform::host_whitespace_or_newline(c))
+        && s.chars()
+            .next_back()
+            .is_some_and(|c| !arkdeck_platform::host_whitespace_or_newline(c))
+        && !s.chars().any(arkdeck_platform::host_control_character)
 }
 pub(crate) fn configure(
     command: &str,

@@ -1,10 +1,8 @@
 //! Current SessionStorageValidation.timestamp + lockedTimestampDate semantics.
 //! This is distinct from the narrower History/Trace formatter domains.
 use crate::{DecodeError, DecodedStore};
-#[cfg(target_os = "macos")]
 use serde_json::json;
 
-#[cfg(target_os = "macos")]
 fn number(bytes: &[u8]) -> Option<i32> {
     if bytes.is_empty() || !bytes.iter().all(u8::is_ascii_digit) {
         return None;
@@ -14,7 +12,6 @@ fn number(bytes: &[u8]) -> Option<i32> {
     })
 }
 
-#[cfg(target_os = "macos")]
 pub fn session_timestamp(text: &str) -> Option<f64> {
     let bytes = text.as_bytes();
     if bytes.len() < 20 {
@@ -85,7 +82,6 @@ pub fn session_timestamp(text: &str) -> Option<f64> {
     Some(date)
 }
 
-#[cfg(target_os = "macos")]
 pub fn decode_session_timestamp(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
     if bytes.is_empty() || bytes.len() > 64 * 1024 {
         return Err(DecodeError::Size);
@@ -96,9 +92,4 @@ pub fn decode_session_timestamp(bytes: &[u8]) -> Result<DecodedStore, DecodeErro
         document: serde_json::to_vec(&text).map_err(|_| DecodeError::Shape)?,
         projection: json!({"referenceSecondsBits": date.to_bits().to_string()}),
     })
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn decode_session_timestamp(_: &[u8]) -> Result<DecodedStore, DecodeError> {
-    Err(DecodeError::Shape)
 }

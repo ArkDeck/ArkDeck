@@ -138,8 +138,9 @@ pub(crate) fn valid_format_timestamp(value: &str) -> bool {
 }
 
 /// Date comparison value for Artifact discovery using the already-pinned
-/// FormatStyle parser and the existing platform Gregorian calendar primitive.
-#[cfg(target_os = "macos")]
+/// FormatStyle parser and the portable Gregorian calendar primitive. Its
+/// Artifact and flash callers are still macOS-only.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
     let parsed = Reader {
         bytes: value.as_bytes(),
@@ -152,78 +153,6 @@ pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
     let seconds =
         month + parsed.seconds_in_month as f64 + f64::from(parsed.nanoseconds) / 1_000_000_000.0;
     seconds.is_finite().then_some(seconds)
-}
-
-#[cfg(all(test, target_os = "macos"))]
-mod artifact_date_tests {
-    use super::*;
-    #[test]
-    fn artifact_comparison_matches_swift_formatstyle_reference_values() {
-        // Observed via the actual fractional.parse ?? plain.parse entry point
-        // on the pinned macOS Swift toolchain, not a second Rust parser.
-        for (value, bits) in [
-            ("2026-09-11T01:00:00+02:00", 4_740_084_473_628_983_296),
-            ("2026-09-11T00:00:00Z", 4_740_084_503_827_972_096),
-            ("2026-09-11T00:00:00.09Z", 4_740_084_503_828_727_071),
-            ("2026-09-11T00:00:00.1Z", 4_740_084_503_828_810_957),
-            (
-                "2026-09-11T08:00:00.100000000+08:00",
-                4_740_084_503_828_810_957,
-            ),
-            ("2026-09-10T19:00:00.100-05:00", 4_740_084_503_828_810_957),
-            ("2026-09-11T00:00:00.11Z", 4_740_084_503_828_894_843),
-            ("2026-09-10T23:30:00-01:00", 4_740_084_518_927_466_496),
-        ] {
-            assert_eq!(
-                format_timestamp_seconds(value).unwrap().to_bits(),
-                bits,
-                "{value}"
-            );
-        }
-    }
-    #[test]
-    fn existing_format_acceptance_remains_independent_of_comparison_conversion() {
-        for value in [
-            "2026-02-31T24:00:01Z",
-            "2026-09-11T00:00:00UTC",
-            "2026-09-11T00:00:00.123456789Ztail",
-        ] {
-            assert!(valid_format_timestamp(value));
-            assert!(format_timestamp_seconds(value).is_some());
-        }
-        for value in [
-            "not-a-date",
-            "2026-09-11T00:00:00.1234567890Z",
-            "2026-09-11T00:00:00+19:00",
-        ] {
-            assert!(!valid_format_timestamp(value));
-            assert!(format_timestamp_seconds(value).is_none());
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    #[test]
-    fn utc_timestamps_are_the_plain_iso8601_form() {
-        assert_eq!(utc_timestamp(0), "1970-01-01T00:00:00Z");
-        assert_eq!(utc_timestamp(1_709_210_096), "2024-02-29T12:34:56Z");
-        assert_eq!(utc_timestamp(1_789_344_000), "2026-09-14T00:00:00Z");
-        assert!(valid_format_timestamp(&utc_now().unwrap()));
-    }
-
-    #[test]
-    fn precise_timestamps_truncate_to_milliseconds() {
-        // Swift `ISO8601Timestamps.string(from:includingFractionalSeconds:)`
-        // on the pinned toolchain: .1239 s spells .123, .9999 s spells .999.
-        assert_eq!(
-            utc_precise_timestamp(1_789_344_000, 0),
-            "2026-09-14T00:00:00.000Z"
-        );
-        assert_eq!(
-            utc_precise_timestamp(1_789_344_000, 123),
-            "2026-09-14T00:00:00.123Z"
-        );
-        assert!(valid_format_timestamp(&utc_precise_now().unwrap()));
-    }
 }
 
 /// The current instant as Swift's precise Runtime clock spells it
@@ -329,4 +258,77 @@ pub(crate) fn utc_timestamp(seconds: u64) -> String {
         second % 3_600 / 60,
         second % 60
     )
+}
+
+#[cfg(test)]
+mod artifact_date_tests {
+    use super::*;
+    #[test]
+    fn artifact_comparison_matches_swift_formatstyle_reference_values() {
+        // Observed via the actual fractional.parse ?? plain.parse entry point
+        // on the pinned macOS Swift toolchain, not a second Rust parser.
+        for (value, bits) in [
+            ("2026-09-11T01:00:00+02:00", 4_740_084_473_628_983_296),
+            ("2026-09-11T00:00:00Z", 4_740_084_503_827_972_096),
+            ("2026-09-11T00:00:00.09Z", 4_740_084_503_828_727_071),
+            ("2026-09-11T00:00:00.1Z", 4_740_084_503_828_810_957),
+            (
+                "2026-09-11T08:00:00.100000000+08:00",
+                4_740_084_503_828_810_957,
+            ),
+            ("2026-09-10T19:00:00.100-05:00", 4_740_084_503_828_810_957),
+            ("2026-09-11T00:00:00.11Z", 4_740_084_503_828_894_843),
+            ("2026-09-10T23:30:00-01:00", 4_740_084_518_927_466_496),
+        ] {
+            assert_eq!(
+                format_timestamp_seconds(value).unwrap().to_bits(),
+                bits,
+                "{value}"
+            );
+        }
+    }
+    #[test]
+    fn existing_format_acceptance_remains_independent_of_comparison_conversion() {
+        for value in [
+            "2026-02-31T24:00:01Z",
+            "2026-09-11T00:00:00UTC",
+            "2026-09-11T00:00:00.123456789Ztail",
+        ] {
+            assert!(valid_format_timestamp(value));
+            assert!(format_timestamp_seconds(value).is_some());
+        }
+        for value in [
+            "not-a-date",
+            "2026-09-11T00:00:00.1234567890Z",
+            "2026-09-11T00:00:00+19:00",
+        ] {
+            assert!(!valid_format_timestamp(value));
+            assert!(format_timestamp_seconds(value).is_none());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn utc_timestamps_are_the_plain_iso8601_form() {
+        assert_eq!(utc_timestamp(0), "1970-01-01T00:00:00Z");
+        assert_eq!(utc_timestamp(1_709_210_096), "2024-02-29T12:34:56Z");
+        assert_eq!(utc_timestamp(1_789_344_000), "2026-09-14T00:00:00Z");
+        assert!(valid_format_timestamp(&utc_now().unwrap()));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn precise_timestamps_truncate_to_milliseconds() {
+        // Swift `ISO8601Timestamps.string(from:includingFractionalSeconds:)`
+        // on the pinned toolchain: .1239 s spells .123, .9999 s spells .999.
+        assert_eq!(
+            utc_precise_timestamp(1_789_344_000, 0),
+            "2026-09-14T00:00:00.000Z"
+        );
+        assert_eq!(
+            utc_precise_timestamp(1_789_344_000, 123),
+            "2026-09-14T00:00:00.123Z"
+        );
+        assert!(valid_format_timestamp(&utc_precise_now().unwrap()));
+    }
 }

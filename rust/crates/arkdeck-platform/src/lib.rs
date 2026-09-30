@@ -216,9 +216,11 @@ mod host_sqlite;
 #[cfg(any(target_os = "macos", windows))]
 pub use host_sqlite::{HostSqlite, SqliteValue};
 
-#[cfg(target_os = "macos")]
+// Portable: pinned Unicode tables in place of CoreFoundation's character sets
+// and NFC. The Foundation originals stay as the macOS tests' parity oracle.
 mod host_text;
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
+mod host_text_foundation;
 pub use host_text::{
     host_alphanumeric, host_canonical_text, host_control_character, host_whitespace_or_newline,
 };
@@ -233,16 +235,19 @@ mod host_inflate;
 #[cfg(target_os = "macos")]
 pub use host_inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 
-#[cfg(target_os = "macos")]
+// Portable: Foundation's Julian/Gregorian UTC calendar and the legacy
+// ISO8601DateFormatter's written shape, with the Foundation originals as the
+// macOS tests' parity oracle.
 mod host_calendar;
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
+mod host_calendar_foundation;
 pub use host_calendar::{
     host_gregorian_add_days, host_gregorian_seconds, host_gregorian_timestamp,
 };
 
-#[cfg(target_os = "macos")]
 mod host_date_formatter;
-#[cfg(target_os = "macos")]
+#[cfg(all(test, target_os = "macos"))]
+mod host_date_formatter_foundation;
 pub use host_date_formatter::host_legacy_iso8601;
 
 #[cfg(target_os = "macos")]

@@ -18,15 +18,7 @@ pub(crate) fn identifier(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
 }
 fn timestamp(value: &str) -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        value.len() <= 32 && arkdeck_platform::host_legacy_iso8601(value) == Some(true)
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let _ = value;
-        false
-    }
+    value.len() <= 32 && arkdeck_platform::host_legacy_iso8601(value) == Some(true)
 }
 fn owners(values: &[Owner]) -> bool {
     let mut seen = std::collections::BTreeSet::new();
@@ -459,4 +451,84 @@ fn selection_valid(index: &ToolIndex) -> bool {
         }
     }
     true
+}
+
+/// GJ-1 hop 1: a registered, selected HDC tool and a registered Bundle
+/// decode on every host. Their registration times are read by the portable
+/// legacy ISO8601DateFormatter check, which on non-macOS hosts once refused
+/// every timestamp and so every registry holding a record.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tools(registered_at: &str) -> Vec<u8> {
+        let reference = format!("tool:sha256:{}", "a".repeat(64));
+        serde_json::to_vec(&json!({
+            "schemaVersion": "arkdeck.bootstrap-tools/2",
+            "records": [{
+                "reference": reference, "contentDigest": "a".repeat(64),
+                "executableSHA256": "b".repeat(64), "byteCount": 1,
+                "registeredAt": registered_at, "trust": {"signature": "unsigned"},
+                "dependencies": [], "relocatable": false, "generation": 1,
+                "state": "available",
+                "references": [{"kind": "activeSelection", "id": "runtime-hdc-selection"}],
+            }],
+            "selection": {"activeToolRef": reference, "activeGeneration": 3},
+        }))
+        .unwrap()
+    }
+
+    fn bundles(registered_at: &str) -> Vec<u8> {
+        serde_json::to_vec(&json!({
+            "schemaVersion": "arkdeck.bootstrap-bundles/1",
+            "records": [{
+                "reference": format!("bundle:sha256:{}", "c".repeat(64)),
+                "digest": "c".repeat(64), "registeredAtUTC": registered_at,
+                "byteCount": 0, "entryCount": 1, "generation": 1,
+                "state": "available", "references": [],
+            }],
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn registered_tool_and_bundle_decode_on_every_host() {
+        for registered_at in ["2026-09-30T08:15:00Z", "2026-09-30T16:15:00+08:00"] {
+            let decoded = decode_tools(&tools(registered_at)).unwrap();
+            let row = &decoded.projection[0];
+            assert_eq!(row["registeredAt"], registered_at);
+            assert_eq!(row["selected"], true);
+            assert_eq!(row["activeSelectionGeneration"], "3");
+            let decoded = decode_bundles(&bundles(registered_at)).unwrap();
+            assert_eq!(decoded.projection[0]["registeredAtUTC"], registered_at);
+        }
+    }
+
+    #[test]
+    fn registration_time_outside_the_formatter_shape_fails_closed() {
+        for registered_at in [
+            "",
+            "2026-09-30T08:15:00",
+            "2026-02-32T08:15:00Z",
+            "2026-09-30T25:00:00Z",
+            "2026-09-30 08:15:00Z",
+            "2026-09-30T08:15:00.5Z",
+            "2026-09-30T08:15:00Z trailing text",
+        ] {
+            assert!(
+                matches!(
+                    decode_tools(&tools(registered_at)),
+                    Err(DecodeError::Header)
+                ),
+                "{registered_at:?}"
+            );
+            assert!(
+                matches!(
+                    decode_bundles(&bundles(registered_at)),
+                    Err(DecodeError::Header)
+                ),
+                "{registered_at:?}"
+            );
+        }
+    }
 }

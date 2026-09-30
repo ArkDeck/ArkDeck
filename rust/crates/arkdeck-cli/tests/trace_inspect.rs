@@ -34,21 +34,9 @@ fn text(value: &Value) -> &str {
     value.as_str().unwrap()
 }
 
-/// The engine versions carrying a format character (Unicode Cf), which
-/// Foundation's `controlCharacters` holds and this CLI's check knows only on
-/// macOS, where Swift's CLI runs.
-const FORMAT_CHARACTER_CASES: [&str; 9] = [
-    "engineVersionSoftHyphen",
-    "engineVersionArabicNumberSign",
-    "engineVersionZeroWidthSpace",
-    "engineVersionLeftToRightMark",
-    "engineVersionWordJoiner",
-    "engineVersionByteOrderMark",
-    "engineVersionInterlinearAnchor",
-    "engineVersionLanguageTag",
-    "engineVersionTagLatinA",
-];
-
+/// Every recorded Swift answer holds on every host, including the engine
+/// versions carrying a format character (Unicode Cf), which Foundation's
+/// `controlCharacters` holds and the platform's pinned table now holds too.
 #[test]
 fn each_answer_is_judged_as_swifts_projection_judges_it() {
     let cases = oracle("projections.json");
@@ -58,11 +46,6 @@ fn each_answer_is_judged_as_swifts_projection_judges_it() {
     for case in cases {
         let name = text(&case["name"]);
         let decided = inspection_projection(&case["value"]);
-        if cfg!(not(target_os = "macos")) && FORMAT_CHARACTER_CASES.contains(&name) {
-            assert_eq!(case["accepted"], false, "{name}");
-            assert!(decided.is_some(), "{name}");
-            continue;
-        }
         assert_eq!(decided.is_some(), case["accepted"] == true, "{name}");
         match decided {
             Some((owner, artifact)) => {
