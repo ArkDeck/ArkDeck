@@ -539,7 +539,7 @@
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "7566c7319c49b4e28e2e00ca2c02c72ed1f079e97baa2a71003d8e9927a063ec",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "eaca0d0aaf37df5be1cf173d1545780a78e7bc913698a6b83194837ddd8c56d8"
+    "spec/control/methods": "0ddd6fa2985728bf85145f6771bbcd6588248a6f69f47fb861eee740577380a8"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1595,20 +1595,20 @@
       "sha256": "e4d796a20b64fa3b22b87cc27aeaca8597fe22ea1af36dc021eec328dbd5257d"
     },
     "spec/control/methods/runtime.tool.inspect.json": {
-      "blob": "16ff248bd559f910503005471dd4a8675e1e29a2",
-      "sha256": "3527b7113d09f8684a808106b701d1a34d6fab55da5a8f221b5873751c2cc2af"
+      "blob": "8f4f411a00ed41841794bc4116d62cb09173fed6",
+      "sha256": "9c03c97d55f613dd6e40f947f5be3c64fef8eab1fbe103c3dc8efca976bf6edc"
     },
     "spec/control/methods/runtime.tool.list.json": {
-      "blob": "01c4e001411eef6cf8907946e26a36af3817047c",
-      "sha256": "f0e4fed4a0239b857315af1df464447c76aca7d2076ada7674ef648876de4fe4"
+      "blob": "008e2a5d7e0d9474990c68b64dfc68c9dcebfa38",
+      "sha256": "64bb76325409f09a347da16c27d5ce4fc4c32409285d7ef7f712301f8a8c1bc8"
     },
     "spec/control/methods/runtime.tool.register.json": {
-      "blob": "200f6d41cde00fd4a86516b5f9b4bfdea4fa35d1",
-      "sha256": "94ff480e223b103c1b830a095b6a1c81bc74da9e13935e94c8d842da8d2774cf"
+      "blob": "3b6ccb3956b50cb8383090a7d9be8673049b2b87",
+      "sha256": "5f5c2e75b75f1af20367492d4a32cea36f5aecfc7d171858983ce82e824aeba4"
     },
     "spec/control/methods/runtime.tool.remove.json": {
-      "blob": "7c789024b1e8b7803596ee7981e7ffa202c79658",
-      "sha256": "6c489cfd2c8a192989897183f78a22873990f2716e53321498add64ed33fc74e"
+      "blob": "5283e1ed63df7aadc85253aa0cde1a8f8760de21",
+      "sha256": "c64e4f2c031ecc2ccbc1233206ddf42b62e680ec3f522e34fbccf0527f281082"
     },
     "spec/control/methods/runtime.tool.select.json": {
       "blob": "634600d14b50135f452822266265250db3e18cb0",
@@ -1727,7 +1727,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "4b963704386b72f26c5e9a8de74cf771fa2c9a753c0a6429bf7d1d605828f036",
+  "inputDigest": "fd55bb8635edfe6f96bf7419dd0c2d393517906d4601efae88a1cdca2d8d37ed",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

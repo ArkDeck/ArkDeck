@@ -14,7 +14,7 @@ mod app_ingress_tests;
 mod arkforge_execution;
 #[cfg(target_os = "macos")]
 mod arkforge_lane;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bootstrap_readers;
 #[cfg(all(test, target_os = "macos"))]
 mod cleanup_debt_control;

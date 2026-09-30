@@ -3280,11 +3280,13 @@
       "equivalentCommands": [],
       "feature": "runtime.bundle.inspect",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.bundle.inspect",
       "targetClassification": "local",
@@ -3296,11 +3298,13 @@
       "equivalentCommands": [],
       "feature": "runtime.bundle.list",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.bundle.list",
       "targetClassification": "local",
@@ -3312,12 +3316,14 @@
       "equivalentCommands": [],
       "feature": "runtime.bundle.register",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "note": "The Rust CLI uses this typed RPC; the Swift bootstrap CLI retains its local registration owner.",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.bundle.register",
       "targetClassification": "local",
@@ -3329,11 +3335,13 @@
       "equivalentCommands": [],
       "feature": "runtime.bundle.remove",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.bundle.remove",
       "targetClassification": "local",
@@ -3613,11 +3621,13 @@
       "equivalentCommands": [],
       "feature": "runtime.tool.inspect",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.tool.inspect",
       "targetClassification": "local",
@@ -3629,11 +3639,13 @@
       "equivalentCommands": [],
       "feature": "runtime.tool.list",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.tool.list",
       "targetClassification": "local",
@@ -3645,12 +3657,14 @@
       "equivalentCommands": [],
       "feature": "runtime.tool.register",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "partial"
       },
       "lifecycle": "current",
       "note": "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration.",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.tool.register",
       "targetClassification": "local",
@@ -3662,11 +3676,13 @@
       "equivalentCommands": [],
       "feature": "runtime.tool.remove",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "implemented"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.tool.remove",
       "targetClassification": "local",
@@ -3678,11 +3694,13 @@
       "equivalentCommands": [],
       "feature": "runtime.tool.select",
       "implementationStatusByPlatform": {
-        "macos": "implemented"
+        "macos": "implemented",
+        "windows": "partial"
       },
       "lifecycle": "current",
       "requiredPlatforms": [
-        "macos"
+        "macos",
+        "windows"
       ],
       "source": "daemon:runtime.tool.select",
       "targetClassification": "direct",

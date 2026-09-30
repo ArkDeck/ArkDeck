@@ -236,10 +236,10 @@ mod control_action;
 #[cfg(windows)]
 #[path = "absent_control_action.rs"]
 mod control_action;
-#[cfg(windows)]
-pub use control_action::ControlActionResources;
 #[cfg(target_os = "macos")]
 pub use control_action::{ControlActionResources, control_action_without_owner};
+#[cfg(windows)]
+pub use control_action::{ControlActionResources, tool_selection_without_owner};
 #[cfg(target_os = "macos")]
 mod control_action_approval;
 #[cfg(target_os = "macos")]
@@ -778,20 +778,23 @@ pub use session_inventory::{session_inventory, session_inventory_owned};
 // The Bootstrap registry's bundle and HDC tool file owners are
 // `arkdeck-bootstrap`, which the CLI's zero-Runtime install shares; the
 // Runtime composes its paged inventories and the DevEco toolchain registry
-// over them here.
+// over them here, on macOS and Windows (where no Bundle or HDC content policy
+// exists yet, so their registries hold nothing the owners admit).
 #[cfg(target_os = "macos")]
+pub use arkdeck_bootstrap::tool_macho;
+#[cfg(any(target_os = "macos", windows))]
 pub use arkdeck_bootstrap::{
     BundleRegistryReadStore, DurableSelectionOutcome, PublishedIdentities, SelectionCandidate,
     SelectionSnapshot, StartupSelection, ToolContent, ToolDependency, ToolRegistryStore,
-    bundle_content, inspect_tool_content, tool_macho,
+    bundle_content, inspect_tool_content,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bundle_list_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use bundle_list_owner::BootstrapListPage;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod tool_list_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod tool_retirement;
 
 // Portable: the product and SDK manifest facts, the same format on macOS

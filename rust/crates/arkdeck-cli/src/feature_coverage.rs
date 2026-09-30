@@ -352,14 +352,10 @@ const DIRECT_UNDER_LOCAL_GROUPS: &[&str] = &["runtime.tool.select"];
 /// host-specific families with no Windows form until a Windows profile is
 /// ratified (§11).
 const MACOS_ONLY_ROOTS: &[&str] = &["legacy", "agentd", "signing", "update-feed", "maintainer"];
-const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
-    "service",
-    "signing",
-    "bundle",
-    "tool",
-    "update",
-    "support-bundle",
-];
+/// `bundle` and `tool` left it with their Windows owners (the Bootstrap
+/// registry at `%LOCALAPPDATA%\ArkDeck\Bootstrap\v1`), as ruling 10 gives a
+/// macOS-only family its Windows counterpart.
+const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &["service", "signing", "update", "support-bundle"];
 
 /// The Runtime leaves whose every method the Windows daemon answers, measured
 /// end to end on Windows: the CLI authenticates a daemon signed with a
@@ -456,6 +452,15 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.import.list",
     "artifact.import.release",
     "artifact.import.abort",
+    // The Bootstrap registry owners (`windows_bootstrap_owners_process.rs`):
+    // the bundle inventory, and a DevEco toolchain's inspection, listing and
+    // retirement. Not the registrations, nor `runtime tool select`: a daemon
+    // Bundle and an HDC are not registered on Windows yet, so nothing is
+    // selected.
+    "runtime.bundle.list",
+    "runtime.tool.list",
+    "runtime.tool.inspect",
+    "runtime.tool.remove",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the

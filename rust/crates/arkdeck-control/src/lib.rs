@@ -1005,12 +1005,7 @@ impl<H: HostServices> Control<H> {
                 let file = params.get("file").and_then(Value::as_str);
                 if params.len() != 2
                     || params.get("kind") != Some(&json!("daemon-bundle"))
-                    || !file.is_some_and(|path| {
-                        path.starts_with('/')
-                            && path.len() <= 16_384
-                            && !path.contains('\0')
-                            && !path.split('/').any(|part| matches!(part, "." | ".."))
-                    })
+                    || !file.is_some_and(|path| path.len() <= 16_384 && local_absolute_path(path))
                 {
                     Response { id: request.id.clone(), outcome: Err(WireError {
                         code: "invalidParams".into(), message: "Bundle registration requires kind daemon-bundle and an absolute local file".into(),
@@ -1037,11 +1032,7 @@ impl<H: HostServices> Control<H> {
                 let root = params.get(key).and_then(Value::as_str);
                 if params.len() != 2
                     || !matches!(kind, Some("deveco" | "hdc"))
-                    || !root.is_some_and(|path| {
-                        path.starts_with('/')
-                            && !path.as_bytes().contains(&0)
-                            && !path.split('/').any(|part| matches!(part, "." | ".."))
-                    })
+                    || !root.is_some_and(local_absolute_path)
                 {
                     Response {
                         id: request.id.clone(),
@@ -1974,6 +1965,29 @@ fn frame_id(bytes: &[u8]) -> String {
 
 // The Bootstrap owner may already have published host metadata. Losing its
 // classified receipt must preserve uncertainty, including schema/encoding failure.
+/// A Bootstrap registration's local path as this host spells an absolute
+/// one, with no `.` or `..` component and no NUL: `/…` on macOS (Swift's
+/// grammar); a drive path `X:\…` on Windows. The owner then checks the path
+/// strictly and reads it without following links.
+#[cfg(not(windows))]
+fn local_absolute_path(path: &str) -> bool {
+    path.starts_with('/')
+        && !path.as_bytes().contains(&0)
+        && !path.split('/').any(|part| matches!(part, "." | ".."))
+}
+#[cfg(windows)]
+fn local_absolute_path(path: &str) -> bool {
+    let bytes = path.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && !bytes.contains(&0)
+        && !path[3..]
+            .split(['\\', '/'])
+            .any(|part| matches!(part, "." | ".."))
+}
+
 fn bootstrap_mutation_response_bytes(method: &str, response: Response) -> Vec<u8> {
     let conforms = match &response.outcome {
         Ok(value) => validate_method_value(method, "result", value).is_ok(),

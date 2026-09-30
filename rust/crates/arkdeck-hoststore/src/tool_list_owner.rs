@@ -245,6 +245,6 @@ fn deveco_error(error: io::Error) -> WireError {
         "registered DevEco root, manifests or child tools failed verification",
     )
 }
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 #[path = "tool_list_owner_tests.rs"]
 mod tests;

@@ -128,15 +128,16 @@ cancel|reconcile`, `agent list|status`, `human-action list|show`, `artifact
 list|inspect|read|export|quota`, `capability list`, `runtime storage
 status|policy`, `session list|show|pin|unpin|export preview|export
 apply|cleanup preview|cleanup apply`, `artifact import
-hap|native-library|workspace-patch|inspect|list|release|abort`),
-`notImplemented` where a leaf it reaches is refused off macOS for a macOS host
-primitive (the macOS-only families below), and `partial` otherwise: the leaves
+hap|native-library|workspace-patch|inspect|list|release|abort`, `runtime bundle
+list`, `runtime tool list|inspect|remove`), `notImplemented` where a leaf it
+reaches is refused off macOS for a macOS host primitive (the macOS-only families
+below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target
 rests on a Runtime owner the Windows daemon does not yet compose or no Windows
 run has measured end to end. `partial` still blocks a Windows claim; the Windows
 profile is not ratified. `requiredPlatforms` is `["macos"]` for host-specific
 families (`legacy`, `agentd`, `signing`, `update-feed`, `maintainer`, `runtime
-service|signing|bundle|tool|update|support-bundle`, legacy command spellings and
+service|signing|update|support-bundle`, legacy command spellings and
 every App surface) and `["macos", "windows"]` otherwise.
 
 `summary.fullFunction` is `true` exactly when no entry is `blocked`. It is the

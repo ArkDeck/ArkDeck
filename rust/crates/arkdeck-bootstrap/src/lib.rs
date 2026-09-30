@@ -59,46 +59,55 @@ pub fn roundtrip<T: DeserializeOwned + Serialize>(
 mod registry;
 pub use registry::{decode_bundles, decode_tool_identity, decode_tools};
 
-#[cfg(target_os = "macos")]
+// The owners the Runtime composes on macOS and Windows: the store's one lock
+// protocol, the frozen indexes' read, list, inspect and retirement, the
+// bundle references and the HDC selection ledger. What reads native content
+// is per platform: on macOS the Mach-O and Security checks of a retained HDC
+// or daemon Bundle; on Windows neither kind's content checks and registration
+// are built yet, so a retained record never verifies and registration
+// refuses (`windows_registration`).
+#[cfg(any(target_os = "macos", windows))]
 mod tool_content;
 #[cfg(target_os = "macos")]
 pub mod tool_macho;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use tool_content::{ToolContent, ToolDependency, inspect_tool_content};
 #[cfg(target_os = "macos")]
 mod tool_registration;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod tool_registry_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod tool_retirement;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod tool_selection_ledger;
-#[cfg(target_os = "macos")]
+#[cfg(windows)]
+mod windows_registration;
+#[cfg(any(target_os = "macos", windows))]
 pub use tool_registry_owner::{PublishedIdentities, ToolRegistryStore};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use tool_retirement::{IndexSnapshot, RetirementRoot};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use tool_selection_ledger::{
     DurableSelectionOutcome, SelectionCandidate, SelectionSnapshot, StartupSelection,
     cutover_pending_selection,
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod store;
 #[cfg(target_os = "macos")]
 pub use store::create_store;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod bundle_content;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bundle_references;
 #[cfg(target_os = "macos")]
 mod bundle_registration;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bundle_registry_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod bundle_retirement;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use bundle_references::ReferenceOwner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use bundle_registry_owner::{BundleRegistryReadStore, BundleValidator};

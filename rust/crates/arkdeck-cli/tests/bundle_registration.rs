@@ -1,5 +1,27 @@
 use arkdeck_cli::{parse, validate_bootstrap_request, validate_bootstrap_response};
 use serde_json::{Value, json};
+/// A daemon Bundle as this host spells an absolute local path, and paths it
+/// refuses before any request: Swift's `/…` grammar on macOS, `X:\…` on
+/// Windows.
+#[cfg(not(windows))]
+const SOURCE: &str = "/Source.app";
+#[cfg(windows)]
+const SOURCE: &str = r"C:\Source.app";
+#[cfg(not(windows))]
+const REFUSED_FILES: &[&str] = &[
+    "relative.app",
+    "/tmp/../Source.app",
+    "/tmp/./Source.app",
+    "/Source.app\0",
+];
+#[cfg(windows)]
+const REFUSED_FILES: &[&str] = &[
+    "relative.app",
+    "/Source.app",
+    r"C:\tmp\..\Source.app",
+    r"C:\tmp\.\Source.app",
+    "C:\\Source.app\0",
+];
 fn invocation(options: &[&str]) -> Result<arkdeck_cli::Invocation, arkdeck_cli::CliError> {
     parse(
         &["runtime", "bundle", "register"]
@@ -11,11 +33,11 @@ fn invocation(options: &[&str]) -> Result<arkdeck_cli::Invocation, arkdeck_cli::
 }
 #[test]
 fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
-    let args = invocation(&["--kind", "daemon-bundle", "--file", "/Source.app"]).unwrap();
+    let args = invocation(&["--kind", "daemon-bundle", "--file", SOURCE]).unwrap();
     assert_eq!(args.method, "runtime.bundle.register");
     assert_eq!(
         args.params.as_ref().unwrap(),
-        json!({"kind":"daemon-bundle","file":"/Source.app"})
+        json!({"kind":"daemon-bundle","file":SOURCE})
             .as_object()
             .unwrap()
     );
@@ -29,12 +51,12 @@ fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
     }
     for options in [
         vec![],
-        vec!["--kind", "hdc", "--file", "/Source.app"],
+        vec!["--kind", "hdc", "--file", SOURCE],
         vec![
             "--kind",
             "daemon-bundle",
             "--file",
-            "/Source.app",
+            SOURCE,
             "--digest",
             "caller",
         ],
@@ -42,7 +64,7 @@ fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
             "--kind",
             "daemon-bundle",
             "--file",
-            "/Source.app",
+            SOURCE,
             "--expected-generation",
             "1",
         ],
@@ -51,12 +73,7 @@ fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
     }
     // Swift's parser takes any `--file`; its handler refuses a path that is
     // not absolute and canonical before any request, and so does this CLI.
-    for file in [
-        "relative.app",
-        "/tmp/../Source.app",
-        "/tmp/./Source.app",
-        "/Source.app\0",
-    ] {
+    for file in REFUSED_FILES {
         let parsed = invocation(&["--kind", "daemon-bundle", "--file", file]).unwrap();
         assert_eq!(
             validate_bootstrap_request(&parsed).unwrap_err().code,
@@ -71,7 +88,7 @@ fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
 }
 #[test]
 fn actual_swift_fixture_receipts_keep_identity_and_map_invalid_receipts_to_unknown() {
-    let args = invocation(&["--kind", "daemon-bundle", "--file", "/Source.app"]).unwrap();
+    let args = invocation(&["--kind", "daemon-bundle", "--file", SOURCE]).unwrap();
     if !arkdeck_contract::METHODS.contains(&args.method) {
         return;
     }
@@ -80,7 +97,7 @@ fn actual_swift_fixture_receipts_keep_identity_and_map_invalid_receipts_to_unkno
     let mut successes = 0;
     for frame in frames
         .lines()
-        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .map(|line| hosted(serde_json::from_str::<Value>(line).unwrap()))
         .filter(|row| row["ok"] == true)
     {
         successes += 1;
@@ -103,4 +120,28 @@ fn actual_swift_fixture_receipts_keep_identity_and_map_invalid_receipts_to_unkno
         }
     }
     assert!(successes > 0);
+}
+
+/// A recorded (macOS) Bootstrap record as this host's Runtime answers it: the
+/// CLI checks that a record names its host's platform, so on Windows the
+/// recorded `"platform": "macos"` reads `"windows"`; on macOS nothing changes.
+fn hosted(mut value: Value) -> Value {
+    fn host(value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                if let Some(platform) = map.get_mut("platform")
+                    && *platform == "macos"
+                {
+                    *platform = json!("windows");
+                }
+                map.values_mut().for_each(host);
+            }
+            Value::Array(items) => items.iter_mut().for_each(host),
+            _ => {}
+        }
+    }
+    if cfg!(windows) {
+        host(&mut value);
+    }
+    value
 }

@@ -22,3 +22,16 @@ impl ControlActionResources {
         match *self {}
     }
 }
+
+/// Swift's `runtime.tool.select` answer with no tool-selection owner, which
+/// the Windows daemon gives until its tool-selection owner is composed.
+pub fn tool_selection_without_owner() -> WireError {
+    WireError {
+        code: "operationUnavailable".into(),
+        message: "the Runtime tool-selection owner is unavailable".into(),
+        details: Some(serde_json::Map::from_iter([(
+            "newDispatchCount".into(),
+            serde_json::json!(0),
+        )])),
+    }
+}

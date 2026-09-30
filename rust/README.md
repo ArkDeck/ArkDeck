@@ -1125,7 +1125,7 @@ No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
-workspaceProjects, planning, agentExecutions, humanActions, traceCache` over a
+workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache` over a
 development root and the account's root alike, the macOS census's order. The
 start's Artifact retention sweep runs as on macOS (see the mutation authority
 section below).
@@ -1226,7 +1226,7 @@ execution owner in `agent-executions` and the human-action owner in
 and the account root. An execution admits its Job as `job.submit` does here
 and observes no Target, since no Windows HDC tuple is registered. The census
 reads `jobs, capabilities, mutationAuthority, targets, artifacts, storage,
-workspaceProjects, planning, agentExecutions, humanActions, traceCache`.
+workspaceProjects, bootstrap, planning, agentExecutions, humanActions, traceCache`.
 
 Tests on Windows: `arkdeck-hoststore/tests/windows_job_reconcile.rs` (the
 Swift restart and reconcile oracle's store, with its first Session laid down,
@@ -2766,12 +2766,40 @@ through PATH.
 - **Index.** The same `arkdeck.bootstrap-deveco-toolchains/1` document. Each host accepts only
   its own record form (Windows: an `X:\…` root, four roles, `"platform":"windows"`, which is
   also in the content digest).
-- **Not yet on Windows.** The daemon's Bootstrap readers, which compose this registry with the
-  macOS-only HDC tool and bundle registries, and retirement. So no CLI leaf serves it on
-  Windows yet.
+- **Retirement** is built on Windows too (see the next section), metadata only; the index is
+  encoded as its registration encodes it, since an NTFS file id may exceed the exact range
+  canonical JSON admits.
 
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-deveco-registration-run.md`.
+
+## Windows Bootstrap registry owners (TASK-XPA-012)
+
+The Windows daemon composes the Bootstrap readers (`bootstrap_readers.rs`) as the macOS daemons
+do, over the registry of a development root's private `bootstrap`, or the account's
+`%LOCALAPPDATA%\ArkDeck\Bootstrap\v1` (the macOS `ArkDeck/Bootstrap/v1` below the product
+directory), created owner-only at the start. The census names `bootstrap` after
+`workspaceProjects`, the macOS order.
+- **Served.** `runtime.bundle.list|inspect|remove` and `runtime.tool.list|inspect|remove` over
+  `arkdeck-bootstrap`'s store, index, retirement, reference and selection-ledger owners, which
+  build on Windows on the NTFS host store; `runtime.tool.register --kind deveco` and a DevEco
+  toolchain's inspection, listing and retirement over the DevEco registry. The control layer and
+  the CLI take a registration path as the host spells an absolute one (`X:\…` on Windows), and the
+  CLI expects the host's `platform` in a returned record.
+- **Not built on Windows yet** (their Windows forms are the next slice): registering a daemon
+  Bundle or an HDC, whose content checks refuse any retained record meanwhile, and the
+  tool-selection owner, so `runtime.tool.select` answers Swift's no-owner refusal.
+- **Contract.** A Windows DevEco child tool's trust has no `teamIdentifier` (Authenticode has no
+  team); the generator's `SHARED_MEMBERS` lends the tool trust's recorded null to
+  `childTools[].trust.teamIdentifier` of the four `runtime.tool.*` results.
+
+Tests on Windows: `arkdeck-hoststore`'s `windows_registration_tests` (a fixture toolchain retires
+once; the installed DevEco Studio's record conforms to the published schemas, ignored unless
+`ARKDECK_LIVE_DEVECO_ROOT` names it), and `arkdeck-agentd/tests/windows_bootstrap_owners_process.rs`
+(Swift's recorded empty-registry answers byte for byte and the Windows refusals over the pipe
+across a restart; with `ARKDECK_DEV_SIGNER_THUMBPRINT`, the leaves through the signed CLI, and
+with `ARKDECK_LIVE_DEVECO_ROOT` the DevEco registration, inspection, listing and retirement
+across restarts).
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

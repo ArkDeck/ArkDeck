@@ -1,15 +1,21 @@
 //! Actual registered HDC content inspection; no candidate execution or trust
 //! derived from durable registry testimony. Published Provider matching belongs
 //! to Runtime composition and is deliberately absent from this content owner.
+#[cfg(target_os = "macos")]
 use crate::tool_macho;
+#[cfg(target_os = "macos")]
 use arkdeck_contract::{canonical_json, sha256_hex};
-use arkdeck_platform::{
-    BootstrapTree, NativeCodeSignature, inspect_bootstrap_tree, inspect_native_code_signature,
-};
+use arkdeck_platform::NativeCodeSignature;
+#[cfg(target_os = "macos")]
+use arkdeck_platform::{BootstrapTree, inspect_bootstrap_tree, inspect_native_code_signature};
+#[cfg(target_os = "macos")]
 use serde_json::{Value, json};
 use std::{io, path::Path};
+#[cfg(target_os = "macos")]
 const MAXIMUM_BYTES: u64 = 256 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const MAXIMUM_LIBRARY_BYTES: u64 = 32 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const USB: &str = "libusb_shared.dylib";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ToolDependency {
@@ -29,18 +35,21 @@ pub struct ToolContent {
     pub trust: NativeCodeSignature,
     pub relocatable: bool,
 }
+#[cfg(target_os = "macos")]
 fn refusal() -> io::Error {
     io::Error::new(
         io::ErrorKind::InvalidData,
         "registered tool content is unsafe, changed or incomplete",
     )
 }
+#[cfg(target_os = "macos")]
 fn entries(tree: &BootstrapTree) -> Vec<Value> {
     tree.entries.iter().map(|e|json!({"path":e.path,"kind":if e.directory{"directory"}else{"file"},
         "executable":e.executable,"quarantineSHA256":e.quarantine_sha256,"byteCount":e.byte_count.to_string(),"sha256":e.sha256})).collect()
 }
 /// Inspect only the current closed hdc + optional sibling libusb layout. The
 /// returned signature describes integrity, never permission to execute.
+#[cfg(target_os = "macos")]
 pub fn inspect_tool_content(path: &Path) -> io::Result<ToolContent> {
     let before = inspect_bootstrap_tree(path)?;
     let names: Vec<&str> = before
@@ -99,7 +108,18 @@ pub fn inspect_tool_content(path: &Path) -> io::Result<ToolContent> {
     })
 }
 
-#[cfg(test)]
+/// The Windows HDC content checks are not built yet (`windows_registration`),
+/// so no retained HDC content is admitted, and a record naming one is refused
+/// as failing its native trust policy. Nothing is read or run.
+#[cfg(windows)]
+pub fn inspect_tool_content(_path: &Path) -> io::Result<ToolContent> {
+    Err(io::Error::new(
+        io::ErrorKind::PermissionDenied,
+        "the Windows HDC content checks are not built yet",
+    ))
+}
+
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{
