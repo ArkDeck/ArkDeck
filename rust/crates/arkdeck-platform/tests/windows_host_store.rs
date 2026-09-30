@@ -404,7 +404,8 @@ fn links_junctions_and_foreign_rights_are_refused_without_rewriting() {
 /// A replacement waits out a moment's holder of the document it replaces
 /// (an anti-malware or indexing filter holding it without delete sharing,
 /// here a handle of this test released after 100 ms) and then publishes;
-/// a holder that stays refuses it with the document unchanged.
+/// a holder that stays past the patience refuses it before publication, with
+/// the document unchanged.
 #[test]
 fn a_replacement_waits_out_a_brief_holder_of_the_replaced_document() {
     use std::os::windows::fs::OpenOptionsExt;
@@ -432,7 +433,7 @@ fn a_replacement_waits_out_a_brief_holder_of_the_replaced_document() {
     let held = hold();
     assert!(matches!(
         root.publish_document("record.json", b"third", 16),
-        Err(DocumentPublishError::OutcomeUnknown(_))
+        Err(DocumentPublishError::BeforePublication(_))
     ));
     drop(held);
     assert_eq!(root.read("record.json", 16).unwrap(), b"second");
