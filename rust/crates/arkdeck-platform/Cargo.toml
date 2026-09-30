@@ -28,6 +28,12 @@ serde_json.workspace = true
 name = "windows_tool_dispatch"
 harness = false
 
+# The console child of the Windows secret-entry tests is this binary itself,
+# attached to a pseudo console.
+[[test]]
+name = "windows_console_secret"
+harness = false
+
 # The fake signer of the Windows PTY exchange tests is this binary itself,
 # attached to the pseudo console the exchange creates.
 [[test]]

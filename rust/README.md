@@ -50,7 +50,11 @@ those two.
 Hosted CI waits for the inexpensive Rust policy job before allocating native
 hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
 job-owned source path, preserving mtimes only for identical bytes. The cache
-key includes the compiler, runner image, dependency manifests and build flags;
+key includes the compiler, runner image, dependency manifests and build flags,
+among them `CARGO_INCREMENTAL`: both native jobs set it to `0`, because each
+compiles a target once and compiler incremental state never survives to
+another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
+of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
 same compatibility key. Before saving, CI removes compiler incremental scratch
 state (not linked products, debug symbols or fingerprints) and records per-view
@@ -243,8 +247,9 @@ but the user and SYSTEM anything (or has no DACL) refuses the start; its access 
 never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
 text) instead; beside the lifecycle only the
-[Target owners](#windows-target-owners-task-xpa-004) are composed over either
-root, and every input from which
+[Target owners](#windows-target-owners-task-xpa-004) and the workspace
+project owner ([Workspace provider](#workspace-provider-task-xpa-015)) are
+composed over either root, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
 code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
 inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
@@ -2200,6 +2205,9 @@ drifted JAR, the managed SDK release profile, removal;
 `arkdeck-platform/tests/windows_verified_source.rs` covers the held source and
 the private entries. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-owners-run.md`.
+that nothing typed is rendered. The signing leaves stay macOS-only (daemon
+identity, file identity, PTY signer). The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
@@ -2905,6 +2913,26 @@ none, so a signing preset is refused there as Swift refuses it without one.
 `AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals`
 is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
 frames in order.
+
+On Windows the daemon composes the same owner over `workspace-projects`
+in its state root, created owner-only (`windows_lifecycle::Authority::compose`),
+and reads its document at start as the macOS start does: one it cannot read
+ends the start. A root is a drive path in the spelling on disk (`X:\a\b`,
+`\`-separated, no `.`/`..`, verbatim, stream or device syntax); no component
+may be a link or junction (the ancestry walk macOS makes, where the standard
+library reports a junction as a link); it is opened without following its last
+component (`arkdeck_platform::InspectedDirectory`), must be named by the system
+with exactly that spelling (so another case or a short name is refused), and is
+pinned by the volume serial and the 64-bit NTFS file reference as its device
+and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
+and digests. No DevEco toolchain or credential owner, workspace composition or
+Job owner is composed there yet: a project stays `runtimeRestartRequired`, a
+symbol preset registers, a preset that pins a toolchain is refused as without
+its owner, and every project or preset update or removal is refused
+(`recordUnreadable`, no new dispatch) because nothing proves that no Job names
+it. `tests/windows_workspace_project.rs` (hoststore) and
+`tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
+measure it.
 
 `arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
 reads use the Data Protection Keychain in the helpers' access group, with

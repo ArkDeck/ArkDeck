@@ -194,6 +194,12 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
+      # Compiler incremental state is scratch in CI: each target is compiled
+      # once per job and `compact` deletes debug/incremental before a save, so
+      # no job ever reads another's. Writing it cost 1.4 to 1.6 GB per Windows
+      # workspace job (4.0 GB on macOS) on 2026-09-30. Same sources, profile
+      # and tests; the value is part of the cache key (ci-workspace.py).
+      CARGO_INCREMENTAL: "0"
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
@@ -376,6 +382,9 @@ jobs:
         working-directory: rust
     env:
       CARGO_TERM_COLOR: always
+      # As in `workspace`: incremental state is never reused across jobs, and
+      # compact deletes it from each view's target before a save.
+      CARGO_INCREMENTAL: "0"
       ARKDECK_RUST_TEST_WORKERS: ${{ startsWith(matrix.os, 'xcode') && '2' || '1' }}
     steps:
       - name: Checkout exact revision with runner Git
