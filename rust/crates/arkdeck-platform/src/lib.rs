@@ -17,16 +17,16 @@ mod windows;
 
 #[cfg(target_os = "macos")]
 pub use process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
-    DeviceShellChannel, DeviceShellChannelError, ManagedServer, ToolLaunchIdentity,
-    VerifiedNamespace, VerifiedResource, VerifiedSource,
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
+    ToolLaunchIdentity, VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
-pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
 pub use process::{
-    PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest, ToolExecution,
-    ToolLimits, ToolRequest, ToolRunError, ToolTermination,
+    DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError, PtyError, PtyExecution,
+    PtyFailureCategory, PtyInteraction, PtyRequest, ToolExecution, ToolLimits, ToolRequest,
+    ToolRunError, ToolTermination,
 };
+pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]
@@ -48,6 +48,14 @@ mod terminal_secret;
 pub use secret::{Secret, wipe};
 #[cfg(target_os = "macos")]
 pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
+// The Windows console reader and Credential Manager store (TASK-XPA-011, G13)
+// with the macOS surface; `trusted_daemon_fingerprint` stays macOS-only until
+// the Authenticode identity (G12) binds a signing receipt on Windows.
+#[cfg(windows)]
+pub use windows::{
+    CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
+    KeychainPresence, TerminalSecretError, read_terminal_secret,
+};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;
@@ -221,6 +229,10 @@ pub use windows::host_store::{
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
+// A workspace project root, pinned by the identity it was registered with
+// (TASK-XPA-015).
+#[cfg(windows)]
+pub use windows::InspectedDirectory;
 
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
@@ -354,6 +366,20 @@ pub use host_deveco_files::{
     DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
     DevEcoRoot,
 };
+// The same five-role reader over a Windows DevEco Studio directory
+// (TASK-XPA-011, G15): four roles, no signed resource envelope (Windows
+// binds no manifest to a publisher signature), identities as the host
+// store's `HostFileIdentity`. `host_deveco_resources` and `property_list`
+// stay macOS-only: Windows DevEco ships no property list.
+#[cfg(windows)]
+pub use windows::{
+    DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
+    DevEcoRoot,
+};
+// A pinned file measured through one no-follow handle (`FileIdInfo`, owner
+// and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
+#[cfg(windows)]
+pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]

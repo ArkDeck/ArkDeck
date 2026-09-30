@@ -4,7 +4,8 @@
 - Authority: the maintainer approved options B, C and E of
   `windows-ci-speed-analysis-20260930.md` on 2026-09-30. This PR is B and C;
   E is the separate `agent/ci-skip-empty-harnesses-20260930` PR.
-- Base: stacked on #2364 (`06b10dc9`, `CARGO_INCREMENTAL=0` in the key), so
+- Base: stacked on #2364 (`06b10dc9`, `CARGO_INCREMENTAL=0` in the key), then
+  merged with `origin/main` after #2364 landed, so
   the key below already separates incremental and non-incremental products.
 - Author: Repo Agent on the maintainer's Windows 11 x64 reference host.
 

@@ -4,9 +4,14 @@
 //! HistoryStore is a separate writer, used only by the explicitly configured
 //! development daemon. No decoder or inventory comparison performs a write.
 
-#[cfg(target_os = "macos")]
+// The workspace registration owner (TASK-XPA-015): register, list and show
+// a project and read its presets on macOS and Windows. Its dependency owners
+// (the DevEco toolchain registry, the signing credential store) and the
+// workspace composition stay macOS-only, so on Windows a preset that pins a
+// toolchain or credential is refused as Swift refuses it without them.
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_project;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use workspace_project::{
     CredentialAcquire, PinPair, PinningResult, ToolchainAcquire, WorkspaceCredentialPinning,
     WorkspacePresetComposition, WorkspaceProjectStore, WorkspaceReference, WorkspaceStartupRecord,
@@ -106,9 +111,21 @@ mod analyzer_composition;
 mod arktrace_doctor;
 #[cfg(target_os = "macos")]
 pub use arktrace_doctor::ProductionDoctorProbe;
-#[cfg(target_os = "macos")]
+// The judges of the ArkTrace CLI's answers and the contract they check,
+// which read nothing from the host: the same code decides on Windows, where
+// no reviewed distribution exists yet to answer them (TASK-XPA-021), and the
+// recorded verdicts replay there. The loader, its trust checker and the
+// doctor probe stay macOS-only: the distribution contract they verify is an
+// Apple one (Developer ID, code directory hashes, POSIX modes in the tree
+// digest).
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod arktrace_analysis;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod arktrace_envelope;
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod arktrace_summary;
 #[cfg(target_os = "macos")]
 mod arktrace_trust;
@@ -679,6 +696,13 @@ mod tool_list_owner;
 #[cfg(target_os = "macos")]
 mod tool_retirement;
 
+// Portable: the product and SDK manifest facts, the same format on macOS
+// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
+// macOS-only until the Windows DevEco trust (G12) exists.
+mod deveco_manifest;
+pub use deveco_manifest::{
+    DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
+};
 #[cfg(target_os = "macos")]
 mod deveco_registry;
 #[cfg(target_os = "macos")]

@@ -249,3 +249,49 @@ measured library facts are in the TASK-XPA-005 run record; print them with:
 ```sh
 cargo test -p arkdeck-platform --lib linked_library_supports_the_runtime_store -- --nocapture
 ```
+
+## DevEco files and pinned signing files on Windows (TASK-XPA-011)
+
+`src/windows/deveco_files.rs` is the Windows `DevEcoRoot`/`DevEcoRole`
+reader (gate G15): the same no-follow, bounded, identity-checked reads as
+`host_deveco_files.rs` over a Windows DevEco Studio directory (default
+`%ProgramFiles%\Huawei\DevEco Studio`), which is a plain directory rather than
+a signed `.app` bundle:
+
+| Role | macOS (`<X>.app/Contents/…`) | Windows (`<root>\…`) |
+| --- | --- | --- |
+| `productManifest` | `Resources/product-info.json` | `product-info.json` |
+| `sdkManifest` | `sdk/default/sdk-pkg.json` | `sdk\default\sdk-pkg.json` |
+| `node` | `tools/node/bin/node` (execute bits) | `tools\node\node.exe` (a `.exe` the caller holds `FILE_EXECUTE` on) |
+| `hvigor` | `tools/hvigor/bin/hvigorw.js` | `tools\hvigor\bin\hvigorw.js` |
+| `signedResourceEnvelope` | `_CodeSignature/CodeResources` | none: Windows binds no manifest to a publisher signature, so the role does not exist |
+
+The root must be a canonical drive path holding the Windows launcher
+`bin\devecostudio64.exe`; any other layout (a macOS tree on a Windows disk, a
+relative, UNC, `.`/`..`, other-case or short-name spelling, a junction
+anywhere) is refused. Every directory from the drive root down and every
+child is opened relative to its parent without following a reparse point and
+must be owned by the token user or a trusted principal (`SYSTEM`,
+`Administrators`, `TrustedInstaller`, the places of Unix root) with no write
+right for anyone else; the drive root alone may let others add entries (the
+`/Applications`/sticky `/tmp` exception). A child's facts are the host store's
+`HostFileIdentity` (volume serial, `FileIdInfo` file id, size, last-write and
+change times), its link count (exactly 1) and whether it is executable.
+`host_deveco_resources` and `property_list` stay macOS-only: Windows DevEco
+ships no property list. The manifests' facts are parsed portably by
+`arkdeck-hoststore::parse_deveco_manifests` (launch entry `Windows`/`amd64`).
+
+`src/windows/pinned_file.rs` (`measure_host_file`, `host_resolved_path`) is
+what the signing layer's `measure`/`foundation_resolved_path`
+(`arkdeck-provider-workspace/src/file_identity.rs`) run on Windows: one
+no-follow handle answers the file's identity, owner and DACL, execute right
+and SHA-256, and the identity is taken again on that handle and on a second
+open of the path after the last byte, so a file written or replaced while it
+is measured is refused. `tests/windows_deveco_files.rs` covers both against
+fixture trees (synthetic manifests; the scratch base is the account's
+`LocalAppData`, since the temporary directory may grant other principals
+write), plus an ignored, shape-only probe of a local installation:
+
+```sh
+ARKDECK_LIVE_DEVECO_ROOT='<DevEco root>' cargo test -p arkdeck-platform --test windows_deveco_files -- --ignored live_deveco
+```

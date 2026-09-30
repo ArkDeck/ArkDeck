@@ -234,8 +234,9 @@ but the user and SYSTEM anything (or has no DACL) refuses the start; its access 
 never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
 text) instead; beside the lifecycle only the
-[Target owners](#windows-target-owners-task-xpa-004) are composed over either
-root, and every input from which
+[Target owners](#windows-target-owners-task-xpa-004) and the workspace
+project owner ([Workspace provider](#workspace-provider-task-xpa-015)) are
+composed over either root, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
 code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
 inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
@@ -1997,6 +1998,26 @@ fake signer is the test binary on the pseudo console; no signer is launched.
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
 
+## Windows persistent device shell channel (TASK-XPA-016, G19)
+
+`DeviceShellChannel` and its answer and error types build on Windows with the
+macOS signature. The framing, the bare-token rule, the budgets and the
+outcomes stay in `src/shell_channel.rs`, shared; only the client under them
+is per platform: the macOS pseudo-terminal client keeps its code, and
+`src/windows/shell.rs` attaches `hdc` to a pseudo console through the G19
+spawn (argv array, suspended, image proved before resume, kill-on-close Job,
+clean environment with a validated overlay), because `hdc shell` refuses a
+plain pipe. Windows differences: a framed line ends with CR; the console's
+rendering is read as text (its VT control sequences are removed before the
+frame is looked for, a cursor-forward over blanks reads back as the blanks,
+lines end in CRLF), so the answer bytes are T1; the shell "comes up" only on
+rendered text; a flood is bounded by the console and ends at the timeout,
+still an unknown outcome; closing ends the client's Job, its descendants
+included. `tests/windows_shell_channel.rs` is a `harness = false` target
+whose fake `hdc -t <key> shell` is the test binary on the pseudo console; no
+HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-016/windows-shell-channel-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
@@ -2113,6 +2134,27 @@ The development-signed package passes `Get-AuthenticodeSignature` only on a host
 that trusts the development certificate. A clean host needs the production
 signature. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-022/xcopy-package-run.md`.
+## Windows credential store and console secret entry (TASK-XPA-011)
+
+Gate-inventory group G13's platform layer has Windows implementations in
+`arkdeck-platform` with the macOS names and answers. `KeychainItems` keeps one
+generic credential per item in this user's Credential Manager (`CredWriteW`/
+`CredReadW`/`CredDeleteW`, DPAPI-protected, `CRED_PERSIST_LOCAL_MACHINE`: per
+user, surviving logoff, never roaming) under the target name
+`ArkDeck/<access group>/<service>/<account>`, the macOS item identity; the
+account is also the user name every read checks. An absent credential is
+`Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
+`errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
+`presence` has to read the blob (no attribute-only query exists) and wipes it
+in place. `read_terminal_secret` requires a console on stdin, clears echo and
+line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
+the mode on every return and, through a console control handler, on Ctrl-C.
+`tests/windows_credential_store.rs` works in a per-run fixture namespace and
+deletes every credential it may have created; `tests/windows_console_secret.rs`
+(`harness = false`) drives the reader in a child on a pseudo console and checks
+that nothing typed is rendered. The signing leaves stay macOS-only (daemon
+identity, file identity, PTY signer). The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
@@ -2819,6 +2861,26 @@ none, so a signing preset is refused there as Swift refuses it without one.
 is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
 frames in order.
 
+On Windows the daemon composes the same owner over `workspace-projects`
+in its state root, created owner-only (`windows_lifecycle::Authority::compose`),
+and reads its document at start as the macOS start does: one it cannot read
+ends the start. A root is a drive path in the spelling on disk (`X:\a\b`,
+`\`-separated, no `.`/`..`, verbatim, stream or device syntax); no component
+may be a link or junction (the ancestry walk macOS makes, where the standard
+library reports a junction as a link); it is opened without following its last
+component (`arkdeck_platform::InspectedDirectory`), must be named by the system
+with exactly that spelling (so another case or a short name is refused), and is
+pinned by the volume serial and the 64-bit NTFS file reference as its device
+and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
+and digests. No DevEco toolchain or credential owner, workspace composition or
+Job owner is composed there yet: a project stays `runtimeRestartRequired`, a
+symbol preset registers, a preset that pins a toolchain is refused as without
+its owner, and every project or preset update or removal is refused
+(`recordUnreadable`, no new dispatch) because nothing proves that no Job names
+it. `tests/windows_workspace_project.rs` (hoststore) and
+`tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
+measure it.
+
 `arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
 reads use the Data Protection Keychain in the helpers' access group, with
 Swift's non-interactive `LAContext` created through the Objective-C runtime. A
@@ -2987,6 +3049,27 @@ envelopes, and `rust/tests/fixtures/arktrace-analysis-validator/` holds those
 envelopes (`reviewed/`, answered for `zlib.htrace` and
 `trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
 reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
+
+On Windows (TASK-XPA-021, decision 5) there is no ArkTrace distribution: the
+repository pins one `trace_streamer`, a macOS arm64 build
+(`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`), and the distribution
+contract the loader verifies is an Apple one (Developer ID signatures,
+notarization and code directory hashes; a tree digest that spells each
+file's POSIX mode). So the loader, its trust checker and the doctor probe
+stay macOS-only, and nothing is loaded on Windows, pinned or not: a Windows
+development root that names `ARKDECK_ARKTRACE_DESCRIPTOR` is refused before
+anything is opened or read. What reads nothing from the host is built there:
+the two judges of the CLI's answers and the request reader
+(`arktrace_summary.rs`, `arktrace_analysis.rs`) with the contract and JSON
+token rules they share (`arktrace_envelope.rs`), and the three recorded
+oracles above replay on Windows with Swift's verdicts. The Windows daemon
+answers the offline Trace surface as a daemon without the distribution:
+`trace.inspect` with Swift's refusal without a Trace inspector
+(`trace-inspect-unavailable`, every recorded request), `trace.cache.status`
+and `trace.cache.purge` refused without the Trace cache owner, and both
+ArkTrace analyzers unavailable (`provider_not_registered`); `cargo test -p
+arkdeck-agentd --test windows_trace_offline_process` runs them against the
+real daemon ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-trace-offline-run.md)).
 
 ## Retired facade mode (TASK-XPA-017)
 

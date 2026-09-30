@@ -67,11 +67,11 @@ use windows_sys::Win32::System::Pipes::CreatePipe;
 
 /// Wide enough that no prompt the bounds admit wraps, short enough to keep
 /// the console host's screen small.
-const CONSOLE_SIZE: COORD = COORD { X: 1024, Y: 64 };
+pub(super) const CONSOLE_SIZE: COORD = COORD { X: 1024, Y: 64 };
 /// The input pipe holds every secret the bounds admit without blocking.
 const INPUT_PIPE_BYTES: u32 = 64 * 1024;
 /// What a console reads as Enter.
-const LINE_ENDING: u8 = b'\r';
+pub(super) const LINE_ENDING: u8 = b'\r';
 /// How long one wait for rendered output lasts before the child, the
 /// deadline and the cancellation are looked at again (the macOS poll).
 const POLL: Duration = Duration::from_millis(25);
@@ -287,19 +287,20 @@ impl Exchange<'_> {
 }
 
 /// One pseudo console: its input pipe (written only with a secret and its
-/// Enter), its output pipe (read by a thread that forwards each rendered
-/// chunk and, once nobody listens, reads on and discards, so the console
-/// host never blocks on a full pipe), and its host, closed on every path.
-struct Console {
-    handle: HPCON,
+/// Enter, or with the persistent shell channel's framed lines), its output
+/// pipe (read by a thread that forwards each rendered chunk and, once
+/// nobody listens, reads on and discards, so the console host never blocks
+/// on a full pipe), and its host, closed on every path.
+pub(super) struct Console {
+    pub(super) handle: HPCON,
     open: bool,
-    input: Option<File>,
-    output: Receiver<Zeroing>,
+    pub(super) input: Option<File>,
+    pub(super) output: Receiver<Zeroing>,
     reader: Option<JoinHandle<()>>,
 }
 
 impl Console {
-    fn open() -> io::Result<Self> {
+    pub(super) fn open() -> io::Result<Self> {
         let (input_read, input_write) = pipe(INPUT_PIPE_BYTES)?;
         let (output_read, output_write) = pipe(0)?;
         let mut handle: HPCON = 0;
@@ -371,7 +372,7 @@ impl Console {
 
     /// Closes the console host (which ends any client still attached) and
     /// its input; the reader then meets the end of the output.
-    fn close(&mut self) {
+    pub(super) fn close(&mut self) {
         if self.open {
             self.open = false;
             // SAFETY: the console is closed exactly once; the reader drains

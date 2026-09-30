@@ -7,8 +7,7 @@
 //! Every number is a 64-bit integer token, no member name repeats, and no
 //! machine string names an absolute path, a `file:` URI or the source's own
 //! path. Success authorizes publishing the exact bytes, never a re-encoding.
-use crate::arktrace_doctor::{exact_keys, integer_tokens};
-use crate::arktrace_profile::ArkTraceContract;
+use crate::arktrace_envelope::{ArkTraceContract, exact_keys, integer_tokens};
 use serde_json::{Map, Value};
 use std::collections::BTreeSet;
 

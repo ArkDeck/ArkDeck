@@ -8,11 +8,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap, HashSet},
-    fs::OpenOptions,
     io,
-    os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
     sync::Mutex,
+};
+#[cfg(target_os = "macos")]
+use std::{
+    fs::OpenOptions,
+    os::unix::fs::{MetadataExt, OpenOptionsExt},
 };
 
 #[path = "workspace_project_document.rs"]
@@ -194,6 +197,7 @@ fn kind(s: &str) -> bool {
 fn timestamp(s: &str) -> Option<f64> {
     crate::format_time::format_timestamp_seconds(s)
 }
+#[cfg(target_os = "macos")]
 fn canonical(s: &str) -> bool {
     s.starts_with('/')
         && s != "/"
@@ -206,6 +210,30 @@ fn canonical(s: &str) -> bool {
 fn root_digest(kind: &str, root: &Root) -> String {
     sha256_hex(format!("{kind}\0{}\0{}\0{}", root.path, root.device, root.inode).as_bytes())
 }
+/// The Windows spelling of the rule: a drive path `X:\a\b` below the
+/// drive's root, `\` separated, no empty, `.` or `..` component, and no
+/// component a Win32 name cannot spell (a trailing dot or space, a control
+/// character, `/ : * ? " < > |`), so no stream, device or verbatim syntax.
+/// Whether it is the spelling on disk is asked of the opened directory.
+#[cfg(windows)]
+fn canonical(s: &str) -> bool {
+    let bytes = s.as_bytes();
+    bytes.len() > 3
+        && s.len() <= 4096
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && bytes[2] == b'\\'
+        && s[3..].split('\\').all(|c| {
+            !c.is_empty()
+                && c != "."
+                && c != ".."
+                && !c.ends_with(['.', ' '])
+                && !c
+                    .chars()
+                    .any(|c| c < ' ' || matches!(c, '/' | ':' | '*' | '?' | '"' | '<' | '>' | '|'))
+        })
+}
+#[cfg(target_os = "macos")]
 fn inspect_root(path: &str) -> Result<Root, WireError> {
     if !canonical(path) {
         return Err(failure(
@@ -311,6 +339,69 @@ fn validate_records(document: &Value) -> Result<Vec<Record>, WireError> {
     }
     presets::validate(document, &refs)?;
     Ok(records)
+}
+/// Swift `inspectRoot` on Windows, check for check: the canonical spelling,
+/// no link or junction in the ancestry, the directory opened without
+/// following its last component and named by the system with exactly this
+/// spelling, then the name looked up again and required to be the directory
+/// opened, its ancestry unchanged. The volume serial and the NTFS file
+/// reference stand for the device and inode.
+#[cfg(windows)]
+fn inspect_root(path: &str) -> Result<Root, WireError> {
+    use arkdeck_platform::InspectedDirectory;
+    if !canonical(path) {
+        return Err(failure(
+            "invalidInput",
+            "workspace root must be a canonical absolute directory",
+        ));
+    }
+    // Every component below the drive's root; a junction is a link here.
+    let ancestry = || -> io::Result<()> {
+        for ancestor in Path::new(path).ancestors().filter(|a| a.parent().is_some()) {
+            if std::fs::symlink_metadata(ancestor)?
+                .file_type()
+                .is_symlink()
+            {
+                return Err(io::Error::other("symbolic ancestry"));
+            }
+        }
+        Ok(())
+    };
+    ancestry().map_err(|_| {
+        failure(
+            "invalidInput",
+            "workspace root ancestry cannot contain a symbolic link",
+        )
+    })?;
+    let cannot_open = || {
+        failure(
+            "invalidInput",
+            "workspace root cannot be opened as a directory",
+        )
+    };
+    let opened = InspectedDirectory::open(Path::new(path)).map_err(|_| cannot_open())?;
+    if !opened.named_exactly(Path::new(path)) {
+        return Err(failure(
+            "invalidInput",
+            "workspace root must be a canonical absolute directory",
+        ));
+    }
+    // A volume whose file ids do not fit an inode (ReFS) cannot be pinned.
+    let (device, inode) = opened.identity().map_err(|_| cannot_open())?;
+    let named = InspectedDirectory::open(Path::new(path))
+        .and_then(|named| named.identity())
+        .map_err(|_| failure("factsDrifted", "workspace root changed during registration"))?;
+    if named != (device, inode) || ancestry().is_err() {
+        return Err(failure(
+            "factsDrifted",
+            "workspace root changed during registration",
+        ));
+    }
+    Ok(Root {
+        path: path.into(),
+        device,
+        inode,
+    })
 }
 /// A registration's projection awaiting a restart: nothing composed for it.
 fn resource(r: &Record) -> Value {
@@ -439,6 +530,8 @@ impl WorkspaceProjectStore {
 
     /// The publications of this Runtime's start-up composition, by project,
     /// as the Swift handler is handed them.
+    /// Only the workspace composition (macOS) publishes.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub(crate) fn mark_published(&self, publications: BTreeMap<String, Map<String, Value>>) {
         if let Ok(mut current) = self.publications.lock() {
             *current = publications;

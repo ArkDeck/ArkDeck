@@ -28,11 +28,14 @@
 //! buffers that are wiped when dropped.
 
 mod base64;
-#[cfg(target_os = "macos")]
+// Portable: Foundation's canonical JSON spellings, proven on every host by
+// its own tests. Its writers (the install, re-key and credential-owner
+// leaves) are still macOS-only, so elsewhere nothing calls it yet.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod canonical_json;
 pub mod deveco_password;
 mod error;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 mod file_identity;
 #[cfg(target_os = "macos")]
 pub mod sdk_release;
@@ -56,6 +59,6 @@ pub mod keychain_secrets;
 pub mod signer;
 
 pub use error::SigningError;
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub use file_identity::{foundation_resolved_path, measure, remeasure};
 pub use signing_preset::SigningFileIdentity;

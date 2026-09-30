@@ -382,6 +382,7 @@ def validate_automatic_check_contract(
     app_build_job = _job_block(swift_text, "app-build")
     ds_job = _job_block(swift_text, "ds-interactions")
     rust_job = _job_block(swift_text, "rust-checks")
+    windows_job = _job_block(swift_text, "windows-clientkit")
     swift_aggregate_job = _job_block(swift_text, "swift")
     for job_name, job_block in (
         ("Swift test", swift_tests_job),
@@ -399,6 +400,7 @@ def validate_automatic_check_contract(
     for job_name, job_block in (
         ("plan", plan_job), ("swift-tests", swift_tests_job),
         ("app-build", app_build_job), ("ds-interactions", ds_job),
+        ("windows-clientkit", windows_job),
     ):
         for required in (
             "ARKDECK_CI_SHA: ${{ github.sha }}",
@@ -422,6 +424,7 @@ def validate_automatic_check_contract(
         '--event "$GITHUB_EVENT_PATH"',
         '--github-output "$GITHUB_OUTPUT"',
         "      rust: ${{ steps.paths.outputs.rust }}\n",
+        "      windows: ${{ steps.paths.outputs.windows }}\n",
         # A main run plans from the newest main commit this workflow passed on.
         # Only a successful run counts: a red or replaced one leaves its
         # changes to the next run. The job may read runs and nothing more.
@@ -498,7 +501,7 @@ def validate_automatic_check_contract(
         "        run: npm test\n",
     )
     required_aggregate = (
-        "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]\n",
+        "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]\n",
         "PLAN_RESULT: ${{ needs.plan.result }}",
         "SWIFT_RESULT: ${{ needs.swift-tests.result }}",
         "APP_RESULT: ${{ needs.app-build.result }}",
@@ -514,6 +517,28 @@ def validate_automatic_check_contract(
         '          else\n'
         '            test "$RUST_RESULT" = skipped\n'
         '          fi\n',
+        "WINDOWS_SELECTED: ${{ needs.plan.outputs.windows }}",
+        "WINDOWS_RESULT: ${{ needs.windows-clientkit.result }}",
+        '          if [ "$WINDOWS_SELECTED" = true ]; then\n'
+        '            test "$WINDOWS_RESULT" = success\n'
+        '          else\n'
+        '            test "$WINDOWS_RESULT" = skipped\n'
+        '          fi\n',
+    )
+    # TASK-XPA-007: the Windows client lane. Exact repository bytes (the
+    # generator check, embedded schema digests and corpus wire tests compare
+    # them), the SDK global.json pins, then generator check, build and tests.
+    required_windows = (
+        "    needs: plan\n",
+        "    if: needs.plan.outputs.windows == 'true'\n",
+        "    runs-on: windows-latest\n",
+        "          git config core.autocrlf false\n",
+        "        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0 (Node 24)\n"
+        "        with:\n"
+        "          global-json-file: windows/global.json\n",
+        "        run: python windows/scripts/generate-clientkit.py --check\n",
+        "        run: dotnet build windows/ArkDeck.Windows.slnx -c Release\n",
+        "        run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build\n",
     )
     required_rust = (
         "    needs: plan\n",
@@ -560,6 +585,23 @@ def validate_automatic_check_contract(
     for token in required_rust:
         if token not in rust_job:
             raise WorkflowContractError(f"Rust job missing contract token: {token}")
+    for token in required_windows:
+        if token not in windows_job:
+            raise WorkflowContractError(f"Windows ClientKit job missing contract token: {token}")
+    windows_order = [
+        windows_job.index(token)
+        for token in (
+            "git config core.autocrlf false",
+            "uses: actions/setup-dotnet@",
+            "generate-clientkit.py --check",
+            "dotnet build windows/ArkDeck.Windows.slnx",
+            "dotnet test windows/ArkDeck.Windows.slnx",
+        )
+    ]
+    if windows_order != sorted(windows_order):
+        raise WorkflowContractError(
+            "Windows ClientKit job must keep bytes, pin the SDK, check the generator, build, then test"
+        )
     for token in required_aggregate:
         if token not in swift_aggregate_job:
             raise WorkflowContractError(
@@ -1899,6 +1941,63 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 agent,
                 sdd,
                 swift.replace('            test "$RUST_RESULT" = skipped\n', "            true\n"),
+            ),
+            (
+                "Windows lane dropped from the aggregate",
+                agent,
+                sdd,
+                swift.replace(
+                    "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]\n",
+                    "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]\n",
+                ),
+            ),
+            (
+                "Windows lane not gated on plan",
+                agent,
+                sdd,
+                swift.replace("    if: needs.plan.outputs.windows == 'true'\n", ""),
+            ),
+            (
+                "aggregator ignores Windows failure",
+                agent,
+                sdd,
+                swift.replace('            test "$WINDOWS_RESULT" = success\n', "            true\n"),
+            ),
+            (
+                "aggregator ignores unexpectedly skipped Windows lane",
+                agent,
+                sdd,
+                swift.replace('            test "$WINDOWS_RESULT" = skipped\n', "            true\n"),
+            ),
+            (
+                "Windows checkout converts line endings",
+                agent,
+                sdd,
+                swift.replace("          git config core.autocrlf false\n", ""),
+            ),
+            (
+                "Windows lane skips the generator check",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: python windows/scripts/generate-clientkit.py --check\n",
+                    "        run: true # generator unchecked\n",
+                ),
+            ),
+            (
+                "Windows tests dropped",
+                agent,
+                sdd,
+                swift.replace(
+                    "        run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build\n",
+                    "        run: true # tests dropped\n",
+                ),
+            ),
+            (
+                "Windows lane on another runner",
+                agent,
+                sdd,
+                swift.replace("    runs-on: windows-latest\n", "    runs-on: ubuntu-latest\n"),
             ),
             (
                 "missing stable aggregator",
