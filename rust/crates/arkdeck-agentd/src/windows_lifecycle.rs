@@ -190,11 +190,9 @@ impl Authority {
     ///   `trace-cache`, the layout the macOS isolated owner creates, or the
     ///   account's `%LOCALAPPDATA%\ArkDeck\Trace`, where the macOS App keeps
     ///   `ArkDeck/Trace` in its container caches. `trace.cache.status` reads
-    ///   the same inventory as on macOS. `trace.cache.purge` is refused before
-    ///   admission (`operationUnavailable`, ruling 18), as the macOS daemon
-    ///   refuses it without its retention owners: the Job owner's
-    ///   active-Session census, which alone proves that no Job's Session still
-    ///   needs the derived data, is not asked on Windows yet.
+    ///   the same inventory as on macOS, and `trace.cache.purge` purges as on
+    ///   macOS, under the Job owner's active-Session census and the Artifact
+    ///   owner's Trace retention census.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each

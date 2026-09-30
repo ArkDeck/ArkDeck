@@ -124,7 +124,7 @@ named pipe (`doctor`, `runtime health`, `operation
 list|describe|example|validate`, `target list|show|display-name set|clear`,
 `workspace project register|list|show|update|remove`, `workspace preset
 list|show|update|remove`, `trace
-cache status`, `job list|show|status|events|timeline|result|evidence|wait|
+cache status|purge`, `diagnostics export`, `job list|show|status|events|timeline|result|evidence|wait|
 cancel|reconcile`, `agent list|status`, `human-action list|show`, `artifact
 list|inspect|read|export|quota`, `capability list|inspect`, `runtime storage
 status|policy|root`, `session list|show|pin|unpin|export preview|export

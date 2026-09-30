@@ -251,7 +251,7 @@
         },
         {
           "path": "contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "contracts/cli-next-action.schema.json",
@@ -1257,7 +1257,7 @@
         },
         {
           "path": "contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "contracts/cli-next-action.schema.json",
@@ -2246,7 +2246,7 @@
         },
         {
           "path": "new/contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "new/contracts/cli-next-action.schema.json",
@@ -3227,7 +3227,7 @@
         },
         {
           "path": "new/contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "new/contracts/cli-next-action.schema.json",
@@ -4230,7 +4230,7 @@
         },
         {
           "path": "contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "contracts/cli-next-action.schema.json",
@@ -5261,7 +5261,7 @@
         },
         {
           "path": "contracts/cli-feature-coverage.json",
-          "sha256": "6f383be74fd08ea977eb8c4007e06940137a0dbbe3a435d22e46a943a4b988f3"
+          "sha256": "555d742a84c36bd4cd3b187928f7bfee8a2b360e952a0dcfba678dcbc4a318a9"
         },
         {
           "path": "contracts/cli-next-action.schema.json",
