@@ -59,9 +59,12 @@ public sealed record LaunchOptions(string? Language, string? StartPage, string? 
 /// Which daemon the App talks to. The identity is an installation input, never read from the
 /// pipe (ClientKit's <see cref="DaemonIdentity"/>): the same variables the Rust CLI reads
 /// (<c>ARKDECK_DAEMON_PATH</c>, <c>ARKDECK_DAEMON_SIGNER_SHA256</c>,
+/// <c>ARKDECK_DAEMON_PUBLISHER_ORGANIZATION</c> with <c>ARKDECK_DAEMON_PUBLISHER_EKU</c>,
 /// <c>ARKDECK_DAEMON_PACKAGE_FAMILY</c>, <c>ARKDECK_ENDPOINT</c>), the image defaulting to
-/// <c>arkdeck-agentd.exe</c> beside the App. With neither a signer pin nor a package family
-/// there is nothing to verify, so the App connects to nothing and shows the recovery banner.
+/// <c>arkdeck-agentd.exe</c> beside the App. With no signer pin, publisher identity or package
+/// family there is nothing to verify, so the App connects to nothing and shows the recovery
+/// banner. A publisher identity with only one of its two values is passed on as given:
+/// ClientKit refuses it before any frame, as the CLI does (maintainer ruling 17).
 /// </summary>
 public static class DaemonConfiguration
 {
@@ -75,11 +78,14 @@ public static class DaemonConfiguration
         var path = Value(environment, "ARKDECK_DAEMON_PATH") ?? Path.Combine(appDirectory, "arkdeck-agentd.exe");
         var signer = Value(environment, "ARKDECK_DAEMON_SIGNER_SHA256");
         var family = Value(environment, "ARKDECK_DAEMON_PACKAGE_FAMILY");
-        if (signer is null && family is null)
+        var organization = Value(environment, "ARKDECK_DAEMON_PUBLISHER_ORGANIZATION");
+        var eku = Value(environment, "ARKDECK_DAEMON_PUBLISHER_EKU");
+        if (signer is null && family is null && organization is null && eku is null)
         {
-            return new UnconfiguredChannel("set ARKDECK_DAEMON_SIGNER_SHA256 or ARKDECK_DAEMON_PACKAGE_FAMILY for " + path);
+            return new UnconfiguredChannel(
+                "set ARKDECK_DAEMON_SIGNER_SHA256, ARKDECK_DAEMON_PUBLISHER_ORGANIZATION and ARKDECK_DAEMON_PUBLISHER_EKU, or ARKDECK_DAEMON_PACKAGE_FAMILY for " + path);
         }
-        var identity = new DaemonIdentity(path, signer, family);
+        var identity = new DaemonIdentity(path, signer, family, organization, eku);
         if (Value(environment, "ARKDECK_ENDPOINT") is { } endpoint)
         {
             try
