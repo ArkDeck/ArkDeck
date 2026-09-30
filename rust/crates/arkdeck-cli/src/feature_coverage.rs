@@ -456,6 +456,11 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.import.list",
     "artifact.import.release",
     "artifact.import.abort",
+    // The cleanup debt ledger over Swift's recorded debug HAP debts
+    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
+    // without a registered HDC a debt is refused before its readback.
+    "recovery.cleanup.list",
+    "cleanup-debt.list",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
