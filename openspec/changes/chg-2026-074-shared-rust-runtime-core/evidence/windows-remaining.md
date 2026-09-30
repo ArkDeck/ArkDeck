@@ -1,17 +1,19 @@
 # Remaining Windows work
 
-Updated 2026-09-30 against protected main `ba756dfe` (#2412), with this PR's Import coverage
-(TASK-XPA-018, `runs/TASK-XPA-018/windows-import-coverage-run.md`). Phase S is the software;
+Updated 2026-10-01 against protected main `cf44fcc8` (#2426), with this PR's coverage wave
+(TASK-XPA-018, `runs/TASK-XPA-018/windows-coverage-wave4-run.md`). Phase S is the software;
 phase A is the maintainer's real-host and DAYU200 acceptance (proposal r12, r13: Windows 11 x64
 only), written out in order in `docs/design/cross-platform/windows-phase-a-runbook.md`. The table
 is refreshed once per milestone, in its own docs commit, not in every slice.
 
 | Operations executable on Windows (/30) | Methods the Windows daemon answers (/105) | GJ software-ready on Windows (/5) | GJ real device on Windows (/5, phase A) | CLI coverage `windows: implemented` (/256) | Client pages (/6 + 1 skeleton) | SPK-3 / SPK-4 / SPK-5 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 0 (`operation.list` names all 30, none `available`) | 71 answered by a composed owner (11 results, 60 owner refusals); 0 non-conforming; 34 no owner | 0 | 0 (rows `WIN-GJ1-001`..`WIN-GJ5-001` registered `NOT_RUN`, #2399) | 61 (79 `partial`, 0 `notImplemented`, 116 unset) | skeleton done (#2365); Device (#2375) and Settings (#2383) built, Sessions and Job results in History (#2393); Debug, Flash, Viewer, Diagnostics open | host rows run, maintainer rows open / WinUI 3 go (provisional) / go |
+| 0 (`operation.list` names all 30, none `available`) | 73 answered by a composed owner (12 results, 61 owner refusals); 0 non-conforming; 32 no owner | 0 | 0 (rows `WIN-GJ1-001`..`WIN-GJ5-001` registered `NOT_RUN`, #2399) | 68 (72 `partial`, 0 `notImplemented`, 116 unset) | skeleton done (#2365); Device (#2375) and Settings (#2383) built, Sessions and Job results in History (#2393); Debug, Flash, Viewer, Diagnostics open | host rows run, maintainer rows open / WinUI 3 go (provisional) / go |
 
 Previous refreshes:
 
+- main `ba756dfe` (#2420): 0 · 71 (11 + 60), 0 non-conforming, 34 no owner · 0 · 0 · 61 (62 after
+  #2425) · same pages · same spikes.
 - main `86d2f2b8` (#2409): 0 · 63 (11 + 52), 0 non-conforming, 42 no owner · 0 · 0 · 52 · skeleton,
   Device and Settings · same spikes.
 - main `659f6474` (#2378): 0 · 28 (7 + 21), 2 non-conforming, 75 no owner · 0 · 0 · 18 · skeleton +
@@ -40,10 +42,10 @@ How each number is read and measured:
   - Owners composed: `jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage,
     workspaceProjects, planning, agentExecutions, humanActions, traceCache`.
   - The census exits 0: no non-conforming answer; #2382 fixed the two of the last refresh.
-  - The 34 with no owner:
+  - The 32 with no owner:
     - `debug.*` (5), `flash.*` (6) and `recovery.flash-invocation.list`;
     - `runtime.hdc.*` (3), `runtime.bundle.*` (4) and `runtime.tool.*` (5);
-    - `control-action.*` (3), `cleanupDebt.*` (2) and `history.filter.*` (3);
+    - `control-action.*` (3) and `history.filter.*` (3; #2423);
     - `trace.inspect` and `trace.probe`.
 - **GJ software-ready.** Every runbook step of that Golden Journey passes on Windows with the fake
   HDC (exit condition 2 of `docs/design/cross-platform/windows-phase-agent-prompt.md`). None does
@@ -53,36 +55,40 @@ How each number is read and measured:
     `capture.diagnostics@1`) need the registered HDC tuple.
   - GJ-2..5 need their owners and lanes: debug, native deploy, the ArkForge lane's Flash hops,
     and the workspace Jobs. The Import owner is on main (#2397); its flash-bundle publication waits
-    for the Flash archive reader (AF-W1).
+    for the Import validator to use the Flash archive reader, which #2410 put on Windows.
 - **GJ real device.** `REAL_DEVICE_PASS` on the current Catalog digest, phase A only. The five rows
   are in `openspec/platforms/windows/conformance-cases.yaml`, all `NOT_RUN`.
 - **CLI coverage.** `implementationStatusByPlatform.windows == "implemented"` in
   `openspec/contracts/cli-feature-coverage.json`, generated from
   `rust/crates/arkdeck-cli/src/feature_coverage.rs`.
-  - The 61 are the leaves that need no Runtime (`help`, `commands`, `completion`, the capability
+  - The 68 are the leaves that need no Runtime (`help`, `commands`, `completion`, the capability
     stubs) plus `WINDOWS_MEASURED_LEAVES`:
     - `doctor`, `runtime health`, `operation list|describe|example|validate`;
     - `target list|show|display-name set|clear`;
-    - `workspace project register|list|show`, `workspace preset list|show`;
+    - `workspace project register|list|show|update|remove`, `workspace preset
+      list|show|update|remove`;
     - `trace cache status`;
     - `job list|show|status|events|timeline|result|evidence|wait|cancel|reconcile`;
     - `agent list|status`, `human-action list|show`;
-    - `artifact list|inspect|read|export|quota`, `capability list`;
-    - `runtime storage status|policy`;
+    - `artifact list|inspect|read|export|quota`, `capability list|inspect`;
+    - `runtime storage status|policy|root`;
     - `session list|show|pin|unpin|export preview|export apply|cleanup preview|cleanup apply`;
-    - `artifact import hap|native-library|workspace-patch|inspect|list|release|abort`.
+    - `artifact import hap|native-library|workspace-patch|inspect|list|release|abort`;
+    - `recovery cleanup list` and `cleanup-debt list` (#2425).
   - Each measured leaf is run through the real CLI against a development-signed daemon, over a
     root holding recorded Swift state. Each test also asserts that the leaves it measured are
     `implemented` in the manifest the CLI renders:
     - `crates/arkdeck-cli/tests/windows_signed_runtime.rs`;
-    - `crates/arkdeck-agentd/tests/windows_{job_store,job_runner,reconcile_agent,artifact_owner,import_owner,mutation_retention,session_owner}_process.rs`.
+    - `crates/arkdeck-agentd/tests/windows_{job_store,job_runner,reconcile_agent,artifact_owner,import_owner,mutation_retention,session_owner,workspace_projects}_process.rs`.
   - Ruling 9: a refusal because an owner is not composed stays `partial`. So do:
     - `job plan|submit|run`, `agent run|resume|abandon`, `human-action resume` and `target
       adopt|availability`: they need a Target or HDC;
-    - `capability inspect`: nothing is issued;
-    - `runtime storage root`: not yet measured;
-    - `artifact import flash-bundle`: refused at publication until AF-W1;
-    - `trace cache purge`, the workspace updates and removals, and preset registration.
+    - `artifact import flash-bundle`: still refused at publication. The Import owner's
+      flash-bundle validator is macOS-only (`import_publication.rs`), though #2410 put the
+      archive reader on Windows;
+    - `trace cache purge`;
+    - `workspace preset register`: a build, test or signing preset pins a DevEco toolchain or
+      credential the Windows daemon does not yet register (a symbol preset registers).
 - **Client pages.** The XPA-007 skeleton and the six XPA-020 surfaces (Debug, Flash, Viewer,
   Diagnostics, Settings, Device), each wired to the real Windows daemon.
   - The skeleton is on main (#2365).
@@ -101,9 +107,7 @@ Open PRs that move these numbers when they land:
 
 | PR | Effect |
 | --- | --- |
-| #2410 | the flash bundle reader on Windows (`artifact import flash-bundle`'s publication, GJ-4) |
-| #2407 | the bundled code-sign helper on the Windows daemon (GJ-3) |
+| #2424 | the ArkForge Flash planned, admitted, run and reconciled on Windows (GJ-4) |
+| #2423 | the History filter owner (`history.filter.*`, 3 methods) |
 | #2411 | `runtime service uninstall` stopping the client-started daemon on Windows |
-| #2414, #2419 | HDC's connect-key injection and replacement stop (GJ-1 device hops, after the tuple) |
-| #2415 | human actions resumed across process crashes on Windows |
 | CHG-2026-078 (TASK-WHR-001..003) | the Windows HDC tuple: operations, GJ-1 device hops and the leaves that need a Target |

@@ -19,7 +19,9 @@
 //!   `runtime storage status`, `session list`, `show`, `export preview` and
 //!   `apply`; then `session pin`, `runtime storage policy`, `session cleanup
 //!   preview` and `apply` reclaim the unpinned Session as over the pipe, and
-//!   `session unpin` releases the kept one. The measured leaves are Windows
+//!   `session unpin` releases the kept one; `runtime storage root` moves the
+//!   Sessions root inside the development root and back to its default. The
+//!   measured leaves are Windows
 //!   `implemented` in the coverage manifest the CLI renders
 //!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
 //!   checks nothing.
@@ -587,10 +589,51 @@ fn gj1_session_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     ]);
     assert_eq!(unpinned["pinned"], false, "{unpinned}");
     assert!(root.session(OBSERVED).join("manifest.json").is_file());
+
+    // The Sessions root moved to an existing owner-only directory inside the
+    // isolated development root, and back to its default.
+    let custom = root.0.join("custom-sessions");
+    HostDirectory::open_or_create_private(&custom).unwrap();
+    let custom_text = custom.to_str().unwrap().to_owned();
+    let status = run(&["runtime", "storage", "status"]);
+    let moved = run(&[
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        status["sessionDomain"]["generation"].as_str().unwrap(),
+        "--root",
+        &custom_text,
+    ]);
+    assert_eq!(
+        moved["sessionDomain"]["rootPath"],
+        custom_text.as_str(),
+        "{moved}"
+    );
+    assert_ne!(moved["sessionDomain"]["rootKind"], "default", "{moved}");
+    let restored = run(&[
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        moved["sessionDomain"]["generation"].as_str().unwrap(),
+        "--default",
+    ]);
+    assert_eq!(
+        restored["sessionDomain"]["rootKind"], "default",
+        "{restored}"
+    );
+    assert_eq!(
+        restored["sessionDomain"]["rootPath"],
+        root.sessions().to_str().unwrap(),
+        "{restored}"
+    );
+    assert!(root.session(OBSERVED).join("manifest.json").is_file());
     running.stop(&root.0);
     assert_measured(&[
         "runtime.storage.status",
         "runtime.storage.policy",
+        "runtime.storage.root",
         "session.list",
         "session.show",
         "session.pin",
