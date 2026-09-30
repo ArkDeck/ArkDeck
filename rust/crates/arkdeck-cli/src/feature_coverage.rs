@@ -352,14 +352,12 @@ const DIRECT_UNDER_LOCAL_GROUPS: &[&str] = &["runtime.tool.select"];
 /// host-specific families with no Windows form until a Windows profile is
 /// ratified (§11).
 const MACOS_ONLY_ROOTS: &[&str] = &["legacy", "agentd", "signing", "update-feed", "maintainer"];
-const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
-    "service",
-    "signing",
-    "bundle",
-    "tool",
-    "update",
-    "support-bundle",
-];
+// `runtime service` is not one: its Windows counterpart is the
+// client-started daemon (maintainer ruling 10, launchd -> client-started
+// daemon), whose `status`, `verify`, `restart` and `uninstall` Windows serves;
+// `install` and `update` stay refused there (`MACOS_HOST_LEAVES`).
+const MACOS_ONLY_RUNTIME_GROUPS: &[&str] =
+    &["signing", "bundle", "tool", "update", "support-bundle"];
 
 /// The Runtime leaves whose every method the Windows daemon answers, measured
 /// end to end on Windows: the CLI authenticates a daemon signed with a
@@ -390,6 +388,14 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.preset.show",
     // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
     "trace.cache.status",
+    // The client-started service (TASK-XPA-002, decision 11), through the
+    // real CLI against a signed daemon it starts itself
+    // (`arkdeck-agentd/tests/windows_service_uninstall_process.rs`):
+    // `uninstall` is its stop, with `restart`'s current-Job refusal.
+    "runtime.service.status",
+    "runtime.service.verify",
+    "runtime.service.restart",
+    "runtime.service.uninstall",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -400,12 +406,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
 /// Registry USB census, and the host store's no-follow Import source reader
 /// (TASK-XPA-018).
 const MACOS_HOST_LEAVES: &[&str] = &[
+    // The LaunchAgent's own installation; the client-started daemon has none.
     "runtime.service.install",
     "runtime.service.update",
-    "runtime.service.restart",
-    "runtime.service.status",
-    "runtime.service.verify",
-    "runtime.service.uninstall",
     "agentd.install",
     "agentd.update",
     "agentd.restart",
@@ -1105,7 +1108,19 @@ mod tests {
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }
-        assert_eq!(windows(&document, "runtime.service.status"), Value::Null);
+        // The client-started service: served but for its installation.
+        for (feature, status) in [
+            ("runtime.service.status", "implemented"),
+            ("runtime.service.verify", "implemented"),
+            ("runtime.service.restart", "implemented"),
+            ("runtime.service.uninstall", "implemented"),
+            ("runtime.service.install", "notImplemented"),
+            ("runtime.service.update", "notImplemented"),
+        ] {
+            assert_eq!(windows(&document, feature), status, "{feature}");
+        }
+        // The retired spellings stay a macOS-only family.
+        assert_eq!(windows(&document, "agentd.status"), Value::Null);
         for entry in document["entries"].as_array().unwrap() {
             let statuses = &entry["implementationStatusByPlatform"];
             if statuses["windows"] == "implemented" {
