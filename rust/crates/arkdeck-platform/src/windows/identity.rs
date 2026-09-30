@@ -565,7 +565,10 @@ fn verify_signature(file: &File, path: &std::path::Path, pins: &SignerPins) -> i
 
 /// The DER certificates, leaf first and root last, of the first signer of an
 /// image that `WinVerifyTrust` accepted; an error when it did not.
-fn trusted_signer_chain(file: &File, path: &std::path::Path) -> io::Result<Vec<Vec<u8>>> {
+pub(crate) fn trusted_signer_chain(
+    file: &File,
+    path: &std::path::Path,
+) -> io::Result<Vec<Vec<u8>>> {
     let path = wide(path.as_os_str())?;
     let mut file_info = WINTRUST_FILE_INFO {
         cbStruct: size_of::<WINTRUST_FILE_INFO>() as u32,

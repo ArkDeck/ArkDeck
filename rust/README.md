@@ -2453,18 +2453,33 @@ write or delete sharing and every ancestor without delete sharing, so its
 canonical path names the verified bytes while held, and that path takes the
 place of the macOS `/.vol` inode alias in the signer's argv.
 `create_private_directory`/`create_private_file` give new entries the store's
-owner-only descriptor where macOS uses `0700`/`0600`. `KeychainSigningSecrets`
-is built on Windows only in its scope-bound form (`over`) over Credential
-Manager: the production constructors bind a receipt to the daemon's code
-identity, and the Windows (Authenticode) form of that identity is not a
-receipt input yet; the CLI signing leaves and the daemon's signing dispatch
-stay macOS-only. `tests/windows_signing_flow.rs` (`harness = false`) runs the
-test binary as a fake `java.exe` on the signer's pseudo console: install, sign,
-verify and record, re-key through Credential Manager, a rejected password, a
-drifted JAR, the managed SDK release profile, removal;
+owner-only descriptor where macOS uses `0700`/`0600`.
+`tests/windows_signing_flow.rs` (`harness = false`) runs the test binary as a
+fake `java.exe` on the signer's pseudo console: install, sign, verify and
+record, re-key through Credential Manager, a rejected password, a drifted JAR,
+the managed SDK release profile, removal;
 `arkdeck-platform/tests/windows_verified_source.rs` covers the held source and
 the private entries. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-owners-run.md`.
+
+A Windows receipt is bound to the installed daemon as on macOS:
+`arkdeck_platform::trusted_daemon_fingerprint` is
+`SHA-256(domain ‖ SHA-256(signer leaf) ‖ SHA-256(image))` of a canonical,
+trusted-write-only `.exe` that `WinVerifyTrust` accepts, and
+`KeychainSigningSecrets::installed`/`for_maintenance` read Credential Manager
+bound to it. The CLI serves `runtime signing status|install|install-sdk-release|
+remove` (and the `signing …` spellings) on Windows; the daemon it binds is the
+one it would start (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside it),
+and the maintenance leaves first require that image to satisfy a configured
+signing pin (`ARKDECK_DAEMON_SIGNER_SHA256` or the publisher identity) before
+Credential Manager is opened. `migrate-deveco` and `install --build-profile`,
+which read DevEco's encrypted password material, are `unsupportedOnPlatform`
+on Windows. The installed Windows daemon composes the workspace presets'
+credential pinning over the account's preset root, bound to its own image; the
+signing dispatch (the workspace composition) stays macOS-only, and Windows
+attempts go under `SigningPresetStore::attempts_root` (`<preset root>\Attempts`).
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

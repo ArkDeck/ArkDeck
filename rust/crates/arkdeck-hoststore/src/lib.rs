@@ -54,10 +54,15 @@ mod workspace_build;
 mod workspace_checkpoint;
 #[cfg(target_os = "macos")]
 pub use crash_symbolizer::{SymbolizeError, symbolize_crash};
-#[cfg(target_os = "macos")]
+// The credential pinning of workspace signing presets is composed on macOS
+// and Windows; the signing dispatch (`SigningSetup`) belongs to the workspace
+// composition, which stays macOS-only (TASK-XPA-011).
+#[cfg(any(target_os = "macos", windows))]
 mod workspace_signing;
 #[cfg(target_os = "macos")]
-pub use workspace_signing::{SigningSetup, credential_pinning, keychain_credential_pinning};
+pub use workspace_signing::SigningSetup;
+#[cfg(any(target_os = "macos", windows))]
+pub use workspace_signing::{credential_pinning, keychain_credential_pinning};
 #[cfg(target_os = "macos")]
 mod workspace_read;
 #[cfg(target_os = "macos")]

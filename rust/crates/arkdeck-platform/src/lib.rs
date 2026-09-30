@@ -49,12 +49,12 @@ pub use secret::{Secret, wipe};
 #[cfg(target_os = "macos")]
 pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
 // The Windows console reader and Credential Manager store (TASK-XPA-011, G13)
-// with the macOS surface; `trusted_daemon_fingerprint` stays macOS-only until
-// the Authenticode identity (G12) binds a signing receipt on Windows.
+// with the macOS surface, and `trusted_daemon_fingerprint` over the daemon's
+// Authenticode signer and bytes.
 #[cfg(windows)]
 pub use windows::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
-    KeychainPresence, TerminalSecretError, read_terminal_secret,
+    KeychainPresence, TerminalSecretError, read_terminal_secret, trusted_daemon_fingerprint,
 };
 // The Windows counterpart of the `/.vol`-bound source (a held file and
 // namespace) and the signing layer's private entries (TASK-XPA-011).

@@ -20,9 +20,8 @@
 //!   verified and recorded as `signing-result.json`
 //!   (`arkdeck-openharmony-signing-result/v1`).
 //! - `keychain_secrets` is the production secret source over the Data
-//!   Protection Keychain and the installed daemon's code identity (macOS); on
-//!   Windows only its scope-bound form over Credential Manager, bound to no
-//!   daemon identity.
+//!   Protection Keychain (macOS) or Credential Manager (Windows) and the
+//!   installed daemon's code identity.
 //! - `credential_owner` (macOS, Windows) is the ledger of the workspace
 //!   signing presets that pin the installed credential by its content
 //!   reference, and their resolution to its receipt; `signing_install`,
