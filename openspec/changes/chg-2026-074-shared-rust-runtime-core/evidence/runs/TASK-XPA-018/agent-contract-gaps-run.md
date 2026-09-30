@@ -85,6 +85,21 @@ Steps:
 - `control_action_human_actions_keep_a_null_selection_schema`: `control-action.show` and
   `runtime.tool.select` still refuse a selection schema.
 
+- `the_rust_owner_s_captured_answers_conform` (added after S1's confirmation). It validates the
+  Rust owner's exact answers S1 captured from `AgentExecutionStore` at a fixed clock, with labels
+  redacted:
+  - `agent.status` of an execution stopped at its deadline (`orchestrationBudgetExpired`,
+    `budgetExpired`) and by an untrusted clock (`orchestrationClockUntrusted`, `clockUntrusted`);
+  - the `agent.list` page listing it;
+  - the waiting pick-a-device `agent.status`, whose `humanAction.selectionSchema` is
+    `{"enum": [...], "type": "string"}`, and that human action as `human-action.show` answers it;
+  - `agent.run`'s refusal details, with `executionId` for a stopped execution and without it for a
+    new execution that has no trusted time.
+
+  The resume owners already publish `orchestrationClockUntrusted`, which they pass through. S1
+  confirmed the daemon replaced the waiting status and `human-action.show` with `internalError`
+  before this change, which S1 checked through the Windows daemon.
+
 In check-contracts' published view (merge-base schemas) the widened answers are refused, and the
 tests assert only that this is the published view, as in #2370.
 

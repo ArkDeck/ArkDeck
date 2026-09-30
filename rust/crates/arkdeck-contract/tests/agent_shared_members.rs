@@ -151,6 +151,94 @@ fn agent_run_publishes_its_orchestration_refusals() {
     }
 }
 
+/// The Rust owner's exact answers S1 captured from `AgentExecutionStore`
+/// (the code the daemon runs on macOS and Windows) at a fixed clock:
+/// an execution stopped at its deadline or by an untrusted clock, the page
+/// that lists it, a waiting pick-a-device execution, and `agent.run`'s
+/// refusals of a stopped execution and of a new one without trusted time.
+#[test]
+fn the_rust_owner_s_captured_answers_conform() {
+    let stopped = |failure: &str, state: &str| {
+        json!({"bindingRevision": null,
+            "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "createdAt": "2026-09-14T00:00:00.000Z", "deadline": "2026-09-14T00:05:00.000Z",
+            "executionId": "har-ambiguous", "failureCode": failure, "generation": "4",
+            "humanAction": null, "jobId": null, "jobState": null,
+            "lastObservedAt": "2026-09-14T00:00:00.000Z", "nextAction": null,
+            "operation": "observe.device@1", "outcomeUnknown": false,
+            "schemaVersion": "arkdeck.agent-execution/1", "state": state, "targetId": null})
+    };
+    let deadline = stopped("orchestrationBudgetExpired", "budgetExpired");
+    let clock = stopped("orchestrationClockUntrusted", "clockUntrusted");
+    let mut item = deadline.clone();
+    item.as_object_mut().unwrap().remove("humanAction");
+    let page = json!({"hasMore": false, "items": [item], "nextCursor": null,
+        "order": "createdAtDescExecutionIdAsc", "pageKind": "snapshot",
+        "schemaVersion": "arkdeck.cli.page/1",
+        "snapshotRevision": "00000000-0000-4000-8000-000000000000"});
+    let action = json!({"actionId": "har-00000000-0000-4000-8000-000000000003",
+        "category": "ambiguousIdentity",
+        "choices": [
+            {"candidateKey": "a".repeat(32), "value": "candidate-00000000-0000-4000-8000-000000000001"},
+            {"candidateKey": "b".repeat(32), "value": "candidate-00000000-0000-4000-8000-000000000002"}],
+        "createdAt": "2026-09-14T00:00:00.000Z", "expiresAt": "2026-09-14T00:05:00.000Z",
+        "minimumAction": "human.confirmDeviceIdentity", "newDispatchCount": 0,
+        "owner": {"id": "har-ambiguous", "kind": "agentExecution"},
+        "reasonCode": "device.identityAmbiguous",
+        "resumeReference": "resume-00000000-0000-4000-8000-000000000003",
+        "schemaVersion": "arkdeck.human-action/1",
+        "selectionSchema": {"enum": ["candidate-00000000-0000-4000-8000-000000000001",
+            "candidate-00000000-0000-4000-8000-000000000002"], "type": "string"},
+        "status": "waiting"});
+    let mut waiting = stopped("", "waitingForHuman");
+    waiting["failureCode"] = Value::Null;
+    waiting["generation"] = json!("3");
+    waiting["humanAction"] = action.clone();
+    waiting["nextAction"] = json!({"expiresAt": "2026-09-14T00:05:00.000Z", "kind": "humanAction",
+        "owner": {"id": "har-ambiguous", "kind": "agentExecution"},
+        "reasonCode": "device.identityAmbiguous",
+        "resource": {"id": "har-00000000-0000-4000-8000-000000000003", "kind": "humanAction"},
+        "resumeReference": "resume-00000000-0000-4000-8000-000000000003"});
+    let answers = [
+        ("agent.status", "result", &deadline),
+        ("agent.status", "result", &clock),
+        ("agent.list", "result", &page),
+        ("agent.status", "result", &waiting),
+        ("human-action.show", "result", &action),
+    ];
+    let refusals = [
+        json!({"executionId": "har-ambiguous", "newDispatchCount": 0, "phase": "preAdmission"}),
+        json!({"newDispatchCount": 0, "phase": "preAdmission"}),
+    ];
+    let widened = validate_method_value(
+        "agent.run",
+        "errorCode",
+        &json!("orchestrationBudgetExpired"),
+    )
+    .is_ok();
+    if !widened {
+        assert!(
+            published_view(),
+            "agent.run must publish its orchestration refusals"
+        );
+        return;
+    }
+    for (method, part, answer) in answers {
+        validate_method_value(method, part, answer)
+            .unwrap_or_else(|error| panic!("{method}: {error:?}: {answer}"));
+    }
+    for code in ["orchestrationBudgetExpired", "orchestrationClockUntrusted"] {
+        validate_method_value("agent.run", "errorCode", &json!(code)).unwrap();
+    }
+    for details in &refusals {
+        validate_method_value("agent.run", "errorDetails", details).unwrap();
+    }
+    // The resume owners already publish the clock refusal they pass through.
+    for method in ["agent.resume", "human-action.resume"] {
+        validate_method_value(method, "errorCode", &json!("orchestrationClockUntrusted")).unwrap();
+    }
+}
+
 #[test]
 fn control_action_human_actions_keep_a_null_selection_schema() {
     let (_, selection) = recorded();
