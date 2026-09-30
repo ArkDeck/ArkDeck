@@ -18,13 +18,15 @@ mod windows;
 #[cfg(target_os = "macos")]
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
-    DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
-    PtyFailureCategory, PtyInteraction, PtyRequest, ToolLaunchIdentity, VerifiedNamespace,
-    VerifiedResource, VerifiedSource,
+    DeviceShellChannel, DeviceShellChannelError, ManagedServer, ToolLaunchIdentity,
+    VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
-pub use process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
+pub use process::{
+    PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest, ToolExecution,
+    ToolLimits, ToolRequest, ToolRunError, ToolTermination,
+};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]

@@ -24,6 +24,7 @@ pub(crate) mod host_store;
 mod identity;
 mod managed;
 mod process;
+mod pty;
 mod server;
 mod state;
 mod stop;

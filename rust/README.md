@@ -1966,6 +1966,26 @@ were seen and Swift's closed failure category classified from the diagnostic
 after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
 it with shell scripts that print the signer's prompts; no signer is launched.
 
+## Windows PTY prompt/secret exchange (TASK-XPA-011, G19)
+
+`VerifiedTool::run_pty_exchange` and its `Pty*` types build on Windows with
+the macOS signature and errors (`src/windows/pty.rs`). The verified tool is
+attached to a pseudo console (`CreatePseudoConsole`,
+`PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`) through the tool runner's spawn:
+argv array, no shell, suspended, image proved before resume, kill-on-close
+Job, clean environment, no inherited handle. Each exact prompt is matched in
+the rendered console output and answered with its secret and CR in one write
+from a wiped buffer; a rendered secret, a repeated or out-of-order prompt, an
+early exit, the budget, the deadline and a cancellation end the exchange, and
+every path ends the Job and closes the console. Windows differences: echo is
+the child's choice and is detected (`SecretEchoDetected`) rather than cleared
+by the parent, a secret must be UTF-8 without control characters, and a
+prompt's trailing space is not matchable (the console renders it as a cursor
+move). `tests/windows_pty_exchange.rs` is a `harness = false` target whose
+fake signer is the test binary on the pseudo console; no signer is launched.
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
