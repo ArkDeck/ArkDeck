@@ -444,6 +444,23 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.preset.show",
     // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
     "trace.cache.status",
+    // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
+    // the HAP, native-library and workspace-patch uploads committed with
+    // their exact bytes, and the Import reads, release and abort. Not
+    // `artifact import flash-bundle`: its publication is refused on Windows
+    // until the Flash archive reader is ported (AF-W1).
+    "artifact.import.hap",
+    "artifact.import.native-library",
+    "artifact.import.workspace-patch",
+    "artifact.import.inspect",
+    "artifact.import.list",
+    "artifact.import.release",
+    "artifact.import.abort",
+    // The cleanup debt ledger over Swift's recorded debug HAP debts
+    // (`windows_cleanup_debt_process.rs`). Not `recovery cleanup continue`:
+    // without a registered HDC a debt is refused before its readback.
+    "recovery.cleanup.list",
+    "cleanup-debt.list",
     // The History filter owner over Swift's recorded filters (TASK-XPA-012;
     // `windows_history_filter_process.rs`).
     "history.filter.list",
@@ -455,9 +472,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
 /// support bundle's service is `operationUnavailable`), each for the macOS
 /// host primitive it needs and Windows does not have yet: the LaunchAgent
 /// (`launchctl`), DevEco's password material, the App container's update lifecycle, the
-/// diagnostic-bundle publisher, the update-feed artifact measure, the I/O
-/// Registry USB census, and the host store's no-follow Import source reader
-/// (TASK-XPA-018).
+/// diagnostic-bundle publisher, the update-feed artifact measure and the I/O
+/// Registry USB census (TASK-XPA-018). The Import uploads are served on
+/// Windows through the host store's `HostImportSource` (TASK-XPA-008).
 const MACOS_HOST_LEAVES: &[&str] = &[
     "runtime.service.install",
     "runtime.service.update",
@@ -488,10 +505,6 @@ const MACOS_HOST_LEAVES: &[&str] = &[
     "update-feed.prepare",
     "update-feed.assemble",
     "flash.install-binding",
-    "artifact.import.hap",
-    "artifact.import.workspace-patch",
-    "artifact.import.flash-bundle",
-    "artifact.import.native-library",
 ];
 
 /// The App's capability table as published, read once.
@@ -1159,12 +1172,13 @@ mod tests {
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),
-            ("artifact.import.list", "partial"),
-            ("artifact.import.release", "partial"),
+            ("artifact.import.list", "implemented"),
+            ("artifact.import.release", "implemented"),
             ("human-action.resume", "partial"),
             ("flash.dayu200", "partial"),
-            ("artifact.import.begin", "notImplemented"),
-            ("artifact.import.workspace-patch", "notImplemented"),
+            ("artifact.import.begin", "implemented"),
+            ("artifact.import.workspace-patch", "implemented"),
+            ("artifact.import.flash-bundle", "partial"),
         ] {
             assert_eq!(windows(&document, feature), status, "{feature}");
         }

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using FlaUI.Core.AutomationElements;
 using Microsoft.Win32;
 
 namespace ArkDeck.App.UITests;
@@ -365,6 +366,211 @@ public sealed class RealDaemonTests
                 {
                     Thread.Sleep(100);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The Agents page against the real Runtime's agent execution and human-action owners
+    /// (TASK-XPA-005 S1), over a development root holding the recorded agent-human-action
+    /// executions and their Target: the pick-a-device action offers exactly its selection
+    /// schema's values, its resume is answered by the Runtime (the recorded deadline has long
+    /// passed, so it expires, and the execution ends <c>budgetExpired</c>), and an orchestrating
+    /// execution is abandoned after its confirmation, each written to the Runtime's record.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void AgentExecutionsAreResumedAndAbandonedThroughTheRealRuntime()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        const string ambiguousAction = "har-00000000-0000-4000-8000-000000000003";
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-agents-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            // The first start creates the owner-only roots; the recorded executions (their
+            // labelled identities read as valid ones, as the Rust process test lays them down)
+            // and the adopted Target are copied in before the second start.
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            var fixture = RepoPaths.At("rust", "tests", "fixtures", "agent-human-action");
+            CopyTree(Path.Combine(fixture, "targets-state"), Path.Combine(root, "targets-state"));
+            foreach (var file in Directory.GetFiles(Path.Combine(fixture, "agent-executions")))
+            {
+                File.WriteAllText(Path.Combine(root, "agent-executions", Path.GetFileName(file)), Unlabelled(File.ReadAllText(file)));
+            }
+            (process, var endpoint) = StartRootDaemon(signed, root);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "agents"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            if (app.TryFind("agents.row.har-ambiguous", AppSession.Timeout) is null)
+            {
+                Assert.Fail("no execution listed: " + (app.TryFind("agents.unavailable.reason", TimeSpan.FromSeconds(1)) is { } why ? AppSession.Name(why) : "no refusal shown"));
+            }
+            foreach (var id in new[] { "har-connect", "har-trust", "har-unproven" }) app.Find("agents.row." + id);
+
+            // The waiting pick-a-device action: exactly the Runtime's values, then its answer.
+            app.Select("agents.humanAction." + ambiguousAction);
+            app.WaitForName("agents.detail.title", n => n == "har-ambiguous");
+            var choices = app.Find("agents.action.choices");
+            var offered = choices.FindAllDescendants(cf => cf.ByControlType(FlaUI.Core.Definitions.ControlType.RadioButton)).Select(AppSession.Name).ToArray();
+            CollectionAssert.AreEqual(new[] { new string('a', 32), new string('b', 32) }, offered);
+            app.Invoke("agents.action.resume");
+            Assert.AreEqual(strings["windows.agents.action.chooseFirst"], app.WaitForName("agents.status", n => n.Length > 0), "no value: nothing is sent");
+            app.Select("agents.action.choice.candidate-00000000-0000-4000-8000-000000000002");
+            app.Invoke("agents.action.resume");
+            var resumed = app.WaitForName("agents.status", n => n != strings["windows.agents.action.chooseFirst"]);
+            TestContext.WriteLine("resume: " + resumed);
+            Assert.AreEqual($"{strings["windows.agents.action.refused"]} · "
+                            + strings.Format("windows.unavailable.reason", ["humanActionExpired", "the durable orchestration deadline has expired"]), resumed);
+            app.WaitForName("agents.row.har-ambiguous", n => n.EndsWith("budgetExpired", StringComparison.Ordinal));
+            SemanticSnapshotTests.WaitUntil(() => app.TryFind("agents.humanAction." + ambiguousAction, TimeSpan.FromMilliseconds(200)) is null, "the expired action leaves the waiting list");
+            Assert.AreEqual("budgetExpired", Execution(root, "har-ambiguous").GetProperty("state").GetString(), "the Runtime's record");
+
+            // A terminal execution offers no abandon; an orchestrating one is abandoned.
+            app.Select("agents.row.har-trust");
+            app.WaitForName("agents.detail.title", n => n == "har-trust");
+            Assert.IsNull(app.TryFind("agents.abandon", TimeSpan.FromMilliseconds(500)));
+            app.Select("agents.row.har-unproven");
+            app.WaitForName("agents.detail.title", n => n == "har-unproven");
+            app.Invoke("agents.abandon");
+            TestContext.WriteLine(app.WaitForName("agents.abandon.message", n => n.Length > 0));
+            app.Invoke("PrimaryButton");
+            app.WaitForName("agents.status", n => n == strings["windows.agents.abandon.done"]);
+            app.WaitForName("agents.row.har-unproven", n => n.EndsWith("abandoned", StringComparison.Ordinal));
+            Assert.AreEqual("abandoned", Execution(root, "har-unproven").GetProperty("state").GetString(), "the Runtime's record");
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>
+    /// The Imports page against the real Runtime's Import owner (TASK-XPA-008), over a
+    /// development root holding the recorded adopted Target: the recorded HAP chosen in the
+    /// system file dialog is uploaded in verified chunks and published, then released; a flash
+    /// bundle is sent and refused at publication (no validator until AF-W1).
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void AFileIsImportedAndReleasedByTheRealRuntime()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-imports-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            CopyTree(RepoPaths.At("rust", "tests", "fixtures", "agent-human-action", "targets-state"), Path.Combine(root, "targets-state"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+            var files = Directory.CreateDirectory(Path.Combine(directory.FullName, "files")).FullName;
+            var hap = Path.Combine(files, "fixture.hap");
+            File.Copy(RepoPaths.At("rust", "tests", "fixtures", "import-upload-current", "fixture.hap"), hap);
+            var flash = Path.Combine(files, "images.tar.gz");
+            File.WriteAllBytes(flash, new byte[4096]);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "imports"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            if (app.TryFind("imports.empty", AppSession.Timeout) is null)
+            {
+                Assert.Fail("no Import list: " + (app.TryFind("imports.unavailable.reason", TimeSpan.FromSeconds(1)) is { } why ? AppSession.Name(why) : "no refusal shown"));
+            }
+
+            AgentImportFlowTests.Choose(app, hap);
+            app.Invoke("imports.start");
+            var done = app.WaitForName("imports.status", n => n.Length > 0);
+            TestContext.WriteLine("import: " + done);
+            StringAssert.StartsWith(done, "Imported fixture.hap as Artifact ART-");
+            app.WaitForName("imports.detail.title", n => n == "fixture.hap");
+            Assert.AreEqual("committed", app.WaitForName("imports.detail.state", n => n.Length > 0));
+            Assert.AreEqual(OracleTarget, AppSession.Name(app.Find("imports.detail.target")));
+            Assert.AreEqual("399a301718f951e835b8630ac1666120b96eefb28da9e37f568596a227a9b67a", AppSession.Name(app.Find("imports.detail.sha256")));
+            Assert.AreEqual("application/vnd.openharmony.hap", AppSession.Name(app.Find("imports.detail.mediaType")));
+            app.Invoke("imports.release");
+            app.Find("imports.release.confirm");
+            app.Invoke("PrimaryButton");
+            app.WaitForName("imports.status", n => n == strings["windows.imports.release.done"]);
+            app.WaitForName("imports.detail.state", n => n == "released");
+
+            app.Find("imports.kind").AsComboBox().Select(3);
+            app.WaitForName("imports.file", n => n == strings["windows.imports.noFile"]);
+            AgentImportFlowTests.Choose(app, flash);
+            app.Invoke("imports.start");
+            var refused = app.WaitForName("imports.status", n => n.StartsWith(strings["windows.imports.failed"], StringComparison.Ordinal));
+            TestContext.WriteLine("flash bundle: " + refused);
+            Assert.AreEqual($"{strings["windows.imports.failed"]} · " + strings.Format("windows.unavailable.reason",
+                ["operationUnavailable", "This Import kind's publication validator is not configured"]), refused);
+
+            var listed = Frame(endpoint, "artifact.import.list", """{"pageSize":200}""").GetProperty("result").GetProperty("items").EnumerateArray()
+                .Select(i => $"{i.GetProperty("metadata").GetProperty("name").GetString()}:{i.GetProperty("state").GetString()}").ToArray();
+            TestContext.WriteLine("Runtime Imports: " + string.Join(", ", listed));
+            CollectionAssert.Contains(listed, "fixture.hap:released");
+            CollectionAssert.Contains(listed, "images.tar.gz:inProgress");
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            Stop(process, directory);
+        }
+    }
+
+    /// <summary>The agent-human-action oracle's text with each labelled identity (<c>&lt;har-2&gt;</c>)
+    /// read as a valid one of its kind, as the Rust process test lays the records down.</summary>
+    private static string Unlabelled(string text) => System.Text.RegularExpressions.Regex.Replace(text, "<(har|resume|candidate|obs)-([0-9]+)>",
+        m => $"{m.Groups[1].Value}-00000000-0000-4000-8000-{long.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture):D12}");
+
+    /// <summary>The Runtime's record of one agent execution (named by its identifier's SHA-256).</summary>
+    private static JsonElement Execution(string root, string executionId)
+    {
+        var name = $"execution-{Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(executionId)))}.json";
+        return JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "agent-executions", name))).RootElement.Clone();
+    }
+
+    private static void Stop(Process? process, DirectoryInfo directory)
+    {
+        if (process is { HasExited: false })
+        {
+            process.Kill();
+            process.WaitForExit();
+        }
+        process?.Dispose();
+        for (var attempt = 0; attempt < 20; attempt++)
+        {
+            try
+            {
+                directory.Delete(recursive: true);
+                break;
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(100);
             }
         }
     }

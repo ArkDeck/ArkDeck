@@ -1,6 +1,7 @@
 //! Fixed read-only Debug probes. Callers provide an adopted route, never argv.
 use crate::{
     CommandOutcome, Direction, HdcDispatch, PortRule, ProcessPlan, Receipt, SemanticOutputParser,
+    device_arguments,
 };
 use std::{collections::BTreeSet, time::Duration};
 
@@ -97,11 +98,7 @@ impl DebugReadTemplate {
 }
 fn plan(key: &str, command: &[&str], capture_bytes: usize) -> ProcessPlan {
     ProcessPlan {
-        arguments: ["-t", key]
-            .into_iter()
-            .chain(command.iter().copied())
-            .map(str::to_owned)
-            .collect(),
+        arguments: device_arguments(key, command.iter().map(|part| (*part).to_owned())),
         timeout: Duration::from_secs(30),
         capture_bytes,
     }

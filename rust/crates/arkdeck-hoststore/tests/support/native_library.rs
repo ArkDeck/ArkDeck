@@ -20,11 +20,19 @@ pub const FIXTURE: &str = "deploy-native-library";
 /// never reads them.
 pub fn code_sign_helper(cases: &Value, root: &Path) -> CodeSignHelper {
     let recorded = &cases["codeSignHelper"];
-    let host_path = root.join("host/arkdeck-code-sign-enable");
+    let host_path = root.join("host").join("arkdeck-code-sign-enable");
+    // The path the oracle's argv names, at the fake's fixed macOS root; a
+    // Windows root names the helper at its own spelling of the same place.
+    #[cfg(unix)]
     assert_eq!(
         recorded["path"],
         host_path.to_str().unwrap(),
         "the helper path the oracle's argv names"
+    );
+    #[cfg(windows)]
+    assert_eq!(
+        recorded["path"],
+        "/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable"
     );
     CodeSignHelper {
         facts: CodeSignHelperFacts {

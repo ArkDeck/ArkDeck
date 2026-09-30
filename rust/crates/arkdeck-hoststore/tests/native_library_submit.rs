@@ -19,16 +19,16 @@
 //! the Import from release.
 //!
 //! Fixture data is isolated host evidence, never a device acceptance result.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
 use arkdeck_hoststore::{
     AdmissionRefusal, AgentEngine, AgentExecutionStore, ImportUploadStore, JobAdmitter, JobPlanner,
+    JobRunner, MutationExecution,
 };
 use serde_json::{Value, json};
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use support::debug_hap::{self, NoDispatch};
 use support::hdc_oracle::{Owners, exchange};
@@ -61,6 +61,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     let hdc = owners.hdc(&NoDispatch);
     let admitter = owners.admitter(&hdc, &owners.default_root);
     let (mut plans, mut submissions, mut differences) = (0, 0, Vec::new());
+    let mut labels = debug_hap::HostLabels::default();
     for exchange in cases["exchanges"].as_array().unwrap() {
         let params = exchange["params"].as_object().unwrap();
         let actual = match exchange["method"].as_str().unwrap() {
@@ -80,6 +81,12 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
             _ => continue,
         };
         let actual = support::legacy_plan_answer(actual);
+        labels.learn(
+            &actual,
+            &exchange["answer"],
+            "/result/materializedPlanDigest",
+        );
+        let actual = labels.swift(&actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",
@@ -103,7 +110,8 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     let swift: Value = serde_json::from_slice(&swift_bytes).unwrap();
     let issued: Value = serde_json::from_slice(&issued_bytes).unwrap();
     assert_eq!(envelopes(&swift).len(), 1, "one capability");
-    if issued_bytes != swift_bytes {
+    labels.learn_keys(&issued, &swift, &["capabilityID"]);
+    if labels.swift_bytes(&issued_bytes) != swift_bytes {
         differences.push(format!(
             "capabilities:\n  swift {}\n  rust  {}",
             String::from_utf8_lossy(&swift_bytes),
@@ -149,7 +157,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
             "materializedStableTargetIdentitySHA256",
             "materializedBindingRevision",
         ] {
-            if ours[member] != theirs[member] {
+            if labels.swift(&ours[member]) != theirs[member] {
                 differences.push(format!(
                     "{case} {member}:\n  swift {}\n  rust  {}",
                     theirs[member], ours[member]
@@ -172,7 +180,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
             .take(2)
             .collect::<Vec<_>>()
             .concat();
-        if fs::read(directory.join("journal.jsonl")).unwrap() != admitted {
+        if labels.swift_bytes(&fs::read(directory.join("journal.jsonl")).unwrap()) != admitted {
             differences.push(format!("{case}: the admission journal differs"));
         }
     }
@@ -204,7 +212,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     for member in ["userVersion", "journalMode", "schema"] {
         assert_eq!(index[member], recorded[member], "index {member}");
     }
-    if admission(&index) != admission(&recorded) {
+    if labels.swift(&json!(admission(&index))) != json!(admission(&recorded)) {
         differences.push(format!(
             "admission rows:\n  swift {}\n  rust  {}",
             json!(admission(&recorded)),
@@ -343,8 +351,7 @@ fn an_agent_run_admits_the_deployment_it_will_run() {
     let hdc = owners.hdc(&NoDispatch);
     let admitter = owners.admitter(&hdc, &owners.default_root);
     let executions = owners.root.join("agent-executions");
-    fs::create_dir(&executions).unwrap();
-    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
+    support::fixture_fs::private_dir(&executions);
     let agents = AgentExecutionStore::open(&executions).unwrap();
     let engine = AgentEngine {
         targets: &owners.targets,
@@ -391,11 +398,91 @@ fn an_agent_run_admits_the_deployment_it_will_run() {
     // with its whole budget.
     let issued = read(&owners.default_root.join("capabilities").join(CHECKPOINT));
     let swift = read(&fixture.join("store/capabilities").join(CHECKPOINT));
-    assert_eq!(envelopes(&issued), envelopes(&swift));
+    let mut labels = debug_hap::HostLabels::default();
+    labels.learn_keys(&issued, &swift, &["capabilityID"]);
+    assert_eq!(
+        labels.swift(&json!(envelopes(&issued))),
+        json!(envelopes(&swift))
+    );
     assert_eq!(
         record["request"]["authorization"]["capabilityId"],
         envelopes(&issued)[0]["capabilityID"]
     );
     assert_eq!(issued["records"][0]["consumptions"], json!([]));
+    assert!(debug_hap::invocations(&owners.root).is_empty());
+}
+
+/// The Windows daemon composes no HDC until the Windows HDC tuple is
+/// registered, so its runner has none: an admitted deployment is refused
+/// before its first step with zero dispatch, even beside the mutation owner its
+/// use would be consumed through. No use is consumed, nothing is journaled,
+/// and the Job waits in `preflight`; the staging, the publish and the rollback
+/// a failure past the publish applies all stay behind the tuple.
+#[test]
+fn without_an_hdc_composition_an_admitted_deployment_is_not_run_and_consumes_no_use() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture(FIXTURE);
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let hdc = owners.hdc(&NoDispatch);
+    let deployed = exchange(&cases, "deployed.submit");
+    let job = owners
+        .admitter(&hdc, &owners.default_root)
+        .handle(deployed["params"].as_object().unwrap())
+        .unwrap()["jobId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let before = fs::read(owners.job_file(&job, "journal.jsonl")).unwrap();
+    let capabilities = debug_hap::tree_bytes(&owners.default_root.join("capabilities"));
+    let runner = JobRunner {
+        imports: None,
+        mutation: Some(MutationExecution {
+            authority: owners.authority(&owners.default_root),
+            state_root: &owners.root,
+        }),
+        jobs: &owners.jobs,
+        artifacts: &owners.artifacts,
+        analyzer: None,
+        quota: 8 << 30,
+        home: "",
+        now: fixed_now,
+        precise_now: fixed_precise_now,
+        sessions: None,
+        cancellation: None,
+        after_commit: None,
+        hdc: None,
+        workspace: None,
+    };
+    let refused = runner
+        .handle(&serde_json::Map::from_iter([("jobId".into(), json!(job))]))
+        .unwrap_err();
+    assert_eq!(
+        (refused.code, refused.message.as_str()),
+        (
+            "rejected",
+            format!(
+                "job {job} runs deploy.native-library.app-owned@1, which the Rust Runtime does \
+                 not execute yet"
+            )
+            .as_str()
+        )
+    );
+    assert_eq!(
+        refused.details,
+        serde_json::Map::from_iter([
+            ("phase".into(), json!("preAdmission")),
+            ("newDispatchCount".into(), json!(0)),
+        ])
+    );
+    assert_eq!(
+        fs::read(owners.job_file(&job, "journal.jsonl")).unwrap(),
+        before
+    );
+    assert_eq!(owners.record(&job)["state"], "preflight");
+    assert_eq!(
+        debug_hap::tree_bytes(&owners.default_root.join("capabilities")),
+        capabilities
+    );
     assert!(debug_hap::invocations(&owners.root).is_empty());
 }

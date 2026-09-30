@@ -112,6 +112,16 @@ fn fresh_root(window: &str) -> PathBuf {
     temporary.join(format!("ad-wincrash-{window}-{nonce:016x}"))
 }
 
+/// A window's root, removed when dropped: after the window's checks, or
+/// when one of them fails.
+struct Removed(PathBuf);
+
+impl Drop for Removed {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 /// The root as `HDCOracleFake.install` left it: the Target document the
 /// Swift oracle's adoption wrote, and the empty Job (`store`), Artifact,
 /// Sessions and Session owner roots, each owner-only; the fake's empty log.
@@ -833,6 +843,7 @@ fn rust_dies_at_each_crash_window_and_recovers_as_swift_does_on_windows() {
     let mut differences = Vec::new();
     for (window, code) in WINDOWS {
         let root = fresh_root(window);
+        let removed = Removed(root.clone());
         let fixture = fixture(window);
         lay_down(&fixture, &root);
         let output = std::process::Command::new(std::env::current_exe().unwrap())
@@ -915,7 +926,8 @@ fn rust_dies_at_each_crash_window_and_recovers_as_swift_does_on_windows() {
             "{window}: the Target document"
         );
         assert_leftovers(&daemon);
-        let _ = fs::remove_dir_all(&root);
+        drop(daemon);
+        drop(removed);
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
 }

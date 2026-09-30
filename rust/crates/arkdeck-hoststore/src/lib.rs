@@ -205,7 +205,7 @@ mod capture_documents;
 mod cleanup_debt;
 #[cfg(any(target_os = "macos", windows))]
 pub use cleanup_debt::list_cleanup_debt;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod cleanup_debt_continue;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

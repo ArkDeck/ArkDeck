@@ -115,9 +115,21 @@ first, `ControlResult` back.
   Inspector requests `job.cancel` for a queued or active Job after a confirmation (a request, not
   an outcome: the state is read back), shows a terminal Job's `job.result`, and opens the record
   in History, whose detail now carries the macOS evidence section (`job.evidence`).
+- **Agents and Imports (TASK-XPA-020).** An Agents page lists the agent executions
+  (`agent.list|status`) and the human actions waiting on a person (`human-action.list|show`).
+  A waiting action is resumed after the person did what it asks (`agent.resume` for an
+  execution's action, `human-action.resume` otherwise); a pick-a-device action offers exactly the
+  values of its `selectionSchema` enum as a radio group, and Resume without a choice says so. An
+  execution that is not terminal is abandoned after a confirmation, guarded by its generation
+  (`agent.abandon`); starting one stays in the CLI. An Imports page uploads a file chosen in the
+  system file dialog as an Import of one kind for an adopted Target (`artifact.import.begin`,
+  bounded `append` chunks each with its SHA-256, `commit`), with its progress and a Cancel that
+  aborts the partial Import; it lists and inspects the Imports (`artifact.import.list|inspect`)
+  and releases a committed one after a confirmation (`artifact.import.release`). A flash bundle
+  is refused by the Runtime at publication until its validator exists (AF-W1).
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 
@@ -157,16 +169,18 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
 - the App published unpackaged (`WindowsPackageType=None`; self-contained Windows App SDK and
   .NET, ReadyToRun and trimmed), `ArkDeck.exe` signed like the runtime;
 - the **xcopy form**: `arkdeck-rc-<version>-windows-x64-<revision>\` with the App, `arkdeck.exe`
-  and `arkdeck-agentd.exe` side by side (the layout both clients default to) and
+  and `arkdeck-agentd.exe` side by side (the layout both clients default to), the runtime's
+  code-sign helper bundle (`ArkDeckKit_ArkDeckWorkflows.bundle\`) beside the daemon, and
   `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
   toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
-- the **MSIX form**: the same App with the signed daemon and CLI at the package root
+- the **MSIX form**: the same App with the signed daemon and CLI and the helper bundle at the
+  package root
   (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12) unless
   `-MsixPublisher` names the signing certificate's subject (the package is then built from a
   copy of `Package.appxmanifest` under `<out>\msix-manifest`, passed as `ArkDeckPackageManifest`;
   the tracked manifest is never rewritten), write virtualization off (ruling 8), unsigned unless
   `-MsixSignCommand` is given; its SHA-256 and the daemon's and CLI's inside it are in the
-  manifest.
+  manifest, and the helper inside it must be the runtime package's.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
 certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`); `production` calls the maintainer's command

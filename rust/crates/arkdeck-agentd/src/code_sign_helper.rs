@@ -20,13 +20,16 @@
 //! the device actions carry (ABI, build id, SHA-256, byte count) are this
 //! file's, so naming a path pins exactly what it holds.
 use arkdeck_provider_hdc::CodeSignHelper;
+#[cfg(target_os = "macos")]
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 /// Names the helper an isolated development root composes.
 pub(crate) const DEVELOPMENT_HELPER: &str = "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER";
 const RESOURCE_BUNDLE: &str = "ArkDeckKit_ArkDeckWorkflows.bundle";
-const RESOURCE: &str = "OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable";
+/// The resource's directory and name inside the bundle, joined one
+/// component at a time so each OS spells the path with its own separator.
+const RESOURCE: [&str; 2] = ["OpenHarmonyNativeCodeSign", "arkdeck-code-sign-enable"];
 /// The helper is a small static executable; Swift's validator bounds the
 /// libraries it reads the same way.
 const MAXIMUM_BYTES: u64 = 16 * 1024 * 1024;
@@ -39,11 +42,15 @@ pub(crate) fn candidates(executable: &Path) -> Vec<PathBuf> {
     };
     let mut candidates = Vec::new();
     for base in [
-        directory.join("../Resources"),
+        directory.join("..").join("Resources"),
         directory.to_path_buf(),
         directory.join(".."),
     ] {
-        let path = base.join(RESOURCE_BUNDLE).join(RESOURCE);
+        let path = RESOURCE
+            .iter()
+            .fold(base.join(RESOURCE_BUNDLE), |path, component| {
+                path.join(component)
+            });
         if !candidates.contains(&path) {
             candidates.push(path);
         }
@@ -67,6 +74,7 @@ pub(crate) fn verified(path: &Path) -> Result<CodeSignHelper, String> {
 }
 
 /// The development override's path: an explicit absolute one, or none.
+#[cfg(target_os = "macos")]
 pub(crate) fn development(value: Option<&OsStr>) -> Result<Option<PathBuf>, String> {
     let Some(value) = value else {
         return Ok(None);
@@ -123,24 +131,46 @@ mod tests {
         data
     }
 
-    #[test]
-    fn the_candidates_are_the_resource_layouts_swift_looks_in() {
-        let paths = candidates(Path::new("/App.app/Contents/MacOS/arkdeck-agentd"));
-        let spelled: Vec<String> = paths
+    fn spelled(executable: &str) -> Vec<String> {
+        candidates(Path::new(executable))
             .iter()
             .map(|path| path.to_string_lossy().into_owned())
-            .collect();
+            .collect()
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_candidates_are_the_resource_layouts_swift_looks_in() {
+        let resource = "OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable";
         assert_eq!(
-            spelled,
+            spelled("/App.app/Contents/MacOS/arkdeck-agentd"),
             [
-                format!("/App.app/Contents/MacOS/../Resources/{RESOURCE_BUNDLE}/{RESOURCE}"),
-                format!("/App.app/Contents/MacOS/{RESOURCE_BUNDLE}/{RESOURCE}"),
-                format!("/App.app/Contents/MacOS/../{RESOURCE_BUNDLE}/{RESOURCE}"),
+                format!("/App.app/Contents/MacOS/../Resources/{RESOURCE_BUNDLE}/{resource}"),
+                format!("/App.app/Contents/MacOS/{RESOURCE_BUNDLE}/{resource}"),
+                format!("/App.app/Contents/MacOS/../{RESOURCE_BUNDLE}/{resource}"),
             ]
         );
         assert!(candidates(Path::new("/")).is_empty());
     }
 
+    /// The same layouts beside a Windows daemon; the packages put the bundle
+    /// beside `arkdeck-agentd.exe`, the second.
+    #[cfg(windows)]
+    #[test]
+    fn the_candidates_are_the_resource_layouts_swift_looks_in() {
+        let resource = r"OpenHarmonyNativeCodeSign\arkdeck-code-sign-enable";
+        assert_eq!(
+            spelled(r"C:\ArkDeck\arkdeck-agentd.exe"),
+            [
+                format!(r"C:\ArkDeck\..\Resources\{RESOURCE_BUNDLE}\{resource}"),
+                format!(r"C:\ArkDeck\{RESOURCE_BUNDLE}\{resource}"),
+                format!(r"C:\ArkDeck\..\{RESOURCE_BUNDLE}\{resource}"),
+            ]
+        );
+        assert!(candidates(Path::new(r"C:\")).is_empty());
+    }
+
+    #[cfg(target_os = "macos")]
     #[test]
     fn the_development_helper_is_an_explicit_absolute_path() {
         assert_eq!(development(None), Ok(None));
