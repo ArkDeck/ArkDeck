@@ -969,7 +969,10 @@
           "type": "string"
         },
         "failureCode": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "fingerprintAlgorithm": {
           "type": "string"
@@ -1059,7 +1062,32 @@
                   "type": "string"
                 },
                 "selectionSchema": {
-                  "type": "null"
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "enum": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "type": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "enum",
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": [
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "status": {
                   "type": "string"
@@ -1521,7 +1549,32 @@
           "type": "string"
         },
         "selectionSchema": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "enum": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "enum",
+                "type"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "state": {
           "type": "string"

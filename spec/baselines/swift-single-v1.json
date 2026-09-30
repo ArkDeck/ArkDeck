@@ -539,7 +539,7 @@
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "7566c7319c49b4e28e2e00ca2c02c72ed1f079e97baa2a71003d8e9927a063ec",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "839347bb5d0fa843daff5957ffd5009a9dabee5399f65a2fe411236b4683a6cb",
-    "spec/control/methods": "f21d7fe493c0a7a1f4af7428ae10fdaa4c4c616277b10907f83ed58a142b32fd"
+    "spec/control/methods": "eaca0d0aaf37df5be1cf173d1545780a78e7bc913698a6b83194837ddd8c56d8"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1307,24 +1307,24 @@
       "sha256": "490651df59b42b06e04e755286e2a118e05df51eb0f1263dbef2a888549c589f"
     },
     "spec/control/methods/agent.abandon.json": {
-      "blob": "2ed1c0e320d83bb5669c47e8a140b4a7ba153ee1",
-      "sha256": "aef708383a10082b8208c5eec4f14656142980e2fd684ea5b1ae98b3ddef1bd6"
+      "blob": "07f3acb591811f7f37e4254f765a0e0d85ccb992",
+      "sha256": "466f0156bed01c844d5b0466fe2312da9134d2f6b3e0c514311c338b029fa2e3"
     },
     "spec/control/methods/agent.list.json": {
-      "blob": "5f83fc708f06b1298b5b23ca298fc5dd08c4dbd7",
-      "sha256": "9081e79c4972c1573b6427da9d11d0cded1fd673fd6bcaa578214ca6039c650a"
+      "blob": "c082499906d0047d503d3f2f22628c6653d8c4a2",
+      "sha256": "452fabfed7b1c38260dcd802d7456588ef1c65a466e5f876183a538291ead944"
     },
     "spec/control/methods/agent.resume.json": {
-      "blob": "20d28559c2119ce851db79950a4fcce2cae04c2f",
-      "sha256": "64b0baa02d876f72329b15922172ec21b6fb4ef58f721084749bdfe6e250d1f2"
+      "blob": "62c35747834e27c970f818e3d92a532d52a7f194",
+      "sha256": "0394ad10f6827519da8f6249f3379e77bca3fcc999f54e0b4c11cfc1978c9a18"
     },
     "spec/control/methods/agent.run.json": {
-      "blob": "797dbda340717b2945b727ed8df02dafb9dd133c",
-      "sha256": "589536bfacdd635e26fe038c3ebb1ae202d5d741b82d2a27a0e9c4ac1779eddb"
+      "blob": "572be1b40fd2dc366e13a1167587a2389803a6b1",
+      "sha256": "89e148ce1bf452c39186118b95a00e3be65a245c9470b4d0c0a0f4cc24255006"
     },
     "spec/control/methods/agent.status.json": {
-      "blob": "2fa4e37f5690f1936b4aac31a5d6a402b7d2f2b3",
-      "sha256": "6ef3937ffc8ce555518b6cc05b8559d5692dd0856d8dcb7d1e03119f1e2ba3ae"
+      "blob": "4d9865ff2a0f430eb2b526eb7c89da3aed8aa390",
+      "sha256": "72279c4e0b17a8bb630f8755ef280cd7dbd8d5b4e1f3565890abe584651fa6ad"
     },
     "spec/control/methods/artifact.export.json": {
       "blob": "a5e9bba8d59089e6aa1de5069eb7f0561b505656",
@@ -1483,16 +1483,16 @@
       "sha256": "87bd812ba74a7eafc8821cb1dbaac0d42d412728b95d59fa00e773b45418af3b"
     },
     "spec/control/methods/human-action.list.json": {
-      "blob": "c608926d16639d593f9e2697514a6e286d9078c5",
-      "sha256": "42bf180e9eb9520699c7e771966720b5f3a2082f2249f73db73196f27fb1796a"
+      "blob": "d5e78db1ca1d314be65047eb425481aa657aad97",
+      "sha256": "d621ac4690d7d4dc52cb028c817a6b7b9ee5cb2c7c889a1dbd3088fad984e3f6"
     },
     "spec/control/methods/human-action.resume.json": {
-      "blob": "fbc4c19e14a4a0f2f3425d03cb457ec238267803",
-      "sha256": "51bdb56c57737c6bb8f34332cdae15385d61b9d1f63167fba6d041931a660705"
+      "blob": "8c804f1065ec58e4656c8c7156179734fe4948ac",
+      "sha256": "0a122115f470f1d0b0caab69af80eaf3a113e1276b0e936030ac11effb265fcf"
     },
     "spec/control/methods/human-action.show.json": {
-      "blob": "f941678198d48cb00721ccce433d063ec3346936",
-      "sha256": "83ae62f601bff4a709a232af5fc63b57c0d69dfac0311dc247da8cba5f55cd52"
+      "blob": "ab1fb0ae999bdf70493b0793e3a2ac34f100353f",
+      "sha256": "284a5377f84d54b755d01d98745465a03994d8b7816b6f01af50fe56e066c8fd"
     },
     "spec/control/methods/job.cancel.json": {
       "blob": "cd9b0da9c90ab8cb9a9411a391e45569b92404f5",
@@ -1727,7 +1727,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "1ed4cefc6e5d352a3127e651fc61b0d402fa05d6326b3ef0a65bbdabe454abf8",
+  "inputDigest": "4b963704386b72f26c5e9a8de74cf771fa2c9a753c0a6429bf7d1d605828f036",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
