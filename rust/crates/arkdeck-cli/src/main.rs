@@ -66,6 +66,15 @@ fn runtime_endpoint(invocation: &Invocation) -> Result<(LocalEndpoint, ServerIde
         publisher_organization: std::env::var("ARKDECK_DAEMON_PUBLISHER_ORGANIZATION").ok(),
         publisher_eku: std::env::var("ARKDECK_DAEMON_PUBLISHER_EKU").ok(),
     };
+    // Decision 11: on Windows the client starts the daemon it needs when its
+    // pipe is absent (never for `--socket`), before anything is sent; the
+    // connection that follows checks its identity as always.
+    #[cfg(windows)]
+    let endpoint = if invocation.socket.is_some() {
+        endpoint
+    } else {
+        arkdeck_cli::runtime_service_windows::ensure_runtime(endpoint, &identity)?
+    };
     Ok((endpoint, identity))
 }
 
@@ -1075,7 +1084,69 @@ fn serve_runtime_service(invocation: &Invocation, id: &str) -> std::process::Exi
             None => 0.into(),
         }
     }
-    #[cfg(not(target_os = "macos"))]
+    // Decision 11: the Windows daemon is client-started; its `status`,
+    // `verify` and `restart` answer as the macOS leaves do.
+    #[cfg(windows)]
+    {
+        use arkdeck_cli::runtime_service_windows as service;
+        let answer = service::run(invocation, id);
+        if let Some(document) = &answer.document {
+            let written = if invocation.legacy_json {
+                write_document(document)
+            } else if invocation.json {
+                write_document(&arkdeck_cli::with_lifecycle(
+                    success_envelope(invocation.command, document.clone(), id),
+                    invocation.command,
+                ))
+            } else {
+                writeln!(
+                    io::stdout().lock(),
+                    "{}",
+                    serde_json::to_string_pretty(document).expect("a JSON document")
+                )
+            };
+            if written.is_err() {
+                return 74.into();
+            }
+        }
+        if let Some(refusal) = answer.refusal {
+            let error = CliError {
+                code: refusal.code,
+                message: refusal.message,
+                details: refusal.details,
+                command: None,
+                plain_exit: None,
+            };
+            let written = if answer.document.is_some() {
+                eprintln!("arkdeck: {}", error.message);
+                Ok(())
+            } else if invocation.json {
+                write_document(&arkdeck_cli::with_lifecycle(
+                    failure_envelope(invocation.command, &error, id, true),
+                    invocation.command,
+                ))
+            } else if invocation.legacy_json {
+                io::stdout().lock().write_all(&arkdeck_cli::legacy_document(
+                    &arkdeck_cli::legacy_failure(&error),
+                ))
+            } else {
+                eprintln!("arkdeck: {}", error.message);
+                Ok(())
+            };
+            if written.is_err() {
+                return 74.into();
+            }
+            return error.exit_code().into();
+        }
+        match answer.failure {
+            Some(failure) => {
+                eprintln!("arkdeck {}: {}", invocation.command, failure.message);
+                failure.exit_code.into()
+            }
+            None => 0.into(),
+        }
+    }
+    #[cfg(not(any(target_os = "macos", windows)))]
     {
         let error = CliError::new(
             "unsupportedOnPlatform",

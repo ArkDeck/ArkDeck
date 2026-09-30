@@ -400,6 +400,62 @@ impl ProcessIdentity {
     }
 }
 
+/// What vouches for an installed daemon image before it runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImagePin {
+    /// The image's Authenticode signer certificate is the pinned one.
+    Signer,
+    /// A package family is pinned; only a running process has one, so it is
+    /// proved on the pipe server after the start, never before.
+    PackageFamily,
+}
+
+/// An installed daemon image checked before it is started, held so that it
+/// is the file started: its path's directories cannot be renamed and the
+/// file cannot be written or deleted while this lives.
+pub(crate) struct VerifiedImage {
+    pub(crate) pin: ImagePin,
+    pub(crate) path: PathBuf,
+    _file: File,
+    _namespace: Vec<File>,
+}
+
+/// Checks the pinned daemon image as a file: an absolute local path, a
+/// regular file, and, when a signer is pinned, a trusted Authenticode
+/// signature by that certificate. No identity configured refuses.
+pub(crate) fn verify_installed_image(expected: &ServerIdentity) -> io::Result<VerifiedImage> {
+    if !expected.executable.is_absolute() {
+        return Err(denied("the installed daemon path must be absolute"));
+    }
+    let path = expected.executable.canonicalize()?;
+    let namespace = lock_namespace(&path)?;
+    let file = crate::process::open_locked_file(&path)?;
+    let family = expected
+        .package_family
+        .as_deref()
+        .is_some_and(|family| !family.is_empty());
+    let pin = match &expected.authenticode_sha256 {
+        Some(pin) => match verify_signature(&file, &path, pin) {
+            Ok(()) => ImagePin::Signer,
+            Err(_) if family => ImagePin::PackageFamily,
+            Err(error) => return Err(error),
+        },
+        None if family => ImagePin::PackageFamily,
+        None => {
+            return Err(denied(
+                "no installed daemon identity is configured (a signer certificate SHA-256 or a \
+                 package family)",
+            ));
+        }
+    };
+    Ok(VerifiedImage {
+        pin,
+        path,
+        _file: file,
+        _namespace: namespace,
+    })
+}
+
 pub(crate) fn process_image(process: HANDLE) -> io::Result<PathBuf> {
     let mut path = vec![0u16; 32768];
     let mut length = path.len() as u32;

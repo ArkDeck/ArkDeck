@@ -22,6 +22,12 @@ arkdeck-provider-arkforge.workspace = true
 [target.'cfg(target_os = "macos")'.dev-dependencies]
 arkforge-ipc.workspace = true
 
+# The Windows client start path and service leaves, driven against this
+# crate's daemon (`tests/windows_client_start_process.rs`).
+[target.'cfg(windows)'.dev-dependencies]
+arkdeck-cli = { path = "../arkdeck-cli" }
+arkdeck-client.workspace = true
+
 # The daemon launches this test binary as its lane's stand-in `arkforged`,
 # which must take the daemon role before any test framework reads the
 # arguments.
