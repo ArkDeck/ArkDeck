@@ -50,7 +50,11 @@ those two.
 Hosted CI waits for the inexpensive Rust policy job before allocating native
 hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
 job-owned source path, preserving mtimes only for identical bytes. The cache
-key includes the compiler, runner image, dependency manifests and build flags;
+key includes the compiler, runner image, dependency manifests and build flags,
+among them `CARGO_INCREMENTAL`: both native jobs set it to `0`, because each
+compiles a target once and compiler incremental state never survives to
+another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
+of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
 same compatibility key. Before saving, CI removes compiler incremental scratch
 state (not linked products, debug symbols or fingerprints) and records per-view
