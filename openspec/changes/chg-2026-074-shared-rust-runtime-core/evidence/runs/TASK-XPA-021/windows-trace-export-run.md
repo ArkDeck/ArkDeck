@@ -178,6 +178,37 @@ CI decides.
    dispatch would let the CLI report a refusal, as was done for `target.adopt`
    in #2350. That would change macOS too, so it is left to the lead.
 
+## Merge with #2356 and main (conflict resolution)
+
+The lead asked for every conflicting PR to be resolved now, so this branch no
+longer waits for #2356 to land. It merged #2356's head `03cf3384`, which
+already carries `main` up to #2366, and then `origin/main` `97793944`.
+
+- The Windows daemon now composes, in the macOS census order: `targets`,
+  `artifacts`, `workspaceProjects` (#2366) and `traceCache`. The Trace cache
+  is composed in a development root only. The owner census line of the
+  Target, workspace and trace tests follows.
+- In `arkdeck-platform`, the import-upload (#2357) and trace-removal
+  submodules are exported side by side.
+- #2360's `windows_trace_offline_process.rs` now expects `trace.cache.status`
+  to answer the empty cache in a development root. `trace.cache.purge` is
+  still refused `rejected` with no details. This is open question 1 above,
+  now done.
+- **Still to do:** switch the Windows `trace_cache_purge` to
+  `TraceCacheStore::purge_unavailable()` (ruling 18) once #2370 is on `main`.
+  Until then the Windows purge keeps the pre-#2370 `rejected`, the same answer
+  `main`'s macOS daemon gives today.
+
+Checks after the merges, all on the Windows 11 x64 reference host:
+
+- `cargo fmt --all --check`: pass.
+- `cargo clippy --workspace --all-targets -- -D warnings`: exit 0.
+- `cargo test -p arkdeck-platform -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-cli`,
+  with the development signer: exit 0. The Windows process tests all pass:
+  artifact 3, target 3, trace export 4, trace offline 2, workspace 3.
+- `generate-contract.py --check` and `generate-clientkit.py --check`: pass.
+  The contract is untouched.
+
 ## CI
 
 To be recorded, not verified.

@@ -513,9 +513,9 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     let mut first = Daemon::start(executable, &root.0);
     let pipe = first.serving();
     assert!(
-        first
-            .seen
-            .contains(&"arkdeck-agentd owners: targets, artifacts, traceCache".to_owned()),
+        first.seen.contains(
+            &"arkdeck-agentd owners: targets, artifacts, workspaceProjects, traceCache".to_owned()
+        ),
         "{:?}",
         first.seen
     );

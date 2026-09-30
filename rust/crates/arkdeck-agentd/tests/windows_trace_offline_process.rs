@@ -10,9 +10,10 @@
 //!   `TraceInspectOracleContractTests`) gets Swift's refusal, byte for byte,
 //!   before a parameter is read — nothing dispatched and no device
 //!   evidence created;
-//! * `trace.cache.status` and `trace.cache.purge` are refused as the macOS
-//!   daemon refuses them without its Trace cache owner (`rejected`, nothing
-//!   removed);
+//! * the development root composes the Trace cache owner (TASK-XPA-021,
+//!   `windows_trace_export_process.rs`): `trace.cache.status` answers the
+//!   empty cache, and `trace.cache.purge` is refused (`rejected`, nothing
+//!   removed) as the macOS daemon refuses it without its Job owner;
 //! * `operation.list` names both ArkTrace analyzers unavailable, with a
 //!   typed reason code (`provider_not_registered`: the Windows daemon
 //!   composes no analyzer provider);
@@ -256,13 +257,20 @@ fn the_windows_daemon_answers_the_offline_trace_surface_without_a_distribution()
         );
     }
 
-    // The Trace cache owner is not composed: both methods are refused with
-    // nothing removed, as the macOS daemon refuses them without that owner.
-    for method in ["trace.cache.status", "trace.cache.purge"] {
-        let answer = connection.answer(method, method, None);
-        assert_eq!(answer["error"]["code"], "rejected", "{method}: {answer}");
-        assert!(answer["error"]["details"].is_null(), "{method}: {answer}");
-    }
+    // The development root composes the Trace cache owner: its status
+    // answers the empty cache; its purge is refused with nothing removed, as
+    // the macOS daemon refuses it without its Job owner.
+    let status = connection.exchange("trace.cache.status", "trace.cache.status", None);
+    assert_eq!(
+        status["result"],
+        json!({"schemaVersion": "arkdeck.trace-cache-status/1",
+            "purgeScope": "inactiveDerivedDatabases", "entryCount": 0, "activeEntryCount": 0,
+            "inactiveEntryCount": 0, "totalByteCount": "0"}),
+        "{status}"
+    );
+    let purge = connection.answer("trace.cache.purge", "trace.cache.purge", None);
+    assert_eq!(purge["error"]["code"], "rejected", "{purge}");
+    assert!(purge["error"]["details"].is_null(), "{purge}");
 
     // Both ArkTrace analyzers are unavailable with a typed reason.
     let list = connection.exchange("operations", "operation.list", None);

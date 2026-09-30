@@ -236,9 +236,8 @@ pub use windows::host_store::{
     HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
     HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal, HostJournalAppender,
     HostReadLock, HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint,
-    OwnerOnlyReadFailure, PayloadCheck, PayloadVerification, UploadChunkCheckpoint,
-    UploadWritePoint,
-    PreparedTraceRemoval,
+    OwnerOnlyReadFailure, PayloadCheck, PayloadVerification, PreparedTraceRemoval,
+    UploadChunkCheckpoint, UploadWritePoint,
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
