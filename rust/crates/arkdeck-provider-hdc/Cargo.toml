@@ -17,3 +17,9 @@ unicode-segmentation.workspace = true
 
 [lints]
 workspace = true
+
+# The fake `hdc` of the Windows managed-server tests is the test binary
+# itself, so it runs without libtest, whose output would reach its streams.
+[[test]]
+name = "windows_managed_hdc"
+harness = false

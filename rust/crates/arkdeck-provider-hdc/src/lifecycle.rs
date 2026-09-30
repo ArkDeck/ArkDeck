@@ -15,8 +15,7 @@
 //! identity before the launch.
 use crate::{CommandOutcome, SemanticOutputParser};
 use arkdeck_platform::{
-    LoopbackServerLease, ServerIdentityReceipt, ToolLaunchIdentity, ToolLimits, ToolRequest,
-    ToolTermination, VerifiedTool,
+    LoopbackServerLease, ToolLaunchIdentity, ToolLimits, ToolRequest, ToolTermination, VerifiedTool,
 };
 use std::ffi::OsString;
 use std::io;
@@ -277,15 +276,9 @@ impl<'a> PreparedLifecycle<'a> {
     }
 }
 
-/// Swift `HDCServerProcessIdentityReceipt.stableGeneration`: the birth as
-/// microseconds, never zero.
-pub fn generation(identity: &ServerIdentityReceipt) -> Option<u64> {
-    identity
-        .start_seconds
-        .checked_mul(1_000_000)?
-        .checked_add(identity.start_microseconds)
-        .filter(|generation| *generation > 0)
-}
+/// Swift `HDCServerProcessIdentityReceipt.stableGeneration`, kept with the
+/// managed server, which also builds on Windows.
+pub use crate::managed_server::generation;
 
 /// Swift `postDispatchProbe`: the commandless identity read again until the
 /// deadline — a restart is observed only as a strictly newer generation, a

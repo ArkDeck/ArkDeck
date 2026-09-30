@@ -22,10 +22,12 @@ mod daemon_start;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
+mod managed;
 mod process;
 mod server;
 mod state;
 mod stop;
+mod tool;
 pub use account::{application_support_directory, arkdeck_application_support_root};
 pub use daemon_start::{
     DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
@@ -33,6 +35,7 @@ pub use daemon_start::{
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
+pub use managed::ManagedServer;
 pub(crate) use process::spawn;
 pub use server::LoopbackServerLease;
 pub use state::{

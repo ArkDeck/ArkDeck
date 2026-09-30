@@ -266,6 +266,16 @@ impl ManagedHdcServer {
     }
 }
 
+/// Swift `HDCServerProcessIdentityReceipt.stableGeneration`: the birth as
+/// microseconds, never zero.
+pub fn generation(identity: &ServerIdentityReceipt) -> Option<u64> {
+    identity
+        .start_seconds
+        .checked_mul(1_000_000)?
+        .checked_add(identity.start_microseconds)
+        .filter(|generation| *generation > 0)
+}
+
 /// Swift `HDCManagedProcessLaunch.matches`.
 fn launch_matches(launch: &ServerLaunch, identity: &ServerIdentityReceipt) -> bool {
     launch.pid == identity.pid
@@ -292,7 +302,7 @@ fn occupant(tool: &VerifiedTool, endpoint: SocketAddrV4) -> String {
             "a server of the configured HDC executable that this launch did not start \
              listens there (pid {}, generation {})",
             lease.identity().pid,
-            crate::lifecycle::generation(lease.identity())
+            generation(lease.identity())
                 .map_or_else(|| "unknown".to_owned(), |generation| generation.to_string())
         ),
         Err(error) if error.kind() == io::ErrorKind::NotFound => {

@@ -17,12 +17,13 @@ use super::tool_process::{
 };
 use super::{READER_CLEANUP_TIMEOUT, VerifiedTool, invalid};
 use crate::macos_server::process_birth;
+use crate::{ServerExit, ServerLaunch, ServerStop};
 use std::ffi::{CString, OsString};
 use std::fs::File;
 use std::io::{self, Write};
 use std::os::unix::ffi::OsStrExt;
 use std::os::unix::process::ExitStatusExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitStatus;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -38,35 +39,6 @@ const PAIRED_KILL_GRACE: Duration = Duration::from_millis(500);
 /// daemon ignores before it starts any child (`main.swift` 377-378) and its
 /// `IdentityBoundDaemonLauncher` leaves ignored across `exec`.
 const PAIRED_IGNORED_SIGNALS: [libc::c_int; 2] = [libc::SIGINT, libc::SIGTERM];
-
-/// Swift `HDCManagedProcessLaunch`: what the spawn itself recorded, which no
-/// reader can manufacture later from a PID or an endpoint.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ServerLaunch {
-    pub pid: i32,
-    pub start_seconds: u64,
-    pub start_microseconds: u64,
-    pub executable_path: PathBuf,
-    pub executable_sha256: String,
-    pub arguments: Vec<OsString>,
-}
-
-/// How a server ended.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ServerExit {
-    Exited(i32),
-    Signalled(i32),
-}
-
-/// What a stopped server left: both streams as captured and how it ended.
-#[derive(Debug)]
-pub struct ServerStop {
-    pub stdout: Vec<u8>,
-    pub stderr: Vec<u8>,
-    /// Either stream went past the capture.
-    pub truncated: bool,
-    pub exit: ServerExit,
-}
 
 type Captured = io::Result<(Vec<u8>, bool)>;
 

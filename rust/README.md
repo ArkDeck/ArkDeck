@@ -1948,6 +1948,29 @@ process, however exact, is `Unbound`. `tests/managed_server.rs` in both crates
 drive it with shell scripts and a fake `hdc` compiled from C at test time; no
 real HDC is launched.
 
+## Windows tool dispatch and managed HDC server (TASK-XPA-005)
+
+Gate-inventory group 5 is ported to Windows in `arkdeck-platform`: the tool
+types (`ToolRequest`, `ToolLimits`, `ToolExecution`, `ToolTermination`,
+`ToolRunError`) and the server records (`ServerIdentityReceipt`,
+`ServerLaunch`, `ServerExit`, `ServerStop`) are one set shared with macOS, and
+`VerifiedTool::run_tool`, `ManagedServer::launch` and the commandless
+`LoopbackServerLease` receipt have Windows implementations (`CreateProcessW`
+argv array in a kill-on-close Job object; `GetExtendedTcpTable` owner, image
+file identity and creation time). Windows has no TERM, so a deadline, a
+cancellation or a stop terminates the Job at once, and Windows reads no argv of
+another process, so `ManagedServer::verifies(receipt)` proves the receipt names
+that server's own child (launch record, creation time, image file, Job
+membership, declared endpoint, listener) where macOS reads argv
+(`verifies_managed_process`). `arkdeck_provider_hdc::ProcessDispatch` and
+`ManagedHdcServer` now build on Windows; `mutation_identity_current()` stays
+`false` there (no Windows launch identity is published), and nothing composes
+them on Windows, since no Windows HDC tuple is registered.
+`tests/windows_tool_dispatch.rs` (platform) and `tests/windows_managed_hdc.rs`
+(provider) are `harness = false` targets whose fake tool and fake `hdc` are the
+test binary itself; no real HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
+
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::{LifecycleAction, LifecycleCommand, PreparedLifecycle}`
