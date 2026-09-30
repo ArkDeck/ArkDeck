@@ -548,7 +548,14 @@ temporary directories (re-record with
 `ARKDECK_RUST_ARTIFACT_QUOTA_RECORD=/private/tmp/<new>`); `tests/artifact_quota.rs`
 reproduces every answer and leaves every root untouched, and
 `scripts/check-artifact-quota.py` compares a fresh Swift daemon and a fresh Rust
-owner, and both CLIs, over each root.
+owner, and both CLIs, over each root. The Windows daemon answers it as the
+macOS one does, from its storage owner's `ArtifactUsage` (TASK-XPA-005) over
+the Artifact root, with the same walk;
+only the reads under it go through the host store, which follows no reparse
+point and requires the owner-only single-link payload the Windows Artifact
+owners read. `tests/windows_artifact_quota.rs` rebuilds the 27 oracle roots on
+NTFS (links as junctions, `0000` as an empty DACL) and reproduces every answer,
+with the host's error number in a message.
 
 Before it serves, the isolated daemon sweeps its Artifact root once, as Swift's
 daemon runs `collectGarbage` at startup (`collect_expired_artifacts`,

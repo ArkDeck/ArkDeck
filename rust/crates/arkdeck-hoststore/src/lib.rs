@@ -327,7 +327,9 @@ use arkdeck_contract::operation_catalog;
 mod operation_request;
 #[cfg(any(target_os = "macos", windows))]
 pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
-#[cfg(target_os = "macos")]
+// `artifact.quota`'s walk, on macOS through `ArtifactUsage` and on Windows
+// through the Artifact read owner.
+#[cfg(any(target_os = "macos", windows))]
 mod artifact_quota;
 #[cfg(any(target_os = "macos", windows))]
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

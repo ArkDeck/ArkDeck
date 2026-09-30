@@ -5,15 +5,22 @@
 //!   `workspace.project.register|list|show` and `workspace.preset.list|show`
 //!   answer from `workspace-projects` (`projects.json` under
 //!   `.projects.lock`), a symbol preset registers, and what they wrote is
-//!   read back after a restart; a project or preset mutation is refused with
-//!   no new dispatch, because the Job owner's census of the workspace Jobs
-//!   that name one is not on Windows yet, so nothing proves that none does; a store directory that is not owner-only, or a
-//!   document the owner cannot read, refuses the start.
+//!   read back after a restart; a project or preset update or remove asks
+//!   the Job owner's workspace census first: with no workspace Job naming
+//!   it, it is written and read back after a restart; while an active Job
+//!   names it (Swift's recorded workspace Job, admitted into `jobs-state` by
+//!   the Job store owner while the daemon is stopped, see
+//!   `arkdeck-hoststore/tests/windows_workspace_census.rs`), it is refused
+//!   (`resourceConflict`, no new dispatch) and nothing is written, also
+//!   after a restart; once that Job has ended it is written. A store
+//!   directory that is not owner-only, or a document the owner cannot read,
+//!   refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): the same hops as the CLI
-//!   verifies the daemon's image and signer and prints them. Without that
-//!   variable this test says so and checks nothing.
+//!   verifies the daemon's image and signer and prints them, a remove
+//!   refused while the Job names the project and done once it has ended.
+//!   Without that variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -22,6 +29,7 @@
 //! this test if it outlives a failed assertion.
 #![cfg(windows)]
 
+use arkdeck_hoststore::{AdmissionVerdict, JobRecord, JobStore, OperationRequest};
 use arkdeck_platform::{HostDirectory, StateRoot};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -71,6 +79,51 @@ impl Root {
     fn document(&self) -> Vec<u8> {
         std::fs::read(self.store().join("projects.json")).unwrap()
     }
+    /// Swift's recorded workspace Job, naming `project` and, as its build
+    /// preset, `preset`, admitted into `jobs-state` by the Job store owner
+    /// (the daemon stopped) as a running Job of another Catalog, whose preset
+    /// inputs are read by their closed names.
+    fn with_running_workspace_job(&self, project: &str, preset: &str) {
+        let store = JobStore::open_owner(&self.0.join("jobs-state")).unwrap();
+        let (record, hash) = workspace_job(project, preset, "running");
+        assert_eq!(
+            store.admit(&record, &hash).unwrap(),
+            AdmissionVerdict::Admitted
+        );
+    }
+    /// That Job, succeeded.
+    fn ending_the_workspace_job(&self, project: &str, preset: &str) {
+        let store = JobStore::open_owner(&self.0.join("jobs-state")).unwrap();
+        let (record, _) = workspace_job(project, preset, "succeeded");
+        store.persist(&record, "2026-09-14T00:00:01Z").unwrap();
+    }
+}
+
+const WORKSPACE_JOB: &str = "job-863e9a9bd1d60afe3c33ac9e43a7b7fb";
+
+/// The recorded Swift `workspace.prepare-isolated-copy@1` Job with the
+/// project and build preset it names, its state, and a Catalog digest that
+/// is not this build's; its request hash is its request's fingerprint.
+fn workspace_job(project: &str, preset: &str, state: &str) -> (JobRecord, String) {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+        "../../tests/fixtures/agent-execution-evidence/store/jobs/{WORKSPACE_JOB}/job-record.json"
+    ));
+    let mut record: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+    for request in ["request", "originalSubmissionRequest"] {
+        record[request]["inputs"]["projectRef"] = json!(project);
+        record[request]["inputs"]["buildPresetRef"] = json!(preset);
+    }
+    record["state"] = json!(state);
+    record["catalogDigest"] = json!("0f".repeat(32));
+    let hash = OperationRequest::decode(
+        &serde_json::to_vec(&record["originalSubmissionRequest"]).unwrap(),
+    )
+    .unwrap()
+    .fingerprint();
+    (
+        JobRecord::decode(&serde_json::to_vec_pretty(&record).unwrap()).unwrap(),
+        hash,
+    )
 }
 impl Drop for Root {
     fn drop(&mut self) {
@@ -366,50 +419,103 @@ fn projects_register_over_the_pipe_and_survive_a_restart() {
         "{absent}"
     );
 
-    // Nothing proves that no workspace Job names the project or the preset
-    // (the Job owner's workspace census is still macOS-only): every mutation
-    // is refused and nothing is written.
-    let written = root.document();
-    for (method, params) in [
+    // No workspace Job names the second project: its update and its remove
+    // are written.
+    let updated = answered(
+        &pipe,
+        "workspace.project.update",
+        json!({"projectRef": second["projectRef"], "expectedGeneration": "1",
+            "kind": "arkdeck", "root": root.project("second")}),
+    );
+    assert_eq!(updated["kind"], "arkdeck", "{updated}");
+    assert_eq!(updated["generation"], "2", "{updated}");
+    let removed = answered(
+        &pipe,
+        "workspace.project.remove",
+        json!({"projectRef": second["projectRef"], "expectedGeneration": "2"}),
+    );
+    assert_eq!(removed["projectRef"], second["projectRef"], "{removed}");
+    let listed = answered(&pipe, "workspace.project.list", json!({}));
+    assert_eq!(listed["projects"].as_array().unwrap().len(), 1, "{listed}");
+    let project = answered(
+        &pipe,
+        "workspace.project.show",
+        json!({"projectRef": reference}),
+    );
+    first.stop(&root.0);
+
+    // A running workspace Job names the first project and its preset: every
+    // mutation of either is refused before anything is written, before and
+    // after a restart.
+    root.with_running_workspace_job(
+        reference.as_str().unwrap(),
+        preset["presetRef"].as_str().unwrap(),
+    );
+    let mutations = [
         (
             "workspace.project.update",
-            json!({"projectRef": second["projectRef"], "expectedGeneration": "1",
-                "kind": "arkdeck", "root": root.project("second")}),
+            json!({"projectRef": reference, "expectedGeneration": project["generation"],
+                "kind": "arkdeck", "root": root.project("first")}),
         ),
         (
             "workspace.project.remove",
-            json!({"projectRef": second["projectRef"], "expectedGeneration": "1"}),
+            json!({"projectRef": reference, "expectedGeneration": project["generation"]}),
         ),
         (
             "workspace.preset.remove",
             json!({"mutationRequestId": "preset-remove", "projectRef": reference,
-                "presetRef": preset["presetRef"], "expectedGeneration": "1"}),
+                "presetRef": preset["presetRef"], "expectedGeneration": preset["generation"]}),
         ),
-    ] {
-        let reply = refused(&pipe, method, params, "recordUnreadable");
-        assert_eq!(
-            reply["error"]["message"], "workspace Job references cannot be verified",
-            "{reply}"
-        );
+    ];
+    let written = root.document();
+    for _ in 0..2 {
+        let mut daemon = Daemon::start(executable, &root.0);
+        let pipe = daemon.serving();
+        for (method, params) in &mutations {
+            let reply = refused(&pipe, method, params.clone(), "resourceConflict");
+            let what = if method.starts_with("workspace.preset.") {
+                "preset"
+            } else {
+                "project"
+            };
+            assert_eq!(
+                reply["error"]["message"],
+                format!("workspace {what} is referenced by an active or uncertain Job"),
+                "{reply}"
+            );
+        }
+        daemon.stop(&root.0);
+        assert_eq!(root.document(), written);
     }
-    assert_eq!(root.document(), written);
-    first.stop(&root.0);
 
-    // Restarted over the same root: both projects and the preset are read
-    // back, still awaiting a composition this daemon does not have.
+    // The Job has ended: the preset and then the project are removed, and
+    // stay removed after a restart.
+    root.ending_the_workspace_job(
+        reference.as_str().unwrap(),
+        preset["presetRef"].as_str().unwrap(),
+    );
+    let mut ended = Daemon::start(executable, &root.0);
+    let pipe = ended.serving();
+    answered(&pipe, mutations[2].0, mutations[2].1.clone());
+    let project = answered(
+        &pipe,
+        "workspace.project.show",
+        json!({"projectRef": reference}),
+    );
+    assert_eq!(project["presetRefs"], json!([]), "{project}");
+    answered(
+        &pipe,
+        "workspace.project.remove",
+        json!({"projectRef": reference, "expectedGeneration": project["generation"]}),
+    );
+    ended.stop(&root.0);
     let mut restarted = Daemon::start(executable, &root.0);
     let pipe = restarted.serving();
-    assert_eq!(answered(&pipe, "workspace.project.list", json!({})), listed);
     assert_eq!(
-        answered(
-            &pipe,
-            "workspace.preset.show",
-            json!({"projectRef": reference, "presetRef": preset["presetRef"]})
-        ),
-        preset
+        answered(&pipe, "workspace.project.list", json!({})),
+        json!({"schemaVersion": "arkdeck.workspace-project-list/1", "projects": []})
     );
     restarted.stop(&root.0);
-    assert_eq!(root.document(), written);
 }
 
 #[test]
@@ -592,38 +698,43 @@ fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     );
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"]["presets"], json!([]), "{envelope}");
-    // A mutation is refused before anything is written: the CLI reports the
-    // refusal, not an unknown outcome.
-    let written = root.document();
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &[
-            "workspace",
-            "project",
-            "remove",
-            "--project",
-            &reference,
-            "--expected-generation",
-            "1",
-        ],
-    );
-    assert_ne!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["error"]["code"], "recordUnreadable", "{envelope}");
-    assert_eq!(root.document(), written);
     first.stop(&root.0);
 
+    // While a running workspace Job names the project, a remove is refused
+    // before anything is written: the CLI reports the refusal, not an
+    // unknown outcome.
+    root.with_running_workspace_job(&reference, "preset-none");
+    let remove = [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        &reference,
+        "--expected-generation",
+        "1",
+    ];
+    let written = root.document();
     let mut second = Daemon::start(&daemon, &root.0);
     let pipe = second.serving();
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &["workspace", "project", "show", "--project", &reference],
-    );
-    assert_eq!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["result"], project);
-    second.stop(&root.0);
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &remove);
+    assert_ne!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["error"]["code"], "resourceConflict", "{envelope}");
     assert_eq!(root.document(), written);
+    second.stop(&root.0);
+
+    // Once the Job has ended the remove is done, and after a restart the
+    // project is gone.
+    root.ending_the_workspace_job(&reference, "preset-none");
+    let mut third = Daemon::start(&daemon, &root.0);
+    let pipe = third.serving();
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &remove);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"]["projectRef"], reference, "{envelope}");
+    third.stop(&root.0);
+    let mut fourth = Daemon::start(&daemon, &root.0);
+    let pipe = fourth.serving();
+    let (status, envelope) = cli(&daemon, &pin, &pipe, &["workspace", "project", "list"]);
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"]["projects"], json!([]), "{envelope}");
+    fourth.stop(&root.0);
 }
