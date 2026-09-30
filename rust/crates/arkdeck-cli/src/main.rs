@@ -696,34 +696,31 @@ fn wait_for_job(
     }
 }
 
-/// The stop an observation answers, where the host has one. Swift ignores
-/// SIGINT and watches it with a dispatch source; this catches SIGTERM with it,
-/// which ends the observation the same way rather than killing the process
-/// mid-line. A host without signals never reports a stop.
+/// The stop an observation answers. Swift ignores SIGINT and watches it with
+/// a dispatch source; on Unix this catches SIGTERM with it, which ends the
+/// observation the same way rather than killing the process mid-line. On
+/// Windows the console's Ctrl+C and Ctrl+Break are recorded the same way
+/// (`SetConsoleCtrlHandler`), and every other console event keeps its
+/// default. Either way the handler only records the stop: the observation
+/// sees it at its next look and ends with `clientInterrupted`, and nothing
+/// is cancelled or sent again because of it.
 struct Interruption {
-    #[cfg(unix)]
     signal: Option<arkdeck_platform::StopSignal>,
 }
 
 impl Interruption {
     fn install() -> Self {
-        Self {
-            #[cfg(unix)]
-            signal: arkdeck_platform::StopSignal::install().ok(),
-        }
+        #[cfg(unix)]
+        let signal = arkdeck_platform::StopSignal::install().ok();
+        #[cfg(windows)]
+        let signal = arkdeck_platform::StopSignal::install(None).ok();
+        Self { signal }
     }
 
     fn requested(&self) -> bool {
-        #[cfg(unix)]
-        {
-            self.signal
-                .as_ref()
-                .is_some_and(arkdeck_platform::StopSignal::requested)
-        }
-        #[cfg(not(unix))]
-        {
-            false
-        }
+        self.signal
+            .as_ref()
+            .is_some_and(arkdeck_platform::StopSignal::requested)
     }
 }
 

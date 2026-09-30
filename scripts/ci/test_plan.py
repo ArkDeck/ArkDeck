@@ -21,12 +21,15 @@ SPEC.loader.exec_module(PLAN)
 
 
 class PathClassificationTests(unittest.TestCase):
-    def assert_lanes(self, paths, *, swift: bool, app: bool, ds: bool, rust: bool = False):
+    def assert_lanes(
+        self, paths, *, swift: bool, app: bool, ds: bool, rust: bool = False, windows: bool = False
+    ):
         selection = PLAN.classify_paths(paths)
         self.assertEqual(selection.swift, swift)
         self.assertEqual(selection.app, app)
         self.assertEqual(selection.ds, ds)
         self.assertEqual(selection.rust, rust)
+        self.assertEqual(selection.windows, windows)
 
     def test_docs_and_previews_outside_design_select_no_lane(self):
         self.assert_lanes(
@@ -115,7 +118,9 @@ class PathClassificationTests(unittest.TestCase):
             ".github/workflows/rust-ci.yml",
         ):
             with self.subTest(path=path):
-                self.assert_lanes([path], swift=True, app=True, ds=True, rust=True)
+                self.assert_lanes(
+                    [path], swift=True, app=True, ds=True, rust=True, windows=True
+                )
 
     def test_rust_and_contract_inputs_select_rust_without_unrelated_lanes(self):
         for path in (
@@ -125,11 +130,15 @@ class PathClassificationTests(unittest.TestCase):
             "rust/crates/arkdeck-contract/src/lib.rs",
             "rust/deny.toml",
             "rust/supply-chain/imports.lock",
-            "spec/control/methods/doctor.json",
             r"rust\crates\arkdeck-control\src\lib.rs",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+        # The method schemas are also ClientKit generator inputs.
+        self.assert_lanes(
+            ["spec/control/methods/doctor.json"],
+            swift=False, app=False, ds=False, rust=True, windows=True,
+        )
 
     def test_contract_schema_catalog_and_generator_only_changes_select_rust(self):
         # The contract schemas under openspec/contracts also select Swift:
@@ -174,14 +183,74 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_control_producer_and_fixture_only_changes_select_rust_without_app(self):
         for path in (
-            "Packages/ArkDeckKit/Contracts/control-protocol.json",
             "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
-            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
             "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
         ):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
+        # The registry and the recorded frames are ClientKit inputs as well.
+        for path in (
+            "Packages/ArkDeckKit/Contracts/control-protocol.json",
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes(
+                    [path], swift=True, app=False, ds=True, rust=True, windows=True
+                )
+
+    def test_windows_client_changes_select_only_the_windows_lane(self):
+        for path in (
+            "windows/ArkDeck.Windows.slnx",
+            "windows/ClientKit/ControlClient.cs",
+            "windows/ClientKit.Tests/ClientTests.cs",
+            "windows/scripts/generate-clientkit.py",
+            "windows/spikes/spk4/ArkDeck.Spk4/App.xaml",
+            "windows/README.md",
+            r"windows\ClientKit\Json\StrictJson.cs",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=False, windows=True)
+
+    def test_every_windows_generator_and_test_input_selects_windows(self):
+        root = SCRIPT.resolve().parents[2]
+        spec = importlib.util.spec_from_file_location(
+            "arkdeck_clientkit_generator", root / "windows/scripts/generate-clientkit.py"
+        )
+        assert spec is not None and spec.loader is not None
+        generator = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = generator
+        spec.loader.exec_module(generator)
+        self.assertTrue(generator.INPUTS)
+        # The tests also read the recorded corpus, and the end-to-end test signs
+        # its daemon copy with the development identity script.
+        declared = [
+            *generator.INPUTS,
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames",
+            "rust/scripts/windows-dev-identity.ps1",
+        ]
+        for path in declared:
+            source = root / path
+            if source.is_dir():
+                inputs = [file.relative_to(root).as_posix() for file in source.rglob("*") if file.is_file()]
+                inputs.append(f"{path}/new-contract-input.json")
+            else:
+                self.assertTrue(source.is_file(), path)
+                inputs = [path]
+            for candidate in inputs:
+                with self.subTest(input=path, changed_path=candidate):
+                    self.assertTrue(PLAN.classify_paths([candidate]).windows)
+
+    def test_unrelated_sources_do_not_select_windows(self):
+        for path in (
+            "rust/crates/arkdeck-contract/src/lib.rs",
+            "rust/scripts/check-readonly.py",
+            "spec/recovery/README.md",
+            "docs/design/cross-platform/windows-phase-agent-prompt.md",
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
+        ):
+            with self.subTest(path=path):
+                self.assertFalse(PLAN.classify_paths([path]).windows)
 
     def test_helper_packaging_changes_select_the_rust_lane_that_checks_them(self):
         # The unsigned structure check of the Rust helper pair runs in the
@@ -445,6 +514,23 @@ class GitPlanTests(unittest.TestCase):
         self.assertIn("rust=true\n", output.read_text(encoding="utf-8"))
         self.assertIs(plan.as_dict()["rust"], True)
 
+    def test_windows_only_agent_push_selects_the_windows_lane(self):
+        self.git("switch", "-qc", "agent/windows")
+        head = self.commit_file("windows/ClientKit/ControlClient.cs", "// C#\n")
+        plan = PLAN.plan_from_push_event(
+            self.root,
+            self.event(before=PLAN.ZERO_OID, after=head, ref="refs/heads/agent/windows"),
+        )
+        self.assertTrue(plan.lanes.windows)
+        self.assertFalse(plan.lanes.swift)
+        self.assertFalse(plan.lanes.app)
+        self.assertFalse(plan.lanes.ds)
+        self.assertFalse(plan.lanes.rust)
+        output = self.root / "github-output"
+        PLAN._append_github_output(output, plan)
+        self.assertIn("windows=true\n", output.read_text(encoding="utf-8"))
+        self.assertIs(plan.as_dict()["windows"], True)
+
     def test_removing_rust_source_still_selects_rust(self):
         self.git("switch", "-qc", "agent/remove-rust")
         source = "rust/crates/arkdeck-contract/src/lib.rs"
@@ -506,9 +592,11 @@ class GitPlanTests(unittest.TestCase):
 
 
 class CommandSelectionTests(unittest.TestCase):
-    def plan(self, *, swift: bool, app: bool, ds: bool = False, rust: bool = False):
+    def plan(
+        self, *, swift: bool, app: bool, ds: bool = False, rust: bool = False, windows: bool = False
+    ):
         return PLAN.CIPlan(
-            lanes=PLAN.LaneSelection(swift=swift, app=app, ds=ds, rust=rust),
+            lanes=PLAN.LaneSelection(swift=swift, app=app, ds=ds, rust=rust, windows=windows),
             base_revision="0" * 40,
             head_revision="1" * 40,
             base_kind="test",
@@ -527,6 +615,7 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertNotIn("xcodebuild", flattened)
         self.assertNotIn("npm", flattened)
         self.assertNotIn("cargo", flattened)
+        self.assertNotIn("dotnet", flattened)
 
     def test_test_only_plan_runs_swift_but_not_app(self):
         flattened = "\n".join(self.commands(self.plan(swift=True, app=False)))
@@ -616,6 +705,83 @@ class CommandSelectionTests(unittest.TestCase):
                                 pathlib.Path("/example/ArkDeck"),
                                 self.plan(swift=False, app=False, rust=True),
                             )
+
+
+class WindowsLaneTests(unittest.TestCase):
+    """TASK-XPA-007: the windows lane builds and tests the ClientKit solution, and a
+    host that cannot run it says so and fails instead of passing silently."""
+
+    def plan(self, **lanes):
+        selection = dict(swift=False, app=False, ds=False, rust=False, windows=False)
+        selection.update(lanes)
+        return PLAN.CIPlan(
+            lanes=PLAN.LaneSelection(**selection),
+            base_revision="0" * 40,
+            head_revision="1" * 40,
+            base_kind="test",
+            reason="test",
+            changed_files=(),
+        )
+
+    def test_windows_plan_checks_the_generator_then_builds_and_tests_the_solution(self):
+        with tempfile.TemporaryDirectory() as directory:
+            commands = [" ".join(c) for c in PLAN.local_commands(pathlib.Path(directory), self.plan(windows=True))]
+        generator = next(i for i, c in enumerate(commands) if c.endswith("windows/scripts/generate-clientkit.py --check"))
+        build = commands.index("dotnet build windows/ArkDeck.Windows.slnx -c Release")
+        test = commands.index("dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build")
+        self.assertLess(generator, build)
+        self.assertLess(build, test)
+        flattened = "\n".join(commands)
+        self.assertNotIn("cargo", flattened)
+        self.assertNotIn("xcodebuild", flattened)
+
+    def test_windows_lane_is_not_runnable_elsewhere_and_fails_after_the_other_lanes(self):
+        root = pathlib.Path("/example/ArkDeck")
+        plan = self.plan(windows=True, rust=True)
+        commands = (
+            ("python3", "scripts/ci/test_plan.py"),
+            ("cargo", "fmt", "--check"),
+            ("python3", "windows/scripts/generate-clientkit.py", "--check"),
+            ("dotnet", "build", "windows/ArkDeck.Windows.slnx", "-c", "Release"),
+        )
+        for system in ("Darwin", "Linux"):
+            with self.subTest(system=system):
+                with mock.patch.object(PLAN.platform, "system", return_value=system), \
+                        mock.patch.object(PLAN, "local_commands", return_value=commands), \
+                        mock.patch.object(PLAN.subprocess, "run") as run:
+                    with self.assertRaisesRegex(PLAN.PlanError, "windows lane is not runnable on this host"):
+                        PLAN.run_local(root, plan)
+                ran = [call.args[0] for call in run.call_args_list]
+                self.assertEqual(ran, [commands[0], commands[1]])
+
+    def test_windows_lane_runs_on_windows(self):
+        commands = (
+            ("python3", "windows/scripts/generate-clientkit.py", "--check"),
+            ("dotnet", "test", "windows/ArkDeck.Windows.slnx", "-c", "Release", "--no-build"),
+        )
+        with mock.patch.object(PLAN.platform, "system", return_value="Windows"), \
+                mock.patch.object(PLAN, "local_commands", return_value=commands), \
+                mock.patch.object(PLAN.subprocess, "run") as run:
+            PLAN.run_local(pathlib.Path("/example/ArkDeck"), self.plan(windows=True))
+        self.assertEqual([call.args[0] for call in run.call_args_list], list(commands))
+
+    def test_an_unselected_windows_lane_does_not_fail_other_hosts(self):
+        with mock.patch.object(PLAN.platform, "system", return_value="Darwin"), \
+                mock.patch.object(PLAN, "local_commands", return_value=(("python3", "x.py"),)), \
+                mock.patch.object(PLAN.subprocess, "run") as run:
+            PLAN.run_local(pathlib.Path("/example/ArkDeck"), self.plan(rust=True))
+        self.assertEqual(run.call_count, 1)
+
+    def test_run_local_exits_non_zero_when_the_windows_lane_cannot_run(self):
+        plan = self.plan(windows=True)
+        with mock.patch.object(PLAN.platform, "system", return_value="Darwin"), \
+                mock.patch.object(PLAN, "plan_between", return_value=plan), \
+                mock.patch.object(PLAN, "local_commands", return_value=()), \
+                mock.patch("sys.stdout"), mock.patch("sys.stderr") as stderr:
+            status = PLAN.main(["--base-revision", "HEAD~1", "--run-local"])
+        self.assertEqual(status, 1)
+        written = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertIn("not runnable", written)
 
 
 if __name__ == "__main__":

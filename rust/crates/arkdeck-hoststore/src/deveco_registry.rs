@@ -1,5 +1,6 @@
 //! Current Swift DevEco metadata schema. Offline decoding does not validate
 //! external content; only the read owner revalidates available registrations.
+use crate::deveco_manifest::{identifier, version};
 use crate::{DecodeError, DecodedStore, roundtrip};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -116,16 +117,6 @@ pub(crate) fn digest(value: &str) -> bool {
         && value
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-}
-pub(crate) fn identifier(value: &str) -> bool {
-    !value.is_empty()
-        && value.len() <= 128
-        && value
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"-._".contains(&b))
-}
-pub(crate) fn version(value: &str) -> bool {
-    identifier(value) && value.bytes().any(|b| b.is_ascii_digit())
 }
 fn owner_identifier(value: &str) -> bool {
     identifier(value) && value.as_bytes()[0].is_ascii_alphanumeric()

@@ -118,19 +118,7 @@ pub struct PinnedTree {
     pub sha256: String,
 }
 
-/// Swift `ArkTraceSummaryInvocationContract`: the versions a reviewed
-/// distribution produces, which every analysis it answers must carry.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ArkTraceContract {
-    pub tool_version: String,
-    pub parser_version: String,
-    pub parser_upstream_revision: String,
-    pub parser_sha256: String,
-    pub parser_build_recipe_version: String,
-    pub parser_adapter_version: String,
-    pub schema_adapter_version: String,
-    pub index_schema_version: i64,
-}
+pub use crate::arktrace_envelope::ArkTraceContract;
 
 /// Swift `ArkTraceDistributionTrustContract`.
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -7,13 +7,23 @@
 //! owns the privacy boundary — echo is disabled on the terminal before the
 //! child runs, rather than trusting the signer to win a race between printing
 //! its prompt and disabling echo itself.
+//!
+//! The Windows exchange (`windows/pty.rs`, TASK-XPA-011, G19) shares these
+//! types, bounds, the transcript wipe, the prompt search and the failure
+//! vocabulary; only the spawn and the terminal differ.
+use super::ToolTermination;
+#[cfg(target_os = "macos")]
 use super::macos_process::spawn_pty;
-use super::{ToolTermination, VerifiedTool, invalid};
+#[cfg(target_os = "macos")]
+use super::{VerifiedTool, invalid};
 use std::ffi::OsString;
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::fd::AsRawFd;
 use std::path::Path;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(target_os = "macos")]
+use std::time::Instant;
 
 /// One prompt the child is expected to print, and the secret to answer it.
 /// Callers clear their copy of the secret after the exchange.
@@ -101,13 +111,15 @@ pub struct PtyRequest<'a> {
     pub timeout: Duration,
 }
 
-const MAX_INTERACTIONS: usize = 4;
-const MAX_PROMPT_BYTES: usize = 512;
-const MAX_SECRET_BYTES: usize = 4096;
-const MIN_OUTPUT_BUDGET: usize = 1024;
+pub(crate) const MAX_INTERACTIONS: usize = 4;
+pub(crate) const MAX_PROMPT_BYTES: usize = 512;
+pub(crate) const MAX_SECRET_BYTES: usize = 4096;
+pub(crate) const MIN_OUTPUT_BUDGET: usize = 1024;
 /// Swift `terminateProcessGroup` for the signer: TERM, 100 ms, KILL.
+#[cfg(target_os = "macos")]
 const TERMINATION_GRACE: Duration = Duration::from_millis(100);
 
+#[cfg(target_os = "macos")]
 impl VerifiedTool {
     /// Runs the pinned executable on a pseudo-terminal, answering each exact
     /// prompt in order with its secret, and reports only what the exchange
@@ -285,7 +297,7 @@ impl VerifiedTool {
 }
 
 /// The transcript, wiped when the exchange is over.
-struct Zeroing(Vec<u8>);
+pub(crate) struct Zeroing(pub(crate) Vec<u8>);
 
 impl Drop for Zeroing {
     fn drop(&mut self) {
@@ -296,11 +308,13 @@ impl Drop for Zeroing {
     }
 }
 
+#[cfg(target_os = "macos")]
 struct ExchangeChild {
     pid: libc::pid_t,
     exited: bool,
 }
 
+#[cfg(target_os = "macos")]
 impl ExchangeChild {
     /// Swift `terminateProcessGroup`: TERM the child's own group, 100 ms, KILL,
     /// then reap the child.
@@ -324,12 +338,14 @@ impl ExchangeChild {
     }
 }
 
+#[cfg(target_os = "macos")]
 impl Drop for ExchangeChild {
     fn drop(&mut self) {
         self.terminate();
     }
 }
 
+#[cfg(target_os = "macos")]
 fn write_all(descriptor: i32, bytes: &[u8]) -> io::Result<()> {
     let mut written = 0;
     while written < bytes.len() {
@@ -354,11 +370,11 @@ fn write_all(descriptor: i32, bytes: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-fn contains(haystack: &[u8], needle: &[u8]) -> bool {
+pub(crate) fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     !needle.is_empty() && find(haystack, needle, 0).is_some()
 }
 
-fn count_occurrences(haystack: &[u8], needle: &[u8]) -> usize {
+pub(crate) fn count_occurrences(haystack: &[u8], needle: &[u8]) -> usize {
     if needle.is_empty() {
         return 0;
     }
@@ -384,7 +400,10 @@ fn find(haystack: &[u8], needle: &[u8], from: usize) -> Option<usize> {
 /// Swift `classifyFailure`: the diagnostic is what followed the last prompt
 /// (or everything, when no prompt was seen), lowercased and matched against
 /// the closed signer vocabulary in Swift's order.
-fn classify_failure(output: &[u8], interactions: &[PtyInteraction]) -> PtyFailureCategory {
+pub(crate) fn classify_failure(
+    output: &[u8],
+    interactions: &[PtyInteraction],
+) -> PtyFailureCategory {
     let diagnostic = interactions
         .last()
         .and_then(|interaction| {
