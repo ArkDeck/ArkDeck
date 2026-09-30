@@ -27,11 +27,16 @@ use serde_json::{Map, Value, json};
 use std::io;
 use std::path::Path;
 
+#[cfg(target_os = "macos")]
 #[path = "tool_selection_owner.rs"]
 mod owner;
-pub use owner::{
-    ToolSelectionActions, ToolSelectionAudit, ToolSelectionDriver, ToolSelectionRegistry,
-};
+// The owner reads the Bootstrap tool registry, not built on Windows yet.
+#[cfg(windows)]
+#[path = "absent_tool_selection_owner.rs"]
+mod owner;
+pub use owner::{ToolSelectionActions, ToolSelectionDriver};
+#[cfg(target_os = "macos")]
+pub use owner::{ToolSelectionAudit, ToolSelectionRegistry};
 
 /// An action's life: `expiresAt` is `createdAt` plus 300 s.
 const LIFETIME_MS: u64 = 300_000;

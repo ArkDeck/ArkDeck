@@ -108,7 +108,7 @@ mod job_repository;
 // checks a consumed HAP's correlation with and the planner computes.
 #[cfg(any(target_os = "macos", windows))]
 mod job_step_digest;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_owner::HdcLifecycleInterlock;
 #[cfg(any(target_os = "macos", windows))]
 pub use job_owner::JobStore;
@@ -229,42 +229,42 @@ pub use agent_execution::{
 mod human_action;
 #[cfg(any(target_os = "macos", windows))]
 pub use human_action::HumanActionResources;
-#[cfg(target_os = "macos")]
+// The control actions (the HDC lifecycle's and the tool selection's) and
+// their durable records, on macOS and Windows (TASK-XPA-005); on Windows no
+// owner is composed without a registered HDC tuple (CHG-2026-078).
+#[cfg(any(target_os = "macos", windows))]
 mod control_action;
-// The control actions are the HDC lifecycle's and the tool selection's, not
-// built on Windows yet; the human-action owner is the same code with none.
-#[cfg(windows)]
-#[path = "absent_control_action.rs"]
-mod control_action;
-#[cfg(windows)]
-pub use control_action::ControlActionResources;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use control_action::{ControlActionResources, control_action_without_owner};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod control_action_approval;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use control_action_approval::{ImpactApproval, InteractionChallenge, InteractionReceipt};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod control_action_store;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod control_action_value;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod hdc_control_action;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use hdc_control_action::{
     HdcControlActions, HdcLifecycleAudit, HdcLifecycleDriver, Impact, ImpactReading, ImpactSource,
     OwnerContext, Record,
 };
-#[cfg(target_os = "macos")]
+// Tool selection's records on both; its owner reads the Bootstrap tool
+// registry, which is macOS-only (`absent_tool_selection_owner.rs`).
+#[cfg(any(target_os = "macos", windows))]
 mod tool_selection;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use tool_selection::{
-    SelectionImpact, ToolFacts, ToolSelectionActions, ToolSelectionAudit, ToolSelectionDriver,
-    ToolSelectionIntent, ToolSelectionRecord, ToolSelectionRecords, ToolSelectionRegistry,
+    SelectionImpact, ToolFacts, ToolSelectionActions, ToolSelectionDriver, ToolSelectionIntent,
+    ToolSelectionRecord, ToolSelectionRecords,
 };
 #[cfg(target_os = "macos")]
+pub use tool_selection::{ToolSelectionAudit, ToolSelectionRegistry};
+#[cfg(any(target_os = "macos", windows))]
 mod hdc_impact_source;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use hdc_impact_source::{CurrentJob, DeviceReading, DeviceRow, ManagedServerImpact};
 #[cfg(target_os = "macos")]
 mod analyzer_output;

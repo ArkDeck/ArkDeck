@@ -11,9 +11,18 @@ use std::sync::Mutex;
 
 const ENDPOINT: &str = "127.0.0.1:8710";
 
-/// A tool the test may pin: the system shell (root-owned, not writable).
+/// A tool the test may pin: the system shell (root-owned, not writable); on
+/// Windows a system executable, in its plain canonical spelling.
 fn shell() -> StatusExecutable {
+    #[cfg(unix)]
     let path = std::fs::canonicalize("/bin/sh").unwrap();
+    #[cfg(windows)]
+    let path = {
+        let system = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap());
+        let path = std::fs::canonicalize(system.join("System32").join("whoami.exe")).unwrap();
+        let text = path.to_str().unwrap();
+        std::path::PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(text))
+    };
     StatusExecutable {
         sha256: sha256_hex(&std::fs::read(&path).unwrap()),
         path: path.to_string_lossy().into_owned(),
@@ -569,15 +578,11 @@ impl ImpactSource for RegisteredHealthyServer<'_> {
 #[test]
 fn only_a_proved_healthy_server_previews_a_restart_whose_approval_is_requested() {
     use crate::hdc_control_action::{HdcControlActions, OwnerContext};
-    use std::os::unix::fs::DirBuilderExt;
-    let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+    let directory = crate::test_private::temporary_root().join(format!(
         "hdc-impact-source-restart-{:032x}",
         u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
     ));
-    std::fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&directory)
-        .unwrap();
+    crate::test_private::create_private_directory(&directory);
     struct Remove(std::path::PathBuf);
     impl Drop for Remove {
         fn drop(&mut self) {

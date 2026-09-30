@@ -29,6 +29,30 @@ fn fields(value: &Value) -> Result<&Map<String, Value>, WireError> {
 fn text<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
     value.get(key)?.as_str()
 }
+/// The path a `launchWindowEntered` record's executable is launched by, as
+/// its identity names it. macOS launches the retained file by its
+/// `/.vol/<device>/<inode>` path. Windows has no launch by file id: the
+/// child is created from the authorized path and its image is proved to be
+/// the retained file while it is suspended, so that path is the launch path
+/// (`arkdeck_platform::ToolLaunchIdentity`).
+pub(crate) fn launch_path(payload: &Value) -> Value {
+    #[cfg(target_os = "macos")]
+    return json!(format!(
+        "/.vol/{}/{}",
+        payload["executableDevice"].as_str().unwrap_or_default(),
+        payload["executableInode"].as_str().unwrap_or_default()
+    ));
+    #[cfg(windows)]
+    return payload["authorizedExecutable"].clone();
+}
+/// The launch path's form, before the record is bound to its command.
+fn launch_path_form(payload: &Value) -> bool {
+    #[cfg(target_os = "macos")]
+    return text(payload, "inodeLaunchPath").is_some_and(|s| s.starts_with("/.vol/"));
+    #[cfg(windows)]
+    return text(payload, "inodeLaunchPath").is_some()
+        && payload["inodeLaunchPath"] == payload["authorizedExecutable"];
+}
 fn uuid(value: &str) -> bool {
     crate::session_cleanup_records::uuid(value)
 }
@@ -200,7 +224,7 @@ pub(crate) fn valid_payload(kind: &str, p: &Value) -> bool {
                 ],
             ) && command()
                 && p["authorizedExecutable"] == p["executable"]
-                && text(p, "inodeLaunchPath").is_some_and(|s| s.starts_with("/.vol/"))
+                && launch_path_form(p)
                 && canonical_unsigned(&p["executableDevice"], u64::MAX)
                 && canonical_unsigned(&p["executableInode"], u64::MAX)
                 && p["executableFileSize"].as_i64().is_some_and(|n| n >= 0)
@@ -714,12 +738,7 @@ impl HdcLifecycleAudit<'_> {
                 || ["stepId", "executable", "argv", "endpoint"]
                     .iter()
                     .any(|key| prior["payload"][*key] != payload[*key])
-                || payload["inodeLaunchPath"]
-                    != json!(format!(
-                        "/.vol/{}/{}",
-                        payload["executableDevice"].as_str().unwrap_or_default(),
-                        payload["executableInode"].as_str().unwrap_or_default()
-                    ))
+                || payload["inodeLaunchPath"] != launch_path(&payload)
             {
                 return Err(invalid());
             }
