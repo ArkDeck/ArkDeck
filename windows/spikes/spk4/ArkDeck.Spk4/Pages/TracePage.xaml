@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="ArkDeck.Spk4.Pages.TracePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel x:Name="Body" Padding="{StaticResource ArkDeckSpace6Thickness}" Spacing="{StaticResource ArkDeckSpace3}">
+        <TextBlock Style="{StaticResource ArkDeckPageTitleStyle}" Text="Trace" />
+        <TextBlock Style="{StaticResource ArkDeckBodyStyle}" TextWrapping="Wrap"
+                   Text="Capture, inspect and export are daemon operations (not part of this spike). The Trace Viewer is a recorded parity debt (proposal decision 5):" />
+    </StackPanel>
+</Page>

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="ArkDeck.Spk4.Fixtures/ArkDeck.Spk4.Fixtures.csproj" />
+  <Project Path="ArkDeck.Spk4.Probe/ArkDeck.Spk4.Probe.csproj" />
+  <Project Path="ArkDeck.Spk4.Tests/ArkDeck.Spk4.Tests.csproj" />
+  <Project Path="ArkDeck.Spk4/ArkDeck.Spk4.csproj" />
+</Solution>

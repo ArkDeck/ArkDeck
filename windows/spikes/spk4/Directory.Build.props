@@ -1,0 +1,13 @@
+<Project>
+  <!-- SPK-4 spike: shared settings for every project under windows/spikes/spk4. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Reproducible restores: no floating versions. -->
+    <CentralPackageFloatingVersionsEnabled>false</CentralPackageFloatingVersionsEnabled>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+</Project>

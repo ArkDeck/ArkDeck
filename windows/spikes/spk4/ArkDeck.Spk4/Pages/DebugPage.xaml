@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Page
+    x:Class="ArkDeck.Spk4.Pages.DebugPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <StackPanel Padding="{StaticResource ArkDeckSpace6Thickness}" Spacing="{StaticResource ArkDeckSpace3}">
+        <TextBlock Style="{StaticResource ArkDeckPageTitleStyle}" Text="Debug" />
+        <!-- Five tabs with the macOS names (design §H.3 Debug row). -->
+        <SelectorBar
+            x:Name="Tabs"
+            AutomationProperties.AutomationId="Debug.Tabs"
+            AutomationProperties.Name="Debug sections"
+            SelectionChanged="Tabs_SelectionChanged" />
+        <ContentPresenter x:Name="TabContent" />
+    </StackPanel>
+</Page>

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    SPK-4 unit tests, run with `dotnet test`. A plain MSTest project on purpose: the
+    `winui-unittest` template (0.0.7-alpha) builds a packaged WinUI test app that `dotnet test`
+    cannot host without Visual Studio's deployment step (REGDB_E_CLASSNOTREG, recorded in the
+    SPK-4 run record). UI behaviour is covered out of process by ArkDeck.Spk4.Probe (UIA).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>ArkDeck.Spk4.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ArkDeck.Spk4.Fixtures\ArkDeck.Spk4.Fixtures.csproj" />
+  </ItemGroup>
+</Project>
