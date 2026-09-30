@@ -5,11 +5,15 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap10 rescap">
+  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  IgnorableNamespaces="uap uap10 rescap desktop6">
 
   <!-- Development identity (ruling 12: CN=ArkDeck Development, host-trusted only). The
        production subject comes from the signing decision (proposal r12 decision 10). The
-       daemon inside the package (ruling 8) is TASK-XPA-022. -->
+       release-candidate package (windows/scripts/package-rc.ps1, TASK-XPA-022) carries the
+       daemon and the CLI beside the App; file-system and registry write virtualization are
+       off (ruling 8), so the App, the packaged daemon and an xcopy CLI share one physical
+       %LOCALAPPDATA%\ArkDeck\Agentd. -->
   <Identity
     Name="ArkDeck.Development"
     Publisher="CN=ArkDeck Development"
@@ -19,6 +23,8 @@
     <DisplayName>ArkDeck</DisplayName>
     <PublisherDisplayName>ArkDeck</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
+    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
+    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
     <uap10:PackageIntegrity>
       <uap10:Content Enforcement="on"/>
     </uap10:PackageIntegrity>
@@ -51,5 +57,6 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>
