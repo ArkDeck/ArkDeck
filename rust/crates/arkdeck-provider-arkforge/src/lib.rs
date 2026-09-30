@@ -23,7 +23,7 @@ pub mod authority_support;
 mod device_access;
 mod flash_lane;
 pub mod flash_session;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod lane;
 mod lane_client;
 mod lane_host;
@@ -43,7 +43,7 @@ pub use flash_lane::{
     LaneFailure, PrewarmReceipt, RockchipHost, Terminal, canonical_facts_digest,
     validate_completion,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use lane::{
     Absence, BUNDLE_PATH_KEY, CAMPAIGN_KEY, DAYU200_PROFILE, DaemonStop, Lane, LaneInputs,
     NATIVE_ROCKUSB_TOOLCHAIN, RETIRED_KEYS, daemon_arguments, device_profile_selector,
