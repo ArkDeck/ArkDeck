@@ -284,8 +284,52 @@ remain gaps even if every measured subset is stable.
 
 `baseline.assert_no_host_identity` re-scans the serialized bytes before they are
 written and refuses a document carrying a home directory, a user name or any
-`/Users/<name>` or `/home/<name>` prefix.  Host facts are limited to OS, OS
-version, architecture, CPU count and Python version.
+`/Users/<name>` or `/home/<name>` prefix, or a Windows `<drive>:\Users\<name>`
+profile.  Host facts are limited to OS, OS version, architecture, CPU count and
+Python version (plus, on Windows only, a `hostTag` such as `windows-amd64` and
+the `loadSource`).
+
+## Windows capture (capture-only, TASK-XPA-025 WM6)
+
+`capture --runtime-kind rust` runs on Windows against the Windows
+`arkdeck-agentd.exe` on a private development root, with the repository's
+Python (`"$ARKDECK_PYTHON"`) and `PYTHONUTF8=1`:
+
+```bash
+cd scripts
+PYTHONUTF8=1 "$ARKDECK_PYTHON" -m bench capture --runtime-kind rust \
+  --daemon <target>/release/arkdeck-agentd.exe --soak <target>/release/arkdeck-soak.exe \
+  --build-configuration release --out-dir <dir>
+```
+
+It writes the same `arkdeck-perf-baseline-1.1.0` document and raw JSONL, with
+`captureOnly: true`, `baselineEligible: false` and the host tag. Until phase A
+commits a Windows reference baseline from a quiet reference host,
+`select-baseline` and `compare` refuse a capture-only document on either side,
+so no lane can gate on one. What differs, and why:
+
+- **Transport.** The daemon names its pipe after the root and records it in the
+  root's `instance.json`; the harness connects once that document names the
+  process it started, checks that the pipe's server process
+  (`GetNamedPipeServerProcessId`) is that process, and stops it through its
+  named stop event (a drain, as `SIGTERM` is on Unix). A start that fails keeps
+  the daemon's bounded output, with the root, profile and SIDs redacted.
+- **Rows.** `ipc.namedPipe` (the health round trip over the pipe),
+  `daemon.idleHandleCount` (open handles) and `daemon.idlePrivateBytes` are
+  measured; `daemon.residentSet*` is the working set and `daemon.idleCpuPercent`
+  the lifetime CPU share. `ipc.health` and `daemon.idleOpenFileDescriptorCount`
+  remain rows, as gaps naming their Windows counterparts.
+- **Job store.** The Windows development root composes no Job store yet (G01):
+  nothing is seeded, `ipc.jobList`/`ipc.jobStatus` are gaps, and the recovery,
+  journal and artifact legs are refused before a run starts.
+- **Host facts.** Clocks are `QueryInterruptTimePrecise` (continuous) and
+  `QueryUnbiasedInterruptTimePrecise` (awake-work). Windows has no load
+  average: the quiet-host figure is the CPUs kept busy over one second
+  (`GetSystemTimes`), held to the same ceiling; conflicting builds are found by
+  image name and, for Python, the process's own command line.
+
+A capture on a shared or busy host is advisory as everywhere else
+(`--allow-loaded-host`). See `windows_host.py` for each Windows API.
 
 ## Rust recovery capture (TASK-XPA-025)
 
