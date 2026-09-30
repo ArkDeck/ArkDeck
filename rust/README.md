@@ -1466,7 +1466,14 @@ verified the same way, so the facts a deployment carries are that file's; the
 standalone and production daemons refuse that variable at startup, as they refuse
 every other development one, and a named helper that does not verify fails
 startup. With no helper anywhere the operation stays unavailable with
-`provider_tool_unavailable`, as before. Once the Target's facts hold, the library's lease (a Job Artifact or an
+`provider_tool_unavailable`, as before. The Windows daemon composes the
+bundled helper the same way (TASK-XPA-009): the xcopy and RC packages carry the
+checked-in resource beside `arkdeck-agentd.exe` in the same bundle layout, and
+the census names `codeSignHelper` in its macOS position. No Windows HDC tuple
+is registered, so there the helper waits behind that gate (the operation
+answers `provider_not_registered`), and a named development helper is refused
+at startup, since on macOS only a development HDC's admission names one.
+`tests/windows_code_sign_helper_process.rs` measures it. Once the Target's facts hold, the library's lease (a Job Artifact or an
 Import) is resolved and bound to them, its bytes are read, and each step's
 action is named from them (`StepAction::Native`, claimed by the operation before
 any step kind): the provider verifies them as the expected ABI's code-signed ELF,
@@ -2536,7 +2543,13 @@ the entries it found; a production package is never built from a dirty
 checkout. It runs `cargo build --release --locked -p arkdeck-agentd -p
 arkdeck-cli --target x86_64-pc-windows-msvc` and stages `arkdeck.exe` and
 `arkdeck-agentd.exe` side by side, because the CLI's default daemon is its
-sibling. It then signs both (`-SigningMode`):
+sibling. Beside them it stages the OpenHarmony code-sign helper a native
+deployment sends to the device (TASK-XPA-009): the checked-in
+`arkdeck-code-sign-enable` at the recorded revision, at
+`ArkDeckKit_ArkDeckWorkflows.bundle/OpenHarmonyNativeCodeSign/` where the
+daemon looks beside itself. It is an arm64 ELF, data on the host, so it is
+never Authenticode-signed; the manifest pins its bytes as it pins the
+executables'. It then signs both executables (`-SigningMode`):
 
 | Mode | Signer |
 | --- | --- |

@@ -195,7 +195,7 @@ pub struct Host {
     usb_registry: bool,
     /// The bundled OpenHarmony code-sign helper this composition verified;
     /// without one a native deployment stays unavailable.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     code_sign_helper: Option<arkdeck_provider_hdc::CodeSignHelper>,
     /// The combined human-action owner over the agent executions and the
     /// union control-action owner.
@@ -622,7 +622,7 @@ impl Host {
     /// the composition that found it (`code_sign_helper.rs`). With one,
     /// `deploy.native-library.app-owned@1` is available and planned; without
     /// one it stays unavailable, as Swift's composition leaves it.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_code_sign_helper(mut self, helper: arkdeck_provider_hdc::CodeSignHelper) -> Self {
         self.code_sign_helper = Some(helper);
         self
@@ -1336,6 +1336,7 @@ impl Host {
             ("humanActions", self.human_actions.is_some()),
             ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
+            ("codeSignHelper", self.code_sign_helper.is_some()),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
         .into_iter()
@@ -1421,7 +1422,7 @@ impl Host {
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
             #[cfg(any(target_os = "macos", windows))]
             usb_registry: false,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             code_sign_helper: None,
             #[cfg(any(target_os = "macos", windows))]
             human_actions: None,
