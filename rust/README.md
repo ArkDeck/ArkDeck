@@ -2624,6 +2624,32 @@ attempts go under `SigningPresetStore::attempts_root` (`<preset root>\Attempts`)
 The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-leaves-run.md`.
 
+## Windows DevEco toolchain registration (TASK-XPA-011)
+
+`arkdeck-hoststore`'s DevEco registry (`DevEcoRegistryStore`: `register`, `inspect`, `list`) is
+built on Windows. node and hvigor register there as the child roles of one content-addressed
+toolchain (`toolchain:sha256:<digest>`); a build uses them through that reference, never
+through PATH.
+- **Source.** The DevEco Studio directory, as a standard `X:\…` path, read by D2's no-follow
+  reader.
+- **Roles.** Four: the product and SDK manifests, `tools\node\node.exe` and
+  `tools\hvigor\bin\hvigorw.js`. There is no signed resource envelope.
+- **Trust.** node's own Authenticode signature must verify
+  (`arkdeck_platform::inspect_native_code_signature` on Windows: `verified` with the signer's
+  name and leaf SHA-256, or `unsigned`, or refused). The launcher `bin\devecostudio64.exe` must
+  be signed by `Huawei Technologies Co., Ltd.` (`inspect_deveco_publisher_signature`).
+- **Pinning.** Children are pinned by the host store's file identity and SHA-256, and every
+  inspect re-measures them.
+- **Index.** The same `arkdeck.bootstrap-deveco-toolchains/1` document. Each host accepts only
+  its own record form (Windows: an `X:\…` root, four roles, `"platform":"windows"`, which is
+  also in the content digest).
+- **Not yet on Windows.** The daemon's Bootstrap readers, which compose this registry with the
+  macOS-only HDC tool and bundle registries, and retirement. So no CLI leaf serves it on
+  Windows yet.
+
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-deveco-registration-run.md`.
+
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::{LifecycleAction, LifecycleCommand, PreparedLifecycle}`

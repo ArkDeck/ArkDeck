@@ -792,21 +792,24 @@ mod tool_list_owner;
 mod tool_retirement;
 
 // Portable: the product and SDK manifest facts, the same format on macOS
-// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
-// macOS-only until the Windows DevEco trust (G12) exists.
+// and Windows (TASK-XPA-011, G15). The DevEco registry and its owner are
+// built on macOS and Windows: on Windows node and hvigor register as the
+// child roles of one content-addressed toolchain, node's Authenticode
+// signature and the DevEco launcher's publisher (G12) in place of the macOS
+// bundle signature and resource envelope.
 mod deveco_manifest;
 pub use deveco_manifest::{
     DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry::decode_deveco_toolchains;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_content;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod deveco_registry_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use deveco_registry_owner::DevEcoRegistryStore;
 
 // The Artifact read, inspect, list and export owners (TASK-XPA-006), on the

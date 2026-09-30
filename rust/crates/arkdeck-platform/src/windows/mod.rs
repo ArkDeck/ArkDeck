@@ -18,6 +18,7 @@ use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
 mod account;
+mod code_signature;
 mod console_secret;
 mod credential;
 mod daemon_fingerprint;
@@ -39,6 +40,10 @@ mod stop;
 mod tool;
 mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
+pub use code_signature::{
+    DEVECO_PUBLISHER, NativeCodeSignature, inspect_deveco_publisher_signature,
+    inspect_native_code_signature, inspect_publisher,
+};
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
