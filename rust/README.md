@@ -2979,6 +2979,27 @@ envelopes (`reviewed/`, answered for `zlib.htrace` and
 `trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
 reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
 
+On Windows (TASK-XPA-021, decision 5) there is no ArkTrace distribution: the
+repository pins one `trace_streamer`, a macOS arm64 build
+(`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`), and the distribution
+contract the loader verifies is an Apple one (Developer ID signatures,
+notarization and code directory hashes; a tree digest that spells each
+file's POSIX mode). So the loader, its trust checker and the doctor probe
+stay macOS-only, and nothing is loaded on Windows, pinned or not: a Windows
+development root that names `ARKDECK_ARKTRACE_DESCRIPTOR` is refused before
+anything is opened or read. What reads nothing from the host is built there:
+the two judges of the CLI's answers and the request reader
+(`arktrace_summary.rs`, `arktrace_analysis.rs`) with the contract and JSON
+token rules they share (`arktrace_envelope.rs`), and the three recorded
+oracles above replay on Windows with Swift's verdicts. The Windows daemon
+answers the offline Trace surface as a daemon without the distribution:
+`trace.inspect` with Swift's refusal without a Trace inspector
+(`trace-inspect-unavailable`, every recorded request), `trace.cache.status`
+and `trace.cache.purge` refused without the Trace cache owner, and both
+ArkTrace analyzers unavailable (`provider_not_registered`); `cargo test -p
+arkdeck-agentd --test windows_trace_offline_process` runs them against the
+real daemon ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-trace-offline-run.md)).
+
 ## Retired facade mode (TASK-XPA-017)
 
 `arkdeck-agentd` no longer runs as the transport facade that forwarded the
