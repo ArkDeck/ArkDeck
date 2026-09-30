@@ -1209,12 +1209,12 @@ through the real daemon across a restart, on the daemon's own clock, and with
 `arkdeck job reconcile|agent status|human-action show` against a dev-signed
 daemon).
 
-Found on the way, on every host: the current contract types an agent
-execution's `failureCode` and a human action's `selectionSchema` as null and
-lists no `orchestrationBudgetExpired` among `agent.run`'s error codes. A
-pick-a-device action, an expired execution and its refusal are answered as a
-conformance failure (`internalError`) by the daemon; the process test reads
-them from the records instead.
+The contract publishes an agent execution's `failureCode`, an agent human
+action's `selectionSchema` and `agent.run`'s orchestration refusals as Swift
+answers them (#2389), so the process test reads the pick-a-device execution
+and its action, the expired execution (its status, the execution list and its
+action) and its `orchestrationBudgetExpired` refusal over the wire, and the
+pick-a-device execution and action through the CLI.
 
 Follow-ups: the start's Artifact retention sweep is still macOS-only; the
 control actions (with the HDC lifecycle) and an execution's Target
