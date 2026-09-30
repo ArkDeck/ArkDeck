@@ -31,8 +31,16 @@ revision of `main`:
 ```powershell
 pwsh windows/scripts/package-rc.ps1 -OutputDirectory <out> -SigningMode production `
   -ProductionSignCommand <sign-file wrapper> -MsixSignCommand <sign-msix wrapper> `
+  -ExpectedPublisherOrganization '<O= of the certificate>' `
+  -ExpectedPublisherEku 1.3.6.1.4.1.311.97.<profile> `
+  -MsixPublisher '<the signing certificate''s subject>' `
   -FeedBaseUri https://<feed host>/arkdeck/windows/
 ```
+
+The expected organisation and EKU are the ones every client pins (ruling 17). The run refuses,
+before building anything, when either is missing or malformed, when the MSIX command or
+publisher is missing, or when the publisher's `O=` is another organisation. After signing, it
+refuses a runtime whose publisher is not the expected one.
 
 That run produces:
 

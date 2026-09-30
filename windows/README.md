@@ -156,16 +156,27 @@ whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17)
   `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
   toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
 - the **MSIX form**: the same App with the signed daemon and CLI at the package root
-  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12), write
-  virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's inside it
-  are in the manifest.
+  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12) unless
+  `-MsixPublisher` names the signing certificate's subject (the package is then built from a
+  copy of `Package.appxmanifest` under `<out>\msix-manifest`, passed as `ArkDeckPackageManifest`;
+  the tracked manifest is never rewritten), write virtualization off (ruling 8), unsigned unless
+  `-MsixSignCommand` is given; its SHA-256 and the daemon's and CLI's inside it are in the
+  manifest.
 
 `-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
 certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`); `production` calls the maintainer's command
 (`-ProductionSignCommand` / `ARKDECK_PRODUCTION_SIGN_COMMAND`, one call per file) for the daemon,
 the CLI and `ArkDeck.exe`, and requires timestamps, one publisher identity (ruling 17) and a
-clean checkout. `-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's
-subject must be the manifest's `Publisher`. The scripts hold no credential. `-FeedBaseUri
+clean checkout. That identity must be the one the clients pin, given by the maintainer:
+`-ExpectedPublisherOrganization` and `-ExpectedPublisherEku` (else
+`ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` / `ARKDECK_DAEMON_PUBLISHER_EKU`, the CLI's own inputs;
+the EKU is an Artifact Signing certificate profile `1.3.6.1.4.1.311.97.<profile>`, never the
+Public Trust marker). Unless `-SkipMsix`, a production run also signs the MSIX:
+`-MsixSignCommand` and `-MsixPublisher` are required and the publisher's `O=` must be the
+expected organisation. Anything missing is refused before anything is built.
+`-MsixSignCommand` / `ARKDECK_MSIX_SIGN_COMMAND` signs the MSIX, whose signer's subject must be
+the manifest's `Publisher`. The scripts hold no credential; the commands obtain them from the
+maintainer at run time. `-FeedBaseUri
 https://…/` writes the App Installer feed `ArkDeck.appinstaller` from the MSIX this run built
 (name, publisher, version and architecture read from its `AppxManifest.xml`). The package
 version must rise with each published RC.

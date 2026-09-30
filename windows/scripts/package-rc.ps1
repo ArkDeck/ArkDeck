@@ -23,8 +23,10 @@ Build mode (default), from one recorded checkout:
      the zip with the zip's SHA-256 added.
   5. Builds the MSIX form (r12 decision 10) with the same layout (daemon at the package root,
      CLI in `bin\`), write virtualization off (ruling 8), identity `CN=ArkDeck Development`
-     (ruling 12). It is signed only through -MsixSignCommand (see below); its SHA-256 goes into
-     the manifest.
+     (ruling 12) unless -MsixPublisher names the signing certificate's subject: the package is
+     then built from a copy of windows/App/Package.appxmanifest with that Publisher (the
+     tracked manifest is never rewritten). It is signed only through -MsixSignCommand (see
+     below); its SHA-256 goes into the manifest.
   6. With -FeedBaseUri, writes the App Installer feed `ArkDeck.appinstaller` beside the MSIX,
      from the MSIX this run built (package name, publisher, version and architecture read from
      its AppxManifest.xml), so feed and package always come from one revision.
@@ -38,8 +40,13 @@ Build mode (default), from one recorded checkout:
                ARKDECK_PRODUCTION_SIGN_COMMAND), called once per file with the file's path as its
                only argument, for the daemon and the CLI (through windows-package-xcopy.ps1) and
                for ArkDeck.exe. Each must then verify with a timestamp, and all three must carry
-               one publisher identity (maintainer ruling 17). A clean checkout only. This script
-               holds no credential; an unconfigured command fails before anything is built.
+               one publisher identity (maintainer ruling 17), and that identity must be the one
+               the clients will pin: -ExpectedPublisherOrganization and -ExpectedPublisherEku
+               (else ARKDECK_DAEMON_PUBLISHER_ORGANIZATION / ARKDECK_DAEMON_PUBLISHER_EKU, the
+               CLI's own installation inputs). Unless -SkipMsix, the MSIX must be signed too:
+               -MsixSignCommand and -MsixPublisher are required, and the publisher's O= must be
+               the expected organisation. A clean checkout only. This script holds no
+               credential; anything unconfigured fails before anything is built.
 -MsixSignCommand (else ARKDECK_MSIX_SIGN_COMMAND), in any mode: the maintainer's command that
 signs the MSIX, called with its path. The MSIX must then verify, and its signer's subject must be
 the manifest's Publisher (a package whose publisher is not its certificate's subject does not
@@ -73,6 +80,9 @@ param(
     [Parameter(ParameterSetName = 'Build')][string]$Thumbprint,
     [Parameter(ParameterSetName = 'Build')][string]$ProductionSignCommand,
     [Parameter(ParameterSetName = 'Build')][string]$MsixSignCommand,
+    [Parameter(ParameterSetName = 'Build')][string]$MsixPublisher,
+    [Parameter(ParameterSetName = 'Build')][string]$ExpectedPublisherOrganization,
+    [Parameter(ParameterSetName = 'Build')][string]$ExpectedPublisherEku,
     [Parameter(ParameterSetName = 'Build')][string]$FeedBaseUri,
     [Parameter(ParameterSetName = 'Build')][switch]$AllowDirty,
     [Parameter(ParameterSetName = 'Build')][switch]$SkipMsix,
@@ -165,6 +175,24 @@ function Resolve-SignCommand([string]$Value, [string]$Variable, [string]$What, [
     return (Resolve-Path -LiteralPath $command).Path
 }
 
+# A package publisher: a distinguished name with a CN= (what makeappx and App Installer compare
+# with the signing certificate's subject), no control character, at most 8192 characters.
+function Test-MsixPublisher([string]$Value) {
+    try { $name = [System.Security.Cryptography.X509Certificates.X500DistinguishedName]::new($Value) } catch { $name = $null }
+    if (-not $name -or $Value.Length -gt 8192 -or $Value -match '[\x00-\x1f]' -or $Value -notmatch '(^|,\s*)CN=') {
+        throw "-MsixPublisher must be the signing certificate's subject as a distinguished name with a CN=: $Value"
+    }
+}
+
+function Get-SubjectOrganization([string]$Subject) {
+    $name = [System.Security.Cryptography.X509Certificates.X500DistinguishedName]::new($Subject)
+    $organizations = @(foreach ($rdn in $name.EnumerateRelativeDistinguishedNames()) {
+            if ($rdn.GetSingleElementType().Value -eq '2.5.4.10') { $rdn.GetSingleElementValue() }
+        })
+    if ($organizations.Count -ne 1) { return $null }
+    return $organizations[0]
+}
+
 # The feed's base URI: absolute https, ending in '/', where the maintainer hosts the feed and the
 # MSIX side by side.
 function Test-FeedBaseUri([string]$Value) {
@@ -234,6 +262,31 @@ function New-RcBuild {
     $msixCommand = Resolve-SignCommand $MsixSignCommand 'ARKDECK_MSIX_SIGN_COMMAND' 'MSIX signing' $false
     if ($msixCommand -and $SkipMsix) { throw '-MsixSignCommand needs the MSIX; drop -SkipMsix.' }
     $feedBase = if ($FeedBaseUri) { Test-FeedBaseUri $FeedBaseUri } else { $null }
+    if ($MsixPublisher) {
+        if ($SkipMsix) { throw '-MsixPublisher needs the MSIX; drop -SkipMsix.' }
+        Test-MsixPublisher $MsixPublisher
+    }
+    $expectedPublisher = $null
+    if ($SigningMode -eq 'production') {
+        # Ruling 17: the identity the CLI and the daemon's clients will pin, given by the
+        # maintainer, never derived from what was signed.
+        $organization = if ($ExpectedPublisherOrganization) { $ExpectedPublisherOrganization } else { [Environment]::GetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_ORGANIZATION') }
+        $eku = if ($ExpectedPublisherEku) { $ExpectedPublisherEku } else { [Environment]::GetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_EKU') }
+        if (-not $organization -or -not $eku) {
+            throw 'A production release candidate needs the publisher identity the clients pin (maintainer ruling 17): -ExpectedPublisherOrganization and -ExpectedPublisherEku, or ARKDECK_DAEMON_PUBLISHER_ORGANIZATION and ARKDECK_DAEMON_PUBLISHER_EKU. Nothing was built or signed.'
+        }
+        if ($organization -ne $organization.Trim() -or $eku -notmatch '^1\.3\.6\.1\.4\.1\.311\.97\.[0-9]+(\.[0-9]+)*$' -or $eku -eq '1.3.6.1.4.1.311.97.1.0') {
+            throw "The expected publisher identity is malformed: the organisation must have no outer whitespace and the EKU must be an Artifact Signing certificate-profile identity (1.3.6.1.4.1.311.97.<profile>, not the Public Trust marker). Nothing was built or signed."
+        }
+        $expectedPublisher = [ordered]@{ organization = $organization; eku = $eku }
+        if (-not $SkipMsix) {
+            if (-not $msixCommand) { throw 'A production release candidate signs its MSIX: pass -MsixSignCommand or set ARKDECK_MSIX_SIGN_COMMAND (or -SkipMsix). Nothing was built or signed.' }
+            if (-not $MsixPublisher) { throw 'A production MSIX is published under its signing certificate''s subject: pass -MsixPublisher "<subject>" (or -SkipMsix). Nothing was built or signed.' }
+            if ((Get-SubjectOrganization $MsixPublisher) -ne $organization) {
+                throw "-MsixPublisher names O=$(Get-SubjectOrganization $MsixPublisher), not the expected publisher $organization. Nothing was built or signed."
+            }
+        }
+    }
     if ($feedBase -and $SkipMsix) { throw '-FeedBaseUri needs the MSIX; drop -SkipMsix.' }
     $dotnet = Get-Dotnet
     $releaseVersion = Get-Content -LiteralPath (Join-Path $repository 'scripts/release/release-version.json') -Raw | ConvertFrom-Json
@@ -253,6 +306,12 @@ function New-RcBuild {
     if ($runtimeStage.Count -ne 1) { throw 'The runtime build left more than one package directory.' }
     $runtimeStage = $runtimeStage[0].FullName
     if ($runtimeManifest.sourceRevision -ne $revision) { throw 'The runtime was built from another revision.' }
+    if ($expectedPublisher) {
+        $runtimePublisher = $runtimeManifest.signing.publisher
+        if ($runtimePublisher.organization -ne $expectedPublisher.organization -or $runtimePublisher.eku -ne $expectedPublisher.eku) {
+            throw "The runtime is signed by $($runtimePublisher.organization) / $($runtimePublisher.eku), not the expected publisher $($expectedPublisher.organization) / $($expectedPublisher.eku)."
+        }
+    }
 
     # 2. The App, unpackaged, self-contained, published (ReadyToRun + trimmed).
     $appProject = Join-Path $repository 'windows/App/ArkDeck.App.csproj'
@@ -294,6 +353,16 @@ function New-RcBuild {
         $msixDirectory = Join-Path $output 'msix'
         $package = @('publish', $appProject, '-c', 'Release', '-p:Platform=x64', '-p:GenerateAppxPackageOnBuild=true',
             "-p:AppxPackageDir=$msixDirectory\", "-p:ArkDeckRuntimeDirectory=$runtimeStage", '--nologo')
+        if ($MsixPublisher) {
+            # The signing certificate's subject as the package publisher, in a copy of the
+            # tracked manifest: nothing in the checkout changes.
+            $manifestCopy = Join-Path $output 'msix-manifest\Package.appxmanifest'
+            [void](New-Item -ItemType Directory -Path (Split-Path -Parent $manifestCopy))
+            [xml]$source = Get-Content -LiteralPath (Join-Path $repository 'windows/App/Package.appxmanifest') -Raw
+            $source.Package.Identity.SetAttribute('Publisher', $MsixPublisher)
+            $source.Save($manifestCopy)
+            $package += "-p:ArkDeckPackageManifest=$manifestCopy"
+        }
         Write-Host "dotnet $($package -join ' ')"
         & $dotnet @package | Out-Host
         if ($LASTEXITCODE -ne 0) { throw "dotnet publish (MSIX) exited $LASTEXITCODE" }
@@ -324,6 +393,9 @@ function New-RcBuild {
         if ($msixCommand) {
             [void](Invoke-ProductionSigning @($packages[0].FullName) $msixCommand)
             $signer = Get-VerifiedSigner $packages[0].FullName ($SigningMode -eq 'production')
+            if ($MsixPublisher -and $identity.Publisher -ne $MsixPublisher) {
+                throw "The MSIX was built with publisher $($identity.Publisher), not -MsixPublisher $MsixPublisher."
+            }
             if ($signer.subject -ne $identity.Publisher) {
                 throw "The MSIX is signed by $($signer.subject), but its manifest names the publisher $($identity.Publisher); Windows would refuse to install it."
             }
@@ -387,6 +459,7 @@ function New-RcBuild {
             mode         = $SigningMode
             signerSha256 = $runtimeManifest.signing.signerSha256
             publisher    = if ($SigningMode -eq 'production') { $runtimeManifest.signing.publisher } else { $null }
+            expectedPublisher = $expectedPublisher
             signed       = if ($SigningMode -ne 'none') { @($AppName, "bin/$CliName", $DaemonName) } else { @() }
             note         = switch ($SigningMode) {
                 'development' { 'Host-trusted development signer (design L.1 item 22); not an installation identity.' }

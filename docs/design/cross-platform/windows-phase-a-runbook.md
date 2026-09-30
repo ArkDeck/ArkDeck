@@ -124,8 +124,9 @@ development MSIX.
 
 - **Gate.** An Artifact Signing account and certificate profile exist; the maintainer holds the
   credentials.
-- **Software gap.** `package-rc.ps1` has no production mode yet (see `windows-rc-package-run.md`,
-  maintainer item 1). The xcopy runtime already has it.
+- `package-rc.ps1 -SigningMode production` delegates the runtime to
+  `windows-package-xcopy.ps1 -SigningMode production`, checks its publisher against the expected
+  organisation and EKU, and signs the App and the MSIX (see `windows-production-rc-run.md`).
 
 1. Write the signing command the scripts call once per file: a `.ps1` or `.exe` that signs its
    only argument with a timestamp. For example, `signtool sign /fd SHA256 /tr
@@ -149,11 +150,16 @@ development MSIX.
    **Refusals:** an untimestamped signature, a dirty checkout, or `-ExpectedSignerSha256`.
 3. Record the publisher organisation and EKU. Every client is configured with them (both or
    neither). No certificate hash is pinned in production.
-4. **Gate for the production App and MSIX:** a `package-rc.ps1` production mode (an agent slice)
-   and the MSIX `Publisher` set to the certificate subject. Then:
-   - sign the MSIX with the same command;
-   - build the App Installer feed (maintainer item 3 of `windows-rc-package-run.md`);
-   - the Store and winget submissions are the maintainer's.
+4. Build the production release candidate from the same clean checkout, with the recorded
+   organisation and EKU and the certificate's subject as the MSIX publisher:
+
+   ```powershell
+   pwsh D:\src\ArkDeck\windows\scripts\package-rc.ps1 -OutputDirectory D:\temp\rc-prod-<date> -SigningMode production -ProductionSignCommand D:\signing\sign-one.ps1 -MsixSignCommand D:\signing\sign-one.ps1 -ExpectedPublisherOrganization '<O=>' -ExpectedPublisherEku 1.3.6.1.4.1.311.97.<profile> -MsixPublisher '<certificate subject>' -FeedBaseUri https://<feed host>/arkdeck/windows/
+   ```
+
+   **Refusals, before anything is built:** no expected organisation or EKU, the Public Trust
+   marker as the EKU, no MSIX command or publisher (unless `-SkipMsix`), or a publisher whose
+   `O=` is another organisation. The Store and winget submissions are the maintainer's.
 5. **Record:** `runs/TASK-XPA-022/production-signing-<date>-run.md`.
 
 ## 2. Sampling, then the Windows HDC registration
