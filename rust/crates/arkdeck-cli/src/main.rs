@@ -878,8 +878,10 @@ fn run_agent(
     let mut answer =
         request(invocation.method, params.clone()).map_err(|error| attach(error, &execution))?;
     if invocation.command == "human-action.resume" {
-        let challenge = answer["schemaVersion"] == "arkdeck.impact-approval-challenge/1";
-        if cfg!(target_os = "macos") && challenge {
+        // Reading the typed challenge is the same on every platform; the
+        // Runtime alone decides whether the answer came from the foreground
+        // console it challenged.
+        if answer["schemaVersion"] == "arkdeck.impact-approval-challenge/1" {
             let stdin = io::stdin();
             let response = arkdeck_cli::read_console_challenge(
                 &answer,
@@ -893,7 +895,7 @@ fn run_agent(
             arkdeck_cli::validate_control_action_result(&result)?;
             return Ok(result);
         }
-        if challenge || answer["owner"]["kind"] == "controlAction" {
+        if answer["owner"]["kind"] == "controlAction" {
             let mut error = CliError::new(
                 "humanActionRequired",
                 "impact approval requires the same foreground interactive console",

@@ -361,6 +361,55 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
     "support-bundle",
 ];
 
+/// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
+/// support bundle's service is `operationUnavailable`), each for the macOS
+/// host primitive it needs and Windows does not have yet: the LaunchAgent
+/// (`launchctl`), the Keychain, the App container's update lifecycle, the
+/// diagnostic-bundle publisher, the update-feed artifact measure, the I/O
+/// Registry USB census, and the host store's no-follow Import source reader
+/// (TASK-XPA-018).
+const MACOS_HOST_LEAVES: &[&str] = &[
+    "runtime.service.install",
+    "runtime.service.update",
+    "runtime.service.restart",
+    "runtime.service.status",
+    "runtime.service.verify",
+    "runtime.service.uninstall",
+    "agentd.install",
+    "agentd.update",
+    "agentd.restart",
+    "agentd.status",
+    "agentd.verify",
+    "agentd.uninstall",
+    "runtime.signing.install-sdk-release",
+    "runtime.signing.install",
+    "runtime.signing.migrate-deveco",
+    "runtime.signing.status",
+    "runtime.signing.remove",
+    "signing.install-sdk-release",
+    "signing.install",
+    "signing.migrate-deveco",
+    "signing.status",
+    "signing.remove",
+    "runtime.update.check",
+    "runtime.update.download",
+    "runtime.update.handoff",
+    "runtime.update.status",
+    "runtime.update.cancel",
+    "runtime.update.cleanup",
+    "runtime.support-bundle.preview",
+    "runtime.support-bundle.export",
+    "maintainer.update-feed.prepare",
+    "maintainer.update-feed.assemble",
+    "update-feed.prepare",
+    "update-feed.assemble",
+    "flash.install-binding",
+    "artifact.import.hap",
+    "artifact.import.workspace-patch",
+    "artifact.import.flash-bundle",
+    "artifact.import.native-library",
+];
+
 /// The App's capability table as published, read once.
 fn app_registry() -> &'static Value {
     static REGISTRY: OnceLock<Value> = OnceLock::new();
@@ -581,13 +630,49 @@ impl Entry {
     }
 
     /// §14's closed status set: implemented on macOS, or `partial` where
-    /// blocked; never more than `notImplemented` on a platform without a
-    /// ratified profile.
+    /// blocked. On Windows, what this CLI serves there:
+    /// - `notImplemented` where a leaf the entry reaches is refused off macOS
+    ///   ([`MACOS_HOST_LEAVES`]), or the entry reaches no leaf (a generic
+    ///   Catalog operation reaches `job submit`, and is `partial`);
+    /// - `implemented` where every leaf it reaches answers without the
+    ///   Runtime (the registry's `connectsToRuntime`), as it does on macOS:
+    ///   its argv fixtures replay and its answer is rendered alike on Windows;
+    /// - `partial` otherwise: the leaves parse, send their frames and render
+    ///   their envelopes on Windows, but the target rests on a Runtime owner
+    ///   the Windows daemon does not yet compose, or whose answer no Windows
+    ///   run has yet measured end to end.
     fn implementation_status(&self, platform: &str) -> &'static str {
         match (platform, self.classification.as_str()) {
             ("macos", "blocked") => "partial",
             ("macos", _) => "implemented",
-            _ => "notImplemented",
+            _ => self.windows_status(),
+        }
+    }
+
+    fn windows_status(&self) -> &'static str {
+        let leaves: Vec<&Value> = self
+            .referenced_leaves
+            .iter()
+            .map(|name| leaf_named(name))
+            .collect();
+        if leaves
+            .iter()
+            .any(|leaf| MACOS_HOST_LEAVES.contains(&command(leaf)))
+        {
+            "notImplemented"
+        } else if leaves.is_empty() {
+            // A generic Catalog operation is reached through `job submit`.
+            if self.classification == "generic" {
+                "partial"
+            } else {
+                "notImplemented"
+            }
+        } else if self.classification != "blocked"
+            && leaves.iter().all(|leaf| leaf["connectsToRuntime"] == false)
+        {
+            "implemented"
+        } else {
+            "partial"
         }
     }
 
@@ -839,6 +924,9 @@ fn validate(entries: &[Entry]) {
             leaf_named(name);
         }
     }
+    for name in MACOS_HOST_LEAVES {
+        leaf_named(name);
+    }
     let referenced: BTreeSet<&str> = entries
         .iter()
         .flat_map(|entry| entry.referenced_leaves.iter().map(String::as_str))
@@ -932,7 +1020,51 @@ fn problems_for(methods: &[&str]) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{METHODS, document_for, problems_for};
+    use super::{METHODS, document, document_for, problems_for};
+    use serde_json::Value;
+
+    fn windows(document: &Value, feature: &str) -> Value {
+        document["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|entry| entry["feature"] == feature)
+            .unwrap_or_else(|| panic!("no entry {feature}"))["implementationStatusByPlatform"]
+            ["windows"]
+            .clone()
+    }
+
+    /// Windows' status is what this CLI serves there: a leaf without the
+    /// Runtime is implemented, one whose target rests on a Runtime owner is
+    /// partial, one refused off macOS is not implemented, and a macOS-only
+    /// family has no Windows status.
+    #[test]
+    fn windows_status_follows_what_this_cli_serves_there() {
+        let document = document();
+        for (feature, status) in [
+            ("commands", "implemented"),
+            ("help", "implemented"),
+            ("completion", "implemented"),
+            ("capability.install", "implemented"),
+            ("job.status", "partial"),
+            ("artifact.import.list", "partial"),
+            ("artifact.import.release", "partial"),
+            ("human-action.resume", "partial"),
+            ("flash.dayu200", "partial"),
+            ("artifact.import.begin", "notImplemented"),
+            ("artifact.import.workspace-patch", "notImplemented"),
+        ] {
+            assert_eq!(windows(&document, feature), status, "{feature}");
+        }
+        assert_eq!(windows(&document, "runtime.service.status"), Value::Null);
+        for entry in document["entries"].as_array().unwrap() {
+            let statuses = &entry["implementationStatusByPlatform"];
+            if statuses["windows"] == "implemented" {
+                assert_eq!(entry["classification"], entry["targetClassification"]);
+                assert_eq!(statuses["macos"], "implemented");
+            }
+        }
+    }
 
     /// A contract view may compile another method set than the rulings: the
     /// manifest then covers the methods it has a ruling for, and the two

@@ -110,7 +110,8 @@ fn console_read_is_bounded_exact_and_refuses_redirected_input() {
     );
     assert_eq!(input.position(), 0);
     assert!(output.is_empty());
-    for ending in ["\n", "\r", ""] {
+    // A Windows console in line mode ends the line with CR LF.
+    for ending in ["\n", "\r", "\r\n", ""] {
         assert_eq!(
             read_console_challenge(
                 &frame["result"],

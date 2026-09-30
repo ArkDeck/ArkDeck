@@ -1,11 +1,27 @@
 use arkdeck_cli::{CliError, parse};
 use arkdeck_client::ClientError;
 use arkdeck_contract::WireError;
-#[cfg(target_os = "macos")]
 use arkdeck_contract::{ImportIntent, sha256_hex};
 use serde_json::{Value, json};
 fn argv(values: &[&str]) -> Vec<String> {
     values.iter().map(|s| (*s).to_owned()).collect()
+}
+/// The intent of a `hap` upload of `bytes` as `fixture.hap`.
+fn hap_intent(bytes: &[u8]) -> ImportIntent {
+    ImportIntent {
+        request_id: "request".into(),
+        kind: "hap".into(),
+        target_id: "TGT-fixture".into(),
+        binding_revision: 7,
+        device_profile: None,
+        name: "fixture.hap".into(),
+        byte_count: bytes.len() as u64,
+        sha256: sha256_hex(bytes),
+    }
+}
+/// The Runtime's projection of that upload with `offset` bytes committed.
+fn resource(intent: &ImportIntent, offset: u64) -> Value {
+    json!({"schemaVersion":"arkdeck.import/1","importId":"imp-00000000-0000-4000-8000-000000000001","importRequestId":intent.request_id,"metadata":intent.projection(),"metadataFingerprint":intent.fingerprint().unwrap(),"generation":"1","state":"inProgress","nextOffset":offset.to_string(),"maximumChunkBytes":"2097152","createdAtUtc":"2026-09-12T00:00:00Z","updatedAtUtc":"2026-09-12T00:00:00Z","receipt":null})
 }
 
 #[test]
@@ -172,25 +188,13 @@ mod upload {
             .unwrap()
         }
         fn intent(&self) -> ImportIntent {
-            ImportIntent {
-                request_id: "request".into(),
-                kind: "hap".into(),
-                target_id: "TGT-fixture".into(),
-                binding_revision: 7,
-                device_profile: None,
-                name: "fixture.hap".into(),
-                byte_count: self.bytes.len() as u64,
-                sha256: sha256_hex(&self.bytes),
-            }
+            hap_intent(&self.bytes)
         }
     }
     impl Drop for Source {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.root).unwrap();
         }
-    }
-    fn resource(intent: &ImportIntent, offset: u64) -> Value {
-        json!({"schemaVersion":"arkdeck.import/1","importId":"imp-00000000-0000-4000-8000-000000000001","importRequestId":intent.request_id,"metadata":intent.projection(),"metadataFingerprint":intent.fingerprint().unwrap(),"generation":"1","state":"inProgress","nextOffset":offset.to_string(),"maximumChunkBytes":"2097152","createdAtUtc":"2026-09-12T00:00:00Z","updatedAtUtc":"2026-09-12T00:00:00Z","receipt":null})
     }
     #[test]
     fn lost_begin_and_append_replies_rediscover_only_the_exact_committed_prefix() {
@@ -395,75 +399,6 @@ mod upload {
         .unwrap_err();
         assert_eq!(error.code, "operationUnavailable");
         assert_eq!(methods, vec!["artifact.import.inspect", "target.show"]);
-    }
-    #[test]
-    fn abort_and_inspection_validate_exact_requested_owner() {
-        let source = Source::new("fixture.hap", b"abcdefgh".to_vec());
-        let intent = source.intent();
-        let invocation = parse(&argv(&[
-            "artifact",
-            "import",
-            "abort",
-            "--import-request-id",
-            "request",
-            "--expected-generation",
-            "1",
-        ]))
-        .unwrap();
-        let mut aborted = resource(&intent, 4);
-        aborted["state"] = json!("aborted");
-        aborted["generation"] = json!("2");
-        assert_eq!(
-            execute_import(&invocation, |method, params, _| {
-                assert_eq!(method, "artifact.import.abort");
-                assert_eq!(params["generation"], "1");
-                Ok(aborted.clone())
-            })
-            .unwrap(),
-            aborted
-        );
-        let invocation = parse(&argv(&[
-            "artifact",
-            "import",
-            "inspect",
-            "--import-request-id",
-            "request",
-        ]))
-        .unwrap();
-        let inspection = json!({"schemaVersion":"arkdeck.import-inspection/1","import":aborted,"references":{"state":"clear","activeJobIds":[],"outcomeUnknownJobIds":[],"activeMaterializationCount":"0"}});
-        assert_eq!(
-            execute_import(&invocation, |method, _, _| {
-                assert_eq!(method, "artifact.import.inspection");
-                Ok(inspection.clone())
-            })
-            .unwrap(),
-            inspection
-        );
-        let mut bad = inspection.clone();
-        bad["references"]["outcomeUnknownJobIds"] = json!(["job-unknown"]);
-        let error = execute_import(&invocation, |_, _, _| Ok(bad.clone())).unwrap_err();
-        // Swift `ArtifactImportInspectionProjection` and `CLIImports.swift`:53.
-        assert_eq!(
-            (error.code, error.message.as_str()),
-            (
-                "recordUnreadable",
-                "Import reference inspection is malformed"
-            )
-        );
-        let mut other = inspection;
-        other["import"]["importRequestId"] = json!("another");
-        other["import"]["metadata"]["importRequestId"] = json!("another");
-        let mut intent = source.intent();
-        intent.request_id = "another".into();
-        other["import"]["metadataFingerprint"] = json!(intent.fingerprint().unwrap());
-        let error = execute_import(&invocation, |_, _, _| Ok(other.clone())).unwrap_err();
-        assert_eq!(
-            (error.code, error.message.as_str()),
-            (
-                "recordUnreadable",
-                "Import inspection returned another requested owner"
-            )
-        );
     }
     /// Swift's CLI refusals of an upload, as `ImportRefusalOracleContractTests`
     /// recorded them (`rust/tests/fixtures/import-refusal-oracle`, "cli"):
@@ -683,6 +618,76 @@ mod upload {
     }
 }
 
+/// Aborting and inspecting an Import only exchange frames with the Runtime,
+/// so they are answered alike on every platform.
+#[test]
+fn abort_and_inspection_validate_exact_requested_owner() {
+    let intent = hap_intent(b"abcdefgh");
+    let invocation = parse(&argv(&[
+        "artifact",
+        "import",
+        "abort",
+        "--import-request-id",
+        "request",
+        "--expected-generation",
+        "1",
+    ]))
+    .unwrap();
+    let mut aborted = resource(&intent, 4);
+    aborted["state"] = json!("aborted");
+    aborted["generation"] = json!("2");
+    assert_eq!(
+        arkdeck_cli::execute_import(&invocation, |method, params, _| {
+            assert_eq!(method, "artifact.import.abort");
+            assert_eq!(params["generation"], "1");
+            Ok(aborted.clone())
+        })
+        .unwrap(),
+        aborted
+    );
+    let invocation = parse(&argv(&[
+        "artifact",
+        "import",
+        "inspect",
+        "--import-request-id",
+        "request",
+    ]))
+    .unwrap();
+    let inspection = json!({"schemaVersion":"arkdeck.import-inspection/1","import":aborted,"references":{"state":"clear","activeJobIds":[],"outcomeUnknownJobIds":[],"activeMaterializationCount":"0"}});
+    assert_eq!(
+        arkdeck_cli::execute_import(&invocation, |method, _, _| {
+            assert_eq!(method, "artifact.import.inspection");
+            Ok(inspection.clone())
+        })
+        .unwrap(),
+        inspection
+    );
+    let mut bad = inspection.clone();
+    bad["references"]["outcomeUnknownJobIds"] = json!(["job-unknown"]);
+    let error = arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone())).unwrap_err();
+    // Swift `ArtifactImportInspectionProjection` and `CLIImports.swift`:53.
+    assert_eq!(
+        (error.code, error.message.as_str()),
+        (
+            "recordUnreadable",
+            "Import reference inspection is malformed"
+        )
+    );
+    let mut other = inspection;
+    other["import"]["importRequestId"] = json!("another");
+    other["import"]["metadata"]["importRequestId"] = json!("another");
+    let mut intent = hap_intent(b"abcdefgh");
+    intent.request_id = "another".into();
+    other["import"]["metadataFingerprint"] = json!(intent.fingerprint().unwrap());
+    let error = arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(other.clone())).unwrap_err();
+    assert_eq!(
+        (error.code, error.message.as_str()),
+        (
+            "recordUnreadable",
+            "Import inspection returned another requested owner"
+        )
+    );
+}
 #[test]
 fn import_list_maps_only_closed_discovery_options() {
     let invocation = parse(&argv(&[
@@ -738,7 +743,6 @@ fn import_list_maps_only_closed_discovery_options() {
             .clone()
     );
 }
-#[cfg(target_os = "macos")]
 #[test]
 fn import_list_rejects_malformed_paging_and_foreign_inventory_without_retry() {
     let invocation = parse(&argv(&["artifact", "import", "list"])).unwrap();
@@ -818,7 +822,6 @@ fn release_uses_original_generation_and_refuses_foreign_or_unbounded_receipts() 
     ] {
         assert!(parse(&argv(&args)).is_err());
     }
-    #[cfg(target_os = "macos")]
     {
         let artifact = "ART-00000000000000000000000000000000";
         let receipt = json!({"schemaVersion":"arkdeck.import-release/1","importId":id,"importRequestId":"release","owner":{"kind":"import","id":id},"artifactId":artifact,"lease":format!("lease-v1:{id}:{artifact}"),"releasedGeneration":"2","generation":"3","state":"released","releasedAtUtc":"2026-09-12T00:00:00Z","retention":{"class":"default","pinned":false,"deadlineUtc":"2026-09-19T00:00:00Z"}});
@@ -979,4 +982,37 @@ fn inspection_and_release_refusals_reach_the_caller_with_the_import_owners_code(
             "{method} {params}"
         );
     }
+}
+
+/// Off macOS no host store reads an Import source yet, so an upload is refused
+/// as the platform's before any frame is sent, and names its request.
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn an_upload_is_refused_off_macos_before_any_frame_is_sent() {
+    let file = std::env::temp_dir().join("fixture.hap");
+    let invocation = parse(&argv(&[
+        "artifact",
+        "import",
+        "hap",
+        "--import-request-id",
+        "request",
+        "--target",
+        "TGT-fixture",
+        "--file",
+        file.to_str().unwrap(),
+    ]))
+    .unwrap();
+    let error =
+        arkdeck_cli::execute_import(&invocation, |method, _, _| -> Result<Value, CliError> {
+            panic!("an upload sent {method}")
+        })
+        .unwrap_err();
+    assert_eq!(
+        (error.code, error.message.as_str()),
+        (
+            "unsupportedOnPlatform",
+            "Import upload is not supported on this platform"
+        )
+    );
+    assert_eq!(error.details["importRequestId"], "request");
 }
