@@ -27,6 +27,7 @@ mod deveco_files;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
+mod inflate;
 mod inspected_directory;
 mod managed;
 mod pinned_file;
@@ -60,6 +61,7 @@ pub use deveco_files::{
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
+pub use inflate::{INFLATE_WINDOW_BYTES, InflateError, RawInflate};
 pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub use pinned_file::{

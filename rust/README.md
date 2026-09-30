@@ -1240,6 +1240,25 @@ through the real daemon across a restart, on the daemon's own clock, and with
 `arkdeck job reconcile|agent status|human-action show` against a dev-signed
 daemon).
 
+HAR crash-resume (TASK-XPA-006, without the Windows HDC tuple):
+`tests/windows_agent_human_action_resume.rs` runs `agent_human_action_raise.rs`'s
+adoption and resume cases on NTFS, over the oracle's fake HDC answered in
+process.
+- A run that names no Target adopts the one proved device and owns one Job,
+  which the runner completes. A budget expiring during the identity readback
+  or at the Target commit, or a USB identity that changes during adoption,
+  commits no Target and no Job.
+- A process that crashes between the Target commit and the execution's own
+  commit is resumed by a new one with every owner reopened. It keeps the
+  original budget and adopts nothing twice.
+- `physicalConnection`, `deviceTrustPrompt` and `ambiguousIdentity` actions
+  are resumed only by their durable references. The original intent is
+  kept, and concurrent resumes own one Job. A changed selection is an
+  idempotency conflict, and an expired action or untrusted clock is refused
+  with no HDC call. The action ends `resolvedByFreshProbe`.
+- A process that crashes after the resume and before the Job is admitted
+  continues to one Job, or is refused once the budget has passed.
+
 The contract publishes an agent execution's `failureCode`, an agent human
 action's `selectionSchema` and `agent.run`'s orchestration refusals as Swift
 answers them (#2389), so the process test reads the pick-a-device execution
@@ -2503,6 +2522,16 @@ well.
   lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
   development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
   `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
+A device command names its target in one place:
+`arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
+`-t <connectKey>` before the command's own arguments. Every plan the provider
+lowers goes through it: observation, capture, Debug HAP and reads, native
+library, port forward, pointer input, trace probe, live mode, and the Rockchip
+reads and Loader entry. `operation::tests::every_target_flag_is_added_here`
+fails if any other non-test code writes `-t` before a connect key. On Windows,
+`windows_managed_hdc.rs` runs a lowered device plan through `ProcessDispatch`:
+the fake process face receives exactly `-t <key> shell param get
+const.product.name`. A plan with no connect key runs nothing.
 
 ## Windows xcopy package (TASK-XPA-022)
 

@@ -79,7 +79,9 @@ pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
     property_value, stable_identity_sha256,
 };
-pub use operation::{DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT};
+pub use operation::{
+    DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT, device_arguments,
+};
 pub use pointer_input::{
     DEFAULT_LONG_PRESS_MS, DISPLAY_MAXIMUM, DURATION_MAXIMUM_MS, DURATION_MINIMUM_MS,
     FRAME_FRESHNESS_BUDGET_MS, Gesture, PointerAction, PointerInput,
