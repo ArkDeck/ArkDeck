@@ -8,7 +8,10 @@ recovery, journal or device-mutation API.
 - Unix sockets require a physical owner-only `0700` parent and a `0600` socket;
   both ends verify peer effective UID. Bind never unlinks an existing endpoint.
 - Windows listeners explicitly use the current logon SID DACL,
-  `FILE_FLAG_FIRST_PIPE_INSTANCE` and `PIPE_REJECT_REMOTE_CLIENTS`. The accepted
+  `FILE_FLAG_FIRST_PIPE_INSTANCE` and `PIPE_REJECT_REMOTE_CLIENTS`. A name
+  another server already holds refuses bind as "held by another instance",
+  whether the holder allows more instances (`ERROR_ACCESS_DENIED`) or only one
+  (`ERROR_PIPE_BUSY`); bind never waits for or retries against it. The accepted
   connection's client PID is held through a process handle and checked against
   the daemon's user SID and elevation before a handler can receive it.
 - Windows clients use identification SQOS, compare pipe owner SID to their own

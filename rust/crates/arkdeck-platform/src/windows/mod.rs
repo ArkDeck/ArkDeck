@@ -160,12 +160,29 @@ fn create_instance(name: &[u16], security: &PipeSecurity, first: bool) -> io::Re
             &attributes,
         )
     };
-    Handle::new(handle).map_err(|error| {
-        if error.raw_os_error() == Some(ERROR_ACCESS_DENIED as i32) {
+    Handle::new(handle).map_err(|error| match error.raw_os_error() {
+        Some(code) if held_by_another_instance(code, first) => {
             let name = String::from_utf16_lossy(&name[..name.len().saturating_sub(1)]);
-            io::Error::new(io::ErrorKind::PermissionDenied, format!("named pipe {name} is held by another instance (Win32 error 5); daemon did not start"))
-        } else { error }
+            io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!(
+                    "named pipe {name} is held by another instance (Win32 error {code}); daemon did not start"
+                ),
+            )
+        }
+        _ => error,
     })
+}
+
+/// Whether creating a pipe instance failed because another server already
+/// holds the name. A holder that allows further instances refuses
+/// `FILE_FLAG_FIRST_PIPE_INSTANCE` with `ERROR_ACCESS_DENIED`; one that
+/// created the name with a single instance (or has used up its own limit)
+/// refuses the first instance with `ERROR_PIPE_BUSY` instead. Both are the
+/// same held name and fail closed alike: nothing waits for or retries
+/// against the holder.
+fn held_by_another_instance(code: i32, first: bool) -> bool {
+    code == ERROR_ACCESS_DENIED as i32 || (first && code == ERROR_PIPE_BUSY as i32)
 }
 
 pub struct LocalListener {
