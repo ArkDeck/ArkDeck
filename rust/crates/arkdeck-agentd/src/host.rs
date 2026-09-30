@@ -2572,6 +2572,50 @@ impl HostServices for Host {
         }
         .continue_cleanup_debt(params)
     }
+    /// `cleanupDebt.list` and `cleanupDebt.continue` on Windows: the macOS
+    /// answers over this composition's Artifact and Job owners, through the
+    /// runner `job.run` uses here. No HDC composition is built (no Windows
+    /// HDC tuple is registered), so a continuation of a debt the ledger owes
+    /// is refused (`rejected`, the provider unavailable) after the ledger and
+    /// the Job are read and before any readback or retry is sent; nothing is
+    /// written to the ledger.
+    #[cfg(windows)]
+    fn cleanup_debt(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let foundation = || WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        };
+        let Some(artifacts) = &self.artifacts else {
+            return Err(foundation());
+        };
+        if method == "cleanupDebt.list" {
+            return arkdeck_hoststore::list_cleanup_debt(artifacts).map_err(|message| WireError {
+                code: "internalError".into(),
+                message,
+                details: None,
+            });
+        }
+        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return Err(foundation());
+        };
+        // A continuation publishes no Session and cancels nothing.
+        windows_runner(
+            state_root,
+            jobs,
+            artifacts,
+            self.imports.as_deref(),
+            self.authority(),
+            &self.home,
+            None,
+            None,
+        )
+        .continue_cleanup_debt(params)
+    }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes
     /// the Job's Journal. A run of a Job no run holds waits the cancellation

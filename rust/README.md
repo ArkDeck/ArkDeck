@@ -1732,6 +1732,20 @@ Job owners. The device oracles' lists and continuations and the committed
 corpus are replayed through them, and `tests/cleanup_debt_continue.rs` covers
 what no oracle records.
 
+On Windows (TASK-XPA-012) the same code builds and the daemon answers both
+methods from its Artifact and Job owners, through the runner `job.run` uses
+there (`windows_runner`), with no HDC composition: a continuation of a debt the
+ledger owes reads the ledger and loads the Job, then is refused (`rejected`,
+`internalFailure("provider hdc is unavailable")`) before any readback or retry,
+and the ledger is not written. The control-layer corpus replay
+(`cleanup_debt_control.rs`) runs on both hosts;
+`arkdeck-agentd/tests/windows_cleanup_debt_process.rs` lists Swift's recorded
+debug HAP ledger exactly as the corpus records it across a restart, proves the
+refusal for both owed debts with the ledger's bytes unchanged, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `recovery cleanup list`, `cleanup-debt
+list` and `recovery cleanup continue` through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-cleanup-debt-owner-run.md`.
+
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
 dispatcher and an analyzer that answers by the first line of its source: 20
