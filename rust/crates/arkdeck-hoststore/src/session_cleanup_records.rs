@@ -328,25 +328,18 @@ impl<'a, const EXPORT: bool> SessionPreviewRecords<'a, EXPORT> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_private::{link, owner_only_file, widen};
     use serde_json::json;
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
-    };
+    use std::fs;
     struct Root(PathBuf);
     impl Root {
         fn new() -> Self {
             let bytes = arkdeck_platform::random_bytes::<16>().unwrap();
             let suffix: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
-            let path = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
-                .join(format!("cleanup-records-{suffix}"));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(path.join("records"))
-                .unwrap();
+            let path =
+                crate::test_private::temporary_root().join(format!("cleanup-records-{suffix}"));
+            crate::test_private::create_private_directories(&path);
+            crate::test_private::create_private_directories(&path.join("records"));
             Self(path)
         }
     }
@@ -384,7 +377,7 @@ mod tests {
         );
         let forged = path.join(filename(&record.preview_id, false));
         fs::write(&forged, &bytes).unwrap();
-        fs::set_permissions(&forged, fs::Permissions::from_mode(0o600)).unwrap();
+        owner_only_file(&forged);
         assert_eq!(
             cleanup.load(&record.preview_id).unwrap_err().code,
             "recordUnreadable"
@@ -497,12 +490,12 @@ mod tests {
             "recordUnreadable"
         );
         fs::write(&path, &original).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        widen(&path);
         assert!(store.load(&record.preview_id).is_err());
         fs::remove_file(&path).unwrap();
         let outside = root.0.join("outside.json");
         fs::write(&outside, &original).unwrap();
-        symlink(&outside, &path).unwrap();
+        link(&outside, &path);
         assert!(
             store
                 .create(preview(2), time("2026-09-12T00:00:00Z"))

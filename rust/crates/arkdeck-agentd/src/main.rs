@@ -742,7 +742,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         for (entry, reason) in &staged.kept {
             eprintln!("arkdeck-agentd: staged Session {entry} is kept as it is: {reason}");
         }
-        let _ = io::stdout().flush();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
     // As Swift's engine then does with the recovery proof of the binding its
     // start carried the Target to (`main.swift` 1342–1356): the enter-Loader

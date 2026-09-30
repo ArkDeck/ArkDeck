@@ -15,6 +15,22 @@ fn decimal(value: &Value) -> Option<u64> {
     let number = text.parse::<u64>().ok()?;
     (number <= i64::MAX as u64 && number.to_string() == text).then_some(number)
 }
+/// A device or file identity as the daemon spells it: a canonical decimal,
+/// within `i64` where the host's `dev_t` and `ino_t` are (macOS); on Windows
+/// a volume serial or an NTFS file reference, whose sequence number fills the
+/// top 16 bits and so may use the whole `u64`.
+fn file_decimal(value: &Value) -> Option<u64> {
+    #[cfg(not(windows))]
+    {
+        decimal(value)
+    }
+    #[cfg(windows)]
+    {
+        let text = value.as_str()?;
+        let number = text.parse::<u64>().ok()?;
+        (number.to_string() == text).then_some(number)
+    }
+}
 pub(super) fn uuid(text: &str) -> bool {
     text.len() == 36
         && text.bytes().enumerate().all(|(index, byte)| {
@@ -374,6 +390,23 @@ fn cleanup_preview(value: &Value) -> Result<(), CliError> {
     Ok(())
 }
 
+/// An absolute path as the daemon spells a Session export's: `/…`, or on
+/// Windows a local drive's `D:\…`.
+#[cfg(not(windows))]
+fn absolute(path: &str) -> bool {
+    path.starts_with('/')
+}
+
+#[cfg(windows)]
+fn absolute(path: &str) -> bool {
+    use std::path::{Component, Path, Prefix};
+    let mut components = Path::new(path).components();
+    matches!(
+        components.next(),
+        Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::Disk(_))
+    ) && components.next() == Some(Component::RootDir)
+}
+
 #[cfg(test)]
 mod cleanup_tests {
     use super::*;
@@ -490,9 +523,9 @@ fn export_preview(value: &Value) -> Result<(), CliError> {
                 "expectedState",
             ],
         )
-        || !dest["path"].as_str().is_some_and(|s| s.starts_with('/'))
-        || decimal(&dest["parentDevice"]).is_none()
-        || decimal(&dest["parentInode"]).is_none()
+        || !dest["path"].as_str().is_some_and(absolute)
+        || file_decimal(&dest["parentDevice"]).is_none()
+        || file_decimal(&dest["parentInode"]).is_none()
         || !dest["volumeIdentity"]
             .as_str()
             .is_some_and(|s| !s.is_empty())
@@ -563,17 +596,37 @@ mod export_tests {
     use super::*;
     use arkdeck_contract::{canonical_json, sha256_hex};
     use serde_json::json;
+    /// The macOS daemon's recorded preview; on Windows its destination
+    /// spelled as a Windows daemon spells it, and signed again.
     fn preview() -> Value {
         let record: Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/session-export/rust-export-ready.json"
         ))
         .unwrap();
+        #[cfg(windows)]
+        {
+            let mut value = record["preview"].clone();
+            assert!(export_preview(&value).is_err(), "a POSIX destination");
+            value["destination"]["path"] = json!(r"C:\exports\session-export");
+            sign(value)
+        }
+        #[cfg(not(windows))]
         record["preview"].clone()
     }
     fn sign(mut value: Value) -> Value {
         value.as_object_mut().unwrap().remove("previewDigest");
         value["previewDigest"] = json!(sha256_hex(&canonical_json(&value).unwrap()));
         value
+    }
+    /// An NTFS file reference whose sequence number uses the top bit is a
+    /// file identity on Windows, not a malformed one.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_file_reference_may_use_the_whole_u64() {
+        let mut value = preview();
+        value["source"]["sessionInode"] = json!(u64::MAX.to_string());
+        value["destination"]["parentInode"] = json!("9223372036854775808");
+        assert!(export_preview(&sign(value)).is_ok());
     }
     #[test]
     fn accepts_actual_owner_record_and_rejects_tampering() {
@@ -627,7 +680,7 @@ fn export_source(source: &Value) -> Result<(), CliError> {
         || !(source["journalSha256"].is_null() || digest(&source["journalSha256"]))
         || ["rootDevice", "rootInode", "sessionDevice", "sessionInode"]
             .iter()
-            .any(|key| decimal(&source[*key]).is_none())
+            .any(|key| file_decimal(&source[*key]).is_none())
         || !source["volumeIdentity"]
             .as_str()
             .is_some_and(|s| !s.is_empty())
@@ -693,9 +746,7 @@ fn export_result(value: &Value) -> Result<(), CliError> {
         || !digest(&value["previewDigest"])
         || !value["sessionId"].as_str().is_some_and(valid_correlation)
         || !value["publishedAtUtc"].as_str().is_some_and(plain_date)
-        || !value["exportedPath"]
-            .as_str()
-            .is_some_and(|s| s.starts_with('/'))
+        || !value["exportedPath"].as_str().is_some_and(absolute)
         || value["deviceIdentifierPolicy"] != "redact"
         || value["evidenceClass"] != "derivedExport"
         || value["newDispatchCount"] != 0
@@ -729,11 +780,21 @@ fn export_result(value: &Value) -> Result<(), CliError> {
 mod export_result_tests {
     use super::*;
     use serde_json::json;
+    /// The macOS daemon's recorded result; on Windows its exported path
+    /// spelled as a Windows daemon spells it.
     fn actual() -> Value {
         let record: Value = serde_json::from_str(include_str!(
             "../../../tests/fixtures/session-export/rust-export-applied.json"
         ))
         .unwrap();
+        #[cfg(windows)]
+        {
+            let mut value = record["result"].clone();
+            assert!(export_result(&value).is_err(), "a POSIX exported path");
+            value["exportedPath"] = json!(r"C:\exports\session-export");
+            value
+        }
+        #[cfg(not(windows))]
         record["result"].clone()
     }
     #[test]

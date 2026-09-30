@@ -548,7 +548,14 @@ temporary directories (re-record with
 `ARKDECK_RUST_ARTIFACT_QUOTA_RECORD=/private/tmp/<new>`); `tests/artifact_quota.rs`
 reproduces every answer and leaves every root untouched, and
 `scripts/check-artifact-quota.py` compares a fresh Swift daemon and a fresh Rust
-owner, and both CLIs, over each root.
+owner, and both CLIs, over each root. The Windows daemon answers it as the
+macOS one does, from its storage owner's `ArtifactUsage` (TASK-XPA-005) over
+the Artifact root, with the same walk;
+only the reads under it go through the host store, which follows no reparse
+point and requires the owner-only single-link payload the Windows Artifact
+owners read. `tests/windows_artifact_quota.rs` rebuilds the 27 oracle roots on
+NTFS (links as junctions, `0000` as an empty DACL) and reproduces every answer,
+with the host's error number in a message.
 
 Before it serves, the isolated daemon sweeps its Artifact root once, as Swift's
 daemon runs `collectGarbage` at startup (`collect_expired_artifacts`,
@@ -903,25 +910,13 @@ isolated owner's name, and for the account's root too, because the host
 store cannot open `Agentd` itself (its DACL also grants SYSTEM), where
 Swift's production daemon keeps the index beside its other owners. It
 answers `job.status`, `job.show` and `job.events` (`jec1` cursors that still
-open after a restart). `job.list` and `job.timeline` page through
-`snapshot_pager`, whose retention needs the
-`document_metadata`/`remove_document` port (ruling 7, in its own slice), so
-it is not built on Windows. Until it is, a `job.list` whose snapshot is one
-page is answered as the pager answers its first page, without storing the
-snapshot (nothing can read a one-page snapshot back: its one cursor is never
-handed out); a longer list, any cursor and `job.timeline` are refused
-`rejected` ("… the Job snapshot pager, which is not built on Windows yet").
-That one page is what `runtime service restart` reads the current Jobs from,
-so a restart still refuses to interrupt a current Job; its proof now reports
-`jobOwner: true`. Nothing admits a Job on Windows yet (no registered HDC
-or runner; the planner and the admitter refuse before admission, below).
-The Windows CLI coverage statuses stay `partial`.
 open after a restart), and `job.list` and `job.timeline` through
 `snapshot_pager` in its `cli-job-snapshots` (see "Windows Session owner,
 publication and snapshot pages" below). `runtime service restart` reads the
 current Jobs from those pages, so a restart still refuses to interrupt a
-current Job; its proof reports `jobOwner: true`. Nothing admits a Job on Windows yet (no planner, admitter or runner, no
-registered HDC). The Windows CLI coverage statuses stay `partial`.
+current Job; its proof reports `jobOwner: true`. Jobs are planned, admitted
+and run through the planner, admitter and runner below; no HDC is registered
+yet. The Windows CLI coverage statuses stay `partial`.
 
 The NTFS store's document replacement (`publish_document`) now waits out,
 for about a second, a moment's holder of the replaced file (an
@@ -946,9 +941,10 @@ reads them over its pipe before and after a restart, and, with
 daemon.
 
 Still macOS-only: the HDC lifecycle interlock and the current-Job census (over
-`hdc_impact_source`); the Job owner's Import, workspace, retention and
-Session-continuity censuses; Flash recovery; and the runner and
-reconciler. The planner and the admitter build on Windows (next section).
+`hdc_impact_source`); the Job owner's Import and Session-continuity
+censuses (its workspace census is on Windows, TASK-XPA-005 #2379); Flash
+recovery; and the reconciler. The planner, the admitter and the runner
+build on Windows (next sections).
 
 ## Job planner and admitter on Windows (TASK-XPA-005)
 
@@ -1024,13 +1020,47 @@ The writer now closes every handle below its staged Session before renaming
 it (Windows renames no directory while a handle below it is open); nothing
 else changes, on either OS.
 
-Still macOS-only: the Session cleanup and export owners (their previews,
-plans and records, and the host store's Session removal), the Artifact usage
-owner the daemon's `runtime.storage.*` answers pair the Session domain with,
-and the Job runners, cancellation and reconciliation that call the writer.
-So the Windows daemon composes no Session owner yet; it serves `job.list`
-and `job.timeline` through the Job store's pager, with cursors that read on
-across a restart. The one-page `job.list` answer without the pager is gone.
+The Session cleanup and export owners (their previews, plans, records and
+censuses) and the Artifact usage owner are on Windows too (slice H3b, below).
+Still macOS-only: the Job runners, cancellation and reconciliation that call
+the writer. `job.list` and `job.timeline` page through the Job store's pager
+on Windows, with cursors that read on across a restart; the one-page
+`job.list` answer without the pager is gone.
+
+### Windows Session cleanup, export and storage (H3b)
+
+`arkdeck-platform` removes a Session on NTFS (`PreparedSessionRemoval`,
+`windows/host_session_removal.rs`, after W1's Trace removal): the same
+bounded capture of the year/month/Session tree (owner, single link, no
+reparse point, every file digested), each removal deleting through a handle
+opened relative to its held parent and compared with the capture just
+before, so a replacement is never removed; NTFS refuses to move an ancestor
+of a prepared tree away while its handles are held. `arkdeck-hoststore`
+builds the Session cleanup and export owners (`session.cleanup.preview` and
+`apply`, `session.export.preview` and `apply`), their records and censuses,
+and `ArtifactUsage` on Windows; a Session export destination is absolute as
+the Session root is (`session::absolute_root`), and its physical spelling is
+E1's. The CLI's Session answer checks take the same Windows spelling. Their
+unit tests run on Windows (fixtures made owner-only by `test_private`;
+where Unix renames a held Sessions root away and the cleanup refuses, NTFS
+refuses the rename and the cleanup applies to the root it proved).
+
+The Windows daemon composes the Session owner (`storage` in its census):
+`session-state` and a default Sessions root `sessions` in private children of
+its root, the macOS isolated names, isolated to the development root as on
+macOS (its reserved owners' directories are never a Sessions root); the
+account's root keeps both below `Agentd` until the Windows App names its
+Sessions location. `runtime.storage.status|policy|root` pair the Session
+domain with the Artifact usage of `artifacts`, and a start removes the
+staged Sessions a crash left (`recover_staged_sessions`), as on macOS.
+`tests/windows_session_owner.rs` (hoststore) replays every frame of the
+Swift storage lock-wait oracle, its Artifact domain and
+`session.export.preview` included;
+`arkdeck-agentd/tests/windows_session_owner_process.rs` serves the recorded
+Swift Sessions over the real daemon (status, list, show, pin, export,
+cleanup, and the same cleanup receipt after a restart) and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-session-cleanup-run.md`.
 
 Tests on Windows: the pager's own tests and the Job list stream tests run
 there as on macOS (their owner-only and unsafe fixtures made by
@@ -1072,15 +1102,17 @@ is left as it is.
 
 The Windows daemon composes the runner, `job.cancel`, `job.result` and
 `job.evidence`, the capability store (`jobs-state\capabilities`), the Session
-owner over a development root (`session-state`, `sessions`; the account root
-composes none yet) and `operation.list` (the HDC and analyzer operations
+owner (`session-state`, `sessions`, below `Agentd` on the account root; see
+the Session owner section) and `operation.list` (the HDC and analyzer operations
 `provider_not_registered`), and recovers the active Jobs at its start
 (`recover_active_jobs`, then the staged Sessions) as the macOS daemon does.
 No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, targets, artifacts, storage, workspaceProjects,
-planning`. The start's Artifact retention sweep stays macOS-only for now.
+planning, traceCache` over a development root (the account's daemon composes
+no Trace cache), the macOS census's order. The start's Artifact retention
+sweep stays macOS-only for now.
 
 Tests on Windows: `arkdeck-hoststore/tests/job_recovery.rs` (the five macOS
 restart and recovery cases), `tests/windows_job_runner.rs` (the recorded
@@ -2373,8 +2405,10 @@ test binary itself; no real HDC is launched. The run record is
 ## Windows xcopy package (TASK-XPA-022)
 
 The daemon and the CLI also ship as an xcopy package for CI and headless use
-(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is the MSIX,
-which this package does not cover.
+(CHG-2026-074 r12 decision 10; Windows 11 x64 only, r13). The App is not in
+this package; the whole-product release candidate (the App, the daemon and the
+CLI, xcopy and MSIX) is `windows/scripts/package-rc.ps1`, which builds this
+package first (`windows/README.md`, "Release candidate package").
 [`scripts/windows-package-xcopy.ps1`](scripts/windows-package-xcopy.ps1)
 (PowerShell 7.2+) builds it from one recorded checkout:
 
@@ -2447,8 +2481,8 @@ The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
 `ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
 built on Windows over the host store's NTFS export, file-export and
 payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
-Job index documents, payloads and snapshot pages as macOS; its Import owner,
-usage and quota answers stay macOS-only. An export destination on Windows is a
+Job index documents, payloads and snapshot pages as macOS; its Import owner
+and quota answer stay macOS-only (the usage owner is on Windows, H3b). An export destination on Windows is a
 local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
 letter upper-case, which must be the directory's own spelling (no junction,
 link, short name or other case); the receipt's `exportedPath` joins the file
@@ -2473,6 +2507,7 @@ restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+
 ## Windows credential store and console secret entry (TASK-XPA-011)
 
 Gate-inventory group G13's platform layer has Windows implementations in

@@ -1,11 +1,12 @@
 //! Runtime-owned Job discovery. A read-only SQLite snapshot supplies Job
 //! identity and state; presentation cursors retain immutable query results.
 //!
-//! On Windows the store, its index and record writers and every Job read
+//! On Windows the store, its index and record writers, every Job read
 //! resource (`job.status`, `job.show`, `job.events`, and `job.list` and
-//! `job.timeline` through the snapshot pager in `cli-job-snapshots`) are
-//! built; what reads other macOS-only owners (the Import, workspace and HDC
-//! lifecycle censuses, the mutation state continuity, Flash recovery) is not.
+//! `job.timeline` through the snapshot pager in `cli-job-snapshots`) and
+//! the workspace project and preset census are built; what reads other
+//! macOS-only owners (the Import and HDC lifecycle censuses, the workspace
+//! copy sweep, the mutation state continuity, Flash recovery) is not.
 #[path = "job_epoch_indexes.rs"]
 mod epoch_indexes;
 #[cfg(any(target_os = "macos", windows))]
@@ -14,7 +15,6 @@ pub(crate) mod import_references;
 #[cfg(any(target_os = "macos", windows))]
 #[path = "job_retention_census.rs"]
 mod retention_census;
-#[cfg(target_os = "macos")]
 #[path = "workspace_references.rs"]
 mod workspace_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};

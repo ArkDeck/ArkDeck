@@ -12,14 +12,9 @@ const DOCUMENT: &str = "session-storage.json";
 const LOCK: &str = ".session-storage.lock";
 const MAXIMUM: usize = 64 * 1024;
 
-// Session cleanup and export (their previews, plans and records, and the
-// host store's Session removal) are still macOS-only.
-#[cfg(target_os = "macos")]
 #[path = "session_cleanup_owner.rs"]
 mod cleanup;
-#[cfg(target_os = "macos")]
 pub use cleanup::ActiveSessions;
-#[cfg(target_os = "macos")]
 #[path = "session_export_owner.rs"]
 mod export;
 
@@ -295,7 +290,20 @@ impl SessionStore {
         })
     }
     pub fn isolated(mut self, boundary: &Path, reserved: Vec<PathBuf>) -> io::Result<Self> {
+        // The development root is the owner's own directory on macOS. On
+        // Windows it is the daemon's held state root, whose DACL and file
+        // identity the daemon has already proved (`StateRoot`); it may grant
+        // others what the store's private rule refuses, so only its spelling
+        // is checked here: canonical, as every path below it is compared.
+        #[cfg(target_os = "macos")]
         HostDirectory::open(boundary)?.validate_path(boundary)?;
+        #[cfg(windows)]
+        if canonical_path(boundary)? != boundary {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "development state is not spelled canonically",
+            ));
+        }
         if !self.path.starts_with(boundary) || !self.default_sessions.starts_with(boundary) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,

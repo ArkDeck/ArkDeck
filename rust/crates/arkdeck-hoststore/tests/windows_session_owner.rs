@@ -1,25 +1,22 @@
-//! The Session storage owner on Windows (TASK-XPA-005/014), against the
-//! Swift oracle of the Session storage requests made while a storage lock is
-//! held (`rust/tests/fixtures/storage-lock-wait-oracle`, recorded by
+//! The Session storage, cleanup and export owner and the Artifact usage owner
+//! on Windows (TASK-XPA-005/014), against the Swift oracle of the Session
+//! storage requests made while a storage lock is held
+//! (`rust/tests/fixtures/storage-lock-wait-oracle`, recorded by
 //! `StorageLockWaitOracleContractTests`; the macOS replay is
 //! `storage_lock_wait_oracle.rs`): over an owner-only root of the same shape
 //! on NTFS, holding the oracle's retained Session in the root the requests
-//! select, `runtime.storage.status`, `.policy` and `.root`, `session.list`
-//! and `session.pin`, each sent while this test holds
-//! `.session-storage.lock`, and a status read sent while it holds the
+//! select, `runtime.storage.status`, `.policy` and `.root`, `session.list`,
+//! `session.pin` and `session.export.preview`, each sent while this test
+//! holds `.session-storage.lock`, and a status read sent while it holds the
 //! selected root's `.arkdeck-retention-catalog.lock`. Each is still waiting
-//! while its lock is held and, once it is released, answers Swift's Session
-//! domain byte for byte (the Session roots read as the oracle's paths, a
-//! snapshot revision as its label), admitted by the published method
-//! schemas; a final status read with both locks free answers the state the
-//! requests left.
-//!
-//! Not replayed here: the answers' Artifact domain (the Artifact usage owner
-//! is still macOS-only) and `session.export.preview` (the Session export is
-//! still macOS-only).
+//! while its lock is held and, once it is released, answers Swift's answer
+//! byte for byte, its Artifact domain included (the roots and the export
+//! destination read as the oracle's paths; its random and host values as the
+//! oracle's labels), admitted by the published method schemas; a final
+//! status read with both locks free answers the state the requests left.
 #![cfg(windows)]
 
-use arkdeck_hoststore::SessionStore;
+use arkdeck_hoststore::{ArtifactUsage, SessionStore};
 use arkdeck_platform::{HostDirectory, HostReadLock};
 use serde_json::{Map, Value, json};
 use std::path::{Path, PathBuf};
@@ -29,6 +26,12 @@ use std::time::Duration;
 /// The recording's root, as its answers name the Session roots.
 const RECORDED_ROOT: &str = "/tmp/arkdeck-storage-lock-wait-oracle";
 const SESSION: &str = "session-fixture";
+/// The Rust daemon's Artifact quota (`arkdeck-agentd`'s `ARTIFACT_QUOTA`),
+/// which the oracle's Artifact store is given.
+const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
+/// The oracle's clock, 2026-09-26T00:00:00Z, in seconds since 2001 as the
+/// daemon hands it to an export preview.
+const NOW: f64 = 1_790_380_800.0 - 978_307_200.0;
 
 fn oracle() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/storage-lock-wait-oracle")
@@ -60,7 +63,7 @@ impl Root {
         };
         let path = temporary.join(format!("ad-winstorage-{nonce:032x}"));
         let root = HostDirectory::open_or_create_private(&path).unwrap();
-        for name in ["session-state", "sessions"] {
+        for name in ["session-state", "sessions", "artifacts"] {
             root.create_private_child(name).unwrap();
         }
         let session = root
@@ -93,32 +96,74 @@ impl Root {
     fn params(&self, frame: &Value) -> Map<String, Value> {
         let mut params: Map<String, Value> =
             frame["params"].as_object().cloned().unwrap_or_default();
-        if let Some(path) = params.get_mut("rootPath") {
-            let relative = path
-                .as_str()
-                .unwrap()
-                .strip_prefix("/private/tmp/arkdeck-storage-lock-wait-oracle/")
-                .unwrap();
-            *path = json!(self.0.join(relative).to_str().unwrap());
+        for key in ["rootPath", "destinationPath"] {
+            if let Some(path) = params.get_mut(key) {
+                let relative = path
+                    .as_str()
+                    .unwrap()
+                    .strip_prefix("/private/tmp/arkdeck-storage-lock-wait-oracle/")
+                    .unwrap();
+                *path = json!(self.0.join(relative).to_str().unwrap());
+            }
         }
         params
+    }
+
+    /// `path` below this root, spelled as the recording spells it.
+    fn recorded_path(&self, path: &str, prefix: &str) -> Value {
+        let relative = Path::new(path).strip_prefix(&self.0).unwrap();
+        json!(format!(
+            "{prefix}/{}",
+            relative.to_str().unwrap().replace('\\', "/")
+        ))
     }
 
     /// An answer with this root's paths spelled as the recording's, and its
     /// snapshot revision as the oracle's label.
     fn labelled(&self, mut answer: Value) -> Value {
         if let Some(result) = answer.get_mut("result").and_then(Value::as_object_mut) {
-            if let Some(root) = result.get_mut("rootPath")
+            if let Some(root) = result
+                .get_mut("sessionDomain")
+                .and_then(|domain| domain.get_mut("rootPath"))
                 && let Some(path) = root.as_str()
             {
-                let relative = Path::new(path).strip_prefix(&self.0).unwrap();
-                *root = json!(format!(
-                    "{RECORDED_ROOT}/{}",
-                    relative.to_str().unwrap().replace('\\', "/")
-                ));
+                *root = self.recorded_path(path, RECORDED_ROOT);
             }
-            if let Some(value) = result.get_mut("snapshotRevision") {
-                *value = json!("<snapshotRevision>");
+            if let Some(path) = result
+                .get_mut("destination")
+                .and_then(|destination| destination.get_mut("path"))
+                && let Some(text) = path.as_str()
+            {
+                *path = self.recorded_path(text, "/private/tmp/arkdeck-storage-lock-wait-oracle");
+            }
+            for key in ["snapshotRevision", "previewId", "previewDigest"] {
+                if let Some(value) = result.get_mut(key) {
+                    *value = json!(format!("<{key}>"));
+                }
+            }
+            for (name, keys) in [
+                (
+                    "destination",
+                    &["parentDevice", "parentInode", "volumeIdentity"][..],
+                ),
+                (
+                    "source",
+                    &[
+                        "rootDevice",
+                        "rootInode",
+                        "sessionDevice",
+                        "sessionInode",
+                        "volumeIdentity",
+                    ][..],
+                ),
+            ] {
+                if let Some(nested) = result.get_mut(name).and_then(Value::as_object_mut) {
+                    for key in keys {
+                        if let Some(value) = nested.get_mut(*key) {
+                            *value = json!(format!("<{key}>"));
+                        }
+                    }
+                }
             }
         }
         answer
@@ -131,20 +176,30 @@ impl Drop for Root {
     }
 }
 
-/// The Session owner's answer to one recorded request: the Session domain
-/// `arkdeck-agentd`'s `runtime_storage` wraps, or its Session resource route.
-fn answer(root: &Root, sessions: &SessionStore, frame: &Value) -> Value {
+/// The Rust daemon's answer to one recorded request, as `arkdeck-agentd`'s
+/// `runtime_storage` and its Session resource routes compose it.
+fn answer(root: &Root, sessions: &SessionStore, artifacts: &ArtifactUsage, frame: &Value) -> Value {
     let method = frame["method"].as_str().unwrap();
     let params = root.params(frame);
     let answered = match method {
         "session.list" | "session.pin" => sessions.handle_resource(method, &params),
-        _ => sessions.handle(method, &params),
+        "session.export.preview" => sessions.preview_export(
+            params["sessionId"].as_str().unwrap(),
+            params["destinationPath"].as_str().unwrap(),
+            params["allowSensitive"].as_bool().unwrap(),
+            NOW,
+        ),
+        _ => {
+            let artifact = artifacts.status().unwrap();
+            sessions.handle(method, &params).map(|session| {
+                json!({"schemaVersion": "arkdeck.runtime-storage/1",
+                    "sessionDomain": session, "artifactDomain": artifact})
+            })
+        }
     };
     let answer = match answered {
         Ok(result) => {
-            if method.starts_with("session.") {
-                arkdeck_contract::validate_method_value(method, "result", &result).unwrap();
-            }
+            arkdeck_contract::validate_method_value(method, "result", &result).unwrap();
             json!({"ok": true, "result": result})
         }
         Err(error) => {
@@ -158,21 +213,10 @@ fn answer(root: &Root, sessions: &SessionStore, frame: &Value) -> Value {
     root.labelled(answer)
 }
 
-/// The recorded answer: a Session resource's result, or the Session domain
-/// of a storage answer.
 fn recorded(frame: &Value) -> Value {
     let mut expected = json!({"ok": frame["ok"]});
     if frame["ok"] == true {
-        let result = &frame["result"];
-        expected["result"] = if frame["method"]
-            .as_str()
-            .unwrap()
-            .starts_with("runtime.storage.")
-        {
-            result["sessionDomain"].clone()
-        } else {
-            result.clone()
-        };
+        expected["result"] = frame["result"].clone();
     } else {
         expected["error"] = frame["error"].clone();
     }
@@ -192,6 +236,7 @@ fn storage_requests_made_while_a_storage_lock_is_held_answer_as_swift_s() {
     let root = Root::new();
     let owner = root.0.join("session-state");
     let sessions = SessionStore::open(&owner, &root.0.join("sessions")).unwrap();
+    let artifacts = ArtifactUsage::open(&root.0.join("artifacts"), ARTIFACT_QUOTA).unwrap();
     let recording = frames();
     let methods: Vec<&str> = recording
         .iter()
@@ -212,9 +257,6 @@ fn storage_requests_made_while_a_storage_lock_is_held_answer_as_swift_s() {
     );
     for (index, frame) in recording.iter().enumerate() {
         let lock = match index {
-            // The Session export is still macOS-only; its preview changes
-            // no storage state the next status reads.
-            6 => continue,
             5 => Some(held(
                 &root.0.join("custom"),
                 ".arkdeck-retention-catalog.lock",
@@ -224,7 +266,7 @@ fn storage_requests_made_while_a_storage_lock_is_held_answer_as_swift_s() {
         };
         let Some(lock) = lock else {
             assert_eq!(
-                answer(&root, &sessions, frame),
+                answer(&root, &sessions, &artifacts, frame),
                 recorded(frame),
                 "frame {index}"
             );
@@ -232,8 +274,12 @@ fn storage_requests_made_while_a_storage_lock_is_held_answer_as_swift_s() {
         };
         let (sender, receiver) = mpsc::channel();
         std::thread::scope(|scope| {
-            let (root, sessions) = (&root, &sessions);
-            scope.spawn(move || sender.send(answer(root, sessions, frame)).unwrap());
+            let (root, sessions, artifacts) = (&root, &sessions, &artifacts);
+            scope.spawn(move || {
+                sender
+                    .send(answer(root, sessions, artifacts, frame))
+                    .unwrap()
+            });
             // A refusal is immediate. The bound only lets one arrive; the
             // answer never depends on it.
             if let Ok(early) = receiver.recv_timeout(Duration::from_millis(200)) {

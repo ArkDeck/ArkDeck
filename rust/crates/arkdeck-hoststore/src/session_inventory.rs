@@ -12,19 +12,12 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::{io, path::Path};
 
-// The cleanup and export censuses serve the Session cleanup and export
-// owners, which are still macOS-only.
-#[cfg(target_os = "macos")]
 #[path = "session_cleanup_inventory.rs"]
 mod cleanup;
-#[cfg(target_os = "macos")]
 pub(crate) use cleanup::CleanupTransaction;
-#[cfg(target_os = "macos")]
 pub use cleanup::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
-#[cfg(target_os = "macos")]
 #[path = "session_export_inventory.rs"]
 mod export;
-#[cfg(target_os = "macos")]
 pub use export::{SessionExportSnapshot, session_export_snapshot};
 
 const METADATA: &str = ".arkdeck-retention-catalog.json";

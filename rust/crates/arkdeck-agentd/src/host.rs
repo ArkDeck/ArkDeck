@@ -2472,7 +2472,7 @@ impl HostServices for Host {
     }
     /// `artifact.quota` walks this owner's Artifact root as the Swift daemon
     /// walks its own before it has cached a total, and writes nothing.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn artifact_quota(&self) -> Result<serde_json::Value, WireError> {
         let Some((_, usage)) = self.storage.as_deref() else {
             return Err(WireError {
@@ -2964,7 +2964,7 @@ impl HostServices for Host {
             .inspect(kind, reference)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn session_resource(
         &self,
         method: &str,
@@ -3086,7 +3086,7 @@ impl HostServices for Host {
             sessions.handle_resource(method, params)
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_storage(
         &self,
         method: &str,
@@ -3131,17 +3131,23 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             };
-            // The Job owner's workspace census is still macOS-only.
-            #[cfg(windows)]
-            let census = |_: WorkspaceReference<'_>| Err(unverified());
+            // A Runtime-owned copy's reference maps to the project it was
+            // copied from through the workspace provider. Windows composes no
+            // workspace provider, so it has made no copy, and every reference
+            // is compared as written (Swift `resolveRegistrationProjectRef`
+            // for a reference nothing maps).
             #[cfg(target_os = "macos")]
+            let registration = |reference: &str| {
+                self.workspace
+                    .as_ref()
+                    .and_then(|workspace| workspace.census_registration(reference))
+            };
+            #[cfg(windows)]
+            let registration = |_: &str| None;
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
-                (Some(jobs), WorkspaceReference::Project(project)) => jobs
-                    .require_no_active_workspace_project_reference(project, &|reference| {
-                        self.workspace
-                            .as_ref()
-                            .and_then(|workspace| workspace.census_registration(reference))
-                    }),
+                (Some(jobs), WorkspaceReference::Project(project)) => {
+                    jobs.require_no_active_workspace_project_reference(project, &registration)
+                }
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)
                 }

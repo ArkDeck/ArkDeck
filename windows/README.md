@@ -116,6 +116,45 @@ host-trusted development certificate (`rust/scripts/windows-dev-identity.ps1`). 
 `ARKDECK_CLIENTKIT_DAEMON` or `rust/target/debug/arkdeck-agentd.exe`
 (`cargo build -p arkdeck-agentd`); without them it reports itself skipped.
 
+## Release candidate package (TASK-XPA-022)
+
+`windows/scripts/package-rc.ps1` (PowerShell 7) builds the Windows x64 release candidate of the
+whole product from one recorded checkout (r12 decision 10, rulings 8, 12 and 17):
+
+- the daemon and the CLI through `rust/scripts/windows-package-xcopy.ps1` (release build,
+  signing, its own manifest) into `<out>\runtime`;
+- the App published unpackaged (`WindowsPackageType=None`; self-contained Windows App SDK and
+  .NET, ReadyToRun and trimmed), `ArkDeck.exe` signed like the runtime;
+- the **xcopy form**: `arkdeck-rc-<version>-windows-x64-<revision>\` with the App, `arkdeck.exe`
+  and `arkdeck-agentd.exe` side by side (the layout both clients default to) and
+  `rc-manifest.json` (`arkdeck.windows-rc-package/1`: every file's size and SHA-256, the
+  toolchains, the signer pin), zipped, with the manifest beside the zip carrying its SHA-256;
+- the **MSIX form**: the same App with the signed daemon and CLI at the package root
+  (`ArkDeckRuntimeDirectory`), identity `CN=ArkDeck Development` (ruling 12), write
+  virtualization off (ruling 8), **unsigned**; its SHA-256 and the daemon's and CLI's inside it
+  are in the manifest.
+
+`-SigningMode none` (CI) signs nothing; `development` signs with the host-trusted development
+certificate (`ARKDECK_DEV_SIGNER_THUMBPRINT`). A production RC is not built here.
+
+```powershell
+pwsh windows/scripts/package-rc.ps1 -OutputDirectory D:\out\rc -SigningMode development -Smoke
+```
+
+`-Smoke` installs the zip into a new owner-only directory under the account's local application
+data with a private development state root, checks every file against the manifest and every
+executable's signer against the pin, lets `arkdeck doctor` start the installed daemon (decision
+11), runs the App's UIA smoke (`App.UITests` `InstalledRcTests`: the installed `ArkDeck.exe`
+connects to that daemon and shows its doctor report, no recovery banner), runs doctor again,
+stops the daemon through its stop event, and uninstalls by removing the directory: no process
+may run from it, no new entry may appear in the local application data and `%LOCALAPPDATA%\ArkDeck`
+must be as it was. The record is `smoke.json` beside the zip.
+
+Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`,
+or a development root) stays. The workflow `.github/workflows/windows-rc.yml` builds the
+unsigned RC on `main` and keeps it as the artifact `arkdeck-windows-rc-<revision>`; it uses no
+secret.
+
 ## CI
 
 `scripts/ci/plan.py` selects the `windows` lane for `windows/**` and for the generator's and tests'
