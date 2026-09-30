@@ -1,4 +1,11 @@
 <Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
   <Project Path="ClientKit/ArkDeck.ClientKit.csproj" />
   <Project Path="ClientKit.Tests/ArkDeck.ClientKit.Tests.csproj" />
+  <Project Path="App.Core/ArkDeck.App.Core.csproj" />
+  <Project Path="App.Tests/ArkDeck.App.Tests.csproj" />
+  <Project Path="App/ArkDeck.App.csproj" />
+  <Project Path="App.UITests/ArkDeck.App.UITests.csproj" />
 </Solution>
