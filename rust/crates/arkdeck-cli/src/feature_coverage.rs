@@ -450,8 +450,10 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "workspace.preset.show",
     "workspace.preset.update",
     "workspace.preset.remove",
-    // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
+    // The Trace cache owner's inventory and purge (TASK-XPA-021;
+    // `windows_trace_export_process.rs`).
     "trace.cache.status",
+    "trace.cache.purge",
     // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
     // the HAP, native-library and workspace-patch uploads committed with
     // their exact bytes, and the Import reads, release and abort. Not
@@ -469,6 +471,9 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     // without a registered HDC a debt is refused before its readback.
     "recovery.cleanup.list",
     "cleanup-debt.list",
+    // A diagnostics capture's Artifacts the macOS Runtime recorded, exported
+    // (`windows_diagnostics_export_process.rs`).
+    "diagnostics.export",
 ];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
@@ -1168,7 +1173,9 @@ mod tests {
             ("target.adopt", "partial"),
             ("workspace.project.update", "implemented"),
             ("workspace.preset.register", "partial"),
-            ("trace.cache.purge", "partial"),
+            ("trace.cache.purge", "implemented"),
+            ("diagnostics.export", "implemented"),
+            ("trace.inspect", "partial"),
             ("device.observations", "partial"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
