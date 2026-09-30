@@ -50,6 +50,16 @@
     <Manifest Include="$(ApplicationManifest)" />
   </ItemGroup>
 
+  <!-- The release-candidate MSIX (windows/scripts/package-rc.ps1, TASK-XPA-022): the daemon,
+       built and signed by rust/scripts/windows-package-xcopy.ps1, beside ArkDeck.exe (the App's
+       default daemon), and the CLI in bin\ (NTFS names are case-insensitive, so arkdeck.exe
+       cannot sit beside ArkDeck.exe). Only when the script names that directory; a plain build
+       carries neither. -->
+  <ItemGroup Condition="'$(ArkDeckRuntimeDirectory)' != ''">
+    <Content Include="$(ArkDeckRuntimeDirectory)\arkdeck-agentd.exe" Link="arkdeck-agentd.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="$(ArkDeckRuntimeDirectory)\arkdeck.exe" Link="bin\arkdeck.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(DisableMsixProjectCapabilityAddedByProject)'!='true' and '$(EnableMsixTooling)'=='true'">
     <ProjectCapability Include="Msix" />
   </ItemGroup>
