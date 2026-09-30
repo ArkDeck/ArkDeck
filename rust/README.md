@@ -892,6 +892,12 @@ so a restart still refuses to interrupt a current Job; its proof now reports
 `jobOwner: true`. Nothing admits a Job on Windows yet (no registered HDC
 or runner; the planner and the admitter refuse before admission, below).
 The Windows CLI coverage statuses stay `partial`.
+open after a restart), and `job.list` and `job.timeline` through
+`snapshot_pager` in its `cli-job-snapshots` (see "Windows Session owner,
+publication and snapshot pages" below). `runtime service restart` reads the
+current Jobs from those pages, so a restart still refuses to interrupt a
+current Job; its proof reports `jobOwner: true`. Nothing admits a Job on Windows yet (no planner, admitter or runner, no
+registered HDC). The Windows CLI coverage statuses stay `partial`.
 
 The NTFS store's document replacement (`publish_document`) now waits out,
 for about a second, a moment's holder of the replaced file (an
@@ -915,10 +921,7 @@ reads them over its pipe before and after a restart, and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI against a dev-signed
 daemon.
 
-Still macOS-only: Session publication (`SessionPublisher`) and the Session
-owner (`SessionStore`, `snapshot_pager`, `session_inventory`), which need
-the `document_metadata`/`remove_document` port and the export submodules;
-the HDC lifecycle interlock and the current-Job census (over
+Still macOS-only: the HDC lifecycle interlock and the current-Job census (over
 `hdc_impact_source`); the Job owner's Import, workspace, retention and
 Session-continuity censuses; Flash recovery; and the runner and
 reconciler. The planner and the admitter build on Windows (next section).
@@ -969,6 +972,59 @@ permission bits. `arkdeck-agentd/tests/windows_job_admission_process.rs`
 checks the daemon over its pipe and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`,
 through `arkdeck job plan|submit` against a dev-signed daemon, before and
 after a restart.
+
+## Windows Session owner, publication and snapshot pages (TASK-XPA-005/014)
+
+`arkdeck-hoststore` builds on Windows the snapshot pager (`snapshot_pager`,
+over the host store's `document_metadata`/`remove_document`, ruling 7), the
+Session storage owner (`SessionStore`: `runtime.storage.status`, `.policy`
+and `.root`, `session.list`, `show`, `pin` and `unpin`, and the storage hold
+a publication registers under), the Session census and retention catalog
+(`session_inventory`), and the Session publication writer
+(`SessionPublisher`, its staged Session and `recover_staged`). The code is
+the macOS code; the Windows arms are:
+
+- a Session root's spelling (`session::absolute_root`): a local drive's
+  absolute path (`D:\…`), in the settings document and in a
+  `runtime.storage.root` request; macOS and Linux keep `/…`;
+- the canonical path the settings and the catalog compare
+  (`session_owner::canonical_path`): `canonicalize`, with a local drive's
+  verbatim `\\?\D:\…` spelled `D:\…`;
+- the Manifest's `platformProfile`: `PLATFORM-WINDOWS@0.2.0` on Windows,
+  the profile the Session was published under; macOS keeps
+  `PLATFORM-MACOS@0.2.0`;
+- the marker's root path is the canonical path as it is (no `/private`
+  alias to drop).
+
+The writer now closes every handle below its staged Session before renaming
+it (Windows renames no directory while a handle below it is open); nothing
+else changes, on either OS.
+
+Still macOS-only: the Session cleanup and export owners (their previews,
+plans and records, and the host store's Session removal), the Artifact usage
+owner the daemon's `runtime.storage.*` answers pair the Session domain with,
+and the Job runners, cancellation and reconciliation that call the writer.
+So the Windows daemon composes no Session owner yet; it serves `job.list`
+and `job.timeline` through the Job store's pager, with cursors that read on
+across a restart. The one-page `job.list` answer without the pager is gone.
+
+Tests on Windows: the pager's own tests and the Job list stream tests run
+there as on macOS (their owner-only and unsafe fixtures made by
+`test_private`; a second hard link stands for a symbolic link, which needs
+a privilege there); `session_publication_windows_tests.rs` publishes every
+recorded Swift Session again (37 recorded stores beside a Sessions tree: 76
+Sessions, 42 refusals) and compares every file, the catalog, each Job's
+proposal and Journal and each marker with Swift's bytes but for the
+platform profile and what names the Manifest's digest, reads the Sessions
+back a page at a time across reopened owners, and crashes a publication
+between its Manifest and its rename in a child process, whose staged Session
+the next start removes; `tests/windows_session_owner.rs` replays the Swift
+storage lock-wait oracle's Session domain; and
+`arkdeck-agentd/tests/windows_job_store_process.rs` pages `job.list` and
+`job.timeline` over the real daemon's pipe and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI, with cursors handed
+out before a restart read after it. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-session-pager-run.md`.
 
 ## Job index and record writers (TASK-XPA-014)
 
@@ -2314,15 +2370,16 @@ The Windows daemon composes the owner over its root's `artifacts` (the
 development root and the account's `%LOCALAPPDATA%\ArkDeck\Agentd` alike),
 created owner-only when absent and never re-permissioned: an existing
 `artifacts` that is not owner-only refuses the start. Every Artifact belongs to
-a Job, which the Job owner proves before anything is read, listed or exported;
-no Job owner is composed on Windows yet, so `artifact list`, `inspect`, `read`
-and `export` answer `operationUnavailable` ("Artifact Job owner is
-unavailable") and touch nothing, as the macOS daemon answers without a Job
-owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
+a Job, which the daemon's Job store (`jobs-state`, "Job store owner on
+Windows" above) proves before anything is read, listed or exported; a Job it
+does not hold is refused `resourceNotFound` ("Artifact Job owner does not
+exist") and nothing is touched. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
 macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
 recorded bytes and digests and reproduces the Swift daemon's recorded
 `artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
-(agentd) runs the real daemon over its pipe and, with
+(agentd) records the Job into the daemon's Job store, answers `artifact list`,
+`inspect`, `read` and `export` over the real daemon's pipe before and after a
+restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.

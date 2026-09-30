@@ -4,7 +4,6 @@
 //! the same pages, the same stored snapshots and the same refusals.
 use super::*;
 use arkdeck_platform::{HostSqlite, SqliteValue};
-use std::os::unix::fs::DirBuilderExt;
 
 struct Root(PathBuf);
 impl Root {
@@ -13,10 +12,7 @@ impl Root {
             "arkdeck-job-list-stream-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&path)
-            .unwrap();
+        crate::test_private::create_private_directory(&path);
         Self(path)
     }
 

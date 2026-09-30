@@ -347,7 +347,7 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
     assert_eq!(proof["beforeInstance"]["pid"], first);
     assert_eq!(proof["afterInstance"]["pid"], second);
     assert_eq!(proof["catalogDigestBefore"], proof["catalogDigestAfter"]);
-    // The daemon composes the Job store (TASK-XPA-005), whose one-page
+    // The daemon composes the Job store (TASK-XPA-005), whose paged
     // `job.list` the restart read the current Jobs from: there are none.
     assert_eq!(proof["jobOwner"], true, "{proof}");
     assert_eq!(document["daemonHealth"]["status"], "ok");

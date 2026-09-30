@@ -10,20 +10,19 @@
 //! beside it. Then:
 //!
 //! * over the daemon's pipe, with a plain pipe handle (no signer needed):
-//!   `job.status`, `job.show`, `job.events` and a one-page `job.list`
-//!   answer exactly what the store answers in process (a list's snapshot
+//!   `job.status`, `job.show`, `job.events`, `job.timeline` and `job.list`
+//!   answer exactly what the store answers in process (a snapshot's
 //!   revision and the sealed `jec1` cursors are fresh on every read), before
-//!   and after a restart, and a cursor handed out before the restart reads
-//!   on after it; `job.timeline` and a list of more than one page are
-//!   refused as the read-only foundation refuses a method it lacks
-//!   (`rejected`: the snapshot pager is not built on Windows yet); a Job
-//!   directory that is not owner-only refuses the start;
+//!   and after a restart. `job.list` and `job.timeline` page through the
+//!   store's snapshot pager (`cli-job-snapshots`): a page at a time they
+//!   hand over the rows of the whole answer, and a cursor of either, like a
+//!   `job.events` cursor, handed out before the restart reads on after it.
+//!   A Job directory that is not owner-only refuses the start;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): `job status`, `job show`,
-//!   `job events` and `job list` print the same answers after a restart, and
-//!   `job timeline` reports the refusal. Without that variable this test
-//!   says so and checks nothing.
+//!   `job events`, `job timeline` and `job list` print the same answers after
+//!   a restart. Without that variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -53,8 +52,8 @@ const DEADLINE: Duration = Duration::from_secs(60);
 /// The recorded `observe.device@1` Job that observed its device.
 const OBSERVED: &str = "job-0f77f8c52864d676372962eccb17389c";
 /// The reads this build answers on Windows from the Job store, each Job's
-/// and the list of them all (one page).
-const READS: [&str; 3] = ["job.status", "job.show", "job.events"];
+/// and the list of them all.
+const READS: [&str; 4] = ["job.status", "job.show", "job.events", "job.timeline"];
 const LIST: &str = "job.list";
 
 /// A read's parameters: the Job's identity, or none for the list.
@@ -330,8 +329,7 @@ fn request(pipe: &str, method: &str, params: Value) -> Value {
     serde_json::from_slice(&reply).unwrap()
 }
 
-/// Every recorded read answered over the pipe as the store answers it, and
-/// the snapshot-paged reads refused before admission with zero dispatch.
+/// Every recorded read answered over the pipe as the store answers it.
 fn assert_reads(pipe: &str, answers: &[(String, &'static str, Value)]) {
     for (id, method, expected) in answers {
         let reply = request(pipe, method, params(id, method));
@@ -341,23 +339,81 @@ fn assert_reads(pipe: &str, answers: &[(String, &'static str, Value)]) {
             "{id} {method}:\n  store  {expected}\n  daemon {actual}"
         );
     }
-    // The timeline pages through the snapshot pager, not built on Windows.
-    let reply = request(pipe, "job.timeline", json!({"jobId": OBSERVED}));
-    assert_eq!(reply["error"]["code"], "rejected", "{reply}");
-    assert_eq!(
-        reply["error"]["message"],
-        "the Job snapshot pager is not built on Windows yet; nothing was read",
-        "{reply}"
-    );
-    // A list of more than one page needs it too.
-    let reply = request(pipe, "job.list", json!({"pageSize": 1}));
-    assert_eq!(reply["error"]["code"], "rejected", "{reply}");
     let absent = request(
         pipe,
         "job.status",
         json!({"jobId": "job-00000000000000000000000000000000"}),
     );
     assert_eq!(absent["error"]["code"], "notFound", "{absent}");
+}
+
+/// The rows of the whole `job.list` the store answered in process.
+fn observed_list(answers: &[(String, &'static str, Value)]) -> Vec<Value> {
+    answers
+        .iter()
+        .find(|(_, method, _)| *method == LIST)
+        .unwrap()
+        .2["result"]["items"]
+        .as_array()
+        .unwrap()
+        .clone()
+}
+
+/// `pages` pages of one row of `method`, each the next row of `rows`, the
+/// whole answer; answers the cursor to the next page and how many rows were
+/// read. Every page names the same snapshot.
+fn page_through(
+    pipe: &str,
+    method: &str,
+    params: Value,
+    rows: &[Value],
+    pages: usize,
+) -> (Value, usize) {
+    let (mut cursor, mut revision) = (Value::Null, Value::Null);
+    for (index, row) in rows.iter().enumerate().take(pages) {
+        let mut asked = params.clone();
+        asked["pageSize"] = json!(1);
+        if !cursor.is_null() {
+            asked["cursor"] = cursor.clone();
+        }
+        let page = request(pipe, method, asked);
+        assert_eq!(page["ok"], true, "{method} page {index}: {page}");
+        let result = &page["result"];
+        assert_eq!(result["items"], json!([row]), "{method} page {index}");
+        assert_eq!(result["hasMore"], true, "{method} page {index}: {page}");
+        if index > 0 {
+            assert_eq!(
+                result["snapshotRevision"], revision,
+                "{method} page {index}"
+            );
+        }
+        revision = result["snapshotRevision"].clone();
+        cursor = result["nextCursor"].clone();
+        assert!(cursor.is_string(), "{method} page {index}: {page}");
+    }
+    (cursor, pages)
+}
+
+/// The rest of `rows` read a page at a time from `cursor`, to the last page.
+fn read_on(pipe: &str, method: &str, params: Value, rows: &[Value], cursor: Value, seen: usize) {
+    let mut cursor = cursor;
+    for index in seen..rows.len() {
+        let mut asked = params.clone();
+        asked["pageSize"] = json!(1);
+        asked["cursor"] = cursor.clone();
+        let page = request(pipe, method, asked);
+        assert_eq!(page["ok"], true, "{method} page {index}: {page}");
+        let result = &page["result"];
+        assert_eq!(
+            result["items"],
+            json!([rows[index]]),
+            "{method} page {index}"
+        );
+        let last = index + 1 == rows.len();
+        assert_eq!(result["hasMore"], !last, "{method} page {index}: {page}");
+        cursor = result["nextCursor"].clone();
+        assert_eq!(cursor.is_null(), last, "{method} page {index}: {page}");
+    }
 }
 
 #[test]
@@ -394,8 +450,7 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: targets, jobs, artifacts, workspaceProjects, planning"
-                .to_owned()
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, planning".to_owned()
         ),
         "{:?}",
         first.seen
@@ -409,6 +464,24 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
     );
     assert_eq!(page["result"]["hasMore"], true, "{page}");
     let cursor = page["result"]["items"][0]["cursor"].clone();
+    // ... and the snapshot pages' cursors: the list and the observed Job's
+    // timeline a page at a time, each page's rows the next of the whole
+    // answer's, the last page's cursor kept for after the restart.
+    let list = observed_list(&answers);
+    let timeline = observed("job.timeline")["result"]["items"]
+        .as_array()
+        .unwrap()
+        .clone();
+    assert!(timeline.len() > 2, "{timeline:?}");
+    let (list_cursor, list_seen) =
+        page_through(&pipe, "job.list", json!({}), &list, list.len() - 1);
+    let (timeline_cursor, timeline_seen) = page_through(
+        &pipe,
+        "job.timeline",
+        json!({"jobId": OBSERVED}),
+        &timeline,
+        2,
+    );
     first.stop(&root.0);
 
     let mut second = Daemon::start(executable, &root.0);
@@ -428,6 +501,17 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
         labelled(json!({"ok": rest["ok"], "result": rest["result"]}))["result"]["items"],
         json!(events),
         "{rest}"
+    );
+    // The snapshot pages read on from the cursors handed out before it, to
+    // the end of the same snapshots.
+    read_on(&pipe, "job.list", json!({}), &list, list_cursor, list_seen);
+    read_on(
+        &pipe,
+        "job.timeline",
+        json!({"jobId": OBSERVED}),
+        &timeline,
+        timeline_cursor,
+        timeline_seen,
     );
     second.stop(&root.0);
 
@@ -551,11 +635,45 @@ fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     let pin: Value = serde_json::from_slice(&signing.stdout).unwrap();
     let pin = pin["pin"].as_str().unwrap().to_owned();
 
-    // Recorded before the first start, read after a restart.
+    // Recorded before the first start, read after a restart; a page of the
+    // list and of the timeline handed out before it, read on after it.
     let mut first = Daemon::start(&daemon, &root.0);
     let pipe = first.serving();
     let (status, envelope) = cli(&daemon, &pin, &pipe, &["job", "status", "--job", OBSERVED]);
     assert_eq!(status, Some(0), "{envelope}");
+    let list = observed_list(&answers);
+    let timeline = answers
+        .iter()
+        .find(|(id, method, _)| id == OBSERVED && *method == "job.timeline")
+        .unwrap()
+        .2["result"]["items"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let first_pages = [
+        (vec!["job", "list", "--page-size", "1"], &list),
+        (
+            vec!["job", "timeline", "--job", OBSERVED, "--page-size", "1"],
+            &timeline,
+        ),
+    ]
+    .map(|(arguments, rows)| {
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(
+            envelope["result"]["items"],
+            json!([rows[0]]),
+            "{arguments:?}"
+        );
+        assert_eq!(envelope["result"]["hasMore"], true, "{envelope}");
+        (
+            arguments,
+            envelope["result"]["nextCursor"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        )
+    });
     first.stop(&root.0);
 
     let mut second = Daemon::start(&daemon, &root.0);
@@ -575,17 +693,16 @@ fn gj1_job_record_hops_run_through_the_cli_against_a_dev_signed_daemon() {
             "{id} {method}: {envelope}"
         );
     }
-    let (status, envelope) = cli(
-        &daemon,
-        &pin,
-        &pipe,
-        &["job", "timeline", "--job", OBSERVED],
-    );
-    assert_ne!(status, Some(0), "{envelope}");
-    assert_eq!(envelope["error"]["code"], "operationFailed", "{envelope}");
-    assert_eq!(
-        envelope["error"]["details"]["wireCode"], "rejected",
-        "{envelope}"
-    );
+    for ((arguments, cursor), rows) in first_pages.iter().zip([&list, &timeline]) {
+        let mut arguments = arguments.clone();
+        arguments.extend(["--cursor", cursor]);
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(
+            envelope["result"]["items"],
+            json!([rows[1]]),
+            "{arguments:?}"
+        );
+    }
     second.stop(&root.0);
 }

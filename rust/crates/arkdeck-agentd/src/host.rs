@@ -828,21 +828,13 @@ impl Host {
             agents.finish(&start, &jobs);
         });
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
         self.jobs
             .as_ref()
             .ok_or_else(job_owner_not_configured)?
             .read_snapshot(job_id)
             .map(|_| ())
-    }
-    /// The Windows daemon composes no Job owner yet (its store follows the
-    /// Job index on SQLite), so every Artifact a Job owns is refused as the
-    /// macOS daemon refuses it without one: before any Artifact is read,
-    /// listed or exported.
-    #[cfg(windows)]
-    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
-        Err(job_owner_not_configured())
     }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
@@ -1241,8 +1233,8 @@ impl Host {
     #[cfg(windows)]
     pub(crate) fn owner_census(&self) -> Vec<&'static str> {
         [
-            ("targets", self.targets.is_some()),
             ("jobs", self.jobs.is_some()),
+            ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
             ("planning", self.planning.is_some()),
@@ -2738,7 +2730,7 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             };
-            // The Job owner's workspace censuses are not built on Windows yet.
+            // The Job owner's workspace census is still macOS-only.
             #[cfg(windows)]
             let census = |_: WorkspaceReference<'_>| Err(unverified());
             #[cfg(target_os = "macos")]

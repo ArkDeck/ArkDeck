@@ -733,15 +733,13 @@ impl<'de> DeserializeSeed<'de> for PageSeed<'_> {
     }
 }
 
-// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
-// by `tests/windows_artifact_owners.rs`.
-#[cfg(all(test, target_os = "macos"))]
+// On macOS and Windows: the fixtures' owner-only directories and files, and
+// the unsafe ones, are made by `test_private`.
+#[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
-    };
+    use crate::test_private::{create_private_directory, link, plant_owner_only, widen};
+    use std::fs;
     struct Root(PathBuf);
     impl Root {
         fn new() -> Self {
@@ -749,7 +747,7 @@ mod tests {
                 .canonicalize()
                 .unwrap()
                 .join(format!("session-pages-{}", uuid().unwrap()));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            create_private_directory(&path);
             Self(path)
         }
         fn pager(&self) -> SnapshotPager {
@@ -946,7 +944,7 @@ mod tests {
             "resourceConflict"
         );
         drop(lock);
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+        widen(&path);
         assert_eq!(
             pager
                 .page(
@@ -960,10 +958,11 @@ mod tests {
                 .code,
             "recordUnreadable"
         );
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        let bytes = fs::read(&path).unwrap();
         let outside = root.0.join("retained");
-        fs::rename(&path, &outside).unwrap();
-        symlink(&outside, &path).unwrap();
+        plant_owner_only(&outside, &bytes);
+        fs::remove_file(&path).unwrap();
+        link(&outside, &path);
         let bytes = fs::read(&outside).unwrap();
         assert_eq!(
             pager
@@ -1027,8 +1026,6 @@ mod tests {
     }
 }
 
-// Unix fixtures (mode bits, symbolic links); the Windows owners are proved
-// by `tests/windows_artifact_owners.rs`.
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 #[path = "snapshot_pager_tests.rs"]
 mod bounded_tests;

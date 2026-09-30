@@ -4,13 +4,11 @@
 //! pager accepted or refused; and what storing or reading holds at once does
 //! not grow with the snapshot beyond the rows a projection hands over.
 use super::*;
+use crate::test_private::{create_private_directory, link, plant_owner_only, widen};
 use arkdeck_contract::strict_json;
 use arkdeck_platform::{AllocationMeter, peak_allocation};
 use serde::{Deserialize, Serialize};
-use std::{
-    fs,
-    os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
-};
+use std::fs;
 
 // Counts what each thread holds, so that a test can bound what one call
 // holds at once whatever other tests run beside it.
@@ -158,7 +156,7 @@ impl Root {
             .canonicalize()
             .unwrap()
             .join(format!("bounded-pages-{}", uuid().unwrap()));
-        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        create_private_directory(&path);
         Self(path)
     }
     fn pager(&self) -> SnapshotPager {
@@ -169,10 +167,7 @@ impl Root {
     }
     /// Store `bytes` as snapshot `revision`, owner-only, as the pager does.
     fn plant(&self, revision: &str, bytes: &[u8]) {
-        let path = self.0.join(filename(revision));
-        let _ = fs::remove_file(&path);
-        fs::write(&path, bytes).unwrap();
-        fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        plant_owner_only(&self.0.join(filename(revision)), bytes);
     }
 }
 impl Drop for Root {
@@ -654,14 +649,13 @@ fn stored_pages_are_read_as_whole_snapshots_were() {
             }
             _ if name.ends_with("link") => {
                 let outside = root.0.join("outside.json");
-                fs::write(&outside, &base).unwrap();
-                fs::set_permissions(&outside, fs::Permissions::from_mode(0o600)).unwrap();
+                plant_owner_only(&outside, &base);
                 let _ = fs::remove_file(&file);
-                symlink(&outside, &file).unwrap();
+                link(&outside, &file);
             }
             _ => {
                 root.plant(REVISION, &base);
-                fs::set_permissions(&file, fs::Permissions::from_mode(0o644)).unwrap();
+                widen(&file);
             }
         }
         let answer = pager.page(METHOD, ORDER, 1, Some(&cursor), || {

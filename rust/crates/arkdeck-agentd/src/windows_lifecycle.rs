@@ -13,10 +13,10 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners, the Job store, the Job planner and
-//!   admitter and the Artifact read and export owner are composed over it
-//!   (see [`Authority::compose`]); every input that would compose another
-//!   owner on macOS is refused, not ignored, until its store is ported (G01);
+//!   lifecycle only the Target owners, the Artifact read and export owner
+//!   and the Job store are composed over it (see [`Authority::compose`]);
+//!   every input that would compose another owner on macOS is refused, not
+//!   ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -123,18 +123,17 @@ impl Authority {
     ///   yet (its integration change waits for the maintainer's samples),
     ///   so no relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
-    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Artifact read and export owner (`ArtifactReadStore`) over the
     ///   root's `artifacts` (the name the macOS isolated owner and production
     ///   composition both give it): the same Job index documents, payloads
-    ///   and `artifact.list` snapshot pages as on macOS; every Artifact
-    ///   belongs to a Job, which the Job owner proves before anything is
-    ///   read, listed or exported;
+    ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
+    ///   belongs to a Job, which the Job owner below proves before anything
+    ///   is read, listed or exported;
+    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Job planner and admitter over the Job store and the root
-    ///   (`job.plan`, `job.submit`), with no HDC, workspace or analyzer
-    ///   provider, Import owner or capability authority beside them: every
-    ///   operation is refused before admission with zero dispatch, as macOS
-    ///   refuses it without that owner, and nothing is admitted.
+    ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
+    ///   tuple is registered): a device operation is refused before admission
+    ///   with zero dispatch, as macOS refuses it without an HDC provider;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -143,14 +142,15 @@ impl Authority {
     ///   `workspace.preset.list|show` answer from it, and a restart reads
     ///   back what it holds. Neither the DevEco toolchain or signing
     ///   credential owner nor the workspace composition is composed, so a
-    ///   project stays `runtimeRestartRequired`; the Job owner's workspace
-    ///   censuses are not built on Windows yet, so nothing proves that no
-    ///   workspace Job names a project or preset, and every project or preset
-    ///   mutation is refused (`recordUnreadable`, no new dispatch).
+    ///   project stays `runtimeRestartRequired`; the Job owner's census of
+    ///   the workspace Jobs that name a project or preset is still
+    ///   macOS-only, so every project or preset mutation is refused
+    ///   (`recordUnreadable`, no new dispatch).
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
-    /// store; a store it cannot open or read ends the start, as on macOS.
+    /// store, which reads its documents under its locks; a store it cannot
+    /// open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
         let name = if self.development {
@@ -170,7 +170,7 @@ impl Authority {
                 path.display()
             )
         })?;
-        let host = host.with_targets(targets).with_jobs(self.job_store()?);
+        let host = host.with_targets(targets);
         let name = "artifacts";
         let path = self.root.private_child(name).map_err(|error| {
             format!(
@@ -184,11 +184,7 @@ impl Authority {
                 path.display()
             )
         })?;
-        report(&format!(
-            "arkdeck-agentd composes the Artifact owner over {}",
-            path.display()
-        ));
-        let host = host.with_artifacts(artifacts);
+        let host = host.with_artifacts(artifacts).with_jobs(self.job_store()?);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -207,9 +203,7 @@ impl Authority {
         projects
             .startup_records()
             .map_err(|error| unusable(&path, &error.message))?;
-        let host = host
-            .with_workspace_projects(projects)
-            .with_planning(self.root.path());
+        let host = host.with_workspace_projects(projects);
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {
@@ -236,11 +230,13 @@ impl Authority {
     /// in the same private child rather than beside its other entries (as
     /// Swift's production daemon does): the host store cannot open the
     /// account root itself, whose DACL also grants SYSTEM. `job.status`,
-    /// `job.show`, `job.events` and a `job.list` of one page answer from it
-    /// (so `runtime service restart` reads the current Jobs), and a restart
-    /// reads back what it holds; nothing admits a Job on Windows yet. Opening validates
-    /// the index's layout and rows and its files' owner and identity; a
-    /// store it cannot open ends the start.
+    /// `job.show` and `job.events` answer from it, and `job.list` and
+    /// `job.timeline` page through its snapshot pager (`cli-job-snapshots`,
+    /// whose cursors read on across a restart), so `runtime service restart`
+    /// reads the current Jobs; a restart reads back what it holds. Nothing
+    /// admits a Job on Windows yet. Opening validates the index's layout and
+    /// rows and its files' owner and identity; a store it cannot open ends
+    /// the start.
     fn job_store(&self) -> Result<arkdeck_hoststore::JobStore, String> {
         const NAME: &str = "jobs-state";
         let path = self.root.private_child(NAME).map_err(|error| {

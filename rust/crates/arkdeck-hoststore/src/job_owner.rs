@@ -1,11 +1,11 @@
 //! Runtime-owned Job discovery. A read-only SQLite snapshot supplies Job
 //! identity and state; presentation cursors retain immutable query results.
 //!
-//! On Windows the store, its index and record writers and the Job read
-//! resources it answers without the snapshot pager (`job.status`,
-//! `job.show`, `job.events`) are built; what reads other macOS-only owners
-//! (the pager behind `job.list` and `job.timeline`, the Session, Import,
-//! workspace and HDC lifecycle censuses, Flash recovery) is not.
+//! On Windows the store, its index and record writers and every Job read
+//! resource (`job.status`, `job.show`, `job.events`, and `job.list` and
+//! `job.timeline` through the snapshot pager in `cli-job-snapshots`) are
+//! built; what reads other macOS-only owners (the Import, workspace and HDC
+//! lifecycle censuses, the mutation state continuity, Flash recovery) is not.
 #[path = "job_epoch_indexes.rs"]
 mod epoch_indexes;
 #[cfg(any(target_os = "macos", windows))]
@@ -21,7 +21,6 @@ use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
 use crate::job_repository::{
     AdmissionVerdict, JobRepository, JobRow, JobWriteError, identifier, order_key,
 };
-#[cfg(target_os = "macos")]
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::{WireError, canonical_json};
 use arkdeck_platform::{DocumentPublishError, HostDirectory};
@@ -52,7 +51,7 @@ pub(crate) mod flash_recovery;
 #[path = "job_hdc_interlock_tests.rs"]
 mod hdc_interlock_tests;
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 #[path = "job_list_stream_tests.rs"]
 mod list_stream_tests;
 
@@ -685,13 +684,6 @@ impl JobStore {
         params: &Map<String, Value>,
     ) -> Result<Value, WireError> {
         self.root.validate_path(&self.path).map_err(unreadable)?;
-        // The timeline pages through the snapshot pager (`snapshot_pager`),
-        // which is not built off macOS: refused as the read-only foundation
-        // refuses a method it lacks.
-        #[cfg(not(target_os = "macos"))]
-        if method == "job.timeline" {
-            return Err(failure("rejected", PAGER_UNAVAILABLE));
-        }
         if method == "job.list" {
             return self.list(params);
         }
@@ -734,7 +726,6 @@ impl JobStore {
                 shown["job"] = self.indexed_status(&record);
                 shown
             }
-            #[cfg(target_os = "macos")]
             "job.timeline" => {
                 let (size, cursor) = pagination(params, MALFORMED_SNAPSHOT_CURSOR)?;
                 SnapshotPager::open(&self.path.join("cli-job-snapshots"))
@@ -874,108 +865,13 @@ impl JobStore {
                 None => Ok(()),
             }
         };
-        #[cfg(target_os = "macos")]
-        {
-            SnapshotPager::open(&self.path.join("cli-job-snapshots"))
-                .map_err(unreadable)?
-                .page_streamed("job.list", &filters, order, size, cursor, rows)
-                .map_err(pager_refusal)
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            single_page(order, size, cursor, rows)
-        }
+        SnapshotPager::open(&self.path.join("cli-job-snapshots"))
+            .map_err(unreadable)?
+            .page_streamed("job.list", &filters, order, size, cursor, rows)
+            .map_err(pager_refusal)
     }
 }
 
-/// Why a Job read that pages through the snapshot pager is refused on
-/// Windows.
-#[cfg(not(target_os = "macos"))]
-const PAGER_UNAVAILABLE: &str =
-    "the Job snapshot pager is not built on Windows yet; nothing was read";
-
-/// `job.list` on Windows until the snapshot pager is built there
-/// (`snapshot_pager`, whose retention waits for the
-/// `document_metadata`/`remove_document` port). A snapshot that is one page
-/// is answered as the pager answers its first page: the same rows, bounds,
-/// refusals and spelling, a fresh revision, no more pages and no cursor. The
-/// pager also stores such a snapshot, but nothing can read it back, since
-/// the one cursor into it is never handed out; so it is not stored. A
-/// snapshot of more than one page (by `pageSize` or by the pager's page byte
-/// bound) and any cursor are refused as the pager's absence, and nothing is
-/// stored.
-#[cfg(not(target_os = "macos"))]
-fn single_page(
-    order: &str,
-    page_size: usize,
-    cursor: Option<&str>,
-    rows: impl FnOnce(&mut dyn FnMut(Value)) -> Result<(), WireError>,
-) -> Result<Value, WireError> {
-    /// The pager's page byte bound (`snapshot_pager::MAX_PAGE`).
-    const MAX_PAGE: usize = 1024 * 1024;
-    if cursor.is_some() {
-        return Err(failure("rejected", PAGER_UNAVAILABLE));
-    }
-    let (mut items, mut bytes, mut more) = (Vec::new(), 2usize, false);
-    let mut refused: Option<WireError> = None;
-    rows(&mut |row| {
-        if refused.is_some() || more {
-            return;
-        }
-        let size = match canonical_json(&row) {
-            Ok(encoded) => encoded.len() + 1,
-            Err(error) => {
-                refused = Some(unreadable(error));
-                return;
-            }
-        };
-        if size + 2 > MAX_PAGE {
-            // The pager's own refusal, as the Job reader answers it.
-            refused = Some(pre_admission(failure(
-                "inputTooLarge",
-                "resource projection exceeds its page bound",
-            )));
-        } else if items.len() == page_size || bytes + size > MAX_PAGE {
-            more = true;
-        } else {
-            bytes += size;
-            items.push(row);
-        }
-    })?;
-    if let Some(refusal) = refused {
-        return Err(refusal);
-    }
-    if more {
-        return Err(failure(
-            "rejected",
-            "a Job list of more than one page needs the Job snapshot pager, which is not \
-             built on Windows yet; nothing was stored",
-        ));
-    }
-    let mut revision = arkdeck_platform::random_bytes::<16>().map_err(unreadable)?;
-    revision[6] = (revision[6] & 0x0f) | 0x40;
-    revision[8] = (revision[8] & 0x3f) | 0x80;
-    let hex: String = revision.iter().map(|b| format!("{b:02x}")).collect();
-    let mut answer = Map::new();
-    answer.insert("schemaVersion".into(), json!("arkdeck.cli.page/1"));
-    answer.insert("pageKind".into(), json!("snapshot"));
-    answer.insert("items".into(), Value::Array(items));
-    answer.insert("order".into(), json!(order));
-    answer.insert(
-        "snapshotRevision".into(),
-        json!(format!(
-            "{}-{}-{}-{}-{}",
-            &hex[..8],
-            &hex[8..12],
-            &hex[12..16],
-            &hex[16..20],
-            &hex[20..]
-        )),
-    );
-    answer.insert("hasMore".into(), Value::Bool(false));
-    answer.insert("nextCursor".into(), Value::Null);
-    Ok(Value::Object(answer))
-}
 /// The canonical bytes of the rows one Job list snapshot may keep.
 const MAX_JOB_SNAPSHOT: usize = 16 * 1024 * 1024;
 
