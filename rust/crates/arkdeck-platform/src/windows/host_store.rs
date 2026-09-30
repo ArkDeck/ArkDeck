@@ -49,7 +49,7 @@ pub struct HostFileIdentity {
 }
 
 impl HostFileIdentity {
-    fn of(stat: &Stat) -> io::Result<Self> {
+    pub(crate) fn of(stat: &Stat) -> io::Result<Self> {
         Ok(Self {
             device: stat.volume,
             inode: stat.inode()?,

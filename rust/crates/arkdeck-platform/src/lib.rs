@@ -354,6 +354,20 @@ pub use host_deveco_files::{
     DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
     DevEcoRoot,
 };
+// The same five-role reader over a Windows DevEco Studio directory
+// (TASK-XPA-011, G15): four roles, no signed resource envelope (Windows
+// binds no manifest to a publisher signature), identities as the host
+// store's `HostFileIdentity`. `host_deveco_resources` and `property_list`
+// stay macOS-only: Windows DevEco ships no property list.
+#[cfg(windows)]
+pub use windows::{
+    DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
+    DevEcoRoot,
+};
+// A pinned file measured through one no-follow handle (`FileIdInfo`, owner
+// and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
+#[cfg(windows)]
+pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
