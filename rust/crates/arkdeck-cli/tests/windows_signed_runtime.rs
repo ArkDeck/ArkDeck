@@ -440,11 +440,17 @@ mod windows {
     }
 
     /// The Windows status of the coverage entry of the daemon method `leaf`
-    /// fronts.
+    /// fronts, in the coverage manifest this CLI renders. That is the product
+    /// `maintainer contracts export` writes, which `tests/machine_contracts.rs`
+    /// holds to the committed `openspec/contracts/cli-feature-coverage.json`.
+    /// It is read from the build rather than the checkout, because
+    /// check-contracts' views copy `rust/` without `openspec/`.
     fn windows_statuses(leaf: &str) -> Vec<String> {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../../openspec/contracts/cli-feature-coverage.json");
-        let coverage: Value = serde_json::from_slice(&std::fs::read(path).unwrap()).unwrap();
+        let product = arkdeck_cli::machine_contracts::contract_products()
+            .into_iter()
+            .find(|product| product.relative_path == "cli-feature-coverage.json")
+            .expect("the CLI renders its feature coverage");
+        let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
         coverage["entries"]
             .as_array()
             .unwrap()
