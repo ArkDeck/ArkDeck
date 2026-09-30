@@ -103,7 +103,7 @@ impl ServiceAnswer {
 }
 
 /// The daemon image this CLI trusts: `ARKDECK_DAEMON_PATH` or the daemon
-/// beside the CLI, with its signer pin or package family.
+/// beside the CLI, with its signer pin, publisher identity or package family.
 pub fn installed_identity() -> Option<ServerIdentity> {
     let executable = std::env::var_os("ARKDECK_DAEMON_PATH")
         .map(PathBuf::from)
@@ -116,6 +116,8 @@ pub fn installed_identity() -> Option<ServerIdentity> {
         executable,
         authenticode_sha256: std::env::var("ARKDECK_DAEMON_SIGNER_SHA256").ok(),
         package_family: std::env::var("ARKDECK_DAEMON_PACKAGE_FAMILY").ok(),
+        publisher_organization: std::env::var("ARKDECK_DAEMON_PUBLISHER_ORGANIZATION").ok(),
+        publisher_eku: std::env::var("ARKDECK_DAEMON_PUBLISHER_EKU").ok(),
     })
 }
 
