@@ -679,6 +679,13 @@ mod tool_list_owner;
 #[cfg(target_os = "macos")]
 mod tool_retirement;
 
+// Portable: the product and SDK manifest facts, the same format on macOS
+// and Windows (TASK-XPA-011, G15). The registry and its read owner stay
+// macOS-only until the Windows DevEco trust (G12) exists.
+mod deveco_manifest;
+pub use deveco_manifest::{
+    DevEcoLaunchHost, DevEcoManifestError, DevEcoManifestFacts, parse_deveco_manifests,
+};
 #[cfg(target_os = "macos")]
 mod deveco_registry;
 #[cfg(target_os = "macos")]
