@@ -204,7 +204,9 @@ impl Authority {
         projects
             .startup_records()
             .map_err(|error| unusable(&path, &error.message))?;
-        let host = host.with_workspace_projects(projects);
+        let host = host
+            .with_workspace_projects(projects)
+            .with_planning(self.root.path());
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {

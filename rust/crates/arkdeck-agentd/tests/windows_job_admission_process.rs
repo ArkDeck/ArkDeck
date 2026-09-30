@@ -126,7 +126,8 @@ impl Root {
         }
     }
     /// Every file below `jobs-state` with its bytes, the SQLite index's
-    /// companions aside (their bytes follow the connection, not the rows).
+    /// companions (their bytes follow the connection, not the rows) and the
+    /// snapshot pages `job.list` stores aside.
     fn snapshot(&self) -> Vec<(PathBuf, Vec<u8>)> {
         fn walk(directory: &Path, into: &mut Vec<(PathBuf, Vec<u8>)>) {
             let mut entries: Vec<_> = std::fs::read_dir(directory)
@@ -136,6 +137,14 @@ impl Root {
             entries.sort();
             for path in entries {
                 if path.is_dir() {
+                    // A `job.list`'s stored snapshot pages are the read's,
+                    // not the Job records'.
+                    if path
+                        .file_name()
+                        .is_some_and(|name| name == "cli-job-snapshots")
+                    {
+                        continue;
+                    }
                     walk(&path, into);
                 } else {
                     let name = path.file_name().unwrap().to_string_lossy().into_owned();
