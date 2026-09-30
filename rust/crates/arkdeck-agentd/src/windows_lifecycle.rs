@@ -15,8 +15,8 @@
 //!   a guard and a pipe named after the root's file identity. Beside the
 //!   lifecycle only the Job store and its capability store, the Target
 //!   owners, the Artifact read and export owner, the Session owner, the
-//!   workspace project owner, the Job planner and admitter and (in a
-//!   development root) the Trace cache owner are composed over it (see
+//!   workspace project owner, the Job planner and admitter and the Trace
+//!   cache owner are composed over it (see
 //!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
@@ -48,6 +48,21 @@ use std::ffi::OsStr;
 use std::io::Write;
 use std::path::Path;
 use std::time::Duration;
+
+/// The account's default Sessions root and Trace cache, in its product
+/// directory `%LOCALAPPDATA%\ArkDeck` beside the state directory `Agentd`:
+/// the names macOS gives `ArkDeck/Sessions` and the App's `ArkDeck/Trace`.
+const ACCOUNT_SESSIONS: &str = "Sessions";
+const ACCOUNT_TRACE: &str = "Trace";
+
+/// The account's product directory as this root spells it (its parent), for
+/// messages.
+fn product(root: &StateRoot) -> std::path::PathBuf {
+    root.path()
+        .parent()
+        .map(Path::to_path_buf)
+        .unwrap_or_default()
+}
 
 /// Swift `AgentDaemonServer`'s instance document, the name and shape the
 /// macOS composition writes (`production.rs`).
@@ -156,17 +171,16 @@ impl Authority {
     ///   (`job.plan`, `job.submit`), with no HDC provider (no Windows HDC
     ///   tuple is registered): a device operation is refused before admission
     ///   with zero dispatch, as macOS refuses it without an HDC provider;
-    /// * in a development root only, the Trace cache owner
-    ///   (`TraceCacheStore`) over `trace-cache\traces`, beside its `staging`,
-    ///   the layout the macOS isolated owner creates: `trace.cache.status`
-    ///   reads the same inventory as on macOS. `trace.cache.purge` is
-    ///   refused before admission (`operationUnavailable`, ruling 18), as the
-    ///   macOS daemon refuses it without its retention owners: the Job
-    ///   owner's active-Session census, which alone proves that no Job's
-    ///   Session still needs the derived data, is not asked on Windows yet.
-    ///   The account's daemon composes none: on macOS it reads the App's
-    ///   cache in the App's container, and the Windows App's cache location
-    ///   is not decided yet.
+    /// * the Trace cache owner (`TraceCacheStore`) over a `traces` directory
+    ///   beside its `staging` ([`Self::trace_cache`]): a development root's
+    ///   `trace-cache`, the layout the macOS isolated owner creates, or the
+    ///   account's `%LOCALAPPDATA%\ArkDeck\Trace`, where the macOS App keeps
+    ///   `ArkDeck/Trace` in its container caches. `trace.cache.status` reads
+    ///   the same inventory as on macOS. `trace.cache.purge` is refused before
+    ///   admission (`operationUnavailable`, ruling 18), as the macOS daemon
+    ///   refuses it without its retention owners: the Job owner's
+    ///   active-Session census, which alone proves that no Job's Session still
+    ///   needs the derived data, is not asked on Windows yet.
     ///
     /// An existing owner directory is never re-permissioned; one that is not
     /// owner-only is refused when its owner opens it. Composing opens each
@@ -252,32 +266,7 @@ impl Authority {
         let host = host
             .with_workspace_projects(projects)
             .with_planning(self.root.path());
-        let host = if self.development {
-            let name = "trace-cache";
-            let unusable = |path: &Path, error: std::io::Error| {
-                format!(
-                    "the Trace cache {} is unusable: {error}; nothing was started",
-                    path.display()
-                )
-            };
-            let parent = self
-                .root
-                .private_child(name)
-                .map_err(|error| unusable(&self.root.path().join(name), error))?;
-            let directory = arkdeck_platform::HostDirectory::open(&parent)
-                .map_err(|error| unusable(&parent, error))?;
-            for child in ["traces", "staging"] {
-                directory
-                    .private_child(child)
-                    .map_err(|error| unusable(&parent.join(child), error))?;
-            }
-            let traces = parent.join("traces");
-            let cache = arkdeck_hoststore::TraceCacheStore::open(&traces)
-                .map_err(|error| unusable(&traces, error))?;
-            host.with_trace_cache(cache)
-        } else {
-            host
-        };
+        let host = host.with_trace_cache(self.trace_cache()?);
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);
         let host = match relation_source(registered, managed, false) {
@@ -342,15 +331,63 @@ impl Authority {
         })
     }
 
+    /// The Trace cache owner over `traces`, beside `staging`, each private
+    /// and created when absent: in a development root below its
+    /// `trace-cache`, the macOS isolated owner's layout; for the account in
+    /// `%LOCALAPPDATA%\ArkDeck\Trace`, the product directory's counterpart
+    /// of the macOS App's `Caches/ArkDeck/Trace` (the account location
+    /// decision in `evidence/runs/TASK-XPA-005/windows-account-locations-run.md`).
+    /// The macOS daemon only reads the App's cache and never creates it,
+    /// because the App's container is the App's; on Windows the App, the
+    /// daemon and the CLI share one physical `%LOCALAPPDATA%` (ruling 8), so
+    /// the daemon, which owns the store, creates it as a development root's
+    /// daemon does. An existing directory is never re-permissioned; one that
+    /// is not owner-only refuses the start when the store opens it.
+    fn trace_cache(&self) -> Result<arkdeck_hoststore::TraceCacheStore, String> {
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the Trace cache {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let parent = if self.development {
+            let name = "trace-cache";
+            self.root
+                .private_child(name)
+                .map_err(|error| unusable(&self.root.path().join(name), error))?
+        } else {
+            let name = ACCOUNT_TRACE;
+            self.root
+                .product_child(name)
+                .map_err(|error| unusable(&product(&self.root).join(name), error))?
+        };
+        let directory = arkdeck_platform::HostDirectory::open(&parent)
+            .map_err(|error| unusable(&parent, error))?;
+        for child in ["traces", "staging"] {
+            directory
+                .private_child(child)
+                .map_err(|error| unusable(&parent.join(child), error))?;
+        }
+        let traces = parent.join("traces");
+        arkdeck_hoststore::TraceCacheStore::open(&traces).map_err(|error| unusable(&traces, error))
+    }
+
     /// The Session storage owner: its settings in the private `session-state`
-    /// and its default Sessions root in the private `sessions`, the macOS
-    /// isolated owner's names. A development root's owner is isolated as the
+    /// and its default Sessions root, the Artifact usage owner (`artifacts`)
+    /// the one the Artifact read owner reads.
+    ///
+    /// A development root keeps its default root in its private `sessions`,
+    /// the macOS isolated owner's names, and its owner is isolated as the
     /// macOS one is: a selected Sessions root stays inside the development
-    /// root and outside every other owner's directory. The account's root
-    /// keeps both in the same children, below `Agentd`, until the Windows App
-    /// names its Sessions location (macOS keeps them in `ArkDeck/Sessions`).
-    /// Its Artifact usage owner (`artifacts`) is the one the Artifact read
-    /// owner reads.
+    /// root and outside every other owner's directory.
+    ///
+    /// The account keeps its default root in `%LOCALAPPDATA%\ArkDeck\Sessions`,
+    /// beside its state directory as macOS keeps `ArkDeck/Sessions` (the
+    /// account location decision, see [`Self::trace_cache`]); its settings
+    /// stay in `Agentd\session-state`, since the host store cannot open the
+    /// account root itself, whose DACL also grants SYSTEM (ruling 23). A
+    /// default root an earlier build kept in `Agentd\sessions` is moved there
+    /// once ([`Self::move_account_sessions`]).
     fn session_store(&self) -> Result<arkdeck_hoststore::SessionStore, String> {
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
             format!(
@@ -368,16 +405,19 @@ impl Authority {
                 .private_child(name)
                 .map_err(|error| unusable(&self.root.path().join(name), &error))
         };
-        let (state, sessions) = (child("session-state")?, child("sessions")?);
+        let state = child("session-state")?;
         let root = &state
             .parent()
             .ok_or_else(|| unusable(&state, &"it has no parent"))?
             .to_path_buf();
+        if !self.development {
+            let sessions = self.move_account_sessions(&state, root)?;
+            return arkdeck_hoststore::SessionStore::open(&state, &sessions)
+                .map_err(|error| unusable(&state, &error));
+        }
+        let sessions = child("sessions")?;
         let store = arkdeck_hoststore::SessionStore::open(&state, &sessions)
             .map_err(|error| unusable(&state, &error))?;
-        if !self.development {
-            return Ok(store);
-        }
         store
             .isolated(
                 root,
@@ -398,6 +438,90 @@ impl Authority {
                 .collect(),
             )
             .map_err(|error| unusable(&state, &error))
+    }
+
+    /// The account's default Sessions root, `%LOCALAPPDATA%\ArkDeck\Sessions`,
+    /// after the one-time move of an earlier build's `Agentd\sessions`
+    /// (`root` is the state directory as the file system spells it):
+    ///
+    /// * no `Agentd\sessions`: nothing to move;
+    /// * `Agentd\sessions` and no `Sessions`: the directory is renamed into
+    ///   place, one rename on the same volume, so every Session, its staging
+    ///   and its identity move together and nothing is copied;
+    /// * both: an empty `Agentd\sessions` is removed; one holding anything
+    ///   refuses the start, naming both, and neither is changed (Sessions
+    ///   are never merged).
+    ///
+    /// Then settings that still select the default root at its old place are
+    /// published selecting it at the new one
+    /// (`SessionStore::rebase_default_root`), which also completes a move a
+    /// start died in. The move runs under the owner lock and the
+    /// single-instance guard, before any owner opens a Session root.
+    fn move_account_sessions(
+        &self,
+        state: &Path,
+        root: &Path,
+    ) -> Result<std::path::PathBuf, String> {
+        const OLD: &str = "sessions";
+        let old = root.join(OLD);
+        // The product directory as the file system spells the state
+        // directory's parent, whatever spelling (a short name, say) the
+        // Known Folder gave the root.
+        let new = root
+            .parent()
+            .map_or_else(|| product(&self.root), Path::to_path_buf)
+            .join(ACCOUNT_SESSIONS);
+        let failed = |what: &str, error: &dyn std::fmt::Display| {
+            format!(
+                "the Sessions root {} could not be {what}: {error}; nothing was started",
+                new.display()
+            )
+        };
+        let has = |name: &str, product: bool| {
+            self.root
+                .has_entry(name, product)
+                .map_err(|error| failed("inspected", &error))
+        };
+        if has(OLD, false)? {
+            if !has(ACCOUNT_SESSIONS, true)? {
+                self.root
+                    .move_child_to_product(OLD, ACCOUNT_SESSIONS)
+                    .map_err(|error| failed(&format!("moved from {}", old.display()), &error))?;
+                report(&format!(
+                    "arkdeck-agentd moved the default Sessions root from {} to {}",
+                    old.display(),
+                    new.display()
+                ));
+            } else if self
+                .root
+                .remove_empty_child(OLD)
+                .map_err(|error| failed("inspected", &error))?
+            {
+                report(&format!(
+                    "arkdeck-agentd removed the empty earlier Sessions root {}",
+                    old.display()
+                ));
+            } else {
+                return Err(format!(
+                    "both {} and the earlier {} hold Sessions; move or remove one of them,                      Sessions are never merged; nothing was changed or started",
+                    new.display(),
+                    old.display()
+                ));
+            }
+        }
+        let sessions = self
+            .root
+            .product_child(ACCOUNT_SESSIONS)
+            .map_err(|error| failed("opened", &error))?;
+        if arkdeck_hoststore::SessionStore::rebase_default_root(state, &old, &sessions)
+            .map_err(|error| failed("recorded in the Session settings", &error))?
+        {
+            report(&format!(
+                "arkdeck-agentd recorded the default Sessions root {} in the Session settings",
+                sessions.display()
+            ));
+        }
+        Ok(sessions)
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread
