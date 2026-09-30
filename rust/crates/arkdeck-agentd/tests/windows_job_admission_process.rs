@@ -4,9 +4,8 @@
 //!
 //! No Windows HDC tuple is registered (its integration change waits for the
 //! maintainer's samples), so the daemon composes no HDC provider, and no
-//! workspace or analyzer provider, Artifact or Import owner or capability
-//! authority either. The planner and the admitter are the macOS code with
-//! those owners absent, so:
+//! workspace or analyzer provider either. The planner and the admitter are
+//! the macOS code with those owners absent, so:
 //!
 //! * a plan or a new submission of `observe.device@1` is refused before
 //!   admission with zero dispatch, as macOS refuses it without an HDC
@@ -415,7 +414,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     let before = root.snapshot();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache"
                 .to_owned()
         ),
         "{:?}",

@@ -961,9 +961,7 @@ capture), the capability store and policy (`capability_store`,
 `capability_policy`; the store directory is the host store's owner-only
 directory on Windows) and `catalog_review`; the Artifact read owner comes
 from #2356. Members whose owner is not built on Windows yet are types with
-no value there, so they are always `None`: `ImportUploadStore` (its
-publication needs the Artifact publication and Flash archive owners),
-`WorkspaceComposition` (the workspace provider crate and the DevEco owners),
+no value there, so they are always `None`: `WorkspaceComposition` (the workspace provider crate and the DevEco owners),
 `AnalyzerComposition` (a trait nothing implements: the ArkTrace profiles pin
 a trace_streamer Windows does not have) and `MutationAuthority` (the Session
 root owner and the Job owner's continuity census). Still `cfg(target_os =
@@ -2535,8 +2533,8 @@ The Artifact read, inspect, list and export owner (`ArtifactReadStore`,
 `ArtifactReadRequest`, `ArtifactInspectRequest`, `ArtifactExportRequest`) is
 built on Windows over the host store's NTFS export, file-export and
 payload-cache primitives (`crates/arkdeck-platform/README.md`), with the same
-Job index documents, payloads and snapshot pages as macOS; its Import owner
-and quota answer stay macOS-only (the usage owner is on Windows, H3b). An export destination on Windows is a
+Job index documents, payloads and snapshot pages as macOS; its quota answer
+stays macOS-only (the usage owner is on Windows, H3b; the Import owner below). An export destination on Windows is a
 local drive's absolute path (`C:\…`), `.` and `..` resolved and the drive
 letter upper-case, which must be the directory's own spelling (no junction,
 link, short name or other case); the receipt's `exportedPath` joins the file
@@ -2561,6 +2559,36 @@ restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+
+## Windows Import owner (TASK-XPA-008)
+
+`arkdeck-hoststore` builds the Import owner (`ImportUploadStore`: begin,
+append, abort, commit, inspect, list, release, an Import's Artifacts, and a
+Job's Import inputs) on Windows, over the host store's NTFS import upload
+(#2357) and the Artifact publication and read owners. The code is the macOS
+code, and `TargetStore::resolve_import_binding` with it. One kind waits: a
+`flash-bundle` Import is refused at publication as a kind whose validator is
+not configured ("This Import kind's publication validator is not
+configured"), before anything is published, until the Flash archive reader
+is on Windows (AF-W1); its begin and upload are the macOS ones. The Windows
+daemon composes the owner over its Artifact root's private `.imports-v1`,
+right after the Artifact owner (census `…, artifacts, imports, storage, …`),
+and hands it to the Job planner and runner. The CLI's `artifact import
+<kind>` uploads on Windows through the host store's `HostImportSource`,
+which holds the source open without write sharing, so it cannot change
+while it is sent; other hosts keep refusing the upload.
+
+Tests on Windows: `tests/import_upload.rs` (31 of its tests; the analyzer
+and child-kill ones stay macOS-only), `tests/import_target.rs` and the
+Swift Import refusal oracle (`import_refusal_oracle_tests.rs`), with
+fixtures made owner-only by `tests/fixture_fs`; the CLI's upload tests;
+and `arkdeck-agentd/tests/windows_import_owner_process.rs`: over the real
+daemon a HAP is uploaded, committed with its exact bytes, read through the
+Import owner, listed, inspected and released across a restart, a flash
+bundle is refused with nothing published, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, the real CLI imports, inspects, lists and
+releases. Run record:
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-008/windows-import-owner-run.md`.
 
 ## Windows credential store and console secret entry (TASK-XPA-011)
 

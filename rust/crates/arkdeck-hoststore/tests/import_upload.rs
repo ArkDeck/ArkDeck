@@ -1,10 +1,12 @@
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
+
+#[path = "fixture_fs/mod.rs"]
+mod fixture_fs;
 use arkdeck_contract::{
     ImportIntent, ImportProjection, WireError, encode_import_chunk, sha256_hex,
 };
 use arkdeck_hoststore::{ImportBinding, ImportUploadFault, ImportUploadStore};
 use serde_json::{Value, json};
-use std::os::unix::fs::{DirBuilderExt, symlink};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -17,16 +19,13 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = fixture_fs::temporary_root().join(format!(
             "rust-import-upload-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fixture_fs::private_dir(&root);
         let artifacts = root.join("artifacts");
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&artifacts)
-            .unwrap();
+        fixture_fs::private_dir(&artifacts);
         Self { root, artifacts }
     }
     fn store(&self) -> ImportUploadStore {
@@ -442,10 +441,7 @@ fn one_owner_and_private_directory_bindings_prevent_foreign_writes() {
         fixture.imports().join("held-payloads"),
     )
     .unwrap();
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .create(fixture.imports().join("payloads"))
-        .unwrap();
+    fixture_fs::private_dir(&fixture.imports().join("payloads"));
     assert_eq!(
         refusal(append(&store, id, 0, b"payload").unwrap_err()),
         text(
@@ -472,7 +468,7 @@ fn linked_or_corrupt_staging_and_foreign_identity_maps_fail_without_touching_raw
         match attack {
             "symlink" => {
                 fs::remove_file(fixture.stage(id)).unwrap();
-                symlink(&raw, fixture.stage(id)).unwrap();
+                fixture_fs::link(&raw, &fixture.stage(id));
             }
             "hardlink" => {
                 fs::remove_file(fixture.stage(id)).unwrap();
@@ -673,17 +669,16 @@ fn maximum_chunk_checkpoint_refuses_more_metadata_and_preserves_staged_bytes() {
 
 #[test]
 fn native_swift_upload_snapshot_reopens_and_resumes_without_rewriting_prior_records() {
-    use std::os::unix::fs::PermissionsExt;
     fn copy(source: &Path, destination: &Path) {
         for entry in fs::read_dir(source).unwrap() {
             let entry = entry.unwrap();
             let dest = destination.join(entry.file_name());
             if entry.file_type().unwrap().is_dir() {
-                fs::DirBuilder::new().mode(0o700).create(&dest).unwrap();
+                fixture_fs::private_dir(&dest);
                 copy(&entry.path(), &dest);
             } else {
                 fs::copy(entry.path(), &dest).unwrap();
-                fs::set_permissions(&dest, fs::Permissions::from_mode(0o600)).unwrap();
+                fixture_fs::owner_only(&dest);
             }
         }
     }
@@ -1122,7 +1117,7 @@ fn import_discovery_snapshot_export_and_receipt_metadata_poisoning() {
             .is_err()
     );
     let output = fixture.root.join("export");
-    fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    fixture_fs::private_dir(&output);
     let exported=store.artifact_resource(&artifacts,"artifact.export",json!({"owner":{"kind":"import","id":id},"artifactId":aid,"destinationDirectory":output}).as_object().unwrap()).unwrap();
     assert_eq!(exported["owner"]["kind"], "import");
     assert_eq!(
@@ -1232,7 +1227,6 @@ fn import_list_pagination_keeps_snapshot_and_rejects_foreign_query_cursor() {
 
 #[test]
 fn unfinished_copy_is_reclaimed_but_linked_copy_never_touches_external_bytes() {
-    use std::os::unix::fs::PermissionsExt;
     for linked in [false, true] {
         let fixture = Fixture::new();
         let store = fixture.store();
@@ -1244,15 +1238,15 @@ fn unfinished_copy_is_reclaimed_but_linked_copy_never_touches_external_bytes() {
         let digest = sha256_hex(format!("{id}\0fixture.hap\0{}", sha256_hex(bytes)).as_bytes());
         let aid = format!("ART-{}", &digest[..32]);
         let dir = fixture.artifacts.join(id);
-        fs::DirBuilder::new().mode(0o700).create(&dir).unwrap();
+        fixture_fs::private_dir(&dir);
         let temporary = dir.join(format!(".{aid}.{}.tmp", "0".repeat(32)));
         let outside = fixture.root.join("outside");
         fs::write(&outside, b"keep").unwrap();
         if linked {
-            symlink(&outside, &temporary).unwrap();
+            fixture_fs::link(&outside, &temporary);
         } else {
             fs::write(&temporary, b"partial copy").unwrap();
-            fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600)).unwrap();
+            fixture_fs::owner_only(&temporary);
         }
         let result = commit(&store, &artifacts, id);
         if linked {
@@ -1268,7 +1262,6 @@ fn unfinished_copy_is_reclaimed_but_linked_copy_never_touches_external_bytes() {
 
 #[test]
 fn published_but_unreceipted_missing_or_corrupt_payload_cannot_finish_commit() {
-    use std::os::unix::fs::PermissionsExt;
     for missing in [true, false] {
         let fixture = Fixture::new();
         let store = ImportUploadStore::open_with_fault(
@@ -1297,9 +1290,7 @@ fn published_but_unreceipted_missing_or_corrupt_payload_cannot_finish_commit() {
         if missing {
             fs::remove_file(&payload).unwrap();
         } else {
-            fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).unwrap();
-            fs::write(&payload, b"BAD!exact").unwrap();
-            fs::set_permissions(&payload, fs::Permissions::from_mode(0o400)).unwrap();
+            fixture_fs::rewrite_sealed(&payload, b"BAD!exact");
         }
         let restarted = fixture.store();
         assert_eq!(
@@ -1331,7 +1322,7 @@ fn lifecycle(
 fn jobs(fixture: &Fixture) -> arkdeck_hoststore::JobStore {
     let root = fixture.root.join("jobs-state");
     if !root.exists() {
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fixture_fs::private_dir(&root);
     }
     arkdeck_hoststore::JobStore::open_owner(&root).unwrap()
 }
@@ -1672,6 +1663,8 @@ fn materialization_hold_blocks_release_and_failed_planning_drops_it() {
             .is_err()
     );
 }
+// Runs an analyzer script or signals a child: macOS only.
+#[cfg(target_os = "macos")]
 #[test]
 fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
     let fixture = Fixture::new();
@@ -1683,7 +1676,6 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
     let id = begin["importId"].as_str().unwrap();
     append(&store, id, 0, bytes).unwrap();
     let committed = commit(&store, &artifacts, id).unwrap();
-    use std::os::unix::fs::PermissionsExt;
     let analyzer = fixture.root.join("analyzer");
     fs::copy(
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1778,10 +1770,7 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
         "recordUnreadable"
     );
     fs::write(&snapshot, original).unwrap();
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .create(fixture.root.join("jobs-state/jobs/job-orphan"))
-        .unwrap();
+    fixture_fs::private_dir(&fixture.root.join("jobs-state/jobs/job-orphan"));
     assert_eq!(
         lifecycle(
             &store,
@@ -1796,6 +1785,8 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
     );
 }
 
+// Runs an analyzer script or signals a child: macOS only.
+#[cfg(target_os = "macos")]
 #[test]
 fn missing_terminal_job_directory_cannot_clear_import_references() {
     let fixture = Fixture::new();
@@ -1807,7 +1798,6 @@ fn missing_terminal_job_directory_cannot_clear_import_references() {
     let id = begin["importId"].as_str().unwrap();
     append(&store, id, 0, bytes).unwrap();
     let committed = commit(&store, &artifacts, id).unwrap();
-    use std::os::unix::fs::PermissionsExt;
     let analyzer = fixture.root.join("analyzer");
     fs::copy(
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1834,10 +1824,7 @@ fn missing_terminal_job_directory_cannot_clear_import_references() {
     let accepted = admit.submit(&request).unwrap();
     let job_id = accepted["jobId"].as_str().unwrap();
     for name in ["session-owner", "Sessions"] {
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(fixture.root.join(name))
-            .unwrap();
+        fixture_fs::private_dir(&fixture.root.join(name));
     }
     let sessions = arkdeck_hoststore::SessionStore::open(
         &fixture.root.join("session-owner"),
@@ -2173,6 +2160,7 @@ fn release_recovery_refuses_retention_drift_and_keeps_the_closed_lease() {
 
 #[test]
 #[ignore = "subprocess fixture invoked by the SIGKILL durability test"]
+#[cfg(target_os = "macos")]
 fn release_sigkill_child() {
     let Some(root) = std::env::var_os("ARKDECK_TEST_IMPORT_RELEASE_CRASH_ROOT") else {
         return;
@@ -2219,6 +2207,8 @@ fn release_sigkill_child() {
     );
     panic!("crash fixture did not reach its requested window");
 }
+// Runs an analyzer script or signals a child: macOS only.
+#[cfg(target_os = "macos")]
 #[test]
 fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
     struct Child(std::process::Child);
@@ -2298,8 +2288,8 @@ fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn lifecycle_analyzer(fixture: &Fixture) -> arkdeck_hoststore::AnalyzerProfile {
-    use std::os::unix::fs::PermissionsExt;
     let analyzer = fixture.root.join("counted-analyzer");
     // Planning reads the executable's identity; only a dispatched child creates
     // this sibling marker. It is an isolated host test, never a device command.
@@ -2308,6 +2298,8 @@ fn lifecycle_analyzer(fixture: &Fixture) -> arkdeck_hoststore::AnalyzerProfile {
     arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap()
 }
 
+// Runs an analyzer script: macOS only.
+#[cfg(target_os = "macos")]
 #[test]
 fn successful_admission_hands_the_hold_to_the_durable_job_without_release_clearance() {
     use std::sync::{
@@ -2453,9 +2445,10 @@ fn successful_admission_hands_the_hold_to_the_durable_job_without_release_cleara
     assert!(!fixture.root.join("counted-analyzer.dispatched").exists());
 }
 
+// Runs an analyzer script or signals a child: macOS only.
+#[cfg(target_os = "macos")]
 #[test]
 fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() {
-    use std::os::unix::fs::PermissionsExt;
     for poison in ["payload", "receipt"] {
         let fixture = Fixture::new();
         let store = fixture.store();
@@ -2487,9 +2480,7 @@ fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() 
                 .artifacts
                 .join(id)
                 .join(committed["receipt"]["artifactId"].as_str().unwrap());
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
-            fs::write(&path, b"PK\x03\x04admitted-tampered").unwrap();
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+            fixture_fs::rewrite_sealed(&path, b"PK\x03\x04admitted-tampered");
         } else {
             let path = fixture.record("before-run");
             let mut record = read(&path);

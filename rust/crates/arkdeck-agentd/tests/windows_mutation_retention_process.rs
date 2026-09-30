@@ -409,7 +409,7 @@ fn the_start_sweeps_lapsed_artifacts_and_names_the_mutation_authority_across_a_r
     let pipe = first.serving();
     for line in [
         "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, \
-         storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache",
+         imports, storage, workspaceProjects, planning, agentExecutions, humanActions, traceCache",
         "recovered 1 active job(s); unknown outcomes parked",
         "reclaimed 4 expired artifact(s)",
     ] {
