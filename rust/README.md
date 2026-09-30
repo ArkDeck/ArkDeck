@@ -81,7 +81,13 @@ New targets default to that queue. Custom harnesses and doctests still run;
 either queue or doctest failure fails the lane. The `rust-test-timings-xcode-27`
 artifact records compilation, queue and doctest durations and complete logs for
 the checkout, and `rust-contract-test-timings-xcode-27` for the published and
-candidate views. Run `python scripts/test_ci_execution.py` to verify
+candidate views. With one worker (Windows and Linux CI, and local runs) the
+same script asks Cargo for every default target except the integration tests
+whose crate-level `#![cfg(...)]` is false on this host (`rustc --print cfg`),
+which would build to harnesses that run nothing; a cfg it cannot decide fails
+the run, and every kept target must appear in Cargo's `Running` lines. Clippy
+`--all-targets` still checks every target on every host. Run
+`python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
 
 The two added CLI targets (`domain_leaves` and `runtime_service`) use random
@@ -592,6 +598,24 @@ replay purge. Database preparation and installed cache ownership remain pending.
 The paired native receipt requires ArkTrace with the directory-hinted owner
 target fix (ArkTrace PR #25); the previously pinned `e6e3133d` skips every
 Ready entry, so parity checks against it record that mismatch rather than pass.
+
+On Windows (TASK-XPA-021) the same owner (`TraceCacheStore`, `trace_inventory`,
+`trace_maintenance`) runs on NTFS over `arkdeck_platform::PreparedTraceRemoval`'s
+Windows port: every entry opened relative to its held parent without following
+a reparse point, the quarantine a POSIX rename that never replaces an entry,
+each removal deleting through a handle whose identity was just compared with
+the capture. NTFS refuses to rename a directory while a handle is open inside
+it, so the quarantine lets go of the moved tree's handles for the rename and
+opens them again, each required to be the captured directory; for the same
+reason a prepared tree's ancestors cannot be moved away meanwhile. The Windows
+daemon composes the owner over `trace-cache/traces` in a development root only
+(the account's daemon would read the App's cache, whose Windows location is not
+decided); `trace.cache.status` answers there, and `trace.cache.purge` is refused
+as the macOS daemon refuses it without its retention owners: the Job owner's
+active-Session census is not asked on Windows yet. `trace export` is the
+Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
+it; the daemon's Job store proves the Trace's Job first, and refuses a Job it
+does not hold (`resourceNotFound`).
 
 Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
 to check real RPC/CLI status and purge, retention, lease contention, restart,
@@ -2277,9 +2301,35 @@ the mode on every return and, through a console control handler, on Ctrl-C.
 `tests/windows_credential_store.rs` works in a per-run fixture namespace and
 deletes every credential it may have created; `tests/windows_console_secret.rs`
 (`harness = false`) drives the reader in a child on a pseudo console and checks
-that nothing typed is rendered. The signing leaves stay macOS-only (daemon
-identity, file identity, PTY signer). The run record is
+that nothing typed is rendered. The signing owners built on it are the next
+section. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
+
+## Windows signing owners (TASK-XPA-011)
+
+`arkdeck-provider-workspace` builds `signer`, `sdk_release`, `credential_owner`,
+`signing_install`, `signing_rekey` and `signing_removal` on Windows as well as
+macOS, with one Runtime semantics. Host paths are this host's spelling
+(`X:\a\b`, joined with `\`): the attempt directory, the managed SDK material
+and its `…\toolchains\lib\hap-sign-tool.jar` rule, and the preset root
+`<LocalAppData>\ArkDeck\Signing\OpenHarmony` (`SigningPresetStore::default_root`).
+`arkdeck_platform::VerifiedSource` has a Windows form: the file is held without
+write or delete sharing and every ancestor without delete sharing, so its
+canonical path names the verified bytes while held, and that path takes the
+place of the macOS `/.vol` inode alias in the signer's argv.
+`create_private_directory`/`create_private_file` give new entries the store's
+owner-only descriptor where macOS uses `0700`/`0600`. `KeychainSigningSecrets`
+is built on Windows only in its scope-bound form (`over`) over Credential
+Manager: the production constructors bind a receipt to the daemon's code
+identity, and the Windows (Authenticode) form of that identity is not a
+receipt input yet; the CLI signing leaves and the daemon's signing dispatch
+stay macOS-only. `tests/windows_signing_flow.rs` (`harness = false`) runs the
+test binary as a fake `java.exe` on the signer's pseudo console: install, sign,
+verify and record, re-key through Credential Manager, a rejected password, a
+drifted JAR, the managed SDK release profile, removal;
+`arkdeck-platform/tests/windows_verified_source.rs` covers the held source and
+the private entries. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-owners-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

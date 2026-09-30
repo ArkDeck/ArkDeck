@@ -580,7 +580,7 @@ impl CredentialOwner {
 
     fn valid_material_directory(&self, path: &str) -> bool {
         let path_object = std::path::Path::new(path);
-        crate::signing_action::is_standard_path(path)
+        crate::file_identity::is_standard_host_path(path)
             && path_object.parent() == Some(self.store.root())
             && path_object
                 .file_name()

@@ -132,7 +132,7 @@ pub struct Host {
     /// workspace Job plans, admits and runs through.
     #[cfg(target_os = "macos")]
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
     #[cfg(target_os = "macos")]
     storage: Option<
@@ -808,7 +808,7 @@ impl Host {
             .read_snapshot(job_id)
             .map(|_| ())
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
         self.trace_cache = Some(cache);
         self
@@ -1211,6 +1211,7 @@ impl Host {
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1259,7 +1260,7 @@ impl Host {
             workspace_projects: None,
             #[cfg(target_os = "macos")]
             workspace: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             trace_cache: None,
             #[cfg(target_os = "macos")]
             storage: None,
@@ -2356,8 +2357,12 @@ impl HostServices for Host {
             details: None,
         };
         let cache = self.trace_cache.as_ref().ok_or_else(unconfigured)?;
-        let jobs = self.jobs.as_ref().ok_or_else(unconfigured)?;
-        let artifacts = self.artifacts.as_ref().ok_or_else(unconfigured)?;
+        // Without the retention owners nothing proves the entries inactive:
+        // refused before admission, so a client reads a refusal rather than
+        // an unknown outcome.
+        let unavailable = arkdeck_hoststore::TraceCacheStore::purge_unavailable;
+        let jobs = self.jobs.as_ref().ok_or_else(unavailable)?;
+        let artifacts = self.artifacts.as_ref().ok_or_else(unavailable)?;
         let refuse = || {
             arkdeck_hoststore::TraceCacheStore::purge_refusal(
                 "Trace cache or authoritative Job/Artifact retention owner is unavailable",
@@ -2372,7 +2377,22 @@ impl HostServices for Host {
         })
         .map_err(|_| refuse())
     }
-    #[cfg(target_os = "macos")]
+    /// The macOS owner's answers without its retention owners: the Job
+    /// owner's active-Session census and the Artifact owner's Trace retention
+    /// are not asked on Windows yet, so nothing can prove that no Job's
+    /// Session still needs the derived data. The purge is refused before admission,
+    /// with zero dispatch (ruling 18), and nothing is purged. Without the
+    /// Trace cache owner itself it is `rejected`, as `trace.cache.status` is.
+    #[cfg(windows)]
+    fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
+        self.trace_cache.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "Trace cache owner is not configured".into(),
+            details: None,
+        })?;
+        Err(arkdeck_hoststore::TraceCacheStore::purge_unavailable())
+    }
+    #[cfg(any(target_os = "macos", windows))]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
         self.trace_cache
             .as_ref()

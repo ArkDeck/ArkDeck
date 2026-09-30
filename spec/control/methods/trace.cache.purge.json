@@ -7,6 +7,7 @@
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "outcomeUnknown",
         "recordUnreadable",
         "rejected",
@@ -139,8 +140,8 @@
   "x-arkdeck-method": "trace.cache.purge",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 6,
-    "request": 8,
-    "result": 2
+    "error": 3,
+    "request": 4,
+    "result": 1
   }
 }

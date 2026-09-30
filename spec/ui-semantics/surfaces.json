@@ -1,6 +1,6 @@
 {
   "schemaVersion": "arkdeck.ui-semantics.surfaces/1",
-  "description": "UI semantic snapshots of the ArkDeck App surfaces the TASK-XPA-007 walking skeleton shows: for one page in one daemon state, the elements a screen reader finds by stable identifier, their role and their accessible name. The Windows App's UIA tree must match each snapshot in every catalogue language (windows/App.UITests); an identifier marked \"macos\" is the macOS App's accessibility identifier of the same element, so the two platforms' trees can be compared by identifier. Names are lists of parts joined without separator: \"@key\" is the catalogue string (strings.json) in the snapshot's language, {\"format\": key, \"args\": [...]} formats it (an argument \"@key\" is itself looked up), anything else is literal. \"match\": \"prefix\" compares only the start (the rest is the daemon's or ClientKit's own detail). Scenarios name the Windows App's scripted test transport (windows/App.Core/Testing/ScriptedDaemon.cs); \"foundation\" answers as today's Windows daemon does.",
+  "description": "UI semantic snapshots of the ArkDeck App surfaces the Windows client shows (TASK-XPA-007 skeleton, TASK-XPA-020 surfaces): for one page in one daemon state, the elements a screen reader finds by stable identifier, their role and their accessible name. The Windows App's UIA tree must match each snapshot in every catalogue language (windows/App.UITests); an identifier marked \"macos\" is the macOS App's accessibility identifier of the same element, so the two platforms' trees can be compared by identifier. Names are lists of parts joined without separator: \"@key\" is the catalogue string (strings.json) in the snapshot's language, {\"format\": key, \"args\": [...]} formats it (an argument \"@key\" is itself looked up), anything else is literal. \"match\": \"prefix\" compares only the start (the rest is the daemon's or ClientKit's own detail). \"steps\" (optional) are what a person does on the page before the elements are compared, in order: \"select\" an item or \"invoke\" a button by identifier (TASK-XPA-020). Scenarios name the Windows App's scripted test transport (windows/App.Core/Testing/ScriptedDaemon.cs); \"foundation\" answers as today's Windows daemon does.",
   "roles": {
     "text": "Text",
     "button": "Button",
@@ -59,6 +59,11 @@
         { "automationId": "app.devices.unavailable.cli", "origin": "windows", "role": "text", "name": [{ "format": "windows.cli.equivalent", "args": ["arkdeck device candidates"] }] },
         { "automationId": "app.devices.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"] },
         { "automationId": "device.action.recheck", "origin": "macos", "role": "button", "name": ["@device.action.recheck"] },
+        {"automationId": "device.targets.title", "origin": "windows", "role": "text", "name": ["@windows.device.targets.title"]},
+        {"automationId": "device.targets.unavailable", "origin": "windows", "role": "text", "name": ["@windows.device.targets.unavailable"]},
+        {"automationId": "device.targets.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["internalError", "Target owner is not configured"]}]},
+        {"automationId": "device.targets.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck target list"]}]},
+        {"automationId": "device.targets.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]},
         { "automationId": "device.detail.adoptViaCLI", "origin": "macos", "role": "text", "name": ["@device.detail.adoptViaCLI"] }
       ]
     },
@@ -112,7 +117,8 @@
         { "automationId": "app.devices.list", "origin": "windows", "role": "list", "name": ["@app.navigation.device"] },
         { "automationId": "device.row.fixture-serial-1", "origin": "macos", "role": "listItem", "name": ["Bench board, ", "@device.state.ready"] },
         { "automationId": "device.row.fixture-serial-2", "origin": "macos", "role": "listItem", "name": ["fixture-serial-2, ", "@device.state.needsTrust"] },
-        { "automationId": "device.row.fixture-serial-3", "origin": "macos", "role": "listItem", "name": ["fixture-serial-3, ", "@device.state.offline"] }
+        { "automationId": "device.row.fixture-serial-3", "origin": "macos", "role": "listItem", "name": ["fixture-serial-3, ", "@device.state.offline"] },
+        {"automationId": "device.target.TGT-FIXTURE-1", "origin": "windows", "role": "listItem", "name": ["Bench board, TGT-FIXTURE-1"]}
       ]
     },
     {
@@ -125,6 +131,86 @@
         { "automationId": "history.row.state.job-0000000000000000000000000000a002", "origin": "macos", "role": "text", "name": ["@history.state.failed"] },
         { "automationId": "history.row.job-0000000000000000000000000000a003", "origin": "windows", "role": "listItem", "name": ["job-0000000000000000000000000000a003, trace.capture@1, ", "@history.state.succeeded"] },
         { "automationId": "jobInspector.list", "origin": "macos", "role": "list", "name": ["@jobInspector.runtimeFacts"] }
+      ]
+    },
+    {
+      "id": "device.targets",
+      "scenario": "targets",
+      "page": "device",
+      "steps": [{"select": "device.target.TGT-3ba3f5f43b92"}],
+      "elements": [
+        {"automationId": "app.devices.unavailable.reason", "origin": "macos", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "hdc.notConfigured"]}]},
+        {"automationId": "device.targets.title", "origin": "windows", "role": "text", "name": ["@windows.device.targets.title"]},
+        {"automationId": "device.targets.list", "origin": "windows", "role": "list", "name": ["@windows.device.targets.title"]},
+        {"automationId": "device.target.TGT-3ba3f5f43b92", "origin": "windows", "role": "listItem", "name": ["TGT-3ba3f5f43b92"]},
+        {"automationId": "device.target.detail.title", "origin": "windows", "role": "text", "name": ["TGT-3ba3f5f43b92"]},
+        {"automationId": "device.target.rename", "origin": "windows", "role": "button", "name": ["@device.action.rename"]},
+        {"automationId": "device.target.detail.connectKey.label", "origin": "windows", "role": "text", "name": ["@device.fact.connectKey"]},
+        {"automationId": "device.target.detail.connectKey", "origin": "windows", "role": "text", "name": ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]},
+        {"automationId": "device.target.detail.identity.label", "origin": "windows", "role": "text", "name": ["@windows.device.target.identity"]},
+        {"automationId": "device.target.detail.identity", "origin": "windows", "role": "text", "name": ["3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"]},
+        {"automationId": "device.target.detail.toolVersion", "origin": "windows", "role": "text", "name": ["3.2.0d"]},
+        {"automationId": "device.target.binding", "origin": "windows", "role": "text", "name": ["ready"]},
+        {"automationId": "device.target.presence", "origin": "windows", "role": "text", "name": ["unresolved (device_observation_unavailable)"]},
+        {"automationId": "device.target.presence.reason", "origin": "windows", "role": "text", "name": ["the Runtime has no device observation source configured"]},
+        {"automationId": "device.target.tool", "origin": "windows", "role": "text", "name": ["absent (runtime_tool_unavailable)"]},
+        {"automationId": "device.target.operations.scope", "origin": "windows", "role": "text", "name": [{"format": "windows.device.target.operationsScope", "args": ["host", "target_scoped_operation_availability_unavailable"]}]},
+        {"automationId": "device.target.operation.observe.device@1", "origin": "windows", "role": "listItem", "name": ["observe.device@1 · unavailable (provider_not_registered)"]},
+        {"automationId": "device.detail.adoptViaCLI", "origin": "macos", "role": "text", "name": ["@device.detail.adoptViaCLI"]}
+      ]
+    },
+    {
+      "id": "history.jobs.traceDetail",
+      "scenario": "jobs",
+      "page": "history",
+      "steps": [{"select": "history.row.job-0000000000000000000000000000a003"}, {"invoke": "history.artifact.inspectTrace.ART-00000000000000000000000000000c01"}],
+      "elements": [
+        {"automationId": "history.detail.title", "origin": "macos", "role": "text", "name": ["@history.detail.title"]},
+        {"automationId": "history.detail.reload", "origin": "macos", "role": "button", "name": ["@history.detail.reload"]},
+        {"automationId": "history.detail.job", "origin": "windows", "role": "text", "name": ["job-0000000000000000000000000000a003"]},
+        {"automationId": "history.detail.operation.label", "origin": "windows", "role": "text", "name": ["@history.detail.operation"]},
+        {"automationId": "history.detail.operation", "origin": "windows", "role": "text", "name": ["trace.capture@1"]},
+        {"automationId": "history.detail.state", "origin": "windows", "role": "text", "name": ["@history.state.succeeded"]},
+        {"automationId": "history.detail.artifacts", "origin": "windows", "role": "text", "name": ["@history.detail.artifacts"]},
+        {"automationId": "history.artifacts", "origin": "macos", "role": "list", "name": ["@history.detail.artifacts"]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000c01", "origin": "macos", "role": "listItem", "name": ["trace.htrace, published"]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000c01.source", "origin": "windows", "role": "text", "name": ["trace.capture@1 · ", {"format": "windows.bytes", "args": ["300,000"]}]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000c01.privacy", "origin": "windows", "role": "text", "name": ["sensitive · application/octet-stream"]},
+        {"automationId": "history.artifact.export.ART-00000000000000000000000000000c01", "origin": "macos", "role": "button", "name": ["@history.artifacts.export"]},
+        {"automationId": "history.artifact.inspectTrace.ART-00000000000000000000000000000c01", "origin": "windows", "role": "button", "name": ["@windows.trace.inspect.action"]},
+        {"automationId": "history.artifact.export.ART-00000000000000000000000000000c02", "origin": "macos", "role": "button", "name": ["@history.artifacts.export"]},
+        {"automationId": "history.artifacts.exportBoundary", "origin": "windows", "role": "text", "name": ["@history.artifacts.exportBoundary"]},
+        {"automationId": "history.artifacts.traceViewerDeferred", "origin": "windows", "role": "text", "name": ["@windows.trace.viewerDeferred"]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.unavailable", "origin": "windows", "role": "text", "name": ["@windows.trace.inspect.unavailable"]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["operationUnavailable", "Trace inspection is unavailable"]}], "live": "polite"},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck trace inspect --job job-0000000000000000000000000000a003 --artifact ART-00000000000000000000000000000c01 --allow-sensitive"]}]}
+      ]
+    },
+    {
+      "id": "history.jobs.failedDetail",
+      "scenario": "jobs",
+      "page": "history",
+      "steps": [{"select": "history.row.job-0000000000000000000000000000a002"}],
+      "elements": [
+        {"automationId": "history.detail.operation", "origin": "windows", "role": "text", "name": ["flash.images@1"]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000b01", "origin": "macos", "role": "listItem", "name": ["flash-log.txt, published"]},
+        {"automationId": "history.artifact.export.ART-00000000000000000000000000000b01", "origin": "macos", "role": "button", "name": ["@history.artifacts.export"]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000b02", "origin": "macos", "role": "listItem", "name": ["partition-table.json, missing"]},
+        {"automationId": "history.artifact.ART-00000000000000000000000000000b02.status", "origin": "windows", "role": "text", "name": ["missing"]}
+      ]
+    },
+    {
+      "id": "history.inspector.trace",
+      "scenario": "inspector",
+      "page": "history",
+      "steps": [{"select": "history.row.job-0000000000000000000000000000a003"}, {"invoke": "history.artifact.inspectTrace.ART-00000000000000000000000000000c01"}],
+      "elements": [
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.title", "origin": "windows", "role": "text", "name": ["@windows.trace.inspect.title"], "live": "polite"},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.engine", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.engine", "args": ["ArkTrace", "4.3.7"]}]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.parser", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.parser", "args": ["trace_streamer", "fixture"]}]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.duration", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.duration", "args": ["5000000000"]}]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.capabilities", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.capabilities", "args": ["cpuScheduling, namedSlices, threadStates"]}]},
+        {"automationId": "history.artifact.trace.ART-00000000000000000000000000000c01.quality", "origin": "windows", "role": "text", "name": [{"format": "windows.trace.inspect.quality", "args": ["ok", "0"]}]}
       ]
     }
   ]
