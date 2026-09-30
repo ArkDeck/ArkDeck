@@ -112,6 +112,13 @@ About the `ownerRefusal` rows:
 Either way the method reached an owner this daemon composes. That makes **28 of 105** methods
 answered by a composed owner (7 with a result for the corpus request, 21 refused by the owner).
 
+The script exits 1 when any reply is `nonConforming`. On this PR's base it does, for the two
+findings below. Against the daemon of the follow-up that fixes them (#2382, branch
+`agent/xpa-018-nonconforming-replies-20260930`) it exits 0, with 7 results, 22 owner refusals and
+76 no owner: `artifact.import.list` becomes the Import owner's refusal, and
+`target.display-name.clear` the Target owner's. #2382 also runs the same census as a Windows test
+(`tests/windows_method_conformance_process.rs`).
+
 ### Findings (not fixed here)
 
 1. **`target.display-name.clear` for a Target that does not exist.** The Target owner answers

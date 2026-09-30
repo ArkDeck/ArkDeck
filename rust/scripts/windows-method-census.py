@@ -28,7 +28,7 @@ The pipe is opened as a plain file: this measures what the daemon answers, not
 the product client's identity check, which the signed CLI tests hold. Prints
 one JSON document: the owners the daemon reports, the Catalog operations
 `operation.list` names available, the counts and every method's reply code,
-message and class. Windows only.
+message and class. Exits 1 when any reply is `nonConforming`. Windows only.
 """
 from __future__ import annotations
 
@@ -174,7 +174,7 @@ def main() -> int:
                 indent=2,
             )
         )
-        return 0
+        return 1 if counts.get("nonConforming") else 0
     finally:
         daemon.kill()
         daemon.wait()
