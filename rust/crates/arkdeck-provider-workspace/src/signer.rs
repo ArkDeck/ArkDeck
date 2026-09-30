@@ -11,6 +11,12 @@
 //! through the terminal: they are in no argument, no environment, no receipt,
 //! no record and no error.
 //!
+//! On Windows (TASK-XPA-011) the same flow runs `java.exe` on a pseudo
+//! console; a [`VerifiedSource`] is held with its whole namespace (no write,
+//! rename or delete of the file or any ancestor while held) and names the
+//! JAR by its canonical path, and the attempt directory and the files this
+//! module creates carry the private descriptor where macOS uses `0700`/`0600`.
+//!
 //! Failure classes follow Swift: anything refused before the signer runs is
 //! [`SigningFailure::Refused`] (zero dispatch, the attempt directory removed);
 //! from the spawn on every failure is [`SigningFailure::OutcomeUnknown`] and
@@ -28,7 +34,8 @@ use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::io::Read;
-use std::os::unix::fs::{DirBuilderExt, MetadataExt, PermissionsExt};
+#[cfg(target_os = "macos")]
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -124,9 +131,7 @@ pub fn sign_hap(
         if input.0 != action.input_byte_count || input.1 != action.input_sha256 {
             return Err(SigningError::drift("input HAP"));
         }
-        std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&action.output.directory)
+        create_private_directory(Path::new(&action.output.directory))
             .map_err(|error| SigningError::io(error.to_string()))?;
         created = true;
         stage_unsigned_hap(action)
@@ -398,11 +403,31 @@ pub fn identity_bound_jar_arguments(
     Ok(bound)
 }
 
+#[cfg(target_os = "macos")]
+fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    std::fs::DirBuilder::new().mode(0o700).create(path)
+}
+
+#[cfg(windows)]
+use arkdeck_platform::create_private_directory;
+
 fn stage_unsigned_hap(action: &SigningAction) -> Result<(), SigningError> {
     let destination = action.output.staged_unsigned_hap();
-    std::fs::copy(&action.input_file_path, &destination)
-        .map_err(|error| SigningError::io(error.to_string()))?;
-    std::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o600))
+    #[cfg(target_os = "macos")]
+    {
+        std::fs::copy(&action.input_file_path, &destination)
+            .map_err(|error| SigningError::io(error.to_string()))?;
+        std::fs::set_permissions(&destination, std::fs::Permissions::from_mode(0o600))
+            .map_err(|error| SigningError::io(error.to_string()))?;
+    }
+    // The copy is created private, never widened afterwards.
+    #[cfg(windows)]
+    std::fs::File::open(&action.input_file_path)
+        .and_then(|mut input| {
+            let mut output = arkdeck_platform::create_private_file(Path::new(&destination))?;
+            std::io::copy(&mut input, &mut output)?;
+            output.sync_all()
+        })
         .map_err(|error| SigningError::io(error.to_string()))?;
     let staged = measured_hap(&destination, MAX_HAP_BYTES)?;
     if staged.0 != action.input_byte_count || staged.1 != action.input_sha256 {
@@ -434,17 +459,20 @@ fn write_record(
         .ok_or_else(|| SigningError::io("signing result record could not be encoded"))?;
     let token = arkdeck_platform::random_bytes::<16>()
         .map_err(|error| SigningError::io(error.to_string()))?;
-    let temporary = format!(
-        "{}/.signing-result-{}.tmp",
-        action.output.directory,
-        hex(&token).to_uppercase()
+    let temporary = crate::signing_action::host_join(
+        &action.output.directory,
+        &format!(".signing-result-{}.tmp", hex(&token).to_uppercase()),
     );
     let result = (|| -> std::io::Result<()> {
+        #[cfg(target_os = "macos")]
         let mut file = std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
             .open(&temporary)?;
+        #[cfg(windows)]
+        let mut file = arkdeck_platform::create_private_file(Path::new(&temporary))?;
         std::io::Write::write_all(&mut file, &bytes)?;
+        #[cfg(target_os = "macos")]
         file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
         file.sync_all()?;
         drop(file);
@@ -459,16 +487,16 @@ fn write_record(
 /// Swift `measuredRegularFile(at:maximumBytes:)`: `(byteCount, sha256)`.
 fn measured_regular_file(path: &str, maximum: u64) -> Result<(u64, String), SigningError> {
     let invalid = || SigningError::unsafe_file("postflight file is absent or invalid");
-    if !path.starts_with('/') {
+    if !Path::new(path).is_absolute() {
         return Err(invalid());
     }
     let metadata = std::fs::symlink_metadata(path).map_err(|_| invalid())?;
-    if !metadata.file_type().is_file() || metadata.size() == 0 || metadata.size() > maximum {
+    if !metadata.file_type().is_file() || metadata.len() == 0 || metadata.len() > maximum {
         return Err(invalid());
     }
     let (sha256, count) = hash_file(path)
         .map_err(|_| SigningError::drift("postflight file changed while hashing"))?;
-    if count != metadata.size() {
+    if count != metadata.len() {
         return Err(SigningError::drift("postflight file changed while hashing"));
     }
     Ok((count, sha256))

@@ -17,9 +17,7 @@
 //! identity moved or the path names another file afterwards.
 use crate::SigningError;
 use crate::signing_preset::SigningFileIdentity;
-#[cfg(unix)]
 use sha2::{Digest, Sha256};
-#[cfg(unix)]
 use std::io::Read;
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
@@ -209,7 +207,6 @@ pub fn remeasure(
     Ok(())
 }
 
-#[cfg(unix)]
 pub(crate) fn hash_file(path: &str) -> std::io::Result<(String, u64)> {
     let mut file = std::fs::File::open(path)?;
     let mut hasher = Sha256::new();

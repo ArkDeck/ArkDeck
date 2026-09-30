@@ -33,6 +33,7 @@ mod server;
 mod state;
 mod stop;
 mod tool;
+mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root};
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{
@@ -62,6 +63,7 @@ pub use state::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 pub use stop::{Latch, StopSignal, send_console_break};
+pub use verified_source::{VerifiedSource, create_private_directory, create_private_file};
 
 pub(crate) struct Handle(OwnedHandle);
 impl Handle {

@@ -51,11 +51,15 @@ pub use terminal_secret::{TerminalSecretError, read_terminal_secret};
 // The Windows console reader and Credential Manager store (TASK-XPA-011, G13)
 // with the macOS surface; `trusted_daemon_fingerprint` stays macOS-only until
 // the Authenticode identity (G12) binds a signing receipt on Windows.
+// The Windows counterpart of the `/.vol`-bound source (a held file and
+// namespace) and the signing layer's private entries (TASK-XPA-011).
 #[cfg(windows)]
 pub use windows::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
     KeychainPresence, TerminalSecretError, read_terminal_secret,
 };
+#[cfg(windows)]
+pub use windows::{VerifiedSource, create_private_directory, create_private_file};
 mod tool_shim;
 #[cfg(target_os = "macos")]
 pub use tool_shim::resolve as resolve_tool_shim;

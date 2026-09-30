@@ -266,14 +266,10 @@ pub(crate) fn prove_receipt_unchanged(
 #[cfg(test)]
 mod publication_tests {
     use super::*;
+    use crate::test_fixture;
     use crate::{credential_owner::CredentialOwner, signing_preset::SecretPresence};
     use arkdeck_platform::Secret;
-    use std::{
-        collections::BTreeMap,
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt},
-        sync::Mutex,
-    };
+    use std::{collections::BTreeMap, fs, sync::Mutex};
     #[derive(Default)]
     struct Secrets(Mutex<BTreeMap<String, Secret>>);
     impl SigningSecrets for Secrets {
@@ -319,27 +315,17 @@ mod publication_tests {
     struct Fixture(PathBuf);
     impl Fixture {
         fn new() -> Self {
-            let path = PathBuf::from(format!(
-                "/private/tmp/arkdeck-signing-outcome-{:032x}",
-                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-            ));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
-            Self(path)
+            Self(test_fixture::directory("signing-outcome"))
         }
         fn configuration(&self) -> SigningPresetConfiguration {
-            let file = |name, executable| {
+            let file = |name: &str, executable| {
                 let path = self.0.join(name);
-                fs::write(&path, b"fixture material").unwrap();
-                fs::set_permissions(
-                    &path,
-                    fs::Permissions::from_mode(if executable { 0o700 } else { 0o600 }),
-                )
-                .unwrap();
+                test_fixture::file(&path, b"fixture material", executable);
                 PathBuf::from(crate::foundation_resolved_path(path.to_str().unwrap()).unwrap())
             };
             SigningPresetConfiguration {
                 project_ref: "demo-app".into(),
-                java_executable: file("java", true),
+                java_executable: file(&test_fixture::executable("java"), true),
                 signer_jar: file("signer.jar", false),
                 keystore: file("source.p12", false),
                 app_certificate: file("source.pem", false),
@@ -406,8 +392,7 @@ mod publication_tests {
                     fs::create_dir(&receipt_path).unwrap();
                     assert!(owner.current().is_err());
                     fs::remove_dir(&receipt_path).unwrap();
-                    fs::write(&receipt_path, bytes).unwrap();
-                    fs::set_permissions(&receipt_path, fs::Permissions::from_mode(0o600)).unwrap();
+                    test_fixture::file(&receipt_path, &bytes, false);
                 }
                 for value in secrets.0.lock().unwrap().values() {
                     assert_eq!(
