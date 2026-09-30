@@ -250,8 +250,9 @@ fn pretty(value: &Value, escape_solidus: bool) -> Result<Vec<u8>> {
 /// Foundation `JSONValue` decoding of a caller's document, without requiring
 /// its canonical spelling: member names are unique under canonical equivalence
 /// (Swift `StrictJSONDuplicateValidator`) and numbers follow `JSONValue`'s
-/// Int64, UInt64, then Double order. Nothing is re-encoded.
-#[cfg(target_os = "macos")]
+/// Int64, UInt64, then Double order. Nothing is re-encoded. The ArkTrace
+/// analysis judge reads its envelopes this way on Windows too.
+#[cfg(any(target_os = "macos", windows))]
 pub(super) fn parse_foundation(bytes: &[u8]) -> Result<Value> {
     let mut reader = Reader { bytes, position: 0 };
     let value = reader.value(0)?;

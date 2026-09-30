@@ -10,8 +10,7 @@
 //! `JSONValue` (member names unique and compared under canonical
 //! equivalence, an integral number an integer); success authorizes
 //! publishing the exact bytes, never a re-encoding.
-use crate::arktrace_doctor::{boolean, exact_keys};
-use crate::arktrace_profile::ArkTraceContract;
+use crate::arktrace_envelope::{ArkTraceContract, boolean, exact_keys};
 use crate::arktrace_summary::{ascii_sha256, contains_private_path, safe, valid_data_quality};
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
