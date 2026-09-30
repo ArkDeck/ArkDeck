@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 12
-status: proposed # r9 approval remains historical; the r10/r11/r12 deltas require maintainer review
+revision: 13
+status: proposed # r9 approval remains historical; the r10–r13 deltas require maintainer review
 class: platform
 core_change_level: none
 owner: fuhanfeng
@@ -10,6 +10,12 @@ platforms: [macos, windows]
 ---
 
 # CHG-2026-074 — Shared Rust runtime core with native SwiftUI and WinUI 3 clients
+
+Revision 13 (2026-09-30) narrows the Windows support tuple to Windows 11 x64: ARM64 is deferred
+and makes no support claim, and Windows 10 and 32-bit x86 stay unsupported (design §L.1 item 9,
+ruled by the maintainer on 2026-09-30). It changes no Requirement, Acceptance Scenario, Core
+baseline, safety invariant or hardware criterion other than removing the ARM64 host from the
+Windows release gates (§ "Revision 13" below).
 
 Revision 12 (2026-09-30) opens the Windows phase now, beside the macOS real-device acceptance
 instead of after it: the Swift runtime targets are deleted and Rust is the only implementation, so
@@ -358,6 +364,24 @@ proposed from `main` `66b7474b` (#2326).
    group 3, the 2026-09-30 entry, the gate note) and L.1 (items 5, 9, 10, 11, 18 and new 20–22)
    changed; nothing else.
 
+## Revision 13 — Windows 11 x64 only (2026-09-30)
+
+Revision 13 changes no scope, Requirement, Acceptance Scenario, acceptance-row wording, Core
+baseline or safety invariant, and it does not approve r6–r12 or itself; the maintainer's merge of
+this PR is the attestation of the ruling it records.
+
+1. **Ruling (design §L.1 item 9, revising r12).** The maintainer ruled on 2026-09-30 that x64 is
+   enough: the first Windows release supports **Windows 11 x64 only**. ARM64 is deferred and makes
+   no support claim; Windows 10 stays unsupported, and 32-bit x86 is not a target (Windows 11 has
+   no 32-bit edition, and WinUI 3 on Windows 11 needs none).
+2. **What follows.** Gate G2 needs GJ-1..5 headless `REAL_DEVICE_PASS` on Windows 11 x64 only;
+   SPK-4 criterion (d) and the XPA-022 clean-host matrix and packages are x64 only; design
+   assumptions A1/A2 and §L.1 item 14 need one Windows 11 x64 host, not an ARM64 one. Adding
+   ARM64 later needs its own revision, and then the ARM64 rows of G2, SPK-4 (d) and XPA-022 run.
+3. **Design re-pin.** Section B (assumptions A1, A2), J.3 (the SPK-4 host), J.4 (the XPA-022 AC),
+   J.5 (gate G2) and L.1 (items 9 and 14) changed; nothing else. The Windows phase prompt
+   (`docs/design/cross-platform/windows-phase-agent-prompt.md`) is updated to match.
+
 ## Governance loop
 
 1. **Why a change is required at all.** `core-portability.md:30` states that introducing a shared
@@ -475,7 +499,7 @@ proposed from `main` `66b7474b` (#2326).
 See section L.1 of the design document. The blocking ones for starting work are: (1) approve this
 change and the `Core strategy` value change; (2) Rust dependency policy (vetted allowlist vs
 zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass rule on runtime
-replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
+replacement; (9) Windows support tuple (Windows 11 x64 + ARM64; r13: Windows 11 x64 only); (10) MSIX packaged + self-contained
 Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the same-user trust
 boundary statement (r5); (18) the macOS-first order, ruled on 2026-09-09 and recorded in r8,
 effective on its merge; (r11) item 19 the parity tiers, item 7 the Swift CLI retirement with M5 and

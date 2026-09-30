@@ -119,6 +119,12 @@ Windows reaches the Runtime by giving `arkdeck-platform` Windows implementations
 primitives and removing `cfg(target_os = "macos")` gates, never by forking Runtime semantics.
 `evidence/windows-remaining.md` carries the Windows dashboard, refreshed once per milestone.
 
+Revision 13 (2026-09-30) narrows the Windows support tuple to Windows 11 x64 (design §L.1 item 9,
+ruled by the maintainer): ARM64 is deferred with no support claim; Windows 10 and 32-bit x86 are
+not targets. TASK-XPA-022's hardware and packages are x64 only, and SPK-4 criterion (d) and gate
+G2 need no ARM64 host. Adding ARM64 later needs its own revision. No other task, dependency,
+status or acceptance criterion changes.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -1425,12 +1431,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Forbidden paths:
   - `openspec/specs/**`、`openspec/platforms/macos/**`
 - Risk:medium
-- Hardware required:yes（clean Windows 11 x64 and ARM64 hosts）
+- Hardware required:yes（a clean Windows 11 x64 host; r13: ARM64 deferred）
 - Decision-Grade:D1
 
 ### Deliverables / Verification
 
-- Signed x64 and ARM64 packages; clean-host TRUST matrix; update channel; clean uninstall; the Windows column of `openspec/verification/traceability.md` and the lock file's `verified` tuples flip here and nowhere earlier (r3). Size: M.
+- Signed x64 packages (r13: ARM64 deferred); clean-host TRUST matrix; update channel; clean uninstall; the Windows column of `openspec/verification/traceability.md` and the lock file's `verified` tuples flip here and nowhere earlier (r3). Size: M.
 
 ## TASK-XPA-023 — Performance regression lanes on both platforms
 

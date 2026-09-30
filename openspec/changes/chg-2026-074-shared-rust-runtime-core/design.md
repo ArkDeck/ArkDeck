@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 1d2e9189f275425ba141a4a7d8abed34121845c2
-  sha256: c22631317fa6b738c93ceab1beff7f0ac81046ade89e5a8046881a33d28c767c
+  blob: ea8b20ef32f7e168c6721a3b33571e0cbf48b957
+  sha256: 937f2eb6db9acd09140361266b1c360fc5e4e8d7eae9715c9114582183df24f6
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -43,6 +43,9 @@ sections A (item 6), E (the Windows client row of the parity table), J.2 (the X0
 the X017 → X004 edge removed), J.4 (rows 002, 003, 004), J.5 (critical path, parallel group 3,
 the 2026-09-30 entry, the release-gate note) and L.1 (ruling notes on items 5, 9, 10, 11 and 18;
 new items 20–22) changed; nothing else.
+Revision 13 re-pins it for the Windows 11 x64-only support tuple: section B (assumptions A1, A2),
+J.3 (the SPK-4 host), J.4 (the XPA-022 AC), J.5 (gate G2) and L.1 (items 9 and 14) changed;
+nothing else.
 
 The 2026-09-06 design refresh is re-pinned for review against checkout
 `d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,

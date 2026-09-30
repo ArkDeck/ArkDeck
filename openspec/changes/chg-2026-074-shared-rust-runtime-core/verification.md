@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r12
+> Change:CHG-2026-074-shared-rust-runtime-core@r13
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -59,12 +59,17 @@ names the reference. Windows rows keep their evidence directories; fake HDC, fix
 CI remain host evidence, never platform or hardware support, and the Windows real-device rows
 belong to the maintainer's phase A.
 
+Revision 13 (2026-09-30) narrows the Windows support tuple to Windows 11 x64: the Golden Journeys
+row, Core conformance and XPA-AC-5/8 are attempted on Windows 11 x64 only, and a Windows
+`verified` tuple can only be x64. ARM64 is deferred; no row's wording, method or expected result
+changes otherwise.
+
 ## Environment
 
 - Core baseline CORE-3.0.0 (ratified) with CORE-4.0.0 candidate; platform profiles `PLATFORM-MACOS`
   0.2.0 (`needsReverification`) and `PLATFORM-WINDOWS` 0.2.0 (this change).
 - Reference hosts: macOS 26.6 / Xcode 26.6 / Apple silicon (8 cores, 16 GB) release builds; Windows
-  11 x64 and Windows 11 ARM64 hosts (to be selected in SPK-3) release builds; Rust 1.98 pinned by
+  11 x64 host (r13: ARM64 deferred) release builds; Rust 1.98 pinned by
   `rust-toolchain.toml`; .NET 10 LTS; Windows App SDK 2.x stable.
 - Device: DAYU200 `TGT-958780b2ffb7` (binding revision as recorded at run time), hdc `3.2.0f`,
   firmware `OpenHarmony-7.0.0.37`; HDC executable SHA-256 recorded per run.

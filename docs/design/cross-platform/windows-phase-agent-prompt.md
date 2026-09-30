@@ -28,7 +28,7 @@
 - **阶段 S（你负责）**：完成全部软件。出口条件见下。
 - **阶段 A（维护者负责）**：在真实主机和板子上完成验收，包括：
   - SPK-3 的主机条件行；
-  - Windows 11 x64（以及 ARM64，视决策 9）上的 GJ-1..5 headless `REAL_DEVICE_PASS`；
+  - Windows 11 x64 上的 GJ-1..5 headless `REAL_DEVICE_PASS`（r13：只支持 x64，ARM64 延后）；
   - 干净主机 smoke；
   - 翻转 conformance、traceability 与平台 lock。
 
@@ -160,7 +160,7 @@
    - XPA-010「Swift and Rust compute the same plan digest」。
 
    Swift 的 runtime target 已删除（#2311/#2312/#2316），所以参照物改为：`rust/tests/fixtures/**` 与 `spec/**` 中录下的 Swift oracle 和语料，加上 macOS 上 Rust writer 写出的 T0 字节。这一条不改 AC 原文，只界定参照物，性质同 r11 的对等三级。
-4. **决策 9（支持格）**：Windows 11 x64 与 ARM64，不支持 Windows 10。
+4. **决策 9（支持格）**：Windows 11 x64 与 ARM64，不支持 Windows 10。（r13 改为：只支持 Windows 11 x64，ARM64 延后，不支持 Windows 10 与 32 位 x86。）
 5. **决策 10（打包）**：App 用 MSIX packaged + self-contained Windows App SDK，签名用 Azure Artifact Signing 并加时间戳，更新走 App Installer；daemon 和 CLI 另外提供 xcopy 形态，供 CI 和 headless 使用。
 6. **决策 11（daemon 生命周期）**：由客户端自启动，daemon 单实例。
 7. **决策 5（Trace 范围）**：选 (b)。capture、inspect、export 对等作为 supported 的门槛，viewer 放到后续。
