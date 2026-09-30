@@ -442,6 +442,26 @@ mod windows {
         SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
     }
 
+    /// Whether the cases that bind a wildcard (`0.0.0.0`, `[::]`) run. A
+    /// program that listens on anything but loopback makes Windows Defender
+    /// Firewall ask the interactive user to allow it, once per executable
+    /// path, and these listeners run from a fresh scratch copy (and a test
+    /// binary under each Cargo target) every time: on a developer's host
+    /// every run would raise a new prompt. They run where no one is asked:
+    /// a GitHub Actions runner (`GITHUB_ACTIONS=true`, set by the runner for
+    /// every step), which is where the Windows workspace lane runs them.
+    /// Every loopback case runs everywhere.
+    fn wildcard_listeners_allowed() -> bool {
+        let allowed = std::env::var_os("GITHUB_ACTIONS").is_some_and(|value| value == "true");
+        if !allowed {
+            eprintln!(
+                "SKIPPED (wildcard listeners only): outside GitHub Actions a wildcard listener \
+                 would raise a Windows Defender Firewall prompt; the loopback cases ran"
+            );
+        }
+        allowed
+    }
+
     // ---- the runner's tests ----------------------------------------------
 
     fn argv_reaches_the_child_verbatim_without_a_shell_and_stdin_is_nul() {
@@ -970,14 +990,18 @@ mod windows {
         let error = LoopbackServerLease::acquire(&tool, endpoint).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::NotFound);
         // A wildcard listener of that other file beside the tool's own exact
-        // listener does not disturb the proof of the tool's process.
-        let shared = loopback(free_port());
-        let wildcard = listening_server(&other, &[format!("0.0.0.0:{}", shared.port())], None);
-        let own = listening_server(&tool, &[shared.to_string()], None);
-        let lease = LoopbackServerLease::acquire(&tool, shared).unwrap();
-        assert_eq!(lease.identity().pid, own.launch_record().pid);
-        own.stop().unwrap();
-        wildcard.stop().unwrap();
+        // listener does not disturb the proof of the tool's process (only
+        // where no firewall prompt is raised, see
+        // `wildcard_listeners_allowed`).
+        if wildcard_listeners_allowed() {
+            let shared = loopback(free_port());
+            let wildcard = listening_server(&other, &[format!("0.0.0.0:{}", shared.port())], None);
+            let own = listening_server(&tool, &[shared.to_string()], None);
+            let lease = LoopbackServerLease::acquire(&tool, shared).unwrap();
+            assert_eq!(lease.identity().pid, own.launch_record().pid);
+            own.stop().unwrap();
+            wildcard.stop().unwrap();
+        }
         foreign.stop().unwrap();
     }
 
@@ -1013,18 +1037,28 @@ mod windows {
 
     fn a_wildcard_or_second_listener_of_the_verified_executable_is_unknown() {
         let tool = this_tool();
-        for addresses in [
-            |port: u16| vec![format!("0.0.0.0:{port}")],
-            |port: u16| vec![format!("[::]:{port}")],
-            |port: u16| vec![format!("127.0.0.1:{port}"), format!("[::1]:{port}")],
-            |port: u16| vec![format!("127.0.0.1:{port}"), format!("0.0.0.0:{port}")],
-        ] {
+        // A second loopback listener runs everywhere; a wildcard only where
+        // no firewall prompt is raised (`wildcard_listeners_allowed`).
+        let mut cases: Vec<fn(u16) -> Vec<String>> =
+            vec![|port| vec![format!("127.0.0.1:{port}"), format!("[::1]:{port}")]];
+        let wildcards = wildcard_listeners_allowed();
+        if wildcards {
+            cases.extend([
+                (|port| vec![format!("0.0.0.0:{port}")]) as fn(u16) -> Vec<String>,
+                |port| vec![format!("[::]:{port}")],
+                |port| vec![format!("127.0.0.1:{port}"), format!("0.0.0.0:{port}")],
+            ]);
+        }
+        for addresses in cases {
             let endpoint = loopback(free_port());
             let addresses = addresses(endpoint.port());
             let server = listening_server(&tool, &addresses, None);
             let error = LoopbackServerLease::acquire(&tool, endpoint).unwrap_err();
             assert_eq!(error.kind(), ErrorKind::PermissionDenied, "{addresses:?}");
             server.stop().unwrap();
+        }
+        if !wildcards {
+            return;
         }
         // Two processes of the tool on the endpoint: the second one's
         // wildcard makes the endpoint's owner unknown.
