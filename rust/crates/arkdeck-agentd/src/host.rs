@@ -116,7 +116,7 @@ pub struct Host {
     pub(crate) provider: Option<HdcReadOnlyProvider>,
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     workspace_projects: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceProjectStore>>,
     /// The workspace provider composed over the registered projects, which a
     /// workspace Job plans, admits and runs through.
@@ -824,7 +824,7 @@ impl Host {
         self.storage = Some(std::sync::Arc::new((sessions, artifacts)));
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_workspace_projects(
         mut self,
         store: arkdeck_hoststore::WorkspaceProjectStore,
@@ -1200,6 +1200,7 @@ impl Host {
     pub(crate) fn owner_census(&self) -> Vec<&'static str> {
         [
             ("targets", self.targets.is_some()),
+            ("workspaceProjects", self.workspace_projects.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
         ]
@@ -1244,7 +1245,7 @@ impl Host {
             provider,
             #[cfg(target_os = "macos")]
             history: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             workspace_projects: None,
             #[cfg(target_os = "macos")]
             workspace: None,
@@ -2603,18 +2604,29 @@ impl HostServices for Host {
             serde_json::json!({"schemaVersion":"arkdeck.runtime-storage/1", "sessionDomain":session, "artifactDomain":artifact}),
         )
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn workspace_project(
         &self,
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        #[cfg(target_os = "macos")]
         if let Some(owner) = &self.workspace_projects {
             use arkdeck_hoststore::WorkspaceReference;
             // A project or preset mutation is refused while an active or
             // uncertain workspace Job names it; without the Job owner nothing
             // proves that none does.
+            let unverified = || WireError {
+                code: "recordUnreadable".into(),
+                message: "workspace Job references cannot be verified".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("workspaceProjectOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            };
+            // Windows composes no Job owner yet.
+            #[cfg(windows)]
+            let census = |_: WorkspaceReference<'_>| Err(unverified());
+            #[cfg(target_os = "macos")]
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
                 (Some(jobs), WorkspaceReference::Project(project)) => jobs
                     .require_no_active_workspace_project_reference(project, &|reference| {
@@ -2625,21 +2637,14 @@ impl HostServices for Host {
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)
                 }
-                (None, _) => Err(WireError {
-                    code: "recordUnreadable".into(),
-                    message: "workspace Job references cannot be verified".into(),
-                    details: Some(serde_json::Map::from_iter([
-                        ("phase".into(), serde_json::json!("workspaceProjectOwner")),
-                        ("newDispatchCount".into(), serde_json::json!(0)),
-                    ])),
-                }),
+                (None, _) => Err(unverified()),
             };
-            return owner.handle(
-                method,
-                params,
-                &|| arkdeck_hoststore::runtime_now().unwrap_or_default(),
-                &census,
-            );
+            #[cfg(target_os = "macos")]
+            let now = || arkdeck_hoststore::runtime_now().unwrap_or_default();
+            // The same whole-second UTC spelling.
+            #[cfg(windows)]
+            let now = utc_now;
+            return owner.handle(method, params, &now, &census);
         }
         let _ = params;
         // Swift answers a preset method without its owner under the preset

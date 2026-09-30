@@ -22,6 +22,7 @@ mod daemon_start;
 mod host_fs;
 pub(crate) mod host_store;
 mod identity;
+mod inspected_directory;
 mod managed;
 mod process;
 mod pty;
@@ -36,6 +37,7 @@ pub use daemon_start::{
 pub use identity::ImagePin;
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
+pub use inspected_directory::InspectedDirectory;
 pub use managed::ManagedServer;
 pub(crate) use process::spawn;
 pub use server::LoopbackServerLease;

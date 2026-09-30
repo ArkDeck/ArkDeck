@@ -221,6 +221,10 @@ pub use windows::host_store::{
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
+// A workspace project root, pinned by the identity it was registered with
+// (TASK-XPA-015).
+#[cfg(windows)]
+pub use windows::InspectedDirectory;
 
 #[cfg(any(target_os = "macos", windows))]
 mod host_sqlite;
