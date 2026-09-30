@@ -42,6 +42,7 @@ public sealed partial class MainWindow : Window
                      (NavOverview, UiStrings.AppNavigationOverview),
                      (NavDevice, UiStrings.AppNavigationDevice),
                      (NavHistory, UiStrings.AppNavigationHistory),
+                     (NavSessions, UiStrings.WindowsNavigationSessions),
                      (NavSettings, UiStrings.WindowsNavigationSettings),
                  })
         {
@@ -84,6 +85,13 @@ public sealed partial class MainWindow : Window
     {
         if (PageHost.Content is IRefreshable page) await page.RefreshAsync();
         await Inspector.RefreshAsync();
+    }
+
+    /// <summary>History, with one Job's record open.</summary>
+    public async Task OpenJobAsync(string jobId)
+    {
+        Select("history");
+        if (_pages.TryGetValue("history", out var page) && page is HistoryPage history) await history.OpenAsync(jobId);
     }
 
     public void Select(string tag)
@@ -143,6 +151,7 @@ public sealed partial class MainWindow : Window
                 "device" => new DevicePage(),
                 "history" => new HistoryPage(),
                 "settings" => new SettingsPage(),
+                "sessions" => new SessionsPage(),
                 _ => new OverviewPage(),
             };
             _pages[tag] = page;

@@ -75,8 +75,11 @@ public sealed class ShellContractTests
         // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
         // `target display-name set|clear`), named only by the loader; no Job, adoption,
         // device or other business write is named anywhere in the App or App.Core.
-        var forbidden = new[] { "job.submit", "job.cancel", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
-        var allowed = new[] { "target.display-name.set", "target.display-name.clear" };
+        var forbidden = new[] { "job.submit", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
+        // TASK-XPA-020 (sessions and Job actions): a Job's cancellation request and the Session
+        // catalog's pin, unpin, cleanup and export, each preview-then-apply or generation-guarded.
+        var allowed = new[] { "target.display-name.set", "target.display-name.clear", "job.cancel", "session.pin", "session.unpin",
+            "session.cleanup.preview", "session.cleanup.apply", "session.export.preview", "session.export.apply" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
                 .Where(p => !p.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")));
@@ -84,7 +87,7 @@ public sealed class ShellContractTests
         {
             var text = File.ReadAllText(file);
             foreach (var write in forbidden) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
-            if (Path.GetFileName(file) is not ("Surfaces.cs" or "ScriptedDaemon.cs"))
+            if (Path.GetFileName(file) is not ("Surfaces.cs" or "Sessions.cs" or "ScriptedDaemon.cs"))
             {
                 foreach (var write in allowed) Assert.IsFalse(text.Contains('"' + write + '"', StringComparison.Ordinal), $"{Path.GetFileName(file)} names {write}");
             }
@@ -109,6 +112,9 @@ public sealed class ShellContractTests
                      CliCommands.RuntimeServiceStatus, CliCommands.RuntimeServiceVerify, CliCommands.RuntimeServiceRestart, CliCommands.RuntimeSigningStatus,
                      CliCommands.RuntimeHdcStatus, CliCommands.RuntimeToolList, CliCommands.RuntimeStorageStatus, CliCommands.TraceCacheStatus,
                      CliCommands.WorkspaceProjectList, CliCommands.WorkspaceProjectRegister, CliCommands.WorkspaceProjectShow, CliCommands.WorkspacePresetList,
+                     CliCommands.JobCancel, CliCommands.JobResult, CliCommands.JobEvidence, CliCommands.SessionList, CliCommands.SessionShow,
+                     CliCommands.SessionPin, CliCommands.SessionUnpin, CliCommands.SessionCleanupPreview, CliCommands.SessionCleanupApply,
+                     CliCommands.SessionExportPreview, CliCommands.SessionExportApply,
                  })
         {
             Assert.IsTrue(commands.Contains(command), command);
@@ -133,7 +139,7 @@ public sealed class ShellContractTests
         foreach (var snapshot in doc.RootElement.GetProperty("snapshots").EnumerateArray())
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
-            Assert.IsTrue(new[] { "overview", "device", "history", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
+            Assert.IsTrue(new[] { "overview", "device", "history", "sessions", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
             if (snapshot.TryGetProperty("steps", out var steps))
             {
                 foreach (var step in steps.EnumerateArray())

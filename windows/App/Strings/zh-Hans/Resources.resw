@@ -691,6 +691,70 @@ SHA-256：%4$@</value>
     <value>当前用量不可用；已保存的配额与保留策略仍显示在上方。</value>
     <comment>settings.storage.measurementUnavailable (SettingsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobInspector_action_cancel" xml:space="preserve">
+    <value>请求取消</value>
+    <comment>jobInspector.action.cancel (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_cancel_requested" xml:space="preserve">
+    <value>已请求取消。Runtime 正在到达安全边界，请等待最终状态。</value>
+    <comment>jobInspector.cancel.requested (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_cancel_refused" xml:space="preserve">
+    <value>取消请求未确认。请刷新记录后重试。</value>
+    <comment>jobInspector.cancel.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_action_openRecord" xml:space="preserve">
+    <value>打开此记录</value>
+    <comment>jobInspector.action.openRecord (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_evidence" xml:space="preserve">
+    <value>执行证据</value>
+    <comment>history.detail.evidence (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_value_notReported" xml:space="preserve">
+    <value>未报告</value>
+    <comment>history.value.notReported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_provider" xml:space="preserve">
+    <value>Provider</value>
+    <comment>history.evidence.provider (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_catalog" xml:space="preserve">
+    <value>Catalog 摘要</value>
+    <comment>history.evidence.catalog (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_binding" xml:space="preserve">
+    <value>绑定修订</value>
+    <comment>history.evidence.binding (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_authority" xml:space="preserve">
+    <value>授权类型</value>
+    <comment>history.evidence.authority (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_authorityReference" xml:space="preserve">
+    <value>授权引用</value>
+    <comment>history.evidence.authorityReference (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_terminalState" xml:space="preserve">
+    <value>终态</value>
+    <comment>history.evidence.terminalState (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_mode" xml:space="preserve">
+    <value>记录的模式</value>
+    <comment>history.evidence.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_effect" xml:space="preserve">
+    <value>记录的影响</value>
+    <comment>history.evidence.effect (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_firstEvidence" xml:space="preserve">
+    <value>首条证据时间</value>
+    <comment>history.evidence.firstEvidence (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>settings.common.cancel (SettingsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -1154,5 +1218,157 @@ SHA-256：%4$@</value>
   <data name="windows_settings_workspace_timeout" xml:space="preserve">
     <value>超时 %lld 秒</value>
     <comment>windows.settings.workspace.timeout (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_sessions" xml:space="preserve">
+    <value>Session</value>
+    <comment>windows.navigation.sessions (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_subtitle" xml:space="preserve">
+    <value>Runtime 在这台电脑上保存的 Session：固定要保留的，导出某一个，或清理保留策略允许清理的。</value>
+    <comment>windows.sessions.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unavailable" xml:space="preserve">
+    <value>无法读取 Session</value>
+    <comment>windows.sessions.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_empty" xml:space="preserve">
+    <value>当前没有保存的 Session。</value>
+    <comment>windows.sessions.empty (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_select" xml:space="preserve">
+    <value>选择一个 Session 以查看详情。</value>
+    <comment>windows.sessions.select (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinned" xml:space="preserve">
+    <value>已固定</value>
+    <comment>windows.sessions.pinned (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_completed" xml:space="preserve">
+    <value>完成时间</value>
+    <comment>windows.sessions.completed (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_expires" xml:space="preserve">
+    <value>到期时间</value>
+    <comment>windows.sessions.expires (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_size" xml:space="preserve">
+    <value>大小</value>
+    <comment>windows.sessions.size (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_generation" xml:space="preserve">
+    <value>代次</value>
+    <comment>windows.sessions.generation (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pin" xml:space="preserve">
+    <value>固定</value>
+    <comment>windows.sessions.pin (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unpin" xml:space="preserve">
+    <value>取消固定</value>
+    <comment>windows.sessions.unpin (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedDone" xml:space="preserve">
+    <value>已固定：保留清理不会移除它。</value>
+    <comment>windows.sessions.pinnedDone (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unpinnedDone" xml:space="preserve">
+    <value>已取消固定：到期后保留清理可以移除它。</value>
+    <comment>windows.sessions.unpinnedDone (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_refused" xml:space="preserve">
+    <value>Session 未更改</value>
+    <comment>windows.sessions.refused (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export" xml:space="preserve">
+    <value>导出…</value>
+    <comment>windows.sessions.export (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_title" xml:space="preserve">
+    <value>检查 Session 导出信息</value>
+    <comment>windows.sessions.export.title (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_message" xml:space="preserve">
+    <value>Runtime 会把 Session %1$@ 写入新文件夹 %2$@（约 %3$@）。设备标识：%4$@。不包含敏感 Artifact。</value>
+    <comment>windows.sessions.export.message (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_confirm" xml:space="preserve">
+    <value>导出</value>
+    <comment>windows.sessions.export.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_done" xml:space="preserve">
+    <value>已导出到 %@</value>
+    <comment>windows.sessions.export.done (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_failed" xml:space="preserve">
+    <value>导出失败</value>
+    <comment>windows.sessions.export.failed (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_artifact" xml:space="preserve">
+    <value>%1$@ · %2$@ · %3$@</value>
+    <comment>windows.sessions.export.artifact (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup" xml:space="preserve">
+    <value>清理…</value>
+    <comment>windows.sessions.cleanup (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_title" xml:space="preserve">
+    <value>检查 Session 清理</value>
+    <comment>windows.sessions.cleanup.title (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_message" xml:space="preserve">
+    <value>将移除 %1$lld 个 Session，回收 %2$@（从 %3$@ 降至 %4$@）。已固定的 Session 会保留。</value>
+    <comment>windows.sessions.cleanup.message (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_nothing" xml:space="preserve">
+    <value>无需清理：保留策略会保留所有 Session。</value>
+    <comment>windows.sessions.cleanup.nothing (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_confirm" xml:space="preserve">
+    <value>移除 Session</value>
+    <comment>windows.sessions.cleanup.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_done" xml:space="preserve">
+    <value>已移除 %1$lld 个 Session，回收 %2$@。</value>
+    <comment>windows.sessions.cleanup.done (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_failed" xml:space="preserve">
+    <value>清理失败</value>
+    <comment>windows.sessions.cleanup.failed (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_cancel_title" xml:space="preserve">
+    <value>请求取消？</value>
+    <comment>windows.jobInspector.cancel.title (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_cancel_message" xml:space="preserve">
+    <value>Runtime 会在下一个安全边界停止 Job %@。已经在写设备的步骤会先完成。</value>
+    <comment>windows.jobInspector.cancel.message (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result" xml:space="preserve">
+    <value>结果</value>
+    <comment>windows.jobInspector.result (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result_artifacts" xml:space="preserve">
+    <value>%1$lld 个 Artifact，%2$lld 个已校验 · %3$lld 个清理项</value>
+    <comment>windows.jobInspector.result.artifacts (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result_unavailable" xml:space="preserve">
+    <value>无法读取结果</value>
+    <comment>windows.jobInspector.result.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_evidence_unavailable" xml:space="preserve">
+    <value>无法读取执行证据</value>
+    <comment>windows.history.evidence.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_evidence_status" xml:space="preserve">
+    <value>证据状态</value>
+    <comment>windows.history.evidence.status (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedYes" xml:space="preserve">
+    <value>是</value>
+    <comment>windows.sessions.pinnedYes (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedNo" xml:space="preserve">
+    <value>否</value>
+    <comment>windows.sessions.pinnedNo (Windows only)</comment>
   </data>
 </root>

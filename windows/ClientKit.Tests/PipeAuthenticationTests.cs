@@ -108,6 +108,36 @@ public sealed class PipeAuthenticationTests
     }
 
     [TestMethod]
+    public async Task ABusyPipeIsWaitedForWithinTheBudgetAsTheRustClientDoes()
+    {
+        // One instance, taken by a first client: the next open meets ERROR_PIPE_BUSY.
+        var endpoint = NewEndpoint();
+        var name = endpoint[@"\\.\pipe\".Length..];
+        await using var first = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+        var accepted = first.WaitForConnectionAsync();
+        using var holder = new NamedPipeClientStream(".", name, PipeDirection.InOut);
+        holder.Connect(5000);
+        await accepted;
+
+        var busy = Assert.ThrowsExactly<ServerAuthenticationException>(() => PipeConnector.Connect(new PipeEndpoint(endpoint), OwnImage()));
+        StringAssert.Contains(busy.Message, "(Win32 error 231)", "without a wait, a busy pipe is refused at once");
+
+        // The server offers its next instance a moment later: the waiting open gets it and the
+        // connection proceeds to authentication (which refuses this unsigned test process).
+        var offered = Task.Run(async () =>
+        {
+            await Task.Delay(300);
+            var next = new NamedPipeServerStream(name, PipeDirection.InOut, 2, PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            await next.WaitForConnectionAsync();
+            return next;
+        });
+        var waited = Assert.ThrowsExactly<ServerAuthenticationException>(() =>
+            PipeConnector.Connect(new PipeEndpoint(endpoint), OwnImage(new string('0', 64)), TimeSpan.FromSeconds(5)));
+        Assert.AreEqual(DaemonUnavailableReason.InstanceMismatch, waited.Reason, waited.Message);
+        await (await offered).DisposeAsync();
+    }
+
+    [TestMethod]
     public async Task NoServerIsDaemonUnavailable()
     {
         var session = new ControlSession(new PipeEndpoint(NewEndpoint()), OwnImage(), TimeSpan.FromSeconds(5));

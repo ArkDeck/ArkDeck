@@ -32,6 +32,10 @@ public sealed partial class JobInspector : UserControl
     private string? _selectedJob;
     private string? _lastState;
     private TextBlock? _stateText;
+    // What the last cancellation or result read said, per Job: the detail is rebuilt on every
+    // poll, these lines are not re-read.
+    private readonly Dictionary<string, string> _cancelMessages = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Loaded<JobResultFacts>> _results = new(StringComparer.Ordinal);
 
     public JobInspector()
     {
@@ -163,6 +167,7 @@ public sealed partial class JobInspector : UserControl
         _detail.Children.Add(_stateText);
         if (job.OutcomeUnknown) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultOutcomeUnknown)));
         else if (job.WaitingForHuman) _detail.Children.Add(Ui.Text("jobInspector.attention", S.Text(UiStrings.JobInspectorResultWaitingForHuman)));
+        Actions(job);
         foreach (var (id, key, value) in new[]
                  {
                      ("jobInspector.fact.job", UiStrings.JobInspectorFactJob, job.JobId),
@@ -174,6 +179,7 @@ public sealed partial class JobInspector : UserControl
         {
             _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
+        if (!job.IsActive) Result(job);
         _detail.Children.Add(Ui.Heading("jobInspector.timeline", S.Text(UiStrings.JobInspectorTimeline)));
         if (state.Events.Unavailable is { } eventsWhy)
         {
@@ -198,5 +204,74 @@ public sealed partial class JobInspector : UserControl
         _lastState = job.State;
         if (job.IsActive) _poll.Start();
         else _poll.Stop();
+    }
+
+    /// <summary>The macOS inspector actions: open the record in History, and — for a queued or
+    /// active Job whose outcome is known (<c>RuntimeJobControlApplicationFacade.canCancel</c>) —
+    /// request cancellation after a confirmation. A request is not an outcome: the line says
+    /// the Runtime is reaching a safe boundary, and the state is read back.</summary>
+    private void Actions(JobSummary job)
+    {
+        var actions = Ui.Row(Ui.Button("jobInspector.openRecord", S.Text(UiStrings.JobInspectorActionOpenRecord),
+            async (_, _) => await MainWindow.Instance.OpenJobAsync(job.JobId)));
+        if (job.IsActive && !job.OutcomeUnknown)
+        {
+            actions.Children.Add(Ui.Button("jobInspector.cancel", S.Text(UiStrings.JobInspectorActionCancel), async (_, _) => await CancelAsync(job)));
+        }
+        _detail.Children.Add(actions);
+        if (_cancelMessages.TryGetValue(job.JobId, out var message))
+        {
+            _detail.Children.Add(Ui.Live(Ui.Text("jobInspector.cancel.result", message, "ArkDeckCaptionStyle"), AutomationLiveSetting.Polite));
+        }
+    }
+
+    private async Task CancelAsync(JobSummary job)
+    {
+        var dialog = Ui.Dialog(XamlRoot, "jobInspector.cancel.confirm", S.Text(UiStrings.WindowsJobInspectorCancelTitle),
+            Ui.Text("jobInspector.cancel.message", S.Format(UiStrings.WindowsJobInspectorCancelMessage, job.JobId)),
+            S.Text(UiStrings.JobInspectorActionCancel), S.Text(UiStrings.SettingsCommonCancel));
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        var state = await Task.Run(() => App.Loader.CancelJobAsync(job.JobId));
+        MainWindow.Instance.Report(state);
+        _cancelMessages[job.JobId] = state.Answer switch
+        {
+            { Value.Requested: true } => S.Text(UiStrings.JobInspectorCancelRequested),
+            { Unavailable: { } why } => $"{S.Text(UiStrings.JobInspectorCancelRefused)} · {why.ReasonText(S)}",
+            _ => S.Text(UiStrings.JobInspectorCancelRefused),
+        };
+        await ShowJobAsync(job.JobId);
+        foreach (var text in _detail.Children.OfType<TextBlock>().Where(t => AutomationProperties.GetAutomationId(t) == "jobInspector.cancel.result"))
+        {
+            Ui.Announce(text);
+        }
+        await RefreshAsync();
+    }
+
+    /// <summary>A terminal Job's <c>job.result</c>: the Artifacts the Runtime verified and the
+    /// cleanup it still owes (read once per Job).</summary>
+    private void Result(JobSummary job)
+    {
+        _detail.Children.Add(Ui.Heading("jobInspector.result", S.Text(UiStrings.WindowsJobInspectorResult)));
+        if (!_results.TryGetValue(job.JobId, out var loaded))
+        {
+            var id = job.JobId;
+            _detail.Children.Add(Ui.Progress("jobInspector.result.loading", S.Text(UiStrings.JobInspectorRefreshing)));
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                var state = await Task.Run(() => App.Loader.JobResultAsync(id));
+                MainWindow.Instance.Report(state);
+                _results[id] = state.Answer;
+                if (_selectedJob == id) await ShowJobAsync(id);
+            });
+            return;
+        }
+        if (loaded.Unavailable is { } why)
+        {
+            _detail.Children.Add(Ui.UnavailableNotice("jobInspector.result.unavailable", UiStrings.WindowsJobInspectorResultUnavailable, why));
+            return;
+        }
+        var result = loaded.Value!;
+        _detail.Children.Add(Ui.Text("jobInspector.result.artifacts",
+            S.Format(UiStrings.WindowsJobInspectorResultArtifacts, result.Artifacts.Count, result.Artifacts.Count(a => a.BytesVerified), result.CleanupCount)));
     }
 }

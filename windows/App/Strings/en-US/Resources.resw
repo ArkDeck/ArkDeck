@@ -691,6 +691,70 @@ SHA-256: %4$@</value>
     <value>Current usage is unavailable. The saved quota and retention policy remain visible above.</value>
     <comment>settings.storage.measurementUnavailable (SettingsLocalizable.xcstrings)</comment>
   </data>
+  <data name="jobInspector_action_cancel" xml:space="preserve">
+    <value>Request cancellation</value>
+    <comment>jobInspector.action.cancel (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_cancel_requested" xml:space="preserve">
+    <value>Cancellation requested. Runtime is reaching a safe boundary; wait for its terminal state.</value>
+    <comment>jobInspector.cancel.requested (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_cancel_refused" xml:space="preserve">
+    <value>Cancellation was not confirmed. Refresh the record before trying again.</value>
+    <comment>jobInspector.cancel.refused (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="jobInspector_action_openRecord" xml:space="preserve">
+    <value>Open this record</value>
+    <comment>jobInspector.action.openRecord (JobsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_evidence" xml:space="preserve">
+    <value>Execution evidence</value>
+    <comment>history.detail.evidence (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_value_notReported" xml:space="preserve">
+    <value>Not reported</value>
+    <comment>history.value.notReported (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_provider" xml:space="preserve">
+    <value>Provider</value>
+    <comment>history.evidence.provider (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_catalog" xml:space="preserve">
+    <value>Catalog digest</value>
+    <comment>history.evidence.catalog (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_binding" xml:space="preserve">
+    <value>Binding revision</value>
+    <comment>history.evidence.binding (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_authority" xml:space="preserve">
+    <value>Authority</value>
+    <comment>history.evidence.authority (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_authorityReference" xml:space="preserve">
+    <value>Authority reference</value>
+    <comment>history.evidence.authorityReference (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_terminalState" xml:space="preserve">
+    <value>Terminal state</value>
+    <comment>history.evidence.terminalState (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_mode" xml:space="preserve">
+    <value>Recorded mode</value>
+    <comment>history.evidence.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_effect" xml:space="preserve">
+    <value>Recorded effect</value>
+    <comment>history.evidence.effect (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_evidence_firstEvidence" xml:space="preserve">
+    <value>First evidence</value>
+    <comment>history.evidence.firstEvidence (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_cancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>settings.common.cancel (SettingsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime unavailable</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -1154,5 +1218,157 @@ SHA-256: %4$@</value>
   <data name="windows_settings_workspace_timeout" xml:space="preserve">
     <value>Timeout %lld s</value>
     <comment>windows.settings.workspace.timeout (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_sessions" xml:space="preserve">
+    <value>Sessions</value>
+    <comment>windows.navigation.sessions (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_subtitle" xml:space="preserve">
+    <value>The Sessions the Runtime keeps on this PC: pin the ones to keep, export one, or clean up what the retention policy allows.</value>
+    <comment>windows.sessions.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unavailable" xml:space="preserve">
+    <value>Sessions unavailable</value>
+    <comment>windows.sessions.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_empty" xml:space="preserve">
+    <value>No Session is stored.</value>
+    <comment>windows.sessions.empty (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_select" xml:space="preserve">
+    <value>Select a Session to see it.</value>
+    <comment>windows.sessions.select (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinned" xml:space="preserve">
+    <value>Pinned</value>
+    <comment>windows.sessions.pinned (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_completed" xml:space="preserve">
+    <value>Completed</value>
+    <comment>windows.sessions.completed (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_expires" xml:space="preserve">
+    <value>Expires</value>
+    <comment>windows.sessions.expires (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_size" xml:space="preserve">
+    <value>Size</value>
+    <comment>windows.sessions.size (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_generation" xml:space="preserve">
+    <value>Generation</value>
+    <comment>windows.sessions.generation (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pin" xml:space="preserve">
+    <value>Pin</value>
+    <comment>windows.sessions.pin (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unpin" xml:space="preserve">
+    <value>Unpin</value>
+    <comment>windows.sessions.unpin (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedDone" xml:space="preserve">
+    <value>Pinned: retention cleanup never removes it.</value>
+    <comment>windows.sessions.pinnedDone (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_unpinnedDone" xml:space="preserve">
+    <value>Unpinned: retention cleanup may remove it when it expires.</value>
+    <comment>windows.sessions.unpinnedDone (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_refused" xml:space="preserve">
+    <value>The Session was not changed</value>
+    <comment>windows.sessions.refused (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export" xml:space="preserve">
+    <value>Export…</value>
+    <comment>windows.sessions.export (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_title" xml:space="preserve">
+    <value>Review Session export</value>
+    <comment>windows.sessions.export.title (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_message" xml:space="preserve">
+    <value>The Runtime writes Session %1$@ to the new folder %2$@ (about %3$@). Device identifiers: %4$@. Sensitive Artifacts are not included.</value>
+    <comment>windows.sessions.export.message (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_confirm" xml:space="preserve">
+    <value>Export</value>
+    <comment>windows.sessions.export.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_done" xml:space="preserve">
+    <value>Exported to %@</value>
+    <comment>windows.sessions.export.done (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_failed" xml:space="preserve">
+    <value>Export failed</value>
+    <comment>windows.sessions.export.failed (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_export_artifact" xml:space="preserve">
+    <value>%1$@ · %2$@ · %3$@</value>
+    <comment>windows.sessions.export.artifact (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup" xml:space="preserve">
+    <value>Clean up…</value>
+    <comment>windows.sessions.cleanup (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_title" xml:space="preserve">
+    <value>Review Session cleanup</value>
+    <comment>windows.sessions.cleanup.title (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_message" xml:space="preserve">
+    <value>Removes %1$lld Sessions and reclaims %2$@ (from %3$@ to %4$@). Pinned Sessions are kept.</value>
+    <comment>windows.sessions.cleanup.message (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_nothing" xml:space="preserve">
+    <value>Nothing to clean up: the retention policy keeps every Session.</value>
+    <comment>windows.sessions.cleanup.nothing (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_confirm" xml:space="preserve">
+    <value>Remove Sessions</value>
+    <comment>windows.sessions.cleanup.confirm (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_done" xml:space="preserve">
+    <value>Removed %1$lld Sessions, reclaimed %2$@.</value>
+    <comment>windows.sessions.cleanup.done (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_cleanup_failed" xml:space="preserve">
+    <value>Cleanup failed</value>
+    <comment>windows.sessions.cleanup.failed (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_cancel_title" xml:space="preserve">
+    <value>Request cancellation?</value>
+    <comment>windows.jobInspector.cancel.title (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_cancel_message" xml:space="preserve">
+    <value>Runtime stops Job %@ at its next safe boundary. A step already writing to the device finishes first.</value>
+    <comment>windows.jobInspector.cancel.message (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result" xml:space="preserve">
+    <value>Result</value>
+    <comment>windows.jobInspector.result (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result_artifacts" xml:space="preserve">
+    <value>%1$lld Artifacts, %2$lld verified · %3$lld cleanup items</value>
+    <comment>windows.jobInspector.result.artifacts (Windows only)</comment>
+  </data>
+  <data name="windows_jobInspector_result_unavailable" xml:space="preserve">
+    <value>Result unavailable</value>
+    <comment>windows.jobInspector.result.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_evidence_unavailable" xml:space="preserve">
+    <value>Execution evidence unavailable</value>
+    <comment>windows.history.evidence.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_evidence_status" xml:space="preserve">
+    <value>Evidence status</value>
+    <comment>windows.history.evidence.status (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedYes" xml:space="preserve">
+    <value>Yes</value>
+    <comment>windows.sessions.pinnedYes (Windows only)</comment>
+  </data>
+  <data name="windows_sessions_pinnedNo" xml:space="preserve">
+    <value>No</value>
+    <comment>windows.sessions.pinnedNo (Windows only)</comment>
   </data>
 </root>

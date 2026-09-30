@@ -46,6 +46,9 @@
                 <NavigationViewItem x:Name="NavHistory" Tag="history" AccessKey="H" AutomationProperties.AutomationId="app.navigation.history">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE81C;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavSessions" Tag="sessions" AccessKey="N" AutomationProperties.AutomationId="app.navigation.sessions">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <!-- Settings as a footer item, where Windows apps keep it (the built-in item has no
                  stable AutomationId, so it stays hidden). -->
