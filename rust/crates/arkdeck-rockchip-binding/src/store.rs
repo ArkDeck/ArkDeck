@@ -248,14 +248,9 @@ impl RockchipBindingStore {
                 _ => "binding lock cannot be opened",
             })
         })?;
-        match root.document_metadata(Self::LOCK_NAME) {
-            Ok(metadata)
-                if std::os::unix::fs::PermissionsExt::mode(&metadata.permissions()) & 0o777
-                    == 0o600 =>
-            {
-                Ok(lock)
-            }
-            _ => Err(refuse("binding lock must be an owner-only regular file")),
+        match root.owner_only_document(Self::LOCK_NAME) {
+            Ok(_) => Ok(lock),
+            Err(_) => Err(refuse("binding lock must be an owner-only regular file")),
         }
     }
 

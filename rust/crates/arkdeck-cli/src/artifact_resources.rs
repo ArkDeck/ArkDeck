@@ -420,25 +420,63 @@ fn export_destination(input: &str) -> Result<String, CliError> {
     } else {
         std::env::current_dir().map_err(|_| invalid())?.join(input)
     };
-    let mut clean = PathBuf::from("/");
-    for component in path.components() {
-        match component {
-            Component::RootDir | Component::CurDir => {}
-            Component::ParentDir => {
-                clean.pop();
+    #[cfg(unix)]
+    let clean = {
+        let mut clean = PathBuf::from("/");
+        for component in path.components() {
+            match component {
+                Component::RootDir | Component::CurDir => {}
+                Component::ParentDir => {
+                    clean.pop();
+                }
+                Component::Normal(value) => clean.push(value),
+                Component::Prefix(_) => return Err(invalid()),
             }
-            Component::Normal(value) => clean.push(value),
-            Component::Prefix(_) => return Err(invalid()),
         }
-    }
-    for prefix in ["/tmp", "/var", "/etc"] {
-        if let Ok(tail) = clean.strip_prefix(prefix) {
-            clean = Path::new("/private")
-                .join(prefix.trim_start_matches('/'))
-                .join(tail);
-            break;
+        for prefix in ["/tmp", "/var", "/etc"] {
+            if let Ok(tail) = clean.strip_prefix(prefix) {
+                clean = Path::new("/private")
+                    .join(prefix.trim_start_matches('/'))
+                    .join(tail);
+                break;
+            }
         }
-    }
+        clean
+    };
+    // A local drive's absolute path (`C:\…`, `\\?\C:\…`), `.` and `..`
+    // resolved lexically, spelled `C:\…` with an upper-case drive letter: the
+    // spelling the daemon's owner compares with the directory it opens.
+    #[cfg(windows)]
+    let clean = {
+        use std::path::Prefix;
+        let mut components = path.components();
+        let drive = match components.next() {
+            Some(Component::Prefix(prefix)) => match prefix.kind() {
+                Prefix::Disk(letter) | Prefix::VerbatimDisk(letter)
+                    if letter.is_ascii_alphabetic() =>
+                {
+                    letter.to_ascii_uppercase()
+                }
+                _ => return Err(invalid()),
+            },
+            _ => return Err(invalid()),
+        };
+        if components.next() != Some(Component::RootDir) {
+            return Err(invalid());
+        }
+        let mut clean = PathBuf::from(format!("{}:\\", char::from(drive)));
+        for component in components {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    clean.pop();
+                }
+                Component::Normal(value) => clean.push(value),
+                Component::Prefix(_) | Component::RootDir => return Err(invalid()),
+            }
+        }
+        clean
+    };
     let text = clean
         .to_str()
         .filter(|s| s.len() <= 4096)
@@ -507,12 +545,15 @@ pub fn validate_artifact_export(
         .ok_or_else(uncertain)?
         .replace('/', "_")
         .replace("..", "_");
+    // The daemon joins the file name to the directory with the host's own
+    // separator.
+    let separator = std::path::MAIN_SEPARATOR;
     let directory = params["destinationDirectory"]
         .as_str()
         .ok_or_else(uncertain)?
-        .trim_end_matches('/');
+        .trim_end_matches(separator);
     let path = format!(
-        "{directory}/{}-{safe_name}",
+        "{directory}{separator}{}-{safe_name}",
         metadata["artifactId"].as_str().ok_or_else(uncertain)?
     );
     if value["schemaVersion"] != "arkdeck.artifact-export/1"

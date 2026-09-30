@@ -6,12 +6,10 @@ use crate::{
     bundle_content::{BundleContent, verify_bundle_content},
     decode_bundles,
 };
-use arkdeck_platform::{HostDirectory, validate_production_daemon_bundle};
+use arkdeck_platform::{HostDirectory, HostFileIdentity, validate_production_daemon_bundle};
 use serde_json::Value;
 use std::{
-    fs::Metadata,
     io,
-    os::unix::fs::MetadataExt,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -41,18 +39,10 @@ fn map_read_error(error: io::Error) -> io::Error {
         corrupt()
     }
 }
-fn same_document(left: &Metadata, right: &Metadata) -> bool {
-    left.dev() == right.dev()
-        && left.ino() == right.ino()
-        && left.mode() == right.mode()
-        && left.uid() == right.uid()
-        && left.gid() == right.gid()
-        && left.nlink() == right.nlink()
-        && left.len() == right.len()
-        && left.mtime() == right.mtime()
-        && left.mtime_nsec() == right.mtime_nsec()
-        && left.ctime() == right.ctime()
-        && left.ctime_nsec() == right.ctime_nsec()
+/// The same document: its device and inode, size and modification and
+/// change times. A change of its mode, owner or links moves the change time.
+fn same_document(left: &HostFileIdentity, right: &HostFileIdentity) -> bool {
+    left == right
 }
 impl BundleRegistryReadStore {
     /// Requires a pre-existing private root, index and lock. The Swift owner's
@@ -105,7 +95,7 @@ impl BundleRegistryReadStore {
     }
     /// Whether `bundles.json` still holds `bytes` as the document `identity`
     /// describes: the same content, inode and times.
-    pub fn validate_index(&self, bytes: &[u8], identity: &Metadata) -> io::Result<()> {
+    pub fn validate_index(&self, bytes: &[u8], identity: &HostFileIdentity) -> io::Result<()> {
         if self.root.read("bundles.json", MAXIMUM_INDEX)? != bytes
             || !same_document(identity, &self.root.document_metadata("bundles.json")?)
         {

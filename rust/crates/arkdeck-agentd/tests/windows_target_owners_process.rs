@@ -261,9 +261,9 @@ fn the_target_owners_answer_over_the_pipe_and_survive_a_restart() {
     let mut first = Daemon::start(executable, &root.0);
     let pipe = first.serving();
     assert!(
-        first
-            .seen
-            .contains(&"arkdeck-agentd owners: jobs, targets, workspaceProjects".to_owned()),
+        first.seen.contains(
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects".to_owned()
+        ),
         "{:?}",
         first.seen
     );

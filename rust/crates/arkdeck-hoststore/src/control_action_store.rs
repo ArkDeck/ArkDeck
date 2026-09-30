@@ -115,7 +115,7 @@ impl<R: StoredAction> ActionStore<R> {
         if !self
             .root
             .document_metadata(".lock")
-            .is_ok_and(|metadata| metadata.len() == 0)
+            .is_ok_and(|metadata| metadata.size == 0)
         {
             return Err(record_unreadable("unsafe control-action lock"));
         }
@@ -189,7 +189,7 @@ impl<R: StoredAction> ActionStore<R> {
                 .root
                 .document_metadata(&name)
                 .ok()
-                .filter(|metadata| metadata.len() <= MAX_RECORD as u64)
+                .filter(|metadata| metadata.size <= MAX_RECORD as u64)
                 .is_some_and(|metadata| self.root.remove_document(&name, &metadata).is_ok());
             if !removed {
                 return Err(record_unreadable(

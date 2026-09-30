@@ -222,6 +222,7 @@ impl ArtifactUsage {
     /// The daemon's `artifact.quota`: the root walked as a Swift store that
     /// has not cached its total walks it (see `artifact_quota`), or Swift's
     /// rendering of the store error that stopped the walk.
+    #[cfg(target_os = "macos")]
     pub fn quota(&self) -> Result<Value, String> {
         crate::artifact_quota::answer(&self.path, self.quota)
     }
