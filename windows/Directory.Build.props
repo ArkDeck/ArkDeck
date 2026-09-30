@@ -1,0 +1,17 @@
+<Project>
+  <!-- Shared settings for the Windows client projects under windows/ (the SPK-4 spike keeps its own). -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Reproducible restores: no floating versions. -->
+    <CentralPackageFloatingVersionsEnabled>false</CentralPackageFloatingVersionsEnabled>
+    <Deterministic>true</Deterministic>
+    <!-- Windows 11 x64 only (CHG-2026-074 r13). -->
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+  </PropertyGroup>
+</Project>
