@@ -15,7 +15,7 @@ pub(crate) struct ObservationState {
 }
 
 /// The Target observation owner's answer as the control layer's typed result.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn typed_observations(
     answer: Result<serde_json::Value, arkdeck_hoststore::ObservationError>,
 ) -> Result<DeviceObservationsResult, WireError> {
@@ -25,6 +25,11 @@ fn typed_observations(
         details: None,
     })
 }
+
+/// Why the Target owner adopts nothing without a registered HDC.
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) const NO_REGISTERED_HDC: &str =
+    "no registered HDC is selected: nothing was observed or dispatched, and no Target was adopted";
 
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
 #[cfg(target_os = "macos")]
@@ -93,7 +98,7 @@ pub struct Host {
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
     // The owners a background agent run keeps using after its request has
     // answered are shared with it.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     targets: Option<std::sync::Arc<arkdeck_hoststore::TargetStore>>,
     #[cfg(target_os = "macos")]
     artifacts: Option<std::sync::Arc<arkdeck_hoststore::ArtifactReadStore>>,
@@ -160,7 +165,7 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     holds: std::sync::Arc<arkdeck_hoststore::DeviceHolds>,
     /// The Runtime's Target observation owner over the development HDC.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     target_observations: arkdeck_hoststore::TargetObservations,
     /// Who reads the live USB relations that prove an observation's
     /// physical identity. By default nothing is read, so no observation is
@@ -168,11 +173,11 @@ pub struct Host {
     /// device through a registered HDC it proved reads the Runtime's own
     /// (`UsbRegistryRelations`), as Swift's daemon composes
     /// `TargetUSBRelation.registeredDAYU200()`.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
     /// Whether `usb` is that reader of the Runtime's own, which the owner
     /// census names.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     usb_registry: bool,
     /// The bundled OpenHarmony code-sign helper this composition verified;
     /// without one a native deployment stays unavailable.
@@ -233,7 +238,7 @@ impl Host {
         self
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_targets(mut self, targets: arkdeck_hoststore::TargetStore) -> Self {
         self.targets = Some(std::sync::Arc::new(targets));
         self
@@ -396,7 +401,7 @@ impl Host {
     /// over `registry`'s census, taken afresh on every read —
     /// `UsbRegistryRelations::system()`, the host's I/O Registry, or a test's
     /// census. The owner census names it.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_usb_registry_relations<C>(
         mut self,
         registry: arkdeck_provider_hdc::UsbRegistryRelations<C>,
@@ -418,14 +423,31 @@ impl Host {
     pub(crate) fn usb_relations(&self) -> &dyn arkdeck_provider_hdc::UsbRelations {
         &*self.usb
     }
+    /// The HDC the Target observation owner dispatches through: the
+    /// development or managed HDC this composition registered.
+    #[cfg(target_os = "macos")]
+    fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
+        self.hdc
+            .as_deref()
+            .map(|hdc| hdc as &dyn arkdeck_provider_hdc::HdcDispatch)
+    }
+    /// On Windows there is none: no Windows HDC tuple is registered yet (its
+    /// integration change waits for the maintainer's samples; the gate
+    /// inventory's G06, G07 and G17a), so the Target observation owner
+    /// observes nothing, dispatches nothing and refuses every adoption before
+    /// admission (`target_adopt`).
+    #[cfg(windows)]
+    fn hdc_dispatch(&self) -> Option<&dyn arkdeck_provider_hdc::HdcDispatch> {
+        None
+    }
     /// Runs `run` over the Target observation owner's sources — the
     /// development HDC, the USB relations, the Target store and the clock —
     /// when this composition has them.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn observe<T>(&self, run: impl FnOnce(&arkdeck_hoststore::Sources<'_>) -> T) -> Option<T> {
-        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        let (dispatch, targets) = (self.hdc_dispatch()?, self.targets.as_ref()?);
         Some(run(&arkdeck_hoststore::Sources {
-            dispatch: &**dispatch,
+            dispatch,
             relations: &*self.usb,
             targets,
             now: &utc_now,
@@ -1172,6 +1194,20 @@ impl Host {
         .collect()
     }
 
+    /// The owners a Windows composition holds, by the names the macOS
+    /// census gives them, in its order: what the daemon reports at its start.
+    #[cfg(windows)]
+    pub(crate) fn owner_census(&self) -> Vec<&'static str> {
+        [
+            ("targets", self.targets.is_some()),
+            ("usbRegistryRelations", self.usb_registry),
+            ("readOnlyHdcProvider", self.provider.is_some()),
+        ]
+        .into_iter()
+        .filter_map(|(name, composed)| composed.then_some(name))
+        .collect()
+    }
+
     pub fn from_environment() -> Self {
         let path = std::env::var_os("ARKDECK_HDC_PATH");
         let digest = std::env::var("ARKDECK_HDC_SHA256").ok();
@@ -1193,7 +1229,7 @@ impl Host {
             staged_kept: std::sync::OnceLock::new(),
             #[cfg(target_os = "macos")]
             imports: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             targets: None,
             #[cfg(target_os = "macos")]
             artifacts: None,
@@ -1240,11 +1276,11 @@ impl Host {
             agents: None,
             #[cfg(target_os = "macos")]
             holds: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             target_observations: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             usb_registry: false,
             #[cfg(target_os = "macos")]
             code_sign_helper: None,
@@ -1366,7 +1402,7 @@ impl HostServices for Host {
         self.imports_for(method, params, true)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn target_resource(
         &self,
         method: &str,
@@ -1381,7 +1417,7 @@ impl HostServices for Host {
             })?
             .handle(method, params, &utc_now())
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn candidate_display_name(
         &self,
         method: &str,
@@ -2869,7 +2905,7 @@ impl HostServices for Host {
     fn doctor_facts(&self, deep: bool) -> arkdeck_control::DoctorFacts {
         #[cfg(target_os = "macos")]
         {
-            use arkdeck_control::{ArtifactStoreFacts, TargetStoreFacts};
+            use arkdeck_control::ArtifactStoreFacts;
             // Swift `totalBytesUsed()` and `quotaTotalBytes`, read in deep mode.
             let artifacts = match &self.storage {
                 None => ArtifactStoreFacts::NotConfigured,
@@ -2886,17 +2922,7 @@ impl HostServices for Host {
                     })
                     .unwrap_or(ArtifactStoreFacts::Unreadable),
             };
-            // Swift `targetStore.listActive()`, read in both modes.
-            let targets = match &self.targets {
-                None => TargetStoreFacts::NotConfigured,
-                Some(targets) => targets
-                    .handle("target.list", &serde_json::Map::new(), &utc_now())
-                    .ok()
-                    .and_then(|rows| rows.as_array().map(Vec::len))
-                    .map_or(TargetStoreFacts::Unreadable, |count| {
-                        TargetStoreFacts::Adopted(count as u64)
-                    }),
-            };
+            let targets = self.target_store_facts();
             // Swift `engine.listCleanupDebt()`: the Job cleanup ledger beside
             // the Artifacts, unreadable without its owners.
             let cleanup_debt = match (deep, &self.jobs, &self.artifacts) {
@@ -2931,6 +2957,8 @@ impl HostServices for Host {
         {
             let _ = deep;
             arkdeck_control::DoctorFacts {
+                #[cfg(windows)]
+                targets: self.target_store_facts(),
                 discovery: self.provider.is_some(),
                 ..arkdeck_control::DoctorFacts::default()
             }
@@ -2984,7 +3012,7 @@ impl HostServices for Host {
             reason_code: reason.into(),
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn observations_following(
         &self,
         reference: &serde_json::Value,
@@ -3005,7 +3033,7 @@ impl HostServices for Host {
             )),
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn target_adopt(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
@@ -3017,6 +3045,22 @@ impl HostServices for Host {
                 .map(|adopted| arkdeck_hoststore::adoption_answer(&adopted, &reference))
         }) {
             Some(answer) => answer.map_err(|error| error.wire()),
+            // The Target owner without a registered HDC to observe through
+            // (no `ARKDECK_HDC_PATH` on macOS; no registered Windows HDC
+            // tuple). A reference it would refuse as malformed is refused so
+            // first; any other is refused as Swift's owner refuses a snapshot
+            // it cannot take (`operationUnavailable`, `preAdmission`, no new
+            // dispatch), which proves that nothing was observed, dispatched or
+            // written: a client reads a refusal, not an unknown outcome.
+            None if self.targets.is_some() => {
+                arkdeck_hoststore::parse_reference(params).map_err(|error| error.wire())?;
+                Err(arkdeck_hoststore::ObservationError::Refused {
+                    code: "operationUnavailable".into(),
+                    message: NO_REGISTERED_HDC.into(),
+                    reference: None,
+                }
+                .wire())
+            }
             None => Err(WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
@@ -3031,7 +3075,7 @@ impl HostServices for Host {
             details: None,
         };
         // With the development HDC, the Target observation owner observes.
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if let Some(answer) = self.observe(|sources| {
             self.target_observations
                 .snapshot(sources, None)
@@ -3048,7 +3092,7 @@ impl HostServices for Host {
             .lock()
             .map_err(|_| fail("the observation generation is unavailable"))?;
         state.snapshot = None;
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         if let Some(targets) = &self.targets {
             targets.expire_candidates()?;
         }
@@ -3065,7 +3109,7 @@ impl HostServices for Host {
                 .cmp(&b.connect_key)
                 .then_with(|| a.state.cmp(&b.state))
         });
-        #[cfg(target_os = "macos")]
+        #[cfg(any(target_os = "macos", windows))]
         let presentations = self
             .targets
             .as_ref()
@@ -3080,7 +3124,7 @@ impl HostServices for Host {
             .transpose()?;
         let mut observations = Vec::with_capacity(candidates.len());
         for candidate in candidates {
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             let presentation = presentations
                 .as_ref()
                 .and_then(|rows| rows.get(&candidate.connect_key));
@@ -3092,27 +3136,27 @@ impl HostServices for Host {
                     fresh_id().map_err(|_| fail("observation identity entropy is unavailable"))?
                 ),
                 observation_continuity: "generationScoped".into(),
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 display_name_generation: presentation
                     .and_then(|v| v["displayNameGeneration"].as_str())
                     .map_or_else(|| next.to_string(), str::to_owned),
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 display_name_generation: next.to_string(),
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 adopted_target_id: presentation
                     .and_then(|v| v["targetId"].as_str())
                     .map(str::to_owned),
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 adopted_target_id: None,
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 binding_revision: presentation.and_then(|v| v["bindingRevision"].as_i64()),
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 binding_revision: None,
-                #[cfg(target_os = "macos")]
+                #[cfg(any(target_os = "macos", windows))]
                 display_name: presentation
                     .and_then(|v| v["displayName"].as_str())
                     .map(str::to_owned),
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(not(any(target_os = "macos", windows)))]
                 display_name: None,
                 device_information: None,
                 observed_facts: (),
@@ -3128,6 +3172,24 @@ impl HostServices for Host {
         };
         state.snapshot = Some(snapshot.clone());
         Ok(snapshot)
+    }
+}
+
+#[cfg(any(target_os = "macos", windows))]
+impl Host {
+    /// Swift `targetStore.listActive()` for `doctor`, read in both modes.
+    fn target_store_facts(&self) -> arkdeck_control::TargetStoreFacts {
+        use arkdeck_control::TargetStoreFacts;
+        match &self.targets {
+            None => TargetStoreFacts::NotConfigured,
+            Some(targets) => targets
+                .handle("target.list", &serde_json::Map::new(), &utc_now())
+                .ok()
+                .and_then(|rows| rows.as_array().map(Vec::len))
+                .map_or(TargetStoreFacts::Unreadable, |count| {
+                    TargetStoreFacts::Adopted(count as u64)
+                }),
+        }
     }
 }
 

@@ -380,19 +380,23 @@ fn production_composes_every_owner_below_the_home_and_serves_the_installed_socke
         "{storage}"
     );
     // Without an HDC nothing is observed, as Swift's refusing dispatcher, and
-    // nothing is adopted.
+    // nothing is adopted: the Target owner refuses before admission, with no
+    // new dispatch.
     assert_eq!(
         request(&home, "device.observations", json!({}))["error"]["code"],
         "rejected"
     );
+    let adopt = request(
+        &home,
+        "target.adopt",
+        json!({"candidate": "0123456789ABCDEF", "observationGeneration": "1",
+            "observationId": "obs-00000000-0000-4000-8000-000000000000"}),
+    );
+    assert_eq!(adopt["error"]["code"], "operationUnavailable", "{adopt}");
     assert_eq!(
-        request(
-            &home,
-            "target.adopt",
-            json!({"candidate": "0123456789ABCDEF", "observationGeneration": "1",
-                "observationId": "obs-00000000-0000-4000-8000-000000000000"})
-        )["error"]["code"],
-        "rejected"
+        adopt["error"]["details"],
+        json!({"phase": "preAdmission", "newDispatchCount": 0}),
+        "{adopt}"
     );
     assert_eq!(
         answered(

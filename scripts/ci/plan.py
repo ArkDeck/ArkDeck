@@ -13,6 +13,7 @@ import dataclasses
 import json
 import os
 import pathlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -89,6 +90,24 @@ DS_INTERACTION_INPUT_PREFIXES = (
     "docs/design/",
 )
 DS_PACKAGE_DIR = "docs/design/arkdeck-ds"
+# The Windows client (TASK-XPA-007): windows/** plus every input its generator
+# (windows/scripts/generate-clientkit.py INPUTS) and its tests read, so a
+# schema, registry, corpus or pattern edit cannot skip the ClientKit checks.
+# test_plan verifies coverage against the generator's actual INPUTS.
+WINDOWS_DIR = "windows"
+WINDOWS_SOLUTION = "windows/ArkDeck.Windows.slnx"
+WINDOWS_INPUT_PREFIXES = (
+    "windows/",
+    "spec/control/methods/",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
+)
+WINDOWS_INPUT_FILES = frozenset({
+    "Packages/ArkDeckKit/Contracts/control-protocol.json",
+    "spec/baselines/swift-single-v1.json",
+    "rust/crates/arkdeck-contract/src/schema_patterns.json",
+    # The end-to-end ClientKit test signs its daemon copy with it.
+    "rust/scripts/windows-dev-identity.ps1",
+})
 
 
 class PlanError(RuntimeError):
@@ -101,6 +120,7 @@ class LaneSelection:
     app: bool
     ds: bool
     rust: bool
+    windows: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
@@ -118,6 +138,7 @@ class CIPlan:
             "app": self.lanes.app,
             "ds": self.lanes.ds,
             "rust": self.lanes.rust,
+            "windows": self.lanes.windows,
             "baseRevision": self.base_revision,
             "headRevision": self.head_revision,
             "baseKind": self.base_kind,
@@ -132,6 +153,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
     app = False
     ds = False
     rust = False
+    windows = False
     for raw_path in paths:
         if not raw_path or "\x00" in raw_path:
             raise PlanError("changed paths must be non-empty and NUL-free")
@@ -146,6 +168,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             app = True
             ds = True
             rust = True
+            windows = True
             continue
 
         # Each view must consume the contract it actually validates. Selecting
@@ -161,6 +184,9 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             )
         ):
             rust = True
+
+        if path.startswith(WINDOWS_INPUT_PREFIXES) or path in WINDOWS_INPUT_FILES:
+            windows = True
 
         if (
             path.startswith("Packages/ArkDeckKit/")
@@ -190,7 +216,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         ):
             app = True
 
-    return LaneSelection(swift=swift, app=app, ds=ds, rust=rust)
+    return LaneSelection(swift=swift, app=app, ds=ds, rust=rust, windows=windows)
 
 
 def _git(
@@ -297,7 +323,7 @@ def _all_lanes_plan(
     *, head_revision: str, base_kind: str, reason: str
 ) -> CIPlan:
     return CIPlan(
-        lanes=LaneSelection(swift=True, app=True, ds=True, rust=True),
+        lanes=LaneSelection(swift=True, app=True, ds=True, rust=True, windows=True),
         base_revision=None,
         head_revision=head_revision,
         base_kind=base_kind,
@@ -473,6 +499,7 @@ def _append_github_output(path: pathlib.Path, plan: CIPlan) -> None:
         "app": str(plan.lanes.app).lower(),
         "ds": str(plan.lanes.ds).lower(),
         "rust": str(plan.lanes.rust).lower(),
+        "windows": str(plan.lanes.windows).lower(),
         "base": plan.base_revision or "unavailable",
         "head": plan.head_revision,
         "base-kind": plan.base_kind,
@@ -584,11 +611,43 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 ("cargo", "vet", "--locked", "--no-registry-suggestions"),
             ]
         )
+    if plan.lanes.windows:
+        commands.extend(
+            [
+                (python, "windows/scripts/generate-clientkit.py", "--check"),
+                ("dotnet", "build", WINDOWS_SOLUTION, "-c", "Release"),
+                ("dotnet", "test", WINDOWS_SOLUTION, "-c", "Release", "--no-build"),
+            ]
+        )
     return tuple(commands)
 
 
+def windows_lane_runnable() -> bool:
+    """The windows lane builds and tests a Windows-only solution (net10.0-windows,
+    named-pipe P/Invoke); nothing else can stand in for it."""
+    return platform.system() == "Windows"
+
+
+def _is_windows_lane_command(command: Sequence[str]) -> bool:
+    return command[0] == "dotnet" or (
+        len(command) > 1 and command[1].startswith(f"{WINDOWS_DIR}/")
+    )
+
+
 def run_local(repo_root: pathlib.Path, plan: CIPlan) -> None:
+    # A selected windows lane on another host is reported as not runnable and
+    # fails the local gate after the other lanes ran; it never passes silently.
+    skip_windows = plan.lanes.windows and not windows_lane_runnable()
+    if skip_windows:
+        print(
+            "ci-plan: the windows lane is selected but cannot run on this host "
+            f"({platform.system() or 'unknown'}); the other lanes run first",
+            file=sys.stderr,
+            flush=True,
+        )
     for command in local_commands(repo_root, plan):
+        if skip_windows and _is_windows_lane_command(command):
+            continue
         # rustup discovers rust-toolchain.toml from the working directory,
         # not --manifest-path. Run each Cargo invocation in the workspace so
         # local validation uses the same pinned toolchain as hosted CI.
@@ -596,6 +655,14 @@ def run_local(repo_root: pathlib.Path, plan: CIPlan) -> None:
         location = f"[{RUST_WORKSPACE_DIR}] " if cwd != repo_root else ""
         print("+ " + location + " ".join(command), flush=True)
         subprocess.run(command, cwd=cwd, env=os.environ.copy(), check=True)
+    if skip_windows:
+        raise PlanError(
+            "the windows lane is not runnable on this host "
+            f"({platform.system() or 'unknown'}): it builds and tests "
+            f"{WINDOWS_SOLUTION} with the .NET SDK on Windows 11 x64; run "
+            "`--run-local` on a Windows host (the hosted windows-clientkit job "
+            "runs it in CI)"
+        )
 
 
 def _parse_arguments(argv: Sequence[str]) -> argparse.Namespace:

@@ -361,6 +361,17 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
     "support-bundle",
 ];
 
+/// The Runtime leaves whose every method the Windows daemon answers, measured
+/// end to end on Windows: the CLI authenticates a daemon signed with a
+/// host-trusted development signer over the named pipe and renders its
+/// answer (`check-readonly.py` `signed_windows_matrix`, `tests/
+/// windows_signed_runtime.rs`; TASK-XPA-018). `device candidates` is not one:
+/// without a registered Windows HDC tuple its method answers a structured
+/// refusal, not the live candidates its target contract names, and the entry
+/// for that method reaches `device wait` and `device list`, which no Windows
+/// run has measured.
+const WINDOWS_MEASURED_LEAVES: &[&str] = &["doctor", "operation.list"];
+
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
 /// support bundle's service is `operationUnavailable`), each for the macOS
 /// host primitive it needs and Windows does not have yet: the LaunchAgent
@@ -637,6 +648,8 @@ impl Entry {
     /// - `implemented` where every leaf it reaches answers without the
     ///   Runtime (the registry's `connectsToRuntime`), as it does on macOS:
     ///   its argv fixtures replay and its answer is rendered alike on Windows;
+    ///   or is answered by the Windows daemon and measured end to end there
+    ///   ([`WINDOWS_MEASURED_LEAVES`]);
     /// - `partial` otherwise: the leaves parse, send their frames and render
     ///   their envelopes on Windows, but the target rests on a Runtime owner
     ///   the Windows daemon does not yet compose, or whose answer no Windows
@@ -668,7 +681,10 @@ impl Entry {
                 "notImplemented"
             }
         } else if self.classification != "blocked"
-            && leaves.iter().all(|leaf| leaf["connectsToRuntime"] == false)
+            && leaves.iter().all(|leaf| {
+                leaf["connectsToRuntime"] == false
+                    || WINDOWS_MEASURED_LEAVES.contains(&command(leaf))
+            })
         {
             "implemented"
         } else {
@@ -927,6 +943,13 @@ fn validate(entries: &[Entry]) {
     for name in MACOS_HOST_LEAVES {
         leaf_named(name);
     }
+    for name in WINDOWS_MEASURED_LEAVES {
+        assert!(
+            !MACOS_HOST_LEAVES.contains(name),
+            "{name} is refused off macOS"
+        );
+        leaf_named(name);
+    }
     let referenced: BTreeSet<&str> = entries
         .iter()
         .flat_map(|entry| entry.referenced_leaves.iter().map(String::as_str))
@@ -1043,6 +1066,10 @@ mod tests {
         let document = document();
         for (feature, status) in [
             ("commands", "implemented"),
+            ("doctor", "implemented"),
+            ("operation.list", "implemented"),
+            ("device.observations", "partial"),
+            ("health", "partial"),
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),

@@ -24,6 +24,7 @@ pub(crate) mod host_store;
 mod identity;
 mod managed;
 mod process;
+mod pty;
 mod publisher;
 mod server;
 mod state;
@@ -45,7 +46,7 @@ pub use state::{
 };
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-pub use stop::{Latch, StopSignal};
+pub use stop::{Latch, StopSignal, send_console_break};
 
 pub(crate) struct Handle(OwnedHandle);
 impl Handle {

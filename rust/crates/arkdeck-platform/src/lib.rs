@@ -18,13 +18,15 @@ mod windows;
 #[cfg(target_os = "macos")]
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
-    DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
-    PtyFailureCategory, PtyInteraction, PtyRequest, ToolLaunchIdentity, VerifiedNamespace,
-    VerifiedResource, VerifiedSource,
+    DeviceShellChannel, DeviceShellChannelError, ManagedServer, ToolLaunchIdentity,
+    VerifiedNamespace, VerifiedResource, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
-pub use process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
+pub use process::{
+    PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest, ToolExecution,
+    ToolLimits, ToolRequest, ToolRunError, ToolTermination,
+};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]
@@ -106,7 +108,8 @@ pub use windows::{
     ConnectionCloser, DetachedDaemon, GuardAcquisition, GuardObject, ImagePin, InstanceScope,
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot,
-    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, verify_daemon_image,
+    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, send_console_break,
+    verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
@@ -214,15 +217,17 @@ pub use host_store::{
 };
 
 // The same durable host store on NTFS (TASK-XPA-005): the core document,
-// lock, publication and Job journal surface. The export, import-upload,
-// update, trace-removal, session-removal, diagnostic-log and payload-cache
-// submodules, and the `std::fs::Metadata`-typed `document_metadata`/
-// `remove_document`, are not on Windows yet.
+// lock, publication and Job journal surface, and the import-upload
+// submodule (TASK-XPA-008). The export, update, trace-removal,
+// session-removal, diagnostic-log and payload-cache submodules, and the
+// `std::fs::Metadata`-typed `document_metadata`/`remove_document`, are not
+// on Windows yet.
 #[cfg(windows)]
 pub use windows::host_store::{
     DocumentPublishError, ExclusiveOutcome, HostDirectory, HostDirectoryFacts, HostDocument,
-    HostDocumentPass, HostEntryKind, HostFileIdentity, HostJournal, HostJournalAppender,
-    HostReadLock, JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck,
+    HostDocumentPass, HostEntryKind, HostFileIdentity, HostImportSource, HostJournal,
+    HostJournalAppender, HostReadLock, HostUploadFile, HostUploadReader, JournalAppendError,
+    JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, UploadChunkCheckpoint, UploadWritePoint,
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
@@ -364,14 +369,16 @@ mod host_deveco_resources;
 #[cfg(target_os = "macos")]
 pub use host_deveco_resources::{DEVECO_RESOURCE_PATHS, verify_deveco_resource_envelope};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod self_resources;
-#[cfg(target_os = "macos")]
+#[cfg(windows)]
+pub use self_resources::{SelfMemory, self_memory};
+#[cfg(any(target_os = "macos", windows))]
 pub use self_resources::{SelfResources, self_resources};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod continuous_clock;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use continuous_clock::ContinuousInstant;
 
 #[cfg(target_os = "macos")]

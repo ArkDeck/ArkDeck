@@ -119,10 +119,86 @@ METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
 }
 
 
+# A Windows capture (TASK-XPA-025, WM6) measures the Windows counterparts of
+# three rows and adds one Windows-only figure; the macOS definitions above are
+# unchanged. `ipc.health` and `daemon.idleOpenFileDescriptorCount` stay rows
+# there, as gaps that name the Windows metric carrying the measurement.
+WINDOWS_REPLACED = ("ipc.health", "daemon.idleOpenFileDescriptorCount")
+WINDOWS_METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
+    "ipc.namedPipe": (
+        "milliseconds",
+        "I.2 row 4 (IPC, named-pipe leg)",
+        "health round trip on an established named-pipe connection to the "
+        "Windows daemon, whose server process id is checked on connect",
+    ),
+    "daemon.idleHandleCount": (
+        "count",
+        "I.2 row 8 (idle resource footprint)",
+        "open kernel handles of a freshly started daemon (GetProcessHandleCount), "
+        "the Windows counterpart of its open descriptors",
+    ),
+    "daemon.idlePrivateBytes": (
+        "bytes",
+        "I.2 row 8 (idle resource footprint)",
+        "private (committed, unshared) bytes of a freshly started daemon",
+    ),
+}
+WINDOWS_RESIDENT_SET_NOTE = (
+    "; on Windows the working set (K32GetProcessMemoryInfo WorkingSetSize)")
+
+
+def metric_definitions(windows: bool | None = None) -> dict[str, tuple[str, str, str]]:
+    """The rows a capture on this host measures when it can."""
+
+    if windows is None:
+        windows = harness.on_windows()
+    if not windows:
+        return METRIC_DEFINITIONS
+    definitions = {name: row for name, row in METRIC_DEFINITIONS.items()
+                   if name not in WINDOWS_REPLACED}
+    for name in ("daemon.residentSetPlateau", "daemon.residentSetSteady"):
+        unit, row, description = definitions[name]
+        definitions[name] = (unit, row, description + WINDOWS_RESIDENT_SET_NOTE)
+    unit, row, description = definitions["daemon.idleCpuPercent"]
+    definitions["daemon.idleCpuPercent"] = (
+        unit, row, "CPU share of a freshly started daemon: its lifetime CPU time over its "
+        "lifetime (GetProcessTimes), the average ps reports on macOS")
+    return definitions | WINDOWS_METRIC_DEFINITIONS
+
+
 RUNTIME_KINDS = ("swift", "rust")
 
+# Why each Job-store row is not measured on Windows.
+WINDOWS_JOB_STORE_GAP = (
+    "the Windows daemon composes no Job store yet (G01): its development root "
+    "owns only the lifecycle, so there is no seeded Job to read and no Job "
+    "fixture for the soak to seed"
+)
 
-def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
+
+def _windows_gaps(gaps: dict[str, baseline.Gap]) -> dict[str, baseline.Gap]:
+    gaps = dict(gaps)
+    gaps.pop("ipc.namedPipe")
+    for name in ("daemon.warmStartRecovery", "job.journalAppend", "job.eventsPage",
+                 "artifact.pagedRead", "job.cancelReconcile"):
+        gap = gaps[name]
+        gaps[name] = baseline.Gap(name, gap.design_row, f"{WINDOWS_JOB_STORE_GAP}; {gap.reason}",
+                                  f"the Job store on Windows (G01), then {gap.blocked_by}")
+    gaps["ipc.health"] = baseline.Gap(
+        "ipc.health", "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+        "Windows has no Unix-domain-socket leg; the same health round trip over "
+        "the named pipe is ipc.namedPipe", "a Unix host")
+    for name in ("ipc.jobList", "ipc.jobStatus"):
+        gaps[name] = baseline.Gap(name, METRIC_DEFINITIONS[name][1], WINDOWS_JOB_STORE_GAP,
+                                  "the Job store on Windows (G01)")
+    gaps["daemon.idleOpenFileDescriptorCount"] = baseline.Gap(
+        "daemon.idleOpenFileDescriptorCount", "I.2 row 8 (idle resource footprint)",
+        "Windows has no descriptor table; open kernel handles are daemon.idleHandleCount",
+        "a Unix host")
+    return gaps
+
+
+def gap_definitions(runtime_kind: str = "swift", windows: bool = False) -> dict[str, baseline.Gap]:
     """Design rows this harness cannot measure on the given daemon, and why.
 
     Most reasons hold for both compositions. Runtime support does not imply
@@ -283,6 +359,8 @@ def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
             "TASK-XPA-022 (Windows packaging) and a macOS installer producer",
         ),
     }
+    if windows:
+        return _windows_gaps(gaps)
     return gaps
 
 
@@ -323,6 +401,10 @@ class RunContext:
             raise ValueError("journal-only requires positive journal samples")
         if (journal_samples and runtime_kind != "rust") or (journal_only and recovery_only):
             raise ValueError("journal capture requires Rust and separate only modes")
+        if harness.on_windows() and (runtime_kind != "rust" or recovery_samples
+                                     or journal_samples or artifact_samples):
+            raise ValueError("a Windows capture measures the Rust daemon without the Job-store "
+                             "legs (recovery, journal, artifact): " + WINDOWS_JOB_STORE_GAP)
         if (artifact_samples < 0 or (artifact_only and not artifact_samples)
                 or (artifact_samples and runtime_kind != "rust")
                 or sum((artifact_only, journal_only, recovery_only)) > 1
@@ -439,15 +521,26 @@ def execute_run(
 
 
 def _execute_run(context, state_directory, samples, scale):
-    samples.update({name: [] for name in (METRIC_DEFINITIONS | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS | artifact.DEFINITIONS)})
-    scale.update({
-        "seedSeconds": context.seed_seconds,
-        "seedJobsPerCycle": context.seed_jobs_per_cycle,
-        "seedRestartIntervalSeconds": SEED_RESTART_INTERVAL_SECONDS,
-        "jobListPageSize": JOB_LIST_PAGE_SIZE,
-        "jobStoreRowCount": None,
-        "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
-    })
+    windows = harness.on_windows()
+    samples.update({name: [] for name in (metric_definitions(windows) | RECOVERY_METRIC_DEFINITIONS | journal.DEFINITIONS | artifact.DEFINITIONS)})
+    if windows:
+        # No Job store to seed or read: the scale says so instead of carrying
+        # seed parameters nothing used.
+        scale.update({
+            "seedStrategy": "none: " + WINDOWS_JOB_STORE_GAP,
+            "jobStoreRowCount": None,
+            "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
+            "transport": "named-pipe",
+        })
+    else:
+        scale.update({
+            "seedSeconds": context.seed_seconds,
+            "seedJobsPerCycle": context.seed_jobs_per_cycle,
+            "seedRestartIntervalSeconds": SEED_RESTART_INTERVAL_SECONDS,
+            "jobListPageSize": JOB_LIST_PAGE_SIZE,
+            "jobStoreRowCount": None,
+            "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
+        })
 
     def record(entry):
         if context.capture_recorder:
@@ -526,22 +619,23 @@ def _execute_run(context, state_directory, samples, scale):
     if context.recovery_only or context.journal_only or context.artifact_only:
         return {name: values for name, values in samples.items() if values}, scale
 
-    seeded = harness.seed_state_directory(
-        context.soak_executable,
-        state_directory,
-        context.seed_seconds,
-        context.seed_jobs_per_cycle,
-        SEED_RESTART_INTERVAL_SECONDS,
-        recorder=record,
-    )
-    if seeded.returncode != 0:
-        raise RunFailed(
-            "the soak fixture could not seed a Runtime state directory: "
-            f"{seeded.stdout.strip()} {seeded.stderr.strip()}"
+    if not windows:
+        seeded = harness.seed_state_directory(
+            context.soak_executable,
+            state_directory,
+            context.seed_seconds,
+            context.seed_jobs_per_cycle,
+            SEED_RESTART_INTERVAL_SECONDS,
+            recorder=record,
         )
+        if seeded.returncode != 0:
+            raise RunFailed(
+                "the soak fixture could not seed a Runtime state directory: "
+                f"{seeded.stdout.strip()} {seeded.stderr.strip()}"
+            )
 
-    if context.runtime_kind == "rust":
-        observations.seed_metrics(state_directory, record)
+        if context.runtime_kind == "rust":
+            observations.seed_metrics(state_directory, record)
 
     runtime = harness.IsolatedRuntime(
         context.daemon_executable, state_directory, runtime_kind=context.runtime_kind
@@ -570,30 +664,40 @@ def _execute_run(context, state_directory, samples, scale):
         guard("ipc-before")
 
         runtime.start()
-        with runtime.client() as client:
-            job_id, row_count = _job_store_probe(client)
-            if job_id is None or row_count is None or row_count <= 0:
-                raise RunFailed(
-                    "the measured daemon cannot read the soak seed's Jobs; "
-                    "use matching Runtime and soak executables"
-                )
-            scale["jobStoreRowCount"] = row_count
-            record({"kind": "jobListProbe", "returnedPageRowCount": row_count,
-                    "pageSize": JOB_LIST_PAGE_SIZE})
-            for index in range(context.ipc_samples):
-                if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
-                    client.close()
-                    client.connect()
-                    client.verify_contract()
-                _, elapsed = client.timed_call("health")
-                samples["ipc.health"].append(elapsed * 1000.0)
-                _, elapsed = client.timed_call(
-                    "job.list", {"pageSize": JOB_LIST_PAGE_SIZE}
-                )
-                samples["ipc.jobList"].append(elapsed * 1000.0)
-                if job_id is not None:
-                    _, elapsed = client.timed_call("job.status", {"jobId": job_id})
-                    samples["ipc.jobStatus"].append(elapsed * 1000.0)
+        if windows:
+            with runtime.client() as client:
+                for index in range(context.ipc_samples):
+                    if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
+                        client.close()
+                        client.connect()
+                        client.verify_contract()
+                    _, elapsed = client.timed_call("health")
+                    samples["ipc.namedPipe"].append(elapsed * 1000.0)
+        else:
+            with runtime.client() as client:
+                job_id, row_count = _job_store_probe(client)
+                if job_id is None or row_count is None or row_count <= 0:
+                    raise RunFailed(
+                        "the measured daemon cannot read the soak seed's Jobs; "
+                        "use matching Runtime and soak executables"
+                    )
+                scale["jobStoreRowCount"] = row_count
+                record({"kind": "jobListProbe", "returnedPageRowCount": row_count,
+                        "pageSize": JOB_LIST_PAGE_SIZE})
+                for index in range(context.ipc_samples):
+                    if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
+                        client.close()
+                        client.connect()
+                        client.verify_contract()
+                    _, elapsed = client.timed_call("health")
+                    samples["ipc.health"].append(elapsed * 1000.0)
+                    _, elapsed = client.timed_call(
+                        "job.list", {"pageSize": JOB_LIST_PAGE_SIZE}
+                    )
+                    samples["ipc.jobList"].append(elapsed * 1000.0)
+                    if job_id is not None:
+                        _, elapsed = client.timed_call("job.status", {"jobId": job_id})
+                        samples["ipc.jobStatus"].append(elapsed * 1000.0)
         record({"kind": "phaseCheckpoint", "phase": "ipc", "status": "COMPLETE",
                 "samples": {name: values for name, values in samples.items() if name.startswith("ipc.")},
                 "scale": scale})
@@ -658,6 +762,10 @@ def _execute_run(context, state_directory, samples, scale):
                 samples["daemon.idleOpenFileDescriptorCount"].append(
                     float(sample.open_file_descriptor_count)
                 )
+            if sample.handle_count is not None:
+                samples["daemon.idleHandleCount"].append(float(sample.handle_count))
+            if sample.private_bytes is not None:
+                samples["daemon.idlePrivateBytes"].append(float(sample.private_bytes))
             observation_index += 1
         plateau, steady, release_index = split_at_release(
             resident_series, observation_indices=resident_indices)

@@ -7,6 +7,21 @@ use std::io::Write;
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::PathBuf;
 
+/// Every test of this binary runs one at a time. The soak gates the growth of
+/// process-wide counters (`ru_maxrss`, the `/dev/fd` census), and libtest runs
+/// the tests of one binary as threads of one process: a sibling test's
+/// descriptors and allocations, open while one workload takes its first and
+/// later readings, would be counted as that workload's growth (#2338, #2344:
+/// "descriptors 24 / 16"). Serializing keeps the bound and makes each run
+/// measure only itself.
+static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    // A failed test must not fail every later one.
+    SERIAL
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
@@ -28,6 +43,7 @@ impl Drop for Root {
 
 #[test]
 fn production_workload_reopens_and_verifies_all_outputs_and_refuses_corruption() {
+    let _serial = serial();
     let root = Root::new();
     let config = Configuration {
         state_directory: root.0.clone(),
@@ -129,6 +145,7 @@ fn production_workload_reopens_and_verifies_all_outputs_and_refuses_corruption()
 
 #[test]
 fn refuses_unowned_nonempty_state_and_invalid_flags() {
+    let _serial = serial();
     let root = Root::new();
     fs::write(root.0.join("unrelated-state"), b"retain").unwrap();
     let config = Configuration {
@@ -165,6 +182,7 @@ fn refuses_unowned_nonempty_state_and_invalid_flags() {
 
 #[test]
 fn recovery_seed_is_exact_fresh_and_replayed_by_production_owner() {
+    let _serial = serial();
     use arkdeck_hoststore::{JobStore, inspect_journal, recover_active_jobs};
     let root = Root::new();
     let manifest = arkdeck_soak::recovery::seed(&root.0, "journal", 20).unwrap();
@@ -201,6 +219,7 @@ fn recovery_seed_is_exact_fresh_and_replayed_by_production_owner() {
 
 #[test]
 fn recovery_seed_refuses_bad_workload_without_writing() {
+    let _serial = serial();
     let root = Root::new();
     for (kind, count) in [("unknown", 20), ("journal", 0), ("history", 10001)] {
         assert!(arkdeck_soak::recovery::seed(&root.0, kind, count).is_err());
@@ -210,6 +229,7 @@ fn recovery_seed_refuses_bad_workload_without_writing() {
 
 #[test]
 fn recovery_seed_refuses_foreign_root_and_final_symlink() {
+    let _serial = serial();
     let root = Root::new();
     fs::write(root.0.join("foreign"), b"preserve").unwrap();
     assert!(arkdeck_soak::recovery::seed(&root.0, "history", 2).is_err());
@@ -223,6 +243,7 @@ fn recovery_seed_refuses_foreign_root_and_final_symlink() {
 
 #[test]
 fn measured_journal_emits_every_append_and_drains_production_pages() {
+    let _serial = serial();
     let root = Root::new();
     let result = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck-soak"))
         .arg("--measure-journal")
@@ -280,6 +301,7 @@ fn measured_journal_emits_every_append_and_drains_production_pages() {
 
 #[test]
 fn artifact_seed_refuses_foreign_or_wrong_size_input_without_publication() {
+    let _serial = serial();
     let root = Root::new();
     assert!(arkdeck_soak::artifact_bench::seed(&root.0, 100, &"a".repeat(64)).is_err());
     assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
@@ -294,6 +316,7 @@ fn artifact_seed_refuses_foreign_or_wrong_size_input_without_publication() {
 
 #[test]
 fn oversized_socket_root_is_rejected_before_publishing_runtime_state() {
+    let _serial = serial();
     let root = Root::new();
     let long = root.0.join("long-private-state-".repeat(6));
     fs::DirBuilder::new().mode(0o700).create(&long).unwrap();
@@ -311,6 +334,7 @@ fn oversized_socket_root_is_rejected_before_publishing_runtime_state() {
 
 #[test]
 fn the_existing_benchmark_socket_path_boundary_remains_valid_for_seeding() {
+    let _serial = serial();
     let root = Root::new();
     let root_limit = 103 - "/agentd.sock".len();
     let name_len = root_limit - root.0.as_os_str().as_encoded_bytes().len() - 1;
