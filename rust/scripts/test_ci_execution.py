@@ -180,6 +180,36 @@ class WorkspaceCacheTests(unittest.TestCase):
             self.write("rust/Cargo.lock", "new dependencies")
             self.assertNotEqual(cache.cache_outputs(self.source, str(self.root), "2026-09-28")["prefix"], first["prefix"])
 
+    def test_fallback_keeps_host_toolchain_image_flags_and_root_but_not_manifests(self):
+        environment = {"RUNNER_OS": "Windows", "RUNNER_ARCH": "X64", "ImageVersion": "20260922.246.2"}
+        with patch.object(cache.subprocess, "check_output", return_value="compiler-v1"), patch.dict(os.environ, environment):
+            first = cache.cache_outputs(self.source, str(self.root), "2026-09-28")
+            self.assertTrue(first["prefix"].startswith(first["fallback"]))
+            self.assertTrue(first["key"].startswith(first["prefix"]))
+            # The image is in clear, so retention can keep one entry per image.
+            self.assertTrue(first["fallback"].startswith("arkdeck-rust-build-v3-Windows-X64-image-20260922.246.2-"))
+            self.assertEqual(retention.RUST_KEY.fullmatch(first["key"])["image"], "20260922.246.2")
+            # Manifest churn: a new exact prefix, the same fallback.
+            for path, text in (("rust/Cargo.lock", "# new dependency\n"),
+                               ("rust/crates/new/Cargo.toml", '[package]\nname = "new"\n')):
+                self.write(path, text)
+                changed = cache.cache_outputs(self.source, str(self.root), "2026-09-28")
+                self.assertNotEqual(changed["prefix"], first["prefix"])
+                self.assertEqual(changed["fallback"], first["fallback"])
+            # Every other compatibility dimension still separates the fallback.
+            for variable, value in (("ImageVersion", "20260925.250.1"), ("RUNNER_OS", "Linux"),
+                                    ("RUSTFLAGS", "-C debuginfo=0"), ("CARGO_INCREMENTAL", "1")):
+                with patch.dict(os.environ, {variable: value}):
+                    self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            self.assertNotEqual(cache.cache_outputs(self.source, str(self.root / "other"))["fallback"], first["fallback"])
+            with patch.object(cache.subprocess, "check_output", return_value="compiler-v2"):
+                self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            self.write("rust/rust-toolchain.toml", '[toolchain]\nchannel = "beta"\n')
+            self.assertNotEqual(cache.cache_outputs(self.source, str(self.root))["fallback"], first["fallback"])
+            # An image string cannot forge the key's separators.
+            with patch.dict(os.environ, {"ImageVersion": "a-b/c d"}):
+                self.assertIn("-image-a_b_c_d-", cache.cache_outputs(self.source, str(self.root))["fallback"])
+
     def test_compaction_preserves_each_views_linked_products_and_debug_info(self):
         mirror = cache.prepare(self.source, self.root)
         targets = [mirror / "rust/target"]
@@ -325,6 +355,43 @@ class CacheRetentionTests(unittest.TestCase):
         same_path_other_host["key"] = same_path_other_host["key"].replace("macOS-ARM64", "Linux-X64")
         self.assertEqual(retention.removals([entry(3), same_path_other_host]), [])
 
+    @staticmethod
+    def v3(n, image, size=700_000_000, version="win", host="Windows-X64", manifests="c"):
+        return {"id": n, "created_at": f"2026-09-{n:02d}", "version": version, "ref": "refs/heads/main",
+                "size_in_bytes": size,
+                "key": f"arkdeck-rust-build-v3-{host}-image-{image}-{'a' * 64}-{manifests * 64}-2026-09-{n:02d}"}
+
+    def test_keeps_the_newest_entry_of_a_second_image_but_never_a_third(self):
+        rows = [self.v3(1, "old"), self.v3(2, "img.1"), self.v3(3, "img.2"), self.v3(4, "img.1", manifests="d"),
+                self.v3(5, "img.2", manifests="d"), self.v3(6, "img.1", version="lin", host="Linux-X64")]
+        # 5 (img.2) is the newest Windows entry and 4 the newest of img.1; the
+        # older entries of either image and a third image go. Linux is its
+        # own format.
+        self.assertEqual(sorted(e["id"] for e in retention.removals(rows)), [1, 2, 3])
+        # One entry per image: the same image never takes the second slot.
+        self.assertEqual([e["id"] for e in retention.removals([self.v3(1, "img.1"), self.v3(2, "img.1")])], [1])
+        # A v2 key names no image, so it never takes the second slot.
+        v2 = {"id": 1, "created_at": "2026-09-01", "version": "win", "ref": "refs/heads/main", "size_in_bytes": 1,
+              "key": f"arkdeck-rust-build-v2-Windows-X64-{'a' * 64}-2026-09-01"}
+        self.assertEqual([e["id"] for e in retention.removals([v2, self.v3(2, "img.1")])], [1])
+
+    def test_other_image_entries_fit_the_rust_budget_and_never_displace_the_newest(self):
+        budget = retention.RUST_BUDGET_BYTES
+        rows = [self.v3(1, "a", size=budget // 4, version="w1"), self.v3(2, "b", size=budget // 4, version="w1"),
+                self.v3(3, "a", size=budget // 4, version="w2"), self.v3(4, "b", size=budget // 4, version="w2"),
+                self.v3(5, "a", size=budget // 4, version="w3"), self.v3(6, "b", size=budget // 4, version="w3")]
+        # Primaries 2, 4 and 6 take three quarters; only the newest other-image
+        # entry (5) fits, the older ones (3, 1) are deleted.
+        self.assertEqual(sorted(e["id"] for e in retention.removals(rows)), [1, 3])
+        # Primaries alone over the budget are all kept, as before this rule.
+        huge = [self.v3(1, "a", size=budget, version="w1"), self.v3(2, "b", size=budget, version="w1"),
+                self.v3(3, "a", size=budget, version="w2")]
+        self.assertEqual([e["id"] for e in retention.removals(huge)], [1])
+        # Other families are neither counted nor deleted.
+        other = {"id": 9, "created_at": "2026-09-09", "version": "w1", "ref": "refs/heads/main",
+                 "size_in_bytes": 10 * budget, "key": "arkdeck-swiftpm-v2-macOS-ARM64-xcode-27.0-image-x-y"}
+        self.assertEqual(retention.removals(rows[:2] + [other]), [])
+
     def test_write_authority_requires_successful_same_repository_main_ci(self):
         event = {"repository": {"full_name": "o/r"}, "workflow_run": {
             "head_repository": {"full_name": "o/r"}, "head_branch": "main", "event": "push",
@@ -455,6 +522,155 @@ pub fn documented() {}
             self.assertNotEqual(stages["shared-resources"]["exitCode"], 0)
             self.assertNotEqual(stages["doctests"]["exitCode"], 0)
             self.assertEqual(stages["isolated"]["exitCode"], 0)
+
+
+WINDOWS = {("windows", None), ("target_os", "windows"), ("target_family", "windows"), ("target_env", "msvc")}
+LINUX = {("unix", None), ("target_os", "linux"), ("target_family", "unix"), ("target_env", "gnu")}
+
+
+class HostSelectionTests(unittest.TestCase):
+    """One worker skips only integration tests whose crate cfg is false here."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="arkdeck-ci-host-test-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.manifest = self.root / "Cargo.toml"
+        self.manifest.write_text('[package]\nname="fixture"\nversion="0.1.0"\nedition="2021"\n')
+        self.targets = [{"kind": ["lib"], "name": "fixture", "src_path": str(self.root / "src/lib.rs"),
+                         "test": True, "doctest": True}]
+        self.metadata = {"workspace_members": ["fixture"], "packages": [
+            {"id": "fixture", "name": "fixture", "manifest_path": str(self.manifest), "targets": self.targets}]}
+
+    def integration(self, name, text, **fields):
+        path = self.root / "tests" / f"{name}.rs"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(text)
+        self.targets.append({"kind": ["test"], "name": name, "src_path": str(path), "test": True, **fields})
+
+    def test_crate_cfg_is_three_valued_over_the_host_target(self):
+        cases = {
+            '#![cfg(target_os = "macos")]\n': (False, False),
+            "#![cfg(unix)]\n": (False, True),
+            "#![cfg(windows)]\n": (True, False),
+            "#![cfg(not(unix))]\n": (True, False),
+            '#![cfg(any(target_os = "linux", windows))]\n': (True, True),
+            '#![cfg(all(unix, feature = "slow"))]\n': (False, None),
+            '#![cfg(any(windows, feature = "slow"))]\n': (True, None),
+            '#![cfg(feature = "slow")]\n': (None, None),
+            "#![cfg(test)]\n": (True, True),
+            # Comments, doc comments, other crate attributes and a multi-line
+            # predicate before the first item.
+            '//! Doc.\n/* a /* nested */ comment */\n#![allow(dead_code)]\n#![cfg(all(\n    unix,\n    not(target_os = "macos"),\n))]\n': (False, True),
+            # Every crate-level cfg must hold.
+            "#![cfg(unix)]\n#![cfg(windows)]\n": (False, False),
+            # A cfg below the first item is a module's, not the crate's.
+            "use std::fs;\n#![cfg(unix)]\n": (True, True),
+            "mod inner {\n    #![cfg(unix)]\n}\n": (True, True),
+            "#[test]\nfn plain() {}\n": (True, True),
+        }
+        for text, (windows, linux) in cases.items():
+            with self.subTest(text):
+                self.assertEqual(tests.crate_cfg(text, WINDOWS), windows)
+                self.assertEqual(tests.crate_cfg(text, LINUX), linux)
+        for text in ('#![cfg_attr(unix, cfg(test))]\n', "#![cfg(unix\n", "#![cfg(unix, windows)]\n",
+                     "#![cfg(frobnicate(unix))]\n", "#![cfg(target_os = macos)]\n", "/* open\n#![cfg(unix)]\n"):
+            with self.subTest(text), self.assertRaises(tests.Undecidable):
+                tests.crate_cfg(text, WINDOWS)
+
+    def test_plan_runs_every_default_target_except_provably_empty_harnesses(self):
+        self.integration("everywhere", "#[test] fn t() {}\n")
+        self.integration("mac_only", '#![cfg(target_os = "macos")]\n#[test] fn t() {}\n')
+        self.integration("unix_only", "#![cfg(unix)]\n#[test] fn t() {}\n")
+        self.integration("not_by_default", "#![cfg(unix)]\n", test=False)
+        self.targets.append({"kind": ["bin"], "name": "tool", "src_path": "main.rs", "test": True})
+        self.targets.append({"kind": ["example"], "name": "demo", "src_path": "demo.rs", "test": False})
+        plan = tests.host_plan(self.metadata, WINDOWS)
+        commands = dict(plan["commands"])
+        self.assertEqual(commands["tests"], tests.BASE + ["--lib", "--bins", "--test", "everywhere"])
+        self.assertEqual(commands["doctests"], tests.BASE + ["--doc"])
+        self.assertEqual(commands["examples"], ["cargo", "build", "--workspace", "--examples", "--locked"])
+        self.assertEqual(sorted(t["name"] for _, t in plan["excluded"]), ["mac_only", "unix_only"])
+        # Exhaustive: every default integration target is run or excluded.
+        tested = {t["name"] for t in self.targets if t["kind"] == ["test"] and t["test"]}
+        self.assertEqual({t["name"] for _, t in plan["run"] + plan["excluded"]}, tested)
+        linux = dict(tests.host_plan(self.metadata, LINUX)["commands"])["tests"]
+        self.assertEqual(linux[len(tests.BASE):], ["--lib", "--bins", "--test", "everywhere", "--test", "unix_only"])
+
+    def test_undecidable_cfg_fails_and_names_the_target(self):
+        self.integration("slow", '#![cfg(feature = "slow")]\n#[test] fn t() {}\n')
+        self.integration("mac_only", '#![cfg(target_os = "macos")]\n')
+        with self.assertRaisesRegex(tests.Undecidable, "fixture slow"):
+            tests.host_plan(self.metadata, WINDOWS)
+
+    def test_custom_harnesses_always_run_and_unusual_shapes_run_everything(self):
+        self.integration("custom", '#![cfg(target_os = "macos")]\nfn main() {}\n')
+        self.manifest.write_text(self.manifest.read_text() + '\n[[test]]\nname="custom"\nharness=false\n')
+        plan = tests.host_plan(self.metadata, WINDOWS)
+        self.assertEqual([t["name"] for _, t in plan["run"]], ["custom"])
+        for change in ({"required-features": ["slow"]}, {"test": False}):
+            with self.subTest(change):
+                original = dict(self.targets[0])
+                self.targets[0].update(change)
+                self.assertIsNone(tests.host_plan(self.metadata, WINDOWS))
+                self.targets[0].clear()
+                self.targets[0].update(original)
+        self.targets.append({"kind": ["example"], "name": "tested", "src_path": "e.rs", "test": True})
+        self.assertIsNone(tests.host_plan(self.metadata, WINDOWS))
+
+    def test_every_selected_target_must_appear_in_cargos_running_lines(self):
+        self.integration("everywhere", "#[test] fn t() {}\n")
+        self.integration("nested", "#[test] fn t() {}\n")
+        plan = tests.host_plan(self.metadata, WINDOWS)
+        log = ("\x1b[1m\x1b[32m     Running\x1b[0m unittests src\\lib.rs (target\\debug\\deps\\fixture-1.exe)\n"
+               "     Running tests\\everywhere.rs (target\\debug\\deps\\everywhere-1.exe)\n"
+               "     Running tests/nested.rs (target/debug/deps/nested-1)\n")
+        self.assertEqual(tests.verify_ran(plan, self.metadata, log), [])
+        self.assertEqual(tests.verify_ran(plan, self.metadata, log.replace("nested", "other")), ["fixture nested"])
+
+    @unittest.skipUnless(shutil.which("cargo"), "native fixture needs Cargo")
+    def test_native_cargo_skips_only_the_empty_harness_and_keeps_docs_examples_and_failures(self):
+        host = "windows" if sys.platform == "win32" else "unix"
+        other = "unix" if host == "windows" else "windows"
+        (self.root / "src").mkdir()
+        (self.root / "examples").mkdir()
+        (self.root / "receipts").mkdir()
+        (self.root / "src/lib.rs").write_text('''/// ```
+/// std::fs::write("receipts/doc", "ran").unwrap();
+/// ```
+pub fn documented() {}
+#[test] fn unit() { std::fs::write("receipts/unit", "ran").unwrap(); }
+''')
+        (self.root / "examples/demo.rs").write_text("fn main() {}\n")
+        mark = 'std::fs::write(concat!(env!("CARGO_MANIFEST_DIR"), "/receipts/{0}"), "ran").unwrap();'
+        self.integration("here", f"#![cfg({host})]\n#[test] fn t() {{ {mark.format('here')} }}\n")
+        self.integration("elsewhere", f"#![cfg({other})]\n#[test] fn t() {{ {mark.format('elsewhere')} }}\n")
+        environment = {"CARGO_TARGET_DIR": str(self.root / "target"), "CARGO_BUILD_JOBS": "2"}
+        with patch.dict(os.environ, environment), contextlib.redirect_stdout(io.StringIO()):
+            for name in tests.CFG_ENVIRONMENT:
+                os.environ.pop(name, None)
+            subprocess.run(["cargo", "generate-lockfile", "--offline"], cwd=self.root, check=True, capture_output=True)
+            directory = self.root / "reports"
+            code = tests.execute(self.root, workers=1, directory=directory)
+            if code:
+                self.fail("native fixture failed: " + "\n".join(p.read_text() for p in directory.glob("*.log")))
+            self.assertEqual({p.name for p in (self.root / "receipts").iterdir()}, {"unit", "doc", "here"})
+            deps = [p.name for p in (self.root / "target/debug/deps").iterdir()]
+            self.assertTrue(any(name.startswith("here-") for name in deps))
+            self.assertFalse(any(name.startswith("elsewhere-") for name in deps))
+            self.assertTrue(any(p.name.startswith("demo") for p in (self.root / "target/debug/examples").iterdir()))
+            selection = json.loads((directory / "host-selection.json").read_text())
+            self.assertEqual((selection["run"], selection["excluded"]), (["fixture/here"], ["fixture/elsewhere"]))
+            # A failing test does not suppress the doctests or the examples.
+            (self.root / "src/lib.rs").write_text((self.root / "src/lib.rs").read_text().replace(
+                'write("receipts/unit", "ran").unwrap();', 'panic!("fixture failure");'))
+            (self.root / "receipts/doc").unlink()
+            self.assertNotEqual(tests.execute(self.root, workers=1, directory=directory), 0)
+            self.assertTrue((self.root / "receipts/doc").exists())
+            # An undecidable crate cfg fails before anything is built.
+            (self.root / "tests/elsewhere.rs").write_text('#![cfg(feature = "x")]\n')
+            with self.assertRaises(tests.Undecidable):
+                tests.execute(self.root, workers=1, directory=directory)
 
 
 if __name__ == "__main__":

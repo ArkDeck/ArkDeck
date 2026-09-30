@@ -62,7 +62,7 @@ pub(crate) fn remove_preset(
         .as_ref()
         .and_then(|r| r.managed_material_directory.as_deref());
     if let Some(path) = managed
-        && (!crate::signing_action::is_standard_path(path)
+        && (!crate::file_identity::is_standard_host_path(path)
             || Path::new(path).parent() != Some(store.root()))
     {
         return Err(SigningError::receipt(

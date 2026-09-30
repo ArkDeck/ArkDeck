@@ -56,10 +56,15 @@ compiles a target once and compiler incremental state never survives to
 another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
 of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
-same compatibility key. Before saving, CI removes compiler incremental scratch
-state (not linked products, debug symbols or fingerprints) and records per-view
-sizes in `cache-size.json`. A separate successful-main workflow retains the
-newest Rust archive per runner/cache format without deleting SwiftPM, Xcode or
+same compatibility key. Main restores only an exact compatibility match; a run
+off main, which never saves, may fall back to main's newest entry for the same
+host, runner image, compiler, flags and cache root whatever the dependency
+manifests, and Cargo rebuilds what differs. Before saving, CI removes compiler
+incremental scratch state (not linked products, debug symbols or fingerprints)
+and records per-view sizes in `cache-size.json`. A separate successful-main
+workflow retains the newest Rust archive per runner/cache format, plus the
+newest of one other runner image (the image is in clear in the key) while the
+retained Rust archives fit 5 GB, without deleting SwiftPM, Xcode or
 policy-tool entries. Restored Git refs/config are discarded and rebuilt from
 the current checkout. Published and candidate views
 retain separate source directories and Cargo targets. In hosted CI the
@@ -76,7 +81,13 @@ New targets default to that queue. Custom harnesses and doctests still run;
 either queue or doctest failure fails the lane. The `rust-test-timings-xcode-27`
 artifact records compilation, queue and doctest durations and complete logs for
 the checkout, and `rust-contract-test-timings-xcode-27` for the published and
-candidate views. Run `python scripts/test_ci_execution.py` to verify
+candidate views. With one worker (Windows and Linux CI, and local runs) the
+same script asks Cargo for every default target except the integration tests
+whose crate-level `#![cfg(...)]` is false on this host (`rustc --print cfg`),
+which would build to harnesses that run nothing; a cfg it cannot decide fails
+the run, and every kept target must appear in Cargo's `Running` lines. Clippy
+`--all-targets` still checks every target on every host. Run
+`python scripts/test_ci_execution.py` to verify
 the cache boundaries and scheduler with a tiny dependency-free Cargo fixture.
 
 The two added CLI targets (`domain_leaves` and `runtime_service`) use random
@@ -2294,6 +2305,15 @@ recorded bytes and digests and reproduces the Swift daemon's recorded
 (agentd) records the Job into the daemon's Job store, answers `artifact list`,
 `inspect`, `read` and `export` over the real daemon's pipe before and after a
 restart and, with
+a Job, which the Job owner proves before anything is read, listed or exported;
+no Job owner is composed on Windows yet, so `artifact list`, `inspect`, `read`
+and `export` answer `operationUnavailable` ("Artifact Job owner is
+unavailable") and touch nothing, as the macOS daemon answers without a Job
+owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
+macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
+recorded bytes and digests and reproduces the Swift daemon's recorded
+`artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
+(agentd) runs the real daemon over its pipe and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
@@ -2315,9 +2335,35 @@ the mode on every return and, through a console control handler, on Ctrl-C.
 `tests/windows_credential_store.rs` works in a per-run fixture namespace and
 deletes every credential it may have created; `tests/windows_console_secret.rs`
 (`harness = false`) drives the reader in a child on a pseudo console and checks
-that nothing typed is rendered. The signing leaves stay macOS-only (daemon
-identity, file identity, PTY signer). The run record is
+that nothing typed is rendered. The signing owners built on it are the next
+section. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
+
+## Windows signing owners (TASK-XPA-011)
+
+`arkdeck-provider-workspace` builds `signer`, `sdk_release`, `credential_owner`,
+`signing_install`, `signing_rekey` and `signing_removal` on Windows as well as
+macOS, with one Runtime semantics. Host paths are this host's spelling
+(`X:\a\b`, joined with `\`): the attempt directory, the managed SDK material
+and its `…\toolchains\lib\hap-sign-tool.jar` rule, and the preset root
+`<LocalAppData>\ArkDeck\Signing\OpenHarmony` (`SigningPresetStore::default_root`).
+`arkdeck_platform::VerifiedSource` has a Windows form: the file is held without
+write or delete sharing and every ancestor without delete sharing, so its
+canonical path names the verified bytes while held, and that path takes the
+place of the macOS `/.vol` inode alias in the signer's argv.
+`create_private_directory`/`create_private_file` give new entries the store's
+owner-only descriptor where macOS uses `0700`/`0600`. `KeychainSigningSecrets`
+is built on Windows only in its scope-bound form (`over`) over Credential
+Manager: the production constructors bind a receipt to the daemon's code
+identity, and the Windows (Authenticode) form of that identity is not a
+receipt input yet; the CLI signing leaves and the daemon's signing dispatch
+stay macOS-only. `tests/windows_signing_flow.rs` (`harness = false`) runs the
+test binary as a fake `java.exe` on the signer's pseudo console: install, sign,
+verify and record, re-key through Credential Manager, a rejected password, a
+drifted JAR, the managed SDK release profile, removal;
+`arkdeck-platform/tests/windows_verified_source.rs` covers the held source and
+the private entries. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-signing-owners-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 

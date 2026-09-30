@@ -1,5 +1,11 @@
 //! Explicit host maintenance: generate and verify a bundle-bound SDK release
 //! profile in private managed material before installing its signing preset.
+//!
+//! On Windows (TASK-XPA-011) the SDK library is `<sdk>\toolchains\lib`, the
+//! managed directory and its files are created with the private descriptor
+//! (the Unix `0700`/`0600`), and the signed profile the signer writes there
+//! inherits the directory's owner-only DACL: it is measured owned, single-link
+//! and private rather than `chmod`ed.
 use crate::{
     SigningError, SigningFileIdentity, foundation_resolved_path, measure, remeasure,
     sdk_release_profile::{application_chain, generate_profile},
@@ -14,11 +20,12 @@ use arkdeck_platform::{
     VerifiedTool, wipe,
 };
 use serde_json::Value;
+#[cfg(target_os = "macos")]
+use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::{
     ffi::OsString,
     fs,
     io::{Read, Write},
-    os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -65,7 +72,7 @@ pub(crate) fn prepare(
         return Err(SigningError::invalid("bundleName is malformed"));
     }
     let sdk = path_text(&configuration.sdk_root)?;
-    if !crate::signing_action::is_standard_path(sdk) {
+    if !crate::file_identity::is_standard_host_path(sdk) {
         return Err(SigningError::invalid(
             "OpenHarmony SDK root must be an explicit canonical absolute path",
         ));
@@ -78,7 +85,7 @@ pub(crate) fn prepare(
             "OpenHarmony SDK root must be an explicit canonical absolute path",
         ));
     }
-    let library = configuration.sdk_root.join("toolchains/lib");
+    let library = configuration.sdk_root.join("toolchains").join("lib");
     let java = measure(
         path_text(&configuration.java_executable)?,
         "java",
@@ -114,9 +121,7 @@ pub(crate) fn prepare(
     {
         track(Path::new(&previous))?;
     }
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .create(&directory)
+    create_private_directory(&directory)
         .map_err(|_| SigningError::io("cannot create private SDK signing material"))?;
     let prepared = PreparedSdkRelease {
         configuration: SigningPresetConfiguration {
@@ -202,12 +207,24 @@ fn read_pinned(identity: &SigningFileIdentity) -> Result<Vec<u8>, SigningError> 
     }
     Ok(bytes)
 }
-fn write_private(path: &Path, bytes: &[u8]) -> Result<(), SigningError> {
-    let mut file = fs::OpenOptions::new()
+#[cfg(target_os = "macos")]
+fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    fs::DirBuilder::new().mode(0o700).create(path)
+}
+#[cfg(windows)]
+use arkdeck_platform::create_private_directory;
+#[cfg(target_os = "macos")]
+fn create_private_file(path: &Path) -> std::io::Result<fs::File> {
+    fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .open(path)
+}
+#[cfg(windows)]
+use arkdeck_platform::create_private_file;
+fn write_private(path: &Path, bytes: &[u8]) -> Result<(), SigningError> {
+    let mut file = create_private_file(path)
         .map_err(|_| SigningError::io("cannot create SDK signing material"))?;
     file.write_all(bytes)
         .and_then(|()| file.sync_all())
@@ -301,7 +318,13 @@ fn sign_profile(
         )));
     }
     let identity = measure_path(output, "signed SDK release profile")?;
-    let held = retain(&identity)?;
+    secure_signed_profile(&identity)?;
+    remeasure(&identity, "signed SDK release profile", false, true)?;
+    Ok(())
+}
+#[cfg(target_os = "macos")]
+fn secure_signed_profile(identity: &SigningFileIdentity) -> Result<(), SigningError> {
+    let held = retain(identity)?;
     let file = fs::File::open(held.inode_path())
         .map_err(|_| SigningError::unsafe_file("signed SDK release profile cannot be opened"))?;
     let metadata = file
@@ -314,9 +337,31 @@ fn sign_profile(
     }
     file.set_permissions(fs::Permissions::from_mode(0o600))
         .and_then(|()| file.sync_all())
-        .map_err(|_| SigningError::io("cannot secure signed SDK release profile"))?;
-    remeasure(&identity, "signed SDK release profile", false, true)?;
-    Ok(())
+        .map_err(|_| SigningError::io("cannot secure signed SDK release profile"))
+}
+/// The profile the signer wrote into the private directory inherits its
+/// owner-only DACL; it must be this user's single-link file with the measured
+/// bytes, and is flushed. Privacy itself is then proved by the caller's
+/// owner-private re-measurement, never granted here.
+#[cfg(windows)]
+fn secure_signed_profile(identity: &SigningFileIdentity) -> Result<(), SigningError> {
+    let held = retain(identity)?;
+    let measured = arkdeck_platform::measure_host_file(&held.path(), identity.byte_count)
+        .map_err(|_| SigningError::unsafe_file("signed SDK release profile cannot be inspected"))?;
+    if measured.links != 1
+        || !measured.owner_is_user
+        || crate::file_identity::hex(&measured.sha256) != identity.sha256
+    {
+        return Err(SigningError::unsafe_file(
+            "signed SDK release profile must be an owned single-link file",
+        ));
+    }
+    drop(held);
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&identity.path)
+        .and_then(|file| file.sync_all())
+        .map_err(|_| SigningError::io("cannot secure signed SDK release profile"))
 }
 fn verify_profile(
     java: &SigningFileIdentity,
@@ -458,32 +503,26 @@ mod publication_tests {
     }
     impl Fixture {
         fn new() -> Self {
-            let home = PathBuf::from(format!(
-                "/private/tmp/arkdeck-sdk-publication-{:032x}",
-                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-            ));
-            fs::DirBuilder::new().mode(0o700).create(&home).unwrap();
+            use crate::test_fixture;
+            let home = test_fixture::directory("sdk-publication");
             let home = PathBuf::from(foundation_resolved_path(home.to_str().unwrap()).unwrap());
             let sdk = home.join("sdk");
-            let lib = sdk.join("toolchains/lib");
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(&lib)
-                .unwrap();
+            let lib = sdk.join("toolchains").join("lib");
+            test_fixture::directories(&lib);
             let write = |name: &str, bytes: &[u8]| {
-                let path = lib.join(name);
-                fs::write(&path, bytes).unwrap();
-                fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+                test_fixture::file(&lib.join(name), bytes, false);
             };
             write("hap-sign-tool.jar", b"fixture");
             write("OpenHarmony.p12", b"fixture-keystore");
             let pem = "-----BEGIN CERTIFICATE-----\nfixture\n-----END CERTIFICATE-----\n";
             write("OpenHarmonyProfileRelease.pem", pem.repeat(3).as_bytes());
             write("UnsgnedReleasedProfileTemplate.json",&serde_json::to_vec(&json!({"type":"release","app-distribution-type":"os_integration","issuer":"pki_internal","bundle-info":{"apl":"normal","app-feature":"hos_normal_app","distribution-certificate":pem}})).unwrap());
-            let java = home.join("java");
-            fs::write(&java, b"not executed: publication-boundary unit fixture").unwrap();
-            fs::set_permissions(&java, fs::Permissions::from_mode(0o700)).unwrap();
+            let java = home.join(test_fixture::executable("java"));
+            test_fixture::file(
+                &java,
+                b"not executed: publication-boundary unit fixture",
+                true,
+            );
             FIXTURE_PROFILE.with(|fixture| fixture.set(true));
             Self {
                 root: home.join("preset"),

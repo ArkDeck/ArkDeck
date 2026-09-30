@@ -16,5 +16,12 @@ hmac.workspace = true
 # here AES-128-GCM opens DevEco's password envelopes.
 aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
 
+# The fake Java of the Windows signing-flow tests is this binary itself,
+# copied into a private fixture tree and run on the pseudo console the
+# signer creates.
+[[test]]
+name = "windows_signing_flow"
+harness = false
+
 [lints]
 workspace = true

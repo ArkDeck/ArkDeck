@@ -808,6 +808,14 @@ impl Host {
             .read_snapshot(job_id)
             .map(|_| ())
     }
+    /// The Windows daemon composes no Job owner yet (its store follows the
+    /// Job index on SQLite), so every Artifact a Job owns is refused as the
+    /// macOS daemon refuses it without one: before any Artifact is read,
+    /// listed or exported.
+    #[cfg(windows)]
+    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
+        Err(job_owner_not_configured())
+    }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
         self.trace_cache = Some(cache);
@@ -2354,8 +2362,12 @@ impl HostServices for Host {
             details: None,
         };
         let cache = self.trace_cache.as_ref().ok_or_else(unconfigured)?;
-        let jobs = self.jobs.as_ref().ok_or_else(unconfigured)?;
-        let artifacts = self.artifacts.as_ref().ok_or_else(unconfigured)?;
+        // Without the retention owners nothing proves the entries inactive:
+        // refused before admission, so a client reads a refusal rather than
+        // an unknown outcome.
+        let unavailable = arkdeck_hoststore::TraceCacheStore::purge_unavailable;
+        let jobs = self.jobs.as_ref().ok_or_else(unavailable)?;
+        let artifacts = self.artifacts.as_ref().ok_or_else(unavailable)?;
         let refuse = || {
             arkdeck_hoststore::TraceCacheStore::purge_refusal(
                 "Trace cache or authoritative Job/Artifact retention owner is unavailable",
