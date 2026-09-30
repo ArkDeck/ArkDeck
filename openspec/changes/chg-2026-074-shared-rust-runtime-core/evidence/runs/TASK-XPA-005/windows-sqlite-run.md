@@ -132,10 +132,17 @@ every `runtime_job` row with its record's SHA-256). For each snapshot it creates
 through `job_index::create` on the linked library, sets the owner journal, and for every row admits
 it (recorded order key, the Job's `jobs/<id>/job-record.json` as the record) and applies
 `version − 1` state updates. It then checks the duplicate and conflict verdicts and that an update
-naming another creation time is refused, and compares the oracle projection, as a whole, with the
-recorded snapshot twice: through a read-only connection beside the open owner, and after the owner
-is closed and the index reopened. It also checks the Job list order
-(`created_at_order_key, job_id COLLATE BINARY`).
+naming another creation time is refused, closes the owner, and compares the oracle projection, as
+a whole, with the recorded snapshot twice: through a read-only connection (as `tests/support::index`
+reads a closed store) and with the index reopened for writing, as after a restart. It also checks
+the Job list order (`created_at_order_key, job_id COLLATE BINARY`).
+
+The first CI run (PR #2335, macOS `xcode-27` workspace job) failed the first version of this test,
+which opened the read-only connection *beside the still-open owner*: on the macOS system SQLite the
+first query of that connection answered `SQLITE_CANTOPEN` (14); on winsqlite3 it passed. The Job
+index code does not read that way (the owner's readers use its own connection; the oracle reader
+and `InspectedIndex` read a store no owner holds), so the test now closes the owner first, as the
+existing macOS tests do. The cause on macOS was not diagnosed here (no macOS host in this slice).
 
 Result on Windows (x64, winsqlite3 3.51.1):
 **153 recorded indexes, 390 rows, all equal**. 368 rows carry the recorded record bytes (their

@@ -1,9 +1,9 @@
 //! Replays every Job index the Swift oracle recorded under `rust/tests/fixtures`
 //! through `job_index` on the platform's own SQLite, and requires the facts the
 //! oracle recorded of it (schema text, `user_version`, journal mode and every
-//! row, each record by its SHA-256) to read back equal: through a read-only
-//! connection beside the open owner, and again after the owner is closed and
-//! the index reopened (TASK-XPA-005). The recorded order keys are replayed as
+//! row, each record by its SHA-256) to read back equal once the owner is
+//! closed: through a read-only connection, and again with the index reopened
+//! for writing (TASK-XPA-005). The recorded order keys are replayed as
 //! recorded; computing them is the Runtime timestamp owner's, not SQLite's.
 use crate::job_index::{self, Admission, AdmissionVerdict, DATABASE, ROWS};
 use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
@@ -175,12 +175,14 @@ fn recorded_swift_indexes_replay_on_the_linked_sqlite() {
             [[Sql::Integer(2)]],
             "{label}"
         );
-        // A reader beside the open owner, then the index after a restart.
+        // After the owner closes: a read-only connection, as the oracle's
+        // own reader (`tests/support::index`) reads a closed store, then the
+        // index reopened for writing, as after a restart.
+        drop(owner);
         let mut reader = HostSqlite::open(&database, true, false).unwrap();
         job_index::current_layout(&mut reader).unwrap();
         assert_eq!(project(&mut reader), expected, "{label}");
         drop(reader);
-        drop(owner);
         let mut reopened = HostSqlite::open(&database, false, false).unwrap();
         job_index::current_layout(&mut reopened).unwrap();
         assert_eq!(project(&mut reopened), expected, "{label}");
