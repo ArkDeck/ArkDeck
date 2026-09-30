@@ -615,9 +615,13 @@ the capture. NTFS refuses to rename a directory while a handle is open inside
 it, so the quarantine lets go of the moved tree's handles for the rename and
 opens them again, each required to be the captured directory; for the same
 reason a prepared tree's ancestors cannot be moved away meanwhile. The Windows
-daemon composes the owner over `trace-cache/traces` in a development root only
-(the account's daemon would read the App's cache, whose Windows location is not
-decided); `trace.cache.status` answers there, and `trace.cache.purge` is refused
+daemon composes the owner over `trace-cache/traces` in a development root and,
+for the account, over `%LOCALAPPDATA%\ArkDeck\Trace	races` (beside its
+`staging`), the counterpart of the macOS App's `Caches/ArkDeck/Trace`, which
+the daemon creates owner-only because the App, the daemon and the CLI share
+one physical `%LOCALAPPDATA%` (ruling 8; the account-location decision in
+`runs/TASK-XPA-005/windows-account-locations-run.md`); `trace.cache.status`
+answers there, and `trace.cache.purge` is refused
 as the macOS daemon refuses it without its retention owners: the Job owner's
 active-Session census is not asked on Windows yet. `trace export` is the
 Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
@@ -1048,6 +1052,14 @@ refuses the rename and the cleanup applies to the root it proved).
 The Windows daemon composes the Session owner (`storage` in its census):
 `session-state` and a default Sessions root `sessions` in private children of
 its root, the macOS isolated names, isolated to the development root as on
+macOS (its reserved owners' directories are never a Sessions root). The
+account keeps its settings in `Agentd\session-state` and its default Sessions
+root in `%LOCALAPPDATA%\ArkDeck\Sessions`, beside `Agentd` as macOS keeps
+`ArkDeck/Sessions` (the same decision); a start moves an earlier build's
+`Agentd\sessions` there once, in one rename, and publishes the settings that
+selected it at the new place (`SessionStore::rebase_default_root`); beside an
+existing `Sessions` an empty earlier root is removed and one holding anything
+refuses the start. `runtime.storage.status|policy|root` pair the Session
 macOS (its reserved owners' directories are never a Sessions root); the
 account's root keeps both below `Agentd` until the Windows App names its
 Sessions location. `runtime.storage.status|policy|root` pair the Session
@@ -1102,6 +1114,9 @@ is left as it is.
 
 The Windows daemon composes the runner, `job.cancel`, `job.result` and
 `job.evidence`, the capability store (`jobs-state\capabilities`), the Session
+owner (`session-state`, and `sessions` in a development root or
+`%LOCALAPPDATA%\ArkDeck\Sessions` for the account; see the Session owner
+section) and `operation.list` (the HDC and analyzer operations
 owner (`session-state`, `sessions`, below `Agentd` on the account root; see
 the Session owner section) and `operation.list` (the HDC and analyzer operations
 `provider_not_registered`), and recovers the active Jobs at its start
@@ -1110,6 +1125,8 @@ No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
 `jobs, capabilities, targets, artifacts, storage, workspaceProjects,
+planning, traceCache` over a development root and the account's root alike,
+the macOS census's order. The start's Artifact retention
 planning, traceCache` over a development root (the account's daemon composes
 no Trace cache), the macOS census's order. The start's Artifact retention
 sweep stays macOS-only for now.

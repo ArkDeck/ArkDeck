@@ -164,7 +164,8 @@ stops the daemon through its stop event, and uninstalls by removing the director
 may run from it, no new entry may appear in the local application data and `%LOCALAPPDATA%\ArkDeck`
 must be as it was. The record is `smoke.json` beside the zip.
 
-Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`,
+Uninstall of the xcopy form is deleting its directory; the daemon's state (`%LOCALAPPDATA%\ArkDeck`:
+its state directory `Agentd`, the default Sessions root `Sessions` and the Trace cache `Trace`;
 or a development root) stays. The workflow `.github/workflows/windows-rc.yml` builds the
 unsigned RC on `main` and keeps it as the artifact `arkdeck-windows-rc-<revision>`; it uses no
 secret.
