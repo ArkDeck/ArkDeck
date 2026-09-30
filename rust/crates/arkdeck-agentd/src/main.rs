@@ -57,6 +57,8 @@ mod tool_selection_startup;
 #[cfg(all(test, target_os = "macos"))]
 mod tool_selection_startup_tests;
 #[cfg(windows)]
+mod windows_hdc_gate;
+#[cfg(windows)]
 mod windows_lifecycle;
 #[cfg(all(test, target_os = "macos"))]
 mod workspace_project_control;
@@ -290,7 +292,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         development.as_deref(),
         std::env::var_os("ARKDECK_ENDPOINT").as_deref(),
         &host::utc_now(),
-        &|name| std::env::var_os(name).is_some(),
+        &|name| std::env::var_os(name),
     )? {
         windows_lifecycle::Start::Serve(serving) => serving,
         // As Swift's second instance: the Runtime serving keeps serving.
