@@ -115,9 +115,21 @@ first, `ControlResult` back.
   Inspector requests `job.cancel` for a queued or active Job after a confirmation (a request, not
   an outcome: the state is read back), shows a terminal Job's `job.result`, and opens the record
   in History, whose detail now carries the macOS evidence section (`job.evidence`).
+- **Agents and Imports (TASK-XPA-020).** An Agents page lists the agent executions
+  (`agent.list|status`) and the human actions waiting on a person (`human-action.list|show`).
+  A waiting action is resumed after the person did what it asks (`agent.resume` for an
+  execution's action, `human-action.resume` otherwise); a pick-a-device action offers exactly the
+  values of its `selectionSchema` enum as a radio group, and Resume without a choice says so. An
+  execution that is not terminal is abandoned after a confirmation, guarded by its generation
+  (`agent.abandon`); starting one stays in the CLI. An Imports page uploads a file chosen in the
+  system file dialog as an Import of one kind for an adopted Target (`artifact.import.begin`,
+  bounded `append` chunks each with its SHA-256, `commit`), with its progress and a Cancel that
+  aborts the partial Import; it lists and inspects the Imports (`artifact.import.list|inspect`)
+  and releases a committed one after a confirmation (`artifact.import.release`). A flash bundle
+  is refused by the Runtime at publication until its validator exists (AF-W1).
 - **Keyboard and assistive technology.** Every action is a Tab stop in reading order (lists of
   rows with their own buttons are `SemanticList`s, which Tab walks row by row); navigation items
-  have access keys (Alt+O, D, H, S); rows of facts and actions wrap (`FlowPanel`, a grid for
+  have access keys (Alt+O, D, H, N, A, I, S); rows of facts and actions wrap (`FlowPanel`, a grid for
   label and value) instead of running past the page at large text sizes; no host control is an
   empty Tab stop.
 

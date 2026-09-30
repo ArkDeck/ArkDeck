@@ -49,6 +49,12 @@
                 <NavigationViewItem x:Name="NavSessions" Tag="sessions" AccessKey="N" AutomationProperties.AutomationId="app.navigation.sessions">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavAgents" Tag="agents" AccessKey="A" AutomationProperties.AutomationId="app.navigation.agents">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE99A;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavImports" Tag="imports" AccessKey="I" AutomationProperties.AutomationId="app.navigation.imports">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE898;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <!-- Settings as a footer item, where Windows apps keep it (the built-in item has no
                  stable AutomationId, so it stays hidden). -->

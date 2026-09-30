@@ -71,6 +71,20 @@ public static class ScriptedDaemon
     public const string ObservedSessionId = "session-job-0f77f8c52864d676372962eccb17389c";
 
     public const string FailedSessionId = "session-job-efd52ab9c633074171a19ddd916fffd9";
+    /// <summary>The agent executions of <see cref="Jobs"/> (the recorded Swift human-action
+    /// corpus, rust/tests/fixtures/agent-human-action): one waiting for a device to be connected,
+    /// one waiting for a person to pick one of two devices, one completed.</summary>
+    public const string ConnectExecutionId = "har-connect";
+
+    public const string AmbiguousExecutionId = "har-ambiguous";
+
+    public const string CompletedExecutionId = "har-completed";
+
+    /// <summary>The committed Import of <see cref="Jobs"/>.</summary>
+    public const string CommittedImportId = "imp-dcb7943f-d934-43da-b290-65d0066cae35";
+
+    public const string FlashRefusal = "This Import kind's publication validator is not configured";
+
     public static readonly IReadOnlyList<string> RunningJobStates = ["running", "waitingForDevice", "running", "succeeded"];
 
     /// <summary>The Target of <see cref="Jobs"/> (the adopted candidate's).</summary>
@@ -111,6 +125,15 @@ public static class ScriptedDaemon
         private int _statusReads;
         private bool _queuedCancelled;
         private readonly List<(string Id, string Completed, string Expires, long Generation, bool Pinned, string Size)> _sessions = [];
+        private readonly Dictionary<string, (string State, long Generation, bool Resolved)> _executions = new(StringComparer.Ordinal)
+        {
+            [ConnectExecutionId] = ("waitingForHuman", 4, false),
+            [AmbiguousExecutionId] = ("waitingForHuman", 3, false),
+            [CompletedExecutionId] = ("completed", 12, true),
+        };
+        private readonly Dictionary<string, JsonObject> _imports = new(StringComparer.Ordinal);
+        // The Imports whose first chunk opens a ZIP container (a HAP's publication check).
+        private readonly HashSet<string> _zipImports = new(StringComparer.Ordinal);
         private long _catalogGeneration = 2;
         private string? _cleanupPreviewId;
 
@@ -143,10 +166,14 @@ public static class ScriptedDaemon
                     "device.observations" => Failure(request, "rejected", "hdc.notConfigured"),
                     _ when method.StartsWith("job.", StringComparison.Ordinal) => Failure(request, "rejected", "The Job owner is not configured"),
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Failure(request, "internalError", "Target owner is not configured"),
+                    _ when method.StartsWith("artifact.import.", StringComparison.Ordinal) => Failure(request, "operationUnavailable", "Import owner services are unavailable", Details("importOwner")),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Failure(request, "operationUnavailable", "workspace project owner is unavailable",
                         Details(method.StartsWith("workspace.preset", StringComparison.Ordinal) ? "workspacePresetOwner" : "workspaceProjectOwner")),
+                    // No state root, so no agent execution owner (measured on #2391's daemon).
+                    _ when method.StartsWith("agent.", StringComparison.Ordinal) || method.StartsWith("human-action.", StringComparison.Ordinal) =>
+                        Failure(request, "operationUnavailable", "AgentExecution owner is unavailable", Details("preAdmission")),
                     _ => SettingsOwnerAbsent(request, method),
                 },
                 DevelopmentRoot => method switch
@@ -160,6 +187,11 @@ public static class ScriptedDaemon
                     "runtime.storage.status" => Success(request, Parse(RecordedStorageJson(Recorded()))),
                     "trace.cache.status" => Success(request, Parse("""{"activeEntryCount":0,"entryCount":0,"inactiveEntryCount":0,"purgeScope":"inactiveDerivedDatabases","schemaVersion":"arkdeck.trace-cache-status/1","totalByteCount":"0"}""")),
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [OracleTargetId]),
+                    "agent.list" => Success(request, Parse(AgentPage([]))),
+                    "human-action.list" => Success(request, Parse(HumanActionPage([]))),
+                    _ when method.StartsWith("agent.", StringComparison.Ordinal) || method.StartsWith("human-action.", StringComparison.Ordinal) =>
+                        Failure(request, "resourceNotFound", "human action does not exist", Details("preAdmission")),
+                    _ when method.StartsWith("artifact.import.", StringComparison.Ordinal) => Import(request, method, OracleTargetId, 1),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
@@ -180,6 +212,8 @@ public static class ScriptedDaemon
                     "job.result" => JobResult(request),
                     "job.evidence" => JobEvidence(request),
                     _ when method.StartsWith("session.", StringComparison.Ordinal) => Session(request, method, recorded: false),
+                    _ when method.StartsWith("agent.", StringComparison.Ordinal) || method.StartsWith("human-action.", StringComparison.Ordinal) => Agent(request, method),
+                    _ when method.StartsWith("artifact.import.", StringComparison.Ordinal) => Import(request, method, FixtureTargetId, 3),
                     _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
                     "runtime.hdc.status" => Success(request, Parse(HdcStatusJson)),
                     "runtime.tool.list" => Success(request, Parse(ToolPageJson)),
@@ -575,6 +609,226 @@ public static class ScriptedDaemon
             new("newDispatchCount", JsonNumber.FromInt64(0)),
             new("phase", new JsonString(phase)),
         ]);
+
+        // ---- Agent executions and human actions (the recorded Swift corpus) ----
+
+        private static string HumanActionJson(string execution, string status)
+        {
+            var (id, category, minimum, reason, choices, schema, resume) = execution == AmbiguousExecutionId
+                ? ("<har-3>", "ambiguousIdentity", "human.confirmDeviceIdentity", "device.identityAmbiguous",
+                    """[{"candidateKey":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","value":"<candidate-1>"},{"candidateKey":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","value":"<candidate-2>"}]""",
+                    """{"enum":["<candidate-1>","<candidate-2>"],"type":"string"}""", "<resume-3>")
+                : ("<har-1>", "physicalConnection", "human.connectOrPowerDevice", "device.notObserved", "[]", "null", "<resume-1>");
+            return $$"""
+                {"actionId":"{{id}}","category":"{{category}}","choices":{{choices}},"createdAt":"2026-09-14T00:00:00.000Z","expiresAt":"2026-09-14T00:05:00.000Z","minimumAction":"{{minimum}}","newDispatchCount":0,"owner":{"id":"{{execution}}","kind":"agentExecution"},"reasonCode":"{{reason}}","resumeReference":"{{resume}}","schemaVersion":"arkdeck.human-action/1","selectionSchema":{{schema}},"status":"{{status}}"}
+                """;
+        }
+
+        private string ExecutionJson(string id, bool withHumanAction)
+        {
+            var (state, generation, resolved) = _executions[id];
+            var waiting = state == "waitingForHuman";
+            var job = state is "jobOwned" or "completed" ? "job-d166d1a72b51eb3b14528dae5cac37ee" : null;
+            var next = waiting
+                ? $$"""{"expiresAt":"2026-09-14T00:05:00.000Z","kind":"humanAction","owner":{"id":"{{id}}","kind":"agentExecution"},"reasonCode":"{{(id == AmbiguousExecutionId ? "device.identityAmbiguous" : "device.notObserved")}}","resource":{"id":"{{(id == AmbiguousExecutionId ? "<har-3>" : "<har-1>")}}","kind":"humanAction"},"resumeReference":"{{(id == AmbiguousExecutionId ? "<resume-3>" : "<resume-1>")}}"}"""
+                : state == "jobOwned" ? $$"""{"kind":"wait","owner":{"id":"{{job}}","kind":"job"},"reasonCode":"job.running","resource":{"id":"{{job}}","kind":"job"},"retryAfter":"250ms"}""" : "null";
+            var human = withHumanAction ? (waiting || resolved && id != CompletedExecutionId ? HumanActionJson(id, waiting ? "waiting" : "resolved") : "null") + "," : "";
+            return $$"""
+                {"bindingRevision":{{(job is null ? "null" : "1")}},"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","createdAt":"2026-09-14T00:00:00.000Z","deadline":"2026-09-14T00:05:00.000Z","executionId":"{{id}}","failureCode":null,"generation":"{{generation}}",{{(withHumanAction ? "\"humanAction\":" + human : "")}}"jobId":{{(job is null ? "null" : $"\"{job}\"")}},"jobState":{{(job is null ? "null" : state == "completed" ? "\"succeeded\"" : "\"running\"")}},"lastObservedAt":"2026-09-14T00:00:00.000Z","nextAction":{{next}},"operation":"observe.device@1","outcomeUnknown":false,"schemaVersion":"arkdeck.agent-execution/1","state":"{{state}}","targetId":{{(job is null ? "null" : "\"TGT-3ba3f5f43b92\"")}}}
+                """;
+        }
+
+        /// <summary>The recorded answer of a resume that handed the execution to its Job
+        /// (agent-human-action "connect.resume").</summary>
+        private static string ResumedJson(string id, long generation) => $$"""
+            {"bindingRevision":1,"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","createdAt":"2026-09-14T00:00:00.000Z","deadline":"2026-09-14T00:05:00.000Z","executionId":"{{id}}","failureCode":null,"generation":"{{generation}}","humanAction":null,"job":{"jobId":"job-d166d1a72b51eb3b14528dae5cac37ee","outcome":"running","outcomeUnknown":false,"outstandingResidueCount":null,"sessionPublication":{"catalogGeneration":null,"manifestSha256":null,"reasonCode":"noCurrentPublicationRecord","state":"unavailable"},"state":"running","waitingForHuman":false},"jobId":"job-d166d1a72b51eb3b14528dae5cac37ee","jobState":"running","lastObservedAt":"2026-09-14T00:00:00.000Z","nextAction":{"kind":"wait","owner":{"id":"job-d166d1a72b51eb3b14528dae5cac37ee","kind":"job"},"reasonCode":"job.running","resource":{"id":"job-d166d1a72b51eb3b14528dae5cac37ee","kind":"job"},"retryAfter":"250ms"},"operation":"observe.device@1","outcomeUnknown":false,"schemaVersion":"arkdeck.agent-execution/1","state":"jobOwned","targetId":"TGT-3ba3f5f43b92"}
+            """;
+
+        private static string AgentPage(IEnumerable<string> rows) => $$"""
+            {"hasMore":false,"items":[{{string.Join(",", rows)}}],"nextCursor":null,"order":"createdAtDescExecutionIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"5a1d7a4e-0000-4000-8000-000000000003"}
+            """;
+
+        private static string HumanActionPage(IEnumerable<string> rows) => $$"""
+            {"hasMore":false,"items":[{{string.Join(",", rows)}}],"nextCursor":null,"order":"createdAtDescActionIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"5a1d7a4e-0000-4000-8000-000000000004"}
+            """;
+
+        /// <summary>The agent execution owner (TASK-XPA-005 S1) over the recorded executions:
+        /// status, list, the human actions, resume (the selection must be one of the action's
+        /// values; a physical action takes none) and generation-guarded abandon.</summary>
+        private byte[] Agent(JsonObject request, string method)
+        {
+            var parameters = request.TryGetValue("params", out var p) ? (JsonObject)p : new JsonObject();
+            string? Param(string key) => parameters.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+            var pre = Details("preAdmission");
+            string? ExecutionOf(string? action) => action switch { "<har-1>" => ConnectExecutionId, "<har-3>" => AmbiguousExecutionId, _ => null };
+            switch (method)
+            {
+                case "agent.list":
+                    return Success(request, Parse(AgentPage(_executions.Keys.Select(id => ExecutionJson(id, withHumanAction: false)))));
+                case "agent.status":
+                {
+                    var id = Param("executionId");
+                    return id is not null && _executions.ContainsKey(id) ? Success(request, Parse(ExecutionJson(id, withHumanAction: true)))
+                        : Failure(request, "resourceNotFound", "agent execution does not exist", Details("agentExecutionOwner"));
+                }
+                case "human-action.list":
+                    return Success(request, Parse(HumanActionPage(_executions.Where(e => e.Value.State == "waitingForHuman").Select(e => HumanActionJson(e.Key, "waiting")))));
+                case "human-action.show":
+                {
+                    var execution = ExecutionOf(Param("humanAction"));
+                    if (execution is null) return Failure(request, "resourceNotFound", "human action does not exist", pre);
+                    return Success(request, Parse(HumanActionJson(execution, _executions[execution].State == "waitingForHuman" ? "waiting" : "resolved")));
+                }
+                case "human-action.resume" or "agent.resume":
+                {
+                    var execution = method == "agent.resume"
+                        ? Param("resumeReference") switch { "<resume-1>" => ConnectExecutionId, "<resume-3>" => AmbiguousExecutionId, _ => null }
+                        : ExecutionOf(Param("humanAction"));
+                    if (execution is null) return Failure(request, "resourceNotFound", "human action does not exist", pre);
+                    var selection = Param("selection");
+                    if (execution == ConnectExecutionId && selection is not null) return Failure(request, "invalidInput", "this physical action accepts no selection", pre);
+                    if (execution == AmbiguousExecutionId && selection is not ("<candidate-1>" or "<candidate-2>"))
+                    {
+                        return Failure(request, "invalidInput", "selection must be an opaque value from this action's schema", pre);
+                    }
+                    var (state, generation, _) = _executions[execution];
+                    if (state != "waitingForHuman") return Failure(request, "resourceConflict", "the human action is no longer waiting", pre);
+                    _executions[execution] = ("jobOwned", generation + 6, true);
+                    return Success(request, Parse(ResumedJson(execution, generation + 6)));
+                }
+                case "agent.abandon":
+                {
+                    var id = Param("executionId");
+                    if (id is null || !_executions.TryGetValue(id, out var current)) return Failure(request, "resourceNotFound", "agent execution does not exist", Details("agentExecutionOwner"));
+                    if (Param("expectedGeneration") != current.Generation.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    {
+                        return Failure(request, "resourceConflict", "execution generation changed", Details("agentExecutionOwner"));
+                    }
+                    _executions[id] = ("abandoned", current.Generation + 1, current.Resolved);
+                    return Success(request, Parse($$"""
+                        {"bindingRevision":null,"catalogDigest":"508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684","createdAt":"2026-09-14T00:00:00.000Z","deadline":"2026-09-14T00:05:00.000Z","executionId":"{{id}}","failureCode":null,"generation":"{{current.Generation + 1}}","humanAction":null,"jobId":null,"jobState":null,"lastObservedAt":"2026-09-14T00:00:00.000Z","nextAction":null,"operation":"observe.device@1","outcomeUnknown":false,"schemaVersion":"arkdeck.agent-execution/1","state":"abandoned","targetId":null}
+                        """));
+                }
+                default:
+                    return Failure(request, "rejected", "not scripted");
+            }
+        }
+
+        // ---- Imports (the recorded Swift upload, rust/tests/fixtures/import-upload-current) ----
+
+        private static JsonObject ImportJson(string id, JsonObject metadata, long generation, string state, long offset, JsonValue receipt) => new(
+        [
+            new("createdAtUtc", new JsonString("2026-09-01T00:00:00Z")),
+            new("generation", new JsonString(generation.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            new("importId", new JsonString(id)),
+            new("importRequestId", metadata["importRequestId"]),
+            new("maximumChunkBytes", new JsonString("2097152")),
+            new("metadata", metadata),
+            new("metadataFingerprint", new JsonString(Sha256Hex(Encoding.UTF8.GetBytes(metadata.ToString())))),
+            new("nextOffset", new JsonString(offset.ToString(System.Globalization.CultureInfo.InvariantCulture))),
+            new("receipt", receipt),
+            new("schemaVersion", new JsonString("arkdeck.import/1")),
+            new("state", new JsonString(state)),
+            new("updatedAtUtc", new JsonString("2026-09-01T00:00:00Z")),
+        ]);
+
+        private static JsonObject Receipt(string id, JsonObject metadata, long generation) => (JsonObject)Parse($$"""
+            {"artifactDigest":"{{((JsonString)metadata["sha256"]).Value}}","artifactId":"ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","bindingRevision":"{{((JsonString)metadata["bindingRevision"]).Value}}","byteCount":"{{((JsonString)metadata["byteCount"]).Value}}","generation":"{{generation}}","importId":"{{id}}","importRequestId":"{{((JsonString)metadata["importRequestId"]).Value}}","lease":"lease-v1:{{id}}:ART-{{Sha256Hex(Encoding.UTF8.GetBytes(id))[..32]}}","mediaType":"{{(((JsonString)metadata["kind"]).Value == "hap" ? "application/vnd.openharmony.hap" : "application/octet-stream")}}","name":"{{((JsonString)metadata["name"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"privacy":"standard","schemaVersion":"arkdeck.import-receipt/1","targetId":"{{((JsonString)metadata["targetId"]).Value}}","validation":{"kind":"{{((JsonString)metadata["kind"]).Value}}"
+            """ + "}}");
+
+        private JsonObject Get(string id) => _imports[id];
+
+        /// <summary>The Import owner (TASK-XPA-008 H3) over one adopted Target: begin, bounded
+        /// appends (offset, count and SHA-256 checked), commit (a flash bundle refused before
+        /// anything is published), abort, list, inspect and generation-guarded release.</summary>
+        private byte[] Import(JsonObject request, string method, string target, long binding)
+        {
+            if (_imports.Count == 0 && target == FixtureTargetId)
+            {
+                var metadata = (JsonObject)Parse($$"""
+                    {"bindingRevision":"3","byteCount":"4096","deviceProfile":null,"importRequestId":"rust-import-upload","kind":"hap","name":"fixture.hap","schemaVersion":"arkdeck.import-intent/1","sha256":"399a301718f951e835b8630ac1666120b96eefb28da9e37f568596a227a9b67a","targetId":"{{FixtureTargetId}}"}
+                    """);
+                _imports[CommittedImportId] = ImportJson(CommittedImportId, metadata, 2, "committed", 4096, Receipt(CommittedImportId, metadata, 2));
+            }
+            var parameters = request.TryGetValue("params", out var p) ? (JsonObject)p : new JsonObject();
+            string? Param(string key) => parameters.TryGetValue(key, out var v) && v is JsonString s ? s.Value : null;
+            var owner = Details("importOwner");
+            JsonObject Meta(JsonObject import) => (JsonObject)import["metadata"];
+            long Long(JsonObject o, string key) => long.Parse(((JsonString)o[key]).Value, System.Globalization.CultureInfo.InvariantCulture);
+            switch (method)
+            {
+                case "artifact.import.list":
+                    return Success(request, Parse($$"""
+                        {"hasMore":false,"items":[{{string.Join(",", _imports.Values.Select(i => i.ToString()))}}],"nextCursor":null,"order":"createdAtDescImportIdAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"5a1d7a4e-0000-4000-8000-000000000005"}
+                        """));
+                case "artifact.import.inspect":
+                    return Param("importId") is { } inspected && _imports.TryGetValue(inspected, out var shown) ? Success(request, shown)
+                        : Failure(request, "resourceNotFound", "Import does not exist", owner);
+                case "artifact.import.begin":
+                {
+                    if (Param("targetId") != target || Param("bindingRevision") != binding.ToString(System.Globalization.CultureInfo.InvariantCulture))
+                    {
+                        return Failure(request, "resourceConflict", "the exact target binding is no longer current", owner);
+                    }
+                    var metadata = new JsonObject(parameters.Members.Where(m => m.Key is not ("artifactId" or "owner")));
+                    var id = "imp-" + Guid.NewGuid().ToString("D");
+                    _imports[id] = ImportJson(id, metadata, 1, "inProgress", 0, JsonNull.Instance);
+                    return Success(request, _imports[id]);
+                }
+                case "artifact.import.append":
+                {
+                    if (Param("importId") is not { } id || !_imports.TryGetValue(id, out var import)) return Failure(request, "resourceNotFound", "Import does not exist", owner);
+                    var bytes = Convert.FromBase64String(Param("base64") ?? "");
+                    var offset = Long(import, "nextOffset");
+                    if (Param("offset") != offset.ToString(System.Globalization.CultureInfo.InvariantCulture) || Param("sha256") != Sha256Hex(bytes)
+                        || Param("byteCount") != bytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) || offset + bytes.Length > Long(Meta(import), "byteCount"))
+                    {
+                        return Failure(request, "invalidInput", "Import append requires exact bounded bytes, offset and digest", owner);
+                    }
+                    if (offset == 0 && bytes.AsSpan().StartsWith("PK\u0003\u0004"u8)) _zipImports.Add(id);
+                    _imports[id] = ImportJson(id, Meta(import), 1, "inProgress", offset + bytes.Length, JsonNull.Instance);
+                    return Success(request, _imports[id]);
+                }
+                case "artifact.import.commit":
+                {
+                    if (Param("importId") is not { } id || !_imports.TryGetValue(id, out var import)) return Failure(request, "resourceNotFound", "Import does not exist", owner);
+                    if (((JsonString)Meta(import)["kind"]).Value == "flash-bundle") return Failure(request, "operationUnavailable", FlashRefusal, owner);
+                    if (Long(import, "nextOffset") != Long(Meta(import), "byteCount")) return Failure(request, "invalidInput", "Import is incomplete", owner);
+                    if (((JsonString)Meta(import)["kind"]).Value == "hap" && !_zipImports.Contains(id))
+                    {
+                        return Failure(request, "invalidInput", "Import is not a ZIP-based HAP/HSP container", owner);
+                    }
+                    _imports[id] = ImportJson(id, Meta(import), 2, "committed", Long(import, "nextOffset"), Receipt(id, Meta(import), 2));
+                    return Success(request, _imports[id]);
+                }
+                case "artifact.import.abort":
+                {
+                    var match = _imports.FirstOrDefault(i => ((JsonString)i.Value["importRequestId"]).Value == Param("importRequestId"));
+                    if (match.Key is null) return Failure(request, "resourceNotFound", "Import does not exist", owner);
+                    if (((JsonString)match.Value["state"]).Value != "inProgress") return Failure(request, "resourceConflict", "Import is no longer in progress", owner);
+                    _imports[match.Key] = ImportJson(match.Key, Meta(match.Value), 2, "aborted", Long(match.Value, "nextOffset"), JsonNull.Instance);
+                    return Success(request, _imports[match.Key]);
+                }
+                case "artifact.import.release":
+                {
+                    if (Param("importId") is not { } id || !_imports.TryGetValue(id, out var import)) return Failure(request, "resourceNotFound", "Import does not exist", owner);
+                    var state = ((JsonString)import["state"]).Value;
+                    if (import["receipt"] is not JsonObject receipt) return Failure(request, "resourceConflict", "Import generation changed", owner);
+                    // A release of the committed generation, repeated, answers the same release (measured).
+                    var released = state == "released" && Param("generation") == ((JsonString)receipt["generation"]).Value;
+                    if (!released && (state != "committed" || Param("generation") != ((JsonString)import["generation"]).Value))
+                    {
+                        return Failure(request, "resourceConflict", "Import generation changed", owner);
+                    }
+                    _imports[id] = ImportJson(id, Meta(import), 3, "released", Long(import, "nextOffset"), receipt);
+                    return Success(request, Parse($$"""
+                        {"artifactId":"{{((JsonString)receipt["artifactId"]).Value}}","generation":"3","importId":"{{id}}","importRequestId":"{{((JsonString)import["importRequestId"]).Value}}","lease":"{{((JsonString)receipt["lease"]).Value}}","owner":{"id":"{{id}}","kind":"import"},"releasedAtUtc":"2026-09-30T08:10:00Z","releasedGeneration":"2","retention":{"class":"default","deadlineUtc":"2026-10-07T08:10:00Z","pinned":false},"schemaVersion":"arkdeck.import-release/1","state":"released"}
+                        """));
+                }
+                default:
+                    return Failure(request, "rejected", "not scripted");
+            }
+        }
 
         /// <summary>The Windows daemon without an Artifact owner (its real answer).</summary>
         private static byte[] ArtifactOwnerAbsent(JsonObject request) =>
