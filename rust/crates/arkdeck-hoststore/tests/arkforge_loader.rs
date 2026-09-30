@@ -3,7 +3,11 @@
 //! for the ArkForge lane daemon's public socket, spoken with ArkForge's own
 //! codec, must independently hold exactly one settled DAYU200 RockUSB Loader
 //! there. Each refusal is Swift's. No daemon, board or USB host is involved.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-010) the stand-in serves ArkForge's own public named
+//! pipe for the lane directory (`arkforge-platform`'s listener), where
+//! `arkforged.exe` serves it, instead of `public.sock`.
+#![cfg(any(target_os = "macos", windows))]
 
 use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::ArkForgeLoader;
@@ -13,8 +17,9 @@ use arkdeck_provider_hdc::{LoaderIdentity, LoaderObserver};
 use arkforge_ipc::framing::{read_frame, write_frame};
 use arkforge_ipc::messages::{Hello, HelloAck, KeyValue, Request, Response};
 use arkforge_ipc::{PROTOCOL_MAJOR, PROTOCOL_MINOR, SessionKind, Status, wire};
+#[cfg(unix)]
 use std::os::unix::net::UnixListener;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 const SERIAL: &str = "loader-serial-0451";
@@ -25,7 +30,11 @@ struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
         static NEXT: AtomicUsize = AtomicUsize::new(0);
-        let root = PathBuf::from("/private/tmp").join(format!(
+        #[cfg(unix)]
+        let temporary = PathBuf::from("/private/tmp");
+        #[cfg(windows)]
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let root = temporary.join(format!(
             "adal-{}-{}",
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
@@ -44,11 +53,50 @@ impl Drop for Root {
 /// One observation the stand-in reports: its port, mode and USB identity.
 struct Seen(&'static str, &'static str, &'static str);
 
+/// The lane daemon's public endpoint in the lane directory `root`, bound
+/// before the session is served.
+#[cfg(unix)]
+struct Public(UnixListener);
+
+#[cfg(unix)]
+impl Public {
+    fn bind(root: &Path) -> Self {
+        Self(UnixListener::bind(root.join("public.sock")).unwrap())
+    }
+
+    fn accept(self) -> std::os::unix::net::UnixStream {
+        self.0.accept().unwrap().0
+    }
+
+    /// A served endpoint's name left behind, removed before the next bind.
+    fn release(root: &Path) {
+        std::fs::remove_file(root.join("public.sock")).unwrap();
+    }
+}
+
+#[cfg(windows)]
+struct Public(arkforge_platform::LocalListener);
+
+#[cfg(windows)]
+impl Public {
+    fn bind(root: &Path) -> Self {
+        use arkforge_platform::{LocalChannel, LocalEndpoint, LocalListener};
+        Self(LocalListener::bind(&LocalEndpoint::for_runtime(root, LocalChannel::Public)).unwrap())
+    }
+
+    fn accept(mut self) -> arkforge_platform::LocalStream {
+        self.0.accept().unwrap()
+    }
+
+    /// A pipe ends with its listener, which its session thread dropped.
+    fn release(_root: &Path) {}
+}
+
 /// One public session answering `discoverDevices` with these observations.
 fn serve(root: &Root, seen: Vec<Seen>) -> std::thread::JoinHandle<()> {
-    let listener = UnixListener::bind(root.0.join("public.sock")).unwrap();
+    let listener = Public::bind(&root.0);
     std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
+        let mut stream = listener.accept();
         let hello = Hello::decode(&read_frame(&mut stream).unwrap().unwrap()).unwrap();
         assert_eq!(hello.session_kind, SessionKind::Public);
         let ack = HelloAck {
@@ -181,7 +229,7 @@ fn the_lane_daemon_must_see_exactly_that_loader_at_that_port() {
     );
     daemon.join().unwrap();
 
-    std::fs::remove_file(root.0.join("public.sock")).unwrap();
+    Public::release(&root.0);
     let daemon = serve(&root, vec![Seen(PORT, "rockusb-maskrom", "0x2207:0x350a")]);
     assert_eq!(
         observe(&root, vec![loader(SERIAL, PORT)], None).unwrap_err(),
@@ -190,7 +238,7 @@ fn the_lane_daemon_must_see_exactly_that_loader_at_that_port() {
     );
     daemon.join().unwrap();
 
-    std::fs::remove_file(root.0.join("public.sock")).unwrap();
+    Public::release(&root.0);
     let daemon = serve(&root, vec![Seen(PORT, "rockusb-loader", "0x2207:0x5000")]);
     assert_eq!(
         observe(&root, vec![loader(SERIAL, PORT)], None).unwrap_err(),

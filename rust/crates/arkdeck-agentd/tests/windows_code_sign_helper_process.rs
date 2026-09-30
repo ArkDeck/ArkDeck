@@ -48,7 +48,7 @@ const CENSUS: &str = "arkdeck-agentd owners: jobs, capabilities, mutationAuthori
      artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, \
      traceCache";
 /// The Flash lane's owners (TASK-XPA-010), after the helper in the census.
-const FLASH: &str = "flashHostFacts, deviceAccess";
+const FLASH: &str = "flashHostFacts, deviceAccess, loaderBinding";
 
 /// The checked-in helper resource, the one both packages ship.
 fn resource() -> PathBuf {

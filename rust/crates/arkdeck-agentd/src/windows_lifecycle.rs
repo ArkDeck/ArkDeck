@@ -388,7 +388,29 @@ impl Authority {
             .with_device_access(arkdeck_provider_arkforge::DeviceAccessObserver::new(
                 &composed.runtime_directory,
             ))
-            .with_lane_plan_preview(composed.lane_plan_preview());
+            .with_lane_plan_preview(composed.lane_plan_preview())
+            // The Loader binding coordinator, as the macOS compositions
+            // compose it: the same root and census, ArkForge's half of the
+            // Loader observation through the lane's directory, and the
+            // Runtime's records below the root.
+            .with_loader_binding(arkdeck_hoststore::LoaderBinding::new(
+                &application_support,
+                arkdeck_platform::usb_host_devices,
+                arkdeck_hoststore::ArkForgeLoader::new(
+                    arkdeck_platform::usb_host_devices,
+                    &composed.runtime_directory,
+                ),
+            ));
+        // The executable lane, installed only with a lane and a
+        // descriptor-bound HDC: neither exists on Windows until the managed
+        // HDC is composed, so nothing is installed yet.
+        let host = crate::arkforge_execution::install(
+            host,
+            &composed,
+            &state,
+            &application_support,
+            arkdeck_platform::usb_host_devices,
+        );
         (host, composed)
     }
 

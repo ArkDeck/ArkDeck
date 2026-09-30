@@ -41,9 +41,13 @@ arkforge-ipc.workspace = true
 # The pager's tests count what a read holds at once (TASK-XPA-025).
 arkdeck-platform = { workspace = true, features = ["allocation-meter"] }
 
-# The pager's tests run on Windows too, counting the same way.
+# The pager's tests run on Windows too, counting the same way. The ArkForge
+# lane daemon's stand-in speaks ArkForge's codec over its own named pipes
+# there (TASK-XPA-010).
 [target.'cfg(windows)'.dev-dependencies]
 arkdeck-platform = { workspace = true, features = ["allocation-meter"] }
+arkforge-ipc.workspace = true
+arkforge-platform.workspace = true
 
 [lints]
 workspace = true
