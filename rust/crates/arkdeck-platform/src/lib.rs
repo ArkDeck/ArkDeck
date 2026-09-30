@@ -342,3 +342,8 @@ mod usb_registry;
 pub use usb_registry::{RegistryEntry, RegistryUnavailable, RegistryValue, UsbHostDevice};
 #[cfg(target_os = "macos")]
 pub use usb_registry::{registry_census, usb_host_devices};
+
+mod usb_device_nodes;
+#[cfg(windows)]
+pub use usb_device_nodes::usb_host_devices;
+pub use usb_device_nodes::{DeviceNode, NodeProperty, NodeValue};

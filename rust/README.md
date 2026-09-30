@@ -2101,6 +2101,54 @@ the reader over a census listing each relation's board among entries it must
 pass over, and an uncertain census failing closed. None of it is device
 evidence.
 
+## Windows USB device census (TASK-XPA-004, provisional)
+
+On Windows `arkdeck_platform::usb_host_devices` is the Runtime's own read of the
+Plug and Play device tree, the counterpart of the I/O Registry census above and
+producing the same `UsbHostDevice`. It asks SetupAPI for the present nodes of the
+`USB` enumerator (`SetupDiGetClassDevsW`, `DIGCF_PRESENT | DIGCF_ALLCLASSES`),
+reads each node's instance ID (`CM_Get_Device_IDW`) and four device properties
+(`SetupDiGetDevicePropertyW`), and destroys the set on every path. It opens no
+device or interface, sends no USB request, installs or changes no driver, needs
+no elevation and writes nothing. A set that cannot be created, or an
+enumeration that stops before its end, is unavailable (`RegistryUnavailable::
+DeviceSet` / `Enumeration`), never a shorter list.
+
+`UsbHostDevice::from_device_node` is the per-node rule, failing closed as the
+macOS per-entry rule does. The property choice lives there and in
+`NodeProperty` only, and is **provisional** until the maintainer's DAYU200
+sample (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
+confirms it:
+
+- entry: a device-level node `USB\VID_hhhh&PID_hhhh\<suffix>`; interface nodes
+  (`&MI_xx`), hubs without numbers and other enumerators are passed over;
+- vendor and product: the first `USB\VID_…&PID_…` entry of
+  `DEVPKEY_Device_HardwareIds`, which must name the instance ID's numbers;
+- serial: the instance ID's suffix, taken as it is; a suffix holding `&` is a
+  Windows-generated, port-derived ID, so the node has no serial and is passed
+  over;
+- topology: the first `DEVPKEY_Device_LocationPaths` entry, spelled as the
+  decimal of the first eight bytes (big-endian) of its SHA-256 (the relation
+  rule accepts only a canonical decimal location; it is stable per port and
+  never equal to a macOS `locationID`);
+- product name: `DEVPKEY_Device_BusReportedDeviceDesc` (optional; without it
+  the board is not the registered HDC-normal DAYU200 and proves nothing);
+- attachment: `DEVPKEY_Device_LastArrivalDate` (a `FILETIME`; none when absent
+  or zero, and then no relation is formed).
+
+`UsbRegistryRelations::system()` reads this census on Windows. The Windows
+daemon does not compose it yet: the Target observation owner it would feed
+(`Host::with_usb_registry_relations` and the HDC, observation and adoption
+owners beside it) is still composed on macOS only, so the Windows Runtime keeps
+reading no relation until that owner is ported.
+
+Tests: `usb_device_nodes` unit tests (the per-node rule over synthetic property
+sets, and this host's census answering with well-formed entries, shape only);
+the provider's `tests/windows_usb_census.rs` (a synthetic node through the
+Windows rule proving a scripted HDC's candidate and holding the adoption's final
+check, a replug or a missing name, arrival or serial proving nothing, and on
+Windows this host's tree through `system()`). None of it is device evidence.
+
 ## Trace Runtime probe (TASK-XPA-016, M1)
 
 `arkdeck_provider_hdc::trace_probe` is Swift's `FoundationTraceRuntimeProbe`
