@@ -5,18 +5,16 @@
 //! daemon's code identity that a receipt is bound to.
 //!
 //! On Windows (TASK-XPA-011) the same items live in Credential Manager
-//! (`arkdeck_platform::KeychainItems`). Only [`KeychainSigningSecrets::over`]
-//! is built there: the production constructors bind a receipt to the
-//! installed daemon's code identity, and the Windows counterpart of that
-//! identity (the daemon's Authenticode signer, gate group G12) is not a
-//! signing-receipt input yet, so a Windows source binds to no daemon.
+//! (`arkdeck_platform::KeychainItems`, the same item identity), and the
+//! daemon's code identity is its Authenticode signer and bytes
+//! (`arkdeck_platform::trusted_daemon_fingerprint`). Where the Windows daemon
+//! is installed is the caller's to say (the CLI's installation inputs), so
+//! `KeychainSigningSecrets::default_daemon_executable` stays macOS-only.
 use crate::SigningError;
-#[cfg(target_os = "macos")]
-use crate::signing_preset::KEYCHAIN_SERVICE;
-use crate::signing_preset::{SecretPresence, SigningSecrets};
-#[cfg(target_os = "macos")]
-use arkdeck_platform::DAEMON_KEYCHAIN_ACCESS_GROUP;
-use arkdeck_platform::{KeychainError, KeychainItems, KeychainPresence, Secret};
+use crate::signing_preset::{KEYCHAIN_SERVICE, SecretPresence, SigningSecrets};
+use arkdeck_platform::{
+    DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems, KeychainPresence, Secret,
+};
 use std::path::{Path, PathBuf};
 
 pub struct KeychainSigningSecrets {
@@ -27,7 +25,6 @@ pub struct KeychainSigningSecrets {
 impl KeychainSigningSecrets {
     /// The production source: the Data Protection Keychain and the daemon
     /// executable a receipt's identity is checked against.
-    #[cfg(target_os = "macos")]
     pub fn installed(daemon_executable: PathBuf) -> Result<Self, SigningError> {
         Ok(Self {
             items: KeychainItems::data_protection(KEYCHAIN_SERVICE, DAEMON_KEYCHAIN_ACCESS_GROUP)
@@ -38,7 +35,6 @@ impl KeychainSigningSecrets {
 
     /// Explicit maintenance CLI's interactive Keychain policy. Runtime
     /// composition continues to call `installed`, which never prompts.
-    #[cfg(target_os = "macos")]
     pub fn for_maintenance(daemon_executable: PathBuf) -> Result<Self, SigningError> {
         Ok(Self {
             items: KeychainItems::data_protection_for_maintenance(
@@ -56,6 +52,15 @@ impl KeychainSigningSecrets {
         Self {
             items,
             daemon: None,
+        }
+    }
+
+    /// The same source bound to the daemon executable a receipt's identity
+    /// is checked against — for a fixture keychain and a fixture daemon.
+    pub fn bound_to(self, daemon_executable: PathBuf) -> Self {
+        Self {
+            daemon: Some(daemon_executable),
+            ..self
         }
     }
 
@@ -103,25 +108,14 @@ impl SigningSecrets for KeychainSigningSecrets {
         let Some(daemon) = &self.daemon else {
             return Ok(None);
         };
-        #[cfg(windows)]
-        {
-            // Unreachable: no Windows constructor names a daemon.
-            let _ = daemon;
-            Err(SigningError::secret(
-                "the installed daemon's identity is not bound to a signing receipt on Windows",
-            ))
-        }
-        #[cfg(target_os = "macos")]
-        {
-            arkdeck_platform::trusted_daemon_fingerprint(daemon)
-                .map(Some)
-                .map_err(|error| match error.kind() {
-                    std::io::ErrorKind::PermissionDenied => SigningError::unsafe_file(
-                        "installed arkdeck-agentd helper is absent or unsafe",
-                    ),
-                    _ => SigningError::secret(error.to_string()),
-                })
-        }
+        arkdeck_platform::trusted_daemon_fingerprint(daemon)
+            .map(Some)
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::PermissionDenied => {
+                    SigningError::unsafe_file("installed arkdeck-agentd helper is absent or unsafe")
+                }
+                _ => SigningError::secret(error.to_string()),
+            })
     }
 }
 
@@ -133,7 +127,7 @@ impl crate::signing_removal::SigningSecretRemoval for KeychainSigningSecrets {
     }
 
     fn remove_legacy(&self, account: &str) -> Result<bool, SigningError> {
-        KeychainItems::outside_data_protection(crate::signing_preset::KEYCHAIN_SERVICE)
+        KeychainItems::outside_data_protection(KEYCHAIN_SERVICE)
             .map_err(keychain_failure("legacy Keychain"))?
             .remove(account)
             .map_err(keychain_failure("legacy Keychain removal"))
