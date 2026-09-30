@@ -10,7 +10,9 @@
 pub mod debug_hap;
 #[path = "../fixture_fs/mod.rs"]
 pub mod fixture_fs;
-#[cfg(target_os = "macos")]
+// The Flash lane's fakes, which its replays use on Windows too
+// (TASK-XPA-010).
+#[cfg(any(target_os = "macos", windows))]
 pub mod flash_lane;
 pub mod hdc_oracle;
 pub mod native_library;
@@ -331,6 +333,19 @@ pub fn assert_store_except(
         );
     }
     (actual_row, recorded_row)
+}
+
+/// An entry's permission bits as the oracle records them. Windows has none:
+/// its owner-only boundary is a DACL, which the owners check themselves, so
+/// the replays there compare kinds and bytes and leave modes out.
+#[cfg(unix)]
+pub fn mode(metadata: &fs::Metadata) -> String {
+    format!("{:o}", metadata.permissions().mode() & 0o777)
+}
+
+#[cfg(windows)]
+pub fn mode(_metadata: &fs::Metadata) -> String {
+    "-".into()
 }
 
 #[cfg(unix)]

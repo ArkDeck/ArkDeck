@@ -35,9 +35,10 @@
 //! publication it hands a terminal Job to; the analyzer lane (its profiles
 //! pin ArkTrace's trace_streamer, which Windows lacks), the workspace lane
 //! (`workspace_run.rs`: the workspace provider crate and the DevEco owners)
-//! and the Flash lane (`flash_run.rs`, AF-W1) stay macOS-only, and an
-//! analyzer or workspace Job is refused before its run as one this Runtime
-//! does not execute. No Windows daemon composes an HDC provider until the
+//! stay macOS-only, and an analyzer or workspace Job is refused before its
+//! run as one this Runtime does not execute. The Flash lane (`flash_run.rs`)
+//! runs on Windows too (TASK-XPA-010), over whatever `FlashLane` and
+//! `RockchipHost` its composition hands it. No Windows daemon composes an HDC provider until the
 //! Windows HDC tuple is registered, so no device Job runs there yet.
 #[cfg(target_os = "macos")]
 use crate::analyzer_composition;
@@ -49,7 +50,7 @@ use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
 use crate::device_facts::HdcComposition;
 use crate::job_cancel::RunCancellation;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use crate::job_journal_events::Target;
 use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_writer::JournalWriter;
@@ -73,10 +74,10 @@ use std::time::Duration;
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_run.rs"]
 mod flash_run;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_run::{FlashExecution, FlashRunner};
 
 #[cfg(target_os = "macos")]

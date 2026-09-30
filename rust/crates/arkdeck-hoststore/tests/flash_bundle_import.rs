@@ -4,14 +4,17 @@
 //! and fits the board is published with Swift's facts. Any other is refused
 //! as Swift's handler refuses it: its own detail is swallowed into the
 //! validator's one refusal, and the Import stays in progress with nothing
-//! published.
-#![cfg(target_os = "macos")]
+//! published. On Windows (TASK-XPA-010) the same, over owner-only
+//! directories made the Windows way.
+#![cfg(any(target_os = "macos", windows))]
+
+#[path = "fixture_fs/mod.rs"]
+mod fixture_fs;
 
 use arkdeck_contract::{ImportIntent, WireError, encode_import_chunk, sha256_hex};
 use arkdeck_hoststore::{ArtifactReadStore, ImportBinding, ImportUploadStore};
 use serde_json::{Value, json};
 use std::fs;
-use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 
 const NOW: &str = "2026-09-25T00:00:00Z";
@@ -23,16 +26,13 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        let root = fixture_fs::temporary_root().join(format!(
             "rust-flash-bundle-import-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
-        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        fixture_fs::private_dir(&root);
         let artifacts = root.join("artifacts");
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&artifacts)
-            .unwrap();
+        fixture_fs::private_dir(&artifacts);
         Self { root, artifacts }
     }
 }

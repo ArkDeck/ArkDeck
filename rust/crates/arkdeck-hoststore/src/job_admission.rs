@@ -22,10 +22,10 @@
 //! On Windows (TASK-XPA-005, GJ-1) the same admission runs over the same
 //! members: the mutation authority proves the Runtime's mutation state with
 //! the same continuity census, and a device mutation is preauthorized against
-//! the capability store as on macOS. The workspace subject
-//! (`preauthorize_workspace`, XPA-011) and the ArkForge Flash lane
-//! (`FlashAdmitter`, AF-W1) are not built there: a workspace mutation is
-//! refused as one without its provider.
+//! the capability store as on macOS, and so is a Flash through its admitter
+//! (`FlashAdmitter`, TASK-XPA-010). The workspace subject
+//! (`preauthorize_workspace`, XPA-011) is not built there: a workspace
+//! mutation is refused as one without its provider.
 use crate::JobStore;
 use crate::capability_policy::DeviceHolds;
 use crate::capability_policy::{self, IssueFailure};
@@ -41,10 +41,10 @@ use crate::operation_request::OperationRequest;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[path = "flash_admission.rs"]
 mod flash_admission;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use flash_admission::FlashAdmitter;
 
 /// Swift `RuntimeDefaultReadOnlyPolicy` bounds.

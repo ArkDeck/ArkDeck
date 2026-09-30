@@ -45,7 +45,7 @@ const BUNDLE: [&str; 3] = [
     "arkdeck-code-sign-enable",
 ];
 const CENSUS: &str = "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, \
-     artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, \
+     artifacts, imports, storage, history, workspaceProjects, planning, agentExecutions, humanActions, \
      traceCache";
 
 /// The checked-in helper resource, the one both packages ship.

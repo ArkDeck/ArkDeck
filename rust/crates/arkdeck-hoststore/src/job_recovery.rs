@@ -634,23 +634,9 @@ fn replay(
                 // A complete-overwrite recovery whose epoch is already
                 // durable completes to `recovered`; any other interrupted
                 // finalization fails.
-                #[cfg(target_os = "macos")]
                 let established = jobs
                     .matching_recovery_epoch(&record, &events)
                     .map_err(|error| internal(format!("{error:?}")))?;
-                // A complete-overwrite recovery epoch belongs to the Flash
-                // lane, which is not built on Windows (AF-W1): a Flash Job
-                // interrupted there is left as it is, never failed unproved.
-                #[cfg(windows)]
-                let established: Option<()> = {
-                    let _ = &events;
-                    if record.operation().starts_with("flash.") {
-                        return Err(internal(
-                            "a Flash recovery epoch is not read on Windows; the Job was left as it is",
-                        ));
-                    }
-                    None
-                };
                 if established.is_some() {
                     journal.transition(
                         "finalizing",

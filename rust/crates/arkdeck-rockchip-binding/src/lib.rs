@@ -15,9 +15,9 @@ pub use identity::{
     is_dayu200_loader, registered_dayu200_devices,
 };
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod store;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use store::{
     BindingError, BindingInstallation, BindingSnapshot, RockchipBindingStore,
     install_current_target, refuse,

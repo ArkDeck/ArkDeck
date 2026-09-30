@@ -199,7 +199,7 @@ impl Token {
         // SAFETY: GetCurrentProcess is a borrowed pseudo-handle.
         Self::for_process(unsafe { GetCurrentProcess() })
     }
-    fn for_process(process: HANDLE) -> io::Result<Self> {
+    pub(crate) fn for_process(process: HANDLE) -> io::Result<Self> {
         let mut token = null_mut();
         // SAFETY: process is live; returned token is taken into RAII ownership.
         bool_result(unsafe { OpenProcessToken(process, TOKEN_QUERY, &mut token) })?;

@@ -7,9 +7,9 @@
 //! * over its pipe, with a plain pipe handle (no signer needed): a HAP is
 //!   begun against the adopted Target, appended and committed, and published
 //!   as an Artifact the Import owns with its exact bytes; its Artifact is read
-//!   through the Import owner; a flash bundle is refused at publication (the
-//!   Flash archive reader is not on Windows yet, AF-W1) and nothing is
-//!   published. After a restart the Import is listed and inspected with the
+//!   through the Import owner; a flash bundle that does not read as one is
+//!   refused at publication by the Flash archive reader, as Swift's
+//!   production policy refuses it (TASK-XPA-010), and nothing is published. After a restart the Import is listed and inspected with the
 //!   same receipt, released, and its Artifact stays readable;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
@@ -176,13 +176,13 @@ fn an_import_is_uploaded_committed_read_and_released_across_a_restart() {
         json!({"owner": owner, "artifactId": artifact}),
     );
     assert_eq!(inspected["artifactDigest"], sha256(HAP));
-    // A flash bundle is refused at publication until the Flash archive
-    // reader is on Windows (AF-W1), as a kind whose validator is not
-    // configured: nothing is published.
+    // A flash bundle that is no gzip archive is refused at publication by
+    // its registered validator, the Flash archive reader, as Swift's
+    // production policy refuses it: nothing is published.
     let (flash, refused) = upload(&pipe, "windows-flash", "flash-bundle", &[0x46; 64]);
     assert_eq!(refused["ok"], false, "{refused}");
     assert_eq!(
-        refused["error"]["message"], "This Import kind's publication validator is not configured",
+        refused["error"]["message"], "Import content failed its registered format validator",
         "{refused}"
     );
     assert!(!root.artifacts().join(&flash).exists());

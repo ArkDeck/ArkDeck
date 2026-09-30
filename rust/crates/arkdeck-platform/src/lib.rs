@@ -30,7 +30,9 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]
-pub use server_identity::{ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop};
+pub use server_identity::{
+    ProvedProcessEnd, ServerExit, ServerIdentityReceipt, ServerLaunch, ServerStop,
+};
 #[cfg(unix)]
 mod account;
 #[cfg(unix)]
@@ -112,16 +114,16 @@ pub use stop_signal::{Latch, StopSignal};
 mod macos_server;
 #[cfg(target_os = "macos")]
 pub use macos_server::{
-    LoopbackServerLease, ProvedProcessEnd, end_proved_process, process_argument_record,
-    process_arguments, verifies_managed_process,
+    LoopbackServerLease, end_proved_process, process_argument_record, process_arguments,
+    verifies_managed_process,
 };
 #[cfg(windows)]
 pub use windows::{
     ConnectionCloser, DetachedDaemon, GuardAcquisition, GuardObject, ImagePin, InstanceScope,
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot,
-    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, send_console_break,
-    verify_daemon_image,
+    StopSignal, await_pipe_instance, default_user_endpoint, end_proved_process, pipe_present,
+    send_console_break, verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.

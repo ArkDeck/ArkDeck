@@ -411,14 +411,16 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "artifact.read",
     "artifact.export",
     "artifact.quota",
-    // The capability store's list (`windows_mutation_retention_process.rs`);
-    // not `capability inspect`, as nothing is issued without a device Job.
+    // The capability store's reads (`windows_mutation_retention_process.rs`,
+    // and Swift's capability-read oracle store in
+    // `windows_reconcile_agent_process.rs`).
     "capability.list",
+    "capability.inspect",
     // The Session and storage owners over recorded Swift Sessions
-    // (TASK-XPA-005/014; `windows_session_owner_process.rs`). Not `runtime
-    // storage root`, which no Windows run has moved yet.
+    // (TASK-XPA-005/014; `windows_session_owner_process.rs`).
     "runtime.storage.status",
     "runtime.storage.policy",
+    "runtime.storage.root",
     "session.list",
     "session.show",
     "session.pin",
@@ -434,21 +436,27 @@ const WINDOWS_MEASURED_LEAVES: &[&str] = &[
     "target.show",
     "target.display-name.set",
     "target.display-name.clear",
-    // The workspace registration owner (TASK-XPA-015): registration and the
-    // reads. Not the updates and removals, nor preset registration, which
-    // the Windows daemon refuses without its Job and DevEco owners.
+    // The workspace registration owner (TASK-XPA-015): registration, the
+    // reads, and the updates and removals the Job owner's workspace census
+    // admits (`windows_workspace_projects_process.rs`). Not preset
+    // registration: a build, test or signing preset pins a DevEco toolchain
+    // or credential the Windows daemon does not yet register.
     "workspace.project.register",
     "workspace.project.list",
     "workspace.project.show",
+    "workspace.project.update",
+    "workspace.project.remove",
     "workspace.preset.list",
     "workspace.preset.show",
+    "workspace.preset.update",
+    "workspace.preset.remove",
     // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
     "trace.cache.status",
     // The Import owner (TASK-XPA-008; `windows_import_owner_process.rs`):
     // the HAP, native-library and workspace-patch uploads committed with
     // their exact bytes, and the Import reads, release and abort. Not
     // `artifact import flash-bundle`: its publication is refused on Windows
-    // until the Flash archive reader is ported (AF-W1).
+    // while the owner's flash-bundle validator is macOS-only.
     "artifact.import.hap",
     "artifact.import.native-library",
     "artifact.import.workspace-patch",
@@ -1163,12 +1171,13 @@ mod tests {
             // Refused by the Windows daemon without an HDC or a Job owner.
             ("target.availability", "partial"),
             ("target.adopt", "partial"),
-            ("workspace.project.update", "partial"),
+            ("workspace.project.update", "implemented"),
+            ("workspace.preset.register", "partial"),
             ("trace.cache.purge", "partial"),
             ("device.observations", "partial"),
             ("job.submit", "partial"),
             ("agent.run", "partial"),
-            ("runtime.storage.root", "partial"),
+            ("runtime.storage.root", "implemented"),
             ("help", "implemented"),
             ("completion", "implemented"),
             ("capability.install", "implemented"),

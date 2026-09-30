@@ -2546,6 +2546,24 @@ them on Windows, since no Windows HDC tuple is registered.
 test binary itself; no real HDC is launched. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-005/windows-tool-dispatch-run.md`.
 
+The managed server's start and stop follow #2131's semantics on Windows as
+well.
+- A start refuses an endpoint something already listens on before launching
+  anything, and names the holder.
+- The stop's `end_proved_process` (the macOS one's Windows counterpart) ends
+  only the process a proof names: a replacement server a confirmed restart
+  left outside the Runtime's Job. It opens the PID once, which pins it, and
+  checks the receipt's birth and this user on that handle before
+  `TerminateProcess`. Another birth, or a PID of 4 or less, ends nothing.
+  Windows has no TERM, so the grace is not waited.
+- `windows_tool_dispatch.rs` proves the end, and that no other birth is ever
+  ended. `windows_managed_hdc.rs` runs restart, then stop, then start: the
+  replacement blocks the start, and once the proved replacement is ended,
+  the next start owns the endpoint.
+- The daemon's own managed-HDC owner (`managed_hdc.rs`, with its restart
+  lifecycle) stays macOS-only. It needs a registered HDC, and a Windows
+  development root refuses `ARKDECK_DEVELOPMENT_HDC_PATH` and
+  `ARKDECK_DEVELOPMENT_HDC_SERVER` before starting anything.
 A device command names its target in one place:
 `arkdeck_provider_hdc::device_arguments` (Swift `deviceArguments`) puts HDC's
 `-t <connectKey>` before the command's own arguments. Every plan the provider
@@ -2718,6 +2736,33 @@ over the real daemon across restarts, reads a document Swift wrote as Swift
 answered it and, with `ARKDECK_DEV_SIGNER_THUMBPRINT`, runs `history filter
 list|save|delete` through the real CLI. Run record:
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-012/windows-history-filter-owner-run.md`.
+## Windows Flash lane (TASK-XPA-010)
+
+The software part of GJ-4 on Windows. `ManagedServer::launch_paired` starts
+the bundle's `bin/arkforged.exe` in its own kill-on-close Job and hands it
+the pairing secret on stdin. Its stop is the end of input, half a second,
+then `TerminateJobObject`. `arkdeck-provider-arkforge`'s `Lane` composes
+over ArkForge's named pipes (#2403). The Flash archive reader reads a
+bundle through the platform's raw DEFLATE decoder (#2410).
+
+`arkdeck-hoststore` builds the Runtime's Flash owners on Windows:
+
+- the planner, the admitter, the run, the recovery and the reconcile
+  (`flash_plan`, `flash_admission`, `flash_run`, `flash_recovery`,
+  `flash_reconcile`), including the delegated Flash's lane receipt;
+- the Rockchip host's dispatcher, durable records, executor and startup
+  reconcile;
+- the Flash facts, the post-flash alias, and the flash-bundle Import
+  validator.
+
+The records keep the platform's owner-only boundary: private directories
+and files, owner-only single-link reads, and no directory `fsync` on NTFS.
+The Swift `flash-plan` oracle, plan digests included, and the `flash-run`
+oracle's eight stories replay on Windows. What a Windows Session names of
+its platform is read back as Swift's wrote it before it is compared. The
+owners that compose only beside a managed HDC stay macOS-only:
+`control_performer`, `rockchip_reactivation` and `loader_binding`. No
+Windows HDC tuple is registered.
 
 ## Windows credential store and console secret entry (TASK-XPA-011)
 

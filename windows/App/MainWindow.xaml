@@ -55,6 +55,9 @@
                 <NavigationViewItem x:Name="NavImports" Tag="imports" AccessKey="I" AutomationProperties.AutomationId="app.navigation.imports">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE898;" /></NavigationViewItem.Icon>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavDebug" Tag="debug" AccessKey="B" AutomationProperties.AutomationId="app.navigation.debug">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEBE8;" /></NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
             <!-- Settings as a footer item, where Windows apps keep it (the built-in item has no
                  stable AutomationId, so it stays hidden). -->

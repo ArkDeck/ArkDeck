@@ -63,6 +63,14 @@ public static class CliCommands
     public const string ImportFlashBundle = "arkdeck artifact import flash-bundle --import-request-id <id> --target <target-id> --file <path>"; // artifact.import.flash-bundle
     public const string ImportWorkspacePatch = "arkdeck artifact import workspace-patch --import-request-id <id> --target <target-id> --file <path>"; // artifact.import.workspace-patch
     public const string ImportNativeLibrary = "arkdeck artifact import native-library ..."; // app.debug.artifacts
+    public const string DebugProbe = "arkdeck debug probe --target <target-id>";   // debug.probe
+    public const string DebugLogs = "arkdeck debug logs --inputs-file <path>";     // capture.diagnostics@1 (the Debug logs preset)
+    public const string DebugHap = "arkdeck debug hap --inputs-file <path>";       // debug.hap@1
+    public const string DebugNativeLibrary = "arkdeck debug native deploy --inputs-file <path>"; // deploy.native-library.app-owned@1
+    public const string DebugTemplate = "arkdeck debug template run --inputs-file <path>"; // debug.template@1
+    public const string DebugPortForward = "arkdeck port-forward create --inputs-file <path>"; // port-forward.create|remove@1
+    public const string DebugPortForwardRemove = "arkdeck port-forward remove --inputs-file <path>";
+    public const string JobRun = "arkdeck job run --job <job-id>";                // job.run
 
     public static string ForExecution(string template, string executionId) =>
         template.Replace("(--execution-id <id>)", "--execution-id " + executionId, StringComparison.Ordinal);

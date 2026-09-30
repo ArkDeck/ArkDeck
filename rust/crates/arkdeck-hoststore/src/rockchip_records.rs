@@ -11,16 +11,28 @@
 //! whose identity drifted, or that cannot be read back, refuses — failed for
 //! a read, unknown for a mutation. Every record is canonical JSON, owner-only,
 //! written through a synchronized rename.
+//!
+//! On Windows (TASK-XPA-010) the same records are made with the platform's
+//! private objects: a directory or file created with the owner-only DACL
+//! (`create_private_directory`, `create_private_file`, never following a
+//! reparse point), an existing directory accepted only as `HostDirectory`
+//! opens a private one, and a record read only as `HostDirectory` reads an
+//! owner-only single-link document. NTFS has no directory `fsync`: a rename
+//! is made durable by the file handles themselves, so the directory
+//! synchronization is a no-op there.
 
-use crate::arktrace_profile::swift_sha256;
 use crate::rockchip_action::RockchipAction;
 use crate::session_graphemes::graphemes;
 use crate::strict_json::swift_quoted;
+use crate::swift_hex::swift_sha256;
 use arkdeck_contract::sha256_hex;
 use arkdeck_provider_arkforge::{HostAction, LaneFailure};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
-use std::io::{Read, Write};
+#[cfg(unix)]
+use std::io::Read;
+use std::io::Write;
+#[cfg(unix)]
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Component, Path, PathBuf};
 
@@ -103,10 +115,7 @@ impl RockchipRecordStore {
                 LaneFailure::Failed(read_detail)
             }
         };
-        match std::fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&action_directory)
-        {
+        match create_private_directory(&action_directory) {
             Ok(()) => {
                 synchronize_directory(&job_directory).map_err(LaneFailure::Failed)?;
                 write_record(&intent, &action_directory.join("intent.json")).map_err(|detail| {
@@ -483,7 +492,7 @@ pub(crate) fn prepare_directory(path: &Path, allow_existing: bool) -> Result<(),
     if !canonical {
         return Err("Rockchip record path is not canonical".into());
     }
-    let created = match std::fs::DirBuilder::new().mode(0o700).create(path) {
+    let created = match create_private_directory(path) {
         Ok(()) => true,
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
             if !allow_existing {
@@ -502,10 +511,7 @@ pub(crate) fn prepare_directory(path: &Path, allow_existing: bool) -> Result<(),
             ));
         }
     };
-    let owner_only = std::fs::symlink_metadata(path).is_ok_and(|metadata| {
-        metadata.file_type().is_dir() && metadata.permissions().mode() & 0o077 == 0
-    });
-    if !owner_only {
+    if !owner_only_directory(path) {
         return Err("Rockchip record directory is not an owner-only real directory".into());
     }
     if created {
@@ -514,7 +520,39 @@ pub(crate) fn prepare_directory(path: &Path, allow_existing: bool) -> Result<(),
     Ok(())
 }
 
+/// A new owner-only directory; an existing entry is `AlreadyExists`.
+#[cfg(unix)]
+fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    std::fs::DirBuilder::new().mode(0o700).create(path)
+}
+
+#[cfg(windows)]
+fn create_private_directory(path: &Path) -> std::io::Result<()> {
+    arkdeck_platform::create_private_directory(path)
+}
+
+/// An owner-only real directory, never reached through a link.
+#[cfg(unix)]
+fn owner_only_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|metadata| {
+        metadata.file_type().is_dir() && metadata.permissions().mode() & 0o077 == 0
+    })
+}
+
+#[cfg(windows)]
+fn owner_only_directory(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_dir())
+        && arkdeck_platform::HostDirectory::open(path).is_ok()
+}
+
+/// Swift `synchronizeDirectory(_:)`; nothing to do on NTFS (see the module).
+#[cfg(windows)]
+fn synchronize_directory(_path: &Path) -> Result<(), String> {
+    Ok(())
+}
+
 /// Swift `synchronizeDirectory(_:)`.
+#[cfg(unix)]
 fn synchronize_directory(path: &Path) -> Result<(), String> {
     let directory = std::fs::OpenOptions::new()
         .read(true)
@@ -547,18 +585,21 @@ fn write_record(value: &Value, path: &Path) -> Result<(), String> {
         )
     })?;
     let temporary = directory.join(format!(".{name}.{}.tmp", uuid_text(&nonce)));
-    let mut file = std::fs::OpenOptions::new()
+    #[cfg(unix)]
+    let created = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .mode(0o600)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(&temporary)
-        .map_err(|error| {
-            format!(
-                "cannot create owner-only Rockchip record (errno {})",
-                error.raw_os_error().unwrap_or(0)
-            )
-        })?;
+        .open(&temporary);
+    #[cfg(windows)]
+    let created = arkdeck_platform::create_private_file(&temporary);
+    let mut file = created.map_err(|error| {
+        format!(
+            "cannot create owner-only Rockchip record (errno {})",
+            error.raw_os_error().unwrap_or(0)
+        )
+    })?;
     let written = file
         .write_all(&bytes)
         .map_err(|error| {
@@ -610,6 +651,22 @@ fn uuid_text(bytes: &[u8; 16]) -> String {
 /// that does not decode is refused in these words rather than Swift's
 /// `DecodingError` (declared).
 fn read_record(path: &Path, fields: &[(&str, Field)]) -> Result<Map<String, Value>, String> {
+    let bytes = record_bytes(path)?;
+    let record = serde_json::from_slice::<Value>(&bytes)
+        .ok()
+        .and_then(|value| value.as_object().cloned())
+        .filter(|record| {
+            fields
+                .iter()
+                .all(|(key, field)| record.get(*key).is_some_and(|value| field.holds(value)))
+        })
+        .ok_or_else(|| "the Rockchip record does not decode".to_owned())?;
+    Ok(record)
+}
+
+/// A record's bytes, read as its owner alone may have written them.
+#[cfg(unix)]
+fn record_bytes(path: &Path) -> Result<Vec<u8>, String> {
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_NOFOLLOW | libc::O_CLOEXEC)
@@ -640,16 +697,36 @@ fn read_record(path: &Path, fields: &[(&str, Field)]) -> Result<Map<String, Valu
             error.raw_os_error().unwrap_or(0)
         )
     })?;
-    let record = serde_json::from_slice::<Value>(&bytes)
-        .ok()
-        .and_then(|value| value.as_object().cloned())
-        .filter(|record| {
-            fields
-                .iter()
-                .all(|(key, field)| record.get(*key).is_some_and(|value| field.holds(value)))
-        })
-        .ok_or_else(|| "the Rockchip record does not decode".to_owned())?;
-    Ok(record)
+    Ok(bytes)
+}
+
+/// A record's bytes: an owned, single-link regular file the owner alone may
+/// read and write, never through a reparse point, in a private directory.
+#[cfg(windows)]
+fn record_bytes(path: &Path) -> Result<Vec<u8>, String> {
+    use arkdeck_platform::{HostDirectory, OwnerOnlyReadFailure};
+    let open = |error: std::io::Error| {
+        format!(
+            "cannot open Rockchip record (errno {})",
+            error.raw_os_error().unwrap_or(0)
+        )
+    };
+    let (Some(directory), Some(name)) = (path.parent(), path.file_name().and_then(|n| n.to_str()))
+    else {
+        return Err(open(std::io::ErrorKind::InvalidInput.into()));
+    };
+    let directory = HostDirectory::open(directory).map_err(open)?;
+    match directory.read_owner_only_detailed(name, MAXIMUM_RECORD_BYTES as usize) {
+        Ok(Some(bytes)) => Ok(bytes),
+        Ok(None) => Err(open(std::io::ErrorKind::NotFound.into())),
+        Err(OwnerOnlyReadFailure::Open(error)) => Err(open(error)),
+        Err(OwnerOnlyReadFailure::Identity | OwnerOnlyReadFailure::Size) => {
+            Err("Rockchip record is not a bounded owner-only regular file".into())
+        }
+        Err(OwnerOnlyReadFailure::Truncated) => {
+            Err("cannot read complete Rockchip record (errno 0)".into())
+        }
+    }
 }
 
 /// Swift's `==` of two decoded records: every field the record type
@@ -680,5 +757,7 @@ pub(crate) fn described(failure: &LaneFailure) -> String {
     }
 }
 
-#[cfg(test)]
+// The records' own tests set Unix modes and flags (macOS only); on Windows
+// the records are exercised through the dispatcher's and the Flash run's.
+#[cfg(all(test, target_os = "macos"))]
 mod tests;

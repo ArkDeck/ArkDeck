@@ -17,6 +17,7 @@ const MAX_CANDIDATES: usize = 1_000;
 pub struct HdcReadOnlyProvider {
     tool: VerifiedTool,
     version: &'static str,
+    endpoint: SocketAddrV4,
 }
 
 impl HdcReadOnlyProvider {
@@ -26,7 +27,16 @@ impl HdcReadOnlyProvider {
                 "the selected platform and HDC executable have no published observation profile",
             ),
         )?;
-        Ok(Self { tool, version })
+        let endpoint = registered_endpoint(std::env::consts::OS, tool.sha256()).ok_or(
+            ObservationFailure::Unavailable(
+                "the selected platform and HDC executable have no registered server endpoint",
+            ),
+        )?;
+        Ok(Self {
+            tool,
+            version,
+            endpoint,
+        })
     }
 
     pub fn tool_version(&self) -> &'static str {
@@ -36,15 +46,16 @@ impl HdcReadOnlyProvider {
     /// Observes once. An absent, ambiguous or changed server never produces a
     /// candidate snapshot. Probe errors do not trigger retry, cleanup or start.
     pub fn list_candidates(&self) -> Result<Vec<DeviceCandidate>, ObservationFailure> {
-        observe_candidates(&PlatformBackend(&self.tool), self.version)
+        observe_candidates(&PlatformBackend(&self.tool, self.endpoint), self.version)
     }
 }
 
 /// These are facts published by Swift's current integration profiles, not a
-/// version inferred from a filename or caller claim. Windows SPK-3 must provide
-/// its own reviewed executable tuple; the macOS hashes cannot authorize it.
+/// version inferred from a filename or caller claim. Windows reads only its
+/// own registered tuples (CHG-2026-078); the macOS hashes cannot authorize it.
 pub(crate) fn registered_version(platform: &str, digest: &str) -> Option<&'static str> {
     match (platform, digest) {
+        ("windows", digest) => crate::windows_tuple(digest).map(|tuple| tuple.reported_version),
         ("macos", "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260") => {
             Some("3.2.0d")
         }
@@ -52,6 +63,15 @@ pub(crate) fn registered_version(platform: &str, digest: &str) -> Option<&'stati
             Some("3.2.0f")
         }
         _ => None,
+    }
+}
+
+/// The one endpoint a registered tool's server is observed on: 8710 for the
+/// published macOS tools, and the registered tuple's own endpoint on Windows.
+pub(crate) fn registered_endpoint(platform: &str, digest: &str) -> Option<SocketAddrV4> {
+    match platform {
+        "windows" => crate::windows_tuple(digest).map(|tuple| tuple.endpoint),
+        _ => registered_version(platform, digest).map(|_| ENDPOINT),
     }
 }
 
@@ -75,13 +95,13 @@ struct Capture {
     exit_code: Option<i32>,
 }
 
-struct PlatformBackend<'a>(&'a VerifiedTool);
+struct PlatformBackend<'a>(&'a VerifiedTool, SocketAddrV4);
 
 impl ObservationBackend for PlatformBackend<'_> {
     type Lease = LoopbackServerLease;
 
     fn acquire_existing_server(&self) -> Result<Self::Lease, ObservationFailure> {
-        LoopbackServerLease::acquire(self.0, ENDPOINT).map_err(|_| {
+        LoopbackServerLease::acquire(self.0, self.1).map_err(|_| {
             ObservationFailure::Unavailable(
                 "existing-server identity at the exact HDC endpoint could not be proved",
             )
@@ -235,6 +255,28 @@ mod tests {
         assert_eq!(registered_version("windows", mac_hash), None);
         assert_eq!(registered_version("linux", mac_hash), None);
         assert_eq!(registered_version("macos", &"0".repeat(64)), None);
+        assert_eq!(
+            registered_endpoint("macos", mac_hash),
+            Some(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710))
+        );
+        assert_eq!(registered_endpoint("windows", mac_hash), None);
+        assert_eq!(registered_endpoint("linux", mac_hash), None);
+    }
+
+    /// Windows reads its version and endpoint from the registered tuple and
+    /// nothing else: every registered entry answers with its own values.
+    #[test]
+    fn windows_answers_exactly_from_its_registered_tuples() {
+        for tuple in crate::WINDOWS_HDC_TUPLES {
+            let sha = tuple.executable_sha256;
+            assert_eq!(
+                registered_version("windows", sha),
+                Some(tuple.reported_version)
+            );
+            assert_eq!(registered_endpoint("windows", sha), Some(tuple.endpoint));
+            assert_eq!(registered_version("macos", sha), None);
+        }
+        assert_eq!(registered_version("windows", &"0".repeat(64)), None);
     }
 
     #[test]
