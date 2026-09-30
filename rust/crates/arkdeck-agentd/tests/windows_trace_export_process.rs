@@ -13,12 +13,14 @@
 //! * The real daemon over an isolated development root composes the Trace
 //!   cache owner over `trace-cache\traces`: `trace.cache.status` answers its
 //!   inventory, before and after a restart and a derived entry laid down in
-//!   the macOS layout; `trace.cache.purge` is refused (no Job owner proves
-//!   that no Session needs the entry) and removes nothing; a `trace-cache`
+//!   the macOS layout; `trace.cache.purge` is refused before admission
+//!   (`operationUnavailable`, ruling 18: no Job owner proves that no Session
+//!   needs the entry) and removes nothing; a `trace-cache`
 //!   that is not owner-only refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
-//!   `trace cache status` answers, `trace cache purge` is refused, and
+//!   `trace cache status` answers, `trace cache purge` is reported as a
+//!   refusal (exit 69), and
 //!   `trace export` is refused by the daemon's Artifact owner (no Job owner)
 //!   with nothing exported. Without that variable this test says so and
 //!   checks nothing.
@@ -535,9 +537,20 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     assert_eq!(counted["entryCount"], 1, "{counted}");
     assert_eq!(counted["inactiveEntryCount"], 1, "{counted}");
     assert_eq!(counted["activeEntryCount"], 0, "{counted}");
-    let reply = refused(&pipe, "trace.cache.purge", json!({}), "rejected");
+    // Refused before admission (ruling 18): no Job owner proves that no
+    // Session needs the entry.
+    let reply = refused(
+        &pipe,
+        "trace.cache.purge",
+        json!({}),
+        "operationUnavailable",
+    );
     assert_eq!(
-        reply["error"]["message"], "Trace cache owner is not configured",
+        reply["error"],
+        json!({"code": "operationUnavailable",
+            "message": "Trace cache purge needs the Job and Artifact retention owners; nothing was purged",
+            "details": {"phase": "preAdmission", "newDispatchCount": 0,
+                "purgeScope": "inactiveDerivedDatabases"}}),
         "{reply}"
     );
     refused(
@@ -613,15 +626,15 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"]["entryCount"], 0, "{envelope}");
     let (status, envelope) = cli(&daemon, &pin, &pipe, &["trace", "cache", "purge"]);
-    // The daemon's `rejected` for a purge is read by the CLI as it reads it
-    // on macOS: a mutation refused without a pre-admission proof is an
-    // unknown outcome that must not be replayed.
-    assert_eq!(status, Some(75), "{envelope}");
-    assert_eq!(envelope["error"]["code"], "outcomeUnknown", "{envelope}");
+    // The refusal before admission carries its proof: the CLI reports a
+    // refusal, not an unknown outcome.
+    assert_eq!(status, Some(69), "{envelope}");
     assert_eq!(
-        envelope["error"]["details"]["wireCode"], "rejected",
+        envelope["error"]["code"], "operationUnavailable",
         "{envelope}"
     );
+    assert_eq!(envelope["error"]["details"]["phase"], "preAdmission");
+    assert_eq!(envelope["error"]["details"]["newDispatchCount"], 0);
     // The daemon's Artifact owner refuses the inspection the export starts
     // with: no Job owner proves the Job on Windows yet.
     let argv = trace_export(JOB, TRACE, &exports);

@@ -12,7 +12,8 @@
 //!   evidence created;
 //! * the development root composes the Trace cache owner (TASK-XPA-021,
 //!   `windows_trace_export_process.rs`): `trace.cache.status` answers the
-//!   empty cache, and `trace.cache.purge` is refused (`rejected`, nothing
+//!   empty cache, and `trace.cache.purge` is refused before admission
+//!   (`operationUnavailable`, ruling 18; nothing
 //!   removed) as the macOS daemon refuses it without its Job owner;
 //! * `operation.list` names both ArkTrace analyzers unavailable, with a
 //!   typed reason code (`provider_not_registered`: the Windows daemon
@@ -269,8 +270,13 @@ fn the_windows_daemon_answers_the_offline_trace_surface_without_a_distribution()
         "{status}"
     );
     let purge = connection.answer("trace.cache.purge", "trace.cache.purge", None);
-    assert_eq!(purge["error"]["code"], "rejected", "{purge}");
-    assert!(purge["error"]["details"].is_null(), "{purge}");
+    assert_eq!(purge["error"]["code"], "operationUnavailable", "{purge}");
+    assert_eq!(
+        purge["error"]["details"],
+        json!({"phase": "preAdmission", "newDispatchCount": 0,
+            "purgeScope": "inactiveDerivedDatabases"}),
+        "{purge}"
+    );
 
     // Both ArkTrace analyzers are unavailable with a typed reason.
     let list = connection.exchange("operations", "operation.list", None);

@@ -59,6 +59,26 @@ impl TraceCacheStore {
         };
         action().map_err(|_| Self::purge_refusal("Trace cache purge outcome is unknown"))
     }
+    /// A purge refused before admission because the Job and Artifact
+    /// retention owners are not composed: only they prove that no Session
+    /// still needs the derived data, so nothing was read, quarantined or
+    /// removed (maintainer ruling 18's shape, as `target.adopt` answers
+    /// without a registered HDC).
+    pub fn purge_unavailable() -> WireError {
+        WireError {
+            code: "operationUnavailable".into(),
+            message:
+                "Trace cache purge needs the Job and Artifact retention owners; nothing was purged"
+                    .into(),
+            details: Some(
+                json!({"phase":"preAdmission", "newDispatchCount":0,
+                "purgeScope":"inactiveDerivedDatabases"})
+                .as_object()
+                .unwrap()
+                .clone(),
+            ),
+        }
+    }
     pub fn purge_refusal(message: &str) -> WireError {
         WireError { code: "outcomeUnknown".into(), message: message.into(), details: Some(json!({"phase":"traceCacheOwner", "newDispatchCount":0, "purgeScope":"inactiveDerivedDatabases"}).as_object().unwrap().clone()) }
     }

@@ -148,8 +148,9 @@ impl Authority {
     ///   (`TraceCacheStore`) over `trace-cache\traces`, beside its `staging`,
     ///   the layout the macOS isolated owner creates: `trace.cache.status`
     ///   reads the same inventory as on macOS. `trace.cache.purge` is
-    ///   refused as the macOS daemon refuses it without its Job owner, which
-    ///   alone proves that no Job's Session still needs the derived data.
+    ///   refused before admission (`operationUnavailable`, ruling 18), as the
+    ///   macOS daemon refuses it without its Job owner, which alone proves
+    ///   that no Job's Session still needs the derived data.
     ///   The account's daemon composes none: on macOS it reads the App's
     ///   cache in the App's container, and the Windows App's cache location
     ///   is not decided yet.

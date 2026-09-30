@@ -223,7 +223,7 @@ public static class ControlContract
         ["target.display-name.set"] = "5d3f52424b709569a95de184ece1427406764f045bd4edc746bfa6384103a099",
         ["target.list"] = "cf8d58d572bd4a397bd6eae3961e7fb146efdc444154abfb307bea72e62bce1b",
         ["target.show"] = "e61eca75c87ab465e25cf1ba40c3fc8c98598f1587aa50f7adf96e3304f86468",
-        ["trace.cache.purge"] = "e602c5b4e58395b6e50952ec1c2077314a193d02f0af4389eac240062f3ff152",
+        ["trace.cache.purge"] = "c5d6e5c3206a5ea83b88b5228757c5e5f5315ea3b037019cbf0f5803e2865d45",
         ["trace.cache.status"] = "52bb0eff631c2869d3c03dd30fa452989e6aa170c26f3ecd17ade8df8103ed4c",
         ["trace.inspect"] = "92f03c730e13fe65d7d88257fd2b7cb59677a884a33bbb6a222d40637c136fc0",
         ["trace.probe"] = "217e44c3b3de1d16b42886ac6c32dc98af637f60faf0da6f217318ec593f7a82",

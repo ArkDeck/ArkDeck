@@ -2362,8 +2362,12 @@ impl HostServices for Host {
             details: None,
         };
         let cache = self.trace_cache.as_ref().ok_or_else(unconfigured)?;
-        let jobs = self.jobs.as_ref().ok_or_else(unconfigured)?;
-        let artifacts = self.artifacts.as_ref().ok_or_else(unconfigured)?;
+        // Without the retention owners nothing proves the entries inactive:
+        // refused before admission, so a client reads a refusal rather than
+        // an unknown outcome.
+        let unavailable = arkdeck_hoststore::TraceCacheStore::purge_unavailable;
+        let jobs = self.jobs.as_ref().ok_or_else(unavailable)?;
+        let artifacts = self.artifacts.as_ref().ok_or_else(unavailable)?;
         let refuse = || {
             arkdeck_hoststore::TraceCacheStore::purge_refusal(
                 "Trace cache or authoritative Job/Artifact retention owner is unavailable",
@@ -2378,18 +2382,19 @@ impl HostServices for Host {
         })
         .map_err(|_| refuse())
     }
-    /// The same refusal as the macOS owner without its Job owner: no Job
-    /// owner is composed on Windows yet, so nothing can prove that no Job's
-    /// Session still needs the derived data, and nothing is purged.
+    /// The macOS owner's answers without its retention owners: no Job owner
+    /// is composed on Windows yet, so nothing can prove that no Job's Session
+    /// still needs the derived data. The purge is refused before admission,
+    /// with zero dispatch (ruling 18), and nothing is purged. Without the
+    /// Trace cache owner itself it is `rejected`, as `trace.cache.status` is.
     #[cfg(windows)]
     fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
-        let unconfigured = || WireError {
+        self.trace_cache.as_ref().ok_or_else(|| WireError {
             code: "rejected".into(),
             message: "Trace cache owner is not configured".into(),
             details: None,
-        };
-        self.trace_cache.as_ref().ok_or_else(unconfigured)?;
-        Err(unconfigured())
+        })?;
+        Err(arkdeck_hoststore::TraceCacheStore::purge_unavailable())
     }
     #[cfg(any(target_os = "macos", windows))]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {

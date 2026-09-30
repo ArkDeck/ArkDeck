@@ -194,10 +194,17 @@ already carries `main` up to #2366, and then `origin/main` `97793944`.
   to answer the empty cache in a development root. `trace.cache.purge` is
   still refused `rejected` with no details. This is open question 1 above,
   now done.
-- **Still to do:** switch the Windows `trace_cache_purge` to
-  `TraceCacheStore::purge_unavailable()` (ruling 18) once #2370 is on `main`.
-  Until then the Windows purge keeps the pre-#2370 `rejected`, the same answer
-  `main`'s macOS daemon gives today.
+- The Windows `trace_cache_purge` was then switched to
+  `TraceCacheStore::purge_unavailable()` once #2370 reached `main` (ruling
+  18). A purge with the cache owner but no Job owner is refused before
+  admission: `operationUnavailable`, details `{phase: preAdmission,
+  newDispatchCount: 0, purgeScope: inactiveDerivedDatabases}`. The CLI
+  reports it as a refusal, exit 69, rather than `outcomeUnknown` (exit 75,
+  open question 2 above, now resolved). Without the cache owner itself, the
+  purge stays `rejected`, as `trace.cache.status` is.
+  - `windows_trace_export_process.rs` asserts the exact refusal over the
+    pipe, and the CLI's exit 69 with the pre-admission details.
+  - `windows_trace_offline_process.rs` asserts the refusal code and details.
 
 Checks after the merges, all on the Windows 11 x64 reference host:
 
