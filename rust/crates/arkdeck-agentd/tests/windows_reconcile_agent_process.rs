@@ -35,8 +35,10 @@
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
 //!   `job reconcile`, `agent status` (the abandoned and the waiting
 //!   execution) and `human-action show` (the expired action and the
-//!   pick-a-device one) report the same, and `agent list` and
-//!   `human-action list` the pages the pipe answers. These leaves are Windows
+//!   pick-a-device one) report the same, `agent list` and
+//!   `human-action list` the pages the pipe answers, and `capability list`
+//!   and `capability inspect`, over Swift's capability-read oracle store
+//!   `base` placed beside the Job state, what Swift's owner answered. These leaves are Windows
 //!   `implemented` in the coverage manifest the CLI renders
 //!   (`WINDOWS_MEASURED_LEAVES`). Without that variable this test says so and
 //!   checks nothing.
@@ -80,6 +82,26 @@ fn agent_fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/agent-human-action")
         .join(name)
+}
+
+fn capability_fixture() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/capability-read/stores/base")
+}
+
+/// The capability-read oracle's recorded exchanges for its `base` store.
+fn capability_exchanges() -> Vec<Value> {
+    document(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/capability-read/cases.json"),
+    )
+    .as_array()
+    .unwrap()
+    .iter()
+    .find(|case| case["scenario"] == "base")
+    .unwrap()["exchanges"]
+        .as_array()
+        .unwrap()
+        .clone()
 }
 
 fn document(path: PathBuf) -> Value {
@@ -273,6 +295,20 @@ impl Root {
                 .create_document(
                     path.file_name().unwrap().to_str().unwrap(),
                     unlabelled(&std::fs::read_to_string(&path).unwrap()).as_bytes(),
+                )
+                .unwrap();
+        }
+    }
+    /// Swift's capability-read oracle store `base` in the capability store
+    /// beside the Job state: two capabilities with their use ledger.
+    fn with_capabilities(&self) {
+        let store =
+            HostDirectory::open_or_create_private(&self.jobs_state().join("capabilities")).unwrap();
+        for name in ["runtime-capabilities.json", "runtime-capabilities.ledger"] {
+            store
+                .create_document(
+                    name,
+                    &std::fs::read(capability_fixture().join(name)).unwrap(),
                 )
                 .unwrap();
         }
@@ -784,6 +820,7 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
     let _turn = turn();
     let root = Root::new();
     let exchanges = agent_exchanges();
+    root.with_capabilities();
     let (daemon, pin) = signed_daemon(&root, &thumbprint);
 
     let mut started = Daemon::start(&daemon, &root.0);
@@ -855,8 +892,24 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
         assert_eq!(envelope["result"]["items"], page["items"], "{envelope}");
         assert_eq!(envelope["result"]["hasMore"], false, "{envelope}");
     }
+    // Swift's recorded capability store, read as Swift's owner answered it.
+    let recorded = capability_exchanges();
+    assert_eq!(recorded.len(), 3);
+    for exchange in &recorded {
+        let arguments: Vec<&str> = match exchange["params"]["capabilityId"].as_str() {
+            Some(id) => vec!["capability", "inspect", "--capability", id],
+            None => vec!["capability", "list"],
+        };
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(
+            envelope["result"], exchange["response"]["result"],
+            "{arguments:?}"
+        );
+    }
     started.stop(&root.0);
     assert_measured(&[
+        "capability.inspect",
         "job.reconcile",
         "agent.status",
         "agent.list",

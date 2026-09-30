@@ -18,9 +18,12 @@
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
 //!   `rust/scripts/check-readonly.py` signs one): the same hops as the CLI
-//!   verifies the daemon's image and signer and prints them, a remove
-//!   refused while the Job names the project and done once it has ended.
-//!   Without that variable this test says so and checks nothing.
+//!   verifies the daemon's image and signer and prints them: a project
+//!   moved to another root and back, a symbol preset registered, updated and
+//!   removed, and a remove refused while the Job names the project and done
+//!   once it has ended. The measured leaves are Windows `implemented` in the
+//!   coverage manifest the CLI renders (`WINDOWS_MEASURED_LEAVES`). Without
+//!   that variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -725,6 +728,126 @@ fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     );
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"]["presets"], json!([]), "{envelope}");
+    // No workspace Job names the project yet: it is moved to the second
+    // root and back, and a symbol preset is registered, updated and removed,
+    // each written and answered with its next generation.
+    let second_root = root.project("second");
+    let mut generation = project["generation"].as_str().unwrap().to_owned();
+    for directory in [&second_root, &first_root] {
+        let (status, envelope) = cli(
+            &daemon,
+            &pin,
+            &pipe,
+            &[
+                "workspace",
+                "project",
+                "update",
+                "--project",
+                &reference,
+                "--expected-generation",
+                &generation,
+                "--kind",
+                "openharmony",
+                "--root",
+                directory,
+            ],
+        );
+        assert_eq!(status, Some(0), "{envelope}");
+        assert_eq!(envelope["result"]["projectRef"], reference, "{envelope}");
+        assert_ne!(envelope["result"]["generation"], generation, "{envelope}");
+        generation = envelope["result"]["generation"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+    }
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "workspace",
+            "preset",
+            "register",
+            "--registration-request-id",
+            "preset-cli",
+            "--project",
+            &reference,
+            "--kind",
+            "symbol",
+            "--template",
+            "openharmony.arkts-symbol@1",
+            "--timeout-seconds",
+            "600",
+            "--relative-source-map",
+            SOURCE_MAP,
+        ],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    let preset = envelope["result"].clone();
+    let preset_ref = preset["presetRef"].as_str().unwrap().to_owned();
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "workspace",
+            "preset",
+            "update",
+            "--mutation-request-id",
+            "preset-cli-update",
+            "--project",
+            &reference,
+            "--preset",
+            &preset_ref,
+            "--expected-generation",
+            preset["generation"].as_str().unwrap(),
+            "--kind",
+            "symbol",
+            "--template",
+            "openharmony.arkts-symbol@1",
+            "--timeout-seconds",
+            "300",
+            "--relative-source-map",
+            SOURCE_MAP,
+        ],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    let updated = envelope["result"].clone();
+    assert_eq!(updated["timeoutSeconds"], 300, "{envelope}");
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "workspace",
+            "preset",
+            "remove",
+            "--mutation-request-id",
+            "preset-cli-remove",
+            "--project",
+            &reference,
+            "--preset",
+            &preset_ref,
+            "--expected-generation",
+            updated["generation"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(
+        envelope["result"]["configurationStatus"], "removed",
+        "{envelope}"
+    );
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &["workspace", "project", "show", "--project", &reference],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    let generation = envelope["result"]["generation"]
+        .as_str()
+        .unwrap()
+        .to_owned();
     first.stop(&root.0);
 
     // While a running workspace Job names the project, a remove is refused
@@ -738,7 +861,7 @@ fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
         "--project",
         &reference,
         "--expected-generation",
-        "1",
+        &generation,
     ];
     let written = root.document();
     let mut second = Daemon::start(&daemon, &root.0);
@@ -764,4 +887,35 @@ fn workspace_project_hops_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(status, Some(0), "{envelope}");
     assert_eq!(envelope["result"]["projects"], json!([]), "{envelope}");
     fourth.stop(&root.0);
+    assert_measured(&[
+        "workspace.project.update",
+        "workspace.project.remove",
+        "workspace.preset.update",
+        "workspace.preset.remove",
+    ]);
+}
+
+/// What this test measured is what the coverage manifest counts: each
+/// leaf's entries are Windows `implemented` in the manifest the CLI renders
+/// (`maintainer contracts export`'s product, held to the committed
+/// `openspec/contracts/cli-feature-coverage.json` by the CLI's own tests).
+fn assert_measured(leaves: &[&str]) {
+    let product = arkdeck_cli::machine_contracts::contract_products()
+        .into_iter()
+        .find(|product| product.relative_path == "cli-feature-coverage.json")
+        .expect("the CLI renders its feature coverage");
+    let coverage: Value = serde_json::from_slice(&product.bytes).unwrap();
+    for leaf in leaves {
+        let statuses: Vec<&Value> = coverage["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|entry| entry["feature"] == *leaf)
+            .map(|entry| &entry["implementationStatusByPlatform"]["windows"])
+            .collect();
+        assert!(
+            !statuses.is_empty() && statuses.iter().all(|status| *status == "implemented"),
+            "{leaf}: {statuses:?}"
+        );
+    }
 }
