@@ -9,7 +9,7 @@
 //! * the account's daemon (no input): `%LOCALAPPDATA%\ArkDeck\Agentd`, its
 //!   `instance.lock`, the guard `Local\ArkDeck.Agentd.<user SID>` and the
 //!   logon-scoped pipe `\\.\pipe\arkdeck-agentd-<logon SID>`. This is the
-//!   daemon decision 11's client will start;
+//!   daemon decision 11's client starts (`arkdeck_client::start`);
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Only the

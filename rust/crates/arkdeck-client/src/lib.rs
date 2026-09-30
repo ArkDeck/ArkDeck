@@ -1,4 +1,5 @@
 //! Same-connection health verification; no reconnect or replay of lost replies.
+//! On Windows a client may start the daemon it needs ([`start`]).
 
 use arkdeck_contract::{
     ContractError, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, Request, Response, WireError,
@@ -10,6 +11,8 @@ use std::fmt;
 use std::io::{self, BufReader, Read, Write};
 use std::time::{Duration, Instant};
 mod bounded;
+#[cfg(windows)]
+pub mod start;
 pub use bounded::BoundedConnection;
 
 #[derive(Debug)]
