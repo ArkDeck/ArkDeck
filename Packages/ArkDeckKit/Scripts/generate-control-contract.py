@@ -131,6 +131,43 @@ TARGET_DISPLAY_NAME_OWNER_ERROR_CODES = [
 # `importOwner`, no dispatch); only `artifact.import.list` was never recorded
 # doing so.
 IMPORT_OWNER_ERROR_CODES = ["operationUnavailable"]
+# Swift's `RuntimeAgentExecutionCoordinator.run` refuses before admission when
+# the execution's durable orchestration deadline has passed or its clock is
+# untrusted (`AgentExecutionBudgetGuard`, `observeBudget`, and the re-entry of a
+# stopped execution); the daemon adds `phase: preAdmission` and
+# `newDispatchCount: 0`. No `agent.run` refusal of either was ever recorded.
+AGENT_RUN_OWNER_ERROR_CODES = ["orchestrationBudgetExpired", "orchestrationClockUntrusted"]
+# Members that carry one Swift type wherever a method answers it, so a value
+# recorded for it in one method is a sample of it in every other. Each entry is
+# (source method, source path) -> the (method, path) pairs that answer the same
+# member; paths are spelled as `infer` spells them. The widening only admits
+# values Swift produced for that member:
+# - `failureCode`: `RuntimeAgentExecutionRecord.projection` writes the
+#   execution's failure code or null, in every method that answers an agent
+#   execution;
+# - `selectionSchema`: `RuntimeAgentHumanAction.projection` writes null, or
+#   `{"type": "string", "enum": [...]}` for a choose-a-candidate action, in
+#   every method that answers an agent-owned human action. Control-action human
+#   actions (`HDCControlActionRecord`) always write null, so `control-action.*`,
+#   `runtime.hdc.*` and `runtime.tool.select` are not widened.
+SHARED_MEMBERS = {
+    ("agent.run", "result.failureCode"): [
+        ("agent.status", "result.failureCode"),
+        ("agent.resume", "result.failureCode"),
+        ("agent.abandon", "result.failureCode"),
+        ("agent.list", "result.items[].failureCode"),
+        ("human-action.resume", "result.failureCode"),
+    ],
+    ("agent.run", "result.humanAction.selectionSchema"): [
+        ("agent.status", "result.humanAction.selectionSchema"),
+        ("agent.resume", "result.humanAction.selectionSchema"),
+        ("agent.resume", "errorDetails.humanAction.selectionSchema"),
+        ("human-action.list", "result.items[].selectionSchema"),
+        ("human-action.show", "result.selectionSchema"),
+        ("human-action.resume", "result.selectionSchema"),
+        ("human-action.resume", "result.humanAction.selectionSchema"),
+    ],
+}
 # Members keyed by caller data — operation input names, Artifact fact names,
 # provenance keys — rather than records with a fixed member set. Each is
 # published as a map, `{"type": "object", "additionalProperties": <schema of
@@ -193,14 +230,35 @@ def signature(value):
     return kind
 
 
+def values_at(value, path):
+    """Every value at `path` (`infer`'s spelling, without its root) below `value`."""
+    if not path:
+        return [value]
+    head, _, rest = path.partition(".")
+    step = head[:-2] if head.endswith("[]") else head
+    if not isinstance(value, dict) or step not in value:
+        return []
+    member = value[step]
+    if head.endswith("[]"):
+        return [found for item in (member if isinstance(member, list) else []) for found in values_at(item, rest)]
+    return values_at(member, rest)
+
+
+# The samples SHARED_MEMBERS lends the method being derived, by path.
+SHARED_SAMPLES = {}
+
+
 def infer(values, closed, path="", maps=None):
     """The narrowest schema in the validator's vocabulary that admits every sample.
 
     `path` names where the samples sit, as MAP_VALUED_MEMBERS spells it. An
     object at a path in `maps` is published as a map, and the path is marked
-    as reached.
+    as reached. A path in SHARED_SAMPLES also admits the samples recorded for
+    the same member in another method.
     """
     maps = {} if maps is None else maps
+    if path in SHARED_SAMPLES:
+        values = list(values) + [value for value in SHARED_SAMPLES[path] if value not in values]
     kinds = sorted({json_type(value) for value in values})
     if kinds == ["integer", "number"] or kinds == ["number"]:
         return {"type": "number"}
@@ -318,7 +376,23 @@ def derive_method_schemas(source):
                        | (set(TARGET_DISPLAY_NAME_OWNER_ERROR_CODES) if method in {
                            "target.display-name.set", "target.display-name.clear"
                        } else set())
-                       | (set(IMPORT_OWNER_ERROR_CODES) if method.startswith("artifact.import.") else set()))
+                       | (set(IMPORT_OWNER_ERROR_CODES) if method.startswith("artifact.import.") else set())
+                       | (set(AGENT_RUN_OWNER_ERROR_CODES) if method == "agent.run" else set()))
+        SHARED_SAMPLES.clear()
+        for (source, source_path), targets in SHARED_MEMBERS.items():
+            for target, target_path in targets:
+                if target != method:
+                    continue
+                root, _, member = source_path.partition(".")
+                frames = [frame for frame, _ in by_method.get(source, [])]
+                answers = [frame.get(root) for frame in frames if root in frame]
+                if not answers:
+                    raise SystemExit(
+                        f"SHARED_MEMBERS: {target} {target_path} needs {source}'s recorded frames"
+                    )
+                SHARED_SAMPLES[target_path] = [
+                    value for answer in answers for value in values_at(answer, member)
+                ]
         maps = dict.fromkeys(MAP_VALUED_MEMBERS.get(method, []), False)
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
