@@ -395,7 +395,7 @@ fn recorded_jobs_are_read_over_the_pipe_and_after_a_restart() {
     assert!(
         first
             .seen
-            .contains(&"arkdeck-agentd owners: targets, jobs, planning".to_owned()),
+            .contains(&"arkdeck-agentd owners: targets, jobs, artifacts, planning".to_owned()),
         "{:?}",
         first.seen
     );

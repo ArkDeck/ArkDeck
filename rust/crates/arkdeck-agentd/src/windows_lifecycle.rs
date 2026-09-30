@@ -13,9 +13,10 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners and the Job store are composed over
-//!   it (see [`Authority::compose`]); every input that would compose another owner
-//!   on macOS is refused, not ignored, until its store is ported (G01);
+//!   lifecycle only the Target owners, the Job store, the Job planner and
+//!   admitter and the Artifact read and export owner are composed over it
+//!   (see [`Authority::compose`]); every input that would compose another
+//!   owner on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -123,14 +124,21 @@ impl Authority {
     ///   so no relation is read, nothing is observed or dispatched, and
     ///   `target.adopt` is refused before admission with zero dispatch;
     /// * the Job store (`jobs-state`, [`Self::job_store`]);
-    /// * the Job planner and admitter over it and the root (`job.plan`,
-    ///   `job.submit`), with no HDC, workspace or analyzer provider, Artifact
-    ///   or Import owner or capability authority beside them: every
+    /// * the Artifact read and export owner (`ArtifactReadStore`) over the
+    ///   root's `artifacts` (the name the macOS isolated owner and production
+    ///   composition both give it): the same Job index documents, payloads
+    ///   and `artifact.list` snapshot pages as on macOS; every Artifact
+    ///   belongs to a Job, which the Job owner proves before anything is
+    ///   read, listed or exported;
+    /// * the Job planner and admitter over the Job store and the root
+    ///   (`job.plan`, `job.submit`), with no HDC, workspace or analyzer
+    ///   provider, Import owner or capability authority beside them: every
     ///   operation is refused before admission with zero dispatch, as macOS
     ///   refuses it without that owner, and nothing is admitted.
     ///
-    /// Composing opens the stores, which read their documents under their
-    /// locks; a store it cannot read ends the start, as on macOS.
+    /// An existing owner directory is never re-permissioned; one that is not
+    /// owner-only is refused when its owner opens it. Composing opens each
+    /// store; a store it cannot open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
         let name = if self.development {
@@ -150,9 +158,26 @@ impl Authority {
                 path.display()
             )
         })?;
+        let host = host.with_targets(targets).with_jobs(self.job_store()?);
+        let name = "artifacts";
+        let path = self.root.private_child(name).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                self.root.path().join(name).display()
+            )
+        })?;
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&path).map_err(|error| {
+            format!(
+                "the Artifact store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })?;
+        report(&format!(
+            "arkdeck-agentd composes the Artifact owner over {}",
+            path.display()
+        ));
         let host = host
-            .with_targets(targets)
-            .with_jobs(self.job_store()?)
+            .with_artifacts(artifacts)
             .with_planning(self.root.path());
         // No Windows HDC is registered, so none is managed either.
         let (registered, managed) = (false, false);

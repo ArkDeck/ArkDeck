@@ -385,7 +385,7 @@ fn observe_device_is_refused_before_admission_without_a_registered_hdc() {
     assert!(
         first
             .seen
-            .contains(&"arkdeck-agentd owners: targets, jobs, planning".to_owned()),
+            .contains(&"arkdeck-agentd owners: targets, jobs, artifacts, planning".to_owned()),
         "{:?}",
         first.seen
     );
