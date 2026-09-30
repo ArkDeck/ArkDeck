@@ -1027,6 +1027,102 @@
       "zh-Hans": "当前用量不可用；已保存的配额与保留策略仍显示在上方。"
     },
     {
+      "key": "jobInspector.action.cancel",
+      "table": "JobsLocalizable",
+      "en": "Request cancellation",
+      "zh-Hans": "请求取消"
+    },
+    {
+      "key": "jobInspector.cancel.requested",
+      "table": "JobsLocalizable",
+      "en": "Cancellation requested. Runtime is reaching a safe boundary; wait for its terminal state.",
+      "zh-Hans": "已请求取消。Runtime 正在到达安全边界，请等待最终状态。"
+    },
+    {
+      "key": "jobInspector.cancel.refused",
+      "table": "JobsLocalizable",
+      "en": "Cancellation was not confirmed. Refresh the record before trying again.",
+      "zh-Hans": "取消请求未确认。请刷新记录后重试。"
+    },
+    {
+      "key": "jobInspector.action.openRecord",
+      "table": "JobsLocalizable",
+      "en": "Open this record",
+      "zh-Hans": "打开此记录"
+    },
+    {
+      "key": "history.detail.evidence",
+      "table": "HistoryLocalizable",
+      "en": "Execution evidence",
+      "zh-Hans": "执行证据"
+    },
+    {
+      "key": "history.value.notReported",
+      "table": "HistoryLocalizable",
+      "en": "Not reported",
+      "zh-Hans": "未报告"
+    },
+    {
+      "key": "history.evidence.provider",
+      "table": "HistoryLocalizable",
+      "en": "Provider",
+      "zh-Hans": "Provider"
+    },
+    {
+      "key": "history.evidence.catalog",
+      "table": "HistoryLocalizable",
+      "en": "Catalog digest",
+      "zh-Hans": "Catalog 摘要"
+    },
+    {
+      "key": "history.evidence.binding",
+      "table": "HistoryLocalizable",
+      "en": "Binding revision",
+      "zh-Hans": "绑定修订"
+    },
+    {
+      "key": "history.evidence.authority",
+      "table": "HistoryLocalizable",
+      "en": "Authority",
+      "zh-Hans": "授权类型"
+    },
+    {
+      "key": "history.evidence.authorityReference",
+      "table": "HistoryLocalizable",
+      "en": "Authority reference",
+      "zh-Hans": "授权引用"
+    },
+    {
+      "key": "history.evidence.terminalState",
+      "table": "HistoryLocalizable",
+      "en": "Terminal state",
+      "zh-Hans": "终态"
+    },
+    {
+      "key": "history.evidence.mode",
+      "table": "HistoryLocalizable",
+      "en": "Recorded mode",
+      "zh-Hans": "记录的模式"
+    },
+    {
+      "key": "history.evidence.effect",
+      "table": "HistoryLocalizable",
+      "en": "Recorded effect",
+      "zh-Hans": "记录的影响"
+    },
+    {
+      "key": "history.evidence.firstEvidence",
+      "table": "HistoryLocalizable",
+      "en": "First evidence",
+      "zh-Hans": "首条证据时间"
+    },
+    {
+      "key": "settings.common.cancel",
+      "table": "SettingsLocalizable",
+      "en": "Cancel",
+      "zh-Hans": "取消"
+    },
+    {
       "key": "windows.recovery.title",
       "table": null,
       "en": "ArkDeck Runtime unavailable",
@@ -1721,6 +1817,234 @@
       "table": null,
       "en": "Timeout %lld s",
       "zh-Hans": "超时 %lld 秒"
+    },
+    {
+      "key": "windows.navigation.sessions",
+      "table": null,
+      "en": "Sessions",
+      "zh-Hans": "Session"
+    },
+    {
+      "key": "windows.sessions.subtitle",
+      "table": null,
+      "en": "The Sessions the Runtime keeps on this PC: pin the ones to keep, export one, or clean up what the retention policy allows.",
+      "zh-Hans": "Runtime 在这台电脑上保存的 Session：固定要保留的，导出某一个，或清理保留策略允许清理的。"
+    },
+    {
+      "key": "windows.sessions.unavailable",
+      "table": null,
+      "en": "Sessions unavailable",
+      "zh-Hans": "无法读取 Session"
+    },
+    {
+      "key": "windows.sessions.empty",
+      "table": null,
+      "en": "No Session is stored.",
+      "zh-Hans": "当前没有保存的 Session。"
+    },
+    {
+      "key": "windows.sessions.select",
+      "table": null,
+      "en": "Select a Session to see it.",
+      "zh-Hans": "选择一个 Session 以查看详情。"
+    },
+    {
+      "key": "windows.sessions.pinned",
+      "table": null,
+      "en": "Pinned",
+      "zh-Hans": "已固定"
+    },
+    {
+      "key": "windows.sessions.completed",
+      "table": null,
+      "en": "Completed",
+      "zh-Hans": "完成时间"
+    },
+    {
+      "key": "windows.sessions.expires",
+      "table": null,
+      "en": "Expires",
+      "zh-Hans": "到期时间"
+    },
+    {
+      "key": "windows.sessions.size",
+      "table": null,
+      "en": "Size",
+      "zh-Hans": "大小"
+    },
+    {
+      "key": "windows.sessions.generation",
+      "table": null,
+      "en": "Generation",
+      "zh-Hans": "代次"
+    },
+    {
+      "key": "windows.sessions.pin",
+      "table": null,
+      "en": "Pin",
+      "zh-Hans": "固定"
+    },
+    {
+      "key": "windows.sessions.unpin",
+      "table": null,
+      "en": "Unpin",
+      "zh-Hans": "取消固定"
+    },
+    {
+      "key": "windows.sessions.pinnedDone",
+      "table": null,
+      "en": "Pinned: retention cleanup never removes it.",
+      "zh-Hans": "已固定：保留清理不会移除它。"
+    },
+    {
+      "key": "windows.sessions.unpinnedDone",
+      "table": null,
+      "en": "Unpinned: retention cleanup may remove it when it expires.",
+      "zh-Hans": "已取消固定：到期后保留清理可以移除它。"
+    },
+    {
+      "key": "windows.sessions.refused",
+      "table": null,
+      "en": "The Session was not changed",
+      "zh-Hans": "Session 未更改"
+    },
+    {
+      "key": "windows.sessions.export",
+      "table": null,
+      "en": "Export…",
+      "zh-Hans": "导出…"
+    },
+    {
+      "key": "windows.sessions.export.title",
+      "table": null,
+      "en": "Review Session export",
+      "zh-Hans": "检查 Session 导出信息"
+    },
+    {
+      "key": "windows.sessions.export.message",
+      "table": null,
+      "en": "The Runtime writes Session %1$@ to the new folder %2$@ (about %3$@). Device identifiers: %4$@. Sensitive Artifacts are not included.",
+      "zh-Hans": "Runtime 会把 Session %1$@ 写入新文件夹 %2$@（约 %3$@）。设备标识：%4$@。不包含敏感 Artifact。"
+    },
+    {
+      "key": "windows.sessions.export.confirm",
+      "table": null,
+      "en": "Export",
+      "zh-Hans": "导出"
+    },
+    {
+      "key": "windows.sessions.export.done",
+      "table": null,
+      "en": "Exported to %@",
+      "zh-Hans": "已导出到 %@"
+    },
+    {
+      "key": "windows.sessions.export.failed",
+      "table": null,
+      "en": "Export failed",
+      "zh-Hans": "导出失败"
+    },
+    {
+      "key": "windows.sessions.export.artifact",
+      "table": null,
+      "en": "%1$@ · %2$@ · %3$@",
+      "zh-Hans": "%1$@ · %2$@ · %3$@"
+    },
+    {
+      "key": "windows.sessions.cleanup",
+      "table": null,
+      "en": "Clean up…",
+      "zh-Hans": "清理…"
+    },
+    {
+      "key": "windows.sessions.cleanup.title",
+      "table": null,
+      "en": "Review Session cleanup",
+      "zh-Hans": "检查 Session 清理"
+    },
+    {
+      "key": "windows.sessions.cleanup.message",
+      "table": null,
+      "en": "Removes %1$lld Sessions and reclaims %2$@ (from %3$@ to %4$@). Pinned Sessions are kept.",
+      "zh-Hans": "将移除 %1$lld 个 Session，回收 %2$@（从 %3$@ 降至 %4$@）。已固定的 Session 会保留。"
+    },
+    {
+      "key": "windows.sessions.cleanup.nothing",
+      "table": null,
+      "en": "Nothing to clean up: the retention policy keeps every Session.",
+      "zh-Hans": "无需清理：保留策略会保留所有 Session。"
+    },
+    {
+      "key": "windows.sessions.cleanup.confirm",
+      "table": null,
+      "en": "Remove Sessions",
+      "zh-Hans": "移除 Session"
+    },
+    {
+      "key": "windows.sessions.cleanup.done",
+      "table": null,
+      "en": "Removed %1$lld Sessions, reclaimed %2$@.",
+      "zh-Hans": "已移除 %1$lld 个 Session，回收 %2$@。"
+    },
+    {
+      "key": "windows.sessions.cleanup.failed",
+      "table": null,
+      "en": "Cleanup failed",
+      "zh-Hans": "清理失败"
+    },
+    {
+      "key": "windows.jobInspector.cancel.title",
+      "table": null,
+      "en": "Request cancellation?",
+      "zh-Hans": "请求取消？"
+    },
+    {
+      "key": "windows.jobInspector.cancel.message",
+      "table": null,
+      "en": "Runtime stops Job %@ at its next safe boundary. A step already writing to the device finishes first.",
+      "zh-Hans": "Runtime 会在下一个安全边界停止 Job %@。已经在写设备的步骤会先完成。"
+    },
+    {
+      "key": "windows.jobInspector.result",
+      "table": null,
+      "en": "Result",
+      "zh-Hans": "结果"
+    },
+    {
+      "key": "windows.jobInspector.result.artifacts",
+      "table": null,
+      "en": "%1$lld Artifacts, %2$lld verified · %3$lld cleanup items",
+      "zh-Hans": "%1$lld 个 Artifact，%2$lld 个已校验 · %3$lld 个清理项"
+    },
+    {
+      "key": "windows.jobInspector.result.unavailable",
+      "table": null,
+      "en": "Result unavailable",
+      "zh-Hans": "无法读取结果"
+    },
+    {
+      "key": "windows.history.evidence.unavailable",
+      "table": null,
+      "en": "Execution evidence unavailable",
+      "zh-Hans": "无法读取执行证据"
+    },
+    {
+      "key": "windows.history.evidence.status",
+      "table": null,
+      "en": "Evidence status",
+      "zh-Hans": "证据状态"
+    },
+    {
+      "key": "windows.sessions.pinnedYes",
+      "table": null,
+      "en": "Yes",
+      "zh-Hans": "是"
+    },
+    {
+      "key": "windows.sessions.pinnedNo",
+      "table": null,
+      "en": "No",
+      "zh-Hans": "否"
     }
   ]
 }

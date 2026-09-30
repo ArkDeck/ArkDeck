@@ -351,6 +351,75 @@
         {"automationId": "settings.storage.retention", "origin": "windows", "role": "text", "name": ["30"]},
         {"automationId": "settings.storage.pinGuarantee", "origin": "windows", "role": "text", "name": ["@settings.storage.pinGuarantee"]}
       ]
+    },
+    {
+      "id": "sessions.targets",
+      "scenario": "targets",
+      "page": "sessions",
+      "steps": [{"select": "sessions.row.session-job-0f77f8c52864d676372962eccb17389c"}],
+      "elements": [
+        {"automationId": "sessions.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.sessions"]},
+        {"automationId": "sessions.refresh", "origin": "windows", "role": "button", "name": ["@settings.common.refresh"]},
+        {"automationId": "sessions.subtitle", "origin": "windows", "role": "text", "name": ["@windows.sessions.subtitle"]},
+        {"automationId": "sessions.cleanup", "origin": "windows", "role": "button", "name": ["@windows.sessions.cleanup"]},
+        {"automationId": "sessions.list", "origin": "windows", "role": "list", "name": ["@windows.navigation.sessions"]},
+        {"automationId": "sessions.row.session-job-0f77f8c52864d676372962eccb17389c", "origin": "windows", "role": "listItem", "name": ["session-job-0f77f8c52864d676372962eccb17389c, ", {"format": "windows.bytes", "args": ["13586"]}, " · 2026-09-14T00:00:00Z"]},
+        {"automationId": "sessions.row.session-job-efd52ab9c633074171a19ddd916fffd9", "origin": "windows", "role": "listItem", "name": ["session-job-efd52ab9c633074171a19ddd916fffd9, ", {"format": "windows.bytes", "args": ["7013"]}, " · 2026-09-14T00:00:00Z"]},
+        {"automationId": "sessions.detail.title", "origin": "windows", "role": "text", "name": ["session-job-0f77f8c52864d676372962eccb17389c"]},
+        {"automationId": "sessions.detail.expires", "origin": "windows", "role": "text", "name": ["2026-12-13T00:00:00Z"]},
+        {"automationId": "sessions.detail.pinned", "origin": "windows", "role": "text", "name": ["@windows.sessions.pinnedNo"]},
+        {"automationId": "sessions.detail.generation", "origin": "windows", "role": "text", "name": ["2"]},
+        {"automationId": "sessions.pin", "origin": "windows", "role": "button", "name": ["@windows.sessions.pin"]},
+        {"automationId": "sessions.export", "origin": "windows", "role": "button", "name": ["@windows.sessions.export"]}
+      ]
+    },
+    {
+      "id": "sessions.foundation",
+      "scenario": "foundation",
+      "page": "sessions",
+      "elements": [
+        {"automationId": "sessions.unavailable", "origin": "windows", "role": "text", "name": ["@windows.sessions.unavailable"]},
+        {"automationId": "sessions.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "Session owner is not configured"]}]},
+        {"automationId": "sessions.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck session list"]}]},
+        {"automationId": "sessions.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]}
+      ]
+    },
+    {
+      "id": "jobInspector.queued",
+      "scenario": "jobs",
+      "page": "overview",
+      "steps": [{"select": "jobInspector.row.job-0000000000000000000000000000a004"}],
+      "elements": [
+        {"automationId": "jobInspector.openRecord", "origin": "macos", "role": "button", "name": ["@jobInspector.action.openRecord"]},
+        {"automationId": "jobInspector.cancel", "origin": "macos", "role": "button", "name": ["@jobInspector.action.cancel"]},
+        {"automationId": "jobInspector.state", "origin": "windows", "role": "text", "name": ["@job.state.queued"], "live": "assertive"}
+      ]
+    },
+    {
+      "id": "jobInspector.terminal",
+      "scenario": "jobs",
+      "page": "overview",
+      "steps": [{"select": "jobInspector.row.job-0000000000000000000000000000a003"}],
+      "elements": [
+        {"automationId": "jobInspector.openRecord", "origin": "macos", "role": "button", "name": ["@jobInspector.action.openRecord"]},
+        {"automationId": "jobInspector.result", "origin": "windows", "role": "text", "name": ["@windows.jobInspector.result"]},
+        {"automationId": "jobInspector.result.artifacts", "origin": "windows", "role": "text", "name": [{"format": "windows.jobInspector.result.artifacts", "args": ["2", "2", "0"]}]}
+      ]
+    },
+    {
+      "id": "history.jobs.evidence",
+      "scenario": "jobs",
+      "page": "history",
+      "steps": [{"select": "history.row.job-0000000000000000000000000000a003"}],
+      "elements": [
+        {"automationId": "history.detail.evidence", "origin": "windows", "role": "text", "name": ["@history.detail.evidence"]},
+        {"automationId": "history.evidence.status", "origin": "windows", "role": "text", "name": ["verified"]},
+        {"automationId": "history.evidence.provider.label", "origin": "macos", "role": "text", "name": ["@history.evidence.provider"]},
+        {"automationId": "history.evidence.provider", "origin": "macos", "role": "text", "name": ["hdc"]},
+        {"automationId": "history.evidence.authority", "origin": "macos", "role": "text", "name": ["defaultReadOnlyPolicy"]},
+        {"automationId": "history.evidence.terminalState", "origin": "macos", "role": "text", "name": ["@history.state.succeeded"]},
+        {"automationId": "history.evidence.steps", "origin": "macos", "role": "text", "name": ["probeHostTool · probeHDCServer · probeDevice"]}
+      ]
     }
   ]
 }

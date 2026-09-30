@@ -131,6 +131,8 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
             if (value is not null) _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
         }
 
+        Evidence(state.Evidence);
+
         _detail.Children.Add(Ui.Heading("history.detail.artifacts", S.Text(UiStrings.HistoryDetailArtifacts), AutomationHeadingLevel.Level3));
         if (state.Artifacts.Unavailable is { } artifactsWhy)
         {
@@ -156,6 +158,55 @@ public sealed partial class HistoryPage() : SurfacePage<HistoryState>(
         {
             _detail.Children.Add(Ui.Text("history.artifacts.traceViewerDeferred", S.Text(UiStrings.WindowsTraceViewerDeferred), "ArkDeckCaptionStyle"));
         }
+    }
+
+    /// <summary>The macOS History evidence section (<c>job.evidence</c>): the Runtime's record
+    /// of what ran and under which authority, the steps it reports and its blockers.</summary>
+    private void Evidence(Loaded<JobEvidenceFacts> loaded)
+    {
+        _detail.Children.Add(Ui.Heading("history.detail.evidence", S.Text(UiStrings.HistoryDetailEvidence), AutomationHeadingLevel.Level3));
+        if (loaded.Unavailable is { } why)
+        {
+            _detail.Children.Add(Ui.UnavailableNotice("history.evidence.unavailable", UiStrings.WindowsHistoryEvidenceUnavailable, why));
+            return;
+        }
+        var e = loaded.Value!;
+        var none = "—";
+        foreach (var (id, key, value) in new (string, string, string)[]
+                 {
+                     ("history.evidence.status", UiStrings.WindowsHistoryEvidenceStatus, e.Status),
+                     ("history.evidence.provider", UiStrings.HistoryEvidenceProvider, e.ProviderId),
+                     ("history.evidence.catalog", UiStrings.HistoryEvidenceCatalog, e.CatalogDigest),
+                     ("history.evidence.binding", UiStrings.HistoryEvidenceBinding, e.BindingRevision?.ToString(CultureInfo.InvariantCulture) ?? none),
+                     ("history.evidence.authority", UiStrings.HistoryEvidenceAuthority, e.AuthorityKind ?? none),
+                     ("history.evidence.authorityReference", UiStrings.HistoryEvidenceAuthorityReference, e.AuthorityReference ?? none),
+                     ("history.evidence.terminalState", UiStrings.HistoryEvidenceTerminalState, e.TerminalState is { } t ? Ui.JobState("history.state.", t) : none),
+                     ("history.evidence.mode", UiStrings.HistoryEvidenceMode, e.ExecutionMode),
+                     ("history.evidence.effect", UiStrings.HistoryEvidenceEffect, e.ActualEffect ?? none),
+                     ("history.evidence.firstEvidence", UiStrings.HistoryEvidenceFirstEvidence, e.FirstEvidenceStepAtUtc ?? none),
+                 })
+        {
+            _detail.Children.Add(Ui.Fact(id, S.Text(key), value));
+        }
+        if (e.ActualStepKinds is null)
+        {
+            _detail.Children.Add(Ui.Text("history.evidence.steps.unreported", S.Text(UiStrings.HistoryValueNotReported), "ArkDeckCaptionStyle"));
+        }
+        else if (e.ActualStepKinds.Count > 0)
+        {
+            _detail.Children.Add(Ui.Text("history.evidence.steps", string.Join(" · ", e.ActualStepKinds), "ArkDeckMonoStyle"));
+        }
+        foreach (var blocker in e.Blockers.Concat(e.MissingRequiredArtifacts))
+        {
+            _detail.Children.Add(Ui.Text("history.evidence.blocker." + blocker, blocker, "ArkDeckMonoStyle"));
+        }
+    }
+
+    /// <summary>Opens one Job's record (the Job Inspector's "Open this record").</summary>
+    public async Task OpenAsync(string jobId)
+    {
+        _selected = jobId;
+        await RefreshAsync();
     }
 
     /// <summary>One Artifact as the macOS History row shows it: name and status, role-free
