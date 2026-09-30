@@ -1,27 +1,31 @@
 //! The Windows daemon's Artifact read and export owner (TASK-XPA-006), as
-//! the real daemon composes it over an isolated development root, holding a
-//! Job's Artifacts recorded by the macOS Runtime
-//! (`rust/tests/fixtures/agent-execution/artifacts/job-73b1…`):
+//! the real daemon composes it over an isolated development root beside its
+//! Job store, holding a Job recorded by the macOS Runtime
+//! (`rust/tests/fixtures/agent-execution`, `job-73b1…`): its Artifacts in the
+//! root's `artifacts`, and the Job itself recorded into `jobs-state` by the
+//! Job store owner before the daemon starts (admitted and advanced to its
+//! recorded version, its Journal beside it), as nothing admits a Job on
+//! Windows yet:
 //!
-//! * over its pipe, with a plain pipe handle (no signer needed): the owner
-//!   is composed over the root's `artifacts`; `artifact.list`, `inspect`,
-//!   `read` and `export` are answered by it, and each is refused
-//!   `operationUnavailable` (phase `artifactOwner`, no new dispatch) because
-//!   the Windows composition does not yet ask its Job owner to prove the
-//!   Artifact's Job — so nothing is read, listed, staged or exported, and
-//!   the Artifact store and the destination stay byte for byte as they were.
-//!   An `artifacts` directory that is not owner-only refuses the start (it is
+//! * over its pipe, with a plain pipe handle (no signer needed): the Job
+//!   owner proves the Artifacts' Job, and `artifact.list`, `inspect` and
+//!   `read` answer exactly what the owner answers in process (a list's
+//!   snapshot revision is fresh on every read), before and after a restart;
+//!   `artifact.export` publishes the recorded bytes under the Artifact's
+//!   name. A Job the Job owner does not hold is refused before anything is
+//!   read (`resourceNotFound`, phase `artifactOwner`, no new dispatch), and
+//!   the recorded Job's Artifacts stay byte for byte as they were. An
+//!   `artifacts` directory that is not owner-only refuses the start (it is
 //!   never re-permissioned);
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
-//!   `rust/scripts/check-readonly.py` signs one): the same four commands and
-//!   the same refusals, with the CLI verifying the daemon's image and signer.
-//!   Without that variable this test says so and checks nothing.
+//!   `rust/scripts/check-readonly.py` signs one): `artifact list`, `inspect`,
+//!   `read` and `export` answer the same, with the CLI verifying the
+//!   daemon's image and signer. Without that variable this test says so and
+//!   checks nothing.
 //!
 //! The recorded bytes and digests themselves, and every export refusal, are
-//! proved at the owner (`arkdeck-hoststore/tests/windows_artifact_owners.rs`);
-//! the whole round trip through this daemon follows once its Job owner
-//! proves an Artifact's Job on Windows.
+//! proved at the owner (`arkdeck-hoststore/tests/windows_artifact_owners.rs`).
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
 //! its development root, a fresh directory below the temporary directory:
@@ -30,6 +34,7 @@
 //! ended by this test if it outlives a failed assertion.
 #![cfg(windows)]
 
+use arkdeck_hoststore::{AdmissionVerdict, ArtifactReadStore, JobRecord, JobStore};
 use arkdeck_platform::{HostDirectory, StateRoot};
 use serde_json::{Value, json};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -49,11 +54,15 @@ fn turn() -> MutexGuard<'static, ()> {
 const DEADLINE: Duration = Duration::from_secs(60);
 const JOB: &str = "job-73b1cb9a96d12a0ea736a065afdf5abd";
 const ARTIFACT: &str = "ART-5ab8ddce1b835cb95173c1a4b08a7e5d";
+/// A Job no owner holds.
+const ABSENT: &str = "job-00000000000000000000000000000000";
+
+fn fixture() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/agent-execution")
+}
 
 fn recorded() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/fixtures/agent-execution/artifacts")
-        .join(JOB)
+    fixture().join("artifacts").join(JOB)
 }
 
 /// A fresh development root, removed afterwards.
@@ -76,8 +85,41 @@ impl Root {
         self.0.join("artifacts")
     }
     /// The recorded Job's Artifacts as the macOS Runtime published them: a
-    /// private Artifact root, the index owner-only, each payload sealed.
+    /// private Artifact root, the index owner-only, each payload sealed; and
+    /// the Job, recorded by the Job store owner into a private `jobs-state`:
+    /// admitted and advanced to its recorded version, its Journal beside it.
     fn with_recorded_job(self) -> Self {
+        let state = self.0.join("jobs-state");
+        HostDirectory::open_or_create_private(&state).unwrap();
+        let store = JobStore::open_owner(&state).unwrap();
+        let index: Value =
+            serde_json::from_slice(&std::fs::read(fixture().join("store/index.json")).unwrap())
+                .unwrap();
+        let row = index["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["jobId"] == JOB)
+            .unwrap();
+        let directory = fixture().join("store/jobs").join(JOB);
+        let record =
+            JobRecord::decode(&std::fs::read(directory.join("job-record.json")).unwrap()).unwrap();
+        assert_eq!(
+            store
+                .admit(&record, row["requestHash"].as_str().unwrap())
+                .unwrap(),
+            AdmissionVerdict::Admitted
+        );
+        for _ in 1..row["version"].as_i64().unwrap() {
+            store
+                .persist(&record, row["updatedAtUTC"].as_str().unwrap())
+                .unwrap();
+        }
+        std::fs::copy(
+            directory.join("journal.jsonl"),
+            state.join("jobs").join(JOB).join("journal.jsonl"),
+        )
+        .unwrap();
         let root = HostDirectory::open_or_create_private(&self.artifacts()).unwrap();
         let job = root.create_private_child(JOB).unwrap();
         for entry in std::fs::read_dir(recorded()).unwrap() {
@@ -280,48 +322,119 @@ fn owner() -> Value {
     json!({"kind": "job", "id": JOB})
 }
 
+/// Every recorded Artifact's `artifact.list`, `inspect` and `read` (sensitive
+/// ones allowed), as their method, parameters and what the Artifact owner
+/// answers in process over this root, with the Job proved.
+fn expected_reads(root: &Root) -> Vec<(&'static str, Value, Value)> {
+    let store = ArtifactReadStore::open(&root.artifacts()).unwrap();
+    let index: Value =
+        serde_json::from_slice(&std::fs::read(recorded().join("index.json")).unwrap()).unwrap();
+    let mut reads = vec![("artifact.list", json!({"owner": owner()}))];
+    for row in index["artifacts"].as_array().unwrap() {
+        let id = row["artifactID"].as_str().unwrap();
+        reads.push((
+            "artifact.inspect",
+            json!({"owner": owner(), "artifactId": id}),
+        ));
+        reads.push((
+            "artifact.read",
+            json!({"owner": owner(), "artifactId": id, "allowSensitive": true}),
+        ));
+    }
+    reads
+        .into_iter()
+        .map(|(method, params)| {
+            let map = params.as_object().unwrap();
+            let answer = if method == "artifact.list" {
+                store.handle_list(map, |_| Ok(()))
+            } else {
+                store.handle_resource(method, map, |_| Ok(()))
+            }
+            .unwrap_or_else(|error| panic!("{method} {params}: {}", error.message));
+            arkdeck_contract::validate_method_value(method, "result", &answer).unwrap();
+            (method, params, labelled(answer))
+        })
+        .collect()
+}
+
+/// An answer with its snapshot revision as a label: fresh on every list.
+fn labelled(mut answer: Value) -> Value {
+    if answer["snapshotRevision"].is_string() {
+        answer["snapshotRevision"] = json!("<revision>");
+    }
+    answer
+}
+
+/// Every recorded read answered over the pipe as the owner answers it.
+fn assert_reads(pipe: &str, expected: &[(&'static str, Value, Value)]) {
+    for (method, params, answer) in expected {
+        let reply = request(pipe, method, params.clone());
+        assert_eq!(reply["ok"], true, "{method} {params}: {reply}");
+        assert_eq!(
+            &labelled(reply["result"].clone()),
+            answer,
+            "{method} {params}"
+        );
+    }
+}
+
 #[test]
-fn the_artifact_owner_is_composed_and_refuses_every_job_artifact_without_a_job_owner() {
+fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart() {
     let _turn = turn();
     let root = Root::new().with_recorded_job();
     let exports = root.exports();
-    let before = Root::tree(&root.artifacts());
+    let job_artifacts = Root::tree(&root.artifacts().join(JOB));
+    let expected = expected_reads(&root);
     let executable = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd"));
 
     let mut daemon = Daemon::start(executable, &root.0);
     let pipe = daemon.serving();
     assert!(
-        daemon.seen.iter().any(|line| line.starts_with(&format!(
-            "arkdeck-agentd composes the Artifact owner over {}",
-            root.artifacts().display()
-        ))),
+        daemon.seen.contains(
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects".to_owned()
+        ),
         "{:?}",
         daemon.seen
     );
-    let unavailable = |method: &str, params: Value| {
-        let reply = refused(&pipe, method, params, "operationUnavailable");
-        assert_eq!(
-            reply["error"],
-            json!({"code": "operationUnavailable",
-                "message": "Artifact Job owner is unavailable",
-                "details": {"phase": "artifactOwner", "newDispatchCount": 0}}),
-            "{method}: {reply}"
-        );
-    };
-    unavailable("artifact.list", json!({"owner": owner()}));
-    unavailable(
-        "artifact.inspect",
-        json!({"owner": owner(), "artifactId": ARTIFACT}),
-    );
-    unavailable(
-        "artifact.read",
-        json!({"owner": owner(), "artifactId": ARTIFACT, "allowSensitive": true}),
-    );
-    unavailable(
+    assert_reads(&pipe, &expected);
+    // The export publishes the recorded bytes under the Artifact's name.
+    let reply = request(
+        &pipe,
         "artifact.export",
         json!({"owner": owner(), "artifactId": ARTIFACT,
             "destinationDirectory": exports.to_str().unwrap()}),
     );
+    assert_eq!(reply["ok"], true, "{reply}");
+    let receipt = &reply["result"];
+    arkdeck_contract::validate_method_value("artifact.export", "result", receipt).unwrap();
+    let bytes = std::fs::read(recorded().join(ARTIFACT)).unwrap();
+    let file = exports.join(format!("{ARTIFACT}-tool-facts.json"));
+    assert_eq!(receipt["exportedPath"], file.to_str().unwrap(), "{receipt}");
+    assert_eq!(
+        receipt["artifactDigest"],
+        arkdeck_contract::sha256_hex(&bytes)
+    );
+    assert_eq!(std::fs::read(&file).unwrap(), bytes);
+    // A Job the Job owner does not hold is refused before anything is read.
+    for (method, params) in [
+        (
+            "artifact.list",
+            json!({"owner": {"kind": "job", "id": ABSENT}}),
+        ),
+        (
+            "artifact.inspect",
+            json!({"owner": {"kind": "job", "id": ABSENT}, "artifactId": ARTIFACT}),
+        ),
+    ] {
+        let reply = refused(&pipe, method, params, "resourceNotFound");
+        assert_eq!(
+            reply["error"],
+            json!({"code": "resourceNotFound",
+                "message": "Artifact Job owner does not exist",
+                "details": {"phase": "artifactOwner", "newDispatchCount": 0}}),
+            "{method}: {reply}"
+        );
+    }
     // A destination that is not a local drive's absolute path is refused as
     // the request is read, before the Job is asked for.
     let reply = refused(
@@ -341,12 +454,17 @@ fn the_artifact_owner_is_composed_and_refuses_every_job_artifact_without_a_job_o
         "operationUnavailable",
     );
     daemon.stop(&root.0);
+
+    // After a restart the same answers.
+    let mut daemon = Daemon::start(executable, &root.0);
+    let pipe = daemon.serving();
+    assert_reads(&pipe, &expected);
+    daemon.stop(&root.0);
     assert_eq!(
-        Root::tree(&root.artifacts()),
-        before,
-        "nothing was read into, listed into or written below the Artifact store"
+        Root::tree(&root.artifacts().join(JOB)),
+        job_artifacts,
+        "the recorded Job's Artifacts are as they were"
     );
-    assert!(Root::tree(&exports).is_empty(), "nothing was exported");
 }
 
 #[test]
@@ -441,7 +559,8 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     let _turn = turn();
     let root = Root::new().with_recorded_job();
     let exports = root.exports();
-    let before = Root::tree(&root.artifacts());
+    let job_artifacts = Root::tree(&root.artifacts().join(JOB));
+    let expected = expected_reads(&root);
     let signed = root.0.join("signed-bin");
     std::fs::create_dir(&signed).unwrap();
     let daemon = signed.join("arkdeck-agentd.exe");
@@ -465,20 +584,34 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
 
     let mut running = Daemon::start(&daemon, &root.0);
     let pipe = running.serving();
+    for (method, params, answer) in &expected {
+        let mut arguments = vec![
+            "artifact".to_owned(),
+            method.trim_start_matches("artifact.").to_owned(),
+            "--job".to_owned(),
+            JOB.to_owned(),
+        ];
+        if let Some(id) = params["artifactId"].as_str() {
+            arguments.extend(["--artifact".to_owned(), id.to_owned()]);
+        }
+        if *method == "artifact.read" {
+            arguments.push("--allow-sensitive".to_owned());
+        }
+        let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
+        assert_eq!(status, Some(0), "{arguments:?}: {envelope}");
+        assert_eq!(
+            &labelled(envelope["result"].clone()),
+            answer,
+            "{arguments:?}"
+        );
+    }
     let exports_text = exports.to_str().unwrap().to_owned();
-    for arguments in [
-        vec!["artifact", "list", "--job", JOB],
-        vec!["artifact", "inspect", "--job", JOB, "--artifact", ARTIFACT],
-        vec![
-            "artifact",
-            "read",
-            "--job",
-            JOB,
-            "--artifact",
-            ARTIFACT,
-            "--allow-sensitive",
-        ],
-        vec![
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
             "artifact",
             "export",
             "--job",
@@ -488,21 +621,18 @@ fn gj1_artifact_commands_run_through_the_cli_against_a_dev_signed_daemon() {
             "--destination",
             &exports_text,
         ],
-    ] {
-        let (status, envelope) = cli(&daemon, &pin, &pipe, &arguments);
-        assert_eq!(status, Some(69), "{arguments:?}: {envelope}");
-        assert_eq!(
-            envelope["error"]["code"], "operationUnavailable",
-            "{arguments:?}: {envelope}"
-        );
-        // The daemon's refusal, not the CLI's own (a daemon it could not
-        // verify or reach is refused otherwise).
-        assert_eq!(
-            envelope["error"]["message"], "Artifact Job owner is unavailable",
-            "{arguments:?}: {envelope}"
-        );
-    }
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    let file = exports.join(format!("{ARTIFACT}-tool-facts.json"));
+    assert_eq!(
+        envelope["result"]["exportedPath"],
+        file.to_str().unwrap(),
+        "{envelope}"
+    );
+    assert_eq!(
+        std::fs::read(&file).unwrap(),
+        std::fs::read(recorded().join(ARTIFACT)).unwrap()
+    );
     running.stop(&root.0);
-    assert_eq!(Root::tree(&root.artifacts()), before);
-    assert!(Root::tree(&exports).is_empty(), "nothing was exported");
+    assert_eq!(Root::tree(&root.artifacts().join(JOB)), job_artifacts);
 }

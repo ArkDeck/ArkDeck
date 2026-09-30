@@ -128,11 +128,8 @@ impl Authority {
     ///   root's `artifacts` (the name the macOS isolated owner and production
     ///   composition both give it): the same Job index documents, payloads
     ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
-    ///   belongs to a Job, which the Job owner proves before anything is
-    ///   read, listed or exported; this composition does not yet ask the Job
-    ///   owner to prove it, so `artifact.list`, `inspect`, `read` and
-    ///   `export` are refused and read and write nothing, as the macOS
-    ///   daemon answers without a Job owner;
+    ///   belongs to a Job, which the Job store above proves before anything
+    ///   is read, listed or exported;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -184,11 +181,6 @@ impl Authority {
                 path.display()
             )
         })?;
-        report(&format!(
-            "arkdeck-agentd composes the Artifact owner over {}; the Job owner does not prove an \
-             Artifact's Job on Windows yet, so every Job's Artifact is refused before it is read",
-            path.display()
-        ));
         let host = host.with_artifacts(artifacts);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {

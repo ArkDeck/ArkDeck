@@ -2245,16 +2245,17 @@ The Windows daemon composes the owner over its root's `artifacts` (the
 development root and the account's `%LOCALAPPDATA%\ArkDeck\Agentd` alike),
 created owner-only when absent and never re-permissioned: an existing
 `artifacts` that is not owner-only refuses the start. Every Artifact belongs to
-a Job, which the Job owner proves before anything is read, listed or exported;
-the Windows daemon composes a Job owner but does not yet ask it to prove an
-Artifact's Job, so `artifact list`, `inspect`, `read`
-and `export` answer `operationUnavailable` ("Artifact Job owner is
-unavailable") and touch nothing, as the macOS daemon answers without a Job
-owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
+a Job, which the daemon's Job store (`jobs-state`, "Job store owner on
+Windows" above) proves before anything is read, listed or exported; a Job it
+does not hold is refused `resourceNotFound` ("Artifact Job owner does not
+exist") and nothing is touched. `tests/windows_artifact_owners.rs`
+(hoststore) reads and exports the
 macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
 recorded bytes and digests and reproduces the Swift daemon's recorded
 `artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
-(agentd) runs the real daemon over its pipe and, with
+(agentd) records the Job into the daemon's Job store, answers `artifact list`,
+`inspect`, `read` and `export` over the real daemon's pipe before and after a
+restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.

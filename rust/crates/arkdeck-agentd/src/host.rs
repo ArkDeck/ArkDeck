@@ -800,21 +800,13 @@ impl Host {
             agents.finish(&start, &jobs);
         });
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
         self.jobs
             .as_ref()
             .ok_or_else(job_owner_not_configured)?
             .read_snapshot(job_id)
             .map(|_| ())
-    }
-    /// The Windows daemon does not ask its Job owner to prove an Artifact's
-    /// Job yet, so every Artifact a Job owns is refused as the macOS daemon
-    /// refuses it without a Job owner: before any Artifact is read, listed
-    /// or exported.
-    #[cfg(windows)]
-    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
-        Err(job_owner_not_configured())
     }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
