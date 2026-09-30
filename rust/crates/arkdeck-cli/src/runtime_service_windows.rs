@@ -627,9 +627,11 @@ pub fn restart_leaf(
             .health(id)
             .map_err(|error| PlainFailure::new(1, error.to_string()))?;
         let digest_before = health_catalog_digest(&health)?;
-        let instance_before = before
+        // Read after `health`: a daemon publishes its instance document
+        // after its pipe exists and before it serves, so only a daemon that
+        // answered is sure to have published it.
+        let instance_before = inspect(target)
             .instance
-            .clone()
             .filter(|instance| instance["pid"] == json!(pid_before))
             .ok_or_else(|| {
                 PlainFailure::new(

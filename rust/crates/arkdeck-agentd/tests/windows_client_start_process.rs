@@ -27,11 +27,12 @@ use arkdeck_cli::runtime_service_windows::{self as service, ServiceTarget};
 use arkdeck_client::Client;
 use arkdeck_client::start::{StartRefusal, StartTarget, Started, ensure_running};
 use arkdeck_platform::{
-    GuardAcquisition, GuardObject, InstanceScope, LocalConnection, ServerIdentity, StateRoot,
-    pipe_present,
+    GuardAcquisition, GuardObject, InstanceScope, LocalConnection, LocalEndpoint, ServerIdentity,
+    StateRoot, await_pipe_instance, pipe_present,
 };
 use serde_json::{Map, Value};
 use std::ffi::OsString;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
@@ -56,6 +57,57 @@ impl Directory {
     fn instance(&self) -> Value {
         serde_json::from_slice(&std::fs::read(self.0.join("instance.json")).unwrap()).unwrap()
     }
+
+    /// The instance document once the daemon on `endpoint` serves. A daemon
+    /// opens its pipe before it publishes `instance.json` and serves only
+    /// after publishing it, so a client start (which returns once the pipe
+    /// exists and its server's identity was checked) says nothing about the
+    /// document; a `health` answer on the pipe does. The probe is a plain
+    /// pipe handle, as `windows_lifecycle_process.rs` uses: it observes the
+    /// daemon and trusts it with nothing.
+    fn instance_once_serving(&self, endpoint: &LocalEndpoint) -> Value {
+        let answer = health_on(endpoint);
+        assert_eq!(answer["ok"], true, "{answer}");
+        self.instance()
+    }
+}
+
+/// One `health` exchange over a plain handle on `endpoint`, waiting (bounded,
+/// on the kernel's pipe wait) while every instance is busy.
+fn health_on(endpoint: &LocalEndpoint) -> Value {
+    let mut pipe = loop {
+        assert!(
+            await_pipe_instance(endpoint, WAIT).unwrap(),
+            "no instance of {} became free",
+            endpoint.as_path().display()
+        );
+        match std::fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(endpoint.as_path())
+        {
+            Ok(pipe) => break pipe,
+            // Another client took the instance offered meanwhile.
+            Err(error) if error.raw_os_error() == Some(231) => {}
+            Err(error) => panic!("{error}"),
+        }
+    };
+    let request = serde_json::json!({
+        "protocolVersion": arkdeck_contract::PROTOCOL_VERSION,
+        "contractIdentity": arkdeck_contract::CONTRACT_IDENTITY,
+        "id": "readiness",
+        "method": "health",
+    });
+    let mut frame = serde_json::to_vec(&request).unwrap();
+    frame.push(b'\n');
+    pipe.write_all(&frame).unwrap();
+    let mut reply = Vec::new();
+    let mut byte = [0u8; 1];
+    while byte[0] != b'\n' {
+        assert_eq!(pipe.read(&mut byte).unwrap(), 1, "the reply ended early");
+        reply.push(byte[0]);
+    }
+    serde_json::from_slice(&reply).unwrap()
 }
 impl Drop for Directory {
     /// A daemon a failed assertion left serving this root is asked to stop
@@ -154,7 +206,7 @@ fn a_started_daemon_that_fails_its_identity_is_reported_and_not_trusted() {
     );
     // It is the daemon this client started, serving the root's pipe; it is
     // left to its own stop request, never used.
-    assert_eq!(root.instance()["pid"], pid);
+    assert_eq!(root.instance_once_serving(&target.endpoint)["pid"], pid);
     assert!(pipe_present(&target.endpoint).unwrap());
     assert!(LocalConnection::connect(&target.endpoint, &target.identity).is_err());
     assert!(stop(&root.0, pid), "a clean drain");
@@ -248,7 +300,7 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
     let Started::Launched { pid: first } = ensure_running(&target, WAIT).unwrap() else {
         panic!("the absent daemon was not launched");
     };
-    assert_eq!(root.instance()["pid"], first);
+    assert_eq!(root.instance_once_serving(&target.endpoint)["pid"], first);
     assert_eq!(
         ensure_running(&target, WAIT).unwrap(),
         Started::AlreadyServing
@@ -338,7 +390,10 @@ fn a_signed_daemon_is_started_once_verified_restarted_and_started_once_by_concur
         })
         .collect();
     assert_eq!(launched.len(), 1, "{outcomes:?}");
-    assert_eq!(root.instance()["pid"], launched[0]);
+    assert_eq!(
+        root.instance_once_serving(&target.endpoint)["pid"],
+        launched[0]
+    );
     assert!(
         outcomes
             .iter()
