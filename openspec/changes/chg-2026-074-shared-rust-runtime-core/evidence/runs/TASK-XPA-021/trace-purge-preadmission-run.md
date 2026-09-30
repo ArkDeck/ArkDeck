@@ -103,4 +103,22 @@ decides.
 
 ## CI
 
-To be recorded, not verified.
+The first head (`300c1448`) was red on `windows-clientkit` at "ClientKit
+generated contract bindings". The contract change moved `trace.cache.purge`'s
+schema digest, so the checked-in ClientKit bindings (#2355, merged meanwhile)
+were stale. The follow-up merges `origin/main` and regenerates them with
+`windows/scripts/generate-clientkit.py --write`. The one change is that
+method's digest in `windows/ClientKit/Generated/ControlContract.g.cs`; the
+CRLF output was normalised to LF.
+
+Checks after the fix:
+
+- `generate-clientkit.py --check`: matches its inputs (105 methods).
+- `generate-contract.py --check`: pass.
+- `dotnet build windows/ArkDeck.Windows.slnx -c Release`: 0 warnings, 0 errors.
+- `dotnet test`: 31 passed, 1 skipped, 0 failed.
+- `cargo fmt --check`: pass.
+- clippy of the changed crates: exit 0.
+- `client_failure_mapping`: 9 passed.
+
+The rest of CI is still to be recorded.
