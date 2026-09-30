@@ -47,6 +47,8 @@ const BUNDLE: [&str; 3] = [
 const CENSUS: &str = "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, \
      artifacts, imports, storage, workspaceProjects, planning, agentExecutions, humanActions, \
      traceCache";
+/// The Flash lane's owners (TASK-XPA-010), after the helper in the census.
+const FLASH: &str = "flashHostFacts, deviceAccess";
 
 /// The checked-in helper resource, the one both packages ship.
 fn resource() -> PathBuf {
@@ -275,7 +277,11 @@ fn the_bundled_helper_is_verified_composed_and_waits_behind_the_hdc_gate() {
     let bytes = std::fs::read(resource()).unwrap();
     let (_directory, executable) = installed(Some(&bytes));
     let (seen, census, deployment) = started(&executable);
-    assert_eq!(census, format!("{CENSUS}, codeSignHelper"), "{seen:?}");
+    assert_eq!(
+        census,
+        format!("{CENSUS}, codeSignHelper, {FLASH}"),
+        "{seen:?}"
+    );
     assert!(
         !seen
             .iter()
@@ -307,7 +313,7 @@ fn a_helper_that_does_not_verify_is_reported_and_the_daemon_serves_without_it() 
                 .any(|line| line.starts_with("native deployment stays unavailable: ")),
             "{name}: {seen:?}"
         );
-        assert_eq!(census, CENSUS, "{name}");
+        assert_eq!(census, format!("{CENSUS}, {FLASH}"), "{name}");
         assert_eq!(
             deployment["reasonCodes"],
             json!(["provider_not_registered"]),
@@ -323,7 +329,7 @@ fn a_helper_that_does_not_verify_is_reported_and_the_daemon_serves_without_it() 
             .any(|line| line.starts_with("native deployment")),
         "{seen:?}"
     );
-    assert_eq!(census, CENSUS);
+    assert_eq!(census, format!("{CENSUS}, {FLASH}"));
 }
 
 #[test]
