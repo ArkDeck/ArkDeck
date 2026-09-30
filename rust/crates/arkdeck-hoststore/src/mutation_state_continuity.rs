@@ -800,7 +800,12 @@ mod tests {
         base: PathBuf,
         root: PathBuf,
         jobs: JobStore,
+        /// Dropped last, once the Job store has closed its index: NTFS
+        /// removes no directory holding a file still open.
+        _removed: Removed,
     }
+    /// The fixture's directory, removed when dropped.
+    struct Removed(PathBuf);
     impl Fixture {
         fn new() -> Self {
             let id = arkdeck_contract::sha256_hex(&arkdeck_platform::random_bytes::<16>().unwrap());
@@ -809,7 +814,12 @@ mod tests {
             let root = base.join("Runtime");
             create_private_directories(&root);
             let jobs = JobStore::open_owner(&root).unwrap();
-            Self { base, root, jobs }
+            Self {
+                _removed: Removed(base.clone()),
+                base,
+                root,
+                jobs,
+            }
         }
         fn check(&self) -> Result<(), WireError> {
             self.jobs.require_mutation_state(&self.root, &[])
@@ -830,9 +840,9 @@ mod tests {
             owner_only_file(&path);
         }
     }
-    impl Drop for Fixture {
+    impl Drop for Removed {
         fn drop(&mut self) {
-            let _ = std::fs::remove_dir_all(&self.base);
+            let _ = std::fs::remove_dir_all(&self.0);
         }
     }
 
