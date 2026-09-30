@@ -28,6 +28,12 @@ serde_json.workspace = true
 name = "windows_tool_dispatch"
 harness = false
 
+# The fake signer of the Windows PTY exchange tests is this binary itself,
+# attached to the pseudo console the exchange creates.
+[[test]]
+name = "windows_pty_exchange"
+harness = false
+
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
 
