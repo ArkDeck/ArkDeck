@@ -649,8 +649,9 @@ mod tests {
 /// other: each test stops one side at a hook, lets the other run into it, and
 /// requires both to finish. A wait that does not end is a lock cycle, which
 /// never ends by itself: the process is aborted rather than left hanging.
-// Over the mutation authority and capability store, which are macOS-only.
-#[cfg(all(test, target_os = "macos"))]
+// Over the mutation authority and the capability store, on macOS and
+// Windows.
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod lock_order_tests {
     use super::*;
     use crate::{

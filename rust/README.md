@@ -1092,9 +1092,8 @@ left on the host is read for publication by `landed_file_bytes` (on Windows
 measured before and after through `measure_host_file`, no reparse point
 followed); the analyzer operations' fixed facts moved to
 `analyzer_operations.rs`, which `analyzer_composition` re-exports on macOS;
-`MutationAuthority` is the same type on Windows, whose proof of the mutation
-state fails closed there (the Job owner's continuity census is not built on
-Windows yet). Still macOS-only, each refused on Windows as a Job this Runtime
+`MutationAuthority` is the same type on Windows (its proof, the continuity
+census, is built there too: see below). Still macOS-only, each refused on Windows as a Job this Runtime
 does not execute: the analyzer lane (ArkTrace's trace_streamer), the
 workspace lane (`workspace_run.rs`) and the Flash lane (`flash_run.rs`,
 AF-W1); a Flash Job's recovery epoch is not read on Windows, and such a Job
@@ -1109,10 +1108,9 @@ the Session owner section) and `operation.list` (the HDC and analyzer operations
 No HDC provider is composed until the Windows HDC tuple is registered, so a
 device Job is refused before its run with zero dispatch; a queued Job is
 cancelled at once and its Session published. The census reads
-`jobs, capabilities, targets, artifacts, storage, workspaceProjects,
-planning, traceCache` over a development root (the account's daemon composes
-no Trace cache), the macOS census's order. The start's Artifact retention
-sweep stays macOS-only for now.
+`jobs, capabilities, mutationAuthority, targets, artifacts, storage,
+workspaceProjects, planning, traceCache` over a development root (the
+account's daemon composes no Trace cache), the macOS census's order.
 
 Tests on Windows: `arkdeck-hoststore/tests/job_recovery.rs` (the five macOS
 restart and recovery cases), `tests/windows_job_runner.rs` (the recorded
@@ -1122,6 +1120,48 @@ without an HDC refused), and `arkdeck-agentd/tests/windows_job_runner_process.rs
 (the same through the real daemon across a restart, and with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck job run|cancel|status|result`
 against a dev-signed daemon).
+
+## Mutation authority and Artifact retention sweep on Windows (TASK-XPA-005)
+
+The Job owner's mutation-state continuity census
+(`mutation_state_continuity.rs`, Swift `RuntimeStateContinuity`) builds on
+Windows, so `MutationAuthority::require_state` proves the Runtime's mutation
+state there as on macOS: the Job store is the root the composition names, no
+`AuthorizationUsage` lies beside it, its history is read-only or its
+capability checkpoint exists, and every retained Session under the default
+`Sessions` and the configured Session root replays with no unresolved device
+mutation or torn tail, no link followed (a junction is refused as a symbolic
+link is). A device mutation's admission then preauthorizes against the
+capability store as on macOS (the Runtime-issued standing capability, the
+lineage and envelope checks, the outcome-gap repair); the workspace subject
+(XPA-011) and the Flash lane (AF-W1) stay macOS-only. `capability.list` and
+`capability.inspect` answer from the store.
+
+The Windows daemon names the root a device mutation proves its state against
+(`windows_lifecycle::Authority::mutation_root`): the account's daemon its own
+`jobs-state`, as the production composition names Swift's state directory; a
+development root the account's `%LOCALAPPDATA%\ArkDeck\Agentd\jobs-state`,
+which its own Job store never is, as the macOS standalone and unacknowledged
+isolated owner name the installed root: the proof refuses before anything of
+that root is read. No development authority is composed on Windows (it needs
+a managed HDC server; `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY` still refuses
+the start). No device mutation reaches admission on Windows until the HDC
+tuple is registered.
+
+The start's Artifact retention sweep (`collect_expired_artifacts`) runs on
+Windows as on macOS, after the Job recovery and before serving. The Windows
+daemon tests that lay down recorded Artifacts whose retention lapsed lay them
+down a century later (`unexpired`), since no answer they compare names the
+deadline but as their root holds it.
+
+Tests on Windows: the continuity census's own tests and the Session cleanup's
+lock-order tests (`session_cleanup_owner.rs`), `tests/windows_artifact_retention.rs`
+(the macOS retention census cases over `observe.device@1` Jobs and the
+recorded store), the host's mutation-root test (`host_tests.rs`), and
+`arkdeck-agentd/tests/windows_mutation_retention_process.rs` (the sweep and
+the authority's census through the real daemon across a restart, and with
+`ARKDECK_DEV_SIGNER_THUMBPRINT` through `arkdeck artifact list|quota` and
+`arkdeck capability list` against a dev-signed daemon).
 
 ## Job index and record writers (TASK-XPA-014)
 

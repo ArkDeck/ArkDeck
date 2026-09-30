@@ -70,6 +70,23 @@ fn recorded() -> PathBuf {
     fixture().join("artifacts").join(JOB)
 }
 
+/// A recorded Artifact index with each retention deadline a century later.
+/// The recorded deadlines lapsed long before this run, and the daemon's
+/// start-up retention sweep reclaims a settled Job's lapsed Artifacts, as
+/// Swift's does; no answer compared here names a deadline but as this root
+/// holds it.
+fn unexpired(bytes: &[u8]) -> Vec<u8> {
+    let mut index: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    for row in index["artifacts"].as_array_mut().unwrap() {
+        if let Some(deadline) = row["retention"]["deadlineUTC"].as_str() {
+            let (year, rest) = deadline.split_at(4);
+            let later = format!("{}{rest}", year.parse::<u32>().unwrap() + 100);
+            row["retention"]["deadlineUTC"] = serde_json::json!(later);
+        }
+    }
+    serde_json::to_vec_pretty(&index).unwrap()
+}
+
 /// A fresh development root, removed afterwards.
 struct Root(PathBuf);
 impl Root {
@@ -90,7 +107,8 @@ impl Root {
         self.0.join("artifacts")
     }
     /// The recorded Job's Artifacts as the macOS Runtime published them: a
-    /// private Artifact root, the index owner-only, each payload sealed; and
+    /// private Artifact root, the index owner-only, each payload sealed, the
+    /// retention deadlines a century later (`unexpired`); and
     /// the Job, recorded by the Job store owner into a private `jobs-state`:
     /// admitted and advanced to its recorded version, its Journal beside it.
     fn with_recorded_job(self) -> Self {
@@ -129,8 +147,13 @@ impl Root {
         let job = root.create_private_child(JOB).unwrap();
         for entry in std::fs::read_dir(recorded()).unwrap() {
             let name = entry.unwrap().file_name().into_string().unwrap();
-            job.create_document(&name, &std::fs::read(recorded().join(&name)).unwrap())
-                .unwrap();
+            let bytes = std::fs::read(recorded().join(&name)).unwrap();
+            let bytes = if name == "index.json" {
+                unexpired(&bytes)
+            } else {
+                bytes
+            };
+            job.create_document(&name, &bytes).unwrap();
             if name != "index.json" {
                 job.seal_document(&name).unwrap();
             }
@@ -425,7 +448,7 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     assert_eq!(reply["result"], quota, "{reply}");
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, capabilities, targets, artifacts, storage, workspaceProjects, planning, traceCache"
+            &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, storage, workspaceProjects, planning, traceCache"
                 .to_owned()
         ),
         "{:?}",

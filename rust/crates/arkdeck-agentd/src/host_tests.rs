@@ -63,6 +63,82 @@ mod tests {
         host.authority().unwrap().require_state(&store).unwrap();
         fs::remove_dir_all(&path).unwrap();
     }
+    /// On Windows the root a device mutation proves its state continuity
+    /// against is the one the composition names: a Job store elsewhere is
+    /// never proved against it, the Job store it names is, and the proof
+    /// still refuses there recorded authorization usage beside the root and
+    /// a Session root that is a link (a junction) out of it.
+    #[cfg(windows)]
+    #[test]
+    fn the_mutation_root_is_the_only_root_the_proof_passes_on_windows() {
+        use arkdeck_platform::HostDirectory;
+        use std::fs;
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let temporary = match temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) => std::path::PathBuf::from(plain),
+            None => temporary,
+        };
+        let path = temporary.join(format!("mutation-root-host-{}", fresh_id().unwrap()));
+        HostDirectory::open_or_create_private(&path).unwrap();
+        let jobs = path.join("jobs-state");
+        HostDirectory::open_or_create_private(&jobs).unwrap();
+        let store = arkdeck_hoststore::JobStore::open_owner(&jobs).unwrap();
+        let host = Host::from_environment().with_capabilities(
+            arkdeck_hoststore::CapabilityStore::open(&jobs.join("capabilities")).unwrap(),
+        );
+        // No root named: no authority, and nothing admitted above readOnly.
+        assert!(host.authority().is_none());
+        // Another Runtime's Job state, as a development root names the
+        // account's: never this store.
+        let host = host.with_mutation_root(path.join("elsewhere").join("jobs-state"));
+        assert_eq!(
+            host.authority()
+                .unwrap()
+                .require_state(&store)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        let host = host.with_mutation_root(jobs.clone());
+        assert_eq!(host.authority().unwrap().default_root, jobs);
+        host.authority().unwrap().require_state(&store).unwrap();
+        HostDirectory::open(&path)
+            .unwrap()
+            .create_document("AuthorizationUsage", b"")
+            .unwrap();
+        assert_eq!(
+            host.authority()
+                .unwrap()
+                .require_state(&store)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        fs::remove_file(path.join("AuthorizationUsage")).unwrap();
+        let made = std::process::Command::new("cmd")
+            .args(["/d", "/c", "mklink", "/J"])
+            .arg(path.join("Sessions"))
+            .arg(&temporary)
+            .stdin(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        assert!(made.status.success(), "{made:?}");
+        assert_eq!(
+            host.authority()
+                .unwrap()
+                .require_state(&store)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        fs::remove_dir(path.join("Sessions")).unwrap();
+        host.authority().unwrap().require_state(&store).unwrap();
+        drop(store);
+        fs::remove_dir_all(&path).unwrap();
+    }
     #[cfg(target_os = "macos")]
     #[test]
     fn candidate_name_owner_uses_only_runtime_snapshot_and_advances_cas() {

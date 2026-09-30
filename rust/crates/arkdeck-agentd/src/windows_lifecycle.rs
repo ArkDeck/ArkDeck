@@ -177,6 +177,10 @@ impl Authority {
         let host = host
             .with_jobs(self.job_store()?)
             .with_capabilities(self.capability_store()?);
+        let host = match self.mutation_root() {
+            Some(root) => host.with_mutation_root(root),
+            None => host,
+        };
         let name = if self.development {
             "targets-state"
         } else {
@@ -327,11 +331,37 @@ impl Authority {
         })
     }
 
+    /// The root a device mutation proves the Runtime's state continuity
+    /// against (`MutationAuthority::require_state`), as the macOS daemons
+    /// name it: the installed Runtime's own Job state.
+    /// * The account's daemon is that Runtime: its Job store's own
+    ///   `jobs-state`, spelled as the root resolves it, as the production
+    ///   composition names Swift's state directory.
+    /// * A development root is not: as the macOS standalone and the
+    ///   unacknowledged isolated owner, it names the account's
+    ///   `%LOCALAPPDATA%\ArkDeck\Agentd\jobs-state`, which its own Job store
+    ///   never is, so every device mutation it is asked for is refused before
+    ///   anything of that root is read. Anchoring the proof at a development
+    ///   root needs the acknowledged development authority beside a managed
+    ///   HDC server, which Windows does not compose (the HDC tuple is not
+    ///   registered).
+    ///
+    /// None when the root cannot be named; then no mutation is admitted.
+    fn mutation_root(&self) -> Option<std::path::PathBuf> {
+        if self.development {
+            StateRoot::account_path()
+                .ok()
+                .map(|root| root.join("jobs-state"))
+        } else {
+            self.root.private_child("jobs-state").ok()
+        }
+    }
+
     /// The capability store beside the Job state (`jobs-state\capabilities`,
     /// created owner-only when absent), as the macOS isolated owner keeps
     /// it: `job.run` settles a device Job's capability use in it and the
-    /// start's Job recovery re-asserts the uses it settles. Nothing issues a
-    /// capability on Windows yet (no mutation authority is composed).
+    /// start's Job recovery re-asserts the uses it settles, and a device
+    /// mutation's admission issues and checks its capability in it.
     fn capability_store(&self) -> Result<arkdeck_hoststore::CapabilityStore, String> {
         let path = self.root.path().join("jobs-state").join("capabilities");
         arkdeck_hoststore::CapabilityStore::open(&path).map_err(|error| {

@@ -77,6 +77,23 @@ impl HdcDispatch for NoDispatch {
     }
 }
 
+/// A recorded Artifact index with each retention deadline a century later.
+/// The recorded deadlines lapsed long before this run, and the daemon's
+/// start-up retention sweep reclaims a settled Job's lapsed Artifacts, as
+/// Swift's does; no answer compared here names a deadline but as this root
+/// holds it.
+fn unexpired(bytes: &[u8]) -> Vec<u8> {
+    let mut index: serde_json::Value = serde_json::from_slice(bytes).unwrap();
+    for row in index["artifacts"].as_array_mut().unwrap() {
+        if let Some(deadline) = row["retention"]["deadlineUTC"].as_str() {
+            let (year, rest) = deadline.split_at(4);
+            let later = format!("{}{rest}", year.parse::<u32>().unwrap() + 100);
+            row["retention"]["deadlineUTC"] = serde_json::json!(later);
+        }
+    }
+    serde_json::to_vec_pretty(&index).unwrap()
+}
+
 /// A fresh development root, removed afterwards.
 struct Root(PathBuf);
 impl Root {
@@ -136,9 +153,13 @@ impl Root {
             for file in std::fs::read_dir(&job).unwrap() {
                 let file = file.unwrap().path();
                 let name = file.file_name().unwrap().to_str().unwrap().to_owned();
-                owned
-                    .create_document(&name, &std::fs::read(&file).unwrap())
-                    .unwrap();
+                let bytes = std::fs::read(&file).unwrap();
+                let bytes = if name == "index.json" {
+                    unexpired(&bytes)
+                } else {
+                    bytes
+                };
+                owned.create_document(&name, &bytes).unwrap();
                 if name != "index.json" {
                     owned.seal_document(&name).unwrap();
                 }

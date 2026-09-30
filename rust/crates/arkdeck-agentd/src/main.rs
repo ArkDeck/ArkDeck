@@ -758,7 +758,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // Job not proven settled. A failure is reported and never stops the
     // daemon, since an un-reclaimable store is what the sweep exists to make
     // visible.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     if let Some(sweep) = host.collect_expired_artifacts() {
         match sweep {
             Ok(reclaimed) if reclaimed.is_empty() => {}
