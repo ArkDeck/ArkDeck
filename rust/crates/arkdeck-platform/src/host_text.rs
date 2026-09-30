@@ -45,10 +45,13 @@ pub fn host_whitespace_or_newline(scalar: char) -> bool {
 /// where that differs from Unicode NFC:
 /// - one leading U+FEFF is dropped (CoreFoundation reads it as a byte order
 ///   mark when the text is created from UTF-8);
-/// - a starter that has already joined with a following starter (combining
-///   class 0) from another input character joins no further starter, so
-///   `U+AC00 U+11A8` and `U+0CCA U+0CD5` stay as they are, while a precomposed
-///   `U+AC01` or `U+0CCB` is kept whole.
+/// - a starter that came precomposed with a following starter (combining
+///   class 0) in one input character joins no starter from another input
+///   character, so `U+AC00 U+11A8` and `U+0CCA U+0CD5` stay as they are,
+///   while `U+1100 U+1161 U+11A8` and `U+0CC6 U+0CC2 U+0CD5` compose fully
+///   and a precomposed `U+AC01` or `U+0CCB` is kept whole;
+/// - six Unicode 16 composites (`OWN_SOURCE_ONLY`) are kept precomposed but
+///   never formed from separate characters.
 ///
 /// The Foundation primitive returned `None` only when it could not allocate;
 /// this one always answers.
@@ -154,13 +157,11 @@ fn primary_composite(first: u32, second: u32) -> Option<u32> {
 }
 
 /// The last starter during composition: where it is, the input character it
-/// came from, and whether it has joined a starter so far, and if so whether
-/// only from its own input character.
+/// came from, and whether it has joined a starter from that same character.
 struct Starter {
     position: usize,
     source: usize,
-    joined_starter: bool,
-    joined_only_own: bool,
+    joined_own_starter: bool,
 }
 
 /// Canonical composition (UAX #15): each character joins the last starter
@@ -175,16 +176,13 @@ fn compose(scalars: &mut Vec<(u32, usize)>) {
         if let Some(last) = starter.as_mut() {
             let adjacent = last.position + 1 == out.len();
             let own = source == last.source;
-            let may_join = class != 0 || !last.joined_starter || (last.joined_only_own && own);
-            if may_join
+            if (own || class != 0 || !last.joined_own_starter)
                 && (adjacent || (last_class != 0 && last_class < class))
                 && let Some(composite) = primary_composite(out[last.position].0, scalar)
+                && (own || tables::OWN_SOURCE_ONLY.binary_search(&composite).is_err())
             {
                 out[last.position].0 = composite;
-                if class == 0 {
-                    last.joined_only_own = own && (!last.joined_starter || last.joined_only_own);
-                    last.joined_starter = true;
-                }
+                last.joined_own_starter |= own && class == 0;
                 continue;
             }
         }
@@ -192,8 +190,7 @@ fn compose(scalars: &mut Vec<(u32, usize)>) {
             starter = Some(Starter {
                 position: out.len(),
                 source,
-                joined_starter: false,
-                joined_only_own: true,
+                joined_own_starter: false,
             });
         }
         last_class = class;
@@ -344,8 +341,11 @@ mod tests {
         // U+0CCB); Unicode 16's starter-second composites never form.
         assert_eq!(nfc("\u{ac00}\u{11a8}"), "\u{ac00}\u{11a8}");
         assert_eq!(nfc("\u{cca}\u{cd5}"), "\u{cca}\u{cd5}");
+        assert_eq!(nfc("\u{1100}\u{1161}\u{11a8}"), "\u{ac01}");
+        assert_eq!(nfc("\u{cc6}\u{cc2}\u{cd5}"), "\u{ccb}");
         assert_eq!(nfc("\u{16121}\u{1611f}"), "\u{16121}\u{1611f}");
-        assert_eq!(nfc("\u{16126}"), "\u{16121}\u{1611f}");
+        assert_eq!(nfc("\u{16126}"), "\u{16126}");
+        assert_eq!(nfc("\u{16d6a}"), "\u{16d6a}");
         // Todhri is unassigned there: no decomposition.
         assert_eq!(nfc("\u{105c9}"), "\u{105c9}");
         // One leading U+FEFF is read as a byte order mark and dropped.

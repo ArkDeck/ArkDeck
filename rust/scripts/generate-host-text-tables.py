@@ -22,8 +22,9 @@ owner does rather than as the standard does:
   U+17000..U+187FF and U+18D00..U+18D1E) are not alphanumeric.
 - U+200B ZERO WIDTH SPACE is in whitespacesAndNewlines.
 - Six Unicode 16 primary composites whose second character is a starter
-  (Gurung Khema U+16126..U+16128, Kirat Rai U+16D68..U+16D6A) decompose but
-  never compose.
+  (Gurung Khema U+16126..U+16128, Kirat Rai U+16D68..U+16D6A) are kept when
+  the text holds them precomposed but never form from separate characters
+  (emitted as OWN_SOURCE_ONLY).
 """
 import argparse
 import hashlib
@@ -39,7 +40,7 @@ PINS = {
 TODHRI = range(0x105C0, 0x10600)
 UNALPHANUMERIC_RANGES = ("Tangut Ideograph", "Tangut Ideograph Supplement")
 WHITESPACE_EXTRA = {0x200B}
-NEVER_COMPOSED = {0x16126, 0x16127, 0x16128, 0x16D68, 0x16D69, 0x16D6A}
+OWN_SOURCE_ONLY = {0x16126, 0x16127, 0x16128, 0x16D68, 0x16D69, 0x16D6A}
 
 
 def pinned(directory: Path, name: str) -> str:
@@ -115,7 +116,7 @@ def generate(directory: Path) -> str:
     # non-starter decompositions never recompose.
     compositions = []
     for code, parts in decomposition.items():
-        if code in excluded or code in NEVER_COMPOSED or len(parts) == 1:
+        if code in excluded or len(parts) == 1:
             continue
         if combining.get(code, 0) or combining.get(parts[0], 0):
             continue
@@ -123,7 +124,7 @@ def generate(directory: Path) -> str:
     compositions.sort()
     if len({(a, b) for a, b, _ in compositions}) != len(compositions):
         raise ValueError("ambiguous primary composition")
-    if not NEVER_COMPOSED <= set(decomposition) or any(c in TODHRI for c in decomposition):
+    if not OWN_SOURCE_ONLY <= {c for _, _, c in compositions} or any(c in TODHRI for c in decomposition):
         raise ValueError("recorded CoreFoundation differences no longer apply")
     classes = []
     for code in sorted(combining):
@@ -159,6 +160,9 @@ def generate(directory: Path) -> str:
         parts = decomposition[code] + [0]
         lines.append(f"    (0x{code:X}, 0x{parts[0]:X}, 0x{parts[1]:X}),")
     lines.append("];")
+    lines.append("/// Composites formed only from one precomposed input character.")
+    own = ", ".join(f"0x{c:X}" for c in sorted(OWN_SOURCE_ONLY))
+    lines.append(f"pub(super) const OWN_SOURCE_ONLY: &[u32] = &[{own}];")
     lines.append("/// Primary composites: (first, second, composite), sorted by the pair.")
     lines.append("pub(super) const COMPOSITION: &[(u32, u32, u32)] = &[")
     lines += [f"    (0x{a:X}, 0x{b:X}, 0x{c:X})," for a, b, c in compositions]
