@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "arkdeck.readonly-machine-output/1",
+  "what": "the CLI's machine output (--output json) of doctor, doctor --deep, doctor --require-healthy, operation list and device candidates against the read-only foundation daemon with no HDC, one JSON line each",
+  "recordedBy": "rust/scripts/check-readonly.py full_matrix on the macOS lane (Rust contract parity, xcode-27)",
+  "sourceRun": "Swift CI run 36714794680 on main 565f8b1d, artifact rust-readonly-recordings-xcode-27, candidate view",
+  "normalized": "the one wall-clock member, \"observedAt\":\"YYYY-MM-DDTHH:MM:SSZ\", read as \"observedAt\":\"<observedAt>\" (T2); nothing else",
+  "sameRunOtherHosts": "the Linux lane's and the signed Windows matrix's recordings of that run were byte-equal once observedAt was labelled",
+  "checkedBy": "check-readonly.py on every host that runs the matrix; Windows through a daemon signed with the host-trusted development signer",
+  "rewrite": "python rust/scripts/check-readonly.py --write-machine-output (after a change that legitimately moves the output; every host's lane then has to reproduce the new bytes)"
+}
