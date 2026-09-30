@@ -22,18 +22,20 @@
 //!   The daemon reconciles on its own clock, so the times it writes, and the
 //!   digest of the Manifest that names them, are not Swift's; everything else
 //!   is (a refusal's wording aside, T2);
-//! * the waiting execution, run again long after its orchestration deadline,
-//!   ends with its action expired; the abandoned execution and its expired
-//!   action read, and every recorded refusal answered, as Swift's owner
-//!   answered them. The expired execution itself is read from its record:
-//!   the current contract types an execution's `failureCode` and an action's
-//!   `selectionSchema` as null, and lists no `orchestrationBudgetExpired`
-//!   among `agent.run`'s error codes, so the daemon answers a conformance
-//!   failure for those reads on every host;
+//! * the execution waiting for a person to pick a device, and its action
+//!   with the selection schema of its two candidates, read as Swift's owner
+//!   answered them; run again long after its orchestration deadline, it is
+//!   refused `orchestrationBudgetExpired` and ends `budgetExpired` with its
+//!   action expired, and reads so, `failureCode` and all, in its status, the
+//!   whole execution list and its action; the abandoned execution and its
+//!   expired action read, and every recorded refusal answered, as Swift's
+//!   owner answered them;
 //! * a restart reads all of it back and changes nothing;
 //! * through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
-//!   `job reconcile`, `agent status` and `human-action show` report the same.
+//!   `job reconcile`, `agent status` (the abandoned and the waiting
+//!   execution) and `human-action show` (the expired action and the
+//!   pick-a-device one) report the same.
 //!   Without that variable this test says so and checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
@@ -480,6 +482,81 @@ fn assert_reconciles(pipe: &str) {
     }
 }
 
+/// The waiting execution as Swift's owner answered it: its status, and its
+/// action as the execution names it, through `human-action.list` and
+/// `.show`, the selection schema naming both candidates.
+fn assert_waiting(pipe: &str, exchanges: &[Value]) {
+    let waiting = exchange(exchanges, "ambiguous.run")["answer"].clone();
+    let status = request(
+        pipe,
+        "agent.status",
+        json!({"executionId": "har-ambiguous"}),
+    );
+    assert_eq!(semantic(&status), semantic(&waiting), "{status}");
+    let action = &waiting["result"]["humanAction"];
+    assert_eq!(action["selectionSchema"]["type"], "string", "{action}");
+    assert_eq!(
+        action["selectionSchema"]["enum"].as_array().unwrap().len(),
+        2,
+        "{action}"
+    );
+    let actions = request(
+        pipe,
+        "human-action.list",
+        json!({"owner": "har-ambiguous", "ownerKind": "agentExecution"}),
+    );
+    assert_eq!(actions["result"]["items"], json!([action]), "{actions}");
+    let shown = request(
+        pipe,
+        "human-action.show",
+        json!({"humanAction": action["actionId"]}),
+    );
+    assert_eq!(shown["result"], *action, "{shown}");
+}
+
+/// The waiting execution once run out of time: its run refused as Swift's
+/// owner refuses it, its status stopped with the refusal's code, and its
+/// action expired.
+fn assert_expired(pipe: &str, exchanges: &[Value]) {
+    let run = request(
+        pipe,
+        "agent.run",
+        exchange(exchanges, "ambiguous.run")["params"].clone(),
+    );
+    assert_eq!(
+        semantic(&run),
+        json!({"ok": false, "error": {"code": "orchestrationBudgetExpired",
+            "details": {"executionId": "har-ambiguous", "phase": "preAdmission",
+                "newDispatchCount": 0}}}),
+        "{run}"
+    );
+    let status = request(
+        pipe,
+        "agent.status",
+        json!({"executionId": "har-ambiguous"}),
+    );
+    let mut expected = exchange(exchanges, "ambiguous.run")["answer"]["result"].clone();
+    for (key, value) in [
+        ("state", json!("budgetExpired")),
+        ("failureCode", json!("orchestrationBudgetExpired")),
+        ("generation", json!("4")),
+        ("humanAction", Value::Null),
+        ("nextAction", Value::Null),
+    ] {
+        expected[key] = value;
+    }
+    assert_eq!(status["result"], expected, "{status}");
+    let action = exchange(exchanges, "ambiguous.run")["answer"]["result"]["humanAction"].clone();
+    let shown = request(
+        pipe,
+        "human-action.show",
+        json!({"humanAction": action["actionId"]}),
+    );
+    let mut expired = action.clone();
+    expired["status"] = json!("expired");
+    assert_eq!(shown["result"], expired, "{shown}");
+}
+
 /// The executions and their actions, read and refused as Swift's owner
 /// answered them once the waiting execution has run out of time.
 fn assert_executions(pipe: &str, exchanges: &[Value]) {
@@ -489,10 +566,27 @@ fn assert_executions(pipe: &str, exchanges: &[Value]) {
         semantic(&exchange(exchanges, "trust.abandon")["answer"]),
         "{status}"
     );
-    // A page of the abandoned executions: the abandoned one, as its status
-    // reads without its action. (The whole list is not read over the wire:
-    // the expired execution's `failureCode` is typed null by the current
-    // contract.)
+    // The whole list, and a page of the abandoned executions: the abandoned
+    // one as its status reads without its action; the expired one with the
+    // code it stopped with.
+    let list = request(pipe, "agent.list", json!({}));
+    let items = list["result"]["items"]
+        .as_array()
+        .unwrap_or_else(|| panic!("{list}"));
+    let ids: Vec<&str> = items
+        .iter()
+        .map(|item| item["executionId"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        ids,
+        ["har-ambiguous", "har-connect", "har-trust", "har-unproven"],
+        "{list}"
+    );
+    assert_eq!(items[0]["state"], "budgetExpired", "{list}");
+    assert_eq!(
+        items[0]["failureCode"], "orchestrationBudgetExpired",
+        "{list}"
+    );
     let list = request(pipe, "agent.list", json!({"state": "abandoned"}));
     let items = list["result"]["items"]
         .as_array()
@@ -543,26 +637,12 @@ fn jobs_are_reconciled_and_executions_answered_as_swift_s_across_a_restart() {
         first.seen
     );
 
-    // The waiting execution as Swift's owner left it. (Its action is not
-    // read over the wire: the current contract types an action's
-    // `selectionSchema` as null, so the pick-a-device action's selection
-    // schema fails the answer's conformance check on every host.)
-    let record = root.execution(AMBIGUOUS);
-    assert_eq!(record["state"], "waitingForHuman");
-    assert_eq!(record["generation"], 3);
-    assert_eq!(record["actions"][0]["status"], "waiting");
+    // The waiting execution as Swift's owner left it and answered it.
+    assert_waiting(&pipe, &exchanges);
     // Run again long after its orchestration deadline (this daemon's clock
     // is not the oracle's): refused, and the execution ends in the same
-    // write that expires its action. The owner's refusal
-    // (`orchestrationBudgetExpired`, as the in-process replay reads it) is
-    // not in the current contract's `agent.run` error codes, so the daemon
-    // answers its conformance failure instead, on every host.
-    let run = request(
-        &pipe,
-        "agent.run",
-        exchange(&exchanges, "ambiguous.run")["params"].clone(),
-    );
-    assert_eq!(run["ok"], false, "{run}");
+    // write that expires its action.
+    assert_expired(&pipe, &exchanges);
     let record = root.execution(AMBIGUOUS);
     assert_eq!(record["state"], "budgetExpired");
     assert_eq!(record["actions"][0]["status"], "expired");
@@ -590,6 +670,13 @@ fn jobs_are_reconciled_and_executions_answered_as_swift_s_across_a_restart() {
     let pipe = second.serving();
     assert_reconciles(&pipe);
     assert_executions(&pipe, &exchanges);
+    // Run again: the same refusal, and nothing written.
+    let run = request(
+        &pipe,
+        "agent.run",
+        exchange(&exchanges, "ambiguous.run")["params"].clone(),
+    );
+    assert_eq!(run["error"]["code"], "orchestrationBudgetExpired", "{run}");
     second.stop(&root.0);
     assert_eq!((root.job(PARKED), root.execution(AMBIGUOUS)), after_first);
 }
@@ -703,6 +790,29 @@ fn reconcile_agent_and_human_action_hops_run_through_the_cli_against_a_dev_signe
         exchange(&exchanges, "trust.abandon")["answer"]["result"],
         "{envelope}"
     );
+    // The waiting execution and its pick-a-device action, before any run.
+    let waiting = exchange(&exchanges, "ambiguous.run")["answer"]["result"].clone();
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &["agent", "status", "--execution-id", "har-ambiguous"],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"], waiting, "{envelope}");
+    let (status, envelope) = cli(
+        &daemon,
+        &pin,
+        &pipe,
+        &[
+            "human-action",
+            "show",
+            "--human-action",
+            waiting["humanAction"]["actionId"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(status, Some(0), "{envelope}");
+    assert_eq!(envelope["result"], waiting["humanAction"], "{envelope}");
     let expired = exchange(&exchanges, "trust.expired");
     let action = expired["params"]["humanAction"].as_str().unwrap();
     let (status, envelope) = cli(
