@@ -61,7 +61,9 @@ display name, Artifact export/import and Trace cache writes.
 
 Design choice: the macOS App keeps device names in its own `UserDefaults`; on Windows the name
 is the Runtime's (`target.display-name.*`, coverage `app.device.rename` equivalent command), so
-the CLI and the App show one name. The macOS input rule and message are kept.
+the CLI and the App show one name. The macOS input rule and message are kept. Accepted on
+2026-09-30 by the phase lead as a delegated minor decision (no Requirement, AC or safety
+invariant changes; the macOS App is unchanged).
 
 ## Checks on the reference host
 
