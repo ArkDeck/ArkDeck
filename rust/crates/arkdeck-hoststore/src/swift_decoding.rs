@@ -350,7 +350,8 @@ pub(crate) fn characters(text: &str) -> usize {
 }
 
 /// The key Swift's `String` equality compares: an ASCII text is its own, any
-/// other its canonical-equivalence key.
+/// other its canonical-equivalence key (the platform's pinned Foundation NFC,
+/// the same on every host; off macOS this once fell back to raw bytes).
 pub(crate) fn text_key(text: &str) -> String {
     if text.is_ascii() {
         return text.to_owned();
@@ -360,4 +361,21 @@ pub(crate) fn text_key(text: &str) -> String {
 
 pub(crate) fn same_text(left: &str, right: &str) -> bool {
     left == right || text_key(left) == text_key(right)
+}
+
+#[cfg(test)]
+mod text_tests {
+    use super::{same_text, text_key};
+
+    /// Canonical equivalence on every host, as Swift `String` equality.
+    #[test]
+    fn text_is_compared_by_canonical_equivalence_on_every_host() {
+        assert!(same_text("caf\u{e9}", "cafe\u{301}"));
+        assert!(same_text("\u{212b}", "\u{c5}"));
+        assert!(same_text("a\u{323}\u{301}", "a\u{301}\u{323}"));
+        assert!(!same_text("cafe", "caf\u{e9}"));
+        assert!(!same_text("\u{e9}", "\u{e8}"));
+        assert_eq!(text_key("cafe\u{301}"), "caf\u{e9}");
+        assert_eq!(text_key("plain"), "plain");
+    }
 }

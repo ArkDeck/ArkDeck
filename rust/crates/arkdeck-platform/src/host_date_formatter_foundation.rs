@@ -85,6 +85,10 @@ mod parity {
                 }
             }
         }
+        for (minute, second) in [(0, 1), (1, 0), (30, 0), (59, 59)] {
+            values.push(format!("2026-09-11T24:{minute:02}:{second:02}Z"));
+            values.push(format!("2026-12-31T24:{minute:02}:{second:02}+05:30"));
+        }
         for value in 0..=99 {
             values.push(format!("2026-09-11T{value:02}:00:00Z"));
             values.push(format!("2026-09-11T00:{value:02}:00Z"));

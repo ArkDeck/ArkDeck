@@ -321,6 +321,39 @@ mod parity {
             }
         }
         failures.extend(report("NFC of a + two non-starters", &reordered, total));
+        // The recorded CoreFoundation rules around starters joining starters
+        // and the leading byte order mark, across input characters.
+        let probes: Vec<String> = [
+            &[0x1100, 0x1161, 0x11A8][..],
+            &[0x1100, 0xAC00],
+            &[0xAC01, 0x0301],
+            &[0xAC00, 0x0301, 0x11A8],
+            &[0x0CC6, 0x0CC2, 0x0CD5],
+            &[0x0CC6, 0x0CD5],
+            &[0x0CCA, 0x0CD5],
+            &[0x0CCB, 0x0CD5],
+            &[0x0DD9, 0x0DCF, 0x0DCA],
+            &[0x0DDC, 0x0DCA],
+            &[0x0B47, 0x0B3E, 0x0B57],
+            &[0x0B47, 0x0B57],
+            &[0x09C7, 0x09BE],
+            &[0x1025, 0x102E],
+            &[0x11131, 0x11127],
+            &[0xFEFF],
+            &[0xFEFF, 0xFEFF],
+            &[0xFEFF, 0x0065, 0x0301],
+            &[0x0061, 0xFEFF],
+            &[0x0061, 0xFEFF, 0x0301],
+            &[0x0065, 0x0301, 0xFEFF],
+        ]
+        .iter()
+        .map(|scalars| scalars.iter().filter_map(|s| char::from_u32(*s)).collect())
+        .collect();
+        let probed: Vec<String> = probes
+            .iter()
+            .filter_map(|text| nfc_mismatch(text))
+            .collect();
+        failures.extend(report("NFC of recorded-rule probes", &probed, probes.len()));
         assert!(
             failures.is_empty(),
             "{}",

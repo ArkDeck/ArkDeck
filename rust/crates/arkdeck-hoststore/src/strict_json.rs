@@ -328,8 +328,8 @@ impl Parser<'_> {
 }
 
 /// The key Swift's `String` equality compares: an ASCII name is its own; any
-/// other is compared by canonical equivalence, which only the macOS host's
-/// Unicode tables answer as Foundation does, so elsewhere it is refused.
+/// other is compared by canonical equivalence, through the platform's pinned
+/// Foundation NFC on every host.
 fn canonical(name: &str) -> Result<String, StrictJsonError> {
     if name.is_ascii() {
         return Ok(name.to_owned());

@@ -5,12 +5,12 @@
 //! internet date-time options) writes `yyyy-MM-dd'T'HH:mm:ssXXXXX`: a
 //! four-digit year, two-digit fields and either `Z` or `+hh:mm`/`-hh:mm`.
 //! This portable check accepts exactly that written shape and, within it,
-//! agrees with the formatter's parse on every field value: the year 0001 to
-//! 9999, the month, the day as the calendar allows it (Julian leap years
-//! before 1582-10-15, so 1500-02-29 exists and the ten dropped days of
-//! October 1582 are read as Julian dates), hours 00 to 23, minutes and seconds
-//! 00 to 59, and any two-digit offset fields, which the formatter reads
-//! without a range check.
+//! agrees with the formatter's parse on every field value, as recorded
+//! against Foundation on macOS (PR #2336): any four-digit year including
+//! 0000, months 01 to 12, days 01 to 31 in every month (the parse carries
+//! 2026-02-31 over rather than refusing it), hours 00 to 24, minutes and
+//! seconds 00 to 59, and any two-digit offset fields, which the formatter
+//! reads without a range check.
 //!
 //! The ICU parser behind Foundation also takes spellings the formatter never
 //! writes (one-digit or over-long fields, other decimal digit scripts,
@@ -54,7 +54,7 @@ fn accepted(bytes: &[u8]) -> bool {
         return false;
     }
     let field = |at: usize, width: usize| number(&bytes[at..at + width]);
-    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+    let (Some(_year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
         field(0, 4),
         field(5, 2),
         field(8, 2),
@@ -64,10 +64,9 @@ fn accepted(bytes: &[u8]) -> bool {
     ) else {
         return false;
     };
-    year >= 1
-        && (1..=12).contains(&month)
-        && (1..=crate::host_calendar::days_in_month(year, month)).contains(&day)
-        && hour <= 23
+    (1..=12).contains(&month)
+        && (1..=31).contains(&day)
+        && hour <= 24
         && minute <= 59
         && second <= 59
 }
@@ -87,11 +86,12 @@ mod tests {
             "2026-09-11T00:00:00+05:30",
             "2026-09-11T00:00:00-00:00",
             "2026-09-11T23:59:59+99:99",
+            "0000-01-01T00:00:00Z",
             "0001-01-01T00:00:00Z",
             "9999-12-31T23:59:59Z",
             "2024-02-29T12:34:56Z",
-            "2000-02-29T00:00:00Z",
-            "1500-02-29T00:00:00Z",
+            "2026-02-31T00:00:00Z",
+            "2026-09-11T24:00:00Z",
             "1582-10-10T00:00:00Z",
         ] {
             assert!(accepts(value), "{value}");
@@ -103,14 +103,11 @@ mod tests {
         for value in [
             "",
             "2026-09-11T00:00:00",
-            "0000-09-11T00:00:00Z",
             "2026-00-11T00:00:00Z",
             "2026-13-11T00:00:00Z",
-            "2026-02-29T00:00:00Z",
-            "1700-02-29T00:00:00Z",
-            "2026-09-31T00:00:00Z",
+            "2026-09-32T00:00:00Z",
             "2026-09-00T00:00:00Z",
-            "2026-09-11T24:00:00Z",
+            "2026-09-11T25:00:00Z",
             "2026-09-11T23:60:00Z",
             "2026-09-11T23:59:60Z",
             "2026-09-11t00:00:00Z",

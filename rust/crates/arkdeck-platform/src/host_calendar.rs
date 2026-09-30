@@ -62,7 +62,7 @@ fn leap(year: i64) -> bool {
     }
 }
 
-pub(crate) fn days_in_month(year: i64, month: i64) -> i64 {
+fn days_in_month(year: i64, month: i64) -> i64 {
     match month {
         2 if leap(year) => 29,
         2 => 28,
