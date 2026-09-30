@@ -95,6 +95,25 @@ restoring the mode, the Ctrl-C case fails with exit 71. No test uses a sleep for
 synchronisation: the parent waits on a condition variable fed by the console output reader,
 bounded by a 60-second deadline.
 
+## Hosted-runner follow-up (CI on PR #2354)
+
+The first `windows-latest` run failed two credential tests: a fixture credential that had just
+been read back became `Status(1168)` (not found) on the next read, while this test made no call
+in between; the file's five tests then ran in parallel threads, each in its own namespace. It did
+not reproduce on the reference host. Two further CI runs on the runner:
+
+- `b75a906a`: the file's tests serialised by a mutex, plus a test in which eight threads each keep
+  one credential while churning their own: no loss, all six tests pass.
+- `d9a6d3b4`: the churn measured separately for short values, 2560-byte values, another user
+  name and `CRED_PERSIST_SESSION`, then all four mixed (8 threads x 40 rounds per phase): no loss
+  in any phase.
+
+So the loss was seen only with the original parallel test layout and was not reproduced by any
+isolated pattern; its mechanism on the runner is not established. The product does not rely on
+it either way: `set` now reads the credential back and refuses ("Credential Manager did not keep
+the written credential") unless the value, account and persistence are as written, and a later
+disappearance is the typed `Status(1168)` / `Absent`, never a value. The tests stay serialised.
+
 ## Checks
 
 Run from `rust/` with `CARGO_TARGET_DIR=D:/cargo-target/c1-cred CARGO_BUILD_JOBS=2`:
@@ -103,7 +122,7 @@ Run from `rust/` with `CARGO_TARGET_DIR=D:/cargo-target/c1-cred CARGO_BUILD_JOBS
 | --- | --- |
 | `cargo fmt --all --check` | clean |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
-| `cargo test -p arkdeck-platform` | pass (lib 63 passed and 1 ignored, incl. 7 new; `windows_credential_store` 5; `windows_console_secret` 7; every other target unchanged) |
+| `cargo test -p arkdeck-platform` | pass (lib 63 passed and 1 ignored, incl. 7 new; `windows_credential_store` 6; `windows_console_secret` 7; every other target unchanged) |
 | `sh scripts/check-sdd.sh` (`PYTHONUTF8=1`) | pass |
 | `git diff --check` | clean |
 
