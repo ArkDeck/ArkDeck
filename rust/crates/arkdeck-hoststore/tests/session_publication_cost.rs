@@ -10,20 +10,31 @@
 //! append takes the directory's Manifest lock, writes the record, and
 //! synchronizes the file and the directory; its cost does not depend on how
 //! long the Journal already is.
-#![cfg(target_os = "macos")]
-
-mod support;
+#![cfg(any(target_os = "macos", windows))]
 
 use arkdeck_hoststore::JournalWriter;
 use serde_json::Value;
 use std::fs;
-use std::os::unix::fs::DirBuilderExt;
+use std::path::Path;
 use std::time::{Duration, Instant};
+
+/// Creates `path` owner-only: mode 0700 on macOS, the store's own protected
+/// owner-only DACL on Windows.
+fn private_directory(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+    }
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
 
 #[test]
 #[ignore = "a measurement for a quiet host"]
 fn copying_a_journal_into_its_session_costs() {
-    let journal = support::fixture("capture-diagnostics-trace")
+    let journal = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/capture-diagnostics-trace")
         .join("store/jobs/job-2ba1bd5a231273e388689a61f209280c/journal.jsonl");
     let events: Vec<Value> = fs::read_to_string(&journal)
         .unwrap()
@@ -35,14 +46,11 @@ fn copying_a_journal_into_its_session_costs() {
         .canonicalize()
         .unwrap()
         .join(format!("arkdeck-journal-copy-{nonce:032x}"));
-    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    private_directory(&root);
     let (mut appends, mut copies) = (Vec::new(), Vec::new());
     for copy in 0..20 {
         let directory = root.join(format!("session-{copy}"));
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&directory)
-            .unwrap();
+        private_directory(&directory);
         let started = Instant::now();
         let mut writer = JournalWriter::open(&directory, true).unwrap();
         for event in &events {

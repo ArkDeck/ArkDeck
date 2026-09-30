@@ -32,6 +32,13 @@ Four further questions, raised later the same day by the portable text/calendar 
 | 15 | NFC keeps CoreFoundation's dropping of one leading U+FEFF, which Swift `String` equality does not do | Keep the CoreFoundation behaviour, so keys stay byte-identical with existing macOS data (T0); the difference from Swift `String` equality is recorded as T1. |
 | 16 | WinUI accent: the system accent (what the spike does) or the product accent of `tokens.css` | The product accent from `docs/design/arkdeck-ds/src/tokens.css`, for one brand on both platforms; light/dark still follow the system, and high-contrast themes use system colours only. |
 
+Ruling 17, raised by the xcopy packaging slice (#2349, `runs/TASK-XPA-022/xcopy-package-run.md`)
+and answered "按推荐" the same day:
+
+| # | Question | Ruling |
+| --- | --- | --- |
+| 17 | The client pins the daemon's Authenticode signer by the certificate's SHA-256 (XPA-AC-6 layer 2), but Azure Artifact Signing issues short-lived leaf certificates, so that pin would change with every signing | Per form: the **MSIX** daemon is pinned by its package family (stable; decision 10); the **xcopy** daemon is pinned by publisher identity — `WinVerifyTrust` passes, the chain ends at the Microsoft root that Artifact Signing chains to, and the leaf's subject organisation and the Artifact Signing per-account identity EKU both equal the configured values — instead of one certificate's hash. The development signer keeps its certificate-hash pin. No form gets a switch that skips identity verification. Implemented in its own TASK-XPA-002 slice. |
+
 Related rulings the same day: the WinUI alpha project templates are accepted, the client uses the
 latest stable stack (.NET 10, Windows App SDK 2.5.1, WinUI 3) with a Fluent 2 style whose product
 semantics come from `docs/design/arkdeck-ds/src/tokens.css`; the Windows support tuple is Windows

@@ -256,10 +256,13 @@ mod capability_policy;
 pub use capability_policy::DeviceHolds;
 #[cfg(target_os = "macos")]
 mod capability_store;
+// Foundation's JSON member-name and text rules, on the portable host text:
+// the Recovery Manifest a Session Manifest carries needs them on Windows too.
 #[cfg(any(target_os = "macos", windows))]
-#[cfg_attr(windows, allow(dead_code))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod strict_json;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod swift_decoding;
 #[cfg(target_os = "macos")]
 pub use capability_store::{
@@ -270,26 +273,36 @@ pub use capability_store::{
 
 #[cfg(target_os = "macos")]
 mod cutover_facts;
-#[cfg(target_os = "macos")]
+// The Job's Journal owners stand on the durable host store (`HostJournal`,
+// `HostJournalAppender`) and the portable host text and calendar, which macOS
+// and Windows both have. The Job events reader's caller, `JobStore::events`,
+// sits on the SQLite Job index and is still macOS-only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_events;
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+mod job_failure;
+#[cfg(all(test, any(target_os = "macos", windows)))]
+mod test_private;
 #[cfg(target_os = "macos")]
 pub use cutover_facts::{
     CutoverFacts, CutoverRoots, MISSING_RECORD, RetainedSessionsRefusal, UNREADABLE_RECORD,
     UnreadableSource, cutover_facts, cutover_retained_sessions,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_journal;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_journal::{JOURNAL_KINDS, JournalEvent};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod job_journal_events;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_journal_replay;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_journal_writer;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_journal_replay::{AbandonmentFact, IntentFact, ReplayFacts, UnknownFact};
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_journal_writer::{JournalWriteError, JournalWriter, inspect_journal};
 
 #[cfg(target_os = "macos")]
@@ -340,8 +353,8 @@ pub use session_export_redaction::SessionExportRedactor;
 
 // The Target owners (TASK-XPA-004) on macOS and Windows: the same
 // `targets.json` bytes under the same `.targets.lock` on both. Off macOS
-// only they use `strict_json` and some members of theirs; the Job, Import
-// and Rockchip consumers of the rest are composed on macOS only.
+// only some members of theirs are used; the Job, Import and Rockchip
+// consumers of the rest are composed on macOS only.
 #[cfg(any(target_os = "macos", windows))]
 mod device_lane;
 #[cfg(any(target_os = "macos", windows))]
@@ -626,16 +639,19 @@ mod trace_owner;
 #[cfg(target_os = "macos")]
 pub use trace_owner::TraceCacheStore;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod recovery_manifest;
 mod session_graphemes;
 #[cfg(target_os = "macos")]
 mod session_inventory;
-#[cfg(target_os = "macos")]
+// The Session Manifest decoder serves the Journal's closed format on macOS and
+// Windows; its Session readers (inventory, publication) are still macOS-only.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod session_manifest;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod session_step_arguments;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use recovery_manifest::{
     RecoveryManifest, RecoveryManifestAbandonConfirmation, RecoveryManifestDeviceMode,
     RecoveryManifestError, RecoveryManifestGuide, RecoveryManifestHazard,
