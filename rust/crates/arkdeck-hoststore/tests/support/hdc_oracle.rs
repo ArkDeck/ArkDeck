@@ -15,10 +15,19 @@ use arkdeck_hoststore::{
     JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher, SessionStore,
     StorageClaims, TargetStore,
 };
-#[cfg(target_os = "macos")]
 use arkdeck_hoststore::{JobResultReader, list_cleanup_debt};
+#[cfg(unix)]
 use arkdeck_platform::VerifiedTool;
-use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch, ProcessDispatch};
+#[cfg(unix)]
+use arkdeck_provider_hdc::ProcessDispatch;
+use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch};
+
+/// What dispatches to the shared fake: its driver as a real subprocess on
+/// macOS; on Windows its answers in process.
+#[cfg(unix)]
+pub type FakeDispatch = ProcessDispatch;
+#[cfg(windows)]
+pub type FakeDispatch = super::oracle_fake::OracleFake;
 use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -81,7 +90,7 @@ pub struct Owners {
     pub jobs: JobStore,
     pub capabilities: CapabilityStore,
     pub sessions: SessionStore,
-    pub dispatch: ProcessDispatch,
+    pub dispatch: FakeDispatch,
     pub holds: DeviceHolds,
     pub claims: StorageClaims,
     pub probe: OracleProbe,
@@ -107,9 +116,19 @@ impl Owners {
             capabilities,
             sessions: SessionStore::open(&root.join("session-owner"), &root.join("Sessions"))
                 .unwrap(),
+            #[cfg(unix)]
             dispatch: ProcessDispatch::new(
                 VerifiedTool::open(root.join("hdc"), &digest).unwrap(),
                 None,
+            ),
+            // The driver's answers cannot run on Windows: the same answers in
+            // process, over the same root (`oracle_fake.rs`).
+            #[cfg(windows)]
+            dispatch: super::oracle_fake::OracleFake::new(
+                &root,
+                super::oracle_fake::Answers::of(
+                    &fs::read_to_string(root.join("hdc-answers.sh")).unwrap(),
+                ),
             ),
             holds: DeviceHolds::default(),
             claims: StorageClaims::default(),
@@ -235,6 +254,22 @@ impl Owners {
     }
 }
 
+/// The members of `job.run`, `job.result` and `job.evidence` answers that a
+/// plan digest derives: the Runtime capability's reference and a use's
+/// consumption fingerprint, beside the store's own (`debug_hap::DERIVED`), and
+/// a Session manifest's digest, whose bytes the leftovers compare relabelled.
+const ANSWER_DERIVED: [&str; 5] = [
+    "manifestSha256",
+    "planDigest",
+    "consumptionFingerprintSha256",
+    "capabilityId",
+    "reference",
+];
+
+/// The seals whose `sha256` is the digest of a Journal prefix the leftovers
+/// compare relabelled, which names a plan digest's derived values.
+const SEALS: [&str; 2] = ["checkpointSeal", "journalSeal"];
+
 /// Every recorded request of the oracle `name`, answered in order by the Rust
 /// owners: `exchanges` of them, each answered as Swift answered it, message
 /// included, the cleanup debt lists and continuations among them. The fake
@@ -244,9 +279,12 @@ impl Owners {
 /// the replay leaves below the root must be Swift's byte for byte: a
 /// continued Job's record with its recovery load's `recovered: journal
 /// clean` and its settled residue, and the ledger with its settlements.
-/// macOS only: it dispatches to the shared fake HDC, a POSIX shell script,
-/// and continues cleanup debt, which the Windows runner does not yet.
-#[cfg(target_os = "macos")]
+///
+/// On Windows the fake answers in process, and what names a host path below
+/// the replay's root is read in the oracle's spelling (its fixed macOS root,
+/// `/` between components), with the plan digests and the values derived
+/// from them read as Swift's (`debug_hap::HostLabels`); every other byte
+/// must be Swift's. On macOS nothing is respelled or relabelled.
 pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
@@ -260,7 +298,43 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
     };
-    let (mut differences, mut replayed) = (Vec::new(), 0);
+    let root = owners.root.clone();
+    let spelled = |bytes: &[u8]| -> Vec<u8> {
+        // A payload that is not text names no path.
+        let Ok(text) = String::from_utf8(bytes.to_vec()) else {
+            return bytes.to_vec();
+        };
+        // The Sessions root a record names is Foundation's spelling of it
+        // (`session_publication::foundation_path`): on macOS the fake's root
+        // without its `/private` alias, in the document's own escaping.
+        let sessions = format!(
+            "\"{}\"",
+            root.join("Sessions").to_string_lossy().replace('\\', r"\\")
+        );
+        let foundation = if text.contains(r"\/") {
+            r#""\/tmp\/arkdeck-hdc-oracle\/Sessions""#
+        } else {
+            r#""/tmp/arkdeck-hdc-oracle/Sessions""#
+        };
+        let text = if cfg!(windows) {
+            text.replace(&sessions, foundation)
+        } else {
+            text
+        };
+        let text = super::oracle_fake::oracle_spelling_json(&text, &root);
+        // The platform a Session was published on is the host's own
+        // (`session_publication.rs`): read as the oracle's, as the Windows
+        // Session tests read it.
+        super::oracle_fake::oracle_spelling(&text, &root)
+            .replace("\"PLATFORM-WINDOWS@0.2.0\"", "\"PLATFORM-MACOS@0.2.0\"")
+            .into_bytes()
+    };
+    let spelled_json = |value: &Value| -> Value {
+        serde_json::from_slice(&spelled(&serde_json::to_vec(value).unwrap())).unwrap()
+    };
+    let mut labels = debug_hap::HostLabels::default();
+    let swift_capabilities = document(&fixture, "store/capabilities/runtime-capabilities.json");
+    let (mut answers, mut replayed) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
         replayed += 1;
@@ -270,14 +344,27 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
                 Ok(result) => json!({"ok": true, "result": result}),
                 Err(refusal) => refused(refusal.code, refusal.message, Some(proven())),
             },
-            "job.submit" => match admitter.handle(params) {
-                Ok(result) => json!({"ok": true, "result": result}),
-                Err(refusal) => refused(
-                    refusal.code,
-                    refusal.message,
-                    Some(if refusal.proven { proven() } else { Map::new() }),
-                ),
-            },
+            "job.submit" => {
+                let answer = match admitter.handle(params) {
+                    Ok(result) => json!({"ok": true, "result": result}),
+                    Err(refusal) => refused(
+                        refusal.code,
+                        refusal.message,
+                        Some(if refusal.proven { proven() } else { Map::new() }),
+                    ),
+                };
+                // The capabilities issued so far, in Swift's install order,
+                // so a later request naming one names this host's.
+                if let Ok(bytes) = fs::read(
+                    owners
+                        .default_root
+                        .join("capabilities/runtime-capabilities.json"),
+                ) {
+                    let ours: Value = serde_json::from_slice(&bytes).unwrap();
+                    labels.learn_keys(&ours, &swift_capabilities, &["capabilityID"]);
+                }
+                answer
+            }
             "job.run" => {
                 if let Some(mode) = exchange["mode"].as_str() {
                     owners.mode(mode);
@@ -306,7 +393,11 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
                 }
             }
             "capability.list" | "capability.inspect" => {
-                match owners.capabilities.handle(method, params) {
+                let params = labels.host_json(&Value::Object(params.clone()));
+                match owners
+                    .capabilities
+                    .handle(method, params.as_object().unwrap())
+                {
                     Ok(result) => json!({"ok": true, "result": result}),
                     Err(error) => refused(error.code, error.message, None),
                 }
@@ -333,21 +424,23 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
         if method.starts_with("cleanupDebt.") {
             assert_conforms(method, &actual);
         }
-        let actual = super::legacy_plan_answer(actual);
-        if actual != exchange["answer"] {
-            differences.push(format!(
-                "{name}:\n  swift {}\n  rust  {actual}",
-                exchange["answer"]
-            ));
-        }
+        // Compared once every derived value is learned, below.
+        answers.push((
+            name.clone(),
+            spelled_json(&super::legacy_plan_answer(actual)),
+            exchange["answer"].clone(),
+        ));
     }
-    assert!(differences.is_empty(), "{}", differences.join("\n"));
     assert_eq!(replayed, exchanges, "every exchange");
 
     // The fake received Swift's calls, in order.
     let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
     assert_eq!(swift.lines().count(), calls);
-    assert_eq!(owners.calls(), swift, "the fake's calls");
+    assert_eq!(
+        String::from_utf8(spelled(owners.calls().as_bytes())).unwrap(),
+        swift,
+        "the fake's calls"
+    );
     assert_eq!(
         fs::read(owners.root.join("targets-state/targets.json")).unwrap(),
         fs::read(fixture.join("targets-state/targets.json")).unwrap(),
@@ -369,10 +462,80 @@ pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
 
     let Owners {
         jobs,
-        root,
+        root: replayed_root,
         default_root,
         ..
     } = owners;
     drop(jobs);
-    super::assert_leftovers_at(&fixture, &root, &default_root);
+    // Each recorded document beside the one the replay left in its place:
+    // the plan digests and what they derive, read as Swift's (nothing is
+    // learned on macOS).
+    let mut keys = debug_hap::DERIVED.to_vec();
+    keys.push("capabilityId");
+    // A Session manifest names the platform it was published on: two bytes
+    // longer as `PLATFORM-WINDOWS@0.2.0`, read above as the oracle's.
+    keys.push("manifestByteCount");
+    let documents = |bytes: &[u8]| -> Vec<Value> {
+        serde_json::from_slice(bytes).map_or_else(
+            |_| {
+                bytes
+                    .split(|byte| *byte == b'\n')
+                    .filter_map(|line| serde_json::from_slice(line).ok())
+                    .collect()
+            },
+            |document| vec![document],
+        )
+    };
+    for (path, _) in document(&fixture, "provenance.json")["files"]
+        .as_object()
+        .unwrap()
+    {
+        let actual = [
+            ("store/", default_root.clone()),
+            ("sessions/", replayed_root.join("Sessions")),
+            ("session-owner/", replayed_root.join("session-owner")),
+            ("artifacts/", replayed_root.join("artifacts")),
+        ]
+        .into_iter()
+        .find_map(|(prefix, base)| {
+            path.strip_prefix(prefix)
+                .map(|rest| rest.split('/').fold(base, |path, part| path.join(part)))
+        });
+        let Some(actual) = actual.filter(|actual| actual.is_file()) else {
+            continue;
+        };
+        let (ours, theirs) = (
+            documents(&spelled(&fs::read(actual).unwrap())),
+            documents(&fs::read(fixture.join(path)).unwrap()),
+        );
+        labels.learn_keys(&json!(ours), &json!(theirs), &keys);
+        // A record seals its Journal by a prefix's digest; the Journal itself
+        // is compared, relabelled, below.
+        for seal in SEALS {
+            labels.learn_within(&json!(ours), &json!(theirs), seal, "sha256");
+        }
+    }
+    let index = super::index(&default_root);
+    labels.learn_keys(
+        &spelled_json(&index),
+        &document(&fixture, "store/index.json"),
+        &["requestHash", "recordSHA256"],
+    );
+    // Every answer as Swift gave it, with the plan digests and the values
+    // derived from them read as Swift's.
+    for (_, actual, expected) in &answers {
+        labels.learn(actual, expected, "/result/materializedPlanDigest");
+        labels.learn_keys(actual, expected, &ANSWER_DERIVED);
+    }
+    let differences: Vec<String> = answers
+        .iter()
+        .filter_map(|(name, actual, expected)| {
+            let actual = labels.swift(actual);
+            (actual != *expected).then(|| format!("{name}:\n  swift {expected}\n  rust  {actual}"))
+        })
+        .collect();
+    assert!(differences.is_empty(), "{}", differences.join("\n"));
+    super::assert_leftovers_relabelled(&fixture, &replayed_root, &default_root, |bytes| {
+        labels.swift_bytes(&spelled(bytes))
+    });
 }

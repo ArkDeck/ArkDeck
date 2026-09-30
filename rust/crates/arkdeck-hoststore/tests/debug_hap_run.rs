@@ -39,18 +39,19 @@
 //! under its own identity, one whose outcome is lost parks its Job. Every
 //! transport byte comes from the shared fake HDC; none of this is hardware
 //! acceptance. The runs spawn the fake, so this binary is theirs.
-#![cfg(target_os = "macos")]
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
 use arkdeck_hoststore::{HdcComposition, JobRecord};
-use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessDispatch, ProcessPlan, Receipt};
+use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
 use serde_json::{Map, Value, json};
 use std::fs;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use support::debug_hap;
 use support::fixed_now;
+use support::hdc_oracle::FakeDispatch;
 use support::hdc_oracle::{self, Owners, exchange};
 
 /// Every call Swift's runs and continuations made.
@@ -165,7 +166,11 @@ fn evidence_a_run_did_not_consume_is_never_continued() {
     let job = admitted(&owners, &hdc, &cases, "normal");
     let mut record = owners.record(&job);
     let swift = support::document(&fixture, &format!("store/jobs/{job}/job-record.json"));
-    record["admissionEvidence"] = swift["admissionEvidence"].clone();
+    // Swift's evidence in this host's plan digest and capability (the same
+    // on macOS; see `debug_hap::HostLabels`).
+    let mut labels = debug_hap::HostLabels::default();
+    labels.learn_keys(&record, &swift, &["materializedPlanDigest", "capabilityId"]);
+    record["admissionEvidence"] = labels.host_json(&swift["admissionEvidence"]);
     let record = JobRecord::decode(&serde_json::to_vec(&record).unwrap()).unwrap();
     owners.jobs.persist(&record, &fixed_now().unwrap()).unwrap();
 
@@ -208,7 +213,7 @@ fn evidence_a_run_did_not_consume_is_never_continued() {
 /// The fake as the oracle drives it, but with a retained executable that
 /// can no longer be proved once a call carrying `after` has been dispatched.
 struct UnprovenAfter<'a> {
-    inner: &'a ProcessDispatch,
+    inner: &'a FakeDispatch,
     after: [&'static str; 3],
     seen: AtomicBool,
 }
@@ -315,7 +320,7 @@ enum Uninstall {
 
 /// The fake as the oracle drives it in `startFailed`, but for its uninstall.
 struct FaultedUninstall<'a> {
-    inner: &'a ProcessDispatch,
+    inner: &'a FakeDispatch,
     root: &'a Path,
     fault: Uninstall,
 }
