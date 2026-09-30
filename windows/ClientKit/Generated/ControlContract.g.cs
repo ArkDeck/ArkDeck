@@ -137,7 +137,7 @@ public static class ControlContract
         ["agent.resume"] = "0394ad10f6827519da8f6249f3379e77bca3fcc999f54e0b4c11cfc1978c9a18",
         ["agent.run"] = "89e148ce1bf452c39186118b95a00e3be65a245c9470b4d0c0a0f4cc24255006",
         ["agent.status"] = "72279c4e0b17a8bb630f8755ef280cd7dbd8d5b4e1f3565890abe584651fa6ad",
-        ["artifact.export"] = "20f8d5af2874a440504d8f49ebd0241c560be78b255a1561a4e2d4b05385e03f",
+        ["artifact.export"] = "046ef7c0e29c1a9dfc204eb4f0d6edf5531dfc5faaa5af6414d5f1514d040b5c",
         ["artifact.import.abort"] = "1c465f894aa1e59fde2e9cbdbbce4c9ac3476d1b50a83fec26d01ea9c5166c5f",
         ["artifact.import.append"] = "888d5b50cfb4da7c7ecbfae00ab02742583b3c5e174d5ccbe55bc94f7a6d15c4",
         ["artifact.import.begin"] = "e31c9703121ac96de9fd3f493b3765d7074097ed95ebe5bc999163f2dbc522dd",
