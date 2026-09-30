@@ -97,7 +97,18 @@ struct Root(PathBuf);
 impl Root {
     fn new(fixture: &Path, name: &str) -> Self {
         let nonce = u64::from_ne_bytes(arkdeck_platform::random_bytes::<8>().unwrap());
-        let root = std::env::temp_dir().join(format!("ad-winagent-records-{name}-{nonce:016x}"));
+        // The temporary directory as the file system resolves it: the host
+        // store opens a directory only by that spelling, never by a short
+        // (`RUNNER~1`) or verbatim one, as the daemon's owners are opened.
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let temporary = match temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) => PathBuf::from(plain),
+            None => temporary,
+        };
+        let root = temporary.join(format!("ad-winagent-records-{name}-{nonce:016x}"));
         HostDirectory::open_or_create_private(&root).unwrap();
         for directory in [
             "targets-state",

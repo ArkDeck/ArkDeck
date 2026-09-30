@@ -169,3 +169,22 @@ and `ARKDECK_DEV_SIGNER_THUMBPRINT` exported:
 | `git diff --check` | 0 | clean |
 
 macOS and Ubuntu cannot be built here, so I reread the cfg pairings by hand. CI decides.
+
+## CI
+
+First head `2402e506` (PR #2391) was red on `Rust workspace (windows-latest)` (job
+109860394450). Both tests in `arkdeck-hoststore/tests/windows_agent_human_action_records.rs`
+panicked with `host snapshot refused`.
+
+- **Cause:** the hosted runner's `TEMP` is spelled short (`C:\Users\RUNNER~1\...`). The test named
+  its stores by `std::env::temp_dir()` as spelled. The host store opens a directory only by the
+  spelling the file system resolves: `open_or_create_private` created it, but `HostDirectory::open`
+  of the same short spelling refused it.
+- **Product path:** the daemon's own owners (`agent-executions`, `human-action-snapshots`) are
+  opened by the paths `StateRoot::private_child` answers, as #2385 settled for the Session owner.
+- **Fix:** the test's root is the resolved spelling of the temporary directory, as every other
+  Windows test here names it.
+- **Reproduced and verified here** with `TEMP`/`TMP` set to an 8.3 spelling
+  (`C:\Users\fuhan\AppData\Local\Temp\LONGTE~1`): before the fix both tests refuse as on CI. After
+  it, `cargo test -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-platform -p arkdeck-cli`
+  passes, with 242 test binaries and no `SKIPPED` line.
