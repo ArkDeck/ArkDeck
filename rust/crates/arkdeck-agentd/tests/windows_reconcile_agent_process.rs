@@ -669,7 +669,7 @@ fn jobs_are_reconciled_and_executions_answered_as_swift_s_across_a_restart() {
     assert!(
         first.seen.contains(
             &"arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, artifacts, imports, storage, \
-              workspaceProjects, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess"
+              history, workspaceProjects, planning, agentExecutions, humanActions, traceCache, flashHostFacts, deviceAccess"
                 .to_owned()
         ),
         "{:?}",

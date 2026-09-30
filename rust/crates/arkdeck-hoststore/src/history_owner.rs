@@ -189,9 +189,9 @@ impl HistoryStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_private::{create_private_directory, link, plant_owner_only, temporary_root};
     use std::{
         fs,
-        os::unix::fs::{DirBuilderExt, symlink},
         sync::{Arc, Barrier},
     };
     const NOW: &str = "2026-09-10T00:00:00.000Z";
@@ -199,11 +199,9 @@ mod tests {
     impl Root {
         fn new() -> Self {
             let nonce = arkdeck_platform::random_bytes::<16>().unwrap();
-            let path = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
-                .join(format!("history-owner-{:x}", u128::from_ne_bytes(nonce)));
-            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            let path =
+                temporary_root().join(format!("history-owner-{:x}", u128::from_ne_bytes(nonce)));
+            create_private_directory(&path);
             Self(path)
         }
         fn open(&self) -> HistoryStore {
@@ -296,11 +294,14 @@ mod tests {
             "2"
         );
     }
+    /// A corrupt document, and one reached through another name (a symbolic
+    /// link on macOS, a second hard link on Windows), are refused and never
+    /// replaced.
     #[test]
     fn corrupt_document_and_link_are_never_replaced() {
         let root = Root::new();
         let owner = root.open();
-        fs::write(root.0.join(DOCUMENT), b"corrupt").unwrap();
+        plant_owner_only(&root.0.join(DOCUMENT), b"corrupt");
         assert_eq!(
             owner
                 .handle("history.filter.save", &save("1"), NOW)
@@ -309,8 +310,9 @@ mod tests {
             "recordUnreadable"
         );
         assert_eq!(fs::read(root.0.join(DOCUMENT)).unwrap(), b"corrupt");
-        fs::remove_file(root.0.join(DOCUMENT)).unwrap();
-        symlink("missing", root.0.join(DOCUMENT)).unwrap();
+        let outside = root.0.join("outside.json");
+        fs::rename(root.0.join(DOCUMENT), &outside).unwrap();
+        link(&outside, &root.0.join(DOCUMENT));
         assert_eq!(
             owner
                 .handle("history.filter.save", &save("1"), NOW)
@@ -318,10 +320,114 @@ mod tests {
                 .code,
             "recordUnreadable"
         );
+        assert_eq!(fs::read(&outside).unwrap(), b"corrupt");
+        #[cfg(unix)]
         assert!(
             fs::symlink_metadata(root.0.join(DOCUMENT))
                 .unwrap()
                 .is_symlink()
         );
+    }
+
+    fn corpus(method: &str) -> Vec<Value> {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
+            "../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/{method}.jsonl"
+        ));
+        fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("{path:?}: {error}"))
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    fn params(frame: &Value) -> Map<String, Value> {
+        frame["params"].as_object().cloned().unwrap_or_default()
+    }
+
+    /// The owner's answer to a recorded frame, at `now`: the recorded result
+    /// exactly, or the recorded refusal's code and details (its message is
+    /// not compared).
+    fn replay(owner: &HistoryStore, frame: &Value, now: &str) {
+        let method = frame["method"].as_str().unwrap();
+        match owner.handle(method, &params(frame), now) {
+            Ok(result) => {
+                assert_eq!(frame["ok"], true, "{frame}: answered {result}");
+                assert_eq!(result, frame["result"], "{frame}");
+            }
+            Err(error) => {
+                assert_eq!(frame["ok"], false, "{frame}: refused {error:?}");
+                assert_eq!(error.code, frame["error"]["code"], "{frame}");
+                assert_eq!(
+                    error.details.map(Value::Object).unwrap_or(Value::Null),
+                    frame["error"]["details"],
+                    "{frame}"
+                );
+            }
+        }
+    }
+
+    /// The committed control-frame corpus's History filter answers
+    /// (`Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/
+    /// history.filter.*.jsonl`), replayed over one store in the order that
+    /// reaches each recorded generation, at the recorded time. The corpus's
+    /// `internalError` "History filter store is not configured" frames are
+    /// Swift's answer without a store, which a composed owner never gives.
+    /// The documents the owner writes are the store's frozen encoding, and
+    /// one Swift wrote (milliseconds in its time) reads as Swift answered it.
+    #[test]
+    fn the_recorded_history_filter_frames_replay_as_recorded() {
+        let (list, saves, deletes) = (
+            corpus("history.filter.list"),
+            corpus("history.filter.save"),
+            corpus("history.filter.delete"),
+        );
+        let at = "2026-09-10T14:16:42Z";
+        let root = Root::new();
+        let owner = root.open();
+        // The empty store, then the recorded `compile` filter at generation 2.
+        replay(&owner, &list[2], at);
+        let compile = json!({"expectedGeneration": "1", "search": "compile", "status": "all",
+            "mode": "all", "timeRange": "anyTime", "activity": "all", "sessionId": null,
+            "targetId": null});
+        owner
+            .handle("history.filter.save", compile.as_object().unwrap(), at)
+            .unwrap();
+        assert_eq!(
+            fs::read(root.0.join(DOCUMENT)).unwrap(),
+            b"{\"generation\":2,\"query\":{\"activity\":\"all\",\"mode\":\"all\",\"search\":\"compile\",\"status\":\"all\",\"timeRange\":\"anyTime\"},\"schemaVersion\":\"arkdeck.history-filter-store/1\",\"updatedAtUTC\":\"2026-09-10T14:16:42Z\"}\n"
+        );
+        replay(&owner, &list[4], at);
+        // Saved at 2 and 3; at 4 another holder of the lock refuses the save.
+        replay(&owner, &saves[1], at);
+        replay(&owner, &saves[2], at);
+        {
+            let other = HostDirectory::open(&root.0).unwrap();
+            let _held = other.lock_document(LOCK).unwrap();
+            replay(&owner, &saves[0], at);
+        }
+        // Saved once more to 5, where a stale generation's delete is refused,
+        // and deleted to 6; then nothing is left to delete.
+        owner
+            .handle("history.filter.save", &params(&saves[0]), at)
+            .unwrap();
+        replay(&owner, &deletes[3], at);
+        replay(&owner, &deletes[1], at);
+        replay(&owner, &list[3], at);
+        replay(&owner, &deletes[0], at);
+        assert_eq!(
+            fs::read(root.0.join(DOCUMENT)).unwrap(),
+            b"{\"generation\":6,\"schemaVersion\":\"arkdeck.history-filter-store/1\",\"updatedAtUTC\":\"2026-09-10T14:16:42Z\"}\n"
+        );
+
+        // The document Swift wrote for the recorded `flash` filter.
+        let swift = Root::new();
+        plant_owner_only(
+            &swift.0.join(DOCUMENT),
+            b"{\"generation\":2,\"query\":{\"activity\":\"flash\",\"mode\":\"execute\",\"search\":\"flash failure\",\"sessionID\":\"session-1\",\"status\":\"needsAttention\",\"targetID\":\"target-1\",\"timeRange\":\"lastWeek\"},\"schemaVersion\":\"arkdeck.history-filter-store/1\",\"updatedAtUTC\":\"2026-09-01T08:30:00.000Z\"}\n",
+        );
+        replay(&swift.open(), &list[5], at);
+        // An unreadable document is refused.
+        plant_owner_only(&swift.0.join(DOCUMENT), b"corrupt");
+        replay(&swift.open(), &list[0], at);
     }
 }

@@ -15,8 +15,8 @@
 //!   a guard and a pipe named after the root's file identity. Beside the
 //!   lifecycle only the Job store and its capability store, the Target
 //!   owners, the Artifact read and export owner, the Session owner, the
-//!   workspace project owner, the Job planner and admitter and the Trace
-//!   cache owner are composed over it (see
+//!   History filter owner, the workspace project owner, the Job planner and
+//!   admitter and the Trace cache owner are composed over it (see
 //!   [`Authority::compose`]); every input that would compose another
 //!   owner on macOS is refused, not ignored, until its store is ported (G01),
 //!   and a development HDC is admitted only by a registered Windows HDC
@@ -161,6 +161,10 @@ impl Authority {
     /// * the Session owner and the Artifact usage owner
     ///   ([`Self::session_store`]): `runtime.storage.*`, `session.list|show|
     ///   pin|unpin`, `session.cleanup.*` and `session.export.*`;
+    /// * the History filter owner (`HistoryStore`, [`Self::history_store`]):
+    ///   `history.filter.list|save|delete` over `history-filter.json` under
+    ///   `.history-filter.lock`, the same document as on macOS, in the root's
+    ///   private `history-filter`;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -264,6 +268,7 @@ impl Authority {
                 },
             )?
         });
+        let host = host.with_history(self.history_store()?);
         // Beside the Job state, as the macOS daemons keep their agent
         // executions, and the combined human-action owner in its own
         // directory beside them (over no control-action owner: none is built
@@ -505,6 +510,30 @@ impl Authority {
         arkdeck_hoststore::TraceCacheStore::open(&traces).map_err(|error| unusable(&traces, error))
     }
 
+    /// The History filter owner over the root's private `history-filter`
+    /// (created owner-only when absent, an existing one opened as it is).
+    /// Both macOS compositions keep `history-filter.json` and its lock in
+    /// the state directory itself; the host store cannot open a Windows
+    /// root itself (a development root is any directory of this user, the
+    /// account's root grants SYSTEM, ruling 23), so the same document and
+    /// lock live one level down, as the Job store's do. The store reopens
+    /// its directory on every request, so a directory made unsafe later
+    /// fails that request only.
+    fn history_store(&self) -> Result<arkdeck_hoststore::HistoryStore, String> {
+        const NAME: &str = "history-filter";
+        let unusable = |path: &Path, error: std::io::Error| {
+            format!(
+                "the History filter store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        };
+        let path = self
+            .root
+            .private_child(NAME)
+            .map_err(|error| unusable(&self.root.path().join(NAME), error))?;
+        arkdeck_hoststore::HistoryStore::open(&path).map_err(|error| unusable(&path, error))
+    }
+
     /// The Session storage owner: its settings in the private `session-state`
     /// and its default Sessions root, the Artifact usage owner (`artifacts`)
     /// the one the Artifact read owner reads.
@@ -565,6 +594,7 @@ impl Authority {
                     "control-action-snapshots",
                     "evolution-workspaces",
                     "workspace-projects",
+                    "history-filter",
                 ]
                 .into_iter()
                 .map(|name| root.join(name))
