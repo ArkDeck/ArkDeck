@@ -57,6 +57,14 @@ fn resource() -> PathBuf {
         .join("arkdeck-code-sign-enable")
 }
 
+/// The helper resource's bytes when this checkout has it: the isolated
+/// contract view keeps only `rust/` and the contract inputs, so its absence
+/// there is not a failure (as `operation_availability_control.rs` and
+/// `native_library.rs` read the same resource).
+fn resource_bytes() -> Option<Vec<u8>> {
+    std::fs::read(resource()).ok()
+}
+
 /// A fresh directory below the temporary directory, removed afterwards.
 struct Scratch(PathBuf);
 impl Scratch {
@@ -274,7 +282,9 @@ fn started(executable: &Path) -> (Vec<String>, String, Value) {
 #[test]
 fn the_bundled_helper_is_verified_composed_and_waits_behind_the_hdc_gate() {
     let _turn = turn();
-    let bytes = std::fs::read(resource()).unwrap();
+    let Some(bytes) = resource_bytes() else {
+        return;
+    };
     let (_directory, executable) = installed(Some(&bytes));
     let (seen, census, deployment) = started(&executable);
     assert_eq!(
@@ -299,13 +309,11 @@ fn the_bundled_helper_is_verified_composed_and_waits_behind_the_hdc_gate() {
 #[test]
 fn a_helper_that_does_not_verify_is_reported_and_the_daemon_serves_without_it() {
     let _turn = turn();
-    for (name, bytes) in [
-        ("not an ELF", b"not an ELF".to_vec()),
-        (
-            "a truncated helper",
-            std::fs::read(resource()).unwrap()[..4096].to_vec(),
-        ),
-    ] {
+    let mut helpers = vec![("not an ELF", b"not an ELF".to_vec())];
+    if let Some(bytes) = resource_bytes() {
+        helpers.push(("a truncated helper", bytes[..4096].to_vec()));
+    }
+    for (name, bytes) in helpers {
         let (_directory, executable) = installed(Some(&bytes));
         let (seen, census, deployment) = started(&executable);
         assert!(
