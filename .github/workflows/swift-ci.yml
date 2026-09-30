@@ -334,17 +334,20 @@ jobs:
       ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
 
   # The Windows client (TASK-XPA-007): ArkDeck.ClientKit's generated contract
-  # bindings, build and MSTest suite on a hosted Windows x64 runner. Git keeps
-  # repository bytes (autocrlf off): the generator check, the embedded schema
-  # digests and the recorded-corpus wire tests compare exact bytes. The
-  # end-to-end test against a development-signed daemon needs a built daemon
-  # and a host-trusted signer, so it reports itself skipped here; it runs on
-  # the Windows reference host. A hosted run is no Windows device acceptance.
+  # bindings, the App's generated strings (spec/ui-semantics -> .resw, equal to
+  # the macOS .xcstrings) and design tokens, then the build (ClientKit, App.Core,
+  # the WinUI 3 App, the tests) and the MSTest suites on a hosted Windows x64
+  # runner. Git keeps repository bytes (autocrlf off): the generator checks, the
+  # embedded schema digests and the recorded-corpus wire tests compare exact
+  # bytes. The end-to-end test against a development-signed daemon and the UIA
+  # tests of the running App need a built daemon, a host-trusted signer and a
+  # desktop session, so they report themselves skipped here; they run on the
+  # Windows reference host. A hosted run is no Windows device acceptance.
   windows-clientkit:
     needs: plan
     if: needs.plan.outputs.windows == 'true'
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -373,10 +376,16 @@ jobs:
       - name: ClientKit generated contract bindings
         run: python windows/scripts/generate-clientkit.py --check
 
+      - name: App strings generated from the shared UI semantics
+        run: python windows/scripts/generate-ui-strings.py --check
+
+      - name: App design tokens generated from tokens.css
+        run: python windows/scripts/generate-xaml-tokens.py --check
+
       - name: Build the Windows client solution
         run: dotnet build windows/ArkDeck.Windows.slnx -c Release
 
-      - name: ClientKit tests
+      - name: Windows client tests
         run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
 
   # Stable required-check name.  A job-level skip is a successful no-op;
