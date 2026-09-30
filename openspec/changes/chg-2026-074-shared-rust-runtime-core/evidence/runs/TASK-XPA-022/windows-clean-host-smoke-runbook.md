@@ -8,7 +8,8 @@ only processes the record that is handed back.
 This runbook details §5 of `docs/design/cross-platform/windows-phase-a-runbook.md`. Where the two
 differ, the steps here apply, and they say why. The App now pins a production daemon by its
 publisher identity as the CLI does, so `package-rc.ps1 -SmokeZip <production zip>` also runs on
-the reference host. The MSIX daemon's package identity is still unsettled; see "Current limits".
+the reference host. The MSIX daemon is pinned by the same publisher identity; see "Current
+limits".
 
 A clean-host PASS is evidence for the packaging exit condition 7. It is not GJ acceptance and not
 device evidence: this runbook never connects a board and never runs `hdc`.
@@ -57,16 +58,16 @@ any means.
 
 Current limits that shape the steps:
 
-- **Both clients pin the xcopy daemon by publisher identity (ruling 17).** The CLI and the App
-  read the same `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and `ARKDECK_DAEMON_PUBLISHER_EKU`; no
-  certificate hash is pinned. The MSIX App is pinned by its package family.
-- **The packaged daemon's identity is not settled.** A process has a package family only if it
-  was activated with package identity. A CLI outside the package that starts
-  `<InstallLocation>\arkdeck-agentd.exe` directly starts it *without* one, so a
-  package-family pin cannot hold. How the MSIX daemon is started with its package identity is
-  an open XPA-022 design point: for example, a `desktop4`/`uap5` execution alias for the
-  daemon, or the App launching it as a full-trust process. Until it is settled, expect step 8
-  to refuse with a package-family mismatch, and record that rather than working around it.
+- **Both clients pin the daemon by publisher identity (ruling 17), in both forms.** The CLI and
+  the App read the same `ARKDECK_DAEMON_PUBLISHER_ORGANIZATION` and
+  `ARKDECK_DAEMON_PUBLISHER_EKU`; no certificate hash is pinned.
+- **The MSIX daemon has no package identity when the CLI starts it.** A process has a package
+  family only if it was activated with package identity, and the CLI starts
+  `<InstallLocation>\arkdeck-agentd.exe` directly. The MSIX form is therefore pinned by the
+  publisher identity too: the daemon inside the package is the same signed file as in the zip
+  (delegated minor decision, pending the next rulings batch; options in
+  `evidence/runs/TASK-XPA-007/clientkit-publisher-pin-run.md`). A package family configured
+  beside it changes nothing; configured alone it refuses, which step 8 checks.
 - **Neither the CLI nor the App starts a daemon of another package form.** Run the xcopy smoke
   and the MSIX smoke one after the other, never side by side (they share
   `%LOCALAPPDATA%\ArkDeck\Agentd`, ruling 8).
@@ -170,16 +171,28 @@ Get-AppxPackage -Name <msix.identityName> | Format-List Name, Publisher, Version
 
 ### 8. MSIX form: first start and the App (standard user)
 
-The packaged App finds its daemon beside it and pins it by the package family:
+The packaged App finds its daemon beside it. Both clients pin it by the publisher identity (see
+"Current limits"). A Start-menu launch reads the user's persistent environment, so set the two
+publisher variables there:
 
 ```powershell
 $pkg = Get-AppxPackage -Name <msix.identityName>
+$daemon = Join-Path $pkg.InstallLocation 'arkdeck-agentd.exe'
+# First the negative: the package family alone cannot prove a CLI-started daemon.
 $env:ARKDECK_DAEMON_PACKAGE_FAMILY = $pkg.PackageFamilyName
-$env:ARKDECK_DAEMON_PATH = Join-Path $pkg.InstallLocation 'arkdeck-agentd.exe'
-& (Join-Path $pkg.InstallLocation 'bin\arkdeck.exe') --output json doctor   # see "Current limits": a package-family refusal is the expected answer today
+$env:ARKDECK_DAEMON_PATH = $daemon
+& (Join-Path $pkg.InstallLocation 'bin\arkdeck.exe') --output json doctor   # expect: refused, no answer from a daemon
+# Then the configuration users get.
+Remove-Item Env:\ARKDECK_DAEMON_PACKAGE_FAMILY
+[Environment]::SetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_ORGANIZATION', $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_ORGANIZATION, 'User')
+[Environment]::SetEnvironmentVariable('ARKDECK_DAEMON_PUBLISHER_EKU', $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_EKU, 'User')
+$env:ARKDECK_DAEMON_PUBLISHER_ORGANIZATION = $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_ORGANIZATION
+$env:ARKDECK_DAEMON_PUBLISHER_EKU = $rc.daemonConfiguration.ARKDECK_DAEMON_PUBLISHER_EKU
+& (Join-Path $pkg.InstallLocation 'bin\arkdeck.exe') --output json doctor   # expect: exit 0, "ok": true (it starts the packaged daemon)
 ```
 
-Start ArkDeck from the Start menu and expect the same Overview as in step 5. Then confirm ruling 8:
+Start ArkDeck from the Start menu and expect the same Overview as in step 5. Remove the two
+user variables after step 10. Then confirm ruling 8:
 `Test-Path "$env:LOCALAPPDATA\ArkDeck\Agentd\instance.json"` must be `True`, which is the
 physical, unvirtualized path.
 
