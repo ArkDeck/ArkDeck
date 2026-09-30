@@ -1667,6 +1667,7 @@ fn materialization_hold_blocks_release_and_failed_planning_drops_it() {
 #[cfg(target_os = "macos")]
 #[test]
 fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
+    use std::os::unix::fs::PermissionsExt;
     let fixture = Fixture::new();
     let store = fixture.store();
     let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
@@ -1789,6 +1790,7 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
 #[cfg(target_os = "macos")]
 #[test]
 fn missing_terminal_job_directory_cannot_clear_import_references() {
+    use std::os::unix::fs::PermissionsExt;
     let fixture = Fixture::new();
     let store = fixture.store();
     let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
@@ -2290,6 +2292,7 @@ fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
 
 #[cfg(target_os = "macos")]
 fn lifecycle_analyzer(fixture: &Fixture) -> arkdeck_hoststore::AnalyzerProfile {
+    use std::os::unix::fs::PermissionsExt;
     let analyzer = fixture.root.join("counted-analyzer");
     // Planning reads the executable's identity; only a dispatched child creates
     // this sibling marker. It is an isolated host test, never a device command.
