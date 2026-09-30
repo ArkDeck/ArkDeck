@@ -146,7 +146,10 @@ cargo run -p arkdeck-cli -- --output json device candidates
 ```
 
 The CLI verifies health on the authenticated connection before the business
-request. It never starts a daemon or reconnects/replays a lost request. A normal
+request. It never reconnects to or replays a lost request. On macOS and Unix it
+never starts a daemon (the LaunchAgent manages the installed one); on Windows it
+starts the daemon it needs when that daemon's pipe is absent (decision 11, see
+the Windows paragraph below). A normal
 `doctor` returns its report even when readiness is false; `--require-healthy`
 returns exit 69 for that report. All 30 Catalog operations are unavailable
 because this phase has no operation execution provider. Without a usable HDC
@@ -217,7 +220,9 @@ Without input it is the account's daemon over `%LOCALAPPDATA%\ArkDeck\Agentd`,
 resolved with `SHGetKnownFolderPath(FOLDERID_LocalAppData)` for its own token
 (the variable is not read) and created owner-only (owner and a protected DACL of
 the user SID and SYSTEM); `cargo run -p arkdeck-agentd` therefore creates that
-directory. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
+directory. An existing `ArkDeck` or `Agentd` directory whose DACL grants anyone
+but the user and SYSTEM anything (or has no DACL) refuses the start; its access is
+never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
 text) instead; only the lifecycle is composed over it, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
@@ -249,9 +254,65 @@ the guard, on the thread that took it, and prints `arkdeck-agentd stopped`; one
 the deadline cut short exits holding them. A successor that finds the guard
 abandoned (`WAIT_ABANDONED`, its holder died with it) says so and starts as the
 start after a crash that every start already is; nothing is replayed.
-`tests/windows_lifecycle_process.rs` drives these over development roots. The
-CLI does not start the daemon yet (decision 11), and its daemon identity check
-is unchanged.
+`tests/windows_lifecycle_process.rs` drives these over development roots.
+
+The Windows daemon is started by its client and is single-instance (CHG-2026-074
+r12 decision 11; TASK-XPA-002, `crates/arkdeck-client/src/start.rs`, the
+implementation choices proposed for maintainer review in the
+[run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-002/client-started-daemon-run.md)).
+Before a command sends anything, the CLI resolves the daemon it may start: the
+account's (no `ARKDECK_ENDPOINT`), or a development root's
+(`ARKDECK_DEVELOPMENT_STATE_ROOT`, reached on the root's own pipe; an
+`ARKDECK_ENDPOINT` beside it must be that pipe). A private `ARKDECK_ENDPOINT`
+names a daemon no client starts. Only when that pipe is absent does the client
+take the starters' turn (a named mutex `<guard>.Start` beside the guard, so
+concurrent starters launch one daemon), look at the pipe again, and launch the
+pinned image (`ARKDECK_DAEMON_PATH` or the CLI's sibling). Before launch it checks
+that file: a trusted Authenticode signature by the pinned certificate. A package
+family can only be proved on a running process. With no identity configured,
+nothing is launched. The image is held against replacement while it is launched
+detached: `DETACHED_PROCESS`, no console window, no inherited handle and no
+standard streams, the image alone as its argument array, in its own directory,
+with the caller's environment minus `ARKDECK_ENDPOINT`. The client waits up to 20
+seconds for the pipe. It then makes the same check every connection makes: the
+pipe owner SID and the server process's image path and signer pin or package
+family. A process that fails that check is reported with the PID this client
+started (`runtimeUnavailable`, `details.daemonStart.outcome` `identityRefused`)
+and is never trusted. A daemon that finds the root held exits `already running`,
+and the holder's pipe is used. No frame is sent while starting, and a request
+lost later is never replayed. Nothing starts a daemon again within a command.
+
+`runtime service status|verify|restart` are the Windows forms of the LaunchAgent
+leaves (`crates/arkdeck-cli/src/runtime_service_windows.rs`). They use the macOS
+envelopes and exit statuses, with `daemonService` where macOS has
+`launchAgent`. None of them starts anything except restart's successor.
+`status` reports the installed image (`daemonImage`), the state root (its kind,
+path, presence, and `accessFindings`: grants to anyone but the user and SYSTEM)
+and the pipe. It also reports the daemon's `health` over a verified connection
+when the pipe exists.
+
+`verify` succeeds (`runtimeVerified: true`) when the image is the pinned one and
+the account's root is absent (the first start creates it owner-only) or
+owner-only. A daemon that runs must also prove its identity and answer `health`
+(`runtime`, else `null`). Otherwise the document comes with exit 69. `--job`,
+`--target` and `--execution-id` are `unsupportedOnPlatform` for now.
+
+`restart` refuses a service that is not ready or has no running daemon (69) and
+current Jobs as macOS does (75). A daemon that composes no Job owner has none.
+Otherwise it sets the running daemon's stop event and waits, within
+`--maximum-wait-seconds` (default 30), for its single-instance guard. It then
+starts the successor through the client start path and proves a new PID, the
+same catalog digest and the same closed Jobs (`restartProof`). A drain its
+deadline cut short leaves the guard abandoned: `restart.drain` says
+`deadlineElapsed`, the guard stays abandoned, and the successor starts as after
+a crash.
+
+`install`, `update`, `uninstall` and the `agentd` spellings stay macOS-only.
+`tests/windows_client_start_process.rs` (in `arkdeck-agentd`) and the CLI's
+`tests/windows_runtime_service.rs` drive these. The signed paths use a copy of
+the daemon signed with the host-trusted development signer
+(`ARKDECK_DEV_SIGNER_THUMBPRINT`, `scripts/windows-dev-identity.ps1`) and are
+skipped, saying so, without one.
 
 ## Isolated macOS History owner
 
