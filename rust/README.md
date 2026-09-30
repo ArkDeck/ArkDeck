@@ -626,6 +626,13 @@ job_journal_writer` must reproduce both from the same records, and
 `JournalRustWriterParityContractTests` holds Swift to the same bytes. Re-record
 from Swift with `ARKDECK_RUST_JOURNAL_WRITER_RECORD=/private/tmp/<new>`.
 
+On Windows the host primitive under the writer, `HostJournalAppender`, and the
+rest of the durable host store have their NTFS implementation (TASK-XPA-005,
+`crates/arkdeck-platform/README.md`): `.manifest.lock` held with `LockFileEx`,
+`FlushFileBuffers` for fsync + `F_FULLFSYNC`, the same names and bytes. The
+writer itself stays macOS-gated until its decoders' host text and time
+primitives (G03/G04 of the TASK-XPA-004 gate inventory) are portable.
+
 ## Job index and record writers (TASK-XPA-014)
 
 `arkdeck_hoststore::JobStore::open_owner` opens a state root for the Rust Job

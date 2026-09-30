@@ -17,9 +17,13 @@ use windows_sys::Win32::System::IO::*;
 use windows_sys::Win32::System::Pipes::*;
 use windows_sys::Win32::System::Threading::*;
 
+mod account;
+mod host_fs;
+pub(crate) mod host_store;
 mod identity;
 mod process;
 mod server;
+pub use account::{application_support_directory, arkdeck_application_support_root};
 pub(crate) use identity::{FileIdentity, file_identity, lock_namespace, reject_reparse_file};
 use identity::{LocalAllocation, ProcessIdentity, Token, require_pipe_owner};
 pub(crate) use process::spawn;

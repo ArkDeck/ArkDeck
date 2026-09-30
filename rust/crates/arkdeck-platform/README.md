@@ -48,6 +48,44 @@ client handle, since the [Microsoft reference](https://learn.microsoft.com/en-us
 still describes a `CreateNamedPipe` handle. Pipe access rights follow
 [Named Pipe Security and Access Rights](https://learn.microsoft.com/en-us/windows/win32/ipc/named-pipe-security-and-access-rights).
 
+## Durable host store on NTFS (TASK-XPA-005)
+
+`src/windows/host_store.rs`, `host_journal.rs` and `host_fs.rs` give Windows the
+same `HostDirectory`, `HostReadLock`, `HostDocument`, `HostJournal` and
+`HostJournalAppender` surface as the Unix `host_store.rs`, with the same file
+names and bytes (T0): only the OS primitive under each check differs, chosen
+from the SPK-5 facts measured on NTFS.
+
+| Unix | Windows |
+| --- | --- |
+| `openat(dirfd, name, O_NOFOLLOW)` | `NtCreateFile` relative to the held directory handle with `FILE_OPEN_REPARSE_POINT`, a reparse point refused; every handle shares read, write and delete |
+| `fstat` dev/ino, size, mtime/ctime | `FileIdInfo` (volume serial, file id), `FileStandardInfo`, `FileBasicInfo` last-write and change times; a file id beyond 64 bits (ReFS) is refused, never folded |
+| owner = euid; mode `0600`/`0700`, no group or other bits | owner SID = token user; the DACL grants nobody else anything (a Session tree: nobody else any write right); entries are created with an explicit protected owner-only DACL |
+| `flock(LOCK_EX)` on the separate lock files | `LockFileEx` on one byte at offset 2^64-2 of the same lock files: NTFS locks are mandatory, so the lock never covers a byte anyone reads (the catalog marker in byte 0 stays readable); released when the holder dies |
+| `renameat`, `renameatx_np(RENAME_EXCL)` | `NtSetInformationFile(FileRenameInformationEx)` with POSIX semantics, replacing or not, relative to the directory handle; readers holding the old file keep its bytes |
+| `unlinkat` | `FileDispositionInfoEx` delete with POSIX semantics |
+| `fsync`, `F_FULLFSYNC`, directory `fsync` | `FlushFileBuffers`; directories the store writes in are held with add-entry rights, which a directory flush needs |
+| `O_APPEND` | `WriteFile` at the documented end-of-file offset |
+| `canonicalize() == path` | the held handle's `GetFinalPathNameByHandleW` equals the path (plain or `\\?\` spelling): no junction, link, short name or other case |
+| volume UUID | the volume GUID of the held handle, in the same `uuid:` spelling |
+
+`application_support_directory()` is the account's `FOLDERID_LocalAppData`
+(Known Folder API, never the `LOCALAPPDATA` variable, as Unix ignores `HOME`);
+`arkdeck_application_support_root()` is its `ArkDeck` child. Not yet on
+Windows: the export, import-upload, update, trace-removal, session-removal,
+diagnostic-log and payload-cache submodules, and the `std::fs::Metadata`-typed
+`document_metadata`/`remove_document`. `PayloadCheck::Unopenable` carries a
+Win32 error code on Windows. `HostJournal::generation` is 0 on NTFS, whose
+file reference already carries a reuse sequence number.
+
+`tests/windows_host_store.rs` replays a macOS-recorded Job journal through a
+process that dies inside an append (mid-record, and after the record's flush),
+repairs the byte-prefix tail in the next process, completes the journal to the
+recorded bytes and reads it back under the lock. It also covers the refusals
+(hard links, junctions, foreign ACEs, reserved name characters, non-canonical
+paths), lock exclusion within and across processes and its release on kill,
+and readers that keep their bytes across a replace.
+
 ## Validation
 
 ```sh

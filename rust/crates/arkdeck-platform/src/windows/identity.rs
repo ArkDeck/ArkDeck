@@ -106,7 +106,7 @@ impl Drop for LocalAllocation {
 
 pub(crate) struct Sid(Vec<u32>);
 impl Sid {
-    fn copy(pointer: PSID) -> io::Result<Self> {
+    pub(crate) fn copy(pointer: PSID) -> io::Result<Self> {
         // SAFETY: only called with pointers from a live token/security descriptor.
         if pointer.is_null() || unsafe { IsValidSid(pointer) } == 0 {
             return Err(denied("invalid security identifier"));
@@ -119,7 +119,7 @@ impl Sid {
         Ok(Self(storage))
     }
 
-    fn pointer(&self) -> PSID {
+    pub(crate) fn pointer(&self) -> PSID {
         self.0.as_ptr().cast_mut().cast()
     }
     pub(crate) fn equals(&self, other: &Self) -> bool {
@@ -224,7 +224,7 @@ impl Token {
         let storage = self.information(TokenOwner)?;
         Sid::copy(storage.header::<TOKEN_OWNER>()?.Owner)
     }
-    fn user(&self) -> io::Result<Sid> {
+    pub(crate) fn user(&self) -> io::Result<Sid> {
         let storage = self.information(TokenUser)?;
         Sid::copy(storage.header::<TOKEN_USER>()?.User.Sid)
     }
