@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ClientKit/ArkDeck.ClientKit.csproj" />
+  <Project Path="ClientKit.Tests/ArkDeck.ClientKit.Tests.csproj" />
+</Solution>

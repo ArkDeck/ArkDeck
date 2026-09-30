@@ -18,19 +18,25 @@ Two host facts decide whether a run may become a baseline at all:
   that reason), and SPK-1 fails outright when p95 moves more than 30% between
   runs.  A loaded host is therefore refused up front instead of quietly
   producing a number that will not reproduce.
+
+On Windows the daemon serves a named pipe named after its development root,
+which it records in the root's `instance.json`; every host fact above is read
+through the Windows counterpart `windows_host` documents.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import tempfile
 import time
 
-from . import clocks, control, observations
+from . import clocks, control, observations, windows_host
 
 SOCKET_NAME = "agentd.sock"
 # Darwin's sun_path is 104 bytes including the terminator.
@@ -54,7 +60,18 @@ class DaemonStartFailed(RuntimeError):
     """The isolated daemon did not reach a healthy state within its budget."""
 
 
-def load_average() -> tuple[float, float, float]:
+def on_windows() -> bool:
+    return windows_host.IS_WINDOWS
+
+
+def load_average() -> tuple[float, ...]:
+    """The load figures; callers read only the first, the one-minute load.
+
+    Windows keeps no load average: its one figure is the CPUs kept busy over a
+    one-second window (`windows_host.LOAD_SOURCE`).
+    """
+    if on_windows():
+        return (windows_host.load_equivalent(cpu_count()),)
     return os.getloadavg()
 
 
@@ -120,13 +137,19 @@ def host_facts() -> dict[str, object]:
     home directory: a baseline document is committed to the repository.
     """
 
-    return {
+    facts = {
         "os": platform.system(),
         "osVersion": platform.mac_ver()[0] or platform.release(),
         "arch": platform.machine(),
         "cpuCount": cpu_count(),
         "python": platform.python_version(),
     }
+    if on_windows():
+        # platform.release() says only "10" or "11"; the build names the host.
+        facts["osVersion"] = windows_host.os_version()
+        facts["hostTag"] = windows_host.host_tag(facts["arch"])
+        facts["loadSource"] = windows_host.LOAD_SOURCE
+    return facts
 
 
 def _run(arguments: list[str], timeout: float = 30.0) -> subprocess.CompletedProcess:
@@ -153,19 +176,50 @@ class ProcessResources:
         self.cpu_percent: float | None = None
         self.thread_count: int | None = None
         self.open_file_descriptor_count: int | None = None
+        # Windows only: open handles and private bytes.
+        self.handle_count: int | None = None
+        self.private_bytes: int | None = None
         self.unmeasured: dict[str, str] = {}
 
     def as_document(self) -> dict[str, object]:
-        return {
+        document = {
             "residentSetBytes": self.resident_set_bytes,
             "cpuPercent": self.cpu_percent,
             "threadCount": self.thread_count,
             "openFileDescriptorCount": self.open_file_descriptor_count,
             "unmeasured": dict(self.unmeasured),
         }
+        if on_windows():
+            document["residentSetSource"] = "WorkingSetSize"
+            document["handleCount"] = self.handle_count
+            document["privateBytes"] = self.private_bytes
+        return document
+
+
+def _sample_windows_process(pid: int) -> ProcessResources:
+    sample = ProcessResources()
+    try:
+        facts = windows_host.process_resources(pid)
+    except OSError as error:
+        reason = f"process counters unreadable: {type(error).__name__}"
+        for field in ("residentSetBytes", "cpuPercent", "threadCount", "handleCount", "privateBytes"):
+            sample.unmeasured[field] = reason
+        return sample
+    sample.resident_set_bytes = facts["workingSetBytes"]
+    sample.cpu_percent = facts["cpuPercent"]
+    sample.thread_count = facts["threadCount"]
+    sample.handle_count = facts["handleCount"]
+    sample.private_bytes = facts["privateBytes"]
+    if sample.thread_count is None:
+        sample.unmeasured["threadCount"] = "process absent from the Toolhelp snapshot"
+    sample.unmeasured["openFileDescriptorCount"] = (
+        "Windows has no descriptor table; open handles are handleCount")
+    return sample
 
 
 def sample_process_resources(pid: int) -> ProcessResources:
+    if on_windows():
+        return _sample_windows_process(pid)
     sample = ProcessResources()
 
     completed = _run(["ps", "-o", "rss=,%cpu=", "-p", str(pid)])
@@ -226,7 +280,16 @@ class IsolatedRuntime:
         self.socket_path = state_directory / SOCKET_NAME
         self.process: subprocess.Popen | None = None
         self.start_diagnostics: dict[str, object] = {}
-        if len(str(self.socket_path).encode("utf-8")) > MAXIMUM_SOCKET_PATH_BYTES:
+        # Windows: the pipe the development root's daemon names in its
+        # instance document, learned at the first start (every later start of
+        # the root serves the same name, derived from the root's file identity).
+        self.endpoint: str | None = None
+        self._output = None
+        if on_windows():
+            if runtime_kind != "rust":
+                raise ValueError("the Windows capture measures the Rust daemon only")
+            self.socket_path = None
+        elif len(str(self.socket_path).encode("utf-8")) > MAXIMUM_SOCKET_PATH_BYTES:
             raise ValueError(
                 f"socket path {self.socket_path} exceeds {MAXIMUM_SOCKET_PATH_BYTES} "
                 "bytes; choose a shorter state directory"
@@ -255,7 +318,11 @@ class IsolatedRuntime:
             if key.startswith("ARKDECK_"):
                 environment.pop(key)
         arguments = [str(self.daemon_executable)]
-        if self.runtime_kind == "rust":
+        if on_windows():
+            # A development root's pipe is named after the root; naming
+            # another endpoint is refused by the daemon.
+            environment["ARKDECK_DEVELOPMENT_STATE_ROOT"] = str(self.state_directory)
+        elif self.runtime_kind == "rust":
             environment["ARKDECK_DEVELOPMENT_STATE_ROOT"] = str(self.state_directory)
             environment["ARKDECK_ENDPOINT"] = str(self.socket_path)
         else:
@@ -267,23 +334,30 @@ class IsolatedRuntime:
             "pollSleepCount": 0, "pollSleepTotalSeconds": 0.0,
             "pollSleepMaxSeconds": 0.0,
         }
+        # Windows keeps the daemon's own words: a start that fails there is
+        # otherwise only an exit status (the Unix harness keeps DEVNULL).
+        self._close_output()
+        if on_windows():
+            self._output = tempfile.TemporaryFile()
+        output = self._output if on_windows() else subprocess.DEVNULL
         started = clocks.awake_seconds()
         self.process = subprocess.Popen(
             arguments,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=output,
+            stderr=output,
             env=environment,
         )
         self.start_diagnostics["spawnReturnedSeconds"] = clocks.awake_seconds() - started
         deadline = clocks.Deadline(budget_seconds)
         while not deadline.expired():
             if self.process.poll() is not None:
+                said = self._daemon_output()
                 raise DaemonStartFailed(
                     f"daemon exited with status {self.process.returncode} before "
-                    "answering health"
+                    "answering health" + (f": {said}" if said else "")
                 )
             self.start_diagnostics["socketPollCount"] += 1
-            if self.socket_path.exists():
+            if self._endpoint_ready():
                 self.start_diagnostics.setdefault("socketObservedSeconds", clocks.awake_seconds() - started)
                 self.start_diagnostics["connectionAttempts"] += 1
                 # These completion fields describe this connection attempt only.
@@ -292,8 +366,9 @@ class IsolatedRuntime:
                 phase = "connect"
                 try:
                     client = control.ControlClient(
-                        str(self.socket_path),
+                        self._address(),
                         timeout_seconds=max(0.001, min(1.0, deadline.remaining_seconds())),
+                        expected_server_pid=self._expected_server_pid(),
                     )
                     try:
                         client.connect()
@@ -337,20 +412,85 @@ class IsolatedRuntime:
             f"daemon did not answer health within {budget_seconds:.0f}s"
         )
 
+    def _close_output(self) -> None:
+        output = getattr(self, "_output", None)
+        if output is not None:
+            output.close()
+        self._output = None
+
+    def _daemon_output(self) -> str:
+        """The daemon's bounded output on Windows, with the state root, the
+        profile and every SID replaced, so it can enter the raw record."""
+        if getattr(self, "_output", None) is None:
+            return ""
+        text = observations.bounded_log(self._output)["text"]
+        text = text.replace(str(self.state_directory), "<state-root>")
+        text = text.replace(os.path.expanduser("~"), "<home>")
+        text = re.sub(r"S-1-[0-9]+(?:-[0-9]+)+", "<sid>", text)
+        self.start_diagnostics["daemonOutput"] = text
+        return " ".join(text.split())
+
+    def _endpoint_ready(self) -> bool:
+        """The Unix socket exists; on Windows the daemon's pipe does.
+
+        The pipe's name is learned once, from the instance document of the
+        first daemon on the fresh root (published after the pipe is bound);
+        every later start of the same root serves the same name, which is
+        then only waited for (`WaitNamedPipe`, which does not connect). The
+        document is not read again: an open handle on it while a restarting
+        daemon replaces it fails that daemon's start with a sharing violation.
+        """
+        if not on_windows():
+            return self.socket_path.exists()
+        if self.endpoint is not None:
+            return windows_host.pipe_exists(self.endpoint)
+        try:
+            document = json.loads((self.state_directory / "instance.json").read_bytes())
+        except (OSError, ValueError):
+            return False
+        if not isinstance(document, dict):
+            return False
+        endpoint = document.get("socketPath")
+        if (document.get("pid") != self.process.pid or not isinstance(endpoint, str)
+                or not endpoint.startswith(windows_host.PIPE_PREFIX + "arkdeck-agentd-dev-")):
+            return False
+        self.endpoint = endpoint
+        return True
+
+    def _address(self) -> str:
+        return self.endpoint if on_windows() else str(self.socket_path)
+
+    def _expected_server_pid(self) -> int | None:
+        return self.process.pid if on_windows() and self.process is not None else None
+
     def client(self) -> control.ControlClient:
-        return control.ControlClient(str(self.socket_path))
+        return control.ControlClient(self._address(), expected_server_pid=self._expected_server_pid())
+
+    def _request_stop(self) -> None:
+        """SIGTERM, or on Windows the daemon's named stop event: both drain.
+        A daemon whose stop event cannot be set is ended outright."""
+        if not on_windows():
+            self.process.terminate()
+            return
+        try:
+            if self.endpoint is None:
+                raise OSError("the daemon never named its pipe")
+            windows_host.request_stop(self.endpoint, self.process.pid)
+        except (OSError, ValueError):
+            self.process.terminate()
 
     def stop(self, budget_seconds: float = 30.0) -> None:
         if self.process is None:
             return
         if self.process.poll() is None:
-            self.process.terminate()
+            self._request_stop()
             try:
                 self.process.wait(timeout=budget_seconds)
             except subprocess.TimeoutExpired:
                 self.process.kill()
                 self.process.wait(timeout=budget_seconds)
         self.process = None
+        self._close_output()
 
     def __enter__(self) -> "IsolatedRuntime":
         return self

@@ -90,6 +90,17 @@ def _toolchain_facts(daemon: pathlib.Path, soak: pathlib.Path) -> dict[str, obje
 # must never be committed as the baseline.
 RELEASE_CONFIGURATION = "release"
 
+# No Windows reference baseline exists until phase A commits one on a quiet
+# reference host. Until then a Windows capture is archived, never compared.
+WINDOWS_CAPTURE_ONLY = (
+    "capture-only: a Windows capture is archived without baseline comparison "
+    "until phase A commits a Windows reference baseline"
+)
+
+
+def capture_only(document: dict) -> bool:
+    return document.get("captureOnly") is True
+
 
 def capture_exit_code(unstable: list[str], disqualifiers: list[str]) -> int:
     """Exit status for a completed capture.
@@ -156,6 +167,10 @@ def command_capture(arguments: argparse.Namespace) -> int:
     results: dict[str, baseline.MetricResult] = {}
     run_records: list[dict[str, object]] = []
     disqualifiers: list[str] = []
+    windows = harness.on_windows()
+    definitions = metrics.metric_definitions(windows)
+    if windows:
+        disqualifiers.append(WINDOWS_CAPTURE_ONLY)
     if arguments.build_configuration != RELEASE_CONFIGURATION:
         disqualifiers.append(
             f"built {arguments.build_configuration}; design section I.2 pins the "
@@ -235,7 +250,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
             capture_recorder(cleanup)
 
         for name, values in samples.items():
-            unit, design_row, description = (metrics.METRIC_DEFINITIONS | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS | metrics.artifact.DEFINITIONS)[name]
+            unit, design_row, description = (definitions | metrics.RECOVERY_METRIC_DEFINITIONS | metrics.journal.DEFINITIONS | metrics.artifact.DEFINITIONS)[name]
             result = results.setdefault(
                 name, baseline.MetricResult(name, unit, design_row, description)
             )
@@ -287,14 +302,14 @@ def command_capture(arguments: argparse.Namespace) -> int:
     toolchain["buildConfiguration"] = arguments.build_configuration
     toolchain["runtimeKind"] = arguments.runtime_kind
     task, spike = baseline.document_identity(arguments.runtime_kind)
-    gaps = metrics.gap_definitions(arguments.runtime_kind)
+    gaps = metrics.gap_definitions(arguments.runtime_kind, windows=windows)
     # Coverage gaps disqualify a baseline but must not waive instability.
     # Only the caller's debug/loaded-host declaration makes a run advisory.
     advisory_reasons = list(disqualifiers)
     if getattr(arguments, "artifact_samples", 0) and 1 in getattr(arguments, "artifact_sizes_mib", ()):
         disqualifiers.append("1 MiB artifact scale is correctness-only, not an I.2 target baseline")
     incomplete = {}
-    for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
+    for name, (_, row, _) in definitions.items():
         missing = [run["index"] for run in run_records
                    if name in run["scale"].get("unmeasured", {})]
         if missing:
@@ -308,7 +323,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
             disqualifiers.append(f"{name}: {reason}")
     for name in results:
         gaps.pop(name, None)
-    for name, (_, row, _) in metrics.METRIC_DEFINITIONS.items():
+    for name, (_, row, _) in definitions.items():
         if name not in results and name not in gaps:
             gaps[name] = baseline.Gap(name, row, "not requested in this capture", "a capture including this leg")
     document = baseline.build_document(
@@ -329,6 +344,9 @@ def command_capture(arguments: argparse.Namespace) -> int:
     for name, partial in incomplete.items():
         document["metrics"][name]["partialMeasurement"] = partial
     document["captureObservationVersion"] = observations.VERSION
+    if windows:
+        document["captureOnly"] = True
+        document["captureOnlyReason"] = WINDOWS_CAPTURE_ONLY
     serialized = baseline.serialize(document)
 
     arguments.out_dir.mkdir(parents=True, exist_ok=True)
@@ -371,6 +389,9 @@ def command_select_baseline(arguments: argparse.Namespace) -> int:
     except json.JSONDecodeError as error:
         print(f"bench: ERROR: {arguments.candidate}: {error}", file=sys.stderr)
         return 1
+    if capture_only(candidate):
+        print(f"bench: {arguments.candidate} is {WINDOWS_CAPTURE_ONLY}", file=sys.stderr)
+        return 1
     kind = baseline.runtime_kind(candidate)
     matching: list[pathlib.Path] = []
     for path in sorted(arguments.directory.glob("perf-baseline-*.json")):
@@ -381,7 +402,7 @@ def command_select_baseline(arguments: argparse.Namespace) -> int:
             # not a missing reference: say so rather than selecting past it.
             print(f"bench: ERROR: {path}: {error}", file=sys.stderr)
             return 1
-        if baseline.runtime_kind(committed) == kind:
+        if baseline.runtime_kind(committed) == kind and not capture_only(committed):
             matching.append(path)
     if not matching:
         print(
@@ -399,6 +420,10 @@ def command_compare(arguments: argparse.Namespace) -> int:
 
     committed = json.loads(arguments.committed.read_text(encoding="utf-8"))
     candidate = json.loads(arguments.candidate.read_text(encoding="utf-8"))
+    for label, document in (("committed", committed), ("candidate", candidate)):
+        if capture_only(document):
+            print(f"bench: ERROR: the {label} document is {WINDOWS_CAPTURE_ONLY}", file=sys.stderr)
+            return 1
     result = comparison.compare(
         committed,
         candidate,

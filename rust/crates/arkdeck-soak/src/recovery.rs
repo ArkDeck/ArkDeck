@@ -1,5 +1,5 @@
 //! Deterministic host-only recovery inputs, never execution authority.
-use crate::{DIGEST, Result, canonical_root, error};
+use super::{DIGEST, Result, canonical_root, error};
 use arkdeck_hoststore::job_journal_events::{self as events, Envelope};
 use arkdeck_hoststore::{AdmissionVerdict, JobRecord, JobStore, JournalWriter, inspect_journal};
 use arkdeck_platform::HostDirectory;

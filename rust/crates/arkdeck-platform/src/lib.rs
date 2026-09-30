@@ -17,14 +17,16 @@ mod windows;
 
 #[cfg(target_os = "macos")]
 pub use process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
-    DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
-    PtyFailureCategory, PtyInteraction, PtyRequest, ToolLaunchIdentity, VerifiedNamespace,
-    VerifiedResource, VerifiedSource,
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ManagedServer,
+    ToolLaunchIdentity, VerifiedNamespace, VerifiedResource, VerifiedSource,
+};
+#[cfg(any(target_os = "macos", windows))]
+pub use process::{
+    DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError, PtyError, PtyExecution,
+    PtyFailureCategory, PtyInteraction, PtyRequest, ToolExecution, ToolLimits, ToolRequest,
+    ToolRunError, ToolTermination,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
-#[cfg(any(target_os = "macos", windows))]
-pub use process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
 #[cfg(any(target_os = "macos", windows))]
 mod server_identity;
 #[cfg(any(target_os = "macos", windows))]
@@ -106,7 +108,8 @@ pub use windows::{
     ConnectionCloser, DetachedDaemon, GuardAcquisition, GuardObject, ImagePin, InstanceScope,
     Latch, ListenerLock, LocalConnection, LocalListener, LoopbackServerLease, ManagedServer,
     OWNER_ONLY_REMEDY, OwnerLock, Readiness, SingleInstanceGuard, StarterLock, StateRoot,
-    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, verify_daemon_image,
+    StopSignal, await_pipe_instance, default_user_endpoint, pipe_present, send_console_break,
+    verify_daemon_image,
 };
 
 /// A local OS endpoint; TCP/HTTP and remote pipe names are not accepted.
@@ -204,17 +207,19 @@ pub use host_store::{
 };
 
 // The same durable host store on NTFS (TASK-XPA-005): the core document,
-// lock, publication and Job journal surface, and (TASK-XPA-006) the export,
-// file-export and payload-cache submodules and the identity-typed
-// `document_metadata`/`remove_document`. The import-upload, update,
-// trace-removal, session-removal and diagnostic-log submodules are not on
-// Windows yet.
+// lock, publication and Job journal surface, the import-upload submodule
+// (TASK-XPA-008), and (TASK-XPA-006) the export, file-export and
+// payload-cache submodules and the identity-typed
+// `document_metadata`/`remove_document`. The update, trace-removal,
+// session-removal and diagnostic-log submodules are not on Windows yet.
 #[cfg(windows)]
 pub use windows::host_store::{
     DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
     HostDirectory, HostDirectoryFacts, HostDocument, HostDocumentPass, HostEntryKind,
-    HostExportCapacity, HostFileIdentity, HostJournal, HostJournalAppender, HostReadLock,
-    JournalAppendError, JournalWritePoint, OwnerOnlyReadFailure, PayloadCheck, PayloadVerification,
+    HostExportCapacity, HostFileIdentity, HostImportSource, HostJournal, HostJournalAppender,
+    HostReadLock, HostUploadFile, HostUploadReader, JournalAppendError, JournalWritePoint,
+    OwnerOnlyReadFailure, PayloadCheck, PayloadVerification, UploadChunkCheckpoint,
+    UploadWritePoint,
 };
 #[cfg(windows)]
 pub use windows::{application_support_directory, arkdeck_application_support_root};
@@ -351,19 +356,35 @@ pub use host_deveco_files::{
     DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
     DevEcoRoot,
 };
+// The same five-role reader over a Windows DevEco Studio directory
+// (TASK-XPA-011, G15): four roles, no signed resource envelope (Windows
+// binds no manifest to a publisher signature), identities as the host
+// store's `HostFileIdentity`. `host_deveco_resources` and `property_list`
+// stay macOS-only: Windows DevEco ships no property list.
+#[cfg(windows)]
+pub use windows::{
+    DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
+    DevEcoRoot,
+};
+// A pinned file measured through one no-follow handle (`FileIdInfo`, owner
+// and DACL, execute right, SHA-256): the signing layer's `measure` on Windows.
+#[cfg(windows)]
+pub use windows::{HostFileMeasure, HostFileMeasureError, host_resolved_path, measure_host_file};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
 pub use host_deveco_resources::{DEVECO_RESOURCE_PATHS, verify_deveco_resource_envelope};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod self_resources;
-#[cfg(target_os = "macos")]
+#[cfg(windows)]
+pub use self_resources::{SelfMemory, self_memory};
+#[cfg(any(target_os = "macos", windows))]
 pub use self_resources::{SelfResources, self_resources};
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod continuous_clock;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use continuous_clock::ContinuousInstant;
 
 #[cfg(target_os = "macos")]
