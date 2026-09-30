@@ -18,13 +18,21 @@
 //! counts as absent; the product name is optional; the attachment is absent
 //! when the node answers none or zero.
 //!
-//! # Provisional property choice
+//! # Provisional property choice, and the gate that holds it
 //!
-//! Which Windows property carries which census field is decided in one place,
-//! [`UsbHostDevice::from_device_node`] together with [`NodeProperty`], and is
-//! **provisional** until the maintainer's DAYU200 USB-properties sample
-//! (`evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
-//! confirms or refutes it:
+//! Which Windows property carries which census field is the mapping of
+//! CHG-2026-078 design §4, taken from the USB crib. It is written down once,
+//! in [`CENSUS_MAPPING`], each field `TBD(sample)` until the maintainer's
+//! DAYU200 USB-properties sample (WHR-003,
+//! `evidence/runs/TASK-XPA-004/dayu200-usb-properties-crib-20260930.md`)
+//! confirms it, and the rule implementing it is
+//! [`UsbHostDevice::from_device_node`] together with [`NodeProperty`].
+//! **While any field is `TBD(sample)`, [`usb_host_devices`] (the census a USB
+//! relation is proved from) fails closed** with
+//! [`crate::RegistryUnavailable::MappingUnconfirmed`], naming the fields: no
+//! Target relation is ever proved from an unconfirmed mapping.
+//! [`usb_device_node_census`] reads the same nodes by the same rule for
+//! diagnostics and the host's own tests, and is never a relation source.
 //!
 //! | census field | Windows source (provisional) |
 //! | --- | --- |
@@ -42,6 +50,75 @@
 //! ports; it is never byte-equal to a macOS topology.
 use crate::usb_registry::UsbHostDevice;
 use sha2::{Digest, Sha256};
+
+/// Whether the processed DAYU200 USB sample has confirmed a census field's
+/// Windows source.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CensusSample {
+    /// `TBD(sample)`: not yet confirmed; the trusted census fails closed.
+    Tbd,
+    /// Confirmed by the processed sample (name the record when setting it).
+    Confirmed,
+}
+
+/// One census field of CHG-2026-078 design §4: the macOS `UsbHostDevice`
+/// field, its Windows source, and the sample's verdict on it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CensusField {
+    pub field: &'static str,
+    pub source: &'static str,
+    pub sample: CensusSample,
+}
+
+/// CHG-2026-078 design §4, the Windows USB relation census mapping, in the
+/// one place it is decided. When the processed DAYU200 USB sample (WHR-003)
+/// confirms a row, set it `Confirmed` (and change the rule if the sample
+/// refutes the source); the trusted census opens only when every row is.
+pub const CENSUS_MAPPING: [CensusField; 6] = [
+    CensusField {
+        field: "device",
+        source: "the device-level node USB\\VID_hhhh&PID_hhhh\\<suffix>, never an &MI_xx interface node",
+        sample: CensusSample::Tbd,
+    },
+    CensusField {
+        field: "vendorId/productId",
+        source: "the first USB\\VID_hhhh&PID_hhhh entry of DEVPKEY_Device_HardwareIds, equal to the instance ID's",
+        sample: CensusSample::Tbd,
+    },
+    CensusField {
+        field: "serial",
+        source: "the instance ID's third segment, case as is; a suffix holding & is port-derived: no serial",
+        sample: CensusSample::Tbd,
+    },
+    CensusField {
+        field: "topology",
+        source: "the first DEVPKEY_Device_LocationPaths entry, hashed (ruling 11)",
+        sample: CensusSample::Tbd,
+    },
+    CensusField {
+        field: "productName",
+        source: "DEVPKEY_Device_BusReportedDeviceDesc",
+        sample: CensusSample::Tbd,
+    },
+    CensusField {
+        field: "attachment",
+        source: "DEVPKEY_Device_LastArrivalDate, changing on every arrival",
+        sample: CensusSample::Tbd,
+    },
+];
+
+/// The census fields the sample has not confirmed yet, in mapping order.
+pub fn unconfirmed_census_fields() -> Vec<&'static str> {
+    unconfirmed(&CENSUS_MAPPING)
+}
+
+fn unconfirmed(mapping: &[CensusField]) -> Vec<&'static str> {
+    mapping
+        .iter()
+        .filter(|row| row.sample == CensusSample::Tbd)
+        .map(|row| row.field)
+        .collect()
+}
 
 /// A device property the Windows census reads. The `DEVPKEY` each one names is
 /// part of the provisional property choice (module documentation).
@@ -176,11 +253,25 @@ impl StripPrefixIgnoreCase for str {
     }
 }
 
-/// Every device-level USB identity present on the host, in device
-/// information set order: nodes the per-node rule passes over are not listed,
-/// and nothing is deduplicated. Read-only: see the module documentation.
+/// The census a USB relation is proved from: every device-level USB identity
+/// present on the host ([`usb_device_node_census`]), once every field of
+/// [`CENSUS_MAPPING`] is confirmed; until then it fails closed with
+/// [`crate::RegistryUnavailable::MappingUnconfirmed`] and reads nothing.
 #[cfg(windows)]
 pub fn usb_host_devices() -> Result<Vec<UsbHostDevice>, crate::RegistryUnavailable> {
+    if !unconfirmed_census_fields().is_empty() {
+        return Err(crate::RegistryUnavailable::MappingUnconfirmed);
+    }
+    usb_device_node_census()
+}
+
+/// Every device-level USB identity present on the host by the provisional
+/// rule, in device information set order: nodes the per-node rule passes
+/// over are not listed, and nothing is deduplicated. Read-only: see the
+/// module documentation. For diagnostics and the host's own tests only:
+/// never a relation source while the mapping is unconfirmed.
+#[cfg(windows)]
+pub fn usb_device_node_census() -> Result<Vec<UsbHostDevice>, crate::RegistryUnavailable> {
     setupapi::census(|node| UsbHostDevice::from_device_node(node))
 }
 
@@ -599,13 +690,52 @@ mod tests {
         assert_eq!(usb_numbers("VÍD_2207&PID_5000"), None);
     }
 
+    /// The gate: every §4 field is `TBD(sample)` until the sample confirms it,
+    /// and only a mapping with none left opens the trusted census.
+    #[test]
+    fn the_census_mapping_is_unconfirmed_until_every_field_is() {
+        assert_eq!(
+            unconfirmed_census_fields(),
+            [
+                "device",
+                "vendorId/productId",
+                "serial",
+                "topology",
+                "productName",
+                "attachment"
+            ]
+        );
+        let mut mapping = CENSUS_MAPPING;
+        for row in &mut mapping[..5] {
+            row.sample = CensusSample::Confirmed;
+        }
+        assert_eq!(unconfirmed(&mapping), ["attachment"]);
+        mapping[5].sample = CensusSample::Confirmed;
+        assert!(unconfirmed(&mapping).is_empty());
+        assert!(
+            crate::RegistryUnavailable::MappingUnconfirmed
+                .to_string()
+                .ends_with("TBD(sample): device, vendorId/productId, serial, topology, productName, attachment")
+        );
+    }
+
+    /// The trusted census reads nothing while the mapping is unconfirmed.
+    #[cfg(windows)]
+    #[test]
+    fn the_trusted_census_fails_closed_while_the_mapping_is_unconfirmed() {
+        assert_eq!(
+            usb_host_devices(),
+            Err(crate::RegistryUnavailable::MappingUnconfirmed)
+        );
+    }
+
     /// This host's census through the production reader: it must answer, and
     /// every entry must be well formed. Only the shape is asserted and
     /// nothing identifying is printed.
     #[cfg(windows)]
     #[test]
     fn the_host_census_answers_with_well_formed_entries() {
-        let devices = usb_host_devices().expect("the host's USB device census answers");
+        let devices = usb_device_node_census().expect("the host's USB device census answers");
         for device in &devices {
             assert!(!device.serial.is_empty());
             assert!(!device.serial.contains('&'));

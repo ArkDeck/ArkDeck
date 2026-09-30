@@ -199,18 +199,60 @@ fn a_windows_census_node_proves_the_candidate_and_holds_the_adoption() {
     }
 }
 
-/// This host's device tree through the production reader: it answers whether
-/// or not a board is attached, and anything it lists is an HDC-normal DAYU200
-/// relation with an attachment. A host-only read, never device evidence;
-/// nothing identifying is printed.
+/// The production reader fails closed while CHG-2026-078 §4's field mapping
+/// awaits the DAYU200 sample: no relation is read, the refusal names every
+/// `TBD(sample)` field, and a relation proof over it is refused as a census
+/// that cannot be taken. The same nodes by the same rule
+/// (`usb_device_node_census`) still answer over this host's own device tree,
+/// and whatever DAYU200 they hold would be a usable relation once the
+/// mapping is confirmed. A host-only read, never device evidence; nothing
+/// identifying is printed.
 #[cfg(windows)]
 #[test]
-fn the_system_census_reader_answers_on_this_host() {
-    let relations = UsbRegistryRelations::system()
+fn the_system_census_reader_fails_closed_until_the_sample_confirms_its_mapping() {
+    let unconfirmed = arkdeck_platform::unconfirmed_census_fields();
+    assert_eq!(
+        unconfirmed,
+        [
+            "device",
+            "vendorId/productId",
+            "serial",
+            "topology",
+            "productName",
+            "attachment"
+        ]
+    );
+    let refusal = UsbRegistryRelations::system().relations().unwrap_err();
+    assert_eq!(refusal, "admissionRejected(\"USB registry unavailable\")");
+    let cause = arkdeck_platform::usb_host_devices().unwrap_err();
+    assert_eq!(
+        cause,
+        arkdeck_platform::RegistryUnavailable::MappingUnconfirmed
+    );
+    assert_eq!(
+        cause.to_string(),
+        format!(
+            "USB registry unavailable: the Windows census field mapping awaits the DAYU200 USB \
+             sample (CHG-2026-078 WHR-003); TBD(sample): {}",
+            unconfirmed.join(", ")
+        )
+    );
+    // The adoption's relation proof over it: refused before any device list.
+    let dispatch = Scripted {
+        calls: Cell::new(0),
+    };
+    let refused = Reading::take(&dispatch, &UsbRegistryRelations::system()).unwrap_err();
+    assert_eq!(refused.0, "admissionRejected(\"USB registry unavailable\")");
+    assert_eq!(dispatch.calls.get(), 0, "no device list was read");
+
+    let devices =
+        arkdeck_platform::usb_device_node_census().expect("the host's USB device census answers");
+    let relations = UsbRegistryRelations::new(move || Ok(devices.clone()))
         .relations()
-        .expect("the host's USB device census answers");
+        .unwrap();
     eprintln!(
-        "{} DAYU200 relation(s) on this host: a host-only read, not device evidence",
+        "{} DAYU200 relation(s) on this host by the unconfirmed rule: a host-only read, not \
+         device evidence",
         relations.len()
     );
     for relation in &relations {
