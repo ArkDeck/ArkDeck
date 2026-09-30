@@ -754,6 +754,9 @@ pub use trace_owner::TraceCacheStore;
 #[cfg(any(target_os = "macos", windows))]
 mod recovery_manifest;
 mod session_graphemes;
+// Its readers, the ArkTrace profile and the Rockchip records, are built on
+// macOS and Windows.
+#[cfg(any(target_os = "macos", windows))]
 mod swift_hex;
 // The Session census and retention catalog the storage owner and the
 // publication writer read and register in, on macOS and Windows.
