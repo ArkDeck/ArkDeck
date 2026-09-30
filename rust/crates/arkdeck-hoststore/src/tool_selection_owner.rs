@@ -665,11 +665,7 @@ impl ToolSelectionAudit<'_> {
                 .any(|k| payload[*k] != prior[*k])
                 || payload["executableSha256"] != self.approved.impact.new.value["executableSHA256"]
                 || payload["inodeLaunchPath"]
-                    != json!(format!(
-                        "/.vol/{}/{}",
-                        payload["executableDevice"].as_str().unwrap_or_default(),
-                        payload["executableInode"].as_str().unwrap_or_default()
-                    ))
+                    != crate::hdc_control_action::lifecycle::launch_path(&payload)
             {
                 return Err(record_unreadable(
                     "selected HDC launch identity differs from the approved executable",

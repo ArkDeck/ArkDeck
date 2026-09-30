@@ -10,7 +10,10 @@
 //! proof. The execution beside the approvals is the physical-assistance
 //! oracle's (`rust/tests/fixtures/agent-human-action`): abandoned, its trust
 //! action expired, whose identities some approvals here are made to share.
-#![cfg(target_os = "macos")]
+//!
+//! On macOS and Windows alike (TASK-XPA-005): the owners and their records
+//! are the same code, over the platform's owner-only host store.
+#![cfg(any(target_os = "macos", windows))]
 
 mod support;
 
@@ -24,7 +27,27 @@ use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
-use support::chmod;
+
+/// An owner-only directory: mode 0700 on macOS; on Windows the store's own
+/// owner-only DACL, which the files std writes in it then inherit.
+fn private_directory(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        fs::create_dir_all(path).unwrap();
+        support::chmod(path, 0o700);
+    }
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+}
+
+/// An owner-only file: mode 0600 on macOS; on Windows it already inherits
+/// its owner-only directory's DACL.
+fn private_file(path: &std::path::Path) {
+    #[cfg(unix)]
+    support::chmod(path, 0o600);
+    #[cfg(windows)]
+    let _ = path;
+}
 
 /// The oracle's abandoned execution `har-trust`.
 const TRUST: &str =
@@ -82,7 +105,14 @@ struct Root(PathBuf);
 
 impl Root {
     fn new(name: &str) -> Self {
-        let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        // The temporary directory's canonical spelling, never Windows' `\\?\`
+        // one, which the host store refuses.
+        let temporary = std::env::temp_dir().canonicalize().unwrap();
+        let temporary = temporary
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+            .map_or(temporary.clone(), PathBuf::from);
+        let root = temporary.join(format!(
             "control-action-approval-{name}-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
@@ -93,9 +123,7 @@ impl Root {
             "control-action-snapshots",
             "human-action-snapshots",
         ] {
-            let path = root.join(directory);
-            fs::create_dir_all(&path).unwrap();
-            chmod(&path, 0o700);
+            private_directory(&root.join(directory));
         }
         let text = fs::read_to_string(
             support::fixture("agent-human-action")
@@ -108,7 +136,7 @@ impl Root {
         .replace("<obs-1>", "obs-00000000-0000-4000-8000-000000000001");
         let record = root.join("agent-executions").join(TRUST);
         fs::write(&record, text).unwrap();
-        chmod(&record, 0o600);
+        private_file(&record);
         Self(root)
     }
 }
@@ -440,7 +468,7 @@ fn a_row_refusal_outranks_a_cursor_refusal() {
     );
     let record = root.0.join("agent-executions").join(TRUST);
     fs::write(&record, b"{\"not\":\"a record\"}").unwrap();
-    chmod(&record, 0o600);
+    private_file(&record);
     let first = owners.human("human-action.list", json!({})).unwrap_err();
     assert_ne!(first.code, "invalidCursor");
     assert_eq!(
