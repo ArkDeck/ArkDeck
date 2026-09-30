@@ -122,7 +122,15 @@ public sealed class AgentImportFlowTests
     /// common item dialog, driven through its UIA patterns: the file name box and Open).</summary>
     internal static void Choose(AppSession app, string path)
     {
-        app.Invoke("imports.chooseFile");
+        ChooseFile(app, "imports.chooseFile", path);
+        app.WaitForName("imports.file", n => n == path);
+    }
+
+    /// <summary>Invokes <paramref name="buttonId"/> and chooses <paramref name="path"/> in the
+    /// system file dialog it opens.</summary>
+    internal static void ChooseFile(AppSession app, string buttonId, string path)
+    {
+        app.Invoke(buttonId);
         AutomationElement? dialog = null;
         SemanticSnapshotTests.WaitUntil(() => (dialog = FileDialog(app)) is not null, "the system file dialog opens");
         AutomationElement? name = null;
@@ -132,7 +140,7 @@ public sealed class AgentImportFlowTests
         var open = dialog!.FindFirstChild(cf => cf.ByAutomationId("1").And(cf.ByControlType(ControlType.Button)))
                    ?? throw new AssertFailedException("the file dialog has no Open button");
         open.Patterns.Invoke.Pattern.Invoke();
-        app.WaitForName("imports.file", n => n == path);
+        SemanticSnapshotTests.WaitUntil(() => FileDialog(app) is null, "the system file dialog closes");
     }
 
     private static AutomationElement? FileDialog(AppSession app)

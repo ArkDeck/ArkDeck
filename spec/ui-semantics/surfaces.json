@@ -504,6 +504,68 @@
         {"automationId": "imports.unavailable.cli", "origin": "windows", "role": "text", "name": [{"format": "windows.cli.equivalent", "args": ["arkdeck artifact import list"]}]},
         {"automationId": "imports.unavailable.copyCli", "origin": "windows", "role": "button", "name": ["@windows.action.copyCli"]}
       ]
+    },
+    {
+      "id": "debug.jobs",
+      "scenario": "jobs",
+      "page": "debug",
+      "elements": [
+        {"automationId": "debug.title", "origin": "windows", "role": "text", "name": ["@windows.navigation.debug"]},
+        {"automationId": "debug.refresh", "origin": "macos", "role": "button", "name": ["@debug.action.refresh"]},
+        {"automationId": "debug.scope", "origin": "macos", "role": "text", "name": ["@debug.scope"]},
+        {"automationId": "debug.target", "origin": "macos", "role": "comboBox", "name": ["@debug.target.label"]},
+        {"automationId": "debug.target.binding", "origin": "macos", "role": "text", "name": [{"format": "debug.target.binding", "args": ["3", "3.2.0f"]}]},
+        {"automationId": "debug.availability.status", "origin": "macos", "role": "text", "name": ["@debug.availability.available"]},
+        {"automationId": "debug.artifacts.chooseLibrary", "origin": "macos", "role": "button", "name": ["@debug.artifacts.chooseLibrary"]},
+        {"automationId": "debug.artifacts.selectedLibrary", "origin": "windows", "role": "text", "name": ["@debug.artifacts.noLibrary"]},
+        {"automationId": "debug.artifacts.preview", "origin": "macos", "role": "button", "name": ["@debug.artifacts.preview"]},
+        {"automationId": "debug.artifacts.productionBoundary", "origin": "macos", "role": "text", "name": ["@debug.artifacts.productionBoundary"]},
+        {"automationId": "debug.artifacts.jobs.empty", "origin": "windows", "role": "text", "name": ["@debug.jobs.empty"]},
+        {"automationId": "debug.artifacts.status", "origin": "windows", "role": "text", "name": [""], "live": "polite"}
+      ]
+    },
+    {
+      "id": "debug.jobs.network",
+      "scenario": "jobs",
+      "page": "debug",
+      "steps": [{"select": "debug.tab.network"}],
+      "elements": [
+        {"automationId": "debug.network.direction.forward", "origin": "windows", "role": "radioButton", "name": ["@debug.network.forward"]},
+        {"automationId": "debug.network.direction.reverse", "origin": "windows", "role": "radioButton", "name": ["@debug.network.reverse"]},
+        {"automationId": "debug.network.validation", "origin": "windows", "role": "text", "name": ["@debug.network.validation.localPortNotNumeric"]},
+        {"automationId": "debug.network.add", "origin": "macos", "role": "button", "name": ["@debug.network.add"]},
+        {"automationId": "debug.network.rule.forward.9000.9001", "origin": "windows", "role": "text", "name": ["forward · tcp:9000 → tcp:9001 · active"]},
+        {"automationId": "debug.network.rule.forward.9000.9001.delete", "origin": "windows", "role": "button", "name": ["@debug.network.delete"]},
+        {"automationId": "debug.network.rule.reverse.9100.9101", "origin": "windows", "role": "text", "name": ["reverse · tcp:9100 → tcp:9101 · active"]},
+        {"automationId": "debug.network.delete.scope", "origin": "windows", "role": "text", "name": ["@debug.network.delete.scope"]}
+      ]
+    },
+    {
+      "id": "debug.jobs.commands",
+      "scenario": "jobs",
+      "page": "debug",
+      "steps": [{"select": "debug.tab.commands"}],
+      "elements": [
+        {"automationId": "debug.commands.typedOnly", "origin": "macos", "role": "text", "name": ["@debug.commands.calloutTyped"]},
+        {"automationId": "debug.commands.template.device.packageInventory", "origin": "macos", "role": "listItem", "name": ["device.packageInventory, readOnly"]},
+        {"automationId": "debug.commands.template.device.uptime", "origin": "macos", "role": "listItem", "name": ["device.uptime, readOnly"]},
+        {"automationId": "debug.commands.run", "origin": "macos", "role": "button", "name": ["@debug.commands.run"]},
+        {"automationId": "debug.commands.result.none", "origin": "windows", "role": "text", "name": ["@debug.commands.result.none"]},
+        {"automationId": "debug.commands.footer", "origin": "macos", "role": "text", "name": ["@debug.commands.footerNoFreeText"]}
+      ]
+    },
+    {
+      "id": "debug.foundation",
+      "scenario": "foundation",
+      "page": "debug",
+      "elements": [
+        {"automationId": "debug.availability.status", "origin": "macos", "role": "text", "name": ["@debug.availability.unavailable"]},
+        {"automationId": "debug.availability.blocked", "origin": "macos", "role": "text", "name": ["@debug.availability.unavailable"]},
+        {"automationId": "debug.target.failure", "origin": "macos", "role": "text", "name": ["@debug.target.label"]},
+        {"automationId": "debug.target.failure.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["internalError", "Target owner is not configured"]}]},
+        {"automationId": "debug.artifacts.jobs.unavailable.reason", "origin": "windows", "role": "text", "name": [{"format": "windows.unavailable.reason", "args": ["rejected", "The Job owner is not configured"]}]},
+        {"automationId": "debug.artifacts.chooseLibrary", "origin": "macos", "role": "button", "name": ["@debug.artifacts.chooseLibrary"]}
+      ]
     }
   ]
 }
