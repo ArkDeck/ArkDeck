@@ -1,9 +1,41 @@
 //! Disposable host fixtures test ownership, not parser or device acceptance.
+//! On Windows (TASK-XPA-021) the scratch root is created owner-only and
+//! every directory and file below it inherits its private DACL, the NTFS
+//! reading of the Unix `0700`/`0600` the fixtures set.
 use super::*;
-use std::{
-    fs,
-    os::unix::fs::{DirBuilderExt, PermissionsExt},
-};
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+#[cfg(unix)]
+fn scratch() -> PathBuf {
+    PathBuf::from(format!(
+        "/private/tmp/trace-maintenance-{:032x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ))
+}
+#[cfg(windows)]
+fn scratch() -> PathBuf {
+    let temporary = std::env::temp_dir().canonicalize().unwrap();
+    let temporary = temporary.to_str().unwrap();
+    let root = PathBuf::from(temporary.strip_prefix(r"\\?\").unwrap_or(temporary)).join(format!(
+        "trace-maintenance-{:032x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ));
+    HostDirectory::open_or_create_private(&root).unwrap();
+    root
+}
+/// `path` and its missing ancestors, private.
+fn private_directories(path: &Path) {
+    #[cfg(unix)]
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(path)
+        .unwrap();
+    #[cfg(windows)]
+    fs::create_dir_all(path).unwrap();
+}
 
 struct Fixture {
     root: PathBuf,
@@ -13,10 +45,7 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> Self {
-        let root = PathBuf::from(format!(
-            "/private/tmp/trace-maintenance-{:032x}",
-            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
-        ));
+        let root = scratch();
         let cache = root.join("traces");
         for path in [
             cache.join(".staging/.owners"),
@@ -24,21 +53,13 @@ impl Fixture {
             cache.join(".leases"),
             root.join("staging/.owners"),
         ] {
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(path)
-                .unwrap();
+            private_directories(&path);
         }
         let trace = "a".repeat(64);
         let parser = "b".repeat(64);
         let relative = format!("{trace}/{parser}");
         let entry = cache.join(&relative);
-        fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(&entry)
-            .unwrap();
+        private_directories(&entry);
         write(&entry.join("database.sqlite"), b"fixture database");
         write(&root.join("original.htrace"), b"original fixture Artifact");
         let metadata = json!({"formatVersion":1,
@@ -104,6 +125,7 @@ impl Drop for Fixture {
 }
 fn write(path: &Path, bytes: &[u8]) {
     fs::write(path, bytes).unwrap();
+    #[cfg(unix)]
     fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
 }
 
@@ -228,11 +250,7 @@ fn quarantine_publication_and_removal_faults_preserve_proof_and_never_delete_rep
             );
         } else {
             assert!(!fixture.entry().exists());
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(fixture.entry())
-                .unwrap();
+            private_directories(&fixture.entry());
             write(&fixture.entry().join("replacement"), b"preserve");
             let result = fixture.run(false);
             assert_eq!(result["removedEntryCount"], 0);
@@ -252,7 +270,7 @@ fn quarantine_publication_and_removal_faults_preserve_proof_and_never_delete_rep
 fn private_session_recovery_uses_existing_inode_proof_and_preserves_creating_records() {
     let fixture = Fixture::new();
     let private = fixture.root.join("staging/session-stale");
-    fs::DirBuilder::new().mode(0o700).create(&private).unwrap();
+    private_directories(&private);
     write(&private.join("private.sqlite"), b"private fixture");
     let (device, inode) = HostDirectory::open(&private)
         .unwrap()

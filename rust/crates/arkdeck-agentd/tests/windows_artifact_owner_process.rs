@@ -425,7 +425,8 @@ fn the_artifact_owner_answers_for_the_job_the_job_owner_holds_across_a_restart()
     assert_eq!(reply["result"], quota, "{reply}");
     assert!(
         daemon.seen.contains(
-            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects".to_owned()
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, traceCache"
+                .to_owned()
         ),
         "{:?}",
         daemon.seen

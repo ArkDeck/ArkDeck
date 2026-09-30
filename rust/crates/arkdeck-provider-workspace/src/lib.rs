@@ -13,15 +13,20 @@
 //!   Keychain value both passwords travel in.
 //! - [`signing_action`] is the durable `workspace.sign-openharmony-hap@1`
 //!   action: its attempt paths and the exact `sign-app` / `verify-app` argv.
-//! - `signer` (macOS) signs through the registered Java and hap-sign-tool
-//!   identities: the JAR and the staged input are bound by their inodes, both
-//!   passwords go only through a pseudo-terminal, and the product is verified
-//!   and recorded as `signing-result.json` (`arkdeck-openharmony-signing-result/v1`).
-//! - `keychain_secrets` (macOS) is the production secret source over the Data
-//!   Protection Keychain and the installed daemon's code identity.
-//! - `credential_owner` (macOS) is the ledger of the workspace signing presets
-//!   that pin the installed credential by its content reference, and their
-//!   resolution to its receipt.
+//! - `signer` (macOS, Windows) signs through the registered Java and
+//!   hap-sign-tool identities: the JAR and the staged input are bound by their
+//!   inodes (macOS) or held with their namespace (Windows), both passwords go
+//!   only through a pseudo-terminal or pseudo console, and the product is
+//!   verified and recorded as `signing-result.json`
+//!   (`arkdeck-openharmony-signing-result/v1`).
+//! - `keychain_secrets` is the production secret source over the Data
+//!   Protection Keychain (macOS) or Credential Manager (Windows) and the
+//!   installed daemon's code identity.
+//! - `credential_owner` (macOS, Windows) is the ledger of the workspace
+//!   signing presets that pin the installed credential by its content
+//!   reference, and their resolution to its receipt; `signing_install`,
+//!   `signing_rekey`, `signing_removal` and `sdk_release` are its explicit
+//!   maintenance.
 //!
 //! No secret is ever placed in an argument, an environment, a receipt, a
 //! record, an error or a log; secrets live in [`arkdeck_platform::Secret`]
@@ -30,33 +35,35 @@
 mod base64;
 // Portable: Foundation's canonical JSON spellings, proven on every host by
 // its own tests. Its writers (the install, re-key and credential-owner
-// leaves) are still macOS-only, so elsewhere nothing calls it yet.
-#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+// leaves) are built on macOS and Windows, so on Linux nothing calls it yet.
+#[cfg_attr(not(any(target_os = "macos", windows)), allow(dead_code))]
 mod canonical_json;
 pub mod deveco_password;
 mod error;
 #[cfg(any(unix, windows))]
 mod file_identity;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod sdk_release;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod sdk_release_profile;
 pub mod secret_envelope;
 pub mod signing_action;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signing_install;
 pub mod signing_preset;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signing_rekey;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signing_removal;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod credential_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod keychain_secrets;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub mod signer;
+#[cfg(all(test, any(target_os = "macos", windows)))]
+mod test_fixture;
 
 pub use error::SigningError;
 #[cfg(any(unix, windows))]

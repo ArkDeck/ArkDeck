@@ -5,7 +5,20 @@
 //! `status` is a diagnostic probe, not an authorization ceremony: it reads the
 //! Keychain without user interaction, never reads a secret's value, and
 //! reports readiness as the LaunchAgent would find it.
-#[cfg(target_os = "macos")]
+//!
+//! On Windows (TASK-XPA-011) `status`, `install`, `install-sdk-release` and
+//! `remove` serve the same documents over Credential Manager and the preset
+//! root `<LocalAppData>\ArkDeck\Signing\OpenHarmony`. The daemon a receipt is
+//! bound to is the installed one this CLI would start and authenticate
+//! (`ARKDECK_DAEMON_PATH` or `arkdeck-agentd.exe` beside the CLI), and a
+//! maintenance leaf that writes or removes a credential first requires its
+//! image to satisfy a configured signing pin — the development signer's
+//! certificate SHA-256 or the Artifact Signing publisher identity (maintainer
+//! ruling 17) — before Credential Manager is opened. `migrate-deveco` and
+//! `install --build-profile` read DevEco's encrypted password material, whose
+//! Windows layout has not been measured: they are refused
+//! (`unsupportedOnPlatform`).
+#[cfg(any(target_os = "macos", windows))]
 use serde_json::{Value, json};
 
 /// Whether `command` is a signing leaf this CLI serves.
@@ -26,7 +39,7 @@ pub fn serves(command: &str) -> bool {
 }
 
 /// Swift `OpenHarmonySigningCredentialResource.projection`.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn projection(
     resource: &arkdeck_provider_workspace::credential_owner::CredentialResource,
 ) -> Value {
@@ -41,7 +54,7 @@ fn projection(
 /// installed, whether it validates with its secrets present
 /// (`OpenHarmonySigningPresetStore.status()`), and the credential the owner
 /// ledger names.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn status_document(
     root: &std::path::Path,
     secrets: &dyn arkdeck_provider_workspace::signing_preset::SigningSecrets,
@@ -75,10 +88,10 @@ pub fn status_document(
 
 /// A secret source that could answer nothing: every item unreadable, no
 /// daemon identity provable.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 struct Unanswerable;
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl arkdeck_provider_workspace::signing_preset::SigningSecrets for Unanswerable {
     fn read(
         &self,
@@ -105,12 +118,18 @@ impl arkdeck_provider_workspace::signing_preset::SigningSecrets for Unanswerable
 /// `runtime signing status`: the production preset root and the Data
 /// Protection Keychain the LaunchAgent reads, bound to the installed daemon.
 /// `None` where this account has no Application Support directory.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn status() -> Option<Value> {
     use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
     use arkdeck_provider_workspace::signing_preset::SigningPresetStore;
     let root = SigningPresetStore::default_root()?;
+    #[cfg(target_os = "macos")]
     let daemon = KeychainSigningSecrets::default_daemon_executable()?;
+    // A daemon that cannot be named answers as an unreadable store does.
+    #[cfg(windows)]
+    let Some(daemon) = installed_daemon().ok() else {
+        return Some(status_document(&root, &Unanswerable));
+    };
     Some(match KeychainSigningSecrets::installed(daemon) {
         Ok(secrets) => status_document(&root, &secrets),
         Err(_) => status_document(&root, &Unanswerable),
@@ -120,7 +139,7 @@ pub fn status() -> Option<Value> {
 /// Swift `runSigning`'s removal projection over the same credential owner
 /// used by workspace preset registration. Tests inject a remover that never
 /// reaches a Keychain; production supplies the fixed ArkDeck service scope.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn remove_document(
     root: &std::path::Path,
     secrets: &dyn arkdeck_provider_workspace::signing_removal::SigningSecretRemoval,
@@ -138,7 +157,7 @@ pub fn remove_document(
     )
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
     let command = invocation.command;
     use arkdeck_provider_workspace::keychain_secrets::KeychainSigningSecrets;
@@ -168,10 +187,21 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
             "unsupported signing subcommand",
         ));
     }
+    #[cfg(windows)]
+    if matches!(
+        command,
+        "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
+    ) {
+        return Err(deveco_material_unsupported());
+    }
     let root = SigningPresetStore::default_root().ok_or_else(no_home)?;
+    #[cfg(target_os = "macos")]
     let daemon = KeychainSigningSecrets::default_daemon_executable().ok_or_else(no_home)?;
+    #[cfg(windows)]
+    let daemon = pinned_installed_daemon()?;
     let empty = serde_json::Map::new();
     let options = invocation.params.as_ref().unwrap_or(&empty);
+    #[cfg(target_os = "macos")]
     if matches!(
         command,
         "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
@@ -220,7 +250,14 @@ pub fn run(invocation: &crate::Invocation) -> Result<Value, crate::CliError> {
         command,
         "runtime.signing.migrate-deveco" | "signing.migrate-deveco"
     ) {
-        migrate_deveco_document(&root, options, &secrets)
+        #[cfg(target_os = "macos")]
+        {
+            migrate_deveco_document(&root, options, &secrets)
+        }
+        #[cfg(windows)]
+        {
+            Err(deveco_material_unsupported())
+        }
     } else {
         remove_document(&root, &secrets).map_err(signing_error)
     }
@@ -257,7 +294,7 @@ pub fn refresh_installed_identity(
         .map_err(|e| e.to_string())
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn signing_error(error: arkdeck_provider_workspace::SigningError) -> crate::CliError {
     crate::CliError {
         plain_exit: Some(1),
@@ -267,7 +304,7 @@ fn signing_error(error: arkdeck_provider_workspace::SigningError) -> crate::CliE
 
 /// Explicit CLI installation. Secret readers are injected only at this Rust
 /// boundary for fixtures; public argv/JSON never accepts plaintext passwords.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn install_document(
     root: &std::path::Path,
     command: &str,
@@ -302,7 +339,7 @@ pub fn install_document(
         ("--certificate", certificate),
         ("--profile", profile),
     ] {
-        if !path.starts_with('/') {
+        if !std::path::Path::new(path).is_absolute() {
             return Err(crate::CliError::plain_usage(format!(
                 "{spelling} {flag} must be an absolute path"
             )));
@@ -310,20 +347,7 @@ pub fn install_document(
     }
     let (keystore_password, key_password) =
         if let Some(path) = options.get("buildProfile").and_then(Value::as_str) {
-            if !path.starts_with('/') {
-                return Err(crate::CliError::plain_usage(format!(
-                    "{spelling} --build-profile must be an absolute path"
-                )));
-            }
-            let material = crate::signing_inputs::read_deveco_profile(Path::new(path))?;
-            // Compare standardized paths without following symlinks, as Swift's
-            // CLI does before binding the adjacent DevEco material.
-            if lexical_absolute(&material.store_file) != lexical_absolute(Path::new(keystore)) {
-                return Err(crate::CliError::plain_usage(format!(
-                    "{spelling} --build-profile names a different storeFile than --keystore"
-                )));
-            }
-            (material.keystore, material.key)
+            build_profile_passwords(&spelling, path, keystore)?
         } else {
             (
                 read_secret("Keystore password: ")?,
@@ -369,6 +393,99 @@ fn lexical_absolute(path: &std::path::Path) -> std::path::PathBuf {
         }
     }
     result
+}
+
+/// `--build-profile`: DevEco's encrypted passwords for `keystore`, read from
+/// the authenticated build profile beside it.
+#[cfg(target_os = "macos")]
+fn build_profile_passwords(
+    spelling: &str,
+    path: &str,
+    keystore: &str,
+) -> Result<(arkdeck_platform::Secret, arkdeck_platform::Secret), crate::CliError> {
+    use std::path::Path;
+    if !path.starts_with('/') {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} --build-profile must be an absolute path"
+        )));
+    }
+    let material = crate::signing_inputs::read_deveco_profile(Path::new(path))?;
+    // Compare standardized paths without following symlinks, as Swift's
+    // CLI does before binding the adjacent DevEco material.
+    if lexical_absolute(&material.store_file) != lexical_absolute(Path::new(keystore)) {
+        return Err(crate::CliError::plain_usage(format!(
+            "{spelling} --build-profile names a different storeFile than --keystore"
+        )));
+    }
+    Ok((material.keystore, material.key))
+}
+
+/// DevEco's password material layout on Windows has not been measured, so
+/// nothing reads it: the build profile's passwords stay DevEco's.
+#[cfg(windows)]
+fn build_profile_passwords(
+    _: &str,
+    _: &str,
+    _: &str,
+) -> Result<(arkdeck_platform::Secret, arkdeck_platform::Secret), crate::CliError> {
+    Err(deveco_material_unsupported())
+}
+
+#[cfg(windows)]
+fn deveco_material_unsupported() -> crate::CliError {
+    crate::CliError::new(
+        "unsupportedOnPlatform",
+        "DevEco's encrypted signing password material is not read on Windows yet; \
+         install with the passwords entered at the console",
+    )
+}
+
+/// The installed daemon this CLI would start and authenticate
+/// (`runtime_service_windows::installed_identity`), in its canonical `X:\…`
+/// spelling.
+#[cfg(windows)]
+fn installed_daemon() -> Result<std::path::PathBuf, crate::CliError> {
+    let unavailable = || {
+        crate::CliError::new(
+            "ioFailure",
+            "the installed arkdeck-agentd.exe cannot be named",
+        )
+    };
+    let identity = crate::runtime_service_windows::installed_identity().ok_or_else(unavailable)?;
+    let canonical = identity
+        .executable
+        .canonicalize()
+        .map_err(|_| unavailable())?;
+    let text = canonical.to_str().ok_or_else(unavailable)?;
+    Ok(std::path::PathBuf::from(
+        text.strip_prefix(r"\\?\").unwrap_or(text),
+    ))
+}
+
+/// [`installed_daemon`], required to satisfy a configured signing pin before
+/// a maintenance leaf binds a receipt to it or opens Credential Manager: a
+/// package family alone proves nothing about a file, and no pin at all is
+/// refused.
+#[cfg(windows)]
+fn pinned_installed_daemon() -> Result<std::path::PathBuf, crate::CliError> {
+    let refused = |message: String| crate::CliError {
+        plain_exit: Some(1),
+        ..crate::CliError::new("ioFailure", message)
+    };
+    let identity = crate::runtime_service_windows::installed_identity()
+        .ok_or_else(|| refused("the installed arkdeck-agentd.exe cannot be named".into()))?;
+    match arkdeck_platform::verify_daemon_image(&identity) {
+        Ok(arkdeck_platform::ImagePin::Signer) => installed_daemon(),
+        Ok(arkdeck_platform::ImagePin::PackageFamily) => Err(refused(
+            "the installed arkdeck-agentd.exe satisfies no signing pin \
+             (ARKDECK_DAEMON_SIGNER_SHA256 or the publisher identity); a signing \
+             credential is bound only to a pinned daemon"
+                .into(),
+        )),
+        Err(error) => Err(refused(format!(
+            "the installed arkdeck-agentd.exe is not the pinned daemon: {error}"
+        ))),
+    }
 }
 
 /// Reject caller-selected daemons before opening the maintenance Keychain.
@@ -461,7 +578,7 @@ pub fn migrate_deveco_document(
 
 /// Explicit SDK release installation. No search through PATH, ambient SDK or
 /// inferred workspace supplies any signing material.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub fn install_sdk_document(
     root: &std::path::Path,
     command: &str,
@@ -485,7 +602,7 @@ pub fn install_sdk_document(
     let sdk = required("sdk", "--sdk")?;
     let java = required("java", "--java")?;
     for (flag, path) in [("--sdk", sdk), ("--java", java)] {
-        if !path.starts_with('/') {
+        if !std::path::Path::new(path).is_absolute() {
             return Err(crate::CliError::plain_usage(format!(
                 "{spelling} {flag} must be an absolute path"
             )));

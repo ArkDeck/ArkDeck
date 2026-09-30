@@ -109,6 +109,146 @@ public sealed class RealDaemonTests
         }
     }
 
+    /// <summary>
+    /// The real daemon over an isolated development state root (TASK-XPA-004's composition on
+    /// <c>origin/main</c>), holding the Swift adoption oracle's Target: the Device page lists
+    /// it although no HDC is registered, shows <c>target.show</c> and <c>target.availability</c>,
+    /// and a rename in the App's dialog is recorded by the Runtime (its display-name document)
+    /// and cleared again.
+    /// </summary>
+    [TestMethod]
+    [Timeout(300_000, CooperativeCancellation = true)]
+    public void TheAppRenamesTheDevelopmentRootsTargetInTheRuntime()
+    {
+        var exe = AppSession.RequireApp();
+        var (thumbprint, daemon, pwsh) = Prerequisites();
+        var strings = Catalogue.Load("en-US");
+        var directory = Directory.CreateTempSubdirectory("arkdeck-app-uitest-root-");
+        Process? process = null;
+        try
+        {
+            var signed = Path.Combine(directory.FullName, "arkdeck-agentd.exe");
+            File.Copy(daemon, signed);
+            var pin = Sign(pwsh, thumbprint, signed);
+            var root = Directory.CreateDirectory(Path.Combine(directory.FullName, "root")).FullName;
+
+            // The first start creates the owner-only Target store directory; the oracle's
+            // targets.json goes into it before the second start reads it.
+            (process, _) = StartRootDaemon(signed, root);
+            process.Kill();
+            process.WaitForExit();
+            process.Dispose();
+            File.Copy(RepoPaths.At("rust", "tests", "fixtures", "target-adoption", "targets-state", "targets.json"),
+                Path.Combine(root, "targets-state", "targets.json"));
+            (process, var endpoint) = StartRootDaemon(signed, root);
+            TestContext.WriteLine("daemon over the development root at " + endpoint);
+
+            using var app = AppSession.Launch(exe, ["--language", "en-US", "--page", "device"], new Dictionary<string, string>
+            {
+                ["ARKDECK_ENDPOINT"] = endpoint,
+                ["ARKDECK_DAEMON_PATH"] = signed,
+                ["ARKDECK_DAEMON_SIGNER_SHA256"] = pin,
+            });
+            var device = app.WaitForName("app.devices.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal));
+            TestContext.WriteLine("device: " + device);
+            StringAssert.StartsWith(device, "unavailable(rejected): hdc.");
+            app.Select("device.target." + OracleTarget);
+            Assert.AreEqual(new string('a', 32), app.WaitForName("device.target.detail.connectKey", n => n.Length > 0));
+            TestContext.WriteLine("presence: " + app.WaitForName("device.target.presence", n => n.Length > 0));
+            TestContext.WriteLine("tool: " + AppSession.Name(app.Find("device.target.tool")));
+
+            app.Invoke("device.target.rename");
+            app.Find("device.rename.field").Patterns.Value.Pattern.SetValue("Bench board");
+            app.Invoke("PrimaryButton");
+            Assert.AreEqual(strings.Format("windows.device.rename.saved", ["Bench board"]), app.WaitForName("device.target.nameStatus", n => n.Length > 0));
+            app.WaitForName("device.target." + OracleTarget, n => n == "Bench board, " + OracleTarget);
+            var names = File.ReadAllText(Path.Combine(root, "targets-state", "target-display-names.json"));
+            TestContext.WriteLine("target-display-names.json: " + names);
+            StringAssert.Contains(names, "Bench board");
+
+            app.Invoke("device.target.clearName");
+            app.WaitForName("device.target.nameStatus", n => n == strings["windows.device.rename.cleared"]);
+            app.WaitForName("device.target." + OracleTarget, n => n == OracleTarget);
+
+            // History: no Job owner is composed over the root yet.
+            app.Navigate("history");
+            var history = app.WaitForName("history.unavailable.reason", n => n.StartsWith("unavailable(", StringComparison.Ordinal));
+            TestContext.WriteLine("history: " + history);
+            foreach (var button in app.Buttons()) Assert.IsTrue(button.Enabled, $"disabled button {button.Id} (XPA-AC-8)");
+        }
+        finally
+        {
+            if (process is { HasExited: false })
+            {
+                process.Kill();
+                process.WaitForExit();
+            }
+            process?.Dispose();
+            for (var attempt = 0; attempt < 20; attempt++)
+            {
+                try
+                {
+                    directory.Delete(recursive: true);
+                    break;
+                }
+                catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+                {
+                    Thread.Sleep(100);
+                }
+            }
+        }
+    }
+
+    private const string OracleTarget = "TGT-3ba3f5f43b92";
+
+    /// <summary>The development signer, a built daemon and PowerShell 7, or the test is skipped.</summary>
+    private static (string Thumbprint, string Daemon, string Pwsh) Prerequisites()
+    {
+        var thumbprint = Environment.GetEnvironmentVariable("ARKDECK_DEV_SIGNER_THUMBPRINT");
+        if (string.IsNullOrEmpty(thumbprint))
+        {
+            using var environment = Registry.CurrentUser.OpenSubKey("Environment");
+            thumbprint = environment?.GetValue("ARKDECK_DEV_SIGNER_THUMBPRINT") as string;
+        }
+        if (string.IsNullOrEmpty(thumbprint)) Assert.Inconclusive("skipped: ARKDECK_DEV_SIGNER_THUMBPRINT is not set on this host");
+        var daemon = Environment.GetEnvironmentVariable("ARKDECK_CLIENTKIT_DAEMON") is { Length: > 0 } configured
+            ? configured
+            : RepoPaths.At("rust", "target", "debug", "arkdeck-agentd.exe");
+        if (!File.Exists(daemon)) Assert.Inconclusive($"skipped: no daemon binary at {daemon} (cargo build -p arkdeck-agentd)");
+        var pwsh = FindPwsh() ?? throw new AssertInconclusiveException("skipped: PowerShell 7 (pwsh) is required to sign the development daemon");
+        return (thumbprint!, daemon, pwsh);
+    }
+
+    /// <summary>A daemon over a development state root, and the pipe it announces
+    /// (<c>arkdeck-agentd listening on …</c>). Every other ArkDeck and HDC input is removed.</summary>
+    private static (Process Process, string Endpoint) StartRootDaemon(string daemon, string root)
+    {
+        var start = new ProcessStartInfo(daemon) { UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true };
+        foreach (var key in start.Environment.Keys.ToArray())
+        {
+            if (key.StartsWith("ARKDECK_", StringComparison.OrdinalIgnoreCase) || key.StartsWith("OHOS_HDC_", StringComparison.OrdinalIgnoreCase))
+            {
+                start.Environment.Remove(key);
+            }
+        }
+        start.Environment["ARKDECK_DEVELOPMENT_STATE_ROOT"] = root;
+        var process = Process.Start(start)!;
+        var announced = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        const string prefix = "arkdeck-agentd listening on ";
+        process.OutputDataReceived += (_, e) =>
+        {
+            if (e.Data is { } line && line.StartsWith(prefix, StringComparison.Ordinal)) announced.TrySetResult(line[prefix.Length..].Trim());
+        };
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+        if (!announced.Task.Wait(TimeSpan.FromSeconds(30)))
+        {
+            if (!process.HasExited) process.Kill();
+            Assert.Fail("the daemon did not announce its pipe");
+        }
+        return (process, announced.Task.Result);
+    }
+
     private static string? FindPwsh()
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator))

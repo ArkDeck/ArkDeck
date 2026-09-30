@@ -20,6 +20,7 @@ use windows_sys::Win32::System::Threading::*;
 mod account;
 mod console_secret;
 mod credential;
+mod daemon_fingerprint;
 mod daemon_start;
 mod deveco_files;
 mod host_fs;
@@ -36,12 +37,14 @@ pub(crate) mod shell;
 mod state;
 mod stop;
 mod tool;
+mod verified_source;
 pub use account::{application_support_directory, arkdeck_application_support_root};
 pub use console_secret::{TerminalSecretError, read_terminal_secret};
 pub use credential::{
     CREDENTIAL_NOT_FOUND, DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems,
     KeychainPresence,
 };
+pub use daemon_fingerprint::trusted_daemon_fingerprint;
 pub use daemon_start::{
     DetachedDaemon, StarterLock, await_pipe_instance, pipe_present, verify_daemon_image,
 };
@@ -66,6 +69,7 @@ pub use state::{
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 pub use stop::{Latch, StopSignal, send_console_break};
+pub use verified_source::{VerifiedSource, create_private_directory, create_private_file};
 
 pub(crate) struct Handle(OwnedHandle);
 impl Handle {

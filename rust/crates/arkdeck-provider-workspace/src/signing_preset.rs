@@ -107,17 +107,18 @@ impl SigningPresetReceipt {
     /// Swift `isManagedSDKReleasePreset`: the official SDK's release material,
     /// whose password is published with the SDK.
     pub fn is_managed_sdk_release(&self) -> bool {
+        use crate::signing_action::{HOST_SEPARATOR as S, host_join};
         let Some(managed) = &self.managed_material_directory else {
             return false;
         };
         self.key_alias == "openharmony application release"
-            && self.keystore.path == format!("{managed}/OpenHarmony.p12")
-            && self.app_certificate.path == format!("{managed}/OpenHarmonyApplicationRelease.pem")
-            && self.signed_profile.path == format!("{managed}/release-profile.p7b")
+            && self.keystore.path == host_join(managed, "OpenHarmony.p12")
+            && self.app_certificate.path == host_join(managed, "OpenHarmonyApplicationRelease.pem")
+            && self.signed_profile.path == host_join(managed, "release-profile.p7b")
             && self
                 .signer_jar
                 .path
-                .ends_with("/toolchains/lib/hap-sign-tool.jar")
+                .ends_with(&format!("{S}toolchains{S}lib{S}hap-sign-tool.jar"))
     }
 
     /// The field checks of Swift `loadValidatedUnlocked`, in its order, short
@@ -171,8 +172,8 @@ impl SigningPresetReceipt {
         }
         if let Some(managed) = &self.managed_material_directory {
             let root = root.to_str().unwrap_or_default();
-            let parent = |path: &str| path.rsplit_once('/').map(|(parent, _)| parent.to_owned());
-            if !crate::signing_action::is_standard_path(managed)
+            let parent = |path: &str| crate::signing_action::host_parent(path).map(str::to_owned);
+            if !crate::file_identity::is_standard_host_path(managed)
                 || parent(managed).as_deref() != Some(root)
                 || [
                     &self.keystore.path,
@@ -238,6 +239,30 @@ impl SigningPresetStore {
     pub fn default_root() -> Option<PathBuf> {
         arkdeck_platform::arkdeck_application_support_root()
             .map(|root| root.join("Signing/OpenHarmony"))
+    }
+
+    /// The Windows preset root (TASK-XPA-011, maintainer-accepted):
+    /// `<LocalAppData>\ArkDeck\Signing\OpenHarmony`, under the same relative
+    /// names as on macOS beside the daemon's `ArkDeck\Agentd` state.
+    #[cfg(windows)]
+    pub fn default_root() -> Option<PathBuf> {
+        arkdeck_platform::arkdeck_application_support_root()
+            .map(|root| root.join("Signing").join("OpenHarmony"))
+    }
+
+    /// The Windows signing attempt root (TASK-XPA-011, accepted with the
+    /// preset root): `<root>\Attempts`, one private directory per signing
+    /// Job below it ([`crate::signing_action::SigningAttemptPaths::for_job`]),
+    /// created owner-only — every missing level, and the root's DACL made
+    /// private whether or not it existed — as the credential owner creates
+    /// the preset root. macOS keeps its attempts in the daemon's state
+    /// directory.
+    #[cfg(windows)]
+    pub fn attempts_root(&self) -> Result<PathBuf, SigningError> {
+        let root = self.root.join("Attempts");
+        arkdeck_platform::HostDirectory::open_or_create_private(&root)
+            .map_err(|_| SigningError::unsafe_file("signing attempt root is unsafe"))?;
+        Ok(root)
     }
 
     pub fn root(&self) -> &Path {

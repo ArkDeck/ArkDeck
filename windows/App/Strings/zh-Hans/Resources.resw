@@ -404,6 +404,129 @@
     <value>已中断</value>
     <comment>job.state.interrupted (JobsLocalizable.xcstrings)</comment>
   </data>
+  <data name="device_action_rename" xml:space="preserve">
+    <value>重命名…</value>
+    <comment>device.action.rename (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_title" xml:space="preserve">
+    <value>重命名设备</value>
+    <comment>device.rename.title (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_message" xml:space="preserve">
+    <value>请输入 1–64 个字符。此名称仅用于 ArkDeck 中显示，不会修改设备标识或绑定关系。</value>
+    <comment>device.rename.message (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_field" xml:space="preserve">
+    <value>设备名称</value>
+    <comment>device.rename.field (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_commit" xml:space="preserve">
+    <value>重命名</value>
+    <comment>device.rename.commit (Localizable.xcstrings)</comment>
+  </data>
+  <data name="device_rename_cancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>device.rename.cancel (Localizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_title" xml:space="preserve">
+    <value>Job 详情</value>
+    <comment>history.detail.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_select" xml:space="preserve">
+    <value>选择一个 Job 以查看详情。planned / simulated 标识永久跟随 Job，包括历史与导出。</value>
+    <comment>history.detail.select (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_loading" xml:space="preserve">
+    <value>正在加载 Job 详情</value>
+    <comment>history.detail.loading (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_reload" xml:space="preserve">
+    <value>重新加载详情</value>
+    <comment>history.detail.reload (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_job" xml:space="preserve">
+    <value>Job</value>
+    <comment>history.detail.job (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_operation" xml:space="preserve">
+    <value>操作</value>
+    <comment>history.detail.operation (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_target" xml:space="preserve">
+    <value>目标</value>
+    <comment>history.detail.target (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_state" xml:space="preserve">
+    <value>状态</value>
+    <comment>history.detail.state (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_mode" xml:space="preserve">
+    <value>执行模式</value>
+    <comment>history.detail.mode (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_created" xml:space="preserve">
+    <value>创建时间</value>
+    <comment>history.detail.created (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_finished" xml:space="preserve">
+    <value>结束时间</value>
+    <comment>history.detail.finished (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_outcomeUnknown" xml:space="preserve">
+    <value>结果未知——此 Job 对设备的影响从未被确认。</value>
+    <comment>history.detail.outcomeUnknown (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_waitingForHuman" xml:space="preserve">
+    <value>等待人工处理。</value>
+    <comment>history.detail.waitingForHuman (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_detail_artifacts" xml:space="preserve">
+    <value>Artifacts</value>
+    <comment>history.detail.artifacts (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_empty" xml:space="preserve">
+    <value>此 Job 未记录 Artifact。</value>
+    <comment>history.artifacts.empty (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_emptyPlanned" xml:space="preserve">
+    <value>无采集产物：planned Job 按设计只含计划记录。</value>
+    <comment>history.artifacts.emptyPlanned (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_export" xml:space="preserve">
+    <value>导出…</value>
+    <comment>history.artifacts.export (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportSensitive" xml:space="preserve">
+    <value>导出敏感 Artifact…</value>
+    <comment>history.artifacts.exportSensitive (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportBoundary" xml:space="preserve">
+    <value>Artifact 字节通过有界分块读取并校验；所选保存位置仅留在 App 内，不会发送给 Runtime。</value>
+    <comment>history.artifacts.exportBoundary (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportPreview_title" xml:space="preserve">
+    <value>检查 Artifact 导出信息</value>
+    <comment>history.artifacts.exportPreview.title (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportPreview_message" xml:space="preserve">
+    <value>名称：%1$@
+大小：%2$@
+隐私级别：%3$@
+SHA-256：%4$@</value>
+    <comment>history.artifacts.exportPreview.message (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportConfirm" xml:space="preserve">
+    <value>选择保存位置…</value>
+    <comment>history.artifacts.exportConfirm (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exportCancel" xml:space="preserve">
+    <value>取消</value>
+    <comment>history.artifacts.exportCancel (HistoryLocalizable.xcstrings)</comment>
+  </data>
+  <data name="history_artifacts_exporting" xml:space="preserve">
+    <value>正在导出 Artifact</value>
+    <comment>history.artifacts.exporting (HistoryLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -535,5 +658,141 @@
   <data name="windows_testTransport_message" xml:space="preserve">
     <value>脚本化 daemon “%@”：此窗口中的内容均不来自 ArkDeck Runtime。</value>
     <comment>windows.testTransport.message (Windows only)</comment>
+  </data>
+  <data name="windows_bytes" xml:space="preserve">
+    <value>%@ 字节</value>
+    <comment>windows.bytes (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_title" xml:space="preserve">
+    <value>已接管的目标</value>
+    <comment>windows.device.targets.title (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_empty" xml:space="preserve">
+    <value>尚未接管任何设备。</value>
+    <comment>windows.device.targets.empty (Windows only)</comment>
+  </data>
+  <data name="windows_device_targets_unavailable" xml:space="preserve">
+    <value>无法读取已接管的目标</value>
+    <comment>windows.device.targets.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_select" xml:space="preserve">
+    <value>选择一个已接管的目标以查看详情。</value>
+    <comment>windows.device.target.select (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_detail_unavailable" xml:space="preserve">
+    <value>无法读取目标详情</value>
+    <comment>windows.device.target.detail.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_adoptedAt" xml:space="preserve">
+    <value>接管时间</value>
+    <comment>windows.device.target.adoptedAt (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_toolVersion" xml:space="preserve">
+    <value>接管时的 HDC 版本</value>
+    <comment>windows.device.target.toolVersion (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_identity" xml:space="preserve">
+    <value>稳定标识（SHA-256）</value>
+    <comment>windows.device.target.identity (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_confirmedAt" xml:space="preserve">
+    <value>信息确认时间</value>
+    <comment>windows.device.target.confirmedAt (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_binding" xml:space="preserve">
+    <value>绑定</value>
+    <comment>windows.device.target.binding (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_presence" xml:space="preserve">
+    <value>在线状态</value>
+    <comment>windows.device.target.presence (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_profile" xml:space="preserve">
+    <value>设备 Profile</value>
+    <comment>windows.device.target.profile (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_tool" xml:space="preserve">
+    <value>HDC</value>
+    <comment>windows.device.target.tool (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_operations" xml:space="preserve">
+    <value>此设备上的操作</value>
+    <comment>windows.device.target.operations (Windows only)</comment>
+  </data>
+  <data name="windows_device_target_operationsScope" xml:space="preserve">
+    <value>范围：%1$@（%2$@）</value>
+    <comment>windows.device.target.operationsScope (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_clear" xml:space="preserve">
+    <value>清除名称</value>
+    <comment>windows.device.rename.clear (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_saved" xml:space="preserve">
+    <value>名称已保存：%@</value>
+    <comment>windows.device.rename.saved (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_cleared" xml:space="preserve">
+    <value>名称已清除</value>
+    <comment>windows.device.rename.cleared (Windows only)</comment>
+  </data>
+  <data name="windows_device_rename_refused" xml:space="preserve">
+    <value>名称未更改</value>
+    <comment>windows.device.rename.refused (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_unavailable" xml:space="preserve">
+    <value>无法读取 Artifact</value>
+    <comment>windows.history.artifacts.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_exported" xml:space="preserve">
+    <value>已导出到 %@</value>
+    <comment>windows.history.artifacts.exported (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_exportFailed" xml:space="preserve">
+    <value>导出失败</value>
+    <comment>windows.history.artifacts.exportFailed (Windows only)</comment>
+  </data>
+  <data name="windows_history_artifacts_showInExplorer" xml:space="preserve">
+    <value>在文件资源管理器中显示</value>
+    <comment>windows.history.artifacts.showInExplorer (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_action" xml:space="preserve">
+    <value>检查 Trace</value>
+    <comment>windows.trace.inspect.action (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_inspecting" xml:space="preserve">
+    <value>正在检查 Trace</value>
+    <comment>windows.trace.inspect.inspecting (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_title" xml:space="preserve">
+    <value>Trace 检查结果</value>
+    <comment>windows.trace.inspect.title (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_unavailable" xml:space="preserve">
+    <value>无法检查 Trace</value>
+    <comment>windows.trace.inspect.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_engine" xml:space="preserve">
+    <value>引擎：%1$@ %2$@</value>
+    <comment>windows.trace.inspect.engine (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_parser" xml:space="preserve">
+    <value>解析器：%1$@ %2$@</value>
+    <comment>windows.trace.inspect.parser (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_duration" xml:space="preserve">
+    <value>时长：%@ ns</value>
+    <comment>windows.trace.inspect.duration (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_capabilities" xml:space="preserve">
+    <value>能力：%@</value>
+    <comment>windows.trace.inspect.capabilities (Windows only)</comment>
+  </data>
+  <data name="windows_trace_inspect_quality" xml:space="preserve">
+    <value>数据质量：%1$@ · %2$lld 个问题</value>
+    <comment>windows.trace.inspect.quality (Windows only)</comment>
+  </data>
+  <data name="windows_trace_viewerDeferred" xml:space="preserve">
+    <value>Windows 版暂不提供 Trace 查看器：Trace 由 Runtime 检查，可用“导出…”保存后在其他工具中打开。</value>
+    <comment>windows.trace.viewerDeferred (Windows only)</comment>
   </data>
 </root>

@@ -986,9 +986,9 @@ fn serve_signing(invocation: &Invocation, id: &str) -> std::process::ExitCode {
     {
         eprintln!("{warning}");
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     let answer = arkdeck_cli::signing_leaves::run(invocation);
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(not(any(target_os = "macos", windows)))]
     let answer: Result<Value, CliError> = Err(CliError::new(
         "unsupportedOnPlatform",
         "OpenHarmony signing presets live in the macOS Keychain",

@@ -3,6 +3,13 @@
 //! shared access group, read without user interaction by Runtime composition,
 //! with a separate interactive maintenance constructor, and the installed
 //! daemon's code identity that a receipt is bound to.
+//!
+//! On Windows (TASK-XPA-011) the same items live in Credential Manager
+//! (`arkdeck_platform::KeychainItems`, the same item identity), and the
+//! daemon's code identity is its Authenticode signer and bytes
+//! (`arkdeck_platform::trusted_daemon_fingerprint`). Where the Windows daemon
+//! is installed is the caller's to say (the CLI's installation inputs), so
+//! `KeychainSigningSecrets::default_daemon_executable` stays macOS-only.
 use crate::SigningError;
 use crate::signing_preset::{KEYCHAIN_SERVICE, SecretPresence, SigningSecrets};
 use arkdeck_platform::{
@@ -48,7 +55,17 @@ impl KeychainSigningSecrets {
         }
     }
 
+    /// The same source bound to the daemon executable a receipt's identity
+    /// is checked against — for a fixture keychain and a fixture daemon.
+    pub fn bound_to(self, daemon_executable: PathBuf) -> Self {
+        Self {
+            daemon: Some(daemon_executable),
+            ..self
+        }
+    }
+
     /// Swift `OpenHarmonyLocalSigning.defaultAgentDaemonURL()`.
+    #[cfg(target_os = "macos")]
     pub fn default_daemon_executable() -> Option<PathBuf> {
         arkdeck_platform::arkdeck_application_support_root()
             .map(|root| root.join("Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd"))

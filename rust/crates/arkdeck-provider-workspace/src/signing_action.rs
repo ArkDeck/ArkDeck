@@ -9,6 +9,24 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+/// The separator of this host's standard paths: `/` on Unix, `\` on Windows.
+/// Attempt, managed-material and SDK paths are host values joined with it;
+/// the durable action and receipt record them as this host spells them.
+#[cfg(not(windows))]
+pub(crate) const HOST_SEPARATOR: char = '/';
+#[cfg(windows)]
+pub(crate) const HOST_SEPARATOR: char = '\\';
+
+/// `<parent><separator><name>` in this host's spelling.
+pub(crate) fn host_join(parent: &str, name: &str) -> String {
+    format!("{parent}{HOST_SEPARATOR}{name}")
+}
+
+/// The textual parent of a host path.
+pub(crate) fn host_parent(path: &str) -> Option<&str> {
+    path.rsplit_once(HOST_SEPARATOR).map(|(parent, _)| parent)
+}
+
 /// Swift `OpenHarmonySigningAttemptPaths`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -32,16 +50,15 @@ impl SigningAttemptPaths {
             .iter()
             .map(|byte| format!("{byte:02x}"))
             .collect();
-        let directory = format!(
-            "{}/{}",
-            root.to_string_lossy().trim_end_matches('/'),
-            &digest[..32]
+        let directory = host_join(
+            root.to_string_lossy().trim_end_matches(HOST_SEPARATOR),
+            &digest[..32],
         );
         Self {
-            signed_hap: format!("{directory}/signed.hap"),
-            certificate_chain_readback: format!("{directory}/certificate-chain.cer"),
-            profile_readback: format!("{directory}/profile-readback.p7b"),
-            result_record: format!("{directory}/signing-result.json"),
+            signed_hap: host_join(&directory, "signed.hap"),
+            certificate_chain_readback: host_join(&directory, "certificate-chain.cer"),
+            profile_readback: host_join(&directory, "profile-readback.p7b"),
+            result_record: host_join(&directory, "signing-result.json"),
             directory,
         }
     }
@@ -49,15 +66,15 @@ impl SigningAttemptPaths {
     /// Swift `stagedUnsignedHAP`: hap-sign-tool selects its package path by
     /// the `.hap` suffix, which Artifact payload names do not carry.
     pub fn staged_unsigned_hap(&self) -> String {
-        format!("{}/unsigned.hap", self.directory)
+        host_join(&self.directory, "unsigned.hap")
     }
 
     /// Swift `supportedCertificateChainReadback`: `verify-app` accepts only a
     /// `.cer` chain output; an early action's `.pem` sibling maps onto it.
     pub fn supported_certificate_chain_readback(&self) -> String {
-        let legacy = format!("{}/certificate-chain.pem", self.directory);
+        let legacy = host_join(&self.directory, "certificate-chain.pem");
         if self.certificate_chain_readback == legacy {
-            format!("{}/certificate-chain.cer", self.directory)
+            host_join(&self.directory, "certificate-chain.cer")
         } else {
             self.certificate_chain_readback.clone()
         }
@@ -146,7 +163,9 @@ impl SigningAction {
     }
 }
 
-/// Foundation `standardizedFileURL.path == path` for an absolute path.
+/// Foundation `standardizedFileURL.path == path` for an absolute path. The
+/// Unix spelling of `file_identity::is_standard_host_path`.
+#[cfg_attr(windows, allow(dead_code))]
 pub(crate) fn is_standard_path(path: &str) -> bool {
     path.starts_with('/')
         && path.len() > 1
