@@ -130,7 +130,9 @@ public static class ScriptedDaemon
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Failure(request, "internalError", "Target owner is not configured"),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
-                    _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
+                    _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Failure(request, "operationUnavailable", "workspace project owner is unavailable",
+                        Details(method.StartsWith("workspace.preset", StringComparison.Ordinal) ? "workspacePresetOwner" : "workspaceProjectOwner")),
+                    _ => SettingsOwnerAbsent(request, method),
                 },
                 DevelopmentRoot => method switch
                 {
@@ -140,7 +142,8 @@ public static class ScriptedDaemon
                     _ when method.StartsWith("target.", StringComparison.Ordinal) => Target(request, method, [OracleTargetId]),
                     _ when method.StartsWith("artifact.", StringComparison.Ordinal) => ArtifactOwnerAbsent(request),
                     "trace.inspect" => NoTraceInspector(request),
-                    _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
+                    _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
+                    _ => SettingsOwnerAbsent(request, method),
                 },
                 _ => method switch
                 {
@@ -153,6 +156,11 @@ public static class ScriptedDaemon
                     "artifact.list" => ArtifactList(request),
                     "artifact.read" => ArtifactRead(request),
                     "trace.inspect" => mode == Inspector ? TraceInspect(request) : NoTraceInspector(request),
+                    _ when method.StartsWith("workspace.", StringComparison.Ordinal) => Workspace(request, method),
+                    "runtime.hdc.status" => Success(request, Parse(HdcStatusJson)),
+                    "runtime.tool.list" => Success(request, Parse(ToolPageJson)),
+                    "runtime.storage.status" => Success(request, Parse(StorageJson)),
+                    "trace.cache.status" => Success(request, Parse(TraceCacheJson)),
                     _ => Failure(request, "rejected", "not scripted"),
                 },
             };
@@ -340,6 +348,38 @@ public static class ScriptedDaemon
             new("phase", new JsonString("traceInspectionOwner")),
         ]);
 
+        /// <summary>The Settings reads of the Windows daemon without their owners (its real answers).</summary>
+        private static byte[] SettingsOwnerAbsent(JsonObject request, string method) => method switch
+        {
+            "runtime.tool.list" or "runtime.bundle.list" => Failure(request, "operationUnavailable", "Bootstrap bundle list owner is not configured", Details("bootstrapRegistryOwner")),
+            "runtime.storage.status" => Failure(request, "rejected", "Runtime storage owners are not configured"),
+            "trace.cache.status" => Failure(request, "rejected", "Trace cache owner is not configured"),
+            _ => Failure(request, "rejected", "this method is unavailable in the read-only Rust foundation"),
+        };
+
+        /// <summary>The workspace project owner holding one registered project and its symbol
+        /// preset, as the Windows daemon answers after registration (TASK-XPA-015).</summary>
+        private static byte[] Workspace(JsonObject request, string method)
+        {
+            var parameters = request.TryGetValue("params", out var p) ? (JsonObject)p : new JsonObject();
+            var reference = parameters.TryGetValue("projectRef", out var r) ? ((JsonString)r).Value : null;
+            var phase = method.StartsWith("workspace.preset", StringComparison.Ordinal) ? "workspacePresetOwner" : "workspaceProjectOwner";
+            if (method == "workspace.project.list") return Success(request, Parse($$"""{"projects":[{{ProjectJson}}],"schemaVersion":"arkdeck.workspace-project-list/1"}"""));
+            if (reference != ProjectRef) return Failure(request, "workspaceReferenceNotFound", "workspace project is not registered", Details(phase));
+            return method switch
+            {
+                "workspace.project.show" => Success(request, Parse(ProjectJson)),
+                "workspace.preset.list" => Success(request, Parse($$"""{"presets":[{{PresetJson}}],"projectRef":"{{ProjectRef}}","schemaVersion":"arkdeck.workspace-preset-list/1"}""")),
+                _ => Failure(request, "rejected", "not scripted"),
+            };
+        }
+
+        private static JsonObject Details(string phase) => new(
+        [
+            new("newDispatchCount", JsonNumber.FromInt64(0)),
+            new("phase", new JsonString(phase)),
+        ]);
+
         /// <summary>The Windows daemon without an Artifact owner (its real answer).</summary>
         private static byte[] ArtifactOwnerAbsent(JsonObject request) =>
             Failure(request, "operationUnavailable", "Artifact owner is not configured", ArtifactDetails);
@@ -366,6 +406,36 @@ public static class ScriptedDaemon
                 """;
         }
     }
+
+    /// <summary>The registered project and preset (the real daemon's answers after
+    /// registration; the root path is never part of them).</summary>
+    public const string ProjectRef = "project-04dfc9a54d0e77e090fbb537";
+
+    public const string PresetRef = "preset-f55cf38289a9c8bf32967f7d";
+
+    private const string ProjectJson = """
+        {"allowedFileGlobs":[],"availability":"unavailable","configurationStatus":"runtimeRestartRequired","generation":"1","kind":"openharmony","operations":[],"presetRefs":[],"projectRef":"project-04dfc9a54d0e77e090fbb537","reason":"restart the Runtime to compose the registered root before submitting a workspace Job","reasonCode":"workspace_runtime_restart_required","registeredAtUtc":"2026-09-30T08:40:07Z","schemaVersion":"arkdeck.workspace-project/1","updatedAtUtc":"2026-09-30T08:40:07Z"}
+        """;
+
+    private const string PresetJson = """
+        {"configurationStatus":"runtimeRestartRequired","constraints":{"relativeSourceMap":"entry/build/sourceMaps.map"},"credentialRef":null,"generation":"1","kind":"symbol","presetRef":"preset-f55cf38289a9c8bf32967f7d","projectRef":"project-04dfc9a54d0e77e090fbb537","registeredAtUtc":"2026-09-30T08:40:07Z","schemaVersion":"arkdeck.workspace-preset/1","templateRef":"openharmony.arkts-symbol@1","timeoutSeconds":600,"toolchainGeneration":null,"toolchainRef":null,"updatedAtUtc":"2026-09-30T08:40:07Z"}
+        """;
+
+    private const string HdcStatusJson = """
+        {"availability":"available","clientVersion":"3.2.0f","clientVersionSource":"probe","configuredExecutableSHA256":null,"daemonVersion":"3.2.0f","endpoint":"127.0.0.1:8710","endpointSource":"default","executablePath":"C:\\Tools\\hdc\\hdc.exe","executableSHA256":"1111111111111111111111111111111111111111111111111111111111111111","executableSource":"registered","generation":"1","healthReasonCode":"hdc.healthy","newDispatchCount":0,"observedAt":"2026-09-30T08:00:00Z","ownership":"managed","processId":4242,"reasonCode":"hdc.available","schemaVersion":"arkdeck.runtime-hdc-status/1","serverEndpointRef":null,"serverHealth":"healthy","serverVersion":null,"signature":null,"startupVersions":null}
+        """;
+
+    private const string ToolPageJson = """
+        {"hasMore":false,"items":[{"contentDigest":"2222222222222222222222222222222222222222222222222222222222222222","contentRetained":true,"contentSchemaVersion":"1","digestAlgorithm":"sha256","generation":"1","kind":"hdc","platform":"windows-x64","references":[],"schemaVersion":"arkdeck.runtime-tool/1","selected":true,"source":"registered","state":"active","toolRef":"tool-hdc-3.2.0f","trust":{"codeDirectoryIdentitySHA256":null,"executionAssessment":"accepted","platformTrust":"trusted","policy":"registered","profileReferences":[],"registeredIdentity":true,"signature":"valid","signingIdentifier":null,"teamIdentifier":null,"toolVersion":"3.2.0f","versionSource":"probe"}}],"nextCursor":null,"order":"registeredAtAscToolRefAsc","pageKind":"snapshot","schemaVersion":"arkdeck.cli.page/1","snapshotRevision":"0f5e0c1a-0000-4000-8000-000000000002"}
+        """;
+
+    private const string StorageJson = """
+        {"artifactDomain":{"policy":"runtimeManaged","remainingBytes":"9663676416","rootReference":"runtime-artifacts","schemaVersion":"arkdeck.runtime-artifact-storage/1","totalBytes":"10737418240","usedBytes":"1073741824"},"schemaVersion":"arkdeck.runtime-storage-status/1","sessionDomain":{"catalogGeneration":null,"generation":"1","policy":{"retentionDays":"30","safetyMarginBytes":"1073741824","totalQuotaBytes":"21474836480"},"rootKind":"default","rootPath":"C:\\Users\\Example\\AppData\\Local\\ArkDeck\\Sessions","schemaVersion":"arkdeck.session-storage/1","usage":{"measurementIncomplete":false,"pinnedBytes":"4096","pinnedSessionCount":"1","sessionCount":"3","unaccountedSessionCount":"0","usedBytes":"123456"}}}
+        """;
+
+    private const string TraceCacheJson = """
+        {"activeEntryCount":1,"entryCount":2,"inactiveEntryCount":1,"purgeScope":"inactiveDerivedEntries","schemaVersion":"arkdeck.trace-cache-status/1","totalByteCount":"65536"}
+        """;
 
     private static string Sha256Hex(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 

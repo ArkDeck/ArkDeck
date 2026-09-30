@@ -93,8 +93,7 @@ public sealed partial class DevicePage() : SurfacePage<DeviceState>(
             panel.Children.Add(Ui.Text("device.targets.empty", S.Text(UiStrings.WindowsDeviceTargetsEmpty)));
             return panel;
         }
-        var list = Ui.List("device.targets.list", S.Text(UiStrings.WindowsDeviceTargetsTitle));
-        list.SelectionMode = ListViewSelectionMode.Single;
+        var list = Ui.Choice("device.targets.list", S.Text(UiStrings.WindowsDeviceTargetsTitle));
         foreach (var target in _targets)
         {
             var row = Ui.Stack(2,

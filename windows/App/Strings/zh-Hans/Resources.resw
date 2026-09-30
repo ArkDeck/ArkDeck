@@ -527,6 +527,170 @@ SHA-256：%4$@</value>
     <value>正在导出 Artifact</value>
     <comment>history.artifacts.exporting (HistoryLocalizable.xcstrings)</comment>
   </data>
+  <data name="settings_tab_general" xml:space="preserve">
+    <value>通用</value>
+    <comment>settings.tab.general (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_toolchains" xml:space="preserve">
+    <value>工具链</value>
+    <comment>settings.tab.toolchains (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_storage" xml:space="preserve">
+    <value>存储</value>
+    <comment>settings.tab.storage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_tab_trace" xml:space="preserve">
+    <value>跟踪</value>
+    <comment>settings.tab.trace (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_refresh" xml:space="preserve">
+    <value>刷新</value>
+    <comment>settings.common.refresh (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_common_loading" xml:space="preserve">
+    <value>正在加载设置……</value>
+    <comment>settings.common.loading (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_subtitle" xml:space="preserve">
+    <value>自定义 ArkDeck，并查看构建身份、平台信息与隐私保证。</value>
+    <comment>settings.general.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_build" xml:space="preserve">
+    <value>应用</value>
+    <comment>settings.general.build (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_app" xml:space="preserve">
+    <value>名称</value>
+    <comment>settings.general.app (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_version" xml:space="preserve">
+    <value>版本</value>
+    <comment>settings.general.version (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_platform" xml:space="preserve">
+    <value>平台</value>
+    <comment>settings.general.platform (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_architecture" xml:space="preserve">
+    <value>架构</value>
+    <comment>settings.general.architecture (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_privacy" xml:space="preserve">
+    <value>隐私</value>
+    <comment>settings.general.privacy (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_localFirst" xml:space="preserve">
+    <value>产物默认保存在本地</value>
+    <comment>settings.general.localFirst (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_localFirst_detail" xml:space="preserve">
+    <value>除非你主动导出，否则 Session 产物始终保存在已配置的本地存储目录。</value>
+    <comment>settings.general.localFirst.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_noUpload" xml:space="preserve">
+    <value>不会自动上传诊断信息</value>
+    <comment>settings.general.noUpload (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_general_noUpload_detail" xml:space="preserve">
+    <value>崩溃或任务失败都不会自动生成或上传诊断包。</value>
+    <comment>settings.general.noUpload.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_subtitle" xml:space="preserve">
+    <value>检查当前选中的 HDC 可执行文件及其已验证的服务端上下文。</value>
+    <comment>settings.toolchains.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_hdc" xml:space="preserve">
+    <value>OpenHarmony HDC</value>
+    <comment>settings.toolchains.hdc (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_path" xml:space="preserve">
+    <value>可执行文件</value>
+    <comment>settings.toolchains.path (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_sha256" xml:space="preserve">
+    <value>SHA-256</value>
+    <comment>settings.toolchains.sha256 (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_source" xml:space="preserve">
+    <value>来源</value>
+    <comment>settings.toolchains.source (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_clientVersion" xml:space="preserve">
+    <value>客户端版本</value>
+    <comment>settings.toolchains.clientVersion (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_daemonVersion" xml:space="preserve">
+    <value>守护进程版本</value>
+    <comment>settings.toolchains.daemonVersion (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_toolchains_endpoint" xml:space="preserve">
+    <value>端点</value>
+    <comment>settings.toolchains.endpoint (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_subtitle" xml:space="preserve">
+    <value>管理 Session 根目录、配额与保留周期，并查看每个存储实际占用了多少。</value>
+    <comment>settings.storage.subtitle (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUsage" xml:space="preserve">
+    <value>ArkDeck Runtime Artifact</value>
+    <comment>settings.storage.runtimeUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUsage_detail" xml:space="preserve">
+    <value>这里是 ArkDeck Runtime 为任务保存的 Artifact 字节。该配额由 Runtime 自行计量与执行；上方的策略作用于 Session 输出根，不作用于这里。</value>
+    <comment>settings.storage.runtimeUsage.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeUnavailable" xml:space="preserve">
+    <value>ArkDeck Runtime 未报告 Artifact 用量，因此这里不显示数字。</value>
+    <comment>settings.storage.runtimeUnavailable (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_sessionUsage" xml:space="preserve">
+    <value>Session 输出根</value>
+    <comment>settings.storage.sessionUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_sessionUsage_detail" xml:space="preserve">
+    <value>上方的配额、安全余量与保留周期只作用于这个根目录。Runtime Artifact 单独存放，不计入这里。</value>
+    <comment>settings.storage.sessionUsage.detail (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_root" xml:space="preserve">
+    <value>根目录</value>
+    <comment>settings.storage.root (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_quota" xml:space="preserve">
+    <value>总配额</value>
+    <comment>settings.storage.quota (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_margin" xml:space="preserve">
+    <value>安全余量</value>
+    <comment>settings.storage.margin (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_retention" xml:space="preserve">
+    <value>保留周期</value>
+    <comment>settings.storage.retention (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_currentUsage" xml:space="preserve">
+    <value>已用空间</value>
+    <comment>settings.storage.currentUsage (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_remaining" xml:space="preserve">
+    <value>剩余</value>
+    <comment>settings.storage.remaining (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_runtimeTotal" xml:space="preserve">
+    <value>Runtime 配额</value>
+    <comment>settings.storage.runtimeTotal (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_pinned" xml:space="preserve">
+    <value>已固定 Session</value>
+    <comment>settings.storage.pinned (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_pinGuarantee" xml:space="preserve">
+    <value>保留策略清理绝不会删除已固定的 Session。</value>
+    <comment>settings.storage.pinGuarantee (SettingsLocalizable.xcstrings)</comment>
+  </data>
+  <data name="settings_storage_measurementUnavailable" xml:space="preserve">
+    <value>当前用量不可用；已保存的配额与保留策略仍显示在上方。</value>
+    <comment>settings.storage.measurementUnavailable (SettingsLocalizable.xcstrings)</comment>
+  </data>
   <data name="windows_recovery_title" xml:space="preserve">
     <value>ArkDeck Runtime 不可用</value>
     <comment>windows.recovery.title (Windows only)</comment>
@@ -794,5 +958,201 @@ SHA-256：%4$@</value>
   <data name="windows_trace_viewerDeferred" xml:space="preserve">
     <value>Windows 版暂不提供 Trace 查看器：Trace 由 Runtime 检查，可用“导出…”保存后在其他工具中打开。</value>
     <comment>windows.trace.viewerDeferred (Windows only)</comment>
+  </data>
+  <data name="windows_navigation_settings" xml:space="preserve">
+    <value>设置</value>
+    <comment>windows.navigation.settings (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tab_runtime" xml:space="preserve">
+    <value>Runtime</value>
+    <comment>windows.settings.tab.runtime (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tab_workspace" xml:space="preserve">
+    <value>工作区</value>
+    <comment>windows.settings.tab.workspace (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_subtitle" xml:space="preserve">
+    <value>ArkDeck Runtime 自身报告的信息，以及控制它的 CLI 命令。</value>
+    <comment>windows.settings.runtime.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_identity" xml:space="preserve">
+    <value>Runtime 身份</value>
+    <comment>windows.settings.runtime.identity (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_status" xml:space="preserve">
+    <value>状态</value>
+    <comment>windows.settings.runtime.status (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_catalog" xml:space="preserve">
+    <value>Catalog 摘要</value>
+    <comment>windows.settings.runtime.catalog (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_methods" xml:space="preserve">
+    <value>已发布的方法</value>
+    <comment>windows.settings.runtime.methods (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_providers" xml:space="preserve">
+    <value>已注册的 Provider</value>
+    <comment>windows.settings.runtime.providers (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_none" xml:space="preserve">
+    <value>无</value>
+    <comment>windows.settings.runtime.none (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_checks" xml:space="preserve">
+    <value>Runtime 检查</value>
+    <comment>windows.settings.runtime.checks (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_hdc" xml:space="preserve">
+    <value>HDC</value>
+    <comment>windows.settings.runtime.check.hdc (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_targets" xml:space="preserve">
+    <value>目标存储</value>
+    <comment>windows.settings.runtime.check.targets (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_recovery" xml:space="preserve">
+    <value>恢复</value>
+    <comment>windows.settings.runtime.check.recovery (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_sessionOutput" xml:space="preserve">
+    <value>Session 输出</value>
+    <comment>windows.settings.runtime.check.sessionOutput (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_check_artifacts" xml:space="preserve">
+    <value>Runtime Artifact</value>
+    <comment>windows.settings.runtime.check.artifacts (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_configured" xml:space="preserve">
+    <value>已配置</value>
+    <comment>windows.settings.runtime.configured (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_notConfigured" xml:space="preserve">
+    <value>未配置</value>
+    <comment>windows.settings.runtime.notConfigured (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_notChecked" xml:space="preserve">
+    <value>未检查</value>
+    <comment>windows.settings.runtime.notChecked (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_adoptedCount" xml:space="preserve">
+    <value>已配置 · 已接管 %lld 台</value>
+    <comment>windows.settings.runtime.adoptedCount (Windows only)</comment>
+  </data>
+  <data name="windows_settings_runtime_outstanding" xml:space="preserve">
+    <value>已检查 · %lld 项待清理</value>
+    <comment>windows.settings.runtime.outstanding (Windows only)</comment>
+  </data>
+  <data name="windows_settings_service_title" xml:space="preserve">
+    <value>Runtime 服务</value>
+    <comment>windows.settings.service.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_service_detail" xml:space="preserve">
+    <value>Runtime 的状态、校验与重启在 CLI 中执行。App 只通过经过认证的管道读取 Runtime，从不启动、停止或替换它。</value>
+    <comment>windows.settings.service.detail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_signing_title" xml:space="preserve">
+    <value>签名</value>
+    <comment>windows.settings.signing.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_signing_detail" xml:space="preserve">
+    <value>签名凭据由 Runtime 保存在 Windows 凭据管理器中，此处从不显示；请用 CLI 查看其状态。</value>
+    <comment>windows.settings.signing.detail (Windows only)</comment>
+  </data>
+  <data name="windows_settings_hdc_unavailable" xml:space="preserve">
+    <value>无法读取 HDC 状态</value>
+    <comment>windows.settings.hdc.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_title" xml:space="preserve">
+    <value>已登记的工具</value>
+    <comment>windows.settings.tools.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_unavailable" xml:space="preserve">
+    <value>无法读取工具登记</value>
+    <comment>windows.settings.tools.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_tools_empty" xml:space="preserve">
+    <value>尚未登记任何工具。</value>
+    <comment>windows.settings.tools.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_title" xml:space="preserve">
+    <value>Trace 缓存</value>
+    <comment>windows.settings.trace.title (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_subtitle" xml:space="preserve">
+    <value>Runtime 维护的 Trace 派生缓存；原始 Trace 从不属于缓存条目。</value>
+    <comment>windows.settings.trace.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_unavailable" xml:space="preserve">
+    <value>无法读取 Trace 缓存状态</value>
+    <comment>windows.settings.trace.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_entries" xml:space="preserve">
+    <value>%1$lld 个条目 · %2$lld 个活跃 · %3$lld 个非活跃</value>
+    <comment>windows.settings.trace.entries (Windows only)</comment>
+  </data>
+  <data name="windows_settings_trace_scope" xml:space="preserve">
+    <value>清理范围</value>
+    <comment>windows.settings.trace.scope (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_subtitle" xml:space="preserve">
+    <value>已向 Runtime 登记的工作区项目与预设。登记和修改在 CLI 中执行；项目根目录只由 Runtime 保存。</value>
+    <comment>windows.settings.workspace.subtitle (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_projects" xml:space="preserve">
+    <value>项目</value>
+    <comment>windows.settings.workspace.projects (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_empty" xml:space="preserve">
+    <value>尚未登记工作区项目。</value>
+    <comment>windows.settings.workspace.empty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_unavailable" xml:space="preserve">
+    <value>无法读取工作区项目</value>
+    <comment>windows.settings.workspace.unavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_select" xml:space="preserve">
+    <value>选择一个项目以查看其预设。</value>
+    <comment>windows.settings.workspace.select (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_kind" xml:space="preserve">
+    <value>类型</value>
+    <comment>windows.settings.workspace.kind (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_availability" xml:space="preserve">
+    <value>可用性</value>
+    <comment>windows.settings.workspace.availability (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_configuration" xml:space="preserve">
+    <value>配置状态</value>
+    <comment>windows.settings.workspace.configuration (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_generation" xml:space="preserve">
+    <value>代次</value>
+    <comment>windows.settings.workspace.generation (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_registered" xml:space="preserve">
+    <value>登记时间</value>
+    <comment>windows.settings.workspace.registered (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_detailUnavailable" xml:space="preserve">
+    <value>无法读取项目详情</value>
+    <comment>windows.settings.workspace.detailUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presets" xml:space="preserve">
+    <value>预设</value>
+    <comment>windows.settings.workspace.presets (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presetsEmpty" xml:space="preserve">
+    <value>此项目尚未登记预设。</value>
+    <comment>windows.settings.workspace.presetsEmpty (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_presetsUnavailable" xml:space="preserve">
+    <value>无法读取预设</value>
+    <comment>windows.settings.workspace.presetsUnavailable (Windows only)</comment>
+  </data>
+  <data name="windows_settings_workspace_timeout" xml:space="preserve">
+    <value>超时 %lld 秒</value>
+    <comment>windows.settings.workspace.timeout (Windows only)</comment>
   </data>
 </root>

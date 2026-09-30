@@ -53,6 +53,7 @@ INPUTS = (
     "ArkDeckApp/Resources/Localizable.xcstrings",
     "ArkDeckApp/Resources/HistoryLocalizable.xcstrings",
     "ArkDeckApp/Resources/JobsLocalizable.xcstrings",
+    "ArkDeckApp/Resources/SettingsLocalizable.xcstrings",
 )
 
 

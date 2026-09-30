@@ -18,4 +18,9 @@
     <PackageReference Include="MSTest" />
     <PackageReference Include="FlaUI.UIA3" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- The contract constants for the real-daemon tests' setup frames. -->
+    <ProjectReference Include="..\ClientKit\ArkDeck.ClientKit.csproj" />
+  </ItemGroup>
 </Project>

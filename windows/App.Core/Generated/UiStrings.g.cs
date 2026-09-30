@@ -137,6 +137,47 @@ public static class UiStrings
     public const string HistoryArtifactsExportConfirm = "history.artifacts.exportConfirm";
     public const string HistoryArtifactsExportCancel = "history.artifacts.exportCancel";
     public const string HistoryArtifactsExporting = "history.artifacts.exporting";
+    public const string SettingsTabGeneral = "settings.tab.general";
+    public const string SettingsTabToolchains = "settings.tab.toolchains";
+    public const string SettingsTabStorage = "settings.tab.storage";
+    public const string SettingsTabTrace = "settings.tab.trace";
+    public const string SettingsCommonRefresh = "settings.common.refresh";
+    public const string SettingsCommonLoading = "settings.common.loading";
+    public const string SettingsGeneralSubtitle = "settings.general.subtitle";
+    public const string SettingsGeneralBuild = "settings.general.build";
+    public const string SettingsGeneralApp = "settings.general.app";
+    public const string SettingsGeneralVersion = "settings.general.version";
+    public const string SettingsGeneralPlatform = "settings.general.platform";
+    public const string SettingsGeneralArchitecture = "settings.general.architecture";
+    public const string SettingsGeneralPrivacy = "settings.general.privacy";
+    public const string SettingsGeneralLocalFirst = "settings.general.localFirst";
+    public const string SettingsGeneralLocalFirstDetail = "settings.general.localFirst.detail";
+    public const string SettingsGeneralNoUpload = "settings.general.noUpload";
+    public const string SettingsGeneralNoUploadDetail = "settings.general.noUpload.detail";
+    public const string SettingsToolchainsSubtitle = "settings.toolchains.subtitle";
+    public const string SettingsToolchainsHdc = "settings.toolchains.hdc";
+    public const string SettingsToolchainsPath = "settings.toolchains.path";
+    public const string SettingsToolchainsSha256 = "settings.toolchains.sha256";
+    public const string SettingsToolchainsSource = "settings.toolchains.source";
+    public const string SettingsToolchainsClientVersion = "settings.toolchains.clientVersion";
+    public const string SettingsToolchainsDaemonVersion = "settings.toolchains.daemonVersion";
+    public const string SettingsToolchainsEndpoint = "settings.toolchains.endpoint";
+    public const string SettingsStorageSubtitle = "settings.storage.subtitle";
+    public const string SettingsStorageRuntimeUsage = "settings.storage.runtimeUsage";
+    public const string SettingsStorageRuntimeUsageDetail = "settings.storage.runtimeUsage.detail";
+    public const string SettingsStorageRuntimeUnavailable = "settings.storage.runtimeUnavailable";
+    public const string SettingsStorageSessionUsage = "settings.storage.sessionUsage";
+    public const string SettingsStorageSessionUsageDetail = "settings.storage.sessionUsage.detail";
+    public const string SettingsStorageRoot = "settings.storage.root";
+    public const string SettingsStorageQuota = "settings.storage.quota";
+    public const string SettingsStorageMargin = "settings.storage.margin";
+    public const string SettingsStorageRetention = "settings.storage.retention";
+    public const string SettingsStorageCurrentUsage = "settings.storage.currentUsage";
+    public const string SettingsStorageRemaining = "settings.storage.remaining";
+    public const string SettingsStorageRuntimeTotal = "settings.storage.runtimeTotal";
+    public const string SettingsStoragePinned = "settings.storage.pinned";
+    public const string SettingsStoragePinGuarantee = "settings.storage.pinGuarantee";
+    public const string SettingsStorageMeasurementUnavailable = "settings.storage.measurementUnavailable";
     public const string WindowsRecoveryTitle = "windows.recovery.title";
     public const string WindowsRecoveryMessageNotRunning = "windows.recovery.message.notRunning";
     public const string WindowsRecoveryMessageImpostor = "windows.recovery.message.impostor";
@@ -204,6 +245,55 @@ public static class UiStrings
     public const string WindowsTraceInspectCapabilities = "windows.trace.inspect.capabilities";
     public const string WindowsTraceInspectQuality = "windows.trace.inspect.quality";
     public const string WindowsTraceViewerDeferred = "windows.trace.viewerDeferred";
+    public const string WindowsNavigationSettings = "windows.navigation.settings";
+    public const string WindowsSettingsTabRuntime = "windows.settings.tab.runtime";
+    public const string WindowsSettingsTabWorkspace = "windows.settings.tab.workspace";
+    public const string WindowsSettingsRuntimeSubtitle = "windows.settings.runtime.subtitle";
+    public const string WindowsSettingsRuntimeIdentity = "windows.settings.runtime.identity";
+    public const string WindowsSettingsRuntimeStatus = "windows.settings.runtime.status";
+    public const string WindowsSettingsRuntimeCatalog = "windows.settings.runtime.catalog";
+    public const string WindowsSettingsRuntimeMethods = "windows.settings.runtime.methods";
+    public const string WindowsSettingsRuntimeProviders = "windows.settings.runtime.providers";
+    public const string WindowsSettingsRuntimeNone = "windows.settings.runtime.none";
+    public const string WindowsSettingsRuntimeChecks = "windows.settings.runtime.checks";
+    public const string WindowsSettingsRuntimeCheckHdc = "windows.settings.runtime.check.hdc";
+    public const string WindowsSettingsRuntimeCheckTargets = "windows.settings.runtime.check.targets";
+    public const string WindowsSettingsRuntimeCheckRecovery = "windows.settings.runtime.check.recovery";
+    public const string WindowsSettingsRuntimeCheckSessionOutput = "windows.settings.runtime.check.sessionOutput";
+    public const string WindowsSettingsRuntimeCheckArtifacts = "windows.settings.runtime.check.artifacts";
+    public const string WindowsSettingsRuntimeConfigured = "windows.settings.runtime.configured";
+    public const string WindowsSettingsRuntimeNotConfigured = "windows.settings.runtime.notConfigured";
+    public const string WindowsSettingsRuntimeNotChecked = "windows.settings.runtime.notChecked";
+    public const string WindowsSettingsRuntimeAdoptedCount = "windows.settings.runtime.adoptedCount";
+    public const string WindowsSettingsRuntimeOutstanding = "windows.settings.runtime.outstanding";
+    public const string WindowsSettingsServiceTitle = "windows.settings.service.title";
+    public const string WindowsSettingsServiceDetail = "windows.settings.service.detail";
+    public const string WindowsSettingsSigningTitle = "windows.settings.signing.title";
+    public const string WindowsSettingsSigningDetail = "windows.settings.signing.detail";
+    public const string WindowsSettingsHdcUnavailable = "windows.settings.hdc.unavailable";
+    public const string WindowsSettingsToolsTitle = "windows.settings.tools.title";
+    public const string WindowsSettingsToolsUnavailable = "windows.settings.tools.unavailable";
+    public const string WindowsSettingsToolsEmpty = "windows.settings.tools.empty";
+    public const string WindowsSettingsTraceTitle = "windows.settings.trace.title";
+    public const string WindowsSettingsTraceSubtitle = "windows.settings.trace.subtitle";
+    public const string WindowsSettingsTraceUnavailable = "windows.settings.trace.unavailable";
+    public const string WindowsSettingsTraceEntries = "windows.settings.trace.entries";
+    public const string WindowsSettingsTraceScope = "windows.settings.trace.scope";
+    public const string WindowsSettingsWorkspaceSubtitle = "windows.settings.workspace.subtitle";
+    public const string WindowsSettingsWorkspaceProjects = "windows.settings.workspace.projects";
+    public const string WindowsSettingsWorkspaceEmpty = "windows.settings.workspace.empty";
+    public const string WindowsSettingsWorkspaceUnavailable = "windows.settings.workspace.unavailable";
+    public const string WindowsSettingsWorkspaceSelect = "windows.settings.workspace.select";
+    public const string WindowsSettingsWorkspaceKind = "windows.settings.workspace.kind";
+    public const string WindowsSettingsWorkspaceAvailability = "windows.settings.workspace.availability";
+    public const string WindowsSettingsWorkspaceConfiguration = "windows.settings.workspace.configuration";
+    public const string WindowsSettingsWorkspaceGeneration = "windows.settings.workspace.generation";
+    public const string WindowsSettingsWorkspaceRegistered = "windows.settings.workspace.registered";
+    public const string WindowsSettingsWorkspaceDetailUnavailable = "windows.settings.workspace.detailUnavailable";
+    public const string WindowsSettingsWorkspacePresets = "windows.settings.workspace.presets";
+    public const string WindowsSettingsWorkspacePresetsEmpty = "windows.settings.workspace.presetsEmpty";
+    public const string WindowsSettingsWorkspacePresetsUnavailable = "windows.settings.workspace.presetsUnavailable";
+    public const string WindowsSettingsWorkspaceTimeout = "windows.settings.workspace.timeout";
 
     /// <summary>Every key, in catalogue order.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -337,6 +427,47 @@ public static class UiStrings
         HistoryArtifactsExportConfirm,
         HistoryArtifactsExportCancel,
         HistoryArtifactsExporting,
+        SettingsTabGeneral,
+        SettingsTabToolchains,
+        SettingsTabStorage,
+        SettingsTabTrace,
+        SettingsCommonRefresh,
+        SettingsCommonLoading,
+        SettingsGeneralSubtitle,
+        SettingsGeneralBuild,
+        SettingsGeneralApp,
+        SettingsGeneralVersion,
+        SettingsGeneralPlatform,
+        SettingsGeneralArchitecture,
+        SettingsGeneralPrivacy,
+        SettingsGeneralLocalFirst,
+        SettingsGeneralLocalFirstDetail,
+        SettingsGeneralNoUpload,
+        SettingsGeneralNoUploadDetail,
+        SettingsToolchainsSubtitle,
+        SettingsToolchainsHdc,
+        SettingsToolchainsPath,
+        SettingsToolchainsSha256,
+        SettingsToolchainsSource,
+        SettingsToolchainsClientVersion,
+        SettingsToolchainsDaemonVersion,
+        SettingsToolchainsEndpoint,
+        SettingsStorageSubtitle,
+        SettingsStorageRuntimeUsage,
+        SettingsStorageRuntimeUsageDetail,
+        SettingsStorageRuntimeUnavailable,
+        SettingsStorageSessionUsage,
+        SettingsStorageSessionUsageDetail,
+        SettingsStorageRoot,
+        SettingsStorageQuota,
+        SettingsStorageMargin,
+        SettingsStorageRetention,
+        SettingsStorageCurrentUsage,
+        SettingsStorageRemaining,
+        SettingsStorageRuntimeTotal,
+        SettingsStoragePinned,
+        SettingsStoragePinGuarantee,
+        SettingsStorageMeasurementUnavailable,
         WindowsRecoveryTitle,
         WindowsRecoveryMessageNotRunning,
         WindowsRecoveryMessageImpostor,
@@ -404,5 +535,54 @@ public static class UiStrings
         WindowsTraceInspectCapabilities,
         WindowsTraceInspectQuality,
         WindowsTraceViewerDeferred,
+        WindowsNavigationSettings,
+        WindowsSettingsTabRuntime,
+        WindowsSettingsTabWorkspace,
+        WindowsSettingsRuntimeSubtitle,
+        WindowsSettingsRuntimeIdentity,
+        WindowsSettingsRuntimeStatus,
+        WindowsSettingsRuntimeCatalog,
+        WindowsSettingsRuntimeMethods,
+        WindowsSettingsRuntimeProviders,
+        WindowsSettingsRuntimeNone,
+        WindowsSettingsRuntimeChecks,
+        WindowsSettingsRuntimeCheckHdc,
+        WindowsSettingsRuntimeCheckTargets,
+        WindowsSettingsRuntimeCheckRecovery,
+        WindowsSettingsRuntimeCheckSessionOutput,
+        WindowsSettingsRuntimeCheckArtifacts,
+        WindowsSettingsRuntimeConfigured,
+        WindowsSettingsRuntimeNotConfigured,
+        WindowsSettingsRuntimeNotChecked,
+        WindowsSettingsRuntimeAdoptedCount,
+        WindowsSettingsRuntimeOutstanding,
+        WindowsSettingsServiceTitle,
+        WindowsSettingsServiceDetail,
+        WindowsSettingsSigningTitle,
+        WindowsSettingsSigningDetail,
+        WindowsSettingsHdcUnavailable,
+        WindowsSettingsToolsTitle,
+        WindowsSettingsToolsUnavailable,
+        WindowsSettingsToolsEmpty,
+        WindowsSettingsTraceTitle,
+        WindowsSettingsTraceSubtitle,
+        WindowsSettingsTraceUnavailable,
+        WindowsSettingsTraceEntries,
+        WindowsSettingsTraceScope,
+        WindowsSettingsWorkspaceSubtitle,
+        WindowsSettingsWorkspaceProjects,
+        WindowsSettingsWorkspaceEmpty,
+        WindowsSettingsWorkspaceUnavailable,
+        WindowsSettingsWorkspaceSelect,
+        WindowsSettingsWorkspaceKind,
+        WindowsSettingsWorkspaceAvailability,
+        WindowsSettingsWorkspaceConfiguration,
+        WindowsSettingsWorkspaceGeneration,
+        WindowsSettingsWorkspaceRegistered,
+        WindowsSettingsWorkspaceDetailUnavailable,
+        WindowsSettingsWorkspacePresets,
+        WindowsSettingsWorkspacePresetsEmpty,
+        WindowsSettingsWorkspacePresetsUnavailable,
+        WindowsSettingsWorkspaceTimeout,
     ];
 }

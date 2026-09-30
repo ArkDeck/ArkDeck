@@ -47,6 +47,27 @@ public sealed class ShellContractTests
     }
 
     [TestMethod]
+    public void HighContrastDefinesEveryTokenWithSystemColours()
+    {
+        // The high-contrast themes select the HighContrast dictionary: it must define every
+        // token the light and dark themes define, and only as a system colour.
+        var tokens = File.ReadAllText(RepoPaths.At("windows", "App", "Themes", "ArkDeckTokens.xaml"));
+        var keys = new Regex("x:Key=\"(ArkDeck[A-Za-z0-9]+)\"");
+        var light = keys.Matches(Section(tokens, "<ResourceDictionary x:Key=\"Light\">")).Select(m => m.Groups[1].Value).ToHashSet();
+        var dark = keys.Matches(Section(tokens, "<ResourceDictionary x:Key=\"Dark\">")).Select(m => m.Groups[1].Value).ToHashSet();
+        var contrast = Section(tokens, "<ResourceDictionary x:Key=\"HighContrast\">");
+        var defined = keys.Matches(contrast).Select(m => m.Groups[1].Value).ToHashSet();
+        Assert.IsTrue(light.Count > 10);
+        CollectionAssert.AreEquivalent(light.Order().ToArray(), dark.Order().ToArray());
+        var missing = light.Except(defined).ToArray();
+        Assert.AreEqual(0, missing.Length, "no high-contrast value for " + string.Join(", ", missing));
+        foreach (var line in contrast.Split('\n').Where(l => l.Contains("x:Key=\"ArkDeck", StringComparison.Ordinal)))
+        {
+            StringAssert.Contains(line, "SystemColor", line.Trim());
+        }
+    }
+
+    [TestMethod]
     public void TheAppHoldsNoRuntimeSemantics()
     {
         // Stop condition: the App reads through ClientKit calls in App.Core and derives no
@@ -54,7 +75,7 @@ public sealed class ShellContractTests
         // (TASK-XPA-020, app.device.rename: host state, generation-guarded, the CLI's
         // `target display-name set|clear`), named only by the loader; no Job, adoption,
         // device or other business write is named anywhere in the App or App.Core.
-        var forbidden = new[] { "job.submit", "job.cancel", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge" };
+        var forbidden = new[] { "job.submit", "job.cancel", "job.run", "job.reconcile", "target.adopt", "device.display-name.set", "device.display-name.clear", "artifact.export", "artifact.import.begin", "trace.cache.purge", "workspace.project.register", "workspace.project.update", "workspace.project.remove", "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove", "runtime.storage.policy", "runtime.storage.root", "runtime.tool.select", "runtime.hdc.restart" };
         var allowed = new[] { "target.display-name.set", "target.display-name.clear" };
         var sources = RepoPaths.AppSources("*.cs")
             .Concat(Directory.EnumerateFiles(RepoPaths.At("windows", "App.Core"), "*.cs", SearchOption.AllDirectories)
@@ -85,6 +106,9 @@ public sealed class ShellContractTests
                      CliCommands.Doctor, CliCommands.RuntimeHealth, CliCommands.DeviceCandidates, CliCommands.JobList, CliCommands.JobStatus, CliCommands.JobEvents,
                      CliCommands.TargetList, CliCommands.TargetShow, CliCommands.TargetAvailability, CliCommands.TargetDisplayNameSet, CliCommands.TargetDisplayNameClear,
                      CliCommands.ArtifactList, CliCommands.ArtifactRead, CliCommands.TraceInspect, RecoveryBannerState.DoctorCommand,
+                     CliCommands.RuntimeServiceStatus, CliCommands.RuntimeServiceVerify, CliCommands.RuntimeServiceRestart, CliCommands.RuntimeSigningStatus,
+                     CliCommands.RuntimeHdcStatus, CliCommands.RuntimeToolList, CliCommands.RuntimeStorageStatus, CliCommands.TraceCacheStatus,
+                     CliCommands.WorkspaceProjectList, CliCommands.WorkspaceProjectRegister, CliCommands.WorkspaceProjectShow, CliCommands.WorkspacePresetList,
                  })
         {
             Assert.IsTrue(commands.Contains(command), command);
@@ -109,7 +133,7 @@ public sealed class ShellContractTests
         foreach (var snapshot in doc.RootElement.GetProperty("snapshots").EnumerateArray())
         {
             Assert.IsTrue(scenarios.Contains(snapshot.GetProperty("scenario").GetString()!));
-            Assert.IsTrue(new[] { "overview", "device", "history" }.Contains(snapshot.GetProperty("page").GetString()));
+            Assert.IsTrue(new[] { "overview", "device", "history", "settings" }.Contains(snapshot.GetProperty("page").GetString()));
             if (snapshot.TryGetProperty("steps", out var steps))
             {
                 foreach (var step in steps.EnumerateArray())

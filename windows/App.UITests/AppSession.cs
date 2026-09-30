@@ -27,6 +27,9 @@ internal sealed class AppSession : IDisposable
 
     public int ProcessId => _app.ProcessId;
 
+    /// <summary>The App window's handle (keyboard tests post their strokes to it).</summary>
+    public IntPtr Handle => Window.Properties.NativeWindowHandle.ValueOrDefault;
+
     /// <summary>The App to test: ARKDECK_APP_EXE, else the solution's Release (then Debug) build.</summary>
     public static string? FindExe()
     {

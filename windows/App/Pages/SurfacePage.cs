@@ -18,7 +18,8 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
     protected static Localizer S => App.Strings;
 
     private readonly StackPanel _body = new() { Spacing = 14 };
-    private readonly ContentControl _progress = new();
+    // Hosts only; a host is never a Tab stop of its own (the keyboard test found empty stops).
+    private readonly ContentControl _progress = new() { IsTabStop = false };
     private bool _refreshing;
 
     protected SurfacePage(string rootId, string titleId, string titleKey, string refreshId, string refreshKey, string progressId, string progressKey)
@@ -37,7 +38,10 @@ public abstract partial class SurfacePage<TState> : UserControl, IRefreshable wh
         page.Children.Add(header);
         page.Children.Add(_progress);
         page.Children.Add(_body);
-        Content = new ScrollViewer { Content = page };
+        var scroll = new ScrollViewer { Content = page };
+        // The page viewport, by which the layout tests measure what is visible.
+        AutomationProperties.SetAutomationId(scroll, rootId + ".page");
+        Content = scroll;
     }
 
     private string ProgressId { get; }
