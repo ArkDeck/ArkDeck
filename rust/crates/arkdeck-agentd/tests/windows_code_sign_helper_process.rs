@@ -44,11 +44,32 @@ const BUNDLE: [&str; 3] = [
     "OpenHarmonyNativeCodeSign",
     "arkdeck-code-sign-enable",
 ];
-const CENSUS: &str = "arkdeck-agentd owners: jobs, capabilities, mutationAuthority, targets, \
-     artifacts, imports, storage, history, workspaceProjects, planning, agentExecutions, humanActions, \
-     traceCache";
-/// The Flash lane's owners (TASK-XPA-010), after the helper in the census.
-const FLASH: &str = "flashHostFacts, deviceAccess";
+/// The owners the macOS census (`Host::owner_census`) lists after
+/// `codeSignHelper`: the helper goes before the first of them a census has.
+const AFTER_HELPER: [&str; 7] = [
+    "flashAliasReconciler",
+    "flashInvocations",
+    "flashHostFacts",
+    "deviceAccess",
+    "lanePlanPreview",
+    "loaderBinding",
+    "readOnlyHdcProvider",
+];
+
+/// `census` (a daemon's `arkdeck-agentd owners: …` line, composed without the
+/// helper) with `codeSignHelper` at its macOS position; whatever else the
+/// daemon composes is left as it is.
+fn with_helper(census: &str) -> String {
+    let owners = census.strip_prefix("arkdeck-agentd owners: ").unwrap();
+    let mut owners: Vec<&str> = owners.split(", ").collect();
+    assert!(!owners.contains(&"codeSignHelper"), "{census}");
+    let at = owners
+        .iter()
+        .position(|owner| AFTER_HELPER.contains(owner))
+        .unwrap_or(owners.len());
+    owners.insert(at, "codeSignHelper");
+    format!("arkdeck-agentd owners: {}", owners.join(", "))
+}
 
 /// The checked-in helper resource, the one both packages ship.
 fn resource() -> PathBuf {
@@ -274,14 +295,13 @@ fn started(executable: &Path) -> (Vec<String>, String, Value) {
 #[test]
 fn the_bundled_helper_is_verified_composed_and_waits_behind_the_hdc_gate() {
     let _turn = turn();
+    // The census of the same daemon with no helper beside it.
+    let (_bare, bare) = installed(None);
+    let (_, baseline, _) = started(&bare);
     let bytes = std::fs::read(resource()).unwrap();
     let (_directory, executable) = installed(Some(&bytes));
     let (seen, census, deployment) = started(&executable);
-    assert_eq!(
-        census,
-        format!("{CENSUS}, codeSignHelper, {FLASH}"),
-        "{seen:?}"
-    );
+    assert_eq!(census, with_helper(&baseline), "{seen:?}");
     assert!(
         !seen
             .iter()
@@ -299,6 +319,16 @@ fn the_bundled_helper_is_verified_composed_and_waits_behind_the_hdc_gate() {
 #[test]
 fn a_helper_that_does_not_verify_is_reported_and_the_daemon_serves_without_it() {
     let _turn = turn();
+    // Without a helper beside it nothing is reported or composed.
+    let (_bare, bare) = installed(None);
+    let (seen, baseline, _) = started(&bare);
+    assert!(
+        !seen
+            .iter()
+            .any(|line| line.starts_with("native deployment")),
+        "{seen:?}"
+    );
+    assert!(!baseline.contains("codeSignHelper"), "{baseline}");
     for (name, bytes) in [
         ("not an ELF", b"not an ELF".to_vec()),
         (
@@ -313,23 +343,13 @@ fn a_helper_that_does_not_verify_is_reported_and_the_daemon_serves_without_it() 
                 .any(|line| line.starts_with("native deployment stays unavailable: ")),
             "{name}: {seen:?}"
         );
-        assert_eq!(census, format!("{CENSUS}, {FLASH}"), "{name}");
+        assert_eq!(census, baseline, "{name}");
         assert_eq!(
             deployment["reasonCodes"],
             json!(["provider_not_registered"]),
             "{name}: {deployment}"
         );
     }
-    // Without a helper beside it nothing is reported or composed.
-    let (_directory, executable) = installed(None);
-    let (seen, census, _) = started(&executable);
-    assert!(
-        !seen
-            .iter()
-            .any(|line| line.starts_with("native deployment")),
-        "{seen:?}"
-    );
-    assert_eq!(census, format!("{CENSUS}, {FLASH}"));
 }
 
 #[test]

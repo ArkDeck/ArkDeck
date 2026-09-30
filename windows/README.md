@@ -225,8 +225,12 @@ may appear in the local application data and `%LOCALAPPDATA%\ArkDeck` must be as
 record is `smoke.json` beside the zip.
 
 `windows/scripts/uninstall-rc.ps1 -InstallDirectory <dir>` uninstalls the xcopy form. It refuses
-a directory without an RC manifest. It stops a daemon running from the directory through its
-own stop event, refuses while the App or a CLI still runs from it, and removes the directory.
+a directory without an RC manifest. It stops a daemon running from the directory with the
+installation's own `bin\arkdeck.exe runtime service uninstall`, pinned to the installed image and
+its signer (an active or unclosed Runtime Job, or any other refusal of the CLI, refuses the
+uninstall; an unsigned image, which no CLI can prove, is asked through its own stop event), leaves
+a daemon of another installation alone, refuses while the App or a CLI still runs from it, and
+removes the directory.
 `-PackageName <identity>` does the same for the MSIX with `Remove-AppxPackage` for this user.
 The daemon's state (`%LOCALAPPDATA%\ArkDeck`: its state directory `Agentd`, the default Sessions
 root `Sessions` and the Trace cache `Trace`; or a development root) and the signing credentials

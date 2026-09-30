@@ -2,7 +2,7 @@
 
 - **Kind:** host-only, on the Windows 11 x64 reference host. No hdc was run and the DAYU200 was
   not touched. Every daemon ran over a fresh development root below the temporary directory.
-- **Base:** protected `main` `f41eb0c9` (#2411).
+- **Base:** protected `main` `394f8229` (#2435).
 
 ## What changed
 
@@ -18,9 +18,9 @@
   development root's selected Sessions root must stay outside `history-filter` too.
 - `arkdeck-cli`: `history filter list|save|delete` join `WINDOWS_MEASURED_LEAVES`;
   `cli-feature-coverage.json` was regenerated with `arkdeck maintainer contracts export`
-  (Windows `implemented` 74 → 77). The six coverage-digest pins in
+  (Windows `implemented` 75 → 78). The six coverage-digest pins in
   `rust/tests/fixtures/maintainer-contracts/oracle.json` were substituted
-  (`fdb0d000…` → `c34413e6…`), as #2378 and #2409 did.
+  (`c50f47b0…` → `14d35444…`), as #2378 and #2409 did.
 
 ## T0 and the Swift oracles
 
