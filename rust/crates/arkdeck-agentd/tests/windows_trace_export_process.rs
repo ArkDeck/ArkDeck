@@ -8,21 +8,21 @@
 //!   published is exported with its recorded bytes and digest, and any other
 //!   of the capture's Artifacts, or its Trace the capture recorded missing,
 //!   is refused before a byte is written. The Job owner's proof is the
-//!   caller's here, as in the owner tests: the daemon has no Job owner on
-//!   Windows yet.
+//!   caller's here, as in the owner tests.
 //! * The real daemon over an isolated development root composes the Trace
 //!   cache owner over `trace-cache\traces`: `trace.cache.status` answers its
 //!   inventory, before and after a restart and a derived entry laid down in
 //!   the macOS layout; `trace.cache.purge` is refused before admission
-//!   (`operationUnavailable`, ruling 18: no Job owner proves that no Session
-//!   needs the entry) and removes nothing; a `trace-cache`
-//!   that is not owner-only refuses the start.
+//!   (`operationUnavailable`, ruling 18: the Job owner's active-Session
+//!   census is not asked on Windows yet, so nothing proves that no Session
+//!   needs the entry) and removes nothing; a `trace-cache` that is not
+//!   owner-only refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`):
 //!   `trace cache status` answers, `trace cache purge` is reported as a
-//!   refusal (exit 69), and
-//!   `trace export` is refused by the daemon's Artifact owner (no Job owner)
-//!   with nothing exported. Without that variable this test says so and
+//!   refusal (exit 69), and `trace export` is refused by the daemon's
+//!   Artifact owner (`resourceNotFound`: its Job store does not hold the
+//!   capture's Job) with nothing exported. Without that variable this test says so and
 //!   checks nothing.
 //!
 //! Every daemon runs with every `ARKDECK_` and `OHOS_HDC_` input removed but
@@ -516,7 +516,8 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: targets, artifacts, workspaceProjects, traceCache".to_owned()
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, traceCache"
+                .to_owned()
         ),
         "{:?}",
         first.seen
@@ -537,8 +538,9 @@ fn the_trace_cache_owner_answers_status_and_refuses_purge_without_a_job_owner() 
     assert_eq!(counted["entryCount"], 1, "{counted}");
     assert_eq!(counted["inactiveEntryCount"], 1, "{counted}");
     assert_eq!(counted["activeEntryCount"], 0, "{counted}");
-    // Refused before admission (ruling 18): no Job owner proves that no
-    // Session needs the entry.
+    // Refused before admission (ruling 18): the Job owner's active-Session
+    // census is not asked on Windows yet, so nothing proves that no Session
+    // needs the entry.
     let reply = refused(
         &pipe,
         "trace.cache.purge",
@@ -636,17 +638,14 @@ fn trace_commands_run_through_the_cli_against_a_dev_signed_daemon() {
     assert_eq!(envelope["error"]["details"]["phase"], "preAdmission");
     assert_eq!(envelope["error"]["details"]["newDispatchCount"], 0);
     // The daemon's Artifact owner refuses the inspection the export starts
-    // with: no Job owner proves the Job on Windows yet.
+    // with: its Job store does not hold the capture's Job.
     let argv = trace_export(JOB, TRACE, &exports);
     let argv: Vec<&str> = argv.iter().map(String::as_str).collect();
     let (status, envelope) = cli(&daemon, &pin, &pipe, &argv);
-    assert_eq!(status, Some(69), "{envelope}");
+    assert_eq!(status, Some(65), "{envelope}");
+    assert_eq!(envelope["error"]["code"], "resourceNotFound", "{envelope}");
     assert_eq!(
-        envelope["error"]["code"], "operationUnavailable",
-        "{envelope}"
-    );
-    assert_eq!(
-        envelope["error"]["message"], "Artifact Job owner is unavailable",
+        envelope["error"]["message"], "Artifact Job owner does not exist",
         "{envelope}"
     );
     running.stop(&root.0);

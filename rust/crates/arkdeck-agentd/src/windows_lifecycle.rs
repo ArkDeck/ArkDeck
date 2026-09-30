@@ -13,12 +13,11 @@
 //! * an isolated development root (`ARKDECK_DEVELOPMENT_STATE_ROOT`, an
 //!   existing directory outside `%LOCALAPPDATA%\ArkDeck`): its `.owner.lock`,
 //!   a guard and a pipe named after the root's file identity. Beside the
-//!   lifecycle only the Target owners, the Artifact read and export owner
-//!   lifecycle only the Target owners, the Artifact read and export owner,
-//!   the workspace project owner and (in a development root) the Trace cache
-//!   owner are composed over it (see [`Authority::compose`]); every input
-//!   that would compose another owner on macOS is refused, not ignored,
-//!   until its store is ported (G01);
+//!   lifecycle only the Job store, the Target owners, the Artifact read and
+//!   export owner, the workspace project owner and (in a development root)
+//!   the Trace cache owner are composed over it (see
+//!   [`Authority::compose`]); every input that would compose another owner
+//!   on macOS is refused, not ignored, until its store is ported (G01);
 //! * a private endpoint (`ARKDECK_ENDPOINT` alone): the read-only foundation
 //!   over a pipe the caller names, owning no state root, as the Unix
 //!   standalone daemon does (the black-box read-only check runs it).
@@ -112,6 +111,7 @@ impl Authority {
     /// (`targets`) composes them, in a private child of the root created
     /// owner-only when absent (`StateRoot::private_child`):
     ///
+    /// * the Job store (`jobs-state`, [`Self::job_store`]);
     /// * the Target store: `targets.json` and the display names under
     ///   `.targets.lock` and `.target-display-names.lock`, the same bytes
     ///   as on macOS; `target.list`, `target.show`, `target.availability`
@@ -129,10 +129,8 @@ impl Authority {
     ///   root's `artifacts` (the name the macOS isolated owner and production
     ///   composition both give it): the same Job index documents, payloads
     ///   and `artifact.list` snapshot pages as on macOS. Every Artifact
-    ///   belongs to a Job, which the Job owner proves before anything is
-    ///   read, listed or exported; no Job owner is composed on Windows yet,
-    ///   so `artifact.list`, `inspect`, `read` and `export` are refused and
-    ///   read and write nothing, as the macOS daemon answers without one;
+    ///   belongs to a Job, which the Job store above proves before anything
+    ///   is read, listed or exported;
     /// * the workspace project owner (`WorkspaceProjectStore`) in
     ///   `workspace-projects`, the name both macOS compositions give it:
     ///   `projects.json` under `.projects.lock`, the same document as on
@@ -145,16 +143,18 @@ impl Authority {
     ///   from Credential Manager bound to this daemon's own image
     ///   (TASK-XPA-011), as the macOS installed daemon does. Neither the
     ///   DevEco toolchain owner nor the workspace composition is composed, so
-    ///   a project stays `runtimeRestartRequired`; with no Job owner to prove
-    ///   that no workspace Job names a project or preset, every project or
-    ///   preset mutation is refused (`recordUnreadable`, no new dispatch);
+    ///   a project stays `runtimeRestartRequired`; this composition does not
+    ///   yet ask the Job owner whether a workspace Job names a project or
+    ///   preset, so every project or preset mutation is refused
+    ///   (`recordUnreadable`, no new dispatch);
     /// * in a development root only, the Trace cache owner
     ///   (`TraceCacheStore`) over `trace-cache\traces`, beside its `staging`,
     ///   the layout the macOS isolated owner creates: `trace.cache.status`
     ///   reads the same inventory as on macOS. `trace.cache.purge` is
     ///   refused before admission (`operationUnavailable`, ruling 18), as the
-    ///   macOS daemon refuses it without its Job owner, which alone proves
-    ///   that no Job's Session still needs the derived data.
+    ///   macOS daemon refuses it without its retention owners: the Job
+    ///   owner's active-Session census, which alone proves that no Job's
+    ///   Session still needs the derived data, is not asked on Windows yet.
     ///   The account's daemon composes none: on macOS it reads the App's
     ///   cache in the App's container, and the Windows App's cache location
     ///   is not decided yet.
@@ -165,6 +165,7 @@ impl Authority {
     /// cannot open or read ends the start, as on macOS.
     pub(crate) fn compose(&self, host: crate::host::Host) -> Result<crate::host::Host, String> {
         use crate::development_usb::{RelationSource, relation_source};
+        let host = host.with_jobs(self.job_store()?);
         let name = if self.development {
             "targets-state"
         } else {
@@ -196,11 +197,6 @@ impl Authority {
                 path.display()
             )
         })?;
-        report(&format!(
-            "arkdeck-agentd composes the Artifact owner over {}; no Job owner is composed, so \
-             every Job's Artifact is refused before it is read",
-            path.display()
-        ));
         let host = host.with_artifacts(artifacts);
         let name = "workspace-projects";
         let unusable = |path: &Path, error: &dyn std::fmt::Display| {
@@ -268,6 +264,35 @@ impl Authority {
             host.owner_census().join(", ")
         ));
         Ok(host)
+    }
+
+    /// The Job store owner over its private child of the root (created
+    /// owner-only when absent, an existing one opened as it is, never
+    /// re-permissioned): `runtime-jobs.sqlite3` under `.rust-job-owner.lock`,
+    /// `jobs/<id>/job-record.json` and `jobs/<id>/journal.jsonl`, as the macOS
+    /// isolated owner keeps them in `jobs-state`. The account's root keeps it
+    /// in the same private child rather than beside its other entries (as
+    /// Swift's production daemon does): the host store cannot open the
+    /// account root itself, whose DACL also grants SYSTEM. `job.status`,
+    /// `job.show`, `job.events` and a `job.list` of one page answer from it
+    /// (so `runtime service restart` reads the current Jobs), and a restart
+    /// reads back what it holds; nothing admits a Job on Windows yet. Opening validates
+    /// the index's layout and rows and its files' owner and identity; a
+    /// store it cannot open ends the start.
+    fn job_store(&self) -> Result<arkdeck_hoststore::JobStore, String> {
+        const NAME: &str = "jobs-state";
+        let path = self.root.private_child(NAME).map_err(|error| {
+            format!(
+                "the Job store {} is unusable: {error}; nothing was started",
+                self.root.path().join(NAME).display()
+            )
+        })?;
+        arkdeck_hoststore::JobStore::open_owner(&path).map_err(|error| {
+            format!(
+                "the Job store {} is unusable: {error}; nothing was started",
+                path.display()
+            )
+        })
     }
 
     /// After a complete drain: the owner lock, then the guard, on the thread

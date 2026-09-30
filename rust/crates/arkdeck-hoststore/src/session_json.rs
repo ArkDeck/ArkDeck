@@ -237,7 +237,7 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
 /// Swift `CanonicalJSONEncoders.canonicalPretty()`: the same spelling with
 /// `.withoutEscapingSlashes`, the one the Artifact documents Swift composes
 /// (a facts product, a capture's markers, index and summary) are written in.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(super) fn encode_canonical_pretty(value: &Value) -> Result<Vec<u8>> {
     pretty(value, false)
 }
@@ -285,7 +285,7 @@ pub fn decode_session_json(bytes: &[u8]) -> Result<DecodedStore> {
     })
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(all(test, any(target_os = "macos", windows)))]
 mod tests {
     use super::{encode_canonical_pretty, encode_pretty};
     use serde_json::{Value, json};

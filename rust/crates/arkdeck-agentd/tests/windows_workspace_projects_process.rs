@@ -6,8 +6,8 @@
 //!   answer from `workspace-projects` (`projects.json` under
 //!   `.projects.lock`), a symbol preset registers, and what they wrote is
 //!   read back after a restart; a project or preset mutation is refused with
-//!   no new dispatch, because no Job owner is composed to prove that no
-//!   workspace Job names it; a store directory that is not owner-only, or a
+//!   no new dispatch, because the composition does not yet ask the Job
+//!   owner whether a workspace Job names it; a store directory that is not owner-only, or a
 //!   document the owner cannot read, refuses the start.
 //! * Through the real CLI against a copy of the daemon signed with the
 //!   host-trusted development signer (`ARKDECK_DEV_SIGNER_THUMBPRINT`, as
@@ -262,7 +262,8 @@ fn projects_register_over_the_pipe_and_survive_a_restart() {
     let pipe = first.serving();
     assert!(
         first.seen.contains(
-            &"arkdeck-agentd owners: targets, artifacts, workspaceProjects, traceCache".to_owned()
+            &"arkdeck-agentd owners: jobs, targets, artifacts, workspaceProjects, traceCache"
+                .to_owned()
         ),
         "{:?}",
         first.seen

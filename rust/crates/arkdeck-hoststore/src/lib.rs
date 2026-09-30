@@ -68,34 +68,45 @@ pub use workspace_read::Inspector as WorkspaceInspector;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(target_os = "macos")]
+// The Job store owner (the SQLite admission index, `jobs/<id>/job-record.json`
+// and the Job read resources) on macOS and Windows. Its readers and writers
+// that other macOS-only owners call carry the dead-code allowance on Windows.
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_owner;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod recovery_epoch;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use recovery_epoch::{
     RECOVERY_EPOCH_DOCUMENT, RECOVERY_EPOCH_LOCK, RecoveryEpoch, RecoveryEpochDraft,
     RecoveryEpochError, RecoverySource, SupersededIntent, append_recovery_epoch,
     list_recovery_epochs,
 };
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_record;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 mod job_record_fields;
-// The Job index's SQL. Windows builds it for its tests until the durable
-// host-store primitives the owner needs (G01) and the timestamp order key
-// (G04) reach Windows; macOS composes it through `job_repository`.
-#[cfg(any(target_os = "macos", all(windows, test)))]
+// The Job index's SQL, which `job_repository` composes.
+#[cfg(any(target_os = "macos", windows))]
 mod job_index;
 #[cfg(all(test, any(target_os = "macos", windows)))]
 mod job_index_tests;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod job_repository;
+// Swift `RuntimeJobEngine.stepSetDigest`, which the Job record's reader
+// checks a consumed HAP's correlation with and the planner computes.
+#[cfg(any(target_os = "macos", windows))]
+mod job_step_digest;
 #[cfg(target_os = "macos")]
-pub use job_owner::{HdcLifecycleInterlock, JobStore};
-#[cfg(target_os = "macos")]
+pub use job_owner::HdcLifecycleInterlock;
+#[cfg(any(target_os = "macos", windows))]
+pub use job_owner::JobStore;
+#[cfg(any(target_os = "macos", windows))]
 pub use job_record::JobRecord;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use job_repository::{AdmissionVerdict, JobWriteError};
 #[cfg(target_os = "macos")]
 mod mutation_execution;
@@ -264,11 +275,12 @@ pub use session_publication::{
 // The Catalog's operation model, its input matching (with the Catalog's
 // pattern subset) and its effect resolution live in `arkdeck-contract`, shared
 // with the CLI; `crate::operation_catalog` keeps naming them here.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 use arkdeck_contract::operation_catalog;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 mod operation_request;
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
 #[cfg(target_os = "macos")]
 mod artifact_quota;

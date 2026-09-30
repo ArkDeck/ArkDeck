@@ -611,9 +611,11 @@ reason a prepared tree's ancestors cannot be moved away meanwhile. The Windows
 daemon composes the owner over `trace-cache/traces` in a development root only
 (the account's daemon would read the App's cache, whose Windows location is not
 decided); `trace.cache.status` answers there, and `trace.cache.purge` is refused
-as the macOS daemon refuses it without its Job owner. `trace export` is the
+as the macOS daemon refuses it without its retention owners: the Job owner's
+active-Session census is not asked on Windows yet. `trace export` is the
 Artifact export path of TASK-XPA-006 and needs nothing Windows-specific beyond
-it; the daemon refuses it until a Job owner is composed on Windows.
+it; the daemon's Job store proves the Trace's Job first, and refuses a Job it
+does not hold (`resourceNotFound`).
 
 Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
 to check real RPC/CLI status and purge, retention, lease contention, restart,
@@ -864,21 +866,85 @@ made owner-only by the store (`HostDirectory::open_or_create_private`)
 because a directory the standard library creates on Windows inherits the
 temporary directory's DACL, which the store refuses.
 
-Still macOS-only, and why:
+The Job store owner followed; see the next section for what it builds and
+what is still macOS-only.
 
-- The Job owner (`JobStore`), which admits Jobs, persists `job-record.json`
-  and serves `job.events` over the reader: it stands on the SQLite Job index
-  (`job_repository`, WM1 slice S3). `JobRecord` imports the index's row types
-  and the Job plan's digest (`job_plan`, over device facts and Artifact
-  reads), so the record decoder and its Foundation pretty-print writer wait
-  with it.
-- Session publication (`SessionPublisher`), which composes the Manifest
-  from the Job record and holds the Session owner (`SessionStore`,
-  `snapshot_pager`): it needs `JobStore`/`JobRecord`, and the Session owner
-  needs `document_metadata`/`remove_document`, which still take
-  `std::fs::Metadata`.
-- The cutover facts (the only caller of the replay's destructive-intent
-  check) and the Session inventory.
+## Job store owner on Windows (TASK-XPA-005)
+
+`arkdeck-hoststore` builds the Job store owner on macOS and Windows: the
+SQLite admission index (`job_repository` over `job_index`, the order key
+from the portable calendar), `JobStore` with its `admit`, `persist` and
+`job-record.json` writer, `JobRecord` and its fields, the Foundation
+pretty-print writers (`session_json::encode_pretty`,
+`encode_canonical_pretty`), the operation request decoder, the recovery
+epoch document reader, and Swift's `stepSetDigest` (moved out of the Job
+plan into `job_step_digest`, which the record reader checks a consumed
+HAP's correlation with). The code is the macOS code; only three things have
+a Windows arm:
+
+- the index database's identity (`job_repository::database_identity`):
+  macOS reads the store's `document_metadata` (device, inode); Windows
+  checks the entry with the store's owner rule (`owned_kind_and_size`) and
+  takes its volume serial and file id (`file_identity`, FileIdInfo),
+  before and after, so a database replaced under the owner is not read;
+  the `-wal`, `-shm` and `-journal` companions pass the same owner,
+  single-link and regular-file rule on both;
+- a first index's file: `0600` through `OpenOptions` on macOS; on Windows the
+  store's own owner-only `create_document`, then SQLite writes the layout
+  and the file and the directory are flushed;
+- the recovery epoch probe (`job_epoch_indexes.rs`): `document_metadata` on
+  macOS, the store's owner rule on Windows.
+
+The Windows daemon composes the store over its root
+(`windows_lifecycle::Authority::compose`) in a private child `jobs-state`
+(`StateRoot::private_child`, owner-only when created, an existing one never
+re-permissioned; one that is not owner-only ends the start): the macOS
+isolated owner's name, and for the account's root too, because the host
+store cannot open `Agentd` itself (its DACL also grants SYSTEM), where
+Swift's production daemon keeps the index beside its other owners. It
+answers `job.status`, `job.show` and `job.events` (`jec1` cursors that still
+open after a restart). `job.list` and `job.timeline` page through
+`snapshot_pager`, whose retention needs the
+`document_metadata`/`remove_document` port (ruling 7, in its own slice), so
+it is not built on Windows. Until it is, a `job.list` whose snapshot is one
+page is answered as the pager answers its first page, without storing the
+snapshot (nothing can read a one-page snapshot back: its one cursor is never
+handed out); a longer list, any cursor and `job.timeline` are refused
+`rejected` ("… the Job snapshot pager, which is not built on Windows yet").
+That one page is what `runtime service restart` reads the current Jobs from,
+so a restart still refuses to interrupt a current Job; its proof now reports
+`jobOwner: true`. Nothing admits a Job on Windows yet (no planner, admitter or runner, no
+registered HDC). The Windows CLI coverage statuses stay `partial`.
+
+The NTFS store's document replacement (`publish_document`) now waits out,
+for about a second, a moment's holder of the replaced file (an
+anti-malware or indexing filter holding it without delete sharing), which
+made repeated `persist` calls fail `OutcomeUnknown` in most runs of the
+corpus below; a failed rename replaced nothing, so the retry cannot publish
+twice.
+
+Tests on Windows and macOS: `tests/job_store_corpus.rs` re-encodes every
+recorded `job-record.json` to its bytes, rebuilds every recorded Job index
+whose rows carry their records through `JobStore::open_owner` (admission and
+version-by-version `persist`), compares the index read back with the
+recorded projection and the published records with the recorded bytes, and
+compares the recorded Swift answers to `job.status`, `job.show` and
+`job.events` with a reader of the rebuilt store; `tests/job_store_writer.rs`
+(the Swift writer oracle) and `tests/job_store_files.rs` (companion links,
+directories, a replaced database). On Windows only,
+`arkdeck-agentd/tests/windows_job_store_process.rs` records the Swift
+`observe.device@1` Jobs into a development root, starts the real daemon,
+reads them over its pipe before and after a restart, and, with
+`ARKDECK_DEV_SIGNER_THUMBPRINT`, through the real CLI against a dev-signed
+daemon.
+
+Still macOS-only: Session publication (`SessionPublisher`) and the Session
+owner (`SessionStore`, `snapshot_pager`, `session_inventory`), which need
+the `document_metadata`/`remove_document` port and the export submodules;
+the HDC lifecycle interlock and the current-Job census (over
+`hdc_impact_source`); the Job owner's Import, workspace, retention and
+Session-continuity censuses; Flash recovery; and every planner, admitter,
+runner and reconciler.
 
 ## Job index and record writers (TASK-XPA-014)
 
@@ -2203,15 +2269,17 @@ The Windows daemon composes the owner over its root's `artifacts` (the
 development root and the account's `%LOCALAPPDATA%\ArkDeck\Agentd` alike),
 created owner-only when absent and never re-permissioned: an existing
 `artifacts` that is not owner-only refuses the start. Every Artifact belongs to
-a Job, which the Job owner proves before anything is read, listed or exported;
-no Job owner is composed on Windows yet, so `artifact list`, `inspect`, `read`
-and `export` answer `operationUnavailable` ("Artifact Job owner is
-unavailable") and touch nothing, as the macOS daemon answers without a Job
-owner. `tests/windows_artifact_owners.rs` (hoststore) reads and exports the
+a Job, which the daemon's Job store (`jobs-state`, "Job store owner on
+Windows" above) proves before anything is read, listed or exported; a Job it
+does not hold is refused `resourceNotFound` ("Artifact Job owner does not
+exist") and nothing is touched. `tests/windows_artifact_owners.rs`
+(hoststore) reads and exports the
 macOS-recorded Artifacts of `rust/tests/fixtures/agent-execution` with their
 recorded bytes and digests and reproduces the Swift daemon's recorded
 `artifact.inspect`/`artifact.read` frames; `tests/windows_artifact_owner_process.rs`
-(agentd) runs the real daemon over its pipe and, with
+(agentd) records the Job into the daemon's Job store, answers `artifact list`,
+`inspect`, `read` and `export` over the real daemon's pipe before and after a
+restart and, with
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
@@ -2994,12 +3062,12 @@ component (`arkdeck_platform::InspectedDirectory`), must be named by the system
 with exactly that spelling (so another case or a short name is refused), and is
 pinned by the volume serial and the 64-bit NTFS file reference as its device
 and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
-and digests. No DevEco toolchain or credential owner, workspace composition or
-Job owner is composed there yet: a project stays `runtimeRestartRequired`, a
+and digests. No DevEco toolchain or credential owner or workspace composition
+is composed there yet: a project stays `runtimeRestartRequired`, a
 symbol preset registers, a preset that pins a toolchain is refused as without
 its owner, and every project or preset update or removal is refused
-(`recordUnreadable`, no new dispatch) because nothing proves that no Job names
-it. `tests/windows_workspace_project.rs` (hoststore) and
+(`recordUnreadable`, no new dispatch) because the composition does not yet ask
+the Job owner whether a Job names it. `tests/windows_workspace_project.rs` (hoststore) and
 `tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
 measure it.
 

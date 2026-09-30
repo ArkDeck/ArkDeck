@@ -583,7 +583,7 @@ pub fn append_recovery_epoch(
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;

@@ -112,7 +112,7 @@ pub struct Host {
     targets: Option<std::sync::Arc<arkdeck_hoststore::TargetStore>>,
     #[cfg(any(target_os = "macos", windows))]
     artifacts: Option<std::sync::Arc<arkdeck_hoststore::ArtifactReadStore>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     jobs: Option<std::sync::Arc<arkdeck_hoststore::JobStore>>,
     /// The agent execution owner beside the Job state.
     #[cfg(target_os = "macos")]
@@ -253,7 +253,7 @@ impl Host {
         self.targets = Some(std::sync::Arc::new(targets));
         self
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(std::sync::Arc::new(jobs));
         self
@@ -800,21 +800,13 @@ impl Host {
             agents.finish(&start, &jobs);
         });
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
         self.jobs
             .as_ref()
             .ok_or_else(job_owner_not_configured)?
             .read_snapshot(job_id)
             .map(|_| ())
-    }
-    /// The Windows daemon composes no Job owner yet (its store follows the
-    /// Job index on SQLite), so every Artifact a Job owns is refused as the
-    /// macOS daemon refuses it without one: before any Artifact is read,
-    /// listed or exported.
-    #[cfg(windows)]
-    fn require_artifact_job(&self, _job_id: &str) -> Result<(), WireError> {
-        Err(job_owner_not_configured())
     }
     #[cfg(any(target_os = "macos", windows))]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
@@ -1210,9 +1202,12 @@ impl Host {
 
     /// The owners a Windows composition holds, by the names the macOS
     /// census gives them, in its order: what the daemon reports at its start.
+    /// This list is the one place that order is spelled on Windows; an owner
+    /// ported later goes in at its position in the macOS census above.
     #[cfg(windows)]
     pub(crate) fn owner_census(&self) -> Vec<&'static str> {
         [
+            ("jobs", self.jobs.is_some()),
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
@@ -1250,7 +1245,7 @@ impl Host {
             targets: None,
             #[cfg(any(target_os = "macos", windows))]
             artifacts: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             jobs: None,
             #[cfg(target_os = "macos")]
             capabilities: None,
@@ -1822,7 +1817,7 @@ impl HostServices for Host {
         self.with_hdc_impact(|source| owner.answer(method, params, source))
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn job_resource(
         &self,
         method: &str,
@@ -2382,9 +2377,10 @@ impl HostServices for Host {
         })
         .map_err(|_| refuse())
     }
-    /// The macOS owner's answers without its retention owners: no Job owner
-    /// is composed on Windows yet, so nothing can prove that no Job's Session
-    /// still needs the derived data. The purge is refused before admission,
+    /// The macOS owner's answers without its retention owners: the Job
+    /// owner's active-Session census and the Artifact owner's Trace retention
+    /// are not asked on Windows yet, so nothing can prove that no Job's
+    /// Session still needs the derived data. The purge is refused before admission,
     /// with zero dispatch (ruling 18), and nothing is purged. Without the
     /// Trace cache owner itself it is `rejected`, as `trace.cache.status` is.
     #[cfg(windows)]
@@ -2665,7 +2661,7 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             };
-            // Windows composes no Job owner yet.
+            // The Windows composition does not ask its Job owner yet.
             #[cfg(windows)]
             let census = |_: WorkspaceReference<'_>| Err(unverified());
             #[cfg(target_os = "macos")]

@@ -5,8 +5,10 @@
 pub use crate::job_index::AdmissionVerdict;
 use crate::job_index::{self, Admission, DATABASE, ROWS, corrupt, current_layout};
 use arkdeck_platform::{HostDirectory, HostReadLock, HostSqlite, SqliteValue};
+#[cfg(target_os = "macos")]
 use std::fs::{File, OpenOptions};
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -86,6 +88,67 @@ fn validate_files(root: &HostDirectory) -> io::Result<()> {
     }
     Ok(())
 }
+/// A first index: the database file created owner-only and exclusively,
+/// its layout written, the file and then the directory flushed.
+#[cfg(target_os = "macos")]
+fn create_database(_root: &HostDirectory, path: &Path) -> io::Result<()> {
+    let file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(path.join(DATABASE))?;
+    let mut db = HostSqlite::open(&path.join(DATABASE), false, false)?;
+    job_index::create(&mut db)?;
+    drop(db);
+    file.sync_all()?;
+    File::open(path)?.sync_all()
+}
+
+/// On Windows the store creates the empty file, relative to the held root
+/// with the owner-only descriptor, as it creates every private document;
+/// SQLite then writes the layout, and the file (reopened for its flush, and
+/// checked to be the one created) and the directory are flushed.
+#[cfg(windows)]
+fn create_database(root: &HostDirectory, path: &Path) -> io::Result<()> {
+    root.create_document(DATABASE, &[])?;
+    let created = database_identity(root)?;
+    let mut db = HostSqlite::open(&path.join(DATABASE), false, false)?;
+    job_index::create(&mut db)?;
+    drop(db);
+    let file = std::fs::OpenOptions::new()
+        .write(true)
+        .open(path.join(DATABASE))?;
+    file.sync_all()?;
+    if database_identity(root)? != created {
+        return Err(corrupt());
+    }
+    root.sync()
+}
+
+/// The device and file identity of the owner's private database file, which
+/// must stay the one the owner opened: the macOS store's `document_metadata`
+/// (an owner-only regular document, opened through no link); on Windows the
+/// store's owner check of the entry and its volume serial and file id.
+#[cfg(target_os = "macos")]
+fn database_identity(root: &HostDirectory) -> io::Result<(u64, u64)> {
+    let metadata = root.document_metadata(DATABASE)?;
+    Ok((metadata.device, metadata.inode))
+}
+
+#[cfg(windows)]
+fn database_identity(root: &HostDirectory) -> io::Result<(u64, u64)> {
+    let before = root.file_identity(DATABASE)?;
+    match root.owned_kind_and_size(DATABASE)? {
+        (arkdeck_platform::HostEntryKind::Regular, _) => (),
+        _ => return Err(corrupt()),
+    }
+    let after = root.file_identity(DATABASE)?;
+    if (before.device, before.inode) != (after.device, after.inode) {
+        return Err(corrupt());
+    }
+    Ok((after.device, after.inode))
+}
+
 /// Swift RuntimeJobRepository's connection choice. A read-only connection
 /// cannot create the shared-memory index a write-ahead log is read through, and
 /// that index exists whenever the log may hold pages. With it, inspect through a
@@ -319,16 +382,7 @@ impl JobRepository {
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),
                     _ => return Err(corrupt()),
                 }
-                let file = OpenOptions::new()
-                    .write(true)
-                    .create_new(true)
-                    .mode(0o600)
-                    .open(path.join(DATABASE))?;
-                let mut db = HostSqlite::open(&path.join(DATABASE), false, false)?;
-                job_index::create(&mut db)?;
-                drop(db);
-                file.sync_all()?;
-                File::open(path)?.sync_all()?;
+                create_database(&root, path)?;
             }
             Ok(_) => (),
             Err(e) => return Err(e),
@@ -358,12 +412,12 @@ impl JobRepository {
         }
         root.validate_path(path)?;
         lock.mark_catalog_initialized(&root, LOCK)?;
-        let metadata = root.document_metadata(DATABASE)?;
+        let identity = database_identity(&root)?;
         Ok(Self {
             root,
             path: path.into(),
             lock,
-            identity: (metadata.device, metadata.inode),
+            identity,
             writable,
             db: Mutex::new(db),
         })
@@ -377,8 +431,7 @@ impl JobRepository {
         self.root.validate_path(&self.path)?;
         self.lock.validate_link(&self.root, LOCK)?;
         validate_files(&self.root)?;
-        let metadata = self.root.document_metadata(DATABASE)?;
-        if (metadata.device, metadata.inode) != self.identity {
+        if database_identity(&self.root)? != self.identity {
             return Err(corrupt());
         }
         Ok(())

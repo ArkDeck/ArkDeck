@@ -401,6 +401,48 @@ fn links_junctions_and_foreign_rights_are_refused_without_rewriting() {
     HostDirectory::open(&scratch.0).unwrap();
 }
 
+/// A replacement waits out a moment's holder of the document it replaces
+/// (an anti-malware or indexing filter holding it without delete sharing,
+/// here a handle of this test released after 100 ms) and then publishes;
+/// a holder that stays refuses it with the document unchanged.
+#[test]
+fn a_replacement_waits_out_a_brief_holder_of_the_replaced_document() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let (scratch, root) = Scratch::new("replace-held");
+    root.publish_document("record.json", b"first", 16).unwrap();
+    let hold = || {
+        std::fs::OpenOptions::new()
+            .read(true)
+            // FILE_SHARE_READ | FILE_SHARE_WRITE, no FILE_SHARE_DELETE.
+            .share_mode(0x1 | 0x2)
+            .open(scratch.join("record.json"))
+            .unwrap()
+    };
+    let held = hold();
+    let (release, released) = mpsc::channel::<()>();
+    let holder = std::thread::spawn(move || {
+        let _ = released.recv_timeout(std::time::Duration::from_millis(100));
+        drop(held);
+    });
+    root.publish_document("record.json", b"second", 16).unwrap();
+    drop(release);
+    holder.join().unwrap();
+    assert_eq!(root.read("record.json", 16).unwrap(), b"second");
+
+    let held = hold();
+    assert!(matches!(
+        root.publish_document("record.json", b"third", 16),
+        Err(DocumentPublishError::OutcomeUnknown(_))
+    ));
+    drop(held);
+    assert_eq!(root.read("record.json", 16).unwrap(), b"second");
+    assert_eq!(
+        root.names(8).unwrap(),
+        vec!["record.json".to_owned()],
+        "no staged document is left"
+    );
+}
+
 #[test]
 fn a_reader_keeps_its_bytes_while_the_name_is_replaced_or_removed() {
     let (_scratch, root) = Scratch::new("readers");

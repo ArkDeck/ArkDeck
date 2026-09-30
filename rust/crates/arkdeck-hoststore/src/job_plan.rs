@@ -855,46 +855,10 @@ impl<'a> JobPlanner<'a> {
     }
 }
 
-fn selected_step_lines(descriptor: &CatalogOperation, inputs: &Map<String, Value>) -> Vec<String> {
-    descriptor
-        .steps
-        .iter()
-        .filter(|step| descriptor.step_is_selected(step, inputs))
-        .map(|step| {
-            format!(
-                "{}|{}|{}|{}|{}",
-                step.step_id, step.kind, step.effect, step.cancellation, step.binding
-            )
-        })
-        .collect()
-}
-
-/// Historical Swift stepSetDigest before #1773 added HAP compensation lines.
-/// Only the terminal historical-record reader uses this; never admission.
-pub(crate) fn historical_hap_step_set_digest(
-    descriptor: &CatalogOperation,
-    inputs: &Map<String, Value>,
-) -> String {
-    sha256_hex(
-        selected_step_lines(descriptor, inputs)
-            .join("\n")
-            .as_bytes(),
-    )
-}
-
 /// Swift RuntimeJobEngine.stepSetDigest. This is provenance, never dispatch permission.
 pub(crate) fn step_set_digest(
     descriptor: &CatalogOperation,
     inputs: &Map<String, Value>,
 ) -> Result<String, PlanRefusal> {
-    let mut lines = selected_step_lines(descriptor, inputs);
-    if descriptor.reference() == "debug.hap@1" {
-        for step in debug_hap_plan::compensations(descriptor, inputs)? {
-            lines.push(format!(
-                "compensation-{}|{}|{}|{}|{}",
-                step.step_id, step.kind, step.effect, step.cancellation, step.binding
-            ));
-        }
-    }
-    Ok(sha256_hex(lines.join("\n").as_bytes()))
+    crate::job_step_digest::step_set_digest(descriptor, inputs).ok_or_else(internal_failure)
 }

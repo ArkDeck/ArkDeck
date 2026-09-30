@@ -455,8 +455,8 @@ impl JobRecord {
                     let inputs = self.request["inputs"]
                         .as_object()
                         .ok_or_else(|| unreadable(()))?;
-                    let expected =
-                        crate::job_plan::step_set_digest(descriptor, inputs).map_err(unreadable)?;
+                    let expected = crate::job_step_digest::step_set_digest(descriptor, inputs)
+                        .ok_or_else(|| unreadable(()))?;
                     // Swift #1773 added compensation lines without changing
                     // the Catalog digest. Earlier terminal records retain the
                     // exact normal-step digest. Reading one grants no replay
@@ -466,7 +466,7 @@ impl JobRecord {
                         && !(terminal(&self.state)
                             && !self.unknown
                             && correlation["stepSetDigestSHA256"]
-                                == crate::job_plan::historical_hap_step_set_digest(
+                                == crate::job_step_digest::historical_hap_step_set_digest(
                                     descriptor, inputs,
                                 ))
                     {
