@@ -139,9 +139,13 @@ impl Authority {
     ///   macOS, a Windows root pinned by its volume serial and NTFS file
     ///   reference. `workspace.project.register|list|show` and
     ///   `workspace.preset.list|show` answer from it, and a restart reads
-    ///   back what it holds. Neither the DevEco toolchain or signing
-    ///   credential owner nor the workspace composition is composed, so a
-    ///   project stays `runtimeRestartRequired`; with no Job owner to prove
+    ///   back what it holds. The installed daemon (not the development
+    ///   root) pins a preset's signing credential in the account's preset
+    ///   root `<LocalAppData>\ArkDeck\Signing\OpenHarmony`, the secrets read
+    ///   from Credential Manager bound to this daemon's own image
+    ///   (TASK-XPA-011), as the macOS installed daemon does. Neither the
+    ///   DevEco toolchain owner nor the workspace composition is composed, so
+    ///   a project stays `runtimeRestartRequired`; with no Job owner to prove
     ///   that no workspace Job names a project or preset, every project or
     ///   preset mutation is refused (`recordUnreadable`, no new dispatch);
     /// * in a development root only, the Trace cache owner
@@ -211,6 +215,11 @@ impl Authority {
             .map_err(|error| unusable(&self.root.path().join(name), &error))?;
         let projects = arkdeck_hoststore::WorkspaceProjectStore::open(&path)
             .map_err(|error| unusable(&path, &error))?;
+        let projects = if self.development {
+            projects
+        } else {
+            projects.with_dependency_pinning(None, Some(credential_pinning()?))
+        };
         // Read now, as the macOS start reads it to compose the registered
         // projects: a document it cannot read ends the start.
         projects
@@ -414,6 +423,26 @@ pub(crate) fn start(
             root,
         }),
     }))
+}
+
+/// The installed daemon's credential pinning: the account's signing preset
+/// root and the Credential Manager secrets bound to this process's own image,
+/// in its canonical `X:\…` spelling (the spelling a receipt's identity is
+/// computed over).
+fn credential_pinning() -> Result<arkdeck_hoststore::WorkspaceCredentialPinning, String> {
+    let root = arkdeck_platform::arkdeck_application_support_root()
+        .ok_or("this account has no local application data for the signing preset")?
+        .join("Signing")
+        .join("OpenHarmony");
+    let image = std::env::current_exe()
+        .and_then(|image| image.canonicalize())
+        .map_err(|error| format!("this daemon's image cannot be named: {error}"))?;
+    let image = image
+        .to_str()
+        .ok_or("this daemon's image path is not text")?;
+    let image = std::path::PathBuf::from(image.strip_prefix(r"\\?\").unwrap_or(image));
+    arkdeck_hoststore::keychain_credential_pinning(root, image)
+        .map_err(|error| format!("the signing credential store is unusable: {error}"))
 }
 
 #[cfg(test)]
