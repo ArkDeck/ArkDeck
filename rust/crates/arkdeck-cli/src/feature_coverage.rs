@@ -370,7 +370,27 @@ const MACOS_ONLY_RUNTIME_GROUPS: &[&str] = &[
 /// refusal, not the live candidates its target contract names, and the entry
 /// for that method reaches `device wait` and `device list`, which no Windows
 /// run has measured.
-const WINDOWS_MEASURED_LEAVES: &[&str] = &["doctor", "operation.list"];
+const WINDOWS_MEASURED_LEAVES: &[&str] = &[
+    "doctor",
+    "operation.list",
+    // The Target store (TASK-XPA-004): its reads and display names. Not
+    // `target availability` (presence stays unresolved without a registered
+    // HDC) nor `target adopt` (refused before admission without one).
+    "target.list",
+    "target.show",
+    "target.display-name.set",
+    "target.display-name.clear",
+    // The workspace registration owner (TASK-XPA-015): registration and the
+    // reads. Not the updates and removals, nor preset registration, which
+    // the Windows daemon refuses without its Job and DevEco owners.
+    "workspace.project.register",
+    "workspace.project.list",
+    "workspace.project.show",
+    "workspace.preset.list",
+    "workspace.preset.show",
+    // The Trace cache owner's inventory (TASK-XPA-021); not its purge.
+    "trace.cache.status",
+];
 
 /// The leaves this CLI refuses off macOS (`unsupportedOnPlatform`; the
 /// support bundle's service is `operationUnavailable`), each for the macOS
@@ -1062,6 +1082,14 @@ mod tests {
             ("commands", "implemented"),
             ("doctor", "implemented"),
             ("operation.list", "implemented"),
+            ("target.show", "implemented"),
+            ("workspace.project.register", "implemented"),
+            ("trace.cache.status", "implemented"),
+            // Refused by the Windows daemon without an HDC or a Job owner.
+            ("target.availability", "partial"),
+            ("target.adopt", "partial"),
+            ("workspace.project.update", "partial"),
+            ("trace.cache.purge", "partial"),
             ("device.observations", "partial"),
             ("health", "partial"),
             ("help", "implemented"),

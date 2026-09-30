@@ -120,7 +120,9 @@ serves there (TASK-XPA-018): `implemented` where every leaf the entry reaches
 answers without the Runtime (the registry's `connectsToRuntime: false`: `help`,
 `commands`, `completion` and the refused stubs) or is answered by the Windows
 daemon and measured end to end against a development-signed daemon over the
-named pipe (`doctor`, `operation list`), `notImplemented` where a leaf
+named pipe (`doctor`, `operation list`, `target list|show|display-name
+set|clear`, `workspace project register|list|show`, `workspace preset
+list|show`, `trace cache status`), `notImplemented` where a leaf
 it reaches is refused off macOS for a macOS host primitive (the Import upload
 kinds, and the macOS-only families below), and `partial` otherwise: the leaves
 parse, send their frames and render their envelopes on Windows, but the target
