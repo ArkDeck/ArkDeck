@@ -56,10 +56,15 @@ compiles a target once and compiler incremental state never survives to
 another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
 of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
-same compatibility key. Before saving, CI removes compiler incremental scratch
-state (not linked products, debug symbols or fingerprints) and records per-view
-sizes in `cache-size.json`. A separate successful-main workflow retains the
-newest Rust archive per runner/cache format without deleting SwiftPM, Xcode or
+same compatibility key. Main restores only an exact compatibility match; a run
+off main, which never saves, may fall back to main's newest entry for the same
+host, runner image, compiler, flags and cache root whatever the dependency
+manifests, and Cargo rebuilds what differs. Before saving, CI removes compiler
+incremental scratch state (not linked products, debug symbols or fingerprints)
+and records per-view sizes in `cache-size.json`. A separate successful-main
+workflow retains the newest Rust archive per runner/cache format, plus the
+newest of one other runner image (the image is in clear in the key) while the
+retained Rust archives fit 5 GB, without deleting SwiftPM, Xcode or
 policy-tool entries. Restored Git refs/config are discarded and rebuilt from
 the current checkout. Published and candidate views
 retain separate source directories and Cargo targets. In hosted CI the
