@@ -406,26 +406,6 @@ impl JobRunner<'_> {
             .and_then(|contents| publisher.publish(&product, &contents));
         self.settle_publication(run, &product, published)
     }
-
-    /// Swift `runOwned`'s drain of a cancellation at a safe boundary between
-    /// steps: the durable request already carried, the Job closed cancelled.
-    /// A device Job drains the same way (`device_run.rs`).
-    pub(crate) fn drain(&self, run: &mut Run) -> Result<(), RunRefusal> {
-        run.transition(
-            "cancelRequested",
-            "cancellingAtSafeBoundary",
-            "safe-boundary",
-        )?;
-        run.transition("cancellingAtSafeBoundary", "cancelled", "steps-drained")?;
-        run.record.set_operation_failure(Some(failure(
-            "cancelled",
-            "cancelled",
-            "notAutomatic",
-            "none",
-        )));
-        run.finish()?;
-        run.persist(self.jobs)
-    }
 }
 
 /// A workspace operation's declared product.

@@ -442,13 +442,18 @@ mod tests {
     #[test]
     fn an_undecodable_ledger_refuses_the_whole_list_and_a_missing_one_owes_nothing() {
         use std::fs;
+        #[cfg(target_os = "macos")]
         use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
         let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
         let root = std::env::temp_dir()
             .canonicalize()
             .unwrap()
             .join(format!("cleanup-debt-list-{nonce:032x}"));
+        #[cfg(target_os = "macos")]
         fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+        // Owner-only, and so is every file created in it.
+        #[cfg(windows)]
+        arkdeck_platform::HostDirectory::open_or_create_private(&root).unwrap();
         let artifacts = ArtifactReadStore::open(&root).unwrap();
         assert_eq!(list_cleanup_debt(&artifacts).unwrap(), json!([]));
         // An owner-only file, as the host store reads every one.
@@ -457,6 +462,7 @@ mod tests {
             br#"[{"jobID": "job-a", "stepID": "cleanup", "remotePath": 1}]"#,
         )
         .unwrap();
+        #[cfg(target_os = "macos")]
         fs::set_permissions(root.join(LEDGER), fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(
             list_cleanup_debt(&artifacts).unwrap_err(),

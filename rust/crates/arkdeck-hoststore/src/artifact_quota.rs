@@ -16,14 +16,26 @@
 //! Unlike Swift, a read here writes nothing: no payload is resealed to 0400,
 //! no payload-verification cache is read or written (Swift's cache only spares
 //! a hash), and no total is kept between reads.
+//!
+//! The walk and its answers are one; only the reads under it are the host's.
+//! On macOS they are Swift's own system calls. On Windows they go through
+//! the host store, which never follows a reparse point (the `O_NOFOLLOW`):
+//! a junction in the root or in a payload's place is a linked entry, and a
+//! payload must also be the owner-only single-link file the Windows Artifact
+//! owners read (`HostDirectory::check_payload`), where Swift checks only its
+//! type and size. An `errno` in a message is the host's error number.
 
 use std::collections::HashSet;
-use std::fs::{self, File, Metadata};
+#[cfg(target_os = "macos")]
+use std::fs::{File, Metadata};
+#[cfg(target_os = "macos")]
 use std::io::Read;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
 use serde_json::{Value, json};
+#[cfg(target_os = "macos")]
 use sha2::{Digest, Sha256};
 
 use crate::strict_json::swift_quoted;
@@ -67,17 +79,12 @@ pub(crate) fn answer(root: &Path, quota: u64) -> Result<Value, String> {
 fn used_bytes(root: &Path) -> Result<i64, StoreError> {
     // Swift `jobDirectories()`: the whole root is classified first.
     let mut jobs = Vec::new();
-    for entry in fs::read_dir(root).map_err(|error| StoreError::Io(error.to_string()))? {
-        let entry = entry.map_err(|error| StoreError::Io(error.to_string()))?;
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let kind = fs::symlink_metadata(entry.path())
-            .map_err(|error| StoreError::Io(error.to_string()))?
-            .file_type();
-        if kind.is_dir() {
+    for (name, kind) in host::root_entries(root)? {
+        if kind == Kind::Directory {
             if name != ".imports-v1" {
                 jobs.push(name);
             }
-        } else if !(kind.is_file() && name == "cleanup-debt.json") {
+        } else if !(kind == Kind::Regular && name == "cleanup-debt.json") {
             return Err(corrupted(format!(
                 "artifact root contains an unexpected or linked entry {name}"
             )));
@@ -95,6 +102,14 @@ fn used_bytes(root: &Path) -> Result<i64, StoreError> {
         }
     }
     Ok(total)
+}
+
+/// What an entry is, its link never followed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Directory,
+    Regular,
+    Other,
 }
 
 /// What the walk reads of one index row.
@@ -118,17 +133,12 @@ fn load_index(root: &Path, job: &str) -> Result<Vec<Row>, StoreError> {
     {
         return Err(StoreError::Io("malformed job identifier".into()));
     }
-    let directory = root.join(job);
-    let index = directory.join("index.json");
     // `fileExists` follows a link: an absent index, or a dangling link, is an
     // empty one.
-    if !index.exists() {
+    if !root.join(job).join("index.json").exists() {
         return Ok(Vec::new());
     }
-    if !fs::symlink_metadata(&index).is_ok_and(|metadata| metadata.is_file()) {
-        return Err(corrupted("artifact index must be a real regular file"));
-    }
-    let bytes = bounded_index(&index)?;
+    let bytes = host::index_bytes(root, job)?;
     let document: Value = serde_json::from_slice(&bytes)
         .map_err(|error| corrupted(format!("undecodable artifact index: {error}")))?;
     let (schema_version, rows) = decode_index(&document)
@@ -151,119 +161,240 @@ fn load_index(root: &Path, job: &str) -> Result<Vec<Row>, StoreError> {
             ));
         }
         if row.published {
-            validate_payload(&directory.join(&row.artifact_id), row)?;
+            host::validate_payload(root, job, row)?;
         }
     }
     Ok(rows)
 }
 
-/// Swift `boundedIndexData(_:)`.
-fn bounded_index(index: &Path) -> Result<Vec<u8>, StoreError> {
-    let mut file =
-        open_unlinked(index).map_err(|_| corrupted("artifact index cannot be opened"))?;
-    let before = file
-        .metadata()
-        .ok()
-        .filter(|metadata| {
-            metadata.is_file() && metadata.len() > 0 && metadata.len() <= INDEX_BOUND
-        })
-        .ok_or_else(|| corrupted("artifact index exceeds its read bound"))?;
-    let mut data = Vec::new();
-    let mut buffer = vec![0_u8; 64 * 1024];
-    loop {
-        let count = match file.read(&mut buffer) {
-            Ok(count) => count,
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => return Err(corrupted("artifact index read failed")),
-        };
-        if data.len() as u64 > INDEX_BOUND - count as u64 {
-            return Err(corrupted("artifact index read failed"));
-        }
-        if count == 0 {
-            break;
-        }
-        data.extend_from_slice(&buffer[..count]);
-    }
-    if !file
-        .metadata()
-        .is_ok_and(|after| same_identity_and_content(&before, &after))
-        || data.len() as u64 != before.len()
-    {
-        return Err(corrupted("artifact index changed during read"));
-    }
-    Ok(data)
-}
+/// The reads under the walk on macOS: Swift's own system calls.
+#[cfg(target_os = "macos")]
+mod host {
+    use super::*;
+    use std::fs;
 
-/// Swift `validateStoredPayload(_:at:)`, without its verification cache and
-/// without resealing.
-fn validate_payload(path: &Path, row: &Row) -> Result<(), StoreError> {
-    let mut file = open_unlinked(path).map_err(|error| {
-        corrupted(format!(
-            "artifact payload is missing, linked or unreadable (errno {})",
-            error.raw_os_error().unwrap_or(0)
-        ))
-    })?;
-    let before = file
-        .metadata()
-        .ok()
-        .filter(|metadata| {
-            metadata.is_file() && i64::try_from(metadata.len()) == Ok(row.byte_count)
-        })
-        .ok_or_else(|| corrupted("artifact payload type or size drifted"))?;
-    let mut hash = Sha256::new();
-    let mut hashed = 0_i64;
-    let mut buffer = vec![0_u8; 1 << 20];
-    loop {
-        let count = match file.read(&mut buffer) {
-            Ok(count) => count,
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(error) => {
-                return Err(StoreError::Io(format!(
-                    "cannot hash artifact payload (errno {})",
-                    error.raw_os_error().unwrap_or(0)
-                )));
+    /// The root's entries in directory order, links not followed.
+    pub(super) fn root_entries(root: &Path) -> Result<Vec<(String, Kind)>, StoreError> {
+        let mut entries = Vec::new();
+        for entry in fs::read_dir(root).map_err(|error| StoreError::Io(error.to_string()))? {
+            let entry = entry.map_err(|error| StoreError::Io(error.to_string()))?;
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let kind = fs::symlink_metadata(entry.path())
+                .map_err(|error| StoreError::Io(error.to_string()))?
+                .file_type();
+            let kind = if kind.is_dir() {
+                Kind::Directory
+            } else if kind.is_file() {
+                Kind::Regular
+            } else {
+                Kind::Other
+            };
+            entries.push((name, kind));
+        }
+        Ok(entries)
+    }
+
+    /// A present index's bytes: a real regular file, read as Swift
+    /// `boundedIndexData(_:)` reads it.
+    pub(super) fn index_bytes(root: &Path, job: &str) -> Result<Vec<u8>, StoreError> {
+        let index = root.join(job).join("index.json");
+        if !fs::symlink_metadata(&index).is_ok_and(|metadata| metadata.is_file()) {
+            return Err(corrupted("artifact index must be a real regular file"));
+        }
+        bounded_index(&index)
+    }
+
+    /// Swift `boundedIndexData(_:)`.
+    fn bounded_index(index: &Path) -> Result<Vec<u8>, StoreError> {
+        let mut file =
+            open_unlinked(index).map_err(|_| corrupted("artifact index cannot be opened"))?;
+        let before = file
+            .metadata()
+            .ok()
+            .filter(|metadata| {
+                metadata.is_file() && metadata.len() > 0 && metadata.len() <= INDEX_BOUND
+            })
+            .ok_or_else(|| corrupted("artifact index exceeds its read bound"))?;
+        let mut data = Vec::new();
+        let mut buffer = vec![0_u8; 64 * 1024];
+        loop {
+            let count = match file.read(&mut buffer) {
+                Ok(count) => count,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(_) => return Err(corrupted("artifact index read failed")),
+            };
+            if data.len() as u64 > INDEX_BOUND - count as u64 {
+                return Err(corrupted("artifact index read failed"));
             }
-        };
-        if count == 0 {
-            break;
+            if count == 0 {
+                break;
+            }
+            data.extend_from_slice(&buffer[..count]);
         }
-        hashed = hashed.saturating_add(count as i64);
-        hash.update(&buffer[..count]);
+        if !file
+            .metadata()
+            .is_ok_and(|after| same_identity_and_content(&before, &after))
+            || data.len() as u64 != before.len()
+        {
+            return Err(corrupted("artifact index changed during read"));
+        }
+        Ok(data)
     }
-    let digest: String = hash
-        .finalize()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
-    if !file
-        .metadata()
-        .is_ok_and(|after| same_identity_and_content(&before, &after))
-        || hashed != row.byte_count
-        || digest != row.sha256
-    {
-        return Err(corrupted("artifact payload digest or identity drifted"));
+
+    /// Swift `validateStoredPayload(_:at:)`, without its verification cache and
+    /// without resealing.
+    pub(super) fn validate_payload(root: &Path, job: &str, row: &Row) -> Result<(), StoreError> {
+        let path = root.join(job).join(&row.artifact_id);
+        let mut file = open_unlinked(&path).map_err(|error| {
+            corrupted(format!(
+                "artifact payload is missing, linked or unreadable (errno {})",
+                error.raw_os_error().unwrap_or(0)
+            ))
+        })?;
+        let before = file
+            .metadata()
+            .ok()
+            .filter(|metadata| {
+                metadata.is_file() && i64::try_from(metadata.len()) == Ok(row.byte_count)
+            })
+            .ok_or_else(|| corrupted("artifact payload type or size drifted"))?;
+        let mut hash = Sha256::new();
+        let mut hashed = 0_i64;
+        let mut buffer = vec![0_u8; 1 << 20];
+        loop {
+            let count = match file.read(&mut buffer) {
+                Ok(count) => count,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) => {
+                    return Err(StoreError::Io(format!(
+                        "cannot hash artifact payload (errno {})",
+                        error.raw_os_error().unwrap_or(0)
+                    )));
+                }
+            };
+            if count == 0 {
+                break;
+            }
+            hashed = hashed.saturating_add(count as i64);
+            hash.update(&buffer[..count]);
+        }
+        let digest: String = hash
+            .finalize()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        if !file
+            .metadata()
+            .is_ok_and(|after| same_identity_and_content(&before, &after))
+            || hashed != row.byte_count
+            || digest != row.sha256
+        {
+            return Err(corrupted("artifact payload digest or identity drifted"));
+        }
+        Ok(())
     }
-    Ok(())
+
+    /// `open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)`.
+    fn open_unlinked(path: &Path) -> std::io::Result<File> {
+        fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
+            .open(path)
+    }
+
+    /// Swift `sameFileIdentityAndContent(_:_:)`.
+    fn same_identity_and_content(before: &Metadata, after: &Metadata) -> bool {
+        before.dev() == after.dev()
+            && before.ino() == after.ino()
+            && before.mode() == after.mode()
+            && before.size() == after.size()
+            && before.mtime() == after.mtime()
+            && before.mtime_nsec() == after.mtime_nsec()
+            && before.ctime() == after.ctime()
+            && before.ctime_nsec() == after.ctime_nsec()
+    }
 }
 
-/// `open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)`.
-fn open_unlinked(path: &Path) -> std::io::Result<File> {
-    fs::OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW)
-        .open(path)
-}
+/// The reads under the walk on Windows, through the host store.
+#[cfg(windows)]
+mod host {
+    use super::{Kind, Row, StoreError, corrupted};
+    use arkdeck_platform::{HostDirectory, HostEntryKind, PayloadCheck};
+    use std::io;
+    use std::path::Path;
 
-/// Swift `sameFileIdentityAndContent(_:_:)`.
-fn same_identity_and_content(before: &Metadata, after: &Metadata) -> bool {
-    before.dev() == after.dev()
-        && before.ino() == after.ino()
-        && before.mode() == after.mode()
-        && before.size() == after.size()
-        && before.mtime() == after.mtime()
-        && before.mtime_nsec() == after.mtime_nsec()
-        && before.ctime() == after.ctime()
-        && before.ctime_nsec() == after.ctime_nsec()
+    use super::INDEX_BOUND;
+
+    fn io_failure(error: io::Error) -> StoreError {
+        StoreError::Io(error.to_string())
+    }
+
+    /// The root's entries in directory order; a reparse point is neither a
+    /// directory nor a regular file.
+    pub(super) fn root_entries(root: &Path) -> Result<Vec<(String, Kind)>, StoreError> {
+        let directory = HostDirectory::open(root).map_err(io_failure)?;
+        let mut entries = Vec::new();
+        for name in directory.names(usize::MAX).map_err(io_failure)? {
+            let kind = match directory.kind_and_size(&name).map_err(io_failure)?.0 {
+                HostEntryKind::Directory => Kind::Directory,
+                HostEntryKind::Regular => Kind::Regular,
+                _ => Kind::Other,
+            };
+            entries.push((name, kind));
+        }
+        Ok(entries)
+    }
+
+    fn job_directory(root: &Path, job: &str) -> Result<HostDirectory, StoreError> {
+        HostDirectory::open(root)
+            .and_then(|root| root.child(job))
+            .map_err(io_failure)
+    }
+
+    /// A present index's bytes: a regular file, not empty and within the
+    /// bound, whose bytes and identity held from open to end of read.
+    pub(super) fn index_bytes(root: &Path, job: &str) -> Result<Vec<u8>, StoreError> {
+        let directory = job_directory(root, job)?;
+        match directory.kind_and_size("index.json") {
+            Ok((HostEntryKind::Regular, size)) if size > 0 && size as u64 <= INDEX_BOUND => {}
+            Ok((HostEntryKind::Regular, _)) => {
+                return Err(corrupted("artifact index exceeds its read bound"));
+            }
+            _ => return Err(corrupted("artifact index must be a real regular file")),
+        }
+        directory
+            .read("index.json", INDEX_BOUND as usize)
+            .map_err(|error| {
+                corrupted(if error.raw_os_error().is_some() {
+                    "artifact index cannot be opened"
+                } else {
+                    "artifact index changed during read"
+                })
+            })
+    }
+
+    /// Swift `validateStoredPayload(_:at:)`, as the Windows Artifact owners
+    /// check a payload, without a verification cache and without resealing.
+    pub(super) fn validate_payload(root: &Path, job: &str, row: &Row) -> Result<(), StoreError> {
+        let directory = job_directory(root, job)?;
+        let Ok(length) = u64::try_from(row.byte_count) else {
+            return Err(corrupted("artifact payload type or size drifted"));
+        };
+        match directory.check_payload(&row.artifact_id, length, &row.sha256) {
+            Ok(PayloadCheck::Verified) => Ok(()),
+            Ok(PayloadCheck::Unopenable(code)) => Err(corrupted(format!(
+                "artifact payload is missing, linked or unreadable (errno {code})"
+            ))),
+            Ok(PayloadCheck::TypeOrSize) => Err(corrupted("artifact payload type or size drifted")),
+            Ok(PayloadCheck::DigestOrIdentity) => {
+                Err(corrupted("artifact payload digest or identity drifted"))
+            }
+            Err(error) => Err(StoreError::Io(format!(
+                "cannot hash artifact payload (errno {})",
+                error.raw_os_error().unwrap_or(0)
+            ))),
+        }
+    }
 }
 
 /// Swift `isSafeArtifactID(_:)`: `^ART-(?:MISSING-)?[0-9a-f]{32}$`. The

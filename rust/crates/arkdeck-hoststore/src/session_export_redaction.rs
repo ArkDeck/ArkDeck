@@ -66,7 +66,7 @@ impl SessionExportRedactor {
         }
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn relative_path(&self, input: &str) -> io::Result<String> {
         if !crate::session_manifest::relative_path(input) {
             return Err(io::Error::new(

@@ -3,10 +3,18 @@
 //! the Rust capability reader: each scenario's store rebuilt as Swift left
 //! it, every read answered as Swift answered it with the store's directory
 //! spelled by the oracle's label, and the store left as Swift left it.
-#![cfg(target_os = "macos")]
+//!
+//! On Windows the same oracle is replayed over the host store's owner-only
+//! directories: a file created in one is owner-only as the oracle's `0600`
+//! files are, and permission bits, which NTFS does not have, are not
+//! compared.
+#![cfg(any(target_os = "macos", windows))]
 
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt, symlink};
+#[cfg(windows)]
+use std::os::windows::fs::symlink_file as symlink;
 use std::path::{Path, PathBuf};
 
 use arkdeck_hoststore::CapabilityStore;
@@ -31,13 +39,22 @@ fn scratch() -> PathBuf {
             .unwrap()
             .as_nanos()
     ));
-    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    private_directory(&root);
     root
+}
+
+/// A directory only its owner can use: `0700` on macOS, the host store's
+/// owner-only descriptor on Windows.
+fn private_directory(path: &Path) {
+    #[cfg(target_os = "macos")]
+    fs::DirBuilder::new().mode(0o700).create(path).unwrap();
+    #[cfg(windows)]
+    arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
 }
 
 /// The store directory as Swift found it before the reads.
 fn rebuild(directory: &Path, scenario: &str, before: &Value) {
-    fs::DirBuilder::new().mode(0o700).create(directory).unwrap();
+    private_directory(directory);
     for entry in before.as_array().unwrap() {
         let path = directory.join(entry["path"].as_str().unwrap());
         match entry["kind"].as_str().unwrap() {
@@ -47,13 +64,31 @@ fn rebuild(directory: &Path, scenario: &str, before: &Value) {
                     .join(scenario)
                     .join(entry["path"].as_str().unwrap());
                 fs::write(&path, fs::read(source).unwrap()).unwrap();
-                let mode = u32::from_str_radix(entry["mode"].as_str().unwrap(), 8).unwrap();
-                fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+                #[cfg(target_os = "macos")]
+                {
+                    let mode = u32::from_str_radix(entry["mode"].as_str().unwrap(), 8).unwrap();
+                    fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+                }
             }
             "symlink" => symlink(entry["target"].as_str().unwrap(), &path).unwrap(),
             other => panic!("{scenario}: unexpected entry kind {other}"),
         }
     }
+}
+
+/// A file as the oracle records it: its permission bits on macOS; NTFS has
+/// none to compare.
+#[cfg(target_os = "macos")]
+fn file_entry(name: &str, metadata: &fs::Metadata) -> Value {
+    json!({
+        "path": name, "kind": "file",
+        "mode": format!("{:o}", metadata.permissions().mode() & 0o7777),
+        "size": metadata.len(),
+    })
+}
+#[cfg(windows)]
+fn file_entry(name: &str, metadata: &fs::Metadata) -> Value {
+    json!({"path": name, "kind": "file", "size": metadata.len()})
 }
 
 /// Every entry of a store directory as the oracle records it.
@@ -75,17 +110,38 @@ fn entries(directory: &Path) -> Value {
                         "target": fs::read_link(&path).unwrap().to_str().unwrap(),
                     })
                 } else if metadata.is_file() {
-                    json!({
-                        "path": name, "kind": "file",
-                        "mode": format!("{:o}", metadata.permissions().mode() & 0o7777),
-                        "size": metadata.len(),
-                    })
+                    file_entry(&name, &metadata)
                 } else {
                     json!({"path": name, "kind": "other"})
                 }
             })
             .collect(),
     )
+}
+
+/// A refusal's message with the store's directory spelled by the oracle's
+/// label. On Windows the directory is a `\\?\` path whose separators the
+/// message may also quote Swift's way, once or twice (each quoting doubles
+/// every backslash); a file in it is spelled `<label>/<name>`, as on macOS.
+fn labelled(message: &str, spelled: &str, label: &str) -> String {
+    #[cfg(windows)]
+    {
+        let mut message = message.to_owned();
+        for depth in (0..3).rev() {
+            let mut path = spelled.to_owned();
+            let mut separator = "\\".to_owned();
+            for _ in 0..depth {
+                path = path.replace('\\', "\\\\");
+                separator = separator.replace('\\', "\\\\");
+            }
+            message = message
+                .replace(&format!("{path}{separator}"), &format!("{label}/"))
+                .replace(&path, label);
+        }
+        message
+    }
+    #[cfg(target_os = "macos")]
+    message.replace(spelled, label)
 }
 
 #[test]
@@ -111,7 +167,7 @@ fn rust_reads_reproduce_the_swift_oracle() {
                 Ok(result) => json!({"ok": true, "result": result}),
                 Err(refusal) => json!({"ok": false, "error": {
                     "code": refusal.code,
-                    "message": refusal.message.replace(&spelled, &label),
+                    "message": labelled(&refusal.message, &spelled, &label),
                 }}),
             };
             exchanges += 1;
@@ -124,10 +180,17 @@ fn rust_reads_reproduce_the_swift_oracle() {
         }
         // The reads write no store document, and leave every entry as
         // Swift's reads left it: at most the lock file is new.
-        if entries(&directory) != trees[scenario]["after"] {
+        #[cfg_attr(target_os = "macos", allow(unused_mut))]
+        let mut after = trees[scenario]["after"].clone();
+        // NTFS has no permission bits to compare.
+        #[cfg(windows)]
+        for entry in after.as_array_mut().unwrap() {
+            entry.as_object_mut().unwrap().remove("mode");
+        }
+        if entries(&directory) != after {
             differences.push(format!(
                 "{scenario} tree:\n  swift {}\n  rust  {}",
-                trees[scenario]["after"],
+                after,
                 entries(&directory)
             ));
         }

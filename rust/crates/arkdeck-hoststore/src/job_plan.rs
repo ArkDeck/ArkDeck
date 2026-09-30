@@ -4,6 +4,18 @@
 //! plan document and its digest, and the `arkdeck.job-plan/1` projection.
 //! Nothing is admitted, journaled, reserved or dispatched, so every refusal is
 //! pre-admission with zero new dispatch.
+//!
+//! On Windows (TASK-XPA-005, GJ-1) the planner is the same code over the
+//! same owners, but two of them do not exist there yet: the ArkForge Flash
+//! lane (`flash_plan`, AF-W1) and the analyzers' ArkTrace profiles
+//! (`AnalyzerProfile`, `analyzer_composition`; no Windows trace_streamer).
+//! The Flash planner stays macOS-only; the `analyzer` member is there but no
+//! analyzer can be named (`AnalyzerComposition` has no implementation on
+//! Windows), so a Windows plan of an analyzer operation is refused as macOS
+//! refuses it without an analyzer. The Import and workspace owners have no
+//! value on Windows yet either (`ImportUploadStore`, `WorkspaceComposition`),
+//! so both members are `None` there, and the daemon composes no HDC provider
+//! until the Windows HDC tuple is registered.
 use crate::ArtifactReadStore;
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::device_facts::{self, HdcComposition};
@@ -15,30 +27,41 @@ use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(target_os = "macos")]
+use std::path::PathBuf;
 
 #[path = "debug_hap_plan.rs"]
 mod debug_hap_plan;
+#[cfg(target_os = "macos")]
 #[path = "flash_plan.rs"]
 mod flash_plan;
 #[path = "native_library_plan.rs"]
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
+#[cfg(target_os = "macos")]
 #[path = "workspace_plan.rs"]
 mod workspace_plan;
+#[cfg(target_os = "macos")]
 pub use flash_plan::{
     FlashPlanner, FlashPlanning, RockchipFactsPort, rockchip_dispatch_unavailable,
 };
+#[cfg(target_os = "macos")]
 pub(crate) use flash_plan::{
     PARTITIONS as DAYU200_PARTITIONS, admission_blocker, canonical_inputs, delegated_arguments,
     is_flash, plan_completion_arguments,
 };
+// The native deployment runner reads it (macOS only yet).
+#[cfg_attr(windows, allow(unused_imports))]
 pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
@@ -74,6 +97,7 @@ const MATERIALIZED: [&str; 28] = [
     "workspace.symbolize-crash@1",
 ];
 
+#[cfg(target_os = "macos")]
 /// Swift `AnalyzerProfile`: one analyzer a host configured, its pinned
 /// executable and the closed invocation the Runtime lowers for it. The
 /// crash-ledger analyzer is the executable a host names with
@@ -101,10 +125,12 @@ pub struct AnalyzerProfile {
     pub arktrace_analysis: Option<crate::arktrace_profile::ArkTraceContract>,
 }
 
+#[cfg(target_os = "macos")]
 fn invalid(message: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
 
+#[cfg(target_os = "macos")]
 /// Swift `FixedExecutableResolver.hashing(path:)`: an explicit absolute path
 /// to a regular executable file, its physical location, and the SHA-256 of
 /// its bytes.
@@ -125,6 +151,7 @@ fn hashed_executable(path: &Path) -> io::Result<(PathBuf, String)> {
     Ok((executable, sha256_hex(&bytes)))
 }
 
+#[cfg(target_os = "macos")]
 impl AnalyzerProfile {
     /// The crash-ledger profile of the executable at `path`.
     pub fn crash_signature(path: &Path) -> io::Result<Self> {
@@ -284,7 +311,9 @@ pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
     pub imports: Option<&'a crate::ImportUploadStore>,
     /// The analyzers the host composed, which an analyzer operation is
-    /// planned against.
+    /// planned against (none on Windows yet: their ArkTrace profiles need a
+    /// trace_streamer Windows does not have).
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     pub analyzer: Option<&'a dyn crate::AnalyzerComposition>,
     pub state_root: &'a Path,
     /// The HDC composition a device-bound operation materializes against;
@@ -297,6 +326,9 @@ pub struct JobPlanner<'a> {
 
 /// A materialized plan: its digest and, for a device-bound plan, the Target
 /// identity and binding revision it binds.
+// A device mutation's capability query reads the Artifact facts (macOS only
+// yet: no capability authority is composed on Windows).
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub(crate) struct Materialized<'a> {
     _import_use: Option<crate::import_upload::ImportUse<'a>>,
     /// The registration a workspace Job materializes against, held until the
@@ -395,6 +427,7 @@ impl<'a> JobPlanner<'a> {
     /// first, then the host's reason, as `materializeTypedPlanBeforeAuthorization`
     /// refuses an analyzer the provider calls unavailable, before anything is
     /// admitted.
+    #[cfg(target_os = "macos")]
     pub(crate) fn unmaterialized_analyzer(
         &self,
         request: &OperationRequest,
@@ -414,6 +447,16 @@ impl<'a> JobPlanner<'a> {
                 format!("{reference} is runtime unavailable: {reason}"),
             ),
         })
+    }
+
+    /// Without an analyzer composition the host names no reason, so
+    /// nothing is refused here, as on macOS without one.
+    #[cfg(windows)]
+    pub(crate) fn unmaterialized_analyzer(
+        &self,
+        _request: &OperationRequest,
+    ) -> Option<PlanRefusal> {
+        None
     }
 
     /// The exact catalog operation a request names, when this Runtime
@@ -454,6 +497,8 @@ impl<'a> JobPlanner<'a> {
                 InputRefusal::Invalid(message) => refusal("invalidInput", message),
                 InputRefusal::Unsupported(message) => refusal("rejected", message),
             })?;
+        // The ArkTrace request parser is the analyzers' own (macOS only).
+        #[cfg(target_os = "macos")]
         if descriptor.reference() == crate::analyzer_composition::TRACE_ANALYSIS
             && crate::arktrace_analysis::AnalysisRequest::parse(&request.inputs).is_err()
         {
@@ -741,8 +786,27 @@ impl<'a> JobPlanner<'a> {
         Ok(leased)
     }
 
+    /// Without an analyzer composition, Swift `AnalyzerProvider.runtimeAvailability`
+    /// finds no profile for the operation's analyzer (`runtime_availability`
+    /// with none): the analyzer operations are the only ones planned here.
+    #[cfg(windows)]
+    fn materialize(
+        &self,
+        _request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<String, PlanRefusal> {
+        Err(refusal(
+            "invalidInput",
+            format!(
+                "{} is runtime unavailable: analyzer.profileUnavailable",
+                descriptor.reference()
+            ),
+        ))
+    }
+
     /// The materialized plan document's digest, as Swift
     /// `materializeTypedPlanBeforeAuthorization` computes it.
+    #[cfg(target_os = "macos")]
     fn materialize(
         &self,
         request: &OperationRequest,
@@ -852,6 +916,26 @@ impl<'a> JobPlanner<'a> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
+    }
+}
+
+/// No workspace composition is built on Windows yet
+/// (`absent_owners::WorkspaceComposition`), so a workspace operation meets
+/// `workspace_plan`'s refusal without one.
+#[cfg(windows)]
+impl JobPlanner<'_> {
+    fn materialize_workspace(
+        &self,
+        _request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<(String, BTreeMap<String, String>), PlanRefusal> {
+        let Some(workspace) = self.workspace else {
+            return Err(refusal(
+                "invalidInput",
+                format!("provider {} is not registered", descriptor.provider),
+            ));
+        };
+        match *workspace {}
     }
 }
 

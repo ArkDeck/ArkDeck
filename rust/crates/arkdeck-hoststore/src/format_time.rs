@@ -158,7 +158,7 @@ pub(crate) fn format_timestamp_seconds(value: &str) -> Option<f64> {
 /// The current instant as Swift's precise Runtime clock spells it
 /// (`ISO8601Timestamps.string(includingFractionalSeconds: true)`): UTC with
 /// milliseconds, truncated.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_precise_now() -> Option<String> {
     let elapsed = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -171,7 +171,7 @@ pub(crate) fn utc_precise_now() -> Option<String> {
 
 /// Unix seconds of a canonical plain UTC timestamp (`utc_timestamp`'s own
 /// spelling, which the Runtime clock produces); any other spelling is none.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn plain_utc_seconds(text: &str) -> Option<u64> {
     let bytes = text.as_bytes();
     if bytes.len() != 20 || !text.is_ascii() {
@@ -191,7 +191,7 @@ pub(crate) fn plain_utc_seconds(text: &str) -> Option<u64> {
     (utc_timestamp(seconds) == text).then_some(seconds)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn utc_precise_timestamp(seconds: u64, milliseconds: u32) -> String {
     let plain = utc_timestamp(seconds);
     format!("{}.{milliseconds:03}Z", &plain[..plain.len() - 1])
@@ -224,7 +224,7 @@ pub(crate) fn utc_precise_from_millis(milliseconds: u64) -> String {
 
 /// The current instant as Swift durable records spell it
 /// (`ISO8601Timestamps.string`): whole seconds in UTC.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_now() -> Option<String> {
     let seconds = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -235,7 +235,7 @@ pub(crate) fn utc_now() -> Option<String> {
 
 /// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ` in the proleptic Gregorian calendar
 /// (Hinnant's `civil_from_days`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) fn utc_timestamp(seconds: u64) -> String {
     let days = (seconds / 86_400) as i64 + 719_468;
     let era = days.div_euclid(146_097);

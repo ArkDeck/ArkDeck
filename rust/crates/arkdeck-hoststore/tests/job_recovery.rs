@@ -8,17 +8,62 @@
 //! capability store. Each is checked against the carrier it ports
 //! (`RuntimeRecoveryService.replay`, `restoreInitialAdmissionProjectionIfNeeded`,
 //! `recover(records:)`).
-#![cfg(target_os = "macos")]
+//!
+//! On Windows the same journals and records are recovered over the NTFS
+//! host store (TASK-XPA-005); the reconcile the first case ends with needs
+//! the reconciler, which is macOS-only yet.
+#![cfg(any(target_os = "macos", windows))]
 
+#[cfg(target_os = "macos")]
 mod support;
+/// The three readings this replay takes from the shared oracle support,
+/// which is Unix-bound (mode bits), on Windows.
+#[cfg(windows)]
+mod support {
+    use serde_json::{Value, json};
+    use std::path::{Path, PathBuf};
+
+    pub fn fixture(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures")
+            .join(name)
+    }
+
+    pub fn fixed_now() -> Option<String> {
+        Some("2026-09-14T00:00:00Z".into())
+    }
+
+    /// The Job index's rows, by identity and version.
+    pub fn index(path: &Path) -> Value {
+        let mut db =
+            arkdeck_platform::HostSqlite::open(&path.join("runtime-jobs.sqlite3"), true, false)
+                .unwrap();
+        let rows = db
+            .query(
+                "SELECT job_id, version FROM runtime_job ORDER BY admission_sequence",
+                &[],
+                1 << 20,
+            )
+            .unwrap();
+        let cell = |value: &arkdeck_platform::SqliteValue| match value {
+            arkdeck_platform::SqliteValue::Integer(n) => json!(n),
+            arkdeck_platform::SqliteValue::Text(text) => json!(text),
+            _ => Value::Null,
+        };
+        json!({"rows": rows.iter().map(|row| json!({"jobId": cell(&row[0]),
+            "version": cell(&row[1])})).collect::<Vec<_>>()})
+    }
+}
 
 use arkdeck_hoststore::job_journal_events::{self as events, Envelope, Target};
-use arkdeck_hoststore::{
-    ArtifactReadStore, JobReconciler, JobRecord, JobStore, JournalWriter, recover_active_jobs,
-    recover_jobs,
-};
-use serde_json::{Map, Value, json};
+#[cfg(target_os = "macos")]
+use arkdeck_hoststore::{ArtifactReadStore, JobReconciler};
+use arkdeck_hoststore::{JobRecord, JobStore, JournalWriter, recover_active_jobs, recover_jobs};
+#[cfg(target_os = "macos")]
+use serde_json::Map;
+use serde_json::{Value, json};
 use std::fs;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::DirBuilderExt;
 use std::path::PathBuf;
 use support::fixed_now;
@@ -31,8 +76,14 @@ struct Root(PathBuf);
 
 impl Root {
     fn new() -> Self {
+        #[cfg(target_os = "macos")]
         let path = PathBuf::from(format!(
             "/private/tmp/arkdeck-job-recovery-{:032x}",
+            u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+        ));
+        #[cfg(windows)]
+        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "arkdeck-job-recovery-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
         ));
         for directory in [
@@ -40,10 +91,7 @@ impl Root {
             path.join("jobs-state"),
             path.join("artifacts"),
         ] {
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(&directory)
-                .unwrap();
+            private_directory(&directory, false);
         }
         Self(path)
     }
@@ -84,6 +132,23 @@ fn fixture_record(path: &str) -> JobRecord {
     JobRecord::decode(&fs::read(support::fixture(path)).unwrap()).unwrap()
 }
 
+/// A directory only its owner can use: `0700` on macOS, the host store's
+/// owner-only descriptor on Windows (a child of one inherits it).
+fn private_directory(path: &std::path::Path, recursive: bool) {
+    #[cfg(target_os = "macos")]
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .recursive(recursive)
+        .create(path)
+        .unwrap();
+    #[cfg(windows)]
+    if recursive {
+        fs::create_dir_all(path).unwrap();
+    } else {
+        arkdeck_platform::HostDirectory::open_or_create_private(path).unwrap();
+    }
+}
+
 /// The record with `change` applied to its durable fields.
 fn edited(record: &JobRecord, change: impl FnOnce(&mut Value)) -> JobRecord {
     let mut value = record.value().unwrap();
@@ -106,11 +171,7 @@ fn envelope(id: &str, event: &str, sequence: i64) -> Envelope {
 fn admit(jobs: &JobStore, root: &Root, record: &JobRecord) -> JournalWriter {
     jobs.admit(record, &"a".repeat(64)).unwrap();
     let directory = root.job(&record.job_id);
-    fs::DirBuilder::new()
-        .mode(0o700)
-        .recursive(true)
-        .create(&directory)
-        .unwrap();
+    private_directory(&directory, true);
     let mut journal = JournalWriter::open(&directory, true).unwrap();
     let id = record.job_id.as_str();
     journal
@@ -229,10 +290,16 @@ fn a_start_parks_a_job_whose_intent_is_outstanding_and_nothing_resolves_it() {
     assert_eq!(root.version(ADMITTED), json!(5));
 
     // Without the exact typed action no reconcile can start, and nothing is
-    // written.
+    // written. (The reconciler is macOS-only yet.)
+    #[cfg(target_os = "macos")]
+    reconcile_refuses_without_the_typed_action(&root, &jobs);
+}
+
+#[cfg(target_os = "macos")]
+fn reconcile_refuses_without_the_typed_action(root: &Root, jobs: &JobStore) {
     let artifacts = ArtifactReadStore::open(&root.0.join("artifacts")).unwrap();
     let refused = JobReconciler {
-        jobs: &jobs,
+        jobs,
         artifacts: &artifacts,
         imports: None,
         now: fixed_now,

@@ -64,7 +64,6 @@ mod workspace_project_control;
 use arkdeck_control::Control;
 #[cfg(unix)]
 use arkdeck_platform::{LocalEndpoint, LocalListener, default_user_endpoint};
-#[cfg(unix)]
 use std::io::{self, Write};
 use std::sync::Arc;
 use std::time::Duration;
@@ -703,7 +702,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // intent and dispatches nothing. A Job it cannot read, or whose recovery
     // needs state it does not hold, is named here and left as it is; a
     // recovery that fails stops the start, as Swift's does.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     if let Some(recovered) = host.recover_active_jobs()? {
         if !recovered.statuses.is_empty() {
             println!(
@@ -733,7 +732,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     // renaming it left it in staging: removed once it is proved this
     // Runtime's, kept and named otherwise, and never published again. A
     // failure is reported and never stops the start: nothing reads staging.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     if let Some(staged) = host.recover_staged_sessions() {
         for (entry, job) in &staged.removed {
             println!(
@@ -743,7 +742,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         for (entry, reason) in &staged.kept {
             eprintln!("arkdeck-agentd: staged Session {entry} is kept as it is: {reason}");
         }
-        let _ = io::stdout().flush();
+        let _ = std::io::Write::flush(&mut std::io::stdout());
     }
     // As Swift's engine then does with the recovery proof of the binding its
     // start carried the Target to (`main.swift` 1342–1356): the enter-Loader

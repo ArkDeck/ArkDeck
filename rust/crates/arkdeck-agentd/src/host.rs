@@ -42,7 +42,7 @@ fn job_owner_not_configured() -> WireError {
 }
 
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
 
 /// The lane and per-action host are shared by direct and background Jobs.
@@ -56,7 +56,7 @@ struct FlashRuntime {
 /// One Job's run, which every concurrent caller for that Job joins and a
 /// cancellation reaches through the run's `cancellation`, or the cancellation
 /// of a Job no run holds, which a concurrent run waits out.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 #[derive(Default)]
 pub(crate) struct RunSlot {
     pub(crate) outcome: Mutex<Option<Result<serde_json::Value, WireError>>>,
@@ -65,7 +65,7 @@ pub(crate) struct RunSlot {
     pub(crate) cancellation: arkdeck_hoststore::RunCancellation,
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 impl RunSlot {
     /// The holder's answer once it finished; none if the slot was poisoned.
     fn wait(&self) -> Option<Result<serde_json::Value, WireError>> {
@@ -84,7 +84,7 @@ impl RunSlot {
 }
 
 /// What a `job.run` of one Job meets in this owner.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 pub(crate) enum RunClaim {
     /// The slot this run now holds the Job in.
     Own(std::sync::Arc<RunSlot>),
@@ -98,11 +98,11 @@ pub struct Host {
     /// What start-up recovery set aside, in its order: a Job whose durable
     /// record this build cannot read, and the reason. `doctor` names them,
     /// as Swift's reads `engine.quarantinedJobRecords`.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     quarantined: std::sync::OnceLock<Vec<(String, String)>>,
     /// The staged Session entries the start kept in the active Sessions
     /// root, and why (`recover_staged_sessions`); `doctor` names them.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     staged_kept: std::sync::OnceLock<Vec<(String, String)>>,
     #[cfg(target_os = "macos")]
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
@@ -117,10 +117,14 @@ pub struct Host {
     /// The agent execution owner beside the Job state.
     #[cfg(target_os = "macos")]
     agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
     #[cfg(target_os = "macos")]
     planning: Option<(std::path::PathBuf, arkdeck_hoststore::AnalyzerProfiles)>,
+    /// The state root `job.plan` and `job.submit` plan against on Windows,
+    /// where no analyzer is composed (G20).
+    #[cfg(windows)]
+    planning: Option<std::path::PathBuf>,
     #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     pub(crate) provider: Option<HdcReadOnlyProvider>,
@@ -134,7 +138,7 @@ pub struct Host {
     workspace: Option<std::sync::Arc<arkdeck_hoststore::WorkspaceComposition>>,
     #[cfg(any(target_os = "macos", windows))]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     storage: Option<
         std::sync::Arc<(
             arkdeck_hoststore::SessionStore,
@@ -143,15 +147,15 @@ pub struct Host {
     >,
     unavailable: &'static str,
     pub(crate) observations: Mutex<ObservationState>,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) running:
         std::sync::Arc<Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>>,
     /// The `job.reconcile` of each Job under way, which a concurrent one of
     /// the same Job joins (Swift `jobReconciliations`).
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) reconciling: Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>,
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     home: String,
     /// Where the files a device-bound Job receives land: Swift's
     /// `HDCObservationProviderAdapter` default,
@@ -159,11 +163,11 @@ pub struct Host {
     /// receive argv, and so the plan digest, names.
     #[cfg(target_os = "macos")]
     receive_root: std::path::PathBuf,
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     default_mutation_root: Option<std::path::PathBuf>,
     /// Swift `HostStorageCoordinator`'s claims, held by the Session
     /// publications this process makes.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the executable its
     /// device-bound Jobs dispatch to, through the process dispatch every HDC
@@ -172,7 +176,7 @@ pub struct Host {
     hdc: Option<std::sync::Arc<crate::managed_hdc::DevelopmentHdc>>,
     /// The device sessions this daemon's control sessions hold (Swift
     /// `deviceSessionHolds`).
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     holds: std::sync::Arc<arkdeck_hoststore::DeviceHolds>,
     /// The Runtime's Target observation owner over the development HDC.
     #[cfg(any(target_os = "macos", windows))]
@@ -262,7 +266,7 @@ impl Host {
     /// every active Job of this owner reopened, its unresolved intents parked
     /// and nothing dispatched, each use its capability store settles
     /// re-asserted. None without a Job owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn recover_active_jobs(
         &self,
     ) -> Result<Option<arkdeck_hoststore::RecoveredJobs>, arkdeck_hoststore::RecoveryError> {
@@ -285,7 +289,7 @@ impl Host {
     /// (`SessionPublisher::recover_staged`); nothing is published again. A
     /// recovery that cannot read staging keeps it all. None without a Job and
     /// a Session owner.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn recover_staged_sessions(&self) -> Option<arkdeck_hoststore::StagedRecovery> {
         let (Some(storage), Some(jobs)) = (self.storage.as_deref(), self.jobs.as_deref()) else {
             return None;
@@ -329,7 +333,7 @@ impl Host {
         self
     }
     /// `capability.list` and `capability.inspect` read this capability store.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_capabilities(mut self, capabilities: arkdeck_hoststore::CapabilityStore) -> Self {
         self.capabilities = Some(std::sync::Arc::new(capabilities));
         self
@@ -344,6 +348,30 @@ impl Host {
     ) -> Self {
         self.planning = Some((state_root.to_owned(), analyzer.unwrap_or_default()));
         self
+    }
+    /// `job.plan` and `job.submit` on Windows: the same planner and
+    /// admitter over the Job store, with no provider, Artifact, Import or
+    /// capability owner composed beside them, so every operation is refused
+    /// before admission as macOS refuses it without that owner.
+    #[cfg(windows)]
+    pub fn with_planning(mut self, state_root: &std::path::Path) -> Self {
+        self.planning = Some(state_root.to_owned());
+        self
+    }
+    /// The Job planner over this Windows composition's owners, as macOS
+    /// builds it: the Artifact owner, and no Import owner, workspace or HDC
+    /// provider (none is composed on Windows yet; the HDC waits for the
+    /// Windows HDC tuple's registration) and no analyzer.
+    #[cfg(windows)]
+    fn planner<'a>(&'a self, state_root: &'a std::path::Path) -> arkdeck_hoststore::JobPlanner<'a> {
+        arkdeck_hoststore::JobPlanner {
+            imports: None,
+            artifacts: self.artifacts.as_deref(),
+            analyzer: None,
+            state_root,
+            hdc: None,
+            workspace: None,
+        }
     }
     #[cfg(any(target_os = "macos", windows))]
     pub fn with_artifacts(mut self, artifacts: arkdeck_hoststore::ArtifactReadStore) -> Self {
@@ -621,7 +649,7 @@ impl Host {
     }
     /// What a device mutation is authorized from: the capability store and
     /// this daemon's device sessions. Without a store no mutation is admitted.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn authority(&self) -> Option<arkdeck_hoststore::MutationAuthority<'_>> {
         Some(arkdeck_hoststore::MutationAuthority {
             default_root: self.default_mutation_root.as_deref()?,
@@ -635,7 +663,7 @@ impl Host {
     /// locked before `reconciling`, as `job.reconcile` locks them, so a run
     /// and a reconcile never both begin on one Job; none if a lock is
     /// poisoned.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub(crate) fn claim_run(&self, job: &str) -> Option<RunClaim> {
         let mut running = self.running.lock().ok()?;
         if let Some(reconcile) = self.reconciling.lock().ok()?.get(job).cloned() {
@@ -821,7 +849,7 @@ impl Host {
         Ok(self)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     pub fn with_storage(
         mut self,
         sessions: arkdeck_hoststore::SessionStore,
@@ -1208,9 +1236,12 @@ impl Host {
     pub(crate) fn owner_census(&self) -> Vec<&'static str> {
         [
             ("jobs", self.jobs.is_some()),
+            ("capabilities", self.capabilities.is_some()),
             ("targets", self.targets.is_some()),
             ("artifacts", self.artifacts.is_some()),
+            ("storage", self.storage.is_some()),
             ("workspaceProjects", self.workspace_projects.is_some()),
+            ("planning", self.planning.is_some()),
             ("traceCache", self.trace_cache.is_some()),
             ("usbRegistryRelations", self.usb_registry),
             ("readOnlyHdcProvider", self.provider.is_some()),
@@ -1235,9 +1266,9 @@ impl Host {
             _ => (None, "hdc.toolConfigurationIncomplete"),
         };
         Self {
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             quarantined: std::sync::OnceLock::new(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             staged_kept: std::sync::OnceLock::new(),
             #[cfg(target_os = "macos")]
             imports: None,
@@ -1247,9 +1278,9 @@ impl Host {
             artifacts: None,
             #[cfg(any(target_os = "macos", windows))]
             jobs: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             capabilities: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             planning: None,
             #[cfg(target_os = "macos")]
             bootstrap: None,
@@ -1262,15 +1293,15 @@ impl Host {
             workspace: None,
             #[cfg(any(target_os = "macos", windows))]
             trace_cache: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             storage: None,
             unavailable,
             observations: Mutex::new(ObservationState::default()),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             running: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             reconciling: Default::default(),
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
             receive_root: arkdeck_platform::foundation_temporary_directory()
@@ -1280,13 +1311,16 @@ impl Host {
                 .map(std::path::PathBuf::from)
                 .filter(|home| home.is_absolute())
                 .map(|home| home.join("Library/Application Support/ArkDeck/Agentd")),
-            #[cfg(target_os = "macos")]
+            // No mutation authority is composed on Windows yet.
+            #[cfg(windows)]
+            default_mutation_root: None,
+            #[cfg(any(target_os = "macos", windows))]
             claims: Default::default(),
             #[cfg(target_os = "macos")]
             hdc: None,
             #[cfg(target_os = "macos")]
             agents: None,
-            #[cfg(target_os = "macos")]
+            #[cfg(any(target_os = "macos", windows))]
             holds: Default::default(),
             #[cfg(any(target_os = "macos", windows))]
             target_observations: Default::default(),
@@ -1323,6 +1357,42 @@ impl Host {
 }
 
 impl HostServices for Host {
+    /// `operation.list` on Windows: the macOS report with this composition's
+    /// owners — the planner, the Job and Artifact owners, and no HDC,
+    /// analyzer, workspace provider or mutation authority.
+    #[cfg(windows)]
+    fn operation_availability(
+        &self,
+        reference: &str,
+        provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        // No analyzer provider is built on Windows (its profiles pin
+        // ArkTrace's trace_streamer): it is not registered, as the offline
+        // Trace surface reports it (`provider_not_registered`), rather than a
+        // provider a host left unconfigured.
+        if provider == "analyzer" {
+            return None;
+        }
+        arkdeck_hoststore::operation_unavailability(
+            reference,
+            provider,
+            &arkdeck_hoststore::OperationAvailabilityContext {
+                planning_owner: self.planning.is_some(),
+                job_owner: self.jobs.is_some(),
+                artifacts: self.artifacts.is_some(),
+                analyzer: None,
+                // No Windows HDC tuple is registered.
+                hdc_registered: false,
+                mutation_owner: self
+                    .authority()
+                    .zip(self.jobs.as_deref())
+                    .is_some_and(|(authority, jobs)| authority.state_proven_now(jobs)),
+                code_sign_helper: false,
+                hdc_tool_current: false,
+                workspace: None,
+            },
+        )
+    }
     #[cfg(target_os = "macos")]
     fn operation_availability(
         &self,
@@ -1853,6 +1923,68 @@ impl HostServices for Host {
                 ])),
             })
     }
+    /// `job.plan` on Windows: the Job planner (no Flash planning, no Flash
+    /// lane being composed), so a device plan is refused before admission
+    /// with zero dispatch, as on macOS without an HDC provider.
+    #[cfg(windows)]
+    fn job_plan(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let Some(state_root) = &self.planning else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        self.planner(state_root)
+            .handle(params)
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })
+    }
+    /// `job.submit` on Windows: the Job admitter over the Job store, its
+    /// idempotency lookup and admission interlock included, with the
+    /// planner above and no capability authority.
+    #[cfg(windows)]
+    fn job_submit(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(state_root), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobAdmitter {
+            planner: self.planner(state_root),
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+            // No mutation authority is composed on Windows yet.
+            authority: None,
+        }
+        .handle(params)
+        .map_err(|refusal| WireError {
+            code: refusal.code.into(),
+            message: refusal.message,
+            details: Some(if refusal.proven {
+                serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])
+            } else {
+                serde_json::Map::new()
+            }),
+        })
+    }
     /// `job.submit` admits into the Job owner the planner materializes for,
     /// the ArkForge Flash operations over the Flash composition and facts.
     #[cfg(target_os = "macos")]
@@ -1899,7 +2031,7 @@ impl HostServices for Host {
     }
     /// `job.result` and `job.evidence` read from the Job and Artifact owners
     /// the isolated composition opened.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn job_result_resource(
         &self,
         method: &str,
@@ -1913,6 +2045,99 @@ impl HostServices for Host {
             });
         };
         arkdeck_hoststore::JobResultReader { jobs, artifacts }.handle(method, params)
+    }
+    /// `job.run` on Windows: the macOS run over this composition's owners —
+    /// the Job and Artifact owners and the Session publication writer, no
+    /// HDC composition (no Windows HDC tuple is registered), analyzer or
+    /// workspace provider, and no Flash lane — so a device Job is refused
+    /// before its run with zero dispatch, and every concurrent caller for one
+    /// Job joins its one run, as on macOS.
+    #[cfg(windows)]
+    fn job_run(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(state_root), Some(jobs), Some(artifacts)) =
+            (&self.planning, &self.jobs, &self.artifacts)
+        else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_deref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
+        let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
+            arkdeck_hoststore::JobRunner {
+                imports: None,
+                mutation: self
+                    .authority()
+                    .map(|authority| arkdeck_hoststore::MutationExecution {
+                        authority,
+                        state_root,
+                    }),
+                jobs,
+                artifacts,
+                analyzer: None,
+                quota: ARTIFACT_QUOTA,
+                home: &self.home,
+                now: arkdeck_hoststore::runtime_now,
+                precise_now: arkdeck_hoststore::runtime_precise_now,
+                sessions: publisher.as_ref(),
+                cancellation,
+                after_commit: None,
+                hdc: None,
+                workspace: None,
+            }
+            .handle(params)
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(refusal.details),
+            })
+        };
+        let uncertain = || WireError {
+            code: "internalError".into(),
+            message: "the Runtime could not complete the Job lifecycle request".into(),
+            details: Some(serde_json::Map::new()),
+        };
+        let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
+            return run(None);
+        };
+        let slot = loop {
+            match self.claim_run(job).ok_or_else(uncertain)? {
+                RunClaim::Own(slot) => break slot,
+                RunClaim::Reconciling(reconcile) => {
+                    if reconcile.wait().is_none() {
+                        return Err(uncertain());
+                    }
+                }
+                RunClaim::Held(slot) => {
+                    let outcome = slot.wait();
+                    if !slot.cancelling {
+                        return outcome.unwrap_or_else(|| Err(uncertain()));
+                    }
+                }
+            }
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run(Some(&slot.cancellation))
+        }))
+        .unwrap_or_else(|_| Err(uncertain()));
+        slot.cancellation.end();
+        slot.finish(&result);
+        if let Ok(mut running) = self.running.lock() {
+            running.remove(job);
+        }
+        result
     }
     /// `job.run` runs an admitted analyzer Job in the owner that admitted it.
     /// Every concurrent caller for one Job joins its one run, as Swift's
@@ -2020,7 +2245,7 @@ impl HostServices for Host {
     }
     /// `artifact.quota` walks this owner's Artifact root as the Swift daemon
     /// walks its own before it has cached a total, and writes nothing.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn artifact_quota(&self) -> Result<serde_json::Value, WireError> {
         let Some((_, usage)) = self.storage.as_deref() else {
             return Err(WireError {
@@ -2121,7 +2346,7 @@ impl HostServices for Host {
     /// Job this owner is running is cancelled by its run, which alone writes
     /// the Job's Journal. A run of a Job no run holds waits the cancellation
     /// out, and a concurrent cancellation joins it.
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn job_cancel(
         &self,
         params: &serde_json::Map<String, serde_json::Value>,
@@ -2494,7 +2719,7 @@ impl HostServices for Host {
             .inspect(kind, reference)
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn session_resource(
         &self,
         method: &str,
@@ -2616,7 +2841,7 @@ impl HostServices for Host {
             sessions.handle_resource(method, params)
         }
     }
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", windows))]
     fn runtime_storage(
         &self,
         method: &str,
@@ -2661,17 +2886,23 @@ impl HostServices for Host {
                     ("newDispatchCount".into(), serde_json::json!(0)),
                 ])),
             };
-            // The Windows composition does not ask its Job owner yet.
-            #[cfg(windows)]
-            let census = |_: WorkspaceReference<'_>| Err(unverified());
+            // A Runtime-owned copy's reference maps to the project it was
+            // copied from through the workspace provider. Windows composes no
+            // workspace provider, so it has made no copy, and every reference
+            // is compared as written (Swift `resolveRegistrationProjectRef`
+            // for a reference nothing maps).
             #[cfg(target_os = "macos")]
+            let registration = |reference: &str| {
+                self.workspace
+                    .as_ref()
+                    .and_then(|workspace| workspace.census_registration(reference))
+            };
+            #[cfg(windows)]
+            let registration = |_: &str| None;
             let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
-                (Some(jobs), WorkspaceReference::Project(project)) => jobs
-                    .require_no_active_workspace_project_reference(project, &|reference| {
-                        self.workspace
-                            .as_ref()
-                            .and_then(|workspace| workspace.census_registration(reference))
-                    }),
+                (Some(jobs), WorkspaceReference::Project(project)) => {
+                    jobs.require_no_active_workspace_project_reference(project, &registration)
+                }
                 (Some(jobs), WorkspaceReference::Preset(preset)) => {
                     jobs.require_no_active_workspace_preset_reference(preset)
                 }

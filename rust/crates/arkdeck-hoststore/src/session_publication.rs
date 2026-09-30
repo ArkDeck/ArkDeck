@@ -32,12 +32,18 @@ use arkdeck_platform::{DocumentPublishError, HostDirectory, host_gregorian_times
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
+#[cfg(target_os = "macos")]
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use std::sync::Mutex;
 
 const APP_VERSION: &str = "ArkDeckKit-M1-006";
+/// The platform profile a Session is published under: the one this Runtime
+/// runs on.
+#[cfg(target_os = "macos")]
 const PLATFORM_PROFILE: &str = "PLATFORM-MACOS@0.2.0";
+#[cfg(windows)]
+const PLATFORM_PROFILE: &str = "PLATFORM-WINDOWS@0.2.0";
 /// Swift `SessionManifestDocument.maximumCanonicalBytes`, which is also a
 /// publication claim's finalization headroom.
 const MAXIMUM_MANIFEST: usize = 16 * 1024 * 1024;
@@ -478,6 +484,9 @@ impl SessionPublisher<'_> {
         }
         marker.insert("phase".into(), json!("manifestPublished"));
         self.probe.reached(PublicationPoint::ManifestPublished);
+        // Nothing below the staged Session stays open across its rename:
+        // Windows renames no directory while a handle below it is open.
+        drop((audit, raw, derived, partial, artifacts, session));
 
         // 8. Under the storage lock, the complete Session renamed to its
         //    published name, never over another entry, staging removed once
@@ -1325,6 +1334,7 @@ pub(crate) fn utc_month(at: &str) -> Option<(String, String)> {
 /// Foundation `URL.resolvingSymlinksInPath()` of an already canonical path:
 /// a `/private` prefix is dropped when the remainder names the same
 /// directory, as `/tmp` and `/var` do.
+#[cfg(target_os = "macos")]
 fn foundation_path(path: &Path) -> String {
     let text = path.to_string_lossy();
     if let Some(rest) = text.strip_prefix("/private/") {
@@ -1337,6 +1347,12 @@ fn foundation_path(path: &Path) -> String {
         }
     }
     text.into_owned()
+}
+
+/// A Windows path has no `/private` alias: the canonical path as it is.
+#[cfg(windows)]
+fn foundation_path(path: &Path) -> String {
+    path.to_string_lossy().into_owned()
 }
 
 /// Swift `UUID().uuidString`: a random version 4 identity in upper case.
@@ -1355,7 +1371,13 @@ fn uuid() -> io::Result<String> {
     ))
 }
 
-#[cfg(test)]
+#[cfg(all(test, windows))]
+#[path = "session_publication_windows_tests.rs"]
+mod windows_tests;
+
+// Unix fixtures (mode bits) and macOS-only owners; the Windows owners are
+// proved by `session_publication_windows_tests.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod measurement {
     //! What a Session publication whose Journal holds more than ten thousand
     //! records holds the storage lock for, and what proving a device

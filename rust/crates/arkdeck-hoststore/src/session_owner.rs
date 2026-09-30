@@ -53,6 +53,35 @@ fn positive(value: Option<&Value>) -> Result<u64, WireError> {
             )
         })
 }
+/// `path.canonicalize()`: the path with every link resolved, in the spelling
+/// the settings and the catalog compare. Windows names the resolved path
+/// verbatim (`\\?\D:\…`); a local drive's path is spelled plainly (`D:\…`),
+/// as the host store's canonical rule accepts it, and any other stays
+/// verbatim, which no plain spelling equals.
+#[cfg(target_os = "macos")]
+pub(crate) fn canonical_path(path: &Path) -> io::Result<PathBuf> {
+    path.canonicalize()
+}
+
+#[cfg(windows)]
+pub(crate) fn canonical_path(path: &Path) -> io::Result<PathBuf> {
+    use std::path::{Component, Prefix};
+    let resolved = path.canonicalize()?;
+    let local = matches!(
+        resolved.components().next(),
+        Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::VerbatimDisk(_))
+    );
+    Ok(
+        match resolved
+            .to_str()
+            .and_then(|text| text.strip_prefix(r"\\?\"))
+        {
+            Some(plain) if local => PathBuf::from(plain),
+            _ => resolved,
+        },
+    )
+}
+
 fn bytes(value: &Value) -> Result<Vec<u8>, WireError> {
     let mut bytes = serde_json::to_vec(value).map_err(unreadable)?;
     bytes.push(b'\n');
@@ -261,7 +290,20 @@ impl SessionStore {
         })
     }
     pub fn isolated(mut self, boundary: &Path, reserved: Vec<PathBuf>) -> io::Result<Self> {
+        // The development root is the owner's own directory on macOS. On
+        // Windows it is the daemon's held state root, whose DACL and file
+        // identity the daemon has already proved (`StateRoot`); it may grant
+        // others what the store's private rule refuses, so only its spelling
+        // is checked here: canonical, as every path below it is compared.
+        #[cfg(target_os = "macos")]
         HostDirectory::open(boundary)?.validate_path(boundary)?;
+        #[cfg(windows)]
+        if canonical_path(boundary)? != boundary {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "development state is not spelled canonically",
+            ));
+        }
         if !self.path.starts_with(boundary) || !self.default_sessions.starts_with(boundary) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -420,13 +462,13 @@ impl SessionStore {
             match (params.get("rootPath"), params.get("resetToDefault")) {
                 (None, Some(Value::Bool(true))) => Some((self.default_sessions.clone(), "default")),
                 (Some(Value::String(path)), None)
-                    if path.starts_with('/')
+                    if crate::session::absolute_root(path)
                         && path.len() <= 4096
                         && path.trim() == path
                         && !path.contains('\0') =>
                 {
                     Some((
-                        PathBuf::from(path).canonicalize().map_err(unreadable)?,
+                        canonical_path(Path::new(path)).map_err(unreadable)?,
                         "custom",
                     ))
                 }
@@ -476,7 +518,7 @@ impl SessionStore {
                 .as_str()
                 .ok_or_else(|| unreadable(()))?,
         );
-        let canonical = match current_path.canonicalize() {
+        let canonical = match canonical_path(&current_path) {
             Ok(path) => path == current_path,
             Err(e)
                 if e.kind() == io::ErrorKind::NotFound
@@ -586,7 +628,7 @@ fn configured_root_in(root: &HostDirectory, default_sessions: &Path) -> Result<P
     // Match the storage status read before a cutover or publication relies on
     // this selection. A missing default root is initialized by the owner;
     // a missing custom root or a noncanonical selection is never substituted.
-    let canonical = match path.canonicalize() {
+    let canonical = match canonical_path(&path) {
         Ok(canonical) => canonical == path,
         Err(error) if error.kind() == io::ErrorKind::NotFound && path == default_sessions => true,
         Err(_) => false,
@@ -695,7 +737,9 @@ impl StorageHold<'_> {
     }
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits) and macOS-only owners; the Windows owners are
+// proved by `session_publication_windows_tests.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use std::{fs, os::unix::fs::DirBuilderExt};

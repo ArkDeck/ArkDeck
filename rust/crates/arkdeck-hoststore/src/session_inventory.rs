@@ -535,7 +535,7 @@ fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Resul
         .map_err(|_| invalid())?
         .projection;
     let root_path = projection["rootPath"].as_str().ok_or_else(invalid)?;
-    if Path::new(root_path).canonicalize()? != path {
+    if crate::session_owner::canonical_path(Path::new(root_path))? != path {
         return Err(invalid());
     }
     let generation = projection["generation"]
@@ -697,7 +697,9 @@ fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Resul
     // Configuration is an immutable caller-supplied byte snapshot. Validate
     // its root binding again; this shadow command does not own a live config
     // file or claim that a concurrent config publication was observed.
-    if Path::new(root_path).canonicalize()? != path || root.read(LOCK, 1)? != marker {
+    if crate::session_owner::canonical_path(Path::new(root_path))? != path
+        || root.read(LOCK, 1)? != marker
+    {
         return Err(invalid());
     }
     root.validate_path(path)?;
@@ -741,7 +743,9 @@ fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Resul
     Ok(projection)
 }
 
-#[cfg(test)]
+// Unix fixtures (mode bits) and macOS-only owners; the Windows owners are
+// proved by `session_publication_windows_tests.rs`.
+#[cfg(all(test, target_os = "macos"))]
 mod owner_tests {
     use super::*;
     use std::{fs, os::unix::fs::DirBuilderExt, path::PathBuf};

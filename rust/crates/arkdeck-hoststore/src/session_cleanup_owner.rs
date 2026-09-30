@@ -258,10 +258,8 @@ impl SessionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{
-        fs,
-        os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
-    };
+    use crate::test_private::{link, owner_only_file};
+    use std::fs;
     struct Fixture {
         root: PathBuf,
     }
@@ -270,16 +268,12 @@ mod tests {
             Self::with_ids(&[])
         }
         fn with_ids(ids: &[&str]) -> Self {
-            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            let root = crate::test_private::temporary_root().join(format!(
                 "cleanup-owner-{:032x}",
                 u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
             ));
             for name in ["state", "sessions"] {
-                fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(root.join(name))
-                    .unwrap();
+                crate::test_private::create_private_directories(&root.join(name));
             }
             let fixture = Self { root };
             fixture.add("session-target");
@@ -297,14 +291,10 @@ mod tests {
             manifest["sessionId"] = json!(id);
             manifest["jobId"] = json!(format!("job-{id}"));
             let path = self.session(id);
-            fs::DirBuilder::new()
-                .recursive(true)
-                .mode(0o700)
-                .create(&path)
-                .unwrap();
+            crate::test_private::create_private_directories(&path);
             let write = |path: PathBuf, bytes: &[u8]| {
                 fs::write(&path, bytes).unwrap();
-                fs::set_permissions(path, fs::Permissions::from_mode(0o600)).unwrap();
+                owner_only_file(&path);
             };
             write(
                 path.join("manifest.json"),
@@ -319,11 +309,7 @@ mod tests {
             );
             for artifact in manifest["artifacts"].as_array().unwrap() {
                 let target = path.join(artifact["relativePath"].as_str().unwrap());
-                fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(target.parent().unwrap())
-                    .unwrap();
+                crate::test_private::create_private_directories(target.parent().unwrap());
                 write(
                     target,
                     if artifact["id"] == "export-raw" {
@@ -579,11 +565,35 @@ mod tests {
         let preview = fixture.preview(&BTreeSet::new());
         let external = fixture.root.join("unrelated");
         fs::write(&external, b"unrelated").unwrap();
-        symlink(&external, fixture.session("session-target").join("link")).unwrap();
+        link(&external, &fixture.session("session-target").join("link"));
         assert!(fixture.apply(&preview, &BTreeSet::new(), now).is_err());
         assert_eq!(fs::read(&external).unwrap(), b"unrelated");
         assert_eq!(fixture.record(&preview)["state"], "ready");
         fs::remove_file(fixture.session("session-target").join("link")).unwrap();
+        // Unix lets the Sessions root be renamed and replaced while the
+        // cleanup applies, and the cleanup then refuses; NTFS refuses the
+        // rename itself while the cleanup holds handles inside the root, so
+        // the cleanup applies to the root it proved.
+        #[cfg(windows)]
+        {
+            let result = fixture
+                .checkpoint(&preview, |point| {
+                    if point == "applying" {
+                        let moved = fs::rename(
+                            fixture.root.join("sessions"),
+                            fixture.root.join("old-sessions"),
+                        )
+                        .unwrap_err();
+                        assert_eq!(moved.kind(), std::io::ErrorKind::PermissionDenied);
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            assert_eq!(result["removedSessionIds"], json!(["session-target"]));
+            assert!(!fixture.root.join("old-sessions").exists());
+            assert!(!fixture.session("session-target").exists());
+        }
+        #[cfg(unix)]
         let error = fixture
             .checkpoint(&preview, |point| {
                 if point == "applying" {
@@ -592,23 +602,23 @@ mod tests {
                         fixture.root.join("old-sessions"),
                     )
                     .unwrap();
-                    fs::DirBuilder::new()
-                        .mode(0o700)
-                        .create(fixture.root.join("sessions"))
-                        .unwrap();
+                    crate::test_private::create_private_directories(&fixture.root.join("sessions"));
                 }
                 Ok(())
             })
             .unwrap_err();
-        assert_eq!(error.code, "resourceConflict");
-        assert_eq!(fixture.record(&preview)["state"], "ready");
-        assert!(
-            fixture
-                .root
-                .join("old-sessions/2026/07/session-target/manifest.json")
-                .exists()
-        );
-        assert!(fixture.root.join("sessions").exists());
+        #[cfg(unix)]
+        {
+            assert_eq!(error.code, "resourceConflict");
+            assert_eq!(fixture.record(&preview)["state"], "ready");
+            assert!(
+                fixture
+                    .root
+                    .join("old-sessions/2026/07/session-target/manifest.json")
+                    .exists()
+            );
+            assert!(fixture.root.join("sessions").exists());
+        }
     }
     #[test]
     fn activity_protects_manifest_job_even_when_session_has_a_nondefault_name() {
@@ -639,7 +649,8 @@ mod tests {
 /// other: each test stops one side at a hook, lets the other run into it, and
 /// requires both to finish. A wait that does not end is a lock cycle, which
 /// never ends by itself: the process is aborted rather than left hanging.
-#[cfg(test)]
+// Over the mutation authority and capability store, which are macOS-only.
+#[cfg(all(test, target_os = "macos"))]
 mod lock_order_tests {
     use super::*;
     use crate::{
@@ -647,7 +658,6 @@ mod lock_order_tests {
         StorageProbe, StorageSnapshot, job_journal_writer::JournalWriter, job_record::JobRecord,
     };
     use std::fs;
-    use std::os::unix::fs::DirBuilderExt;
     use std::sync::{Mutex, mpsc};
     use std::time::Duration;
 
@@ -659,16 +669,10 @@ mod lock_order_tests {
     impl Root {
         fn new() -> Self {
             let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
-            let root = std::env::temp_dir()
-                .canonicalize()
-                .unwrap()
+            let root = crate::test_private::temporary_root()
                 .join(format!("cleanup-lock-order-{nonce:032x}"));
             for name in ["Runtime", "session-state", "Sessions", "published"] {
-                fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(root.join(name))
-                    .unwrap();
+                crate::test_private::create_private_directories(&root.join(name));
             }
             Self(root)
         }
@@ -794,10 +798,7 @@ mod lock_order_tests {
             .join("../../tests/fixtures/pointer-input/store/jobs")
             .join(format!("job-{JOB}"));
         let directory = root.0.join("published").join(format!("job-{JOB}"));
-        fs::DirBuilder::new()
-            .mode(0o700)
-            .create(&directory)
-            .unwrap();
+        crate::test_private::create_private_directories(&directory);
         let journal: String = fs::read_to_string(fixture.join("journal.jsonl"))
             .unwrap()
             .lines()

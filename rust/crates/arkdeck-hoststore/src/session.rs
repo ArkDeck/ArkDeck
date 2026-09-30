@@ -22,6 +22,24 @@ struct Document {
     policy: Policy,
 }
 
+/// A Session root as the settings and a request spell it: absolute (`/…`).
+#[cfg(not(windows))]
+pub(crate) fn absolute_root(path: &str) -> bool {
+    path.starts_with('/')
+}
+
+/// On Windows, a local drive's absolute path (`D:\…`): not a UNC, device,
+/// verbatim or drive-relative one.
+#[cfg(windows)]
+pub(crate) fn absolute_root(path: &str) -> bool {
+    use std::path::{Component, Path, Prefix};
+    let mut components = Path::new(path).components();
+    matches!(
+        components.next(),
+        Some(Component::Prefix(prefix)) if matches!(prefix.kind(), Prefix::Disk(_))
+    ) && components.next() == Some(Component::RootDir)
+}
+
 pub fn decode_session_configuration(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
     let (doc, document) = roundtrip::<Document>(bytes, 64 * 1024, true)?;
     let bounded_positive = |n: u64| (1..=i64::MAX as u64).contains(&n);
@@ -29,7 +47,7 @@ pub fn decode_session_configuration(bytes: &[u8]) -> Result<DecodedStore, Decode
         || doc.schema_version != "arkdeck.session-storage-store/1"
         || !bounded_positive(doc.generation)
         || !["default", "custom"].contains(&doc.root_kind.as_str())
-        || !doc.root_path.starts_with('/')
+        || !absolute_root(&doc.root_path)
         || doc.root_path.len() > 4096
         || doc.root_path.contains('\0')
         || !bounded_positive(doc.policy.total_quota_bytes)
@@ -57,13 +75,39 @@ pub fn decode_session_configuration(bytes: &[u8]) -> Result<DecodedStore, Decode
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(not(windows))]
+    const ROOT: &str = "/fixture/sessions";
+    #[cfg(windows)]
+    const ROOT: &str = r"C:\fixture\sessions";
     fn bytes(quota: u64, margin: u64, days: u64) -> Vec<u8> {
+        bytes_at(ROOT, quota, margin, days)
+    }
+    fn bytes_at(root: &str, quota: u64, margin: u64, days: u64) -> Vec<u8> {
         let value = json!({"schemaVersion": "arkdeck.session-storage-store/1",
-            "generation": 2, "rootKind": "custom", "rootPath": "/fixture/sessions",
+            "generation": 2, "rootKind": "custom", "rootPath": root,
             "policy": {"totalQuotaBytes": quota, "safetyMarginBytes": margin, "retentionDays": days}});
         let mut bytes = serde_json::to_vec(&value).unwrap();
         bytes.push(b'\n');
         bytes
+    }
+    /// A Windows Session root is a local drive's absolute path; a POSIX,
+    /// UNC, verbatim or drive-relative one is refused.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_root_is_a_local_drive_s_absolute_path() {
+        for root in [
+            "/fixture/sessions",
+            r"\\server\share\sessions",
+            r"\\?\C:\fixture\sessions",
+            r"C:fixture\sessions",
+            r"\fixture\sessions",
+        ] {
+            assert!(
+                decode_session_configuration(&bytes_at(root, 10, 1, 1)).is_err(),
+                "{root}"
+            );
+        }
+        assert!(decode_session_configuration(&bytes_at(ROOT, 10, 1, 1)).is_ok());
     }
     #[test]
     fn preserves_full_width_quota_and_refuses_out_of_bounds_policy() {

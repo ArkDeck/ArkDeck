@@ -29,38 +29,63 @@
 //! dispatched; the steps it confirmed are never run again
 //! (`device_run.rs`), and a resumed Job continues under the capability use
 //! it holds, never a second one (`mutation_execution.rs`).
-use crate::analyzer_composition::{self, AnalyzerComposition};
+//!
+//! On Windows (TASK-XPA-005, GJ-1) the same runner is built with the device
+//! lane, the Artifact publication, the cancellation and the Session
+//! publication it hands a terminal Job to; the analyzer lane (its profiles
+//! pin ArkTrace's trace_streamer, which Windows lacks), the workspace lane
+//! (`workspace_run.rs`: the workspace provider crate and the DevEco owners)
+//! and the Flash lane (`flash_run.rs`, AF-W1) stay macOS-only, and an
+//! analyzer or workspace Job is refused before its run as one this Runtime
+//! does not execute. No Windows daemon composes an HDC provider until the
+//! Windows HDC tuple is registered, so no device Job runs there yet.
+#[cfg(target_os = "macos")]
+use crate::analyzer_composition;
+use crate::analyzer_composition::AnalyzerComposition;
+#[cfg(target_os = "macos")]
 use crate::analyzer_output::{self, Invocation, Receipt, Source};
+#[cfg(target_os = "macos")]
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
 use crate::device_facts::HdcComposition;
 use crate::job_cancel::RunCancellation;
-use crate::job_journal_events::{self as events, Envelope, Target};
+#[cfg(target_os = "macos")]
+use crate::job_journal_events::Target;
+use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_writer::JournalWriter;
 use crate::job_owner::JobStore;
 use crate::job_record::{JobRecord, terminal};
 use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
+#[cfg(target_os = "macos")]
 use arkdeck_platform::{
     AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ToolLimits, ToolRequest, ToolRunError,
     ToolTermination, VerifiedNamespace, VerifiedResource, VerifiedSource, VerifiedTool,
 };
 use serde_json::{Map, Value, json};
+#[cfg(target_os = "macos")]
 use std::ffi::OsString;
 use std::path::Path;
+#[cfg(target_os = "macos")]
 use std::time::Duration;
 
+#[cfg(target_os = "macos")]
 #[path = "workspace_run.rs"]
 mod workspace_run;
 
+#[cfg(target_os = "macos")]
 #[path = "flash_run.rs"]
 mod flash_run;
+#[cfg(target_os = "macos")]
 pub use flash_run::{FlashExecution, FlashRunner};
 
+#[cfg(target_os = "macos")]
 const STEP_KIND: &str = "runDeterministicAnalyzer";
 /// Swift `DescriptorBoundProcessDispatcher`'s per-stream capture, whatever
 /// budget the analyzer profile gives its answer.
+#[cfg(target_os = "macos")]
 const CAPTURE_BYTES: usize = 8 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const MAXIMUM_SOURCE_BYTES: u64 = 512 * 1024 * 1024;
 /// The states Swift `runOwned` drives (a finalizing `debug.hap@1` aside).
 const RUNNABLE: [&str; 4] = [
@@ -75,10 +100,17 @@ const RUNNABLE: [&str; 4] = [
 /// composition, a Runtime-owned workspace copy, the patches applied to and
 /// reverted from a workspace and a workspace build through its workspace
 /// composition. Every other Job is refused before its run starts.
+#[cfg(target_os = "macos")]
 pub(crate) fn executes(operation: &str) -> bool {
     analyzer_composition::EXECUTED.contains(&operation)
         || crate::device_run::runs(operation)
         || workspace_run::runs(operation)
+}
+
+/// On Windows only the device lane is built.
+#[cfg(windows)]
+pub(crate) fn executes(operation: &str) -> bool {
+    crate::device_run::runs(operation)
 }
 
 /// A `job.run` refusal: its control-plane code, message and details.
@@ -133,6 +165,7 @@ fn valid_identifier(id: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
+#[cfg(target_os = "macos")]
 /// `RockchipHostProcessDiagnostics.signalDeath`.
 fn signal_death(signal: i32) -> String {
     format!(
@@ -149,6 +182,7 @@ pub(crate) fn failure(code: &str, category: &str, retryability: &str, recovery: 
 
 /// Swift `RuntimeDispatchFailure` before a verified receipt, and the
 /// process-group resolution of a cancelled child.
+#[cfg(target_os = "macos")]
 enum Dispatch {
     Failed(String),
     OutcomeUnknown(String),
@@ -156,6 +190,7 @@ enum Dispatch {
 }
 
 /// A child that exited: its status, its output and whether any was dropped.
+#[cfg(target_os = "macos")]
 struct Exited {
     status: i32,
     stdout: Vec<u8>,
@@ -376,13 +411,16 @@ impl JobRunner<'_> {
             ));
         }
         let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
+        #[cfg(target_os = "macos")]
         let workspace = self
             .workspace
             .filter(|_| workspace_run::runs(record.operation()));
-        if !analyzer_composition::EXECUTED.contains(&record.operation())
-            && !device
-            && workspace.is_none()
-        {
+        #[cfg(target_os = "macos")]
+        let analyzer = analyzer_composition::EXECUTED.contains(&record.operation());
+        // Neither lane is built on Windows.
+        #[cfg(windows)]
+        let (workspace, analyzer) = (None::<&crate::WorkspaceComposition>, false);
+        if !analyzer && !device && workspace.is_none() {
             return Err(proven(
                 "rejected",
                 format!(
@@ -396,8 +434,11 @@ impl JobRunner<'_> {
         // Job a reconcile confirmed at its safe boundary, whose products it
         // republished — and a complete-overwrite recovery belongs to the
         // flash lane this Runtime does not hold.
+        #[cfg(target_os = "macos")]
         let resumed_signing = record.operation() == crate::workspace_composition::SIGN
             && state == "resumeAtConfirmedSafeBoundary";
+        #[cfg(windows)]
+        let resumed_signing = false;
         if state != "preflight"
             && !resumed_signing
             && (!device || state == "recoveringByCompleteOverwrite")
@@ -456,6 +497,7 @@ impl JobRunner<'_> {
             self.take_over_held_use(&mut run)
                 .map_err(|message| proven("rejected", message, Some(id)))?;
         }
+        #[cfg(target_os = "macos")]
         match (self.hdc.filter(|_| device), workspace) {
             (Some(hdc), _) => self.execute_device(&mut run, hdc)?,
             (None, Some(workspace))
@@ -497,11 +539,18 @@ impl JobRunner<'_> {
             (None, Some(workspace)) => self.execute_workspace_patch(&mut run, workspace)?,
             (None, None) => self.execute(&mut run)?,
         }
+        // Only a device Job reaches here on Windows.
+        #[cfg(windows)]
+        match self.hdc.filter(|_| device) {
+            Some(hdc) => self.execute_device(&mut run, hdc)?,
+            None => return Err(uncertain()),
+        }
         run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())
     }
 
     /// Swift `runOwned` through `dispatchWithWAL` for the one analyzer step.
+    #[cfg(target_os = "macos")]
     fn execute(&self, run: &mut Run) -> Result<(), RunRefusal> {
         let operation = run.record.operation().to_owned();
         let step = analyzer_composition::step(&operation).ok_or_else(uncertain)?;
@@ -792,6 +841,27 @@ impl JobRunner<'_> {
         run.persist(self.jobs)
     }
 
+    /// Swift `runOwned`'s drain of a cancellation at a safe boundary between
+    /// steps: the durable request already carried, the Job closed cancelled.
+    /// A device Job and a workspace Job drain the same way (`device_run.rs`,
+    /// `workspace_run.rs`).
+    pub(crate) fn drain(&self, run: &mut Run) -> Result<(), RunRefusal> {
+        run.transition(
+            "cancelRequested",
+            "cancellingAtSafeBoundary",
+            "safe-boundary",
+        )?;
+        run.transition("cancellingAtSafeBoundary", "cancelled", "steps-drained")?;
+        run.record.set_operation_failure(Some(failure(
+            "cancelled",
+            "cancelled",
+            "notAutomatic",
+            "none",
+        )));
+        run.finish()?;
+        run.persist(self.jobs)
+    }
+
     /// Swift's `.failed(reason)` lane in `runOwned`.
     pub(crate) fn fail(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
         run.record.set_operation_failure(Some(failure(
@@ -885,6 +955,7 @@ impl JobRunner<'_> {
     /// invocation: the source bound by descriptor first, then the pinned
     /// executable, then the child, which reads the source's inode alias and
     /// is stopped once `cancelled` holds.
+    #[cfg(target_os = "macos")]
     fn dispatch(
         &self,
         invocation: &Invocation<'_>,
@@ -945,6 +1016,7 @@ impl JobRunner<'_> {
 /// and no environment beyond the clean base. A failure after the source is
 /// bound is reported only by its class, as Swift keeps the authorized
 /// executable's path out of a trace operation's durable failure.
+#[cfg(target_os = "macos")]
 fn dispatch_arktrace(
     invocation: &Invocation<'_>,
     source: &Source<'_>,
@@ -1064,7 +1136,7 @@ pub(crate) fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Op
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
     use crate::arktrace_profile::ArkTraceContract;

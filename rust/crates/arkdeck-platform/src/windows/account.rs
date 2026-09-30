@@ -8,22 +8,33 @@ use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::ptr::null_mut;
 use windows_sys::Win32::System::Com::CoTaskMemFree;
-use windows_sys::Win32::UI::Shell::{FOLDERID_LocalAppData, KF_FLAG_DEFAULT, SHGetKnownFolderPath};
+use windows_sys::Win32::UI::Shell::{
+    FOLDERID_LocalAppData, FOLDERID_Profile, KF_FLAG_DEFAULT, SHGetKnownFolderPath,
+};
+use windows_sys::core::GUID;
 
 /// The Windows counterpart of Swift's Application Support directory: the
 /// account's local application data directory, absolute and existing.
 pub fn application_support_directory() -> Option<PathBuf> {
+    known_folder(&FOLDERID_LocalAppData)
+}
+
+/// The Windows counterpart of the Unix `runtime_home` (Swift
+/// `NSHomeDirectory()`, which Artifact redaction replaces): the account's
+/// profile directory, the Known Folder `FOLDERID_Profile` of this process's
+/// token, never `USERPROFILE`.
+pub fn runtime_home() -> Option<String> {
+    known_folder(&FOLDERID_Profile)
+        .and_then(|directory| directory.into_os_string().into_string().ok())
+}
+
+/// A Known Folder of this process's token, absolute.
+fn known_folder(folder: &GUID) -> Option<PathBuf> {
     let mut path = null_mut();
     // SAFETY: a documented Known Folder id, the process token (null) and an
     // output pointer; the returned string is freed below whatever the result.
-    let status = unsafe {
-        SHGetKnownFolderPath(
-            &FOLDERID_LocalAppData,
-            KF_FLAG_DEFAULT as u32,
-            null_mut(),
-            &mut path,
-        )
-    };
+    let status =
+        unsafe { SHGetKnownFolderPath(folder, KF_FLAG_DEFAULT as u32, null_mut(), &mut path) };
     struct Free(*mut u16);
     impl Drop for Free {
         fn drop(&mut self) {
