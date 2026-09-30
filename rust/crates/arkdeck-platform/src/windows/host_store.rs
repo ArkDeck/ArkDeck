@@ -28,6 +28,11 @@ pub use file_export::FileExportStaging;
 #[path = "host_trace_removal.rs"]
 mod trace_removal;
 pub use trace_removal::PreparedTraceRemoval;
+#[path = "host_import_upload.rs"]
+mod import_upload;
+pub use import_upload::{
+    HostImportSource, HostUploadFile, HostUploadReader, UploadChunkCheckpoint, UploadWritePoint,
+};
 
 pub struct HostDirectory(pub(super) File, pub(super) Ownership);
 
@@ -56,7 +61,7 @@ pub struct HostFileIdentity {
 }
 
 impl HostFileIdentity {
-    fn of(stat: &Stat) -> io::Result<Self> {
+    pub(crate) fn of(stat: &Stat) -> io::Result<Self> {
         Ok(Self {
             device: stat.volume,
             inode: stat.inode()?,

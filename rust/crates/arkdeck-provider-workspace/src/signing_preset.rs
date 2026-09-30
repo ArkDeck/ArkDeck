@@ -249,7 +249,7 @@ impl SigningPresetStore {
     }
 
     /// Swift `loadValidated(presetID:requireSecrets:)`.
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     pub fn load_validated(
         &self,
         preset_id: &str,
@@ -335,7 +335,7 @@ pub fn validate_trusted_daemon_identity(
 
 /// Swift `remeasureForDispatch(_:)`: every pinned file still measures as
 /// recorded, the Java launcher executable and the keystore private.
-#[cfg(unix)]
+#[cfg(any(unix, windows))]
 pub fn remeasure_for_dispatch(receipt: &SigningPresetReceipt) -> Result<(), SigningError> {
     crate::remeasure(&receipt.java_executable, "java", true, false)?;
     crate::remeasure(&receipt.signer_jar, "signer JAR", false, false)?;

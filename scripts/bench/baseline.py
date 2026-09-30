@@ -217,6 +217,8 @@ def _identity_patterns() -> list[tuple[str, re.Pattern[str]]]:
             patterns.append(("user name", re.compile(rf"\b{re.escape(user)}\b")))
     patterns.append(("home path prefix", re.compile(r"/Users/[^/\"\\ ]+")))
     patterns.append(("home path prefix", re.compile(r"/home/[^/\"\\ ]+")))
+    # A Windows profile, raw or JSON-escaped (C:\Users\<name>, C:\\Users\\<name>).
+    patterns.append(("home path prefix", re.compile(r"[A-Za-z]:(?:\\\\|\\|/)Users(?:\\\\|\\|/)[^/\"\\ ]+")))
     return patterns
 
 

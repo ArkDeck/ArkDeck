@@ -58,6 +58,7 @@ jobs:
       app: ${{ steps.paths.outputs.app }}
       ds: ${{ steps.paths.outputs.ds }}
       rust: ${{ steps.paths.outputs.rust }}
+      windows: ${{ steps.paths.outputs.windows }}
       base: ${{ steps.paths.outputs.base }}
       reason: ${{ steps.paths.outputs.reason }}
       changed-count: ${{ steps.paths.outputs.changed-count }}
@@ -127,6 +128,7 @@ jobs:
             echo "- ArkDeck App build-for-testing: \`${{ steps.paths.outputs.app }}\`"
             echo "- @arkdeck/ds interaction tests: \`${{ steps.paths.outputs.ds }}\`"
             echo "- Rust workspace and dependency policy: \`${{ steps.paths.outputs.rust }}\`"
+            echo "- Windows ClientKit build and tests: \`${{ steps.paths.outputs.windows }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   swift-tests:
@@ -331,12 +333,58 @@ jobs:
     secrets:
       ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
 
+  # The Windows client (TASK-XPA-007): ArkDeck.ClientKit's generated contract
+  # bindings, build and MSTest suite on a hosted Windows x64 runner. Git keeps
+  # repository bytes (autocrlf off): the generator check, the embedded schema
+  # digests and the recorded-corpus wire tests compare exact bytes. The
+  # end-to-end test against a development-signed daemon needs a built daemon
+  # and a host-trusted signer, so it reports itself skipped here; it runs on
+  # the Windows reference host. A hosted run is no Windows device acceptance.
+  windows-clientkit:
+    needs: plan
+    if: needs.plan.outputs.windows == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "1"
+    steps:
+      - name: Checkout exact revision with runner Git
+        env:
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          git config core.autocrlf false
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth=1 origin \
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Pinned .NET SDK (windows/global.json)
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0 (Node 24)
+        with:
+          global-json-file: windows/global.json
+
+      - name: ClientKit generated contract bindings
+        run: python windows/scripts/generate-clientkit.py --check
+
+      - name: Build the Windows client solution
+        run: dotnet build windows/ArkDeck.Windows.slnx -c Release
+
+      - name: ClientKit tests
+        run: dotnet test windows/ArkDeck.Windows.slnx -c Release --no-build
+
   # Stable required-check name.  A job-level skip is a successful no-op;
   # workflow-level paths filters are intentionally absent because GitHub can
   # leave a required workflow that never started pending indefinitely.
   swift:
     if: always()
-    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]
+    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks, windows-clientkit]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -351,6 +399,8 @@ jobs:
           DS_RESULT: ${{ needs.ds-interactions.result }}
           RUST_SELECTED: ${{ needs.plan.outputs.rust }}
           RUST_RESULT: ${{ needs.rust-checks.result }}
+          WINDOWS_SELECTED: ${{ needs.plan.outputs.windows }}
+          WINDOWS_RESULT: ${{ needs.windows-clientkit.result }}
         run: |
           set -eu
           test "$PLAN_RESULT" = success
@@ -374,6 +424,11 @@ jobs:
           else
             test "$RUST_RESULT" = skipped
           fi
+          if [ "$WINDOWS_SELECTED" = true ]; then
+            test "$WINDOWS_RESULT" = success
+          else
+            test "$WINDOWS_RESULT" = skipped
+          fi
 
       - name: Coverage summary
         if: always()
@@ -384,6 +439,7 @@ jobs:
             echo "- ArkDeck App lane selected: \`${{ needs.plan.outputs.app }}\`; result: \`${{ needs.app-build.result }}\`."
             echo "- @arkdeck/ds interaction lane selected: \`${{ needs.plan.outputs.ds }}\`; result: \`${{ needs.ds-interactions.result }}\`."
             echo "- Rust workspace lane selected: \`${{ needs.plan.outputs.rust }}\`; result: \`${{ needs.rust-checks.result }}\`."
+            echo "- Windows ClientKit lane selected: \`${{ needs.plan.outputs.windows }}\`; result: \`${{ needs.windows-clientkit.result }}\`."
             echo "- Rust checks run on Windows, macOS and Linux; hosted runners do not constitute Windows device acceptance."
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."

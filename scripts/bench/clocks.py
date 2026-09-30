@@ -21,12 +21,19 @@ continues across sleep and `CLOCK_UPTIME_RAW` does not; on Linux the roles are
 carried by `CLOCK_BOOTTIME` and `CLOCK_MONOTONIC`.  Resolution is by semantics,
 never by name, and the resolved names are recorded in the baseline document so
 a later reader can tell which clock produced a number.
+
+Windows has no `clock_gettime`.  There the continuous clock is interrupt time
+(`QueryInterruptTimePrecise`, which advances through sleep) and the awake-work
+clock is unbiased interrupt time (`QueryUnbiasedInterruptTimePrecise`, which
+does not); `windows_host` reads both, and the document names them the same way.
 """
 
 from __future__ import annotations
 
 import datetime
 import time
+
+from . import windows_host
 
 # (attribute name, ...) in preference order.  The first attribute that this
 # interpreter actually exposes wins; the harness fails closed if none does,
@@ -51,6 +58,8 @@ def _resolve(candidates: tuple[str, ...], role: str) -> str:
 
 
 def _continuous_name() -> str:
+    if windows_host.IS_WINDOWS:
+        return windows_host.CONTINUOUS_CLOCK
     # Darwin exposes no CLOCK_BOOTTIME; its CLOCK_MONOTONIC is the continuous
     # clock.  Linux exposes both, and there CLOCK_MONOTONIC is the awake-work
     # clock, so CLOCK_BOOTTIME must be preferred.
@@ -58,18 +67,24 @@ def _continuous_name() -> str:
 
 
 def _awake_name() -> str:
+    if windows_host.IS_WINDOWS:
+        return windows_host.AWAKE_CLOCK
     return _resolve(_AWAKE_CANDIDATES, "awake-work")
 
 
 def elapsed_seconds() -> float:
     """Continuous monotonic reading, for deadlines and timeouts only."""
 
+    if windows_host.IS_WINDOWS:
+        return windows_host.continuous_seconds()
     return time.clock_gettime(getattr(time, _continuous_name()))
 
 
 def awake_seconds() -> float:
     """Awake-work monotonic reading, for durations and throughput samples."""
 
+    if windows_host.IS_WINDOWS:
+        return windows_host.awake_seconds()
     return time.clock_gettime(getattr(time, _awake_name()))
 
 

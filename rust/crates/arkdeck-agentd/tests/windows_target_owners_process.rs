@@ -263,7 +263,7 @@ fn the_target_owners_answer_over_the_pipe_and_survive_a_restart() {
     assert!(
         first
             .seen
-            .contains(&"arkdeck-agentd owners: targets, artifacts, traceCache".to_owned()),
+            .contains(&"arkdeck-agentd owners: targets, artifacts, workspaceProjects, traceCache".to_owned()),
         "{:?}",
         first.seen
     );

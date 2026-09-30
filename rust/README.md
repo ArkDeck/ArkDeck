@@ -50,7 +50,11 @@ those two.
 Hosted CI waits for the inexpensive Rust policy job before allocating native
 hosts. `scripts/ci-workspace.py` synchronizes the exact checkout into a stable,
 job-owned source path, preserving mtimes only for identical bytes. The cache
-key includes the compiler, runner image, dependency manifests and build flags;
+key includes the compiler, runner image, dependency manifests and build flags,
+among them `CARGO_INCREMENTAL`: both native jobs set it to `0`, because each
+compiles a target once and compiler incremental state never survives to
+another job (the 2026-09-30 analysis under TASK-XPA-002 measured 1.4 to 1.6 GB
+of it written per Windows workspace job and 4.0 GB on macOS);
 only successful protected-main runs save it, at most once per UTC day for the
 same compatibility key. Before saving, CI removes compiler incremental scratch
 state (not linked products, debug symbols or fingerprints) and records per-view
@@ -225,8 +229,9 @@ but the user and SYSTEM anything (or has no DACL) refuses the start; its access 
 never rewritten. `ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing directory of the
 user outside `%LOCALAPPDATA%\ArkDeck` (decided on file identity, never on path
 text) instead; beside the lifecycle only the
-[Target owners](#windows-target-owners-task-xpa-004) are composed over either
-root, and every input from which
+[Target owners](#windows-target-owners-task-xpa-004) and the workspace
+project owner ([Workspace provider](#workspace-provider-task-xpa-015)) are
+composed over either root, and every input from which
 the isolated macOS owner composes an owner (development HDC, USB relations,
 code-sign helper, mutation authority, App ingress, analyzer, ArkTrace, workspace
 inspector) refuses the start until its store is ported. `ARKDECK_ENDPOINT` alone
@@ -1984,6 +1989,46 @@ were seen and Swift's closed failure category classified from the diagnostic
 after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
 it with shell scripts that print the signer's prompts; no signer is launched.
 
+## Windows PTY prompt/secret exchange (TASK-XPA-011, G19)
+
+`VerifiedTool::run_pty_exchange` and its `Pty*` types build on Windows with
+the macOS signature and errors (`src/windows/pty.rs`). The verified tool is
+attached to a pseudo console (`CreatePseudoConsole`,
+`PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE`) through the tool runner's spawn:
+argv array, no shell, suspended, image proved before resume, kill-on-close
+Job, clean environment, no inherited handle. Each exact prompt is matched in
+the rendered console output and answered with its secret and CR in one write
+from a wiped buffer; a rendered secret, a repeated or out-of-order prompt, an
+early exit, the budget, the deadline and a cancellation end the exchange, and
+every path ends the Job and closes the console. Windows differences: echo is
+the child's choice and is detected (`SecretEchoDetected`) rather than cleared
+by the parent, a secret must be UTF-8 without control characters, and a
+prompt's trailing space is not matchable (the console renders it as a cursor
+move). `tests/windows_pty_exchange.rs` is a `harness = false` target whose
+fake signer is the test binary on the pseudo console; no signer is launched.
+The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-pty-exchange-run.md`.
+
+## Windows persistent device shell channel (TASK-XPA-016, G19)
+
+`DeviceShellChannel` and its answer and error types build on Windows with the
+macOS signature. The framing, the bare-token rule, the budgets and the
+outcomes stay in `src/shell_channel.rs`, shared; only the client under them
+is per platform: the macOS pseudo-terminal client keeps its code, and
+`src/windows/shell.rs` attaches `hdc` to a pseudo console through the G19
+spawn (argv array, suspended, image proved before resume, kill-on-close Job,
+clean environment with a validated overlay), because `hdc shell` refuses a
+plain pipe. Windows differences: a framed line ends with CR; the console's
+rendering is read as text (its VT control sequences are removed before the
+frame is looked for, a cursor-forward over blanks reads back as the blanks,
+lines end in CRLF), so the answer bytes are T1; the shell "comes up" only on
+rendered text; a flood is bounded by the console and ends at the timeout,
+still an unknown outcome; closing ends the client's Job, its descendants
+included. `tests/windows_shell_channel.rs` is a `harness = false` target
+whose fake `hdc -t <key> shell` is the test binary on the pseudo console; no
+HDC is launched. The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-016/windows-shell-channel-run.md`.
+
 ## HDC process dispatch (TASK-XPA-016, SPK-6)
 
 `arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
@@ -2130,6 +2175,27 @@ recorded bytes and digests and reproduces the Swift daemon's recorded
 `ARKDECK_DEV_SIGNER_THUMBPRINT` set, through the real CLI against a
 development-signed copy. The run record is
 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-006/windows-artifact-export-run.md`.
+## Windows credential store and console secret entry (TASK-XPA-011)
+
+Gate-inventory group G13's platform layer has Windows implementations in
+`arkdeck-platform` with the macOS names and answers. `KeychainItems` keeps one
+generic credential per item in this user's Credential Manager (`CredWriteW`/
+`CredReadW`/`CredDeleteW`, DPAPI-protected, `CRED_PERSIST_LOCAL_MACHINE`: per
+user, surviving logoff, never roaming) under the target name
+`ArkDeck/<access group>/<service>/<account>`, the macOS item identity; the
+account is also the user name every read checks. An absent credential is
+`Status(CREDENTIAL_NOT_FOUND)` / `Absent` / `Ok(false)` as macOS answers
+`errSecItemNotFound`; values are bounded by Credential Manager's 2560 bytes;
+`presence` has to read the blob (no attribute-only query exists) and wipes it
+in place. `read_terminal_secret` requires a console on stdin, clears echo and
+line input, reads UTF-16 with `ReadConsoleW` into a wiped buffer, and restores
+the mode on every return and, through a console control handler, on Ctrl-C.
+`tests/windows_credential_store.rs` works in a per-run fixture namespace and
+deletes every credential it may have created; `tests/windows_console_secret.rs`
+(`harness = false`) drives the reader in a child on a pseudo console and checks
+that nothing typed is rendered. The signing leaves stay macOS-only (daemon
+identity, file identity, PTY signer). The run record is
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-011/windows-credential-store-run.md`.
 
 ## HDC lifecycle executor (TASK-XPA-016, SPK-6)
 
@@ -2836,6 +2902,26 @@ none, so a signing preset is refused there as Swift refuses it without one.
 is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
 frames in order.
 
+On Windows the daemon composes the same owner over `workspace-projects`
+in its state root, created owner-only (`windows_lifecycle::Authority::compose`),
+and reads its document at start as the macOS start does: one it cannot read
+ends the start. A root is a drive path in the spelling on disk (`X:\a\b`,
+`\`-separated, no `.`/`..`, verbatim, stream or device syntax); no component
+may be a link or junction (the ancestry walk macOS makes, where the standard
+library reports a junction as a link); it is opened without following its last
+component (`arkdeck_platform::InspectedDirectory`), must be named by the system
+with exactly that spelling (so another case or a short name is refused), and is
+pinned by the volume serial and the 64-bit NTFS file reference as its device
+and inode (a ReFS 128-bit id is refused). `projects.json` keeps the macOS keys
+and digests. No DevEco toolchain or credential owner, workspace composition or
+Job owner is composed there yet: a project stays `runtimeRestartRequired`, a
+symbol preset registers, a preset that pins a toolchain is refused as without
+its owner, and every project or preset update or removal is refused
+(`recordUnreadable`, no new dispatch) because nothing proves that no Job names
+it. `tests/windows_workspace_project.rs` (hoststore) and
+`tests/windows_workspace_projects_process.rs` (agentd, the real daemon and CLI)
+measure it.
+
 `arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
 reads use the Data Protection Keychain in the helpers' access group, with
 Swift's non-interactive `LAContext` created through the Objective-C runtime. A
@@ -3004,6 +3090,27 @@ envelopes, and `rust/tests/fixtures/arktrace-analysis-validator/` holds those
 envelopes (`reviewed/`, answered for `zlib.htrace` and
 `trace_small_10.systrace`), Swift's verdicts on 176 edits of them and Swift's
 reading of 49 analysis requests (`ArkTraceAnalysisValidatorOracleContractTests`).
+
+On Windows (TASK-XPA-021, decision 5) there is no ArkTrace distribution: the
+repository pins one `trace_streamer`, a macOS arm64 build
+(`Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx`), and the distribution
+contract the loader verifies is an Apple one (Developer ID signatures,
+notarization and code directory hashes; a tree digest that spells each
+file's POSIX mode). So the loader, its trust checker and the doctor probe
+stay macOS-only, and nothing is loaded on Windows, pinned or not: a Windows
+development root that names `ARKDECK_ARKTRACE_DESCRIPTOR` is refused before
+anything is opened or read. What reads nothing from the host is built there:
+the two judges of the CLI's answers and the request reader
+(`arktrace_summary.rs`, `arktrace_analysis.rs`) with the contract and JSON
+token rules they share (`arktrace_envelope.rs`), and the three recorded
+oracles above replay on Windows with Swift's verdicts. The Windows daemon
+answers the offline Trace surface as a daemon without the distribution:
+`trace.inspect` with Swift's refusal without a Trace inspector
+(`trace-inspect-unavailable`, every recorded request), `trace.cache.status`
+and `trace.cache.purge` refused without the Trace cache owner, and both
+ArkTrace analyzers unavailable (`provider_not_registered`); `cargo test -p
+arkdeck-agentd --test windows_trace_offline_process` runs them against the
+real daemon ([run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-021/windows-trace-offline-run.md)).
 
 ## Retired facade mode (TASK-XPA-017)
 
@@ -3242,3 +3349,39 @@ or provides hardware acceptance evidence. See
 [the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
 and [the SPK-11 record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md)
 for validation, the three-run Rust numbers and the remaining scope.
+
+The workload tests (`tests/workload.rs`) run one at a time: the gate reads
+process-wide counters, and libtest runs one binary's tests as threads of one
+process, so a sibling test's descriptors would count as another run's growth.
+
+### Windows transport soak
+
+On Windows the same executable soaks the named-pipe serving path: each cycle
+binds a private `\\.\pipe\arkdeck-soak-<run>` with `FILE_FLAG_FIRST_PIPE_INSTANCE`
+(so a generation that did not release every instance fails the next bind),
+serves the shared `serve_control` loop, and connects `--jobs-per-cycle` times
+with the production client, which verifies the server's image and Authenticode
+signer as the CLI does. The Job owners are macOS-only until the Job store
+reaches Windows (G01), so every exchange is a verified health handshake and a
+refused `job.list`, and the document says `workload: windows-pipe-transport/v1`
+and counts no Job. The same growth bounds apply to the Windows counters: the
+peak working set for `maxResidentSetBytes` and open handles
+(`GetProcessHandleCount`) for the descriptor fields; `workingSetBytes` and
+`privateBytes` are recorded beside them. The client pins the soak's own image,
+so run a copy signed with the host-trusted development certificate:
+
+```powershell
+New-Item -ItemType Directory $env:TEMP\soak-bin | Out-Null
+Copy-Item target\release\arkdeck-soak.exe $env:TEMP\soak-bin\
+$signed = pwsh -File scripts\windows-dev-identity.ps1 sign `
+  -Thumbprint $env:ARKDECK_DEV_SIGNER_THUMBPRINT -Path $env:TEMP\soak-bin\arkdeck-soak.exe
+$env:ARKDECK_SOAK_SIGNER_SHA256 = ($signed | ConvertFrom-Json).pin
+& $env:TEMP\soak-bin\arkdeck-soak.exe --state-directory $env:TEMP\adksoak-1 `
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+Without the pin it refuses before creating anything; the Job-store fixtures
+(`--seed-recovery`, `--measure-journal`, `--seed-artifact-bench`) are refused on
+Windows. `cargo test -p arkdeck-soak --test windows_pipe -- --ignored` runs the
+signed leg with `ARKDECK_DEV_SIGNER_THUMBPRINT` set. Enablement only: formal
+Windows measurement belongs to phase A on a quiet reference host.

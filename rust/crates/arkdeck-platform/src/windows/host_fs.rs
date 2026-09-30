@@ -380,6 +380,29 @@ pub(crate) struct Access {
     pub(crate) user: u32,
     /// Rights the DACL grants anyone else; a NULL DACL grants everything.
     pub(crate) others: u32,
+    /// The owner is the token user or one of the [`TRUSTED_PRINCIPALS`]
+    /// (the Unix "owned by this user or by root").
+    pub(crate) owner_trusted: bool,
+    /// Rights the DACL grants anyone but the token user and the
+    /// [`TRUSTED_PRINCIPALS`]: the Unix group and other bits of an entry
+    /// that may be owned by root.
+    pub(crate) untrusted: u32,
+}
+
+/// The principals that hold the Unix root's place on Windows: `SYSTEM`, the
+/// `Administrators` group and `TrustedInstaller`. What an installer puts
+/// under `Program Files` is owned and writable by these alone; they can
+/// read and replace any file anyway (backup and restore privileges), so a
+/// grant to them changes nothing a caller could rely on.
+pub(crate) const TRUSTED_PRINCIPALS: [&str; 3] = [
+    "S-1-5-18",
+    "S-1-5-32-544",
+    "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464",
+];
+
+fn trusted_principal(sid: &Sid) -> bool {
+    sid.text()
+        .is_ok_and(|text| TRUSTED_PRINCIPALS.contains(&text.as_str()))
 }
 
 impl Access {
@@ -406,15 +429,19 @@ impl Access {
             return Err(io::Error::from_raw_os_error(status as i32));
         }
         let user = user()?;
-        let owner_is_user = Sid::copy(owner)?.equals(user);
+        let owner = Sid::copy(owner)?;
+        let owner_is_user = owner.equals(user);
+        let owner_trusted = owner_is_user || trusted_principal(&owner);
         if dacl.is_null() {
             return Ok(Self {
                 owner_is_user,
                 user: FILE_ALL_ACCESS,
                 others: FILE_ALL_ACCESS,
+                owner_trusted,
+                untrusted: FILE_ALL_ACCESS,
             });
         }
-        let (mut allowed, mut denied, mut others) = (0, 0, 0);
+        let (mut allowed, mut denied, mut others, mut untrusted) = (0, 0, 0, 0);
         // SAFETY: a valid ACL returned by GetSecurityInfo.
         let count = unsafe { (*dacl).AceCount };
         for index in 0..u32::from(count) {
@@ -435,6 +462,8 @@ impl Access {
                         owner_is_user,
                         user: 0,
                         others: FILE_ALL_ACCESS,
+                        owner_trusted,
+                        untrusted: FILE_ALL_ACCESS,
                     });
                 }
             }
@@ -453,7 +482,12 @@ impl Access {
             let is_user = unsafe { EqualSid(sid.cast(), user.pointer()) } != 0;
             match (header.AceType, is_user) {
                 (ACCESS_ALLOWED_ACE_TYPE, true) => allowed |= mask & !denied,
-                (ACCESS_ALLOWED_ACE_TYPE, false) => others |= mask,
+                (ACCESS_ALLOWED_ACE_TYPE, false) => {
+                    others |= mask;
+                    if !trusted_principal(&Sid::copy(sid.cast())?) {
+                        untrusted |= mask;
+                    }
+                }
                 (_, true) => denied |= mask,
                 (_, false) => {}
             }
@@ -462,7 +496,27 @@ impl Access {
             owner_is_user,
             user: allowed,
             others,
+            owner_trusted,
+            untrusted,
         })
+    }
+    /// Unix "owned by this user or root, `mode & 0o022 == 0`": the owner is
+    /// trusted and nobody else may change the entry.
+    pub(crate) fn trusted_write_only(&self) -> bool {
+        self.owner_trusted && self.untrusted & WRITE_RIGHTS == 0
+    }
+    /// [`Self::trusted_write_only`] of a directory others may only add
+    /// entries to (the Unix sticky `/tmp`, or `/Applications`): adding an
+    /// entry never replaces, renames or removes one that exists.
+    pub(crate) fn trusted_write_only_but_add(&self) -> bool {
+        self.owner_trusted
+            && self.untrusted & WRITE_RIGHTS & !(FILE_ADD_FILE | FILE_ADD_SUBDIRECTORY) == 0
+    }
+    /// Unix "owned by this user, `mode & 0o077 == 0`" where root still reads
+    /// everything: owned by the token user and nobody but the user and the
+    /// trusted principals is granted anything.
+    pub(crate) fn owner_private(&self) -> bool {
+        self.owner_is_user && self.untrusted == 0
     }
     /// Unix `mode & 0o077 == 0`: nobody but the owner is granted anything.
     pub(crate) fn private(&self) -> bool {

@@ -580,8 +580,12 @@ fn upload(
         )),
     }
 }
-/// Off macOS no host store reads an Import source yet, so an upload is
-/// refused before any frame is sent.
+/// Off macOS an upload is refused before any frame is sent. On Windows the
+/// host store reads an Import source (`HostImportSource`, TASK-XPA-008), but
+/// the daemon's Import owner (`arkdeck-hoststore` `ImportUploadStore`) is
+/// still macOS-only: it composes the Job store's import references, the
+/// Artifact publication and read owners, and the `std::fs::Metadata`-typed
+/// `document_metadata`/`remove_document`, none of which is on Windows yet.
 #[cfg(not(target_os = "macos"))]
 fn upload(
     _: &Invocation,

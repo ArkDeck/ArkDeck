@@ -1,8 +1,8 @@
 """Minimal control-plane client used only to time round trips.
 
-The daemon speaks newline-delimited JSON over a Unix domain socket: one request
-object per line, one response object per line
-(`rust/crates/arkdeck-client/src/lib.rs`).  A session
+The daemon speaks newline-delimited JSON over a Unix domain socket, or on
+Windows over its named pipe: one request object per line, one response object
+per line (`rust/crates/arkdeck-client/src/lib.rs`).  A session
 verifies the current health contract on the same connection before any measured
 request. Every frame carries the one current version and contract identity.
 
@@ -21,7 +21,7 @@ from pathlib import Path
 import socket
 import uuid
 
-from . import clocks
+from . import clocks, windows_host
 
 _REGISTRY_PATH = Path(__file__).resolve().parents[2] / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 _REGISTRY = json.loads(_REGISTRY_PATH.read_text())
@@ -38,8 +38,11 @@ class ControlError(RuntimeError):
 class ControlClient:
     """One connection to one daemon socket."""
 
-    def __init__(self, socket_path: str, timeout_seconds: float = 30.0) -> None:
+    def __init__(self, socket_path: str, timeout_seconds: float = 30.0,
+                 expected_server_pid: int | None = None) -> None:
         self.socket_path = socket_path
+        # Windows only: the pipe server must be the daemon the harness started.
+        self.expected_server_pid = expected_server_pid
         self.timeout_seconds = timeout_seconds
         self._socket: socket.socket | None = None
         self._buffer = b""
@@ -80,6 +83,14 @@ class ControlClient:
             self.__dict__.pop("_exchange", None)
 
     def connect(self) -> None:
+        if windows_host.IS_WINDOWS and self.socket_path.startswith(windows_host.PIPE_PREFIX):
+            try:
+                self._socket = windows_host.PipeStream(
+                    self.socket_path, self.timeout_seconds, self.expected_server_pid)
+            except OSError as error:
+                raise ControlError(f"connect {self.socket_path}: {error}") from error
+            self._verified = False
+            return
         connection = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         connection.settimeout(self.timeout_seconds)
         try:
