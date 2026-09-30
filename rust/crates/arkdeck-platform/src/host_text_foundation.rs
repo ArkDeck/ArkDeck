@@ -118,7 +118,8 @@ pub(crate) fn normalize(value: &str, form: isize) -> Option<String> {
 /// Portable tables against CoreFoundation on this Mac: every scalar for the
 /// three character sets, NFC and NFD, then every composition pair, every
 /// table starter before every non-starter, and every ordered pair of
-/// non-starters. A mismatch lists the first scalars that differ.
+/// non-starters. A mismatch names the differing scalars as ranges, or the
+/// differing sequences with both normalizations.
 #[cfg(test)]
 mod parity {
     use super::*;
@@ -129,13 +130,32 @@ mod parity {
     /// A character-set membership test, portable or Foundation.
     type Predicate = fn(char) -> bool;
 
-    fn report(name: &str, mismatches: &[String], total: usize) {
-        assert!(
-            mismatches.is_empty(),
-            "{name}: {} of {total} differ from CoreFoundation; first: {:?}",
-            mismatches.len(),
-            &mismatches[..mismatches.len().min(40)]
-        );
+    fn hex(text: Option<&str>) -> String {
+        text.map_or_else(
+            || "None".to_owned(),
+            |text| {
+                text.chars()
+                    .map(|c| format!("{:04X}", c as u32))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            },
+        )
+    }
+
+    /// Scalars as `start-end` ranges.
+    fn ranges(scalars: &[u32]) -> String {
+        let mut spans: Vec<(u32, u32)> = Vec::new();
+        for &scalar in scalars {
+            match spans.last_mut() {
+                Some((_, end)) if *end + 1 == scalar => *end = scalar,
+                _ => spans.push((scalar, scalar)),
+            }
+        }
+        spans
+            .iter()
+            .map(|(start, end)| format!("{start:04X}-{end:04X}"))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 
     fn scalars() -> impl Iterator<Item = char> {
@@ -148,6 +168,30 @@ mod parity {
             .flat_map(|(start, end, _)| *start..=*end)
             .filter_map(char::from_u32)
             .collect()
+    }
+
+    /// A sequence whose NFC differs, with both answers.
+    fn nfc_mismatch(text: &str) -> Option<String> {
+        let portable = host_canonical_text(text);
+        let foundation = normalize(text, 2);
+        (portable != foundation).then(|| {
+            format!(
+                "[{}] portable [{}] foundation [{}]",
+                hex(Some(text)),
+                hex(portable.as_deref()),
+                hex(foundation.as_deref())
+            )
+        })
+    }
+
+    fn report(name: &str, mismatches: &[String], total: usize) -> Option<String> {
+        (!mismatches.is_empty()).then(|| {
+            format!(
+                "{name}: {} of {total} differ from CoreFoundation: {}",
+                mismatches.len(),
+                mismatches[..mismatches.len().min(300)].join("; ")
+            )
+        })
     }
 
     #[test]
@@ -165,13 +209,31 @@ mod parity {
                 whitespace_or_newline,
             ),
         ];
+        let mut failures = Vec::new();
         for (name, portable, foundation) in sets {
-            let mismatches: Vec<String> = scalars()
-                .filter(|scalar| portable(*scalar) != foundation(*scalar))
-                .map(|scalar| format!("U+{:04X} portable={}", scalar as u32, portable(scalar)))
-                .collect();
-            report(name, &mismatches, 0x110000 - 0x800);
+            for member in [true, false] {
+                let differing: Vec<u32> = scalars()
+                    .filter(|scalar| portable(*scalar) == member && foundation(*scalar) != member)
+                    .map(|scalar| scalar as u32)
+                    .collect();
+                if !differing.is_empty() {
+                    failures.push(format!(
+                        "{name}: {} scalars portable={member} foundation={}: {}",
+                        differing.len(),
+                        !member,
+                        ranges(&differing)
+                    ));
+                }
+            }
         }
+        assert!(
+            failures.is_empty(),
+            "{}",
+            failures.join(
+                "
+"
+            )
+        );
     }
 
     #[test]
@@ -180,15 +242,33 @@ mod parity {
         let mut nfd = Vec::new();
         for scalar in scalars() {
             let text = scalar.to_string();
-            if host_canonical_text(&text) != normalize(&text, 2) {
-                nfc.push(format!("U+{:04X}", scalar as u32));
-            }
-            if Some(canonical_decomposition(&text)) != normalize(&text, 0) {
-                nfd.push(format!("U+{:04X}", scalar as u32));
+            nfc.extend(nfc_mismatch(&text));
+            let portable = canonical_decomposition(&text);
+            let foundation = normalize(&text, 0);
+            if Some(portable.as_str()) != foundation.as_deref() {
+                nfd.push(format!(
+                    "[{}] portable [{}] foundation [{}]",
+                    hex(Some(&text)),
+                    hex(Some(&portable)),
+                    hex(foundation.as_deref())
+                ));
             }
         }
-        report("NFC of one scalar", &nfc, 0x110000 - 0x800);
-        report("NFD of one scalar", &nfd, 0x110000 - 0x800);
+        let failures: Vec<String> = [
+            report("NFC of one scalar", &nfc, 0x110000 - 0x800),
+            report("NFD of one scalar", &nfd, 0x110000 - 0x800),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+        assert!(
+            failures.is_empty(),
+            "{}",
+            failures.join(
+                "
+"
+            )
+        );
     }
 
     #[test]
@@ -203,45 +283,51 @@ mod parity {
             .collect();
         seconds.sort_unstable();
         seconds.dedup();
-        let mut mismatches = Vec::new();
+        let mut failures = Vec::new();
+        let mut pairs = Vec::new();
         let mut total = 0;
-        let mut check = |text: String| {
-            total += 1;
-            if host_canonical_text(&text) != normalize(&text, 2) {
-                mismatches.push(
-                    text.chars()
-                        .map(|c| format!("{:04X}", c as u32))
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                );
-            }
-        };
         for first in firsts.iter().filter_map(|first| char::from_u32(*first)) {
             for second in &seconds {
-                check(format!("{first}{second}"));
+                total += 1;
+                pairs.extend(nfc_mismatch(&format!("{first}{second}")));
             }
         }
+        failures.extend(report("NFC of starter + second", &pairs, total));
         // Hangul: every leading consonant with every vowel, and every LV
         // syllable with every trailing consonant, plus the out-of-range T.
+        let mut hangul = Vec::new();
+        total = 0;
         for l in 0x1100..0x1113 {
             for v in 0x1161..0x1176 {
-                check([l, v].into_iter().filter_map(char::from_u32).collect());
+                total += 1;
+                let text: String = [l, v].into_iter().filter_map(char::from_u32).collect();
+                hangul.extend(nfc_mismatch(&text));
             }
         }
         for lv in (0xAC00..0xD7A4).step_by(28) {
             for t in 0x11A7..0x11C3 {
-                check([lv, t].into_iter().filter_map(char::from_u32).collect());
+                total += 1;
+                let text: String = [lv, t].into_iter().filter_map(char::from_u32).collect();
+                hangul.extend(nfc_mismatch(&text));
             }
         }
+        failures.extend(report("NFC of Hangul jamo sequences", &hangul, total));
+        let mut reordered = Vec::new();
+        total = 0;
         for first in &marks {
             for second in &marks {
-                check(format!("a{first}{second}"));
+                total += 1;
+                reordered.extend(nfc_mismatch(&format!("a{first}{second}")));
             }
         }
-        report(
-            "NFC of composition and reordering sequences",
-            &mismatches,
-            total,
+        failures.extend(report("NFC of a + two non-starters", &reordered, total));
+        assert!(
+            failures.is_empty(),
+            "{}",
+            failures.join(
+                "
+"
+            )
         );
     }
 }

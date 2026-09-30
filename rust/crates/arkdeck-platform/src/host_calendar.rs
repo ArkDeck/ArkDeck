@@ -17,6 +17,9 @@ const GREGORIAN_START: i64 = 2_299_161;
 const DAY: i64 = 86_400;
 /// Far beyond year 9999 of either era; keeps the day arithmetic in range.
 const LIMIT: f64 = 1.0e15;
+/// Julian day 0.0, noon of 4713-01-01 BC (Julian): Foundation's calendar
+/// reads any earlier instant as this one.
+const EARLIEST: f64 = -211_845_067_200.0;
 
 fn gregorian_day(year: i64, month: i64, day: i64) -> i64 {
     let a = (14 - month) / 12;
@@ -71,10 +74,15 @@ pub(crate) fn days_in_month(year: i64, month: i64) -> i64 {
 /// Year of the era, month, day, hour, minute and second of whole seconds
 /// from the reference date.
 fn decompose(whole: f64) -> Option<(i64, i64, i64, i64, i64, i64)> {
-    if !whole.is_finite() || whole.abs() > LIMIT {
+    if !whole.is_finite() || whole > LIMIT {
         return None;
     }
-    let seconds = whole as i64;
+    // Foundation reads negative zero as the second before the reference date.
+    let seconds = if whole == 0.0 && whole.is_sign_negative() {
+        -1
+    } else {
+        whole.max(EARLIEST) as i64
+    };
     let (year, month, day) = civil(REFERENCE_DAY + seconds.div_euclid(DAY));
     let time = seconds.rem_euclid(DAY);
     let year_of_era = if year >= 1 { year } else { 1 - year };
@@ -150,8 +158,9 @@ pub fn host_gregorian_add_days(at: f64, days: i32) -> Option<f64> {
     if !at.is_finite() || days <= 0 {
         return None;
     }
-    // A UTC day is always 86,400 seconds.
-    let result = at + f64::from(days) * DAY as f64;
+    // A UTC day is always 86,400 seconds; Foundation starts no earlier than
+    // Julian day 0 and then drops the fraction.
+    let result = at.max(EARLIEST) + f64::from(days) * DAY as f64;
     if !result.is_finite() {
         return None;
     }
@@ -214,7 +223,24 @@ mod timestamp_tests {
         assert!(host_gregorian_add_days(at(9999, 12, 1), 31).is_none());
         assert!(host_gregorian_add_days(at(2026, 1, 1), 0).is_none());
         assert!(host_gregorian_timestamp(1.0e300).is_none());
-        assert!(host_gregorian_timestamp(-1.0e300).is_none());
+        // Before Julian day 0 Foundation reads Julian day 0 (4713 BC), keeping
+        // the fraction; negative zero is the second before the reference date.
+        assert_eq!(
+            host_gregorian_timestamp(-1.0e300).as_deref(),
+            Some("4713-01-01T12:00:00.000000000Z")
+        );
+        assert_eq!(
+            host_gregorian_timestamp(EARLIEST - 1_000.25).as_deref(),
+            Some("4713-01-01T12:00:00.750000000Z")
+        );
+        assert_eq!(
+            host_gregorian_add_days(EARLIEST - 1_000.25, 1),
+            Some(EARLIEST + 86_400.0)
+        );
+        assert_eq!(
+            host_gregorian_timestamp(-0.0).as_deref(),
+            Some("2000-12-31T23:59:59.000000000Z")
+        );
         // Unix epoch and a Gregorian leap day, as the Session fixtures spell them.
         assert_eq!(text(-978_307_200.0), "1970-01-01T00:00:00.000000000Z");
         assert_eq!(

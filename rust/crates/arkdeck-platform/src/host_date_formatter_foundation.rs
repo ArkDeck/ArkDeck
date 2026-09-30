@@ -168,7 +168,7 @@ mod parity {
             "{} of {} differ from Foundation; first: {:?}",
             mismatches.len(),
             values.len(),
-            &mismatches[..mismatches.len().min(40)]
+            &mismatches[..mismatches.len().min(1000)]
         );
     }
 

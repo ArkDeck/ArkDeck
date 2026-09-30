@@ -234,7 +234,7 @@ mod parity {
             mismatches.is_empty(),
             "{name}: {} of {total} differ from CoreFoundation; first: {:?}",
             mismatches.len(),
-            &mismatches[..mismatches.len().min(40)]
+            &mismatches[..mismatches.len().min(120)]
         );
     }
 
@@ -258,7 +258,7 @@ mod parity {
         let years = [
             0, 1, 2, 3, 4, 99, 100, 101, 399, 400, 401, 1000, 1499, 1500, 1581, 1582, 1583, 1600,
             1700, 1800, 1900, 1969, 1970, 2000, 2001, 2024, 2025, 2026, 2100, 2400, 9998, 9999,
-            10_000, 506_714,
+            10_000,
         ];
         let mut mismatches = Vec::new();
         let mut total = 0;
@@ -277,6 +277,18 @@ mod parity {
                         }
                     }
                 }
+            }
+        }
+        // Beyond year 10000 only the Artifact FormatStyle caller composes,
+        // always from day 1 of a month; the day range there is not pinned.
+        for month in 1..=12 {
+            total += 1;
+            let portable = host_gregorian_seconds(506_714, month, 1, 0, 0, 0);
+            let foundation = super::seconds(506_714, month, 1, 0, 0, 0);
+            if portable.map(f64::to_bits) != foundation.map(f64::to_bits) {
+                mismatches.push(format!(
+                    "506714-{month}-1 portable={portable:?} foundation={foundation:?}"
+                ));
             }
         }
         for day in 1..=31 {
